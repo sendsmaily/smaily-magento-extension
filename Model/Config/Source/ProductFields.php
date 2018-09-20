@@ -1,8 +1,8 @@
-<?xml version="1.0"?> 
-<!--
+<?php
+
 /**
  * Sendsmaily Sync
- * Export Magento newsletter subscribers to Sendsmaily
+ * Module to export Magento newsletter subscribers to Sendsmaily
  * Copyright (C) 2010 Sendsmaily
  *
  * This program is free software: you can redistribute it and/or modify
@@ -18,8 +18,23 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
--->
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
-    <module name="Magento_Smaily" setup_version="1.1.0">
-    </module>
-</config>
+
+namespace Magento\Smaily\Model\Config\Source;
+
+class ProductFields implements \Magento\Framework\Option\ArrayInterface
+{
+	// Get product fields list for Smaily
+ 	public function toOptionArray(){
+		
+		$list = [
+			['value' => 'name', 'label' => 'Product Name'],
+			['value' => 'description', 'label' => 'Product Description'],
+			['value' => 'sku', 'label' => 'SKU'],			
+			['value' => 'qty', 'label' => 'Qty'],
+			['value' => 'price', 'label' => 'Price'],
+			['value' => 'base_price', 'label' => 'Base Price']
+		];
+		
+		return $list;
+ 	}
+}

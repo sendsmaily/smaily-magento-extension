@@ -310,7 +310,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 				$reminderUpdate =  strtotime($sync_time,$currentDate);	 
 				
 				$response = $this->alertCustomer($row,$fields);
-			
 				if( @$response['message'] == 'OK' ){
 					$this->updateReminderDate($quote_id,date("Y-m-d H:i:s",$reminderUpdate));
 				}

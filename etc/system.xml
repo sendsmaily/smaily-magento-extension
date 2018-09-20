@@ -52,7 +52,7 @@
 				<field id="autoresponder_id" translate="label" type="select" sortOrder="60" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Autoresponder ID (confirmation email)</label>
                     <source_model>Magento\Smaily\Model\Config\Source\Autoresponders</source_model>
-					<comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000017234-creating-an-autoresponder" target="_blank">How to set up an autoresponder for confirmation emails?.</a>]]></comment>
+					<comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000017234-creating-an-autoresponder" target="_blank">How to set up an autoresponder for confirmation emails?.You can link to the abandoned cart in email template with the parameter abandoned_cart_url</a>]]></comment>
                 </field>	
 			</group>
 			<group id="sync" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
@@ -69,28 +69,21 @@
 			</group>
 			<group id="abandoned" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
 				<label>Abandoned cart</label>
-				<field id="ac_ar_id" translate="label" type="select" sortOrder="90" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Autoresponder ID </label>
-                    <source_model>Magento\Smaily\Model\Config\Source\Autoresponders</source_model>
-					<comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000017234-creating-an-autoresponder" target="_blank">How to set up an autoresponder for confirmation emails?.</a>]]></comment>
-                </field>
+				
 				 <field id="sync_time" translate="label" type="select" sortOrder="100" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Trigger abandoned cart automation</label>
                     <source_model>Magento\Smaily\Model\Config\Source\SyncTime</source_model>
-					<comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000017234-creating-an-autoresponder" target="_blank">How to set up an autoresponder for confirmation emails?You can link to the abandoned cart in email template with the parameter abandoned_cart_url</a>]]></comment>
+					<comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000017234-creating-an-autoresponder" target="_blank">How to set up an autoresponder for confirmation emails?</a>]]></comment>
                 </field>
 				<field id="productfields" translate="label" type="multiselect" sortOrder="110" showInDefault="1" showInWebsite="0" showInStore="0">
 						<label>Add parameters to the trigger</label>
 						<source_model>Magento\Smaily\Model\Config\Source\ProductFields</source_model>
 					<comment>Select fields you wish to send in autoresponder.You can use those parameters in the template and email subject to personalize abandoned cart reminder emails</comment>           
-				 </field>
-				 <field id="carturl" translate="label" type="text" sortOrder="120" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Cart url</label>
-                </field>
+				 </field>	
 			</group>
 			<group id="rss" translate="label" type="text" sortOrder="50" showInDefault="1" showInWebsite="0" showInStore="0">
 				<label>Product RSS feed</label>
-				<field id="feed_token" translate="label" type="text" sortOrder="130" showInDefault="1" showInWebsite="0" showInStore="0">
+				<field id="feed_token" translate="label" type="text" sortOrder="120" showInDefault="1" showInWebsite="0" showInStore="0">
 						<label>Product RSS feed token</label>
 						<comment><![CDATA[ [YOUR DOMAIN]/smaily/rss/feed/token/[TOKEN], Copy this URL into your template editor's RSS block, replace [YOUR DOMAIN] with your site url and replace [TOKEN] with token value in this field ]]></comment>
 				</field>

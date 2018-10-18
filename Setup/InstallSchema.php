@@ -1,5 +1,5 @@
 <?php
-	namespace Magento\Smaily\Setup;
+    namespace Magento\Smaily\Setup;
 
 use Magento\Framework\Setup\InstallSchemaInterface;
 use Magento\Framework\Setup\ModuleContextInterface;
@@ -21,7 +21,7 @@ public function install(SchemaSetupInterface $setup, ModuleContextInterface    $
     $columns = [
         'reminder_date' => [
             'type' => \Magento\Framework\DB\Ddl\Table::TYPE_DATETIME,
-            'nullable' => true,			
+            'nullable' => true,
             'comment' => 'Reminder Date',
         ],
 

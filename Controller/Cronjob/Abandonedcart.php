@@ -17,10 +17,8 @@ class Abandonedcart extends \Magento\Framework\App\Action\Action
         // Get Smaily Helper class
         $helperData = $objectManager->create('Magento\Smaily\Helper\Data');
 
-
         $response = $helperData->cronAbandonedcart($orders->getList());
 
         exit;
     }
-
 }

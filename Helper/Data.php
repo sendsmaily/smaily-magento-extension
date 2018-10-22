@@ -116,7 +116,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function getAutoresponders()
     {
         if (empty($_SESSION['Smaily_autoresponder'])) {
-
             $_list = $this->callApi('autoresponder', ['status' => ['ACTIVE']]);
             $list = [];
             foreach ($_list as $r) {
@@ -138,7 +137,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return Smaily api response
      */
-    public function subscribe($email, $data=[], $update = 0)
+    public function subscribe($email, $data = [], $update = 0)
     {
         $address = [
             'email'=>$email,
@@ -165,7 +164,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return Smaily api response
      */
-    public function subscribeAutoresponder($aid, $email, $data=[])
+    public function subscribeAutoresponder($aid, $email, $data = [])
     {
         $address = [
             'email'=>$email,
@@ -291,9 +290,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
             if ((!$notifyOnce && $currentDate >= $nextDate) || ($notifyOnce && empty($row['reminder_date']) ) ){
 
-                $reminderUpdate =  strtotime($sync_time,$currentDate);
+                $reminderUpdate = strtotime($sync_time, $currentDate);
 
-                $response = $this->alertCustomer($row,$fields);
+                $response = $this->alertCustomer($row, $fields);
 
                 if (@$response['message'] == 'OK') {
                     $this->updateReminderDate($quote_id, date('Y-m-d H:i:s', $reminderUpdate));
@@ -325,7 +324,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             <table class="order" style="width:-webkit-fill-available"><tr style="hover:background-color:#ddd;">
         ';
         foreach ($row['products'][0] as $field => $val) {
-            if (in_array($field,$fields) || $field == 'name' ) {
+            if (in_array($field, $fields) || $field == 'name' ) {
                  $table .= " <th style='padding: 12px 12px 12px 12px;text-align: left;
                 background-color: #4CA;color: white;'>".trim(ucfirst($field)).'</th>';
             }
@@ -336,13 +335,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         foreach ($row['products'] as $product) {
             $table .= '<tr>';
             $_product = [];
-            foreach($product as $field => $val) {
-                if (in_array($field,$fields) || $field == 'name') {
+            foreach ($product as $field => $val) {
+                if (in_array($field, $fields) || $field == 'name') {
                     $_product[$field] = $val;
-                    $table .= "<td style='padding: 12px 12px 12px 12px;text-align: left;'>".trim($val)."</td>";
+                    $table .= '<td style="padding: 12px 12px 12px 12px;text-align: left;">'.trim($val).'</td>';
                 }
             }
-            $table .= "</tr>";
+            $table .= '</tr>';
             $responderProduct[] = $_product;
         }
         $table .= '</table>';

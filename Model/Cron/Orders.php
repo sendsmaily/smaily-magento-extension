@@ -6,8 +6,8 @@ class Orders
 {
 
     // Get Abandoned cart items
-    public function getList($limit=1000){
-
+    public function getList($limit = 1000)
+    {
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $resource = $objectManager->create('\Magento\Framework\App\ResourceConnection');
         $connection = $resource->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
@@ -21,11 +21,10 @@ class Orders
             INNER JOIN `customer_entity` AS `cust_email` ON cust_email.entity_id = main_table.customer_id
             WHERE (main_table.items_count != 0) AND (main_table.is_active = 1)');
 
-        foreach($quotes as $quote){
-
+        foreach ($quotes as $quote) {
             $itemData = $connection->fetchAll('SELECT product_id, name, description, sku, qty, price, base_price, weight From `quote_item` WHERE quote_id = '.$quote['entity_id']);
 
-            if( !empty($itemData) )
+            if (!empty($itemData)) {
                 $list[] = [
                     'quote_id' => $quote['entity_id'],
                     'store_id' => $quote['store_id'],
@@ -39,6 +38,7 @@ class Orders
                     'reminder_date' => $quote['reminder_date'],
                     'products' => $itemData,
                 ];
+            }
         }
         return $list;
     }

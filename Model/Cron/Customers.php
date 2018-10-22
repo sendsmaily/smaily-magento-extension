@@ -13,49 +13,49 @@ class Customers
         \Magento\Newsletter\Model\ResourceModel\Subscriber\CollectionFactory $subcriberFactory,
         \Magento\Customer\Model\ResourceModel\Customer\CollectionFactory $customerFactory,
         \Magento\Customer\Api\CustomerRepositoryInterfaceFactory $customerRepositoryFactory
-    ){
+    ) {
         $this->subcriberFactory = $subcriberFactory;
         $this->customerFactory = $customerFactory;
         $this->customerRepository = $customerRepositoryFactory->create();
-    }  
+    }
 
     // Get Customer/Subscribers list
-    public function getList($limit=500){
-
+    public function getList($limit = 500) {
         $list = [];
         $exists_ids = [];
 
         // Load Smaily helper class
-         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $helperData = $objectManager->create('Magento\Smaily\Helper\Data');
 
         // get subscribers
         $subscribers = $this->subcriberFactory->create()->setPageSize($limit)->load();
-        foreach($subscribers as $s){
-
-            $customer_id = (int)$s->getData('customer_id');
+        foreach ($subscribers as $s) {
+            $customer_id = (int) $s->getData('customer_id');
             $customer = $customer_id ? $this->customerRepository->getById($customer_id) : false;
-             if( $customer )
+            if ($customer) {
                 $exists_ids[] = $customer_id;
+            }
 
             // get DOB
             $DOB = '';
-            if( $customer ){
-                $DOB =  $customer->getDob();
-                if( !empty($DOB) )
-                    $DOB = $DOB.' 00:00';
+            if ($customer) {
+                $DOB = $customer->getDob();
+                if (!empty($DOB)) {
+                    $DOB .= ' 00:00';
+                }
             }
             // create list
             $list[] = [
-                'email'=>$s->getData('subscriber_email'),
+                'email' => $s->getData('subscriber_email'),
                 'name' => $customer ? ucfirst($customer->getFirstname()).' '.ucfirst($customer->getLastname()) : '',
                 'subscription_type' => 'Subscriber',
-                'customer_group' =>   $customer ? $helperData->getCustomerGroupName($customer->getGroupId()) : 'Guest',
+                'customer_group' => $customer ? $helperData->getCustomerGroupName($customer->getGroupId()) : 'Guest',
                 'customer_id' => $customer_id,
                 'prefix' => $customer ? $customer->getPrefix() : '',
                 'firstname' => $customer ? ucfirst($customer->getFirstname()) : '',
-                'lastname' =>  $customer ? ucfirst($customer->getLastname()) : '',
-                'gender' =>  $customer ? ($customer->getGender() == 2 ? 'Female' : 'Male') : '',
+                'lastname' => $customer ? ucfirst($customer->getLastname()) : '',
+                'gender' => $customer ? ($customer->getGender() == 2 ? 'Female' : 'Male') : '',
                 'birthday' => $DOB,
                 'website' => '',
                 'store' => $customer ? $customer->getData('store_id') : '',
@@ -64,16 +64,14 @@ class Customers
 
         // get customers
         $customers = $this->customerFactory->create()
-            ->addAttributeToSelect("*")
+            ->addAttributeToSelect('*')
             ->addAttributeToSort('id', 'DESC')
             ->setPageSize($limit)
             ->load();
 
-        foreach($customers as $c){
-
-            $customer_id = (int)$c->getId();
-            if( !in_array($customer_id,$exists_ids) ){
-
+        foreach ($customers as $c) {
+            $customer_id = (int) $c->getId();
+            if (!in_array($customer_id, $exists_ids)) {
                 // create list
                 $list[] = [
                     'email'=>$c->getEmail(),
@@ -84,12 +82,11 @@ class Customers
                     'prefix' => $c->getPrefix(),
                     'firstname' => ucfirst($c->getFirstname()),
                     'lastname' =>  ucfirst($c->getLastname()),
-                    'gender' =>  $c->getGender() == 2 ? "Female" : "Male",
-                    'birthday' => !empty($c->getDob()) ? $c->getDob()." 00:00" : '',
+                    'gender' =>  $c->getGender() == 2 ? 'Female' : 'Male',
+                    'birthday' => !empty($c->getDob()) ? $c->getDob().' 00:00' : '',
                     'website' => '',
                     'store' => $c->getData('store_id'),
                 ];
-
             }
         }
         return $list;

@@ -114,13 +114,13 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
             $email = (string)$this->getRequest()->getPost('email');
 
             try {
-                // valiate EMail
+                // Validate EMail
                 $this->validateEmailFormat($email);
                 $this->validateGuestSubscription();
                 $this->validateEmailAvailable($email);
 
                 // Load Smaily Helper class
-                   $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+                $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
                 $helperData = $objectManager->create('Magento\Smaily\Helper\Data');
 
                 // check Smaily extension is enable
@@ -135,10 +135,15 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
                     $sm = $objectManager->create('Magento\Store\Model\StoreManagerInterface');
 
                     // get name of customer from Request
-                    $name = (string)@$this->getRequest()->getPost('name');
+                    $name = (string) @$this->getRequest()->getPost('name');
 
                     // create addtional fields array
-                    $extra = ['name'=>$name,'subscription_type' => 'Subscriber','customer_group'=>'Guest','store'=>$sm->getStore()->getStoreId()];
+                    $extra = [
+                        'name' => $name,
+                        'subscription_type' => 'Subscriber',
+                        'customer_group' => 'Guest',
+                        'store' => $sm->getStore()->getStoreId(),
+                    ];
 
                     // check customer is logged in or not
                     if ($customerSession->isLoggedIn()) {
@@ -147,8 +152,9 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
 
                         // get customer DOB
                         $dob = $cust->getDob();
-                        if (!empty($dob))
-                            $dob = $dob.' 00:00';
+                        if (!empty($dob)) {
+                            $dob .= ' 00:00';
+                        }
 
                         // get custmer data
                         $extra['customer_id'] = $cust->getId();
@@ -163,8 +169,9 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
                         $name = explode(' ', trim($name));
                         $extra['firstname'] = ucfirst($name[0]);
                         unset($name[0]);
-                        if (!empty($name))
+                        if (!empty($name)) {
                             $extra['lastname'] = ucfirst(implode(' ', $name));
+                        }
                     }
 
                     /*

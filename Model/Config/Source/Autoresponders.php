@@ -5,7 +5,7 @@ namespace Magento\Smaily\Model\Config\Source;
 class Autoresponders implements \Magento\Framework\Option\ArrayInterface
 {
     /**
-     * Get Option values for AutoResponder ID field
+     * Get Option values for AutoResponder ID field.
      *
      * @return array
      */

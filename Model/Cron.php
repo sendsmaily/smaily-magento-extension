@@ -17,7 +17,7 @@ class Cron
     public function __construct(
         LoggerInterface $logger,
         Customers $customers
-       ) {
+    ) {
 
         $this->objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $helperData = $this->objectManager->create('Magento\Smaily\Helper\Data');
@@ -30,8 +30,7 @@ class Cron
     // call cron function
     public function runCron()
     {
-        if ( $this->helperData->isEnabled() ){
-
+        if ($this->helperData->isEnabled()) {
             // import all customer to Smaily
             $response = $this->helperData->cronSubscribeAll($this->customers->getList());
 

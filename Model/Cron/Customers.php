@@ -8,7 +8,9 @@ class Customers
     protected $customerFactory;
     protected $customerRepository;
 
-    // load objects
+    /**
+     * Load objects
+     */
     public function __construct(
         \Magento\Newsletter\Model\ResourceModel\Subscriber\CollectionFactory $subcriberFactory,
         \Magento\Customer\Model\ResourceModel\Customer\CollectionFactory $customerFactory,
@@ -19,9 +21,12 @@ class Customers
         $this->customerRepository = $customerRepositoryFactory->create();
     }
 
-    // Get Customer/Subscribers list
-    public function getList($limit = 500) {
-        $list = [];
+    /**
+     * Get Customer/Subscribers list
+     */
+    public function getList()
+    {
+        $contact = [];
         $exists_ids = [];
 
         // Load Smaily helper class
@@ -29,7 +34,7 @@ class Customers
         $helperData = $objectManager->create('Magento\Smaily\Helper\Data');
 
         // get subscribers
-        $subscribers = $this->subcriberFactory->create()->setPageSize($limit)->load();
+        $subscribers = $this->subcriberFactory->create()->load();
         foreach ($subscribers as $s) {
             $customer_id = (int) $s->getData('customer_id');
             $customer = $customer_id ? $this->customerRepository->getById($customer_id) : false;
@@ -46,7 +51,7 @@ class Customers
                 }
             }
             // create list
-            $list[] = [
+            $contact[] = [
                 'email' => $s->getData('subscriber_email'),
                 'name' => $customer ? ucfirst($customer->getFirstname()).' '.ucfirst($customer->getLastname()) : '',
                 'subscription_type' => 'Subscriber',
@@ -66,14 +71,13 @@ class Customers
         $customers = $this->customerFactory->create()
             ->addAttributeToSelect('*')
             ->addAttributeToSort('id', 'DESC')
-            ->setPageSize($limit)
             ->load();
 
         foreach ($customers as $c) {
             $customer_id = (int) $c->getId();
             if (!in_array($customer_id, $exists_ids)) {
                 // create list
-                $list[] = [
+                $contact[] = [
                     'email'=>$c->getEmail(),
                     'name' => ucfirst($c->getFirstname()).' '.ucfirst($c->getLastname()),
                     'subscription_type' => 'Customer',
@@ -89,6 +93,6 @@ class Customers
                 ];
             }
         }
-        return $list;
+        return $contact;
     }
 }

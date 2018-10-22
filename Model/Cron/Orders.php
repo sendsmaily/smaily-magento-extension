@@ -6,7 +6,7 @@ class Orders
 {
 
     // Get Abandoned cart items
-    public function getList($limit = 1000)
+    public function getList()
     {
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $resource = $objectManager->create('\Magento\Framework\App\ResourceConnection');

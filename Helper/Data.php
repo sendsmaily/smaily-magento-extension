@@ -148,15 +148,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $fields = explode(',', trim($this->getGeneralConfig('fields')));
 
             foreach ($data as $field => $val) {
-                if (in_array($field, $fields) || $field === 'name') {
+                if ($field === 'name' || in_array($field, $fields, true)) {
                     $address[$field] = trim($val);
                 }
             }
         }
 
-        $response = $this->callApi('contact', $address, 'POST');
-
-        return $response;
+        return $this->callApi('contact', $address, 'POST');
     }
 
     /**
@@ -173,7 +171,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         if (!empty($data)) {
             $fields = explode(',', trim($this->getGeneralConfig('fields')));
             foreach ($data as $field => $val) {
-                if (in_array($field, $fields) || $field == 'name') {
+                if ($field === 'name' || in_array($field, $fields, true)) {
                     $address[$field] = trim($val);
                 }
             }
@@ -204,7 +202,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             ];
 
             foreach ($row as $field => $val) {
-                if (in_array($field, $fields)) {
+                if (in_array($field, $fields, true)) {
                     $_data[$field] = trim($val);
                 }
             }
@@ -253,10 +251,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $store = $storeManager->getStore()->getId();
         $transport = $transportBuilder->setTemplateIdentifier('smaily_email_template')
             ->setTemplateOptions(['area' => 'frontend', 'store' => $store])
-            ->setTemplateVars([
-                'store' => $storeManager->getStore(),
-                'data'  => $message,
-            ])
+            ->setTemplateVars(['store' => $storeManager->getStore(), 'data'  => $message])
             ->setFrom('general')
             ->addTo($_data['email'], $_data['customer_name'])
             ->getTransport();
@@ -306,7 +301,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         foreach ($row['products'] as $product) {
             $_product = [];
             foreach ($product as $field => $val) {
-                if (in_array($field, $fields) || $field == 'name') {
+                if ($field === 'name' || in_array($field, $fields, true)) {
                     $_product[$field] = $val;
                 }
             }

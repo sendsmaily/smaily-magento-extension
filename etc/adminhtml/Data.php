@@ -135,7 +135,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return Smaily api response
      */
-    public function subscribe($email, $data=[], $update = 0)
+    public function subscribe($email, $data = [], $update = 0)
     {
         $address = [
             'email' => $email,
@@ -300,87 +300,24 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
     private function alertCustomer($row, $fields)
     {
-        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-        $storeManager = $objectManager->get('\Magento\Store\Model\StoreManagerInterface');
-        $cart_url =$this->getGeneralConfig('carturl');
+        $responderProduct = [];
+
+        foreach ($row['products'] as $product) {
+            $_product = [];
+            foreach ($product as $field => $val) {
+                if (in_array($field,$fields) || $field == 'name') {
+                    $_product[$field] = $val;
+                }
+            }
+            $responderProduct[] = $_product;
+        }
 
         $_data = [
             'customer_name' => $row['customer_firstname'],
             'email' => $row['customer_email']
         ];
 
-        $table = '
-            <style>
-                .order tr:nth-child(even){background-color: #f2f2f2;}
-                .order tr:hover {background-color: #ddd;}
-            </style>
-            <table class="order" style="width:-webkit-fill-available">
-                <tr style="hover:background-color:#ddd;">
-        ';
-        foreach ($row['products'][0] as $field => $val) {
-            if (in_array($field, $fields) || $field == 'name') {
-                 $table .= ' <th style="padding: 12px 12px 12px 12px;text-align: left;
-                background-color: #4CA;color: white;">' . trim(ucfirst($field)) . '</th>';
-            }
-        }
-
-        $table .= '</tr>';
-        $responderProduct = [];
-        foreach ($row['products'] as $product) {
-            $table .= '<tr>';
-            $_product = [];
-            foreach ($product as $field => $val) {
-                if (in_array($field,$fields) || $field == 'name') {
-                    $_product[$field] = $val;
-                    $table .= '<td style="padding: 12px 12px 12px 12px;text-align: left;">' . trim($val) . '</td>';
-                }
-            }
-            $table .= '</tr>';
-            $responderProduct[] = $_product;
-        }
-        $table .= '</table>';
-
-
-        $message = "<body style='background:#F6F6F6; font-family:Verdana, Arial, Helvetica, sans-serif; font-size:12px; margin:0; padding:0;'>
-            <div style='background:#F6F6F6; font-family:Verdana, Arial, Helvetica, sans-serif; font-size:12px; margin:0; padding:0;'>
-                <table cellspacing='0' cellpadding='0' border='0' width='100%'>
-                    <tr>
-                        <td align='center' valign='top' style='padding:20px 0 20px 0'>
-                            <table bgcolor='#FFFFFF' cellspacing='0' cellpadding='10' border='0' width='' style='border:1px solid #E0E0E0;'>
-                                <tr>
-                                    <td valign='top'><a href=''><img src='/images.jpg' alt='' style='margin-bottom:10px;' border='0'/></a>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td valign='top'>
-                                        <h1 style='font-size:22px; font-weight:normal; line-height:22px; margin:0 0 11px 0;'>Hello,
-                                            ".$row['customer_firstname']."</h1>
-                                            <p style='font-size:12px; line-height:16px; margin:0;'> You have an abandoned cart at <a href=".$cart_url .">".$cart_url ."</a>.
-                                            We would be glad to help you feel comfortable</br> with our checkout process.
-                                        </p>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                      ".$table ."
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td align='center' style='text-align:left;'>
-                                        <p style='font-size:12px; margin:0;'>Thank you, <br><strong>John Doe</strong></p>
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-            </body>";
-
-        $response = 1;
-
         return  $this->autoResponderAPiEmail($_data, $responderProduct);
-        // $this->abandonedCartEmail($_data,$message);
     }
 
     /**
@@ -388,7 +325,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return api response
      */
-    public function callApi($endpoint, $data, $method = 'GET')
+    public function callApi($endpoint, $data = [], $method = 'GET')
     {
         // get smaily subdomain, username and password
         $subdomain = $this->getSubdomain();
@@ -417,7 +354,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
         // get result
         $result = json_decode(@curl_exec($ch), true);
-        $error = false;
 
         // check error
         if (curl_errno($ch)) {

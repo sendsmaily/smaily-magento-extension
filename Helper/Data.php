@@ -304,16 +304,15 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         echo 'DONE';
     }
 
-
-    private function alertCustomer($row,$fields)
+    private function alertCustomer($row, $fields)
     {
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $storeManager = $objectManager->get('\Magento\Store\Model\StoreManagerInterface');
         $cart_url =$this->getGeneralConfig('carturl');
 
         $_data = [
-            'customer_name' =>$row['customer_firstname'],
-            'email'=>$row['customer_email']
+            'customer_name' => $row['customer_firstname'],
+            'email' => $row['customer_email'],
         ];
 
         $table = '
@@ -392,7 +391,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return array
      */
-    public function callApi($endpoint, $data, $method = 'GET')
+    public function callApi($endpoint, $data = [], $method = 'GET')
     {
         // get smaily subdomain, username and password
         $subdomain = $this->getSubdomain();
@@ -400,12 +399,12 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $password = trim($this->getGeneralConfig('password'));
 
         // create api url
-        $apiUrl = 'https://'.$subdomain.'.sendsmaily.net/api/'.trim($endpoint, '/').'.php';
+        $apiUrl = "https://$subdomain.sendsmaily.net/api/$endpoint.php";
 
         // create api post data
         $data = http_build_query($data);
         if ($method === 'GET') {
-            $apiUrl = $apiUrl.'?'.$data;
+            $apiUrl = "$apiUrl?$data";
         }
 
         // curl call

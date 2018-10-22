@@ -13,12 +13,8 @@ class Cron
     protected $logger;
     protected $customers;
 
-    // load objects
-    public function __construct(
-        LoggerInterface $logger,
-        Customers $customers
-    ) {
-
+    public function __construct(LoggerInterface $logger, Customers $customers)
+    {
         $this->objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $helperData = $this->objectManager->create('Magento\Smaily\Helper\Data');
         $this->helperData = $helperData;
@@ -27,7 +23,6 @@ class Cron
         $this->customers = $customers;
     }
 
-    // call cron function
     public function runCron()
     {
         if ($this->helperData->isEnabled()) {

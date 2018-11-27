@@ -116,7 +116,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function getAutoresponders()
     {
         if (empty($_SESSION['Smaily_autoresponder'])) {
-
             $_list = $this->callApi('autoresponder', ['status' => ['ACTIVE']]);
             $list = [];
             foreach ($_list as $r) {
@@ -138,10 +137,10 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return Smaily api response
      */
-    public function subscribe($email, $data=[], $update = 0)
+    public function subscribe($email, $data = [], $update = 0)
     {
         $address = [
-            'email'=>$email,
+            'email' => $email,
             'is_unsubscribed' => $update
         ];
 
@@ -165,10 +164,10 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return Smaily api response
      */
-    public function subscribeAutoresponder($aid, $email, $data=[])
+    public function subscribeAutoresponder($aid, $email, $data = [])
     {
         $address = [
-            'email'=>$email,
+            'email' => $email,
         ];
 
         if (!empty($data)) {
@@ -180,7 +179,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             }
         }
 
-        $post  = [
+        $post = [
             'autoresponder' => $aid,
             'addresses' => [$address],
         ];
@@ -228,9 +227,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function autoResponderAPiEmail($_data, $emailProduct)
     {
         $autoRespId = $this->getGeneralConfig('ac_ar_id');
-        $prod= @$emailProduct[0];
+        $prod = @$emailProduct[0];
 
-        $address  =array(
+        $address = array(
             'email' => $_data['email'],
             'name' => $_data['customer_name'],
             'abandoned_cart_url' => $this->getGeneralConfig('carturl'),
@@ -238,12 +237,12 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $response = false;
         if (!empty($prod)) {
             foreach ($prod as $field => $val) {
-                $address['product_'.$field] = $val;
+                $address['product_' . $field] = $val;
             }
 
             $query = array(
-              'autoresponder' => $autoRespId,
-              'addresses' => array($address),
+                'autoresponder' => $autoRespId,
+                'addresses' => array($address),
             );
             $response = $this->callApi('autoresponder', $query, 'POST');
         }
@@ -254,13 +253,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     {
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $storeManager = $objectManager->get('\Magento\Store\Model\StoreManagerInterface');
-        $transportBuilder =$objectManager->get('\Magento\Framework\Mail\Template\TransportBuilder');
+        $transportBuilder = $objectManager->get('\Magento\Framework\Mail\Template\TransportBuilder');
         $store = $storeManager->getStore()->getId();
         $transport = $transportBuilder->setTemplateIdentifier('smaily_email_template')
             ->setTemplateOptions(['area' => 'frontend', 'store' => $store])
             ->setTemplateVars([
                 'store' => $storeManager->getStore(),
-                'data'  => $message,
+                'data' => $message,
             ])
             ->setFrom('general')
             ->addTo($_data['email'], $_data['customer_name'])
@@ -278,43 +277,39 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $sync_time = str_replace(':', ' ', $this->getGeneralConfig('sync_time'));
         $fields = explode(',', trim($this->getGeneralConfig('productfields')));
 
-        $currentDate = strtotime(date('Y-m-d H').':00:00');
+        $currentDate = strtotime(date('Y-m-d H') . ':00:00');
 
         $notifyOnce = false;
-
-        $data = [];
-        $messageData = [];
 
         foreach ($orders as $row) {
             $quote_id = $row['quote_id'];
             $nextDate = !empty($row['reminder_date']) ? strtotime($row['reminder_date']) : $currentDate;
 
-            if ((!$notifyOnce && $currentDate >= $nextDate) || ($notifyOnce && empty($row['reminder_date']) ) ){
+            if ((!$notifyOnce && $currentDate >= $nextDate) || ($notifyOnce && empty($row['reminder_date']))) {
+                $reminderUpdate = strtotime($sync_time, $currentDate);
 
-                $reminderUpdate =  strtotime($sync_time,$currentDate);
-
-                $response = $this->alertCustomer($row,$fields);
+                $response = $this->alertCustomer($row, $fields);
 
                 if (@$response['message'] == 'OK') {
                     $this->updateReminderDate($quote_id, date('Y-m-d H:i:s', $reminderUpdate));
                 }
 
-                echo $quote_id. ' : '.($response  ? 'Sent' : 'Error').'<br>';
+                echo $quote_id . ' : ' . ($response ? 'Sent' : 'Error') . '<br>';
             }
         }
         echo 'DONE';
     }
 
 
-    private function alertCustomer($row,$fields)
+    private function alertCustomer($row, $fields)
     {
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $storeManager = $objectManager->get('\Magento\Store\Model\StoreManagerInterface');
-        $cart_url =$this->getGeneralConfig('carturl');
+        $cart_url = $this->getGeneralConfig('carturl');
 
         $_data = [
-            'customer_name' =>$row['customer_firstname'],
-            'email'=>$row['customer_email']
+            'customer_name' => $row['customer_firstname'],
+            'email' => $row['customer_email']
         ];
 
         $table = '
@@ -325,9 +320,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             <table class="order" style="width:-webkit-fill-available"><tr style="hover:background-color:#ddd;">
         ';
         foreach ($row['products'][0] as $field => $val) {
-            if (in_array($field,$fields) || $field == 'name' ) {
-                 $table .= " <th style='padding: 12px 12px 12px 12px;text-align: left;
-                background-color: #4CA;color: white;'>".trim(ucfirst($field)).'</th>';
+            if (in_array($field, $fields) || $field == 'name') {
+                $table .= " <th style='padding: 12px 12px 12px 12px;text-align: left;
+                background-color: #4CA;color: white;'>" . trim(ucfirst($field)) . '</th>';
             }
         }
 
@@ -336,10 +331,10 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         foreach ($row['products'] as $product) {
             $table .= '<tr>';
             $_product = [];
-            foreach($product as $field => $val) {
-                if (in_array($field,$fields) || $field == 'name') {
+            foreach ($product as $field => $val) {
+                if (in_array($field, $fields) || $field == 'name') {
                     $_product[$field] = $val;
-                    $table .= "<td style='padding: 12px 12px 12px 12px;text-align: left;'>".trim($val)."</td>";
+                    $table .= "<td style='padding: 12px 12px 12px 12px;text-align: left;'>" . trim($val) . "</td>";
                 }
             }
             $table .= "</tr>";
@@ -361,15 +356,15 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                                 <tr>
                                     <td valign='top'>
                                         <h1 style='font-size:22px; font-weight:normal; line-height:22px; margin:0 0 11px 0;'>Hello,
-                                            ".$row['customer_firstname']."</h1>
-                                            <p style='font-size:12px; line-height:16px; margin:0;'> You have an abandoned cart at <a href=".$cart_url .">".$cart_url ."</a>.
+                                            " . $row['customer_firstname'] . "</h1>
+                                            <p style='font-size:12px; line-height:16px; margin:0;'> You have an abandoned cart at <a href=" . $cart_url . ">" . $cart_url . "</a>.
                                             We would be glad to help you feel comfortable</br> with our checkout process.
                                         </p>
                                     </td>
                                 </tr>
                                 <tr>
                                     <td>
-                                      ".$table ."
+                                      " . $table . "
                                     </td>
                                 </tr>
                                 <tr>
@@ -384,7 +379,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             </div>
             </body>";
 
-        return  $this->autoResponderAPiEmail($_data, $responderProduct);
+        return $this->autoResponderAPiEmail($_data, $responderProduct);
         // $this->abandonedCartEmail($_data,$message);
     }
 
@@ -401,12 +396,12 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $password = trim($this->getGeneralConfig('password'));
 
         // create api url
-        $apiUrl = 'https://'.$subdomain.'.sendsmaily.net/api/'.trim($endpoint, '/').'.php';
+        $apiUrl = 'https://' . $subdomain . '.sendsmaily.net/api/' . trim($endpoint, '/') . '.php';
 
         // create api post data
         $data = http_build_query($data);
         if ($method === 'GET') {
-            $apiUrl = $apiUrl.'?'.$data;
+            $apiUrl = $apiUrl . '?' . $data;
         }
 
         // curl call

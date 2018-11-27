@@ -5,7 +5,8 @@ namespace Magento\Smaily\Model\Config\Source;
 class ProductFields implements \Magento\Framework\Option\ArrayInterface
 {
     // Get product fields list for Smaily
-     public function toOptionArray(){
+    public function toOptionArray()
+    {
 
         $list = [
             ['value' => 'name', 'label' => 'Product Name'],
@@ -17,5 +18,5 @@ class ProductFields implements \Magento\Framework\Option\ArrayInterface
         ];
 
         return $list;
-     }
+    }
 }

@@ -5,7 +5,8 @@ namespace Magento\Smaily\Model\Config\Source;
 class Fields implements \Magento\Framework\Option\ArrayInterface
 {
     // Get Additional fields list for Smaily
-     public function toOptionArray(){
+    public function toOptionArray()
+    {
 
         $list = [
             ['value' => 'subscription_type', 'label' => 'Subscription Type'],
@@ -21,5 +22,5 @@ class Fields implements \Magento\Framework\Option\ArrayInterface
         ];
 
         return $list;
-     }
+    }
 }

@@ -5,7 +5,8 @@ namespace Magento\Smaily\Model\Config\Source;
 class SyncTime implements \Magento\Framework\Option\ArrayInterface
 {
     // Get time list for Smaily
-     public function toOptionArray(){
+    public function toOptionArray()
+    {
 
         $list = [
             ['value' => '1:hour', 'label' => '1 Hour'],
@@ -21,5 +22,5 @@ class SyncTime implements \Magento\Framework\Option\ArrayInterface
         ];
 
         return $list;
-     }
+    }
 }

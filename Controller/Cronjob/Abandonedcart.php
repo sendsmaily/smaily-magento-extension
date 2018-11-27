@@ -22,5 +22,4 @@ class Abandonedcart extends \Magento\Framework\App\Action\Action
 
         exit;
     }
-
 }

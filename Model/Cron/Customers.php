@@ -85,9 +85,9 @@ class Customers
                     'customer_id' => $customer_id,
                     'prefix' => $c->getPrefix(),
                     'firstname' => ucfirst($c->getFirstname()),
-                    'lastname' =>  ucfirst($c->getLastname()),
-                    'gender' =>  $c->getGender() == 2 ? 'Female' : 'Male',
-                    'birthday' => !empty($c->getDob()) ? $c->getDob().' 00:00' : '',
+                    'lastname' => ucfirst($c->getLastname()),
+                    'gender' => $c->getGender() == 2 ? 'Female' : 'Male',
+                    'birthday' => !empty($c->getDob()) ? $c->getDob() . ' 00:00' : '',
                     'website' => '',
                     'store' => $c->getData('store_id'),
                 ];

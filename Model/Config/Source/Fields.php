@@ -4,11 +4,7 @@ namespace Magento\Smaily\Model\Config\Source;
 
 class Fields implements \Magento\Framework\Option\ArrayInterface
 {
-    /**
-     * Get Option values for Additional field.
-     *
-     * @return array
-     */
+    // Get Additional fields list for Smaily
     public function toOptionArray()
     {
         $list = [

@@ -22,7 +22,7 @@ class Orders
             WHERE (main_table.items_count != 0) AND (main_table.is_active = 1)');
 
         foreach ($quotes as $quote) {
-            $itemData = $connection->fetchAll('SELECT product_id, name, description, sku, qty, price, base_price, weight From `quote_item` WHERE quote_id = '.$quote['entity_id']);
+            $itemData = $connection->fetchAll('SELECT product_id, name, description, sku, qty, price, base_price, weight From `quote_item` WHERE quote_id = ' . $quote['entity_id']);
 
             if (!empty($itemData)) {
                 $list[] = [

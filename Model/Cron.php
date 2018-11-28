@@ -1,5 +1,4 @@
 <?php
-
 namespace Magento\Smaily\Model;
 
 use \Psr\Log\LoggerInterface;

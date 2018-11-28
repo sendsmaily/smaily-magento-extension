@@ -140,7 +140,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function subscribe($email, $data = [], $update = 0)
     {
         $address = [
-            'email'=>$email,
+            'email' => $email,
             'is_unsubscribed' => $update
         ];
 
@@ -165,7 +165,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function subscribeAutoresponder($aid, $email, $data = [])
     {
         $address = [
-            'email'=>$email,
+            'email' => $email,
         ];
 
         if (!empty($data)) {
@@ -177,7 +177,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             }
         }
 
-        $post  = [
+        $post = [
             'autoresponder' => $aid,
             'addresses' => [$address],
         ];
@@ -221,9 +221,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function autoResponderAPiEmail($_data, $emailProduct)
     {
         $autoRespId = $this->getGeneralConfig('ac_ar_id');
-        $prod= @$emailProduct[0];
+        $prod = @$emailProduct[0];
 
-        $address  =array(
+        $address = array(
             'email' => $_data['email'],
             'name' => $_data['customer_name'],
             'abandoned_cart_url' => $this->getGeneralConfig('carturl'),
@@ -231,12 +231,12 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $response = false;
         if (!empty($prod)) {
             foreach ($prod as $field => $val) {
-                $address['product_'.$field] = $val;
+                $address['product_' . $field] = $val;
             }
 
             $query = array(
-              'autoresponder' => $autoRespId,
-              'addresses' => array($address),
+                'autoresponder' => $autoRespId,
+                'addresses' => array($address),
             );
             $response = $this->callApi('autoresponder', $query, 'POST');
         }
@@ -247,11 +247,14 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     {
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $storeManager = $objectManager->get('\Magento\Store\Model\StoreManagerInterface');
-        $transportBuilder =$objectManager->get('\Magento\Framework\Mail\Template\TransportBuilder');
+        $transportBuilder = $objectManager->get('\Magento\Framework\Mail\Template\TransportBuilder');
         $store = $storeManager->getStore()->getId();
         $transport = $transportBuilder->setTemplateIdentifier('smaily_email_template')
             ->setTemplateOptions(['area' => 'frontend', 'store' => $store])
-            ->setTemplateVars(['store' => $storeManager->getStore(), 'data'  => $message])
+            ->setTemplateVars([
+                'store' => $storeManager->getStore(),
+                'data' => $message,
+            ])
             ->setFrom('general')
             ->addTo($_data['email'], $_data['customer_name'])
             ->getTransport();
@@ -268,12 +271,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $sync_time = str_replace(':', ' ', $this->getGeneralConfig('sync_time'));
         $fields = explode(',', trim($this->getGeneralConfig('productfields')));
 
-        $currentDate = strtotime(date('Y-m-d H').':00:00');
+        $currentDate = strtotime(date('Y-m-d H') . ':00:00');
 
         $notifyOnce = false;
-
-        $data = [];
-        $messageData = [];
 
         foreach ($orders as $row) {
             $quote_id = $row['quote_id'];
@@ -288,7 +288,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                     $this->updateReminderDate($quote_id, date('Y-m-d H:i:s', $reminderUpdate));
                 }
 
-                echo $quote_id. ' : '.($response  ? 'Sent' : 'Error').'<br>';
+                echo $quote_id . ' : ' . ($response ? 'Sent' : 'Error') . '<br>';
             }
         }
         echo 'DONE';
@@ -329,7 +329,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $password = trim($this->getGeneralConfig('password'));
 
         // create api url
-        $apiUrl = "https://$subdomain.sendsmaily.net/api/$endpoint.php";
+        $apiUrl = 'https://' . $subdomain . '.sendsmaily.net/api/' . trim($endpoint, '/') . '.php';
 
         // create api post data
         $data = http_build_query($data);

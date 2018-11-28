@@ -62,19 +62,20 @@ class Feed extends \Magento\Framework\App\Action\Action
 
             // calculate discount
             if ($splcPrice < $price && $price > 0) {
-                $discount = ceil(($price-$splcPrice)/$price*100);
+                $discount = ceil(($price - $splcPrice) / $price * 100);
             }
 
-            // formate price
-            $price = $currencysymbol.number_format($price, 2, '.', ',');
-            $splcPrice = $currencysymbol.number_format($splcPrice, 2, '.', ',');
+            // format price
+            $price = $currencysymbol . number_format($price, 2, '.', ',');
+            $splcPrice = $currencysymbol . number_format($splcPrice, 2, '.', ',');
+
 
             // get product detail page url from product object
             $url = $product->getProductUrl();
             // get product image url from product object
             $image = $product->getImage();
             if (!empty($image)) {
-                $image = $baseUrl.'pub/media/catalog/product/'.ltrim($image, '/');
+                $image = $baseUrl . 'pub/media/catalog/product/' . ltrim($image, '/');
             }
 
             // get created time of product
@@ -83,8 +84,8 @@ class Feed extends \Magento\Framework\App\Action\Action
             $price_fields = '';
             if ($discount > 0) {
                 $price_fields = '
-              <smly:old_price>'.$price.'</smly:old_price>
-              <smly:discount>-'.$discount.'%</smly:discount>';
+              <smly:old_price>' . $price . '</smly:old_price>
+              <smly:discount>-' . $discount . '%</smly:discount>';
             }
 
             // Feed Item array
@@ -119,7 +120,8 @@ class Feed extends \Magento\Framework\App\Action\Action
     public function getLatestProducts($limit)
     {
         // load  product collection object
-        $productCollection = $this->objectManager->create('Magento\Catalog\Model\ResourceModel\Product\CollectionFactory');
+        $productCollection = $this->objectManager
+            ->create('Magento\Catalog\Model\ResourceModel\Product\CollectionFactory');
         $collection = $productCollection->create()
             ->addAttributeToSelect('*')                // set product fields to load
             ->addAttributeToSort('created_at', 'DESC') // set sorting

@@ -174,11 +174,7 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
                         }
                     }
 
-                    /*
-                    * Send customee data to Smaily for subscription
-                    *
-                    * @return Smaily api response
-                    */
+                    // Send customer data to Smaily for subscription
                     $response = $helperData->subscribeAutoresponder($autoresponder_id, $email, $extra);
                     if (@$response['message'] == 'OK') {
                         $this->messageManager->addSuccess(__('Thank you for your subscription !'));

@@ -1,4 +1,6 @@
 <?xml version="1.0"?>
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../Smaily/etc/email_templates.xsd">
-<template id="smaily_email_template" label="Email Form" file="myemail.phtml" type="html" module="Magento_Smaily" area="frontend"/>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="../../Smaily/etc/email_templates.xsd">
+    <template id="smaily_email_template" label="Email Form" file="myemail.phtml" type="html" module="Magento_Smaily"
+              area="frontend"/>
 </config>

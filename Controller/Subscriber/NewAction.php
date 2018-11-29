@@ -88,7 +88,7 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
     }
 
     /**
-     * Validates the format of the email address
+     * Validates the format of the email address.
      *
      * @param string $email
      * @throws \Magento\Framework\Exception\LocalizedException

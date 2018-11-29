@@ -26,12 +26,12 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return string
      */
-    public function getConfigValue($config_path, $storeId = null)
+    public function getConfigValue($configPath, $storeId = null)
     {
-        return $this->scopeConfig->getValue($config_path, ScopeInterface::SCOPE_STORE, $storeId);
+        return $this->scopeConfig->getValue($configPath, ScopeInterface::SCOPE_STORE, $storeId);
     }
 
-    private function updateReminderDate($quote_id, $reminderDate)
+    private function updateReminderDate($quoteId, $reminderDate)
     {
         if (!isset($this->connection)) {
             $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
@@ -40,7 +40,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         }
 
         $table = 'quote';
-        $sql = "Update $table Set reminder_date = '$reminderDate' where entity_id = '$quote_id'";
+        $sql = "UPDATE $table SET reminder_date = '$reminderDate' WHERE entity_id = '$quoteId'";
 
         return $this->connection->exec($sql);
     }
@@ -135,7 +135,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     /**
      * Subscribe/Import Customer to Smaily by email
      *
-     * @return Smaily api response
+     * @return array
+     *  Smaily api response
      */
     public function subscribe($email, $data = [], $update = 0)
     {
@@ -160,7 +161,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     /**
      * Get Subscribe/Import Customer to Smaily by email with AutoResponder ID
      *
-     * @return Smaily api response
+     * @return array
+     *  Smaily api response
      */
     public function subscribeAutoresponder($aid, $email, $data = [])
     {
@@ -188,7 +190,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     /**
      * Get Subsbribe/Import all Customers to Smaily by array list
      *
-     * @return Smaily api response
+     * @return array
+     *  Smaily api response
      */
     public function cronSubscribeAll($list)
     {
@@ -216,7 +219,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     /**
      * Call to Smaily email API;
      *
-     * @return success
+     * @return bool|array
+     *  Smaily api response
      */
     public function autoResponderAPiEmail($_data, $emailProduct)
     {
@@ -264,7 +268,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     /**
      * Call to Smaily Autoresponder api;
      *
-     * @return success
+     * @return void
      */
     public function cronAbandonedcart($orders)
     {

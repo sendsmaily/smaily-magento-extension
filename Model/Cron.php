@@ -29,7 +29,7 @@ class Cron
             $response = $this->helperData->cronSubscribeAll($this->customers->getList());
 
             // create log for api response.
-            $writer = new \Zend\Log\Writer\Stream(BP . '/var/log/cron.log');
+            $writer = new \Zend\Log\Writer\Stream('/var/log/cron.log');
             $logger = new \Zend\Log\Logger();
             $logger->addWriter($writer);
             $logger->info(json_encode($response));

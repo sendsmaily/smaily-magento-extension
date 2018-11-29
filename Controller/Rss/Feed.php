@@ -25,7 +25,7 @@ class Feed extends \Magento\Framework\App\Action\Action
     public function execute()
     {
         // check Smaily exenstion and valiate Token
-        if ((int) @$this->helperData->getGeneralConfig('enable') && trim($this->helperData->getGeneralConfig('feed_token')) == trim(@$this->getRequest()->getParam('token'))) {
+        if ((int)@$this->helperData->getGeneralConfig('enable') && trim($this->helperData->getGeneralConfig('feed_token')) == trim(@$this->getRequest()->getParam('token'))) {
             // call to Genenate Rss Feed function
             $this->generateRssFeed(50);
         } else {
@@ -81,40 +81,39 @@ class Feed extends \Magento\Framework\App\Action\Action
             // get created time of product
             $createTime = strtotime($product->getCreatedAt());
 
-            $price_fields = '';
+            $discount_fields = '';
             if ($discount > 0) {
-                $price_fields = '
-              <smly:old_price>' . $price . '</smly:old_price>
-              <smly:discount>-' . $discount . '%</smly:discount>';
+                $discount_fields =
+                    '<smly:old_price>' . $price . '</smly:old_price>' .
+                    '<smly:discount>-' . $discount . '%</smly:discount>';
             }
 
             // Feed Item array
-            $items[] = '<item>
-                <title>'.$product->getName().'</title>
-                <link>'.$url.'</link>
-                <guid isPermaLink="True">'.$url.'</guid>
-                <pubDate>'.date('D, d M Y H:i:s', $createTime).'</pubDate>
-                <description>'.htmlentities($product->getData('description')).'</description>
-                <enclosure url="'.$image.'" />
-                <smly:price>'.$splcPrice.'</smly:price>'.
-                $price_fields.
-            '</item>';
+            $items[] =
+                '<item>' .
+                    '<title>' . $product->getName() . '</title>' .
+                    '<link>' . $url . '</link>' .
+                    '<guid isPermaLink="True">' . $url . '</guid>' .
+                    '<pubDate>' . date('D, d M Y H:i:s', $createTime) . '</pubDate>' .
+                    '<description>' . htmlentities($product->getData('description')) . '</description>' .
+                    '<enclosure url="' . $image . '" />' .
+                    '<smly:price>' . $splcPrice . '</smly:price>' .
+                    $discount_fields .
+                '</item>';
         }
-
-        $rss = '<?xml version="1.0" encoding="utf-8"?>
-            <rss xmlns:smly="https://sendsmaily.net/schema/editor/rss.xsd" version="2.0">
-            <channel>
-                <title>'.$this->helperData->getConfigValue('general/store_information/name').'</title>
-                <link>'.$baseUrl.'</link>
-                <description>Product Feed</description>
-                <lastBuildDate>'.date('D, d M Y H:i:s').'</lastBuildDate>' .
-                implode(' ', $items) .
-            '</channel>
-        </rss>';
 
         // render created feed.
         header('Content-Type: application/xml');
-        echo $rss;
+        echo '<?xml version="1.0" encoding="utf-8"?>' . PHP_EOL .
+            '<rss xmlns:smly="https://sendsmaily.net/schema/editor/rss.xsd" version="2.0">
+                <channel>
+                    <title>' . $this->helperData->getConfigValue('general/store_information/name') . '</title>
+                    <link>' . $baseUrl . '</link>
+                    <description>Product Feed</description>
+                    <lastBuildDate>' . date('D, d M Y H:i:s') . '</lastBuildDate>' .
+                    implode('', $items) .
+                '</channel>
+            </rss>';
     }
 
     public function getLatestProducts($limit)

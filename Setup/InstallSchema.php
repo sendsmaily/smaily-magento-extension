@@ -1,4 +1,5 @@
 <?php
+
 namespace Magento\Smaily\Setup;
 
 use Magento\Framework\Setup\InstallSchemaInterface;

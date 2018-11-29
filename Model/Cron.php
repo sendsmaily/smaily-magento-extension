@@ -1,5 +1,4 @@
 <?php
-
 namespace Magento\Smaily\Model;
 
 use \Psr\Log\LoggerInterface;
@@ -13,12 +12,8 @@ class Cron
     protected $logger;
     protected $customers;
 
-    // load objects
-    public function __construct(
-        LoggerInterface $logger,
-        Customers $customers
-    ) {
-
+    public function __construct(LoggerInterface $logger, Customers $customers)
+    {
         $this->objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $helperData = $this->objectManager->create('Magento\Smaily\Helper\Data');
         $this->helperData = $helperData;
@@ -27,7 +22,6 @@ class Cron
         $this->customers = $customers;
     }
 
-    // call cron function
     public function runCron()
     {
         if ($this->helperData->isEnabled()) {
@@ -35,7 +29,7 @@ class Cron
             $response = $this->helperData->cronSubscribeAll($this->customers->getList());
 
             // create log for api response.
-            $writer = new \Zend\Log\Writer\Stream(BP . '/var/log/cron.log');
+            $writer = new \Zend\Log\Writer\Stream('/var/log/cron.log');
             $logger = new \Zend\Log\Logger();
             $logger->addWriter($writer);
             $logger->info(json_encode($response));

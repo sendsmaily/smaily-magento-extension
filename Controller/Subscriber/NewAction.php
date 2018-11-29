@@ -88,7 +88,7 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
     }
 
     /**
-     * Validates the format of the email address
+     * Validates the format of the email address.
      *
      * @param string $email
      * @throws \Magento\Framework\Exception\LocalizedException
@@ -114,7 +114,7 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
             $email = (string)$this->getRequest()->getPost('email');
 
             try {
-                // valiate EMail
+                // Validate EMail
                 $this->validateEmailFormat($email);
                 $this->validateGuestSubscription();
                 $this->validateEmailAvailable($email);
@@ -135,14 +135,14 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
                     $sm = $objectManager->create('Magento\Store\Model\StoreManagerInterface');
 
                     // get name of customer from Request
-                    $name = (string)@$this->getRequest()->getPost('name');
+                    $name = (string) @$this->getRequest()->getPost('name');
 
                     // create addtional fields array
                     $extra = [
                         'name' => $name,
                         'subscription_type' => 'Subscriber',
                         'customer_group' => 'Guest',
-                        'store' => $sm->getStore()->getStoreId()
+                        'store' => $sm->getStore()->getStoreId(),
                     ];
 
                     // check customer is logged in or not
@@ -153,7 +153,7 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
                         // get customer DOB
                         $dob = $cust->getDob();
                         if (!empty($dob)) {
-                            $dob = $dob . ' 00:00';
+                            $dob .= ' 00:00';
                         }
 
                         // get custmer data
@@ -174,11 +174,7 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
                         }
                     }
 
-                    /*
-                    * Send customee data to Smaily for subscription
-                    *
-                    * @return Smaily api response
-                    */
+                    // Send customer data to Smaily for subscription
                     $response = $helperData->subscribeAutoresponder($autoresponder_id, $email, $extra);
                     if (@$response['message'] == 'OK') {
                         $this->messageManager->addSuccess(__('Thank you for your subscription !'));

@@ -5,8 +5,12 @@ namespace Magento\Smaily\Model\Cron;
 class Orders
 {
 
-    // Get Abandoned cart items
-    public function getList($limit = 1000)
+    /**
+     * Get Abandoned cart items.
+     *
+     * @return array
+     */
+    public function getList()
     {
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $resource = $objectManager->create('\Magento\Framework\App\ResourceConnection');
@@ -14,15 +18,22 @@ class Orders
 
         $list = [];
 
-        $quotes = $connection->fetchAll('SELECT
-            `main_table`.*,(main_table.base_subtotal_with_discount * main_table.base_to_global_rate) AS `subtotal`,
-            `cust_email`.`email`
+        $quotes = $connection->fetchAll(
+            'SELECT
+                `main_table`.*,(main_table.base_subtotal_with_discount * main_table.base_to_global_rate) AS `subtotal`,
+                `cust_email`.`email`
             FROM `quote` AS `main_table`
             INNER JOIN `customer_entity` AS `cust_email` ON cust_email.entity_id = main_table.customer_id
-            WHERE (main_table.items_count != 0) AND (main_table.is_active = 1)');
+            WHERE (main_table.items_count != 0) AND (main_table.is_active = 1)'
+        );
 
         foreach ($quotes as $quote) {
-            $itemData = $connection->fetchAll('SELECT product_id, name, description, sku, qty, price, base_price, weight From `quote_item` WHERE quote_id = ' . $quote['entity_id']);
+            $itemData = $connection
+                ->fetchAll(
+                    'SELECT product_id, name, description, sku, qty, price, base_price, weight
+                    FROM `quote_item`
+                    WHERE quote_id = ' . $quote['entity_id']
+                );
 
             if (!empty($itemData)) {
                 $list[] = [
@@ -40,6 +51,7 @@ class Orders
                 ];
             }
         }
+
         return $list;
     }
 }

@@ -18,7 +18,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function isEnabled()
     {
-        return (bool)$this->getGeneralConfig('enable');
+        return (bool) $this->getGeneralConfig('enable');
     }
 
     /**
@@ -26,12 +26,12 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return string
      */
-    public function getConfigValue($config_path, $storeId = null)
+    public function getConfigValue($configPath, $storeId = null)
     {
-        return $this->scopeConfig->getValue($config_path, ScopeInterface::SCOPE_STORE, $storeId);
+        return $this->scopeConfig->getValue($configPath, ScopeInterface::SCOPE_STORE, $storeId);
     }
 
-    private function updateReminderDate($quote_id, $reminderDate)
+    private function updateReminderDate($quoteId, $reminderDate)
     {
         if (!isset($this->connection)) {
             $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
@@ -40,7 +40,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         }
 
         $table = 'quote';
-        $sql = "Update $table Set reminder_date = '$reminderDate' where entity_id = '$quote_id'";
+        $sql = "UPDATE $table SET reminder_date = '$reminderDate' WHERE entity_id = '$quoteId'";
 
         return $this->connection->exec($sql);
     }
@@ -53,16 +53,16 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function getGeneralConfig($code, $storeId = null)
     {
         $tab = 'general';
-        if (in_array($code, ['autoresponder_id'])) {
+        if ($code === 'autoresponder_id') {
             $tab = 'subscribe';
         }
-        if (in_array($code, ['fields', 'sync_period'])) {
+        if (in_array($code, ['fields', 'sync_period'], true)) {
             $tab = 'sync';
         }
-        if (in_array($code, ['ac_ar_id', 'sync_time', 'productfields', 'carturl'])) {
+        if (in_array($code, ['ac_ar_id', 'sync_time', 'productfields', 'carturl'], true)) {
             $tab = 'abandoned';
         }
-        if (in_array($code, ['feed_token'])) {
+        if ($code === 'feed_token') {
             $tab = 'rss';
         }
 
@@ -89,7 +89,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getCustomerGroupName($group_id)
     {
-        $group_id = (int)$group_id;
+        $group_id = (int) $group_id;
         $list = [];
 
         if (empty($_SESSION['Smaily_customergroups'])) {
@@ -97,12 +97,12 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $customerGroups = $objectManager->get('\Magento\Customer\Model\ResourceModel\Group\Collection');
 
             foreach ($customerGroups->toOptionArray() as $opt) {
-                $list[intval($opt['value'])] = trim($opt['label']);
+                $list[(int) $opt['value']] = trim($opt['label']);
             }
             $_SESSION['Smaily_customergroups'] = $list;
 
         } else {
-            $list = (array)$_SESSION['Smaily_customergroups'];
+            $list = (array) $_SESSION['Smaily_customergroups'];
         }
 
         return isset($list[$group_id]) ? $list[$group_id] : 'Customer';
@@ -126,7 +126,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $_SESSION['Smaily_autoresponder'] = $list;
 
         } else {
-            $list = (array)$_SESSION['Smaily_autoresponder'];
+            $list = (array) $_SESSION['Smaily_autoresponder'];
         }
 
         return $list;
@@ -135,7 +135,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     /**
      * Subscribe/Import Customer to Smaily by email
      *
-     * @return Smaily api response
+     * @return array
+     *  Smaily api response
      */
     public function subscribe($email, $data = [], $update = 0)
     {
@@ -148,21 +149,20 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $fields = explode(',', trim($this->getGeneralConfig('fields')));
 
             foreach ($data as $field => $val) {
-                if (in_array($field, $fields) || $field === 'name') {
+                if ($field === 'name' || in_array($field, $fields, true)) {
                     $address[$field] = trim($val);
                 }
             }
         }
 
-        $response = $this->callApi('contact', $address, 'POST');
-
-        return $response;
+        return $this->callApi('contact', $address, 'POST');
     }
 
     /**
      * Get Subscribe/Import Customer to Smaily by email with AutoResponder ID
      *
-     * @return Smaily api response
+     * @return array
+     *  Smaily api response
      */
     public function subscribeAutoresponder($aid, $email, $data = [])
     {
@@ -173,7 +173,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         if (!empty($data)) {
             $fields = explode(',', trim($this->getGeneralConfig('fields')));
             foreach ($data as $field => $val) {
-                if (in_array($field, $fields) || $field == 'name') {
+                if ($field === 'name' || in_array($field, $fields, true)) {
                     $address[$field] = trim($val);
                 }
             }
@@ -184,15 +184,14 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             'addresses' => [$address],
         ];
 
-        $response = $this->callApi('autoresponder', $post, 'POST');
-
-        return $response;
+        return $this->callApi('autoresponder', $post, 'POST');
     }
 
     /**
      * Get Subsbribe/Import all Customers to Smaily by array list
      *
-     * @return Smaily api response
+     * @return array
+     *  Smaily api response
      */
     public function cronSubscribeAll($list)
     {
@@ -206,7 +205,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             ];
 
             foreach ($row as $field => $val) {
-                if (in_array($field, $fields)) {
+                if (in_array($field, $fields, true)) {
                     $_data[$field] = trim($val);
                 }
             }
@@ -214,15 +213,14 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $data[] = $_data;
         }
 
-        $response = $this->callApi('contact', $data, 'POST');
-
-        return $response;
+        return $this->callApi('contact', $data, 'POST');
     }
 
     /**
      * Call to Smaily email API;
      *
-     * @return success
+     * @return bool|array
+     *  Smaily api response
      */
     public function autoResponderAPiEmail($_data, $emailProduct)
     {
@@ -270,7 +268,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     /**
      * Call to Smaily Autoresponder api;
      *
-     * @return success
+     * @return void
      */
     public function cronAbandonedcart($orders)
     {
@@ -300,87 +298,26 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         echo 'DONE';
     }
 
-
     private function alertCustomer($row, $fields)
     {
-        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-        $storeManager = $objectManager->get('\Magento\Store\Model\StoreManagerInterface');
-        $cart_url = $this->getGeneralConfig('carturl');
+        $responderProduct = [];
+
+        foreach ($row['products'] as $product) {
+            $_product = [];
+            foreach ($product as $field => $val) {
+                if ($field === 'name' || in_array($field, $fields, true)) {
+                    $_product[$field] = $val;
+                }
+            }
+            $responderProduct[] = $_product;
+        }
 
         $_data = [
             'customer_name' => $row['customer_firstname'],
-            'email' => $row['customer_email']
+            'email' => $row['customer_email'],
         ];
 
-        $table = '
-            <style>
-                .order tr:nth-child(even){background-color: #f2f2f2;}
-                .order tr:hover {background-color: #ddd;}
-            </style>
-            <table class="order" style="width:-webkit-fill-available"><tr style="hover:background-color:#ddd;">
-        ';
-        foreach ($row['products'][0] as $field => $val) {
-            if (in_array($field, $fields) || $field == 'name') {
-                $table .= " <th style='padding: 12px 12px 12px 12px;text-align: left;
-                background-color: #4CA;color: white;'>" . trim(ucfirst($field)) . '</th>';
-            }
-        }
-
-        $table .= '</tr>';
-        $responderProduct = [];
-        foreach ($row['products'] as $product) {
-            $table .= '<tr>';
-            $_product = [];
-            foreach ($product as $field => $val) {
-                if (in_array($field, $fields) || $field == 'name') {
-                    $_product[$field] = $val;
-                    $table .= "<td style='padding: 12px 12px 12px 12px;text-align: left;'>" . trim($val) . "</td>";
-                }
-            }
-            $table .= "</tr>";
-            $responderProduct[] = $_product;
-        }
-        $table .= '</table>';
-
-
-        $message = "<body style='background:#F6F6F6; font-family:Verdana, Arial, Helvetica, sans-serif; font-size:12px; margin:0; padding:0;'>
-            <div style='background:#F6F6F6; font-family:Verdana, Arial, Helvetica, sans-serif; font-size:12px; margin:0; padding:0;'>
-                <table cellspacing='0' cellpadding='0' border='0' width='100%'>
-                    <tr>
-                        <td align='center' valign='top' style='padding:20px 0 20px 0'>
-                            <table bgcolor='#FFFFFF' cellspacing='0' cellpadding='10' border='0' width='' style='border:1px solid #E0E0E0;'>
-                                <tr>
-                                    <td valign='top'><a href=''><img src='/images.jpg' alt='' style='margin-bottom:10px;' border='0'/></a>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td valign='top'>
-                                        <h1 style='font-size:22px; font-weight:normal; line-height:22px; margin:0 0 11px 0;'>Hello,
-                                            " . $row['customer_firstname'] . "</h1>
-                                            <p style='font-size:12px; line-height:16px; margin:0;'> You have an abandoned cart at <a href=" . $cart_url . ">" . $cart_url . "</a>.
-                                            We would be glad to help you feel comfortable</br> with our checkout process.
-                                        </p>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                      " . $table . "
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td align='center' style='text-align:left;'>
-                                        <p style='font-size:12px; margin:0;'>Thank you, <br><strong>John Doe</strong></p>
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-            </body>";
-
         return $this->autoResponderAPiEmail($_data, $responderProduct);
-        // $this->abandonedCartEmail($_data,$message);
     }
 
     /**
@@ -388,7 +325,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return array
      */
-    public function callApi($endpoint, $data, $method = 'GET')
+    public function callApi($endpoint, $data = [], $method = 'GET')
     {
         // get smaily subdomain, username and password
         $subdomain = $this->getSubdomain();
@@ -401,7 +338,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         // create api post data
         $data = http_build_query($data);
         if ($method === 'GET') {
-            $apiUrl = $apiUrl . '?' . $data;
+            $apiUrl = "$apiUrl?$data";
         }
 
         // curl call

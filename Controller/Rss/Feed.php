@@ -3,17 +3,14 @@
 namespace Magento\Smaily\Controller\Rss;
 
 use Magento\Framework\App\Action\Context;
-use Magento\Framework\Api\SortOrder as SortOrder;
 
 class Feed extends \Magento\Framework\App\Action\Action
 {
-
     protected $helperData;
     protected $objectManager;
 
     public function __construct(Context $context)
     {
-
         // create object manager object
         $this->objectManager = \Magento\Framework\App\ObjectManager::getInstance();
 
@@ -68,9 +65,10 @@ class Feed extends \Magento\Framework\App\Action\Action
                 $discount = ceil(($price - $splcPrice) / $price * 100);
             }
 
-            // formate price
+            // format price
             $price = $currencysymbol . number_format($price, 2, '.', ',');
             $splcPrice = $currencysymbol . number_format($splcPrice, 2, '.', ',');
+
 
             // get product detail page url from product object
             $url = $product->getProductUrl();
@@ -83,40 +81,39 @@ class Feed extends \Magento\Framework\App\Action\Action
             // get created time of product
             $createTime = strtotime($product->getCreatedAt());
 
-            $price_fields = '';
+            $discount_fields = '';
             if ($discount > 0) {
-                $price_fields = '
-              <smly:old_price>' . $price . '</smly:old_price>
-              <smly:discount>-' . $discount . '%</smly:discount>';
+                $discount_fields =
+                    '<smly:old_price>' . $price . '</smly:old_price>' .
+                    '<smly:discount>-' . $discount . '%</smly:discount>';
             }
 
             // Feed Item array
-            $items[] = '<item>
-              <title>' . $product->getName() . '</title>
-              <link>' . $url . '</link>
-              <guid isPermaLink="True">' . $url . '</guid>
-              <pubDate>' . date("D, d M Y H:i:s", $createTime) . '</pubDate>
-              <description>' . htmlentities($product->getData('description')) . '</description>
-              <enclosure url="' . $image . '" />
-              <smly:price>' . $splcPrice . '</smly:price>' . $price_fields . '
-            </item>
-            ';
+            $items[] =
+                '<item>' .
+                    '<title>' . $product->getName() . '</title>' .
+                    '<link>' . $url . '</link>' .
+                    '<guid isPermaLink="True">' . $url . '</guid>' .
+                    '<pubDate>' . date('D, d M Y H:i:s', $createTime) . '</pubDate>' .
+                    '<description>' . htmlentities($product->getData('description')) . '</description>' .
+                    '<enclosure url="' . $image . '" />' .
+                    '<smly:price>' . $splcPrice . '</smly:price>' .
+                    $discount_fields .
+                '</item>';
         }
-
-        $rss = '<?xml version="1.0" encoding="utf-8"?>' .
-            '<rss xmlns:smly="https://sendsmaily.net/schema/editor/rss.xsd" version="2.0">' .
-            '<channel>' .
-                '<title>' . $this->helperData->getConfigValue('general/store_information/name') . '</title>' .
-                '<link>' . $baseUrl . '</link>' .
-                '<description>Product Feed</description>' .
-                '<lastBuildDate>' . date('D, d M Y H:i:s') . '</lastBuildDate>';
-        $rss .= implode(' ', $items);
-
-        $rss .= '</channel></rss>';
 
         // render created feed.
         header('Content-Type: application/xml');
-        echo $rss;
+        echo '<?xml version="1.0" encoding="utf-8"?>' . PHP_EOL .
+            '<rss xmlns:smly="https://sendsmaily.net/schema/editor/rss.xsd" version="2.0">
+                <channel>
+                    <title>' . $this->helperData->getConfigValue('general/store_information/name') . '</title>
+                    <link>' . $baseUrl . '</link>
+                    <description>Product Feed</description>
+                    <lastBuildDate>' . date('D, d M Y H:i:s') . '</lastBuildDate>' .
+                    implode('', $items) .
+                '</channel>
+            </rss>';
     }
 
     public function getLatestProducts($limit)
@@ -125,9 +122,9 @@ class Feed extends \Magento\Framework\App\Action\Action
         $productCollection = $this->objectManager
             ->create('Magento\Catalog\Model\ResourceModel\Product\CollectionFactory');
         $collection = $productCollection->create()
-            ->addAttributeToSelect('*')// set product fields to load
-            ->addAttributeToSort('created_at', 'DESC')// set sorting
-            ->setPageSize($limit)// set limit
+            ->addAttributeToSelect('*')                // set product fields to load
+            ->addAttributeToSort('created_at', 'DESC') // set sorting
+            ->setPageSize($limit)                      // set limit
             ->load();
 
         return $collection;

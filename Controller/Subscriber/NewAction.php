@@ -1,6 +1,6 @@
 <?php
 
-namespace Magento\Smaily\Controller\Subscriber;
+namespace Smaily\SmailyForMagento\Controller\Subscriber;
 
 use Magento\Customer\Api\AccountManagementInterface as CustomerAccountManagement;
 use Magento\Customer\Model\Session;
@@ -8,6 +8,7 @@ use Magento\Customer\Model\Url as CustomerUrl;
 use Magento\Framework\App\Action\Context;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Newsletter\Model\SubscriberFactory;
+use Smaily\SmailyForMagento\Helper\Data as Helper;
 
 class NewAction extends \Magento\Newsletter\Controller\Subscriber
 {
@@ -15,6 +16,7 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
      * @var CustomerAccountManagement
      */
     protected $customerAccountManagement;
+    protected $helperData;
 
     /**
      * Initialize dependencies.
@@ -32,9 +34,11 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
         Session $customerSession,
         StoreManagerInterface $storeManager,
         CustomerUrl $customerUrl,
-        CustomerAccountManagement $customerAccountManagement
+        CustomerAccountManagement $customerAccountManagement,
+        Helper $helperData
     ) {
         $this->customerAccountManagement = $customerAccountManagement;
+        $this->helperData = $helperData;
         parent::__construct(
             $context,
             $subscriberFactory,
@@ -119,20 +123,19 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
                 $this->validateGuestSubscription();
                 $this->validateEmailAvailable($email);
 
-                // Load Smaily Helper class
-                $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-                $helperData = $objectManager->create('Magento\Smaily\Helper\Data');
+                $subscriber = $this->_subscriberFactory->create()->loadByEmail($email);
+                if ($subscriber->getId()
+                    && $subscriber->getSubscriberStatus() == \Magento\Newsletter\Model\Subscriber::STATUS_SUBSCRIBED
+                ) {
+                    throw new \Magento\Framework\Exception\LocalizedException(
+                        __('This email address is already subscribed.')
+                    );
+                }
 
                 // check Smaily extension is enable
-                if ($helperData->isEnabled()) {
+                if ($this->helperData->isEnabled()) {
                     // get Autoreponder ID
-                    $autoresponder_id = $helperData->getGeneralConfig('autoresponder_id');
-
-                    // get current customer session
-                    $customerSession = $objectManager->create('Magento\Customer\Model\Session');
-
-                    // get store manager object
-                    $sm = $objectManager->create('Magento\Store\Model\StoreManagerInterface');
+                    $autoresponder_id = $this->helperData->getGeneralConfig('autoresponder_id');
 
                     // get name of customer from Request
                     $name = (string) @$this->getRequest()->getPost('name');
@@ -142,11 +145,11 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
                         'name' => $name,
                         'subscription_type' => 'Subscriber',
                         'customer_group' => 'Guest',
-                        'store' => $sm->getStore()->getStoreId(),
+                        'store' => $this->_storeManager->getStore()->getStoreId(),
                     ];
 
                     // check customer is logged in or not
-                    if ($customerSession->isLoggedIn()) {
+                    if ($this->_customerSession->isLoggedIn()) {
                         // load current customer oject
                         $cust = $customerSession->getCustomer();
 
@@ -158,7 +161,7 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
 
                         // get custmer data
                         $extra['customer_id'] = $cust->getId();
-                        $extra['customer_group'] = $helperData->getCustomerGroupName($cust->getGroupId());
+                        $extra['customer_group'] = $this->helperData->getCustomerGroupName($cust->getGroupId());
                         $extra['prefix'] = $cust->getPrefix();
                         $extra['gender'] = $cust->getGender() == 2 ? 'Female' : 'Male';
                         $extra['birthday'] = $dob;
@@ -175,7 +178,7 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
                     }
 
                     // Send customer data to Smaily for subscription
-                    $response = $helperData->subscribeAutoresponder($autoresponder_id, $email, $extra);
+                    $response = $this->helperData->subscribeAutoresponder($autoresponder_id, $email, $extra);
                     if (@$response['message'] == 'OK') {
                         $this->messageManager->addSuccess(__('Thank you for your subscription !'));
                     } else {
@@ -183,7 +186,7 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
                         throw new \Exception(@$response['message']);
                     }
                 } else {
-                    // get status of subscribed customer
+                    // If plugin not enabled use Magento NewAction code
                     $status = $this->_subscriberFactory->create()->subscribe($email);
                     if ($status == \Magento\Newsletter\Model\Subscriber::STATUS_NOT_ACTIVE) {
                         $this->messageManager->addSuccess(__('The confirmation request has been sent.'));
@@ -191,14 +194,12 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
                         $this->messageManager->addSuccess(__('Thank you for your subscription.'));
                     }
                 }
-
             } catch (\Magento\Framework\Exception\LocalizedException $e) {
                 // Throw exception if an error
                 $this->messageManager->addException(
                     $e,
                     __('There was a problem with the subscription: %1', $e->getMessage())
                 );
-
             } catch (\Exception $e) {
                 // Throw exception if an error
                 $this->messageManager->addException($e, __('Something went wrong with the subscription.'));

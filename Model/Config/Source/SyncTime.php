@@ -1,6 +1,6 @@
 <?php
 
-namespace Magento\Smaily\Model\Config\Source;
+namespace Smaily\SmailyForMagento\Model\Config\Source;
 
 class SyncTime implements \Magento\Framework\Option\ArrayInterface
 {

@@ -1,6 +1,6 @@
 <?php
 
-namespace Magento\Smaily\Helper;
+namespace Smaily\SmailyForMagento\Helper;
 
 use Magento\Store\Model\ScopeInterface;
 
@@ -91,18 +91,11 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     {
         $group_id = (int) $group_id;
         $list = [];
+        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        $customerGroups = $objectManager->get('\Magento\Customer\Model\ResourceModel\Group\Collection');
 
-        if (empty($_SESSION['Smaily_customergroups'])) {
-            $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-            $customerGroups = $objectManager->get('\Magento\Customer\Model\ResourceModel\Group\Collection');
-
-            foreach ($customerGroups->toOptionArray() as $opt) {
-                $list[(int) $opt['value']] = trim($opt['label']);
-            }
-            $_SESSION['Smaily_customergroups'] = $list;
-
-        } else {
-            $list = (array) $_SESSION['Smaily_customergroups'];
+        foreach ($customerGroups->toOptionArray() as $opt) {
+            $list[(int) $opt['value']] = trim($opt['label']);
         }
 
         return isset($list[$group_id]) ? $list[$group_id] : 'Customer';
@@ -115,18 +108,17 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getAutoresponders()
     {
-        if (empty($_SESSION['Smaily_autoresponder'])) {
-            $_list = $this->callApi('autoresponder', ['status' => ['ACTIVE']]);
-            $list = [];
-            foreach ($_list as $r) {
-                if (!empty($r['id']) && !empty($r['name'])) {
-                    $list[$r['id']] = trim($r['name']);
-                }
-            }
-            $_SESSION['Smaily_autoresponder'] = $list;
+        $_list = $this->callApi('autoresponder', ['status' => ['ACTIVE']]);
 
-        } else {
-            $list = (array) $_SESSION['Smaily_autoresponder'];
+        if ($_list === null) {
+            return array();
+        }
+
+        $list = [];
+        foreach ($_list as $r) {
+            if (!empty($r['id']) && !empty($r['name'])) {
+                $list[$r['id']] = trim($r['name']);
+            }
         }
 
         return $list;
@@ -292,10 +284,15 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                     $this->updateReminderDate($quote_id, date('Y-m-d H:i:s', $reminderUpdate));
                 }
 
-                echo $quote_id . ' : ' . ($response ? 'Sent' : 'Error') . '<br>';
+                $result = $quote_id . ' : ' . ($response ? 'Sent' : 'Error') . '<br>';
+                // create log for api response.
+                $writer = new \Zend\Log\Writer\Stream('/var/log/cronCart.log');
+                $logger = new \Zend\Log\Logger();
+                $logger->addWriter($writer);
+                $logger->info($result);
             }
         }
-        echo 'DONE';
+        $logger->info('DONE');
     }
 
     private function alertCustomer($row, $fields)

@@ -1,24 +1,32 @@
 <?php
 
-namespace Magento\Smaily\Model\Cron;
+namespace Smaily\SmailyForMagento\Model\Cron;
+
+use \Magento\Newsletter\Model\ResourceModel\Subscriber\CollectionFactory;
+use \Magento\Customer\Model\ResourceModel\Customer\CollectionFactory as CustomerFactory;
+use \Magento\Customer\Api\CustomerRepositoryInterfaceFactory;
+use Smaily\SmailyForMagento\Helper\Data as Helper;
 
 class Customers
 {
     protected $subcriberFactory;
     protected $customerFactory;
     protected $customerRepository;
+    protected $helperData;
 
     /**
      * Load objects
      */
     public function __construct(
-        \Magento\Newsletter\Model\ResourceModel\Subscriber\CollectionFactory $subcriberFactory,
-        \Magento\Customer\Model\ResourceModel\Customer\CollectionFactory $customerFactory,
-        \Magento\Customer\Api\CustomerRepositoryInterfaceFactory $customerRepositoryFactory
+        CollectionFactory $subcriberFactory,
+        CustomerFactory $customerFactory,
+        CustomerRepositoryInterfaceFactory $customerRepositoryFactory,
+        Helper $helperData
     ) {
         $this->subcriberFactory = $subcriberFactory;
         $this->customerFactory = $customerFactory;
         $this->customerRepository = $customerRepositoryFactory->create();
+        $this->helperData = $helperData;
     }
 
     /**
@@ -28,10 +36,6 @@ class Customers
     {
         $contact = [];
         $exists_ids = [];
-
-        // Load Smaily helper class
-        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-        $helperData = $objectManager->create('Magento\Smaily\Helper\Data');
 
         // get subscribers
         $subscribers = $this->subcriberFactory->create()->load();
@@ -55,7 +59,7 @@ class Customers
                 'email' => $s->getData('subscriber_email'),
                 'name' => $customer ? ucfirst($customer->getFirstname()).' '.ucfirst($customer->getLastname()) : '',
                 'subscription_type' => 'Subscriber',
-                'customer_group' => $customer ? $helperData->getCustomerGroupName($customer->getGroupId()) : 'Guest',
+                'customer_group' => $customer ? $this->helperData->getCustomerGroupName($customer->getGroupId()) : 'Guest',
                 'customer_id' => $customer_id,
                 'prefix' => $customer ? $customer->getPrefix() : '',
                 'firstname' => $customer ? ucfirst($customer->getFirstname()) : '',
@@ -63,7 +67,7 @@ class Customers
                 'gender' => $customer ? ($customer->getGender() == 2 ? 'Female' : 'Male') : '',
                 'birthday' => $DOB,
                 'website' => '',
-                'store' => $customer ? $customer->getData('store_id') : '',
+               // 'store' => $customer ? $customer->getData('store_id') : '', error no 'store_id'
             ];
         }
 
@@ -81,7 +85,7 @@ class Customers
                     'email'=>$c->getEmail(),
                     'name' => ucfirst($c->getFirstname()).' '.ucfirst($c->getLastname()),
                     'subscription_type' => 'Customer',
-                    'customer_group' => $helperData->getCustomerGroupName($c->getGroupId()),
+                    'customer_group' => $this->helperData->getCustomerGroupName($c->getGroupId()),
                     'customer_id' => $customer_id,
                     'prefix' => $c->getPrefix(),
                     'firstname' => ucfirst($c->getFirstname()),

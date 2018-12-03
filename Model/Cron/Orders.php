@@ -1,6 +1,6 @@
 <?php
 
-namespace Magento\Smaily\Model\Cron;
+namespace Smaily\SmailyForMagento\Model\Cron;
 
 class Orders
 {
@@ -51,7 +51,6 @@ class Orders
                 ];
             }
         }
-
         return $list;
     }
 }

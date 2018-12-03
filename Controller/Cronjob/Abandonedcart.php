@@ -1,21 +1,25 @@
 <?php
 
-namespace Magento\Smaily\Controller\Cronjob;
+namespace Smaily\SmailyForMagento\Controller\Cronjob;
+
+use \Magento\Framework\App\Action\Context;
+use Smaily\SmailyForMagento\Model\Cron\Orders;
+use Smaily\SmailyForMagento\Helper\Data as Helper;
 
 class Abandonedcart extends \Magento\Framework\App\Action\Action
 {
+    protected $orders;
+    protected $helper;
+
+    public function __construct(Context $context, Orders $orders, Helper $helper)
+    {
+        $this->orders = $orders;
+        $this->helper =  $helper;
+        parent::__construct($context);
+    }
 
     public function execute()
     {
-        // Get object Manager.
-        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-
-        // Get Abandoned orders for cron job.
-        $orders = $objectManager->create('Magento\Smaily\Model\Cron\Orders');
-
-        // Get Smaily Helper class.
-        $helperData = $objectManager->create('Magento\Smaily\Helper\Data');
-
-        $helperData->cronAbandonedcart($orders->getList());
+        $this->helper->cronAbandonedcart($this->orders->getList());
     }
 }

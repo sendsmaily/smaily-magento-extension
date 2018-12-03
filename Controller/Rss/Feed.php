@@ -1,37 +1,38 @@
 <?php
 
-namespace Magento\Smaily\Controller\Rss;
+namespace Smaily\SmailyForMagento\Controller\Rss;
 
 use Magento\Framework\App\Action\Context;
+use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
+use Magento\Store\Model\StoreManagerInterface;
+use Magento\Directory\Model\Currency;
+use Smaily\SmailyForMagento\Helper\Data as Helper;
 
 class Feed extends \Magento\Framework\App\Action\Action
 {
     protected $helperData;
     protected $objectManager;
+    protected $collection;
+    protected $storeManager;
+    protected $currency;
 
-    public function __construct(Context $context)
-    {
-        // create object manager object
-        $this->objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-
-        // load Smaily helper class
-        $helperData = $this->objectManager->create('Magento\Smaily\Helper\Data');
+    public function __construct(
+        Context $context,
+        Helper $helperData,
+        CollectionFactory $collection,
+        StoreManagerInterface $storeManager,
+        Currency $currency
+    ) {
         $this->helperData = $helperData;
-
-        // call parent class function
+        $this->collection = $collection;
+        $this->storeManager = $storeManager;
+        $this->currency = $currency;
         parent::__construct($context);
     }
 
     public function execute()
     {
-        // check Smaily exenstion and valiate Token
-        if ((int)@$this->helperData->getGeneralConfig('enable') && trim($this->helperData->getGeneralConfig('feed_token')) == trim(@$this->getRequest()->getParam('token'))) {
-            // call to Genenate Rss Feed function
-            $this->generateRssFeed(50);
-        } else {
-            echo 'Access Denied !';
-        }
-        exit;
+        $this->generateRssFeed(50);
     }
 
     private function generateRssFeed($limit = 50)
@@ -39,14 +40,11 @@ class Feed extends \Magento\Framework\App\Action\Action
         // Get latest products
         $products = $this->getLatestProducts($limit);
 
-        // load store manager object
-        $storeManager = $this->objectManager->get('\Magento\Store\Model\StoreManagerInterface');
-
         // get magento base url
-        $baseUrl = $storeManager->getStore()->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_WEB);
+        $baseUrl = $this->storeManager->getStore()->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_WEB);
 
         // get default curreny symbol
-        $currencysymbol = $this->objectManager->get('Magento\Directory\Model\Currency')->getCurrencySymbol();
+        $currencysymbol = $this->currency->getCurrencySymbol();
 
         $items = [];
 
@@ -66,9 +64,8 @@ class Feed extends \Magento\Framework\App\Action\Action
             }
 
             // format price
-            $price = $currencysymbol . number_format($price, 2, '.', ',');
-            $splcPrice = $currencysymbol . number_format($splcPrice, 2, '.', ',');
-
+            $price = number_format($price, 2, '.', ',') . $currencysymbol;
+            $splcPrice = number_format($splcPrice, 2, '.', ','). $currencysymbol;
 
             // get product detail page url from product object
             $url = $product->getProductUrl();
@@ -102,26 +99,25 @@ class Feed extends \Magento\Framework\App\Action\Action
                 '</item>';
         }
 
-        // render created feed.
-        header('Content-Type: application/xml');
-        echo '<?xml version="1.0" encoding="utf-8"?>' . PHP_EOL .
-            '<rss xmlns:smly="https://sendsmaily.net/schema/editor/rss.xsd" version="2.0">
-                <channel>
-                    <title>' . $this->helperData->getConfigValue('general/store_information/name') . '</title>
-                    <link>' . $baseUrl . '</link>
-                    <description>Product Feed</description>
-                    <lastBuildDate>' . date('D, d M Y H:i:s') . '</lastBuildDate>' .
-                    implode('', $items) .
-                '</channel>
-            </rss>';
+        $rss = '<?xml version="1.0" encoding="utf-8"?>' .
+        '<rss xmlns:smly="https://sendsmaily.net/schema/editor/rss.xsd" version="2.0">
+        <channel>
+         <title>' . $this->helperData->getConfigValue('general/store_information/name') . '</title>
+         <link>' . $baseUrl . '</link>
+         <description>Product Feed</description>
+         <lastBuildDate>' . date('D, d M Y H:i:s') . '</lastBuildDate>' .
+         implode('', $items) .
+        '</channel>
+        </rss>';
+
+        header('Content-Type: text/xml');
+        return $this->getResponse()->setBody($rss);
     }
 
-    public function getLatestProducts($limit)
+    protected function getLatestProducts($limit)
     {
         // load  product collection object
-        $productCollection = $this->objectManager
-            ->create('Magento\Catalog\Model\ResourceModel\Product\CollectionFactory');
-        $collection = $productCollection->create()
+        $collection = $this->collection->create()
             ->addAttributeToSelect('*')                // set product fields to load
             ->addAttributeToSort('created_at', 'DESC') // set sorting
             ->setPageSize($limit)                      // set limit

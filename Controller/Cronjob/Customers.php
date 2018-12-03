@@ -1,22 +1,26 @@
 <?php
 
-namespace Magento\Smaily\Controller\Cronjob;
+namespace Smaily\SmailyForMagento\Controller\Cronjob;
+
+use \Magento\Framework\App\Action\Context;
+use Smaily\SmailyForMagento\Model\Cron\Customers as CronCustomers;
+use Smaily\SmailyForMagento\Helper\Data as Helper;
 
 class Customers extends \Magento\Framework\App\Action\Action
 {
+    private $customers;
+    private $helper;
+
+    public function __construct(Context $context, CronCustomers $customers, Helper $helper)
+    {
+        $this->customers = $customers;
+        $this->helper = $helper;
+        parent::__construct($context);
+    }
 
     public function execute()
     {
-        // Get object Manager.
-        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-
-        // Get customers for cron job.
-        $customers = $objectManager->create('Magento\Smaily\Model\Cron\Customers');
-
-        // Get Smaily Helper class.
-        $helperData = $objectManager->create('Magento\Smaily\Helper\Data');
-
         // Export customer to Smaily.
-        $helperData->cronSubscribeAll($customers->getList());
+        $this->helper->cronSubscribeAll($this->customers->getList());
     }
 }

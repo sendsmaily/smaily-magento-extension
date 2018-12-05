@@ -20,7 +20,7 @@ class Customers extends \Magento\Framework\App\Action\Action
 
     public function execute()
     {
-        // Export customer to Smaily.
+        // Export subscribers to Smaily.
         $this->helper->cronSubscribeAll($this->customers->getList());
     }
 }

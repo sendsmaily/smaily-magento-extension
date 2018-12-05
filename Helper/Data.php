@@ -275,24 +275,22 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $quote_id = $row['quote_id'];
             $nextDate = !empty($row['reminder_date']) ? strtotime($row['reminder_date']) : $currentDate;
 
-            if ((!$notifyOnce && $currentDate >= $nextDate) || ($notifyOnce && empty($row['reminder_date']))) {
+            if ((!$notifyOnce && $currentDate >= $nextDate) || ($notifyOnce && empty($row['reminder_date'])) || true) {
                 $reminderUpdate = strtotime($sync_time, $currentDate);
 
                 $response = $this->alertCustomer($row, $fields);
-
                 if (@$response['message'] == 'OK') {
                     $this->updateReminderDate($quote_id, date('Y-m-d H:i:s', $reminderUpdate));
                 }
 
-                $result = $quote_id . ' : ' . ($response ? 'Sent' : 'Error') . '<br>';
+                $result = 'Quote id: ' . $quote_id . ' > ' . ($response ? 'Sent' : 'Error');
                 // create log for api response.
-                $writer = new \Zend\Log\Writer\Stream('/var/log/cronCart.log');
+                $writer = new \Zend\Log\Writer\Stream(BP. '/var/log/cronCart.log');
                 $logger = new \Zend\Log\Logger();
                 $logger->addWriter($writer);
                 $logger->info($result);
             }
         }
-        $logger->info('DONE');
     }
 
     private function alertCustomer($row, $fields)
@@ -313,7 +311,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             'customer_name' => $row['customer_firstname'],
             'email' => $row['customer_email'],
         ];
-
         return $this->autoResponderAPiEmail($_data, $responderProduct);
     }
 

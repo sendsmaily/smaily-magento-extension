@@ -8,26 +8,19 @@ use Magento\Framework\Setup\SchemaSetupInterface;
 
 class InstallSchema implements InstallSchemaInterface
 {
-    /**
-     * {@inheritdoc}
-     * @SuppressWarnings(PHPMD.ExcessiveMethodLength)
-     */
     public function install(SchemaSetupInterface $setup, ModuleContextInterface $context)
     {
         $installer = $setup;
         $installer->startSetup();
-        $eavTable = $installer->getTable('quote');
-        $columns = [
-            'reminder_date' => [
+        $installer->getConnection()->addColumn(
+            $installer->getTable('quote'),
+            'reminder_date',
+            array(
                 'type' => \Magento\Framework\DB\Ddl\Table::TYPE_DATETIME,
                 'nullable' => true,
-                'comment' => 'Reminder Date',
-            ],
-        ];
-        $connection = $installer->getConnection();
-        foreach ($columns as $name => $definition) {
-            $connection->addColumn($eavTable, $name, $definition);
-        }
+                'comment' => 'Reminder Date'
+            )
+        );
         $installer->endSetup();
     }
 }

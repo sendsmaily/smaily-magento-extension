@@ -37,8 +37,10 @@ class Customers
         $contact = [];
         $exists_ids = [];
 
-        // get subscribers
-        $subscribers = $this->subcriberFactory->create()->load();
+        // get only subscribers filtered by status 1 => subscribed
+        $subscribers = $this->subcriberFactory->create()
+            ->addFieldToFilter('subscriber_status', array('eq'=> 1))
+            ->load();
         foreach ($subscribers as $s) {
             $customer_id = (int) $s->getData('customer_id');
             $customer = $customer_id ? $this->customerRepository->getById($customer_id) : false;
@@ -54,8 +56,13 @@ class Customers
                     $DOB .= ' 00:00';
                 }
             }
-            // create list
-            $contact[] = [
+
+            // get fields to sync from configuration page
+            $sync_fields = $this->helperData->getGeneralConfig('fields');
+            $sync_fields = explode(',', $sync_fields);
+
+            // create list with subscriber data
+            $subscriberData = array(
                 'email' => $s->getData('subscriber_email'),
                 'name' => $customer ? ucfirst($customer->getFirstname()).' '.ucfirst($customer->getLastname()) : '',
                 'subscription_type' => 'Subscriber',
@@ -66,36 +73,16 @@ class Customers
                 'lastname' => $customer ? ucfirst($customer->getLastname()) : '',
                 'gender' => $customer ? ($customer->getGender() == 2 ? 'Female' : 'Male') : '',
                 'birthday' => $DOB,
-                'website' => '',
-               // 'store' => $customer ? $customer->getData('store_id') : '', error no 'store_id'
-            ];
-        }
+            );
 
-        // get customers
-        $customers = $this->customerFactory->create()
-            ->addAttributeToSelect('*')
-            ->addAttributeToSort('id', 'DESC')
-            ->load();
-
-        foreach ($customers as $c) {
-            $customer_id = (int) $c->getId();
-            if (!in_array($customer_id, $exists_ids)) {
-                // create list
-                $contact[] = [
-                    'email'=>$c->getEmail(),
-                    'name' => ucfirst($c->getFirstname()).' '.ucfirst($c->getLastname()),
-                    'subscription_type' => 'Customer',
-                    'customer_group' => $this->helperData->getCustomerGroupName($c->getGroupId()),
-                    'customer_id' => $customer_id,
-                    'prefix' => $c->getPrefix(),
-                    'firstname' => ucfirst($c->getFirstname()),
-                    'lastname' => ucfirst($c->getLastname()),
-                    'gender' => $c->getGender() == 2 ? 'Female' : 'Male',
-                    'birthday' => !empty($c->getDob()) ? $c->getDob() . ' 00:00' : '',
-                    'website' => '',
-                    'store' => $c->getData('store_id'),
-                ];
+            // Update values only selected in configuration page
+            $subscriber = array();
+            foreach ($subscriberData as $key => $value) {
+                if ($key === 'email' || $key === 'name' || in_array($key, $sync_fields)) {
+                    $subscriber[$key] = $value;
+                }
             }
+            $contact[] = $subscriber;
         }
         return $contact;
     }

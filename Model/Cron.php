@@ -21,7 +21,7 @@ class Cron
 
     public function runCron()
     {
-        if ($this->helperData->isEnabled()) {
+        if ($this->helperData->isCronEnabled()) {
             // import all customer to Smaily
             $response = $this->helperData->cronSubscribeAll($this->customers->getList());
             // create log for api response.

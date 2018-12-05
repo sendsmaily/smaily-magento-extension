@@ -22,6 +22,16 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
+     * Check  Smaily Cron Sync is enabled
+     *
+     * @return bool
+     */
+    public function isCronEnabled()
+    {
+        return (bool) $this->getGeneralConfig('enableCronSync');
+    }
+
+    /**
      * Get Magento main configuration by field
      *
      * @return string
@@ -56,7 +66,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         if ($code === 'autoresponder_id') {
             $tab = 'subscribe';
         }
-        if (in_array($code, ['fields', 'sync_period'], true)) {
+        if (in_array($code, ['fields', 'sync_period', 'enableCronSync'], true)) {
             $tab = 'sync';
         }
         if (in_array($code, ['ac_ar_id', 'sync_time', 'productfields', 'carturl'], true)) {

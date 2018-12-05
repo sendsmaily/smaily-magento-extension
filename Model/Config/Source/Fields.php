@@ -43,15 +43,7 @@ class Fields implements \Magento\Framework\Option\ArrayInterface
             [
                 'value' => 'birthday',
                 'label' => 'Date Of Birth',
-            ],
-            [
-                'value' => 'website',
-                'label' => 'Website',
-            ],
-            [
-                'value' => 'store',
-                'label' => 'Store',
-            ],
+            ]
         ];
 
         return $list;

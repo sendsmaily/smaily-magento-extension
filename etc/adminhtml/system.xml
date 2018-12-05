@@ -40,7 +40,7 @@
                 <field id="fields" translate="label" type="multiselect" sortOrder="70" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Syncronize additional fields</label>
                     <source_model>Smaily\SmailyForMagento\Model\Config\Source\Fields</source_model>
-                    <comment>Select fields you wish to synchronize along with subscription data</comment>
+                    <comment>Select fields you wish to synchronize along with subscription data. Subscriber Email and Name fields are automatically synchronized</comment>
                 </field>
                 <field id="sync_period" translate="label" type="text" sortOrder="80" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>How often do you want contacts syncronized?</label>

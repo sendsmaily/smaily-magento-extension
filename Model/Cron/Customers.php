@@ -3,14 +3,12 @@
 namespace Smaily\SmailyForMagento\Model\Cron;
 
 use \Magento\Newsletter\Model\ResourceModel\Subscriber\CollectionFactory;
-use \Magento\Customer\Model\ResourceModel\Customer\CollectionFactory as CustomerFactory;
 use \Magento\Customer\Api\CustomerRepositoryInterfaceFactory;
 use Smaily\SmailyForMagento\Helper\Data as Helper;
 
 class Customers
 {
     protected $subcriberFactory;
-    protected $customerFactory;
     protected $customerRepository;
     protected $helperData;
 
@@ -19,12 +17,10 @@ class Customers
      */
     public function __construct(
         CollectionFactory $subcriberFactory,
-        CustomerFactory $customerFactory,
         CustomerRepositoryInterfaceFactory $customerRepositoryFactory,
         Helper $helperData
     ) {
         $this->subcriberFactory = $subcriberFactory;
-        $this->customerFactory = $customerFactory;
         $this->customerRepository = $customerRepositoryFactory->create();
         $this->helperData = $helperData;
     }

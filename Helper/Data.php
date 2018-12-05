@@ -180,7 +180,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Get Subsbribe/Import all Customers to Smaily by array list
+     * Send newsletter subscribers to Smaily
      *
      * @return array
      *  Smaily api response
@@ -188,23 +188,21 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function cronSubscribeAll($list)
     {
         $data = [];
-        $fields = explode(',', trim($this->getGeneralConfig('fields')));
-
-        foreach ($list as $row) {
-            $_data = [
-                'email' => $row['email'],
-                'is_unsubscribed' => 0
-            ];
-
-            foreach ($row as $field => $val) {
-                if (in_array($field, $fields, true)) {
-                    $_data[$field] = trim($val);
-                }
+        // Get unsubscribers from Smaily
+        $unsubscribers = $this->getUnsubscribers();
+        // Populate unsubscribers emails array
+        $unsubscribers_emails= array();
+        foreach ($unsubscribers as $unsubscriber) {
+            if (isset($unsubscriber['email'])) {
+                $unsubscribers_emails[] = $unsubscriber['email'];
             }
-
-            $data[] = $_data;
         }
-
+        // Update only subscribers who are still subscribed
+        foreach ($list as $row) {
+            if (!in_array($row['email'], $unsubscribers_emails)) {
+                $data[] = $row;
+            }
+        }
         return $this->callApi('contact', $data, 'POST');
     }
 
@@ -314,6 +312,26 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         return $this->autoResponderAPiEmail($_data, $responderProduct);
     }
 
+    /**
+     * Get Smaily unsubscribers
+     *
+     * @return array Unsubscribers list from smaily
+     */
+    public function getUnsubscribers()
+    {
+        $data = array(
+            'list' => 2,
+        );
+        // Api call to Smaily
+        $response = $this->callApi('contact', $data);
+        // If successful return unsubscribers
+        if (isset($response)) {
+            return $response;
+        // If has errors return empty array
+        } else {
+            return array();
+        }
+    }
     /**
      * Call to Smaily API
      *

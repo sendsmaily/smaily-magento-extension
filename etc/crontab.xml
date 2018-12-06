@@ -1,8 +1,11 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Cron:etc/crontab.xsd">
     <group id="default">
-        <job name="smaily_smailyformagento_cronjob" instance="Smaily\SmailyForMagento\Model\Cron" method="runCron">
-            <config_path>smaily/sync/sync_period</config_path>
+        <job name="smaily_subscriber_sync" instance="Smaily\SmailyForMagento\Model\Cron" method="subscriberSync">
+            <config_path>crontab/default/jobs/smaily_subscriber_sync/schedule/cron_expr</config_path>
+        </job>
+        <job name="smaily_abandoned_cart" instance="Smaily\SmailyForMagento\Model\Cron" method="abandonedCartSync">
+            <schedule>* * * * *</schedule>
         </job>
     </group>
 </config>

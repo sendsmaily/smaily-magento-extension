@@ -31,6 +31,16 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         return (bool) $this->getGeneralConfig('enableCronSync');
     }
 
+        /**
+     * Check  Smaily Abandoned Cart is enabled
+     *
+     * @return bool
+     */
+    public function isAbandonedCartEnabled()
+    {
+        return (bool) $this->getGeneralConfig('enableAbandonedCart');
+    }
+
     /**
      * Get Magento main configuration by field
      *
@@ -69,7 +79,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         if (in_array($code, ['fields', 'sync_period', 'enableCronSync'], true)) {
             $tab = 'sync';
         }
-        if (in_array($code, ['ac_ar_id', 'sync_time', 'productfields', 'carturl'], true)) {
+        if (in_array($code, ['ac_ar_id', 'sync_time', 'productfields', 'carturl', 'enableAbandonedCart'], true)) {
             $tab = 'abandoned';
         }
         if ($code === 'feed_token') {
@@ -282,10 +292,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         foreach ($orders as $row) {
             $quote_id = $row['quote_id'];
             $nextDate = !empty($row['reminder_date']) ? strtotime($row['reminder_date']) : $currentDate;
-
-            if ((!$notifyOnce && $currentDate >= $nextDate) || ($notifyOnce && empty($row['reminder_date'])) || true) {
+            if ((!$notifyOnce && $currentDate >= $nextDate) || ($notifyOnce && empty($row['reminder_date']))) {
                 $reminderUpdate = strtotime($sync_time, $currentDate);
-
                 $response = $this->alertCustomer($row, $fields);
                 if (@$response['message'] == 'OK') {
                     $this->updateReminderDate($quote_id, date('Y-m-d H:i:s', $reminderUpdate));

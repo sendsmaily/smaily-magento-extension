@@ -48,6 +48,7 @@ class Orders
                     'customer_email' => $quote['customer_email'],
                     'reminder_date' => $quote['reminder_date'],
                     'products' => $itemData,
+                    'is_sent' => $quote['is_sent']
                 ];
             }
         }

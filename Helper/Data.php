@@ -51,6 +51,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         return $this->scopeConfig->getValue($configPath, ScopeInterface::SCOPE_STORE, $storeId);
     }
 
+    /**
+     * Updates remainder date of Abandoned Cart
+     *
+     * @param string $quoteId       Cart id
+     * @param string $reminderDate  time when to remind customer
+     * @return void
+     */
     private function updateReminderDate($quoteId, $reminderDate)
     {
         if (!isset($this->connection)) {
@@ -62,6 +69,24 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $table = 'quote';
         $sql = "UPDATE $table SET reminder_date = '$reminderDate' WHERE entity_id = '$quoteId'";
 
+        return $this->connection->exec($sql);
+    }
+
+    /**
+     * Updates Abandoned cart sent mail status in database
+     *
+     * @param string $quoteId Cart id
+     * @return void
+     */
+    private function updateSentStatus($quoteId)
+    {
+        if (!isset($this->connection)) {
+            $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+            $resource = $objectManager->create('\Magento\Framework\App\ResourceConnection');
+            $this->connection = $resource->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
+        }
+        $table = 'quote';
+        $sql = "UPDATE $table SET is_sent = '1' WHERE entity_id = '$quoteId'";
         return $this->connection->exec($sql);
     }
 
@@ -282,24 +307,40 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function cronAbandonedcart($orders)
     {
+        // Get sync interval and fields from settings
         $sync_time = str_replace(':', ' ', $this->getGeneralConfig('sync_time'));
         $fields = explode(',', trim($this->getGeneralConfig('productfields')));
-
-        $currentDate = strtotime(date('Y-m-d H') . ':00:00');
-
-        $notifyOnce = false;
-
+        $currentDate = strtotime(date('Y-m-d H:i') . ':00');
         foreach ($orders as $row) {
+            // Quote id
             $quote_id = $row['quote_id'];
-            $nextDate = !empty($row['reminder_date']) ? strtotime($row['reminder_date']) : $currentDate;
-            if ((!$notifyOnce && $currentDate >= $nextDate) || ($notifyOnce && empty($row['reminder_date']))) {
+            // Is email sent
+            $isSent = (int) $row['is_sent'] === 1 ? true : false;
+            // Set remainder date if not already been set
+            if (!empty($row['reminder_date'])) {
+                $nextDate = strtotime($row['reminder_date']);
+            } else {
+                $nextDate = strtotime($sync_time, $currentDate);
+                $this->updateReminderDate($quote_id, date('Y-m-d H:i:s', $nextDate));
+                continue;
+            }
+            // Send remainder mail if reminder date has passed and mail not sent
+            if ($currentDate >= $nextDate && !$isSent) {
                 $reminderUpdate = strtotime($sync_time, $currentDate);
+                // Send cart data to smaily autoresponder
                 $response = $this->alertCustomer($row, $fields);
+                // If successful log quote id else log error message
+                $result = '';
                 if (@$response['message'] == 'OK') {
-                    $this->updateReminderDate($quote_id, date('Y-m-d H:i:s', $reminderUpdate));
+                    // Update quote sent status
+                    $this->updateSentStatus($quote_id);
+                    // Log message
+                    $result = 'Quote id: ' . $quote_id . ' > ' . ($response ? 'Sent' : 'Error');
+                } else {
+                    if (array_key_exists('error', $response)) {
+                        $result = 'Quote id: ' . $quote_id . ' > ' . $response['message'];
+                    }
                 }
-
-                $result = 'Quote id: ' . $quote_id . ' > ' . ($response ? 'Sent' : 'Error');
                 // create log for api response.
                 $writer = new \Zend\Log\Writer\Stream(BP. '/var/log/cronCart.log');
                 $logger = new \Zend\Log\Logger();
@@ -361,37 +402,24 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $subdomain = $this->getSubdomain();
         $username = trim($this->getGeneralConfig('username'));
         $password = trim($this->getGeneralConfig('password'));
-
         // create api url
         $apiUrl = 'https://' . $subdomain . '.sendsmaily.net/api/' . trim($endpoint, '/') . '.php';
-
-        // create api post data
-        $data = http_build_query($data);
-        if ($method === 'GET') {
-            $apiUrl = "$apiUrl?$data";
+        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        $curl = $objectManager->create('\Magento\Framework\HTTP\Client\Curl');
+        try {
+                $data = http_build_query($data);
+            if ($method = 'GET') {
+                $apiUrl = $apiUrl . "?" . $data;
+                $curl->get($apiUrl);
+            }
+            if ($method = 'POST') {
+                $curl->setCredentials($username, $password);
+                $curl->post($apiUrl, $data);
+            }
+            $response = json_decode($curl->getBody(), true);
+        } catch (\Exception $e) {
+            $response = array('error' => true, 'message' => $e->getMessage());
         }
-
-        // curl call
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $apiUrl);
-        curl_setopt($ch, CURLOPT_HEADER, 0);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        if ($method === 'POST') {
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-        }
-        curl_setopt($ch, CURLOPT_USERPWD, "$username:$password");
-
-        // get result
-        $result = json_decode(@curl_exec($ch), true);
-
-        // check error
-        if (curl_errno($ch)) {
-            $result = ['code' => 0, 'message' => curl_error($ch)];
-        }
-
-        curl_close($ch);
-
-        return $result;
+        return $response;
     }
 }

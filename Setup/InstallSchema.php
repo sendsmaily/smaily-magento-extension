@@ -21,6 +21,16 @@ class InstallSchema implements InstallSchemaInterface
                 'comment' => 'Reminder Date'
             )
         );
+        $installer->getConnection()->addColumn(
+            $installer->getTable('quote'),
+            'is_sent',
+            array(
+                'type' => \Magento\Framework\DB\Ddl\Table::TYPE_BOOLEAN,
+                'nullable' => true,
+                'default' => 0,
+                'comment' => 'Email sent'
+            )
+        );
         $installer->endSetup();
     }
 }

@@ -66,10 +66,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $this->connection = $resource->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
         }
 
-        $table = 'quote';
-        $sql = "UPDATE $table SET reminder_date = '$reminderDate' WHERE entity_id = '$quoteId'";
-
-        return $this->connection->exec($sql);
+        $table = $this->connection->getTableName('quote');
+        $sql = "UPDATE $table SET reminder_date = :REMINDER_DATE WHERE entity_id = :QUOTE_ID";
+        $binds = array(
+            'QUOTE_ID' => $quoteId,
+            'REMINDER_DATE' => $reminderDate
+        );
+        return $this->connection->query($sql, $binds);
     }
 
     /**
@@ -85,9 +88,10 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $resource = $objectManager->create('\Magento\Framework\App\ResourceConnection');
             $this->connection = $resource->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
         }
-        $table = 'quote';
-        $sql = "UPDATE $table SET is_sent = '1' WHERE entity_id = '$quoteId'";
-        return $this->connection->exec($sql);
+        $table = $this->connection->getTableName('quote');
+        $sql = "UPDATE $table SET is_sent = '1' WHERE entity_id = :QUOTE_ID";
+        $binds = array('QUOTE_ID' => $quoteId);
+        return $this->connection->query($sql, $binds);
     }
 
     /**

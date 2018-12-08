@@ -17,12 +17,12 @@ class Frequency extends \Magento\Framework\App\Config\Value
     /**
      * @var \Magento\Framework\App\Config\ValueFactory
      */
-    protected $_configValueFactory;
+    protected $configValueFactory;
 
     /**
      * @var string
      */
-    protected $_runModelPath = '';
+    protected $runModelPath = '';
 
     /**
      * @param \Magento\Framework\Model\Context $context
@@ -46,8 +46,8 @@ class Frequency extends \Magento\Framework\App\Config\Value
         $runModelPath = '',
         array $data = []
     ) {
-        $this->_runModelPath = $runModelPath;
-        $this->_configValueFactory = $configValueFactory;
+        $this->runModelPath = $runModelPath;
+        $this->configValueFactory = $configValueFactory;
         parent::__construct($context, $registry, $config, $cacheTypeList, $resource, $resourceCollection, $data);
     }
 
@@ -73,7 +73,7 @@ class Frequency extends \Magento\Framework\App\Config\Value
         $cronExprString = join(' ', $cronExprArray);
 
         try {
-            $this->_configValueFactory->create()->load(
+            $this->configValueFactory->create()->load(
                 self::CRON_STRING_PATH,
                 'path'
             )->setValue(
@@ -81,11 +81,11 @@ class Frequency extends \Magento\Framework\App\Config\Value
             )->setPath(
                 self::CRON_STRING_PATH
             )->save();
-            $this->_configValueFactory->create()->load(
+            $this->configValueFactory->create()->load(
                 self::CRON_MODEL_PATH,
                 'path'
             )->setValue(
-                $this->_runModelPath
+                $this->runModelPath
             )->setPath(
                 self::CRON_MODEL_PATH
             )->save();

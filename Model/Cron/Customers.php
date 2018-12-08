@@ -35,7 +35,7 @@ class Customers
 
         // get only subscribers filtered by status 1 => subscribed
         $subscribers = $this->subcriberFactory->create()
-            ->addFieldToFilter('subscriber_status', array('eq'=> 1))
+            ->addFieldToFilter('subscriber_status', ['eq'=> 1])
             ->load();
         foreach ($subscribers as $s) {
             $customer_id = (int) $s->getData('customer_id');
@@ -58,7 +58,7 @@ class Customers
             $sync_fields = explode(',', $sync_fields);
 
             // create list with subscriber data
-            $subscriberData = array(
+            $subscriberData = [
                 'email' => $s->getData('subscriber_email'),
                 'name' => $customer ? ucfirst($customer->getFirstname()).' '.ucfirst($customer->getLastname()) : '',
                 'subscription_type' => 'Subscriber',
@@ -69,10 +69,10 @@ class Customers
                 'lastname' => $customer ? ucfirst($customer->getLastname()) : '',
                 'gender' => $customer ? ($customer->getGender() == 2 ? 'Female' : 'Male') : '',
                 'birthday' => $DOB,
-            );
+            ];
 
             // Update values only selected in configuration page
-            $subscriber = array();
+            $subscriber = [];
             foreach ($subscriberData as $key => $value) {
                 if ($key === 'email' || $key === 'name' || in_array($key, $sync_fields)) {
                     $subscriber[$key] = $value;

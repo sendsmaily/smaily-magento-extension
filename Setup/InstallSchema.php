@@ -15,21 +15,21 @@ class InstallSchema implements InstallSchemaInterface
         $installer->getConnection()->addColumn(
             $installer->getTable('quote'),
             'reminder_date',
-            array(
+            [
                 'type' => \Magento\Framework\DB\Ddl\Table::TYPE_DATETIME,
                 'nullable' => true,
                 'comment' => 'Reminder Date'
-            )
+            ]
         );
         $installer->getConnection()->addColumn(
             $installer->getTable('quote'),
             'is_sent',
-            array(
+            [
                 'type' => \Magento\Framework\DB\Ddl\Table::TYPE_BOOLEAN,
                 'nullable' => true,
                 'default' => 0,
                 'comment' => 'Email sent'
-            )
+            ]
         );
         $installer->endSetup();
     }

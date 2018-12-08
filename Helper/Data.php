@@ -31,7 +31,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         return (bool) $this->getGeneralConfig('enableCronSync');
     }
 
-        /**
+    /**
      * Check  Smaily Abandoned Cart is enabled
      *
      * @return bool
@@ -68,10 +68,10 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
         $table = $this->connection->getTableName('quote');
         $sql = "UPDATE $table SET reminder_date = :REMINDER_DATE WHERE entity_id = :QUOTE_ID";
-        $binds = array(
+        $binds = [
             'QUOTE_ID' => $quoteId,
             'REMINDER_DATE' => $reminderDate
-        );
+        ];
         return $this->connection->query($sql, $binds);
     }
 
@@ -90,7 +90,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         }
         $table = $this->connection->getTableName('quote');
         $sql = "UPDATE $table SET is_sent = '1' WHERE entity_id = :QUOTE_ID";
-        $binds = array('QUOTE_ID' => $quoteId);
+        $binds = ['QUOTE_ID' => $quoteId];
         return $this->connection->query($sql, $binds);
     }
 
@@ -159,8 +159,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     {
         $_list = $this->callApi('autoresponder', ['status' => ['ACTIVE']]);
 
-        if ($_list === null) {
-            return array();
+        if ($_list['error']) {
+            return [];
         }
 
         $list = [];
@@ -240,7 +240,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         // Get unsubscribers from Smaily
         $unsubscribers = $this->getUnsubscribers();
         // Populate unsubscribers emails array
-        $unsubscribers_emails= array();
+        $unsubscribers_emails= [];
         foreach ($unsubscribers as $unsubscriber) {
             if (isset($unsubscriber['email'])) {
                 $unsubscribers_emails[] = $unsubscriber['email'];
@@ -266,21 +266,21 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $autoRespId = $this->getGeneralConfig('ac_ar_id');
         $prod = @$emailProduct[0];
 
-        $address = array(
+        $address = [
             'email' => $_data['email'],
             'name' => $_data['customer_name'],
             'abandoned_cart_url' => $this->getGeneralConfig('carturl'),
-        );
+        ];
         $response = false;
         if (!empty($prod)) {
             foreach ($prod as $field => $val) {
                 $address['product_' . $field] = $val;
             }
 
-            $query = array(
+            $query = [
                 'autoresponder' => $autoRespId,
-                'addresses' => array($address),
-            );
+                'addresses' => [$address],
+            ];
             $response = $this->callApi('autoresponder', $query, 'POST');
         }
         return $response;
@@ -382,9 +382,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getUnsubscribers()
     {
-        $data = array(
+        $data = [
             'list' => 2,
-        );
+        ];
         // Api call to Smaily
         $response = $this->callApi('contact', $data);
         // If successful return unsubscribers
@@ -392,7 +392,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             return $response;
         // If has errors return empty array
         } else {
-            return array();
+            return [];
         }
     }
     /**
@@ -422,7 +422,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             }
             $response = json_decode($curl->getBody(), true);
         } catch (\Exception $e) {
-            $response = array('error' => true, 'message' => $e->getMessage());
+            $response = ['error' => true, 'message' => $e->getMessage()];
         }
         return $response;
     }

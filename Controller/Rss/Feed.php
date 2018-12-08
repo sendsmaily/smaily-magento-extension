@@ -4,6 +4,8 @@ namespace Smaily\SmailyForMagento\Controller\Rss;
 
 use Magento\Framework\App\Action\Context;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
+use Magento\Catalog\Model\ResourceModel\Category\CollectionFactory as CategoryCollectionFactory;
+use Magento\Catalog\Model\CategoryFactory;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Directory\Model\Currency;
 use Smaily\SmailyForMagento\Helper\Data as Helper;
@@ -15,32 +17,51 @@ class Feed extends \Magento\Framework\App\Action\Action
     protected $collection;
     protected $storeManager;
     protected $currency;
+    protected $category;
+    protected $categoryCollection;
 
     public function __construct(
         Context $context,
         Helper $helperData,
         CollectionFactory $collection,
+        CategoryCollectionFactory $categoryCollection,
+        CategoryFactory $category,
         StoreManagerInterface $storeManager,
         Currency $currency
     ) {
         $this->helperData = $helperData;
         $this->collection = $collection;
+        $this->categoryCollection = $categoryCollection;
         $this->storeManager = $storeManager;
         $this->currency = $currency;
+        $this->category = $category;
         parent::__construct($context);
     }
 
     public function execute()
     {
-        $this->generateRssFeed(50);
+        // Get category from user
+        $categoryName = strip_tags($this->getRequest()->getparam('category'));
+        // Get limit from user
+        $limit = (int) $this->getRequest()->getParam('limit');
+        if (!$limit > 0) {
+            // If no limit provided use null
+            $limit = null;
+        }
+        // If category exist generate gategory feed
+        if (!empty($categoryName)) {
+            $products = $this->getProductsByCategoryName($categoryName, $limit);
+            $this->generateRssFeed($products);
+        } else {
+            // Generate rss feed from all items
+            $products = $this->getLatestProducts($limit);
+            $this->generateRssFeed($products);
+        }
     }
 
-    private function generateRssFeed($limit = 50)
+    private function generateRssFeed($products)
     {
-        // Get latest products
-        $products = $this->getLatestProducts($limit);
-
-        // get magento base url
+        // base url of store
         $baseUrl = $this->storeManager->getStore()->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_WEB);
 
         // get default curreny symbol
@@ -92,7 +113,7 @@ class Feed extends \Magento\Framework\App\Action\Action
                     '<link>' . $url . '</link>' .
                     '<guid isPermaLink="True">' . $url . '</guid>' .
                     '<pubDate>' . date('D, d M Y H:i:s', $createTime) . '</pubDate>' .
-                    '<description>' . htmlentities($product->getData('description')) . '</description>' .
+                    '<description>' . strip_tags($product->getData('description')) . '</description>' .
                     '<enclosure url="' . $image . '" />' .
                     '<smly:price>' . $splcPrice . '</smly:price>' .
                     $discount_fields .
@@ -114,7 +135,7 @@ class Feed extends \Magento\Framework\App\Action\Action
         return $this->getResponse()->setBody($rss);
     }
 
-    protected function getLatestProducts($limit)
+    protected function getLatestProducts($limit = 50)
     {
         // load  product collection object
         $collection = $this->collection->create()
@@ -122,7 +143,32 @@ class Feed extends \Magento\Framework\App\Action\Action
             ->addAttributeToSort('created_at', 'DESC') // set sorting
             ->setPageSize($limit)                      // set limit
             ->load();
-
         return $collection;
+    }
+
+    protected function getProductsByCategoryName($name, $limit = 50)
+    {
+        $categoryId = $this->getProductCategoryIdByCategoryName($name);
+        $category = $this->category->create()->load($categoryId);
+        $collection = $category->getProductCollection()
+            ->addAttributeToSelect('*')
+            ->addAttributeToSort('created_at', 'DESC') // set sorting
+            ->setPageSize($limit);
+        return $collection;
+    }
+
+    protected function getProductCategoryIdByCategoryName(string $name)
+    {
+        $id = [];
+        $categories = $this->categoryCollection->create()
+            ->addAttributeToSelect('*')
+            ->addAttributeToFilter('name', ['like' => $name]);
+        if (!empty($categories)) {
+            foreach ($categories as $category) {
+                $id[] = (int) $category->getId();
+            }
+        }
+        $result = !empty($id) ? $id[0] : false;
+        return $result;
     }
 }

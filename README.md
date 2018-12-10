@@ -72,6 +72,10 @@ All development for Smaily for Magento is [handled via GitHub](https://github.co
 
 Cron update data-log is stored in the `root/var/log/` folder of Magento store. Contacts synchronization log is saved in "cron.log" file and Abandoned Cart log is stored in "cronCart.log".
 
+### How can I filter RSS-feed output by category and limit results?
+
+You can access RSS feed by visiting ulr `store_url/smaily/rss/feed` and you can add parameters (category and limit) by appending them to url separated with slashes. For example `store_url/smaily/rss/feed/category/bikes/limit/10`. Regular RSS-feed shows 50 last products.
+
 ### How can I access additional Abandoned cart parameters in Smaily template editor?
 
 Here is a list of all the parameters available in Smaily email templating engine:
@@ -80,17 +84,17 @@ Here is a list of all the parameters available in Smaily email templating engine
 
 - Abandoned cart url: `{{ abandoned_cart_url}}`.
 
-- Product name: `{{ product_name }}`.
+- Product name: `{{ product_name }}`.
 
-- Product description: `{{ product_description }}`.
+- Product description: `{{ product_description }}`.
 
-- Product SKU: `{{ product_sku }}`.
+- Product SKU: `{{ product_sku }}`.
 
-- Product quantity: `{{ product_qty }}`.
+- Product quantity: `{{ product_qty }}`.
 
-- Product price:  `{{ product_price }}`.
+- Product price: `{{ product_price }}`.
 
-- Product base price: `{{ product_base_price }}`.
+- Product base price: `{{ product_base_price }}`.
 
 ## Troubleshooting
 

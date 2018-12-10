@@ -35,7 +35,7 @@ class Customers
 
         // get only subscribers filtered by status 1 => subscribed
         $subscribers = $this->subcriberFactory->create()
-            ->addFieldToFilter('subscriber_status', ['eq'=> 1])
+            ->addFieldToFilter('subscriber_status', ['eq' => 1])
             ->load();
         foreach ($subscribers as $s) {
             $customer_id = (int) $s->getData('customer_id');

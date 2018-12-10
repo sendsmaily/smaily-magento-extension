@@ -135,7 +135,7 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
                 // check Smaily extension is enable
                 if ($this->helperData->isEnabled()) {
                     // get Autoreponder ID
-                    $autoresponder_id = $this->helperData->getGeneralConfig('autoresponder_id');
+                    $autoresponderId = $this->helperData->getGeneralConfig('autoresponder_id');
 
                     // get name of customer from Request
                     $name = (string) @$this->getRequest()->getPost('name');
@@ -178,7 +178,7 @@ class NewAction extends \Magento\Newsletter\Controller\Subscriber
                     }
 
                     // Send customer data to Smaily for subscription
-                    $response = $this->helperData->subscribeAutoresponder($autoresponder_id, $email, $extra);
+                    $response = $this->helperData->subscribeAutoresponder($autoresponderId, $email, $extra);
                     if (@$response['message'] == 'OK') {
                         $this->messageManager->addSuccess(__('Thank you for your subscription !'));
                     } else {

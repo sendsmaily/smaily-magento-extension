@@ -85,8 +85,8 @@ class Feed extends \Magento\Framework\App\Action\Action
             }
 
             // format price
-            $price = number_format($price, 2, '.', ',') . $currencysymbol;
-            $splcPrice = number_format($splcPrice, 2, '.', ','). $currencysymbol;
+            $price = $this->currency->format($price, array('precision'  => 2), false) . $currencysymbol;
+            $splcPrice = $this->currency->format($splcPrice, array('precision'  => 2), false) . $currencysymbol;
 
             // get product detail page url from product object
             $url = $product->getProductUrl();
@@ -108,31 +108,33 @@ class Feed extends \Magento\Framework\App\Action\Action
 
             // Feed Item array
             $items[] =
-                '<item>' .
-                    '<title>' . $product->getName() . '</title>' .
-                    '<link>' . $url . '</link>' .
-                    '<guid isPermaLink="True">' . $url . '</guid>' .
-                    '<pubDate>' . date('D, d M Y H:i:s', $createTime) . '</pubDate>' .
-                    '<description>' . strip_tags($product->getData('description')) . '</description>' .
-                    '<enclosure url="' . $image . '" />' .
-                    '<smly:price>' . $splcPrice . '</smly:price>' .
-                    $discount_fields .
-                '</item>';
+            '<item>' .
+                '<title>' . $product->getName() . '</title>' .
+                '<link>' . $url . '</link>' .
+                '<guid isPermaLink="True">' . $url . '</guid>' .
+                '<pubDate>' . date('D, d M Y H:i:s', $createTime) . '</pubDate>' .
+                '<description>' . htmlentities(strip_tags($product->getData('description'))) . '</description>' .
+                '<enclosure url="' . $image . '" />' .
+                '<smly:price>' . $splcPrice . '</smly:price>' .
+                $discount_fields .
+            '</item>';
         }
 
-        $rss = '<?xml version="1.0" encoding="utf-8"?>' .
+        $rss =
+        '<?xml version="1.0" encoding="utf-8"?>' .
         '<rss xmlns:smly="https://sendsmaily.net/schema/editor/rss.xsd" version="2.0">
-        <channel>
-         <title>' . $this->helperData->getConfigValue('general/store_information/name') . '</title>
-         <link>' . $baseUrl . '</link>
-         <description>Product Feed</description>
-         <lastBuildDate>' . date('D, d M Y H:i:s') . '</lastBuildDate>' .
-         implode('', $items) .
-        '</channel>
+            <channel>
+            <title>' . $this->helperData->getConfigValue('general/store_information/name') . '</title>
+            <link>' . $baseUrl . '</link>
+            <description>Product Feed</description>
+            <lastBuildDate>' . date('D, d M Y H:i:s') . '</lastBuildDate>' .
+            implode('', $items) .
+            '</channel>
         </rss>';
 
-        header('Content-Type: text/xml');
-        return $this->getResponse()->setBody($rss);
+        return $this->getResponse()
+            ->setHeader('Content-Type', 'text/xml')
+            ->setBody($rss);
     }
 
     protected function getLatestProducts($limit = 50)
@@ -168,7 +170,6 @@ class Feed extends \Magento\Framework\App\Action\Action
                 $id[] = (int) $category->getId();
             }
         }
-        $result = !empty($id) ? $id[0] : false;
-        return $result;
+        return !empty($id) ? $id[0] : false;
     }
 }

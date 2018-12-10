@@ -411,7 +411,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $curl = $objectManager->create('\Magento\Framework\HTTP\Client\Curl');
         try {
-                $data = http_build_query($data);
+            $data = http_build_query($data);
             if ($method = 'GET') {
                 $apiUrl = $apiUrl . "?" . $data;
                 $curl->get($apiUrl);

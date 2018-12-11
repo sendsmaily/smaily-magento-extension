@@ -1,6 +1,6 @@
 <?php
 
-namespace Magento\Smaily\Model\Config\Source;
+namespace Smaily\SmailyForMagento\Model\Config\Source;
 
 class Autoresponders implements \Magento\Framework\Option\ArrayInterface
 {
@@ -17,8 +17,7 @@ class Autoresponders implements \Magento\Framework\Option\ArrayInterface
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
 
         // get autoresponder IDs list from Smaily
-        $autoresponders = $objectManager->create('Magento\Smaily\Helper\Data')->getAutoresponders();
-
+        $autoresponders = $objectManager->create('Smaily\SmailyForMagento\Helper\Data')->getAutoresponders();
         foreach ($autoresponders as $id => $name) {
             $list[] = ['value' => $id, 'label' => $name];
         }

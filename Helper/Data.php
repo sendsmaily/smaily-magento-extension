@@ -1,6 +1,6 @@
 <?php
 
-namespace Magento\Smaily\Helper;
+namespace Smaily\SmailyForMagento\Helper;
 
 use Magento\Store\Model\ScopeInterface;
 
@@ -22,6 +22,26 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
+     * Check  Smaily Cron Sync is enabled
+     *
+     * @return bool
+     */
+    public function isCronEnabled()
+    {
+        return (bool) $this->getGeneralConfig('enableCronSync');
+    }
+
+    /**
+     * Check  Smaily Abandoned Cart is enabled
+     *
+     * @return bool
+     */
+    public function isAbandonedCartEnabled()
+    {
+        return (bool) $this->getGeneralConfig('enableAbandonedCart');
+    }
+
+    /**
      * Get Magento main configuration by field
      *
      * @return string
@@ -31,6 +51,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         return $this->scopeConfig->getValue($configPath, ScopeInterface::SCOPE_STORE, $storeId);
     }
 
+    /**
+     * Updates remainder date of Abandoned Cart
+     *
+     * @param string $quoteId       Cart id
+     * @param string $reminderDate  time when to remind customer
+     * @return void
+     */
     private function updateReminderDate($quoteId, $reminderDate)
     {
         if (!isset($this->connection)) {
@@ -39,10 +66,32 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $this->connection = $resource->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
         }
 
-        $table = 'quote';
-        $sql = "UPDATE $table SET reminder_date = '$reminderDate' WHERE entity_id = '$quoteId'";
+        $table = $this->connection->getTableName('quote');
+        $sql = "UPDATE $table SET reminder_date = :REMINDER_DATE WHERE entity_id = :QUOTE_ID";
+        $binds = [
+            'QUOTE_ID' => $quoteId,
+            'REMINDER_DATE' => $reminderDate
+        ];
+        return $this->connection->query($sql, $binds);
+    }
 
-        return $this->connection->exec($sql);
+    /**
+     * Updates Abandoned cart sent mail status in database
+     *
+     * @param string $quoteId Cart id
+     * @return void
+     */
+    private function updateSentStatus($quoteId)
+    {
+        if (!isset($this->connection)) {
+            $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+            $resource = $objectManager->create('\Magento\Framework\App\ResourceConnection');
+            $this->connection = $resource->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
+        }
+        $table = $this->connection->getTableName('quote');
+        $sql = "UPDATE $table SET is_sent = '1' WHERE entity_id = :QUOTE_ID";
+        $binds = ['QUOTE_ID' => $quoteId];
+        return $this->connection->query($sql, $binds);
     }
 
     /**
@@ -56,10 +105,10 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         if ($code === 'autoresponder_id') {
             $tab = 'subscribe';
         }
-        if (in_array($code, ['fields', 'sync_period'], true)) {
+        if (in_array($code, ['fields', 'sync_period', 'enableCronSync'], true)) {
             $tab = 'sync';
         }
-        if (in_array($code, ['ac_ar_id', 'sync_time', 'productfields', 'carturl'], true)) {
+        if (in_array($code, ['ac_ar_id', 'sync_time', 'productfields', 'carturl', 'enableAbandonedCart'], true)) {
             $tab = 'abandoned';
         }
         if ($code === 'feed_token') {
@@ -91,18 +140,11 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     {
         $group_id = (int) $group_id;
         $list = [];
+        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        $customerGroups = $objectManager->get('\Magento\Customer\Model\ResourceModel\Group\Collection');
 
-        if (empty($_SESSION['Smaily_customergroups'])) {
-            $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-            $customerGroups = $objectManager->get('\Magento\Customer\Model\ResourceModel\Group\Collection');
-
-            foreach ($customerGroups->toOptionArray() as $opt) {
-                $list[(int) $opt['value']] = trim($opt['label']);
-            }
-            $_SESSION['Smaily_customergroups'] = $list;
-
-        } else {
-            $list = (array) $_SESSION['Smaily_customergroups'];
+        foreach ($customerGroups->toOptionArray() as $opt) {
+            $list[(int) $opt['value']] = trim($opt['label']);
         }
 
         return isset($list[$group_id]) ? $list[$group_id] : 'Customer';
@@ -115,18 +157,17 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getAutoresponders()
     {
-        if (empty($_SESSION['Smaily_autoresponder'])) {
-            $_list = $this->callApi('autoresponder', ['status' => ['ACTIVE']]);
-            $list = [];
-            foreach ($_list as $r) {
-                if (!empty($r['id']) && !empty($r['name'])) {
-                    $list[$r['id']] = trim($r['name']);
-                }
-            }
-            $_SESSION['Smaily_autoresponder'] = $list;
+        $_list = $this->callApi('autoresponder', ['status' => ['ACTIVE']]);
 
-        } else {
-            $list = (array) $_SESSION['Smaily_autoresponder'];
+        if ($_list['error']) {
+            return [];
+        }
+
+        $list = [];
+        foreach ($_list as $r) {
+            if (!empty($r['id']) && !empty($r['name'])) {
+                $list[$r['id']] = trim($r['name']);
+            }
         }
 
         return $list;
@@ -188,7 +229,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Get Subsbribe/Import all Customers to Smaily by array list
+     * Send newsletter subscribers to Smaily
      *
      * @return array
      *  Smaily api response
@@ -196,23 +237,21 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function cronSubscribeAll($list)
     {
         $data = [];
-        $fields = explode(',', trim($this->getGeneralConfig('fields')));
-
-        foreach ($list as $row) {
-            $_data = [
-                'email' => $row['email'],
-                'is_unsubscribed' => 0
-            ];
-
-            foreach ($row as $field => $val) {
-                if (in_array($field, $fields, true)) {
-                    $_data[$field] = trim($val);
-                }
+        // Get unsubscribers from Smaily
+        $unsubscribers = $this->getUnsubscribers();
+        // Populate unsubscribers emails array
+        $unsubscribers_emails= [];
+        foreach ($unsubscribers as $unsubscriber) {
+            if (isset($unsubscriber['email'])) {
+                $unsubscribers_emails[] = $unsubscriber['email'];
             }
-
-            $data[] = $_data;
         }
-
+        // Update only subscribers who are still subscribed
+        foreach ($list as $row) {
+            if (!in_array($row['email'], $unsubscribers_emails)) {
+                $data[] = $row;
+            }
+        }
         return $this->callApi('contact', $data, 'POST');
     }
 
@@ -227,21 +266,21 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $autoRespId = $this->getGeneralConfig('ac_ar_id');
         $prod = @$emailProduct[0];
 
-        $address = array(
+        $address = [
             'email' => $_data['email'],
             'name' => $_data['customer_name'],
             'abandoned_cart_url' => $this->getGeneralConfig('carturl'),
-        );
+        ];
         $response = false;
         if (!empty($prod)) {
             foreach ($prod as $field => $val) {
                 $address['product_' . $field] = $val;
             }
 
-            $query = array(
+            $query = [
                 'autoresponder' => $autoRespId,
-                'addresses' => array($address),
-            );
+                'addresses' => [$address],
+            ];
             $response = $this->callApi('autoresponder', $query, 'POST');
         }
         return $response;
@@ -272,30 +311,47 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function cronAbandonedcart($orders)
     {
+        // Get sync interval and fields from settings
         $sync_time = str_replace(':', ' ', $this->getGeneralConfig('sync_time'));
         $fields = explode(',', trim($this->getGeneralConfig('productfields')));
-
-        $currentDate = strtotime(date('Y-m-d H') . ':00:00');
-
-        $notifyOnce = false;
-
+        $currentDate = strtotime(date('Y-m-d H:i') . ':00');
         foreach ($orders as $row) {
+            // Quote id
             $quote_id = $row['quote_id'];
-            $nextDate = !empty($row['reminder_date']) ? strtotime($row['reminder_date']) : $currentDate;
-
-            if ((!$notifyOnce && $currentDate >= $nextDate) || ($notifyOnce && empty($row['reminder_date']))) {
+            // Is email sent
+            $isSent = (int) $row['is_sent'] === 1 ? true : false;
+            // Set remainder date if not already been set
+            if (!empty($row['reminder_date'])) {
+                $nextDate = strtotime($row['reminder_date']);
+            } else {
+                $nextDate = strtotime($sync_time, $currentDate);
+                $this->updateReminderDate($quote_id, date('Y-m-d H:i:s', $nextDate));
+                continue;
+            }
+            // Send remainder mail if reminder date has passed and mail not sent
+            if ($currentDate >= $nextDate && !$isSent) {
                 $reminderUpdate = strtotime($sync_time, $currentDate);
-
+                // Send cart data to smaily autoresponder
                 $response = $this->alertCustomer($row, $fields);
-
+                // If successful log quote id else log error message
+                $result = '';
                 if (@$response['message'] == 'OK') {
-                    $this->updateReminderDate($quote_id, date('Y-m-d H:i:s', $reminderUpdate));
+                    // Update quote sent status
+                    $this->updateSentStatus($quote_id);
+                    // Log message
+                    $result = 'Quote id: ' . $quote_id . ' > ' . ($response ? 'Sent' : 'Error');
+                } else {
+                    if (array_key_exists('error', $response)) {
+                        $result = 'Quote id: ' . $quote_id . ' > ' . $response['message'];
+                    }
                 }
-
-                echo $quote_id . ' : ' . ($response ? 'Sent' : 'Error') . '<br>';
+                // create log for api response.
+                $writer = new \Zend\Log\Writer\Stream(BP. '/var/log/cronCart.log');
+                $logger = new \Zend\Log\Logger();
+                $logger->addWriter($writer);
+                $logger->info($result);
             }
         }
-        echo 'DONE';
     }
 
     private function alertCustomer($row, $fields)
@@ -316,10 +372,29 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             'customer_name' => $row['customer_firstname'],
             'email' => $row['customer_email'],
         ];
-
         return $this->autoResponderAPiEmail($_data, $responderProduct);
     }
 
+    /**
+     * Get Smaily unsubscribers
+     *
+     * @return array Unsubscribers list from smaily
+     */
+    public function getUnsubscribers()
+    {
+        $data = [
+            'list' => 2,
+        ];
+        // Api call to Smaily
+        $response = $this->callApi('contact', $data);
+        // If successful return unsubscribers
+        if (isset($response)) {
+            return $response;
+        // If has errors return empty array
+        } else {
+            return [];
+        }
+    }
     /**
      * Call to Smaily API
      *
@@ -331,37 +406,24 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $subdomain = $this->getSubdomain();
         $username = trim($this->getGeneralConfig('username'));
         $password = trim($this->getGeneralConfig('password'));
-
         // create api url
         $apiUrl = 'https://' . $subdomain . '.sendsmaily.net/api/' . trim($endpoint, '/') . '.php';
-
-        // create api post data
-        $data = http_build_query($data);
-        if ($method === 'GET') {
-            $apiUrl = "$apiUrl?$data";
+        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        $curl = $objectManager->create('\Magento\Framework\HTTP\Client\Curl');
+        try {
+            $data = http_build_query($data);
+            if ($method = 'GET') {
+                $apiUrl = $apiUrl . "?" . $data;
+                $curl->get($apiUrl);
+            }
+            if ($method = 'POST') {
+                $curl->setCredentials($username, $password);
+                $curl->post($apiUrl, $data);
+            }
+            $response = json_decode($curl->getBody(), true);
+        } catch (\Exception $e) {
+            $response = ['error' => true, 'message' => $e->getMessage()];
         }
-
-        // curl call
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $apiUrl);
-        curl_setopt($ch, CURLOPT_HEADER, 0);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        if ($method === 'POST') {
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-        }
-        curl_setopt($ch, CURLOPT_USERPWD, "$username:$password");
-
-        // get result
-        $result = json_decode(@curl_exec($ch), true);
-
-        // check error
-        if (curl_errno($ch)) {
-            $result = ['code' => 0, 'message' => curl_error($ch)];
-        }
-
-        curl_close($ch);
-
-        return $result;
+        return $response;
     }
 }

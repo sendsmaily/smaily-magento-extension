@@ -1,52 +1,71 @@
 <?php
 
-namespace Magento\Smaily\Controller\Rss;
+namespace Smaily\SmailyForMagento\Controller\Rss;
 
 use Magento\Framework\App\Action\Context;
+use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
+use Magento\Catalog\Model\ResourceModel\Category\CollectionFactory as CategoryCollectionFactory;
+use Magento\Catalog\Model\CategoryFactory;
+use Magento\Store\Model\StoreManagerInterface;
+use Magento\Directory\Model\Currency;
+use Smaily\SmailyForMagento\Helper\Data as Helper;
 
 class Feed extends \Magento\Framework\App\Action\Action
 {
     protected $helperData;
     protected $objectManager;
+    protected $collection;
+    protected $storeManager;
+    protected $currency;
+    protected $category;
+    protected $categoryCollection;
 
-    public function __construct(Context $context)
-    {
-        // create object manager object
-        $this->objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-
-        // load Smaily helper class
-        $helperData = $this->objectManager->create('Magento\Smaily\Helper\Data');
+    public function __construct(
+        Context $context,
+        Helper $helperData,
+        CollectionFactory $collection,
+        CategoryCollectionFactory $categoryCollection,
+        CategoryFactory $category,
+        StoreManagerInterface $storeManager,
+        Currency $currency
+    ) {
         $this->helperData = $helperData;
-
-        // call parent class function
+        $this->collection = $collection;
+        $this->categoryCollection = $categoryCollection;
+        $this->storeManager = $storeManager;
+        $this->currency = $currency;
+        $this->category = $category;
         parent::__construct($context);
     }
 
     public function execute()
     {
-        // check Smaily exenstion and valiate Token
-        if ((int)@$this->helperData->getGeneralConfig('enable') && trim($this->helperData->getGeneralConfig('feed_token')) == trim(@$this->getRequest()->getParam('token'))) {
-            // call to Genenate Rss Feed function
-            $this->generateRssFeed(50);
-        } else {
-            echo 'Access Denied !';
+        // Get category from user
+        $categoryName = strip_tags($this->getRequest()->getparam('category'));
+        // Get limit from user
+        $limit = (int) $this->getRequest()->getParam('limit');
+        if (!$limit > 0) {
+            // If no limit provided use null
+            $limit = null;
         }
-        exit;
+        // If category exist generate gategory feed
+        if (!empty($categoryName)) {
+            $products = $this->getProductsByCategoryName($categoryName, $limit);
+            $this->generateRssFeed($products);
+        } else {
+            // Generate rss feed from all items
+            $products = $this->getLatestProducts($limit);
+            $this->generateRssFeed($products);
+        }
     }
 
-    private function generateRssFeed($limit = 50)
+    private function generateRssFeed($products)
     {
-        // Get latest products
-        $products = $this->getLatestProducts($limit);
-
-        // load store manager object
-        $storeManager = $this->objectManager->get('\Magento\Store\Model\StoreManagerInterface');
-
-        // get magento base url
-        $baseUrl = $storeManager->getStore()->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_WEB);
+        // base url of store
+        $baseUrl = $this->storeManager->getStore()->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_WEB);
 
         // get default curreny symbol
-        $currencysymbol = $this->objectManager->get('Magento\Directory\Model\Currency')->getCurrencySymbol();
+        $currencysymbol = $this->currency->getCurrencySymbol();
 
         $items = [];
 
@@ -66,9 +85,8 @@ class Feed extends \Magento\Framework\App\Action\Action
             }
 
             // format price
-            $price = $currencysymbol . number_format($price, 2, '.', ',');
-            $splcPrice = $currencysymbol . number_format($splcPrice, 2, '.', ',');
-
+            $price = $this->currency->format($price, array('precision'  => 2), false) . $currencysymbol;
+            $splcPrice = $this->currency->format($splcPrice, array('precision'  => 2), false) . $currencysymbol;
 
             // get product detail page url from product object
             $url = $product->getProductUrl();
@@ -90,43 +108,68 @@ class Feed extends \Magento\Framework\App\Action\Action
 
             // Feed Item array
             $items[] =
-                '<item>' .
-                    '<title>' . $product->getName() . '</title>' .
-                    '<link>' . $url . '</link>' .
-                    '<guid isPermaLink="True">' . $url . '</guid>' .
-                    '<pubDate>' . date('D, d M Y H:i:s', $createTime) . '</pubDate>' .
-                    '<description>' . htmlentities($product->getData('description')) . '</description>' .
-                    '<enclosure url="' . $image . '" />' .
-                    '<smly:price>' . $splcPrice . '</smly:price>' .
-                    $discount_fields .
-                '</item>';
+            '<item>' .
+                '<title>' . htmlentities($product->getName()) . '</title>' .
+                '<link>' . $url . '</link>' .
+                '<guid isPermaLink="True">' . $url . '</guid>' .
+                '<pubDate>' . date('D, d M Y H:i:s', $createTime) . '</pubDate>' .
+                '<description>' . htmlentities(($product->getData('description'))) . '</description>' .
+                '<enclosure url="' . $image . '" />' .
+                '<smly:price>' . $splcPrice . '</smly:price>' .
+                $discount_fields .
+            '</item>';
         }
 
-        // render created feed.
-        header('Content-Type: application/xml');
-        echo '<?xml version="1.0" encoding="utf-8"?>' . PHP_EOL .
-            '<rss xmlns:smly="https://sendsmaily.net/schema/editor/rss.xsd" version="2.0">
-                <channel>
-                    <title>' . $this->helperData->getConfigValue('general/store_information/name') . '</title>
-                    <link>' . $baseUrl . '</link>
-                    <description>Product Feed</description>
-                    <lastBuildDate>' . date('D, d M Y H:i:s') . '</lastBuildDate>' .
-                    implode('', $items) .
-                '</channel>
-            </rss>';
+        $rss =
+        '<?xml version="1.0" encoding="utf-8"?>' .
+        '<rss xmlns:smly="https://sendsmaily.net/schema/editor/rss.xsd" version="2.0">
+            <channel>
+            <title>' . $this->helperData->getConfigValue('general/store_information/name') . '</title>
+            <link>' . $baseUrl . '</link>
+            <description>Product Feed</description>
+            <lastBuildDate>' . date('D, d M Y H:i:s') . '</lastBuildDate>' .
+            implode('', $items) .
+            '</channel>
+        </rss>';
+
+        return $this->getResponse()
+            ->setHeader('Content-Type', 'text/xml')
+            ->setBody($rss);
     }
 
-    public function getLatestProducts($limit)
+    protected function getLatestProducts($limit = 50)
     {
         // load  product collection object
-        $productCollection = $this->objectManager
-            ->create('Magento\Catalog\Model\ResourceModel\Product\CollectionFactory');
-        $collection = $productCollection->create()
+        $collection = $this->collection->create()
             ->addAttributeToSelect('*')                // set product fields to load
             ->addAttributeToSort('created_at', 'DESC') // set sorting
             ->setPageSize($limit)                      // set limit
             ->load();
-
         return $collection;
+    }
+
+    protected function getProductsByCategoryName($name, $limit = 50)
+    {
+        $categoryId = $this->getProductCategoryIdByCategoryName($name);
+        $category = $this->category->create()->load($categoryId);
+        $collection = $category->getProductCollection()
+            ->addAttributeToSelect('*')
+            ->addAttributeToSort('created_at', 'DESC') // set sorting
+            ->setPageSize($limit);
+        return $collection;
+    }
+
+    protected function getProductCategoryIdByCategoryName(string $name)
+    {
+        $id = [];
+        $categories = $this->categoryCollection->create()
+            ->addAttributeToSelect('*')
+            ->addAttributeToFilter('name', ['like' => $name]);
+        if (!empty($categories)) {
+            foreach ($categories as $category) {
+                $id[] = (int) $category->getId();
+            }
+        }
+        return !empty($id) ? $id[0] : false;
     }
 }

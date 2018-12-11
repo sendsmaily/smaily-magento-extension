@@ -1,6 +1,6 @@
 <?php
 
-namespace Magento\Smaily\Model\Config\Source;
+namespace Smaily\SmailyForMagento\Model\Config\Source;
 
 class Fields implements \Magento\Framework\Option\ArrayInterface
 {
@@ -43,15 +43,7 @@ class Fields implements \Magento\Framework\Option\ArrayInterface
             [
                 'value' => 'birthday',
                 'label' => 'Date Of Birth',
-            ],
-            [
-                'value' => 'website',
-                'label' => 'Website',
-            ],
-            [
-                'value' => 'store',
-                'label' => 'Store',
-            ],
+            ]
         ];
 
         return $list;

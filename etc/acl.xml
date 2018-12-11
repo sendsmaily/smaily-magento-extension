@@ -3,8 +3,8 @@
     <acl>
         <resources>
             <resource id="Magento_Backend::admin">
-                <resource id="Magento_Smaily::smaily" title="Smaily" translate="title" sortOrder="40">
-                    <resource id="Magento_Smaily::access" title="Access" translate="title" sortOrder="10" />
+                <resource id="Smaily_SmailyForMagento::smaily" title="Smaily" translate="title" sortOrder="40">
+                    <resource id="Smaily_SmailyForMagento::access" title="Access" translate="title" sortOrder="10" />
                 </resource>
             </resource>
         </resources>

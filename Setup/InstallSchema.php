@@ -1,6 +1,6 @@
 <?php
 
-namespace Magento\Smaily\Setup;
+namespace Smaily\SmailyForMagento\Setup;
 
 use Magento\Framework\Setup\InstallSchemaInterface;
 use Magento\Framework\Setup\ModuleContextInterface;
@@ -8,32 +8,29 @@ use Magento\Framework\Setup\SchemaSetupInterface;
 
 class InstallSchema implements InstallSchemaInterface
 {
-    /**
-     * {@inheritdoc}
-     * @SuppressWarnings(PHPMD.ExcessiveMethodLength)
-     */
     public function install(SchemaSetupInterface $setup, ModuleContextInterface $context)
     {
         $installer = $setup;
-
         $installer->startSetup();
-
-        $eavTable = $installer->getTable('quote');
-
-        $columns = [
-            'reminder_date' => [
+        $installer->getConnection()->addColumn(
+            $installer->getTable('quote'),
+            'reminder_date',
+            [
                 'type' => \Magento\Framework\DB\Ddl\Table::TYPE_DATETIME,
                 'nullable' => true,
-                'comment' => 'Reminder Date',
-            ],
-
-        ];
-
-        $connection = $installer->getConnection();
-        foreach ($columns as $name => $definition) {
-            $connection->addColumn($eavTable, $name, $definition);
-        }
-
+                'comment' => 'Reminder Date'
+            ]
+        );
+        $installer->getConnection()->addColumn(
+            $installer->getTable('quote'),
+            'is_sent',
+            [
+                'type' => \Magento\Framework\DB\Ddl\Table::TYPE_BOOLEAN,
+                'nullable' => true,
+                'default' => 0,
+                'comment' => 'Email sent'
+            ]
+        );
         $installer->endSetup();
     }
 }

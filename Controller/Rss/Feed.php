@@ -109,11 +109,11 @@ class Feed extends \Magento\Framework\App\Action\Action
             // Feed Item array
             $items[] =
             '<item>' .
-                '<title>' . $product->getName() . '</title>' .
+                '<title>' . htmlentities($product->getName()) . '</title>' .
                 '<link>' . $url . '</link>' .
                 '<guid isPermaLink="True">' . $url . '</guid>' .
                 '<pubDate>' . date('D, d M Y H:i:s', $createTime) . '</pubDate>' .
-                '<description>' . htmlentities(strip_tags($product->getData('description'))) . '</description>' .
+                '<description>' . htmlentities(($product->getData('description'))) . '</description>' .
                 '<enclosure url="' . $image . '" />' .
                 '<smly:price>' . $splcPrice . '</smly:price>' .
                 $discount_fields .

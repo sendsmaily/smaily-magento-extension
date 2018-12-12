@@ -1,29 +1,25 @@
 <?php
+
 namespace Smaily\SmailyForMagento\Model;
 
-use \Psr\Log\LoggerInterface;
 use Smaily\SmailyForMagento\Helper\Data as Helper;
 use Smaily\SmailyForMagento\Model\Cron\Orders;
 use \Smaily\SmailyForMagento\Model\Cron\Customers;
 
 class Cron
 {
-    protected $objectManager;
     protected $helperData;
-    protected $logger;
     protected $orders;
     protected $customers;
 
     public function __construct(
-        LoggerInterface $logger,
-        Customers $customers,
+        Helper $helperData,
         Orders $orders,
-        Helper $helperData
+        Customers $customers
     ) {
         $this->helperData = $helperData;
-        $this->logger = $logger;
-        $this->customers = $customers;
         $this->orders = $orders;
+        $this->customers = $customers;
     }
 
     public function subscriberSync()

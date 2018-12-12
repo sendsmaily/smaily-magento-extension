@@ -159,7 +159,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     {
         $_list = $this->callApi('autoresponder', ['status' => ['ACTIVE']]);
 
-        if ($_list['error']) {
+        if (isset($_list['error'])) {
             return [];
         }
 
@@ -265,6 +265,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     {
         $autoRespId = $this->getGeneralConfig('ac_ar_id');
         $prod = @$emailProduct[0];
+
+        // TODO -> If array of products send array data if single product select single product data
 
         $address = [
             'email' => $_data['email'],
@@ -411,12 +413,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $curl = $objectManager->create('\Magento\Framework\HTTP\Client\Curl');
         try {
-            $data = http_build_query($data);
-            if ($method = 'GET') {
+            if ($method === 'GET') {
+                $data = http_build_query($data);
                 $apiUrl = $apiUrl . "?" . $data;
+                $curl->setCredentials($username, $password);
                 $curl->get($apiUrl);
             }
-            if ($method = 'POST') {
+            if ($method === 'POST') {
                 $curl->setCredentials($username, $password);
                 $curl->post($apiUrl, $data);
             }

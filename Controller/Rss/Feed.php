@@ -13,28 +13,27 @@ use Smaily\SmailyForMagento\Helper\Data as Helper;
 class Feed extends \Magento\Framework\App\Action\Action
 {
     protected $helperData;
-    protected $objectManager;
     protected $collection;
+    protected $categoryCollection;
+    protected $category;
     protected $storeManager;
     protected $currency;
-    protected $category;
-    protected $categoryCollection;
 
     public function __construct(
-        Context $context,
         Helper $helperData,
         CollectionFactory $collection,
         CategoryCollectionFactory $categoryCollection,
         CategoryFactory $category,
         StoreManagerInterface $storeManager,
-        Currency $currency
+        Currency $currency,
+        Context $context
     ) {
         $this->helperData = $helperData;
         $this->collection = $collection;
         $this->categoryCollection = $categoryCollection;
+        $this->category = $category;
         $this->storeManager = $storeManager;
         $this->currency = $currency;
-        $this->category = $category;
         parent::__construct($context);
     }
 

@@ -50,9 +50,10 @@ All development for Smaily for Magento is [handled via GitHub](https://github.co
 ## Installation
 
 1. Make sure you have Magento 2.0 and above installed.
-2. Upload or extract the `SmailyForMagento` folder to your site's `/app/code/Smaily` directory. Folder structure needs to be `magento_root/app/code/Smaily/SmailyForMagento` for this module to work.
-3. Run "php bin/magento setup:upgrade".
-4. Extension configuration can be found from Magento administration interface, under "Stores → Configuration → Smaily Email Marketing and Automation".
+2. Install Smaily extension with composer. Run `composer require smaily/smailyformagento:version` in magento root directory.
+3. For manual installation upload or extract the `SmailyForMagento` folder to your site's `/app/code/Smaily` directory. Folder structure needs to be `magento_root/app/code/Smaily/SmailyForMagento` for this module to work.
+4. Run "php bin/magento setup:upgrade".
+5. Extension configuration can be found from Magento administration interface, under "Stores → Configuration → Smaily Email Marketing and Automation".
 
 ## Usage
 

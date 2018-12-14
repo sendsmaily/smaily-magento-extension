@@ -274,20 +274,34 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function autoResponderAPiEmail($_data, $emailProduct)
     {
+        // send data to autoresponder limit 10 products
         $autoRespId = $this->getGeneralConfig('ac_ar_id');
-        $prod = @$emailProduct[0];
-
-        $address = [
-            'email' => $_data['email'],
-            'name' => $_data['customer_name'],
-            'abandoned_cart_url' => $this->getGeneralConfig('carturl'),
-        ];
         $response = false;
-        if (!empty($prod)) {
-            foreach ($prod as $field => $val) {
-                $address['product_' . $field] = $val;
+        if (!empty($emailProduct) && !empty($_data)) {
+            $address = [
+                'email' => $_data['email'],
+                'name' => $_data['customer_name'],
+                'abandoned_cart_url' => $this->getGeneralConfig('carturl'),
+            ];
+            //If more than one product in abandoned cart iterate to products array
+            if (count($emailProduct) > 10) {
+                $address['over_10_products'] = 'true';
+            } elseif (count($emailProduct) > 1) {
+                $length = count($emailProduct);
+                if ($length > 10) {
+                    $length = 10;
+                }
+                for ($i=0; $i < $length; $i++) {
+                    foreach ($emailProduct[$i] as $key => $value) {
+                        $itemNumber = $i + 1;
+                        $address[$key . '_' . $itemNumber] = $value;
+                    }
+                }
+            } else {
+                foreach ($emailProduct[0] as $key => $val) {
+                    $address[$key . '_1'] = $val;
+                }
             }
-
             $query = [
                 'autoresponder' => $autoRespId,
                 'addresses' => [$address],
@@ -373,7 +387,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $_product = [];
             foreach ($product as $field => $val) {
                 if ($field === 'name' || in_array($field, $fields, true)) {
-                    $_product[$field] = $val;
+                    $_product['product_' . $field] = $val;
                 }
             }
             $responderProduct[] = $_product;

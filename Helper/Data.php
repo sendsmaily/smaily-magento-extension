@@ -273,9 +273,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                 'abandoned_cart_url' => $this->getGeneralConfig('carturl'),
             ];
             //If more than one product in abandoned cart iterate to products array
-            if (count($emailProduct)>10) {
-                $address['over_10_products'] = true;
-            } elseif (count($emailProduct) >1) {
+            if (count($emailProduct) > 10) {
+                $address['over_10_products'] = 'true';
+            } elseif (count($emailProduct) > 1) {
                 $length = count($emailProduct);
                 if ($length > 10) {
                     $length = 10;
@@ -288,7 +288,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                 }
             } else {
                 foreach ($emailProduct[0] as $key => $val) {
-                    $address[$key] = $val;
+                    $address[$key . '_1'] = $val;
                 }
             }
             $query = [
@@ -430,8 +430,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                 $apiUrl = $apiUrl . "?" . $data;
                 $curl->setCredentials($username, $password);
                 $curl->get($apiUrl);
-            }
-            if ($method === 'POST') {
+            } elseif ($method === 'POST') {
                 $curl->setCredentials($username, $password);
                 $curl->post($apiUrl, $data);
             }

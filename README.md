@@ -84,17 +84,23 @@ Here is a list of all the parameters available in Smaily email templating engine
 
 - Abandoned cart url: `{{ abandoned_cart_url}}`.
 
-- Product name: `{{ product_name }}`.
+Up to 10 products can be received in Smaily templating engine. You can refrence each product with number 1-10 behind parameter name.
 
-- Product description: `{{ product_description }}`.
+- Product name: `{{ product_name_[1-10] }}`.
 
-- Product SKU: `{{ product_sku }}`.
+- Product description: `{{ product_description_[1-10] }}`.
 
-- Product quantity: `{{ product_qty }}`.
+- Product SKU: `{{ product_sku_[1-10] }}`.
 
-- Product price: `{{ product_price }}`.
+- Product quantity: `{{ product_qty_[1-10] }}`.
 
-- Product base price: `{{ product_base_price }}`.
+- Product price: `{{ product_price_[1-10] }}`.
+
+- Product base price: `{{ product_base_price_[1-10] }}`.
+
+Also you can determine if customer had more than 10 items in cart
+
+- More than 10 items: `{{ over_10_products }}`.
 
 ## Troubleshooting
 

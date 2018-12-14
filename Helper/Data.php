@@ -2,14 +2,27 @@
 
 namespace Smaily\SmailyForMagento\Helper;
 
+use Magento\Framework\App\Helper\Context;
 use Magento\Store\Model\ScopeInterface;
 
 class Data extends \Magento\Framework\App\Helper\AbstractHelper
 {
+    protected $logger;
 
     const XML_PATH = 'smaily/';
 
     private $connection;
+
+    public function __construct(
+        Context $context,
+        \Psr\Log\LoggerInterface $logger
+    ) {
+        parent::__construct(
+            $context
+        );
+
+        $this->logger = $logger;
+    }
 
     /**
      * Check  Smaily Extension is enabled
@@ -157,18 +170,14 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getAutoresponders()
     {
-        $_list = $this->callApi('autoresponder');
-
-        print_r($_list);// exit;
-
-        if ($_list['code'] !== 200) {
-            return [];
-        }
-
+        $response = $this->callApi('autoresponder');
         $list = [];
-        foreach ($_list as $r) {
-            if (!empty($r['id']) && !empty($r['name'])) {
-                $list[$r['id']] = trim($r['name']);
+
+        if (!empty($response)) {
+            foreach ($response as $r) {
+                if (!empty($r['id']) && !empty($r['name'])) {
+                    $list[$r['id']] = trim($r['name']);
+                }
             }
         }
 
@@ -387,15 +396,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $data = [
             'list' => 2,
         ];
-        // Api call to Smaily
-        $response = $this->callApi('contact', $data);
-        // If successful return unsubscribers
-        if (isset($response)) {
-            return $response;
-        // If has errors return empty array
-        } else {
-            return [];
-        }
+
+        // Request unsubscribers from Smaily.
+        return $this->callApi('contact', $data);
     }
     /**
      * Call to Smaily API
@@ -404,6 +407,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function callApi($endpoint, $data = [], $method = 'GET')
     {
+        $response = [];
         // get smaily subdomain, username and password
         $subdomain = $this->getSubdomain();
         $username = $this->getGeneralConfig('username');
@@ -413,19 +417,32 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $curl = $objectManager->create('\Magento\Framework\HTTP\Client\Curl');
         try {
-            $data = http_build_query($data);
-            if ($method = 'GET') {
-                $apiUrl = $apiUrl . "?" . $data;
+            if ($method === 'GET') {
+                $data = urldecode(http_build_query($data));
+                $apiUrl = $apiUrl . '?' . $data;
+                $curl->setCredentials($username, $password);
                 $curl->get($apiUrl);
-            }
-            if ($method = 'POST') {
+
+                $response = (array) json_decode($curl->getBody(), true);
+            } elseif ($method === 'POST') {
                 $curl->setCredentials($username, $password);
                 $curl->post($apiUrl, $data);
+
+                $response = (array) json_decode($curl->getBody(), true);
+
+                // Validate response.
+                if (!array_key_exists('code', $response)) {
+                    throw new \Exception('Something went wrong with the request.');
+                }
+                if ((int) $response['code'] !== 101) {
+                    throw new \Exception($response['message']);
+                }
             }
-            $response = json_decode($curl->getBody(), true);
         } catch (\Exception $e) {
-            $response = ['error' => true, 'message' => $e->getMessage()];
+            $this->logger->error($e->getMessage());
+            $response = [];
         }
+
         return $response;
     }
 }

@@ -157,9 +157,11 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getAutoresponders()
     {
-        $_list = $this->callApi('autoresponder', ['status' => ['ACTIVE']]);
+        $_list = $this->callApi('autoresponder');
 
-        if ($_list['error']) {
+        print_r($_list);// exit;
+
+        if ($_list['code'] !== 200) {
             return [];
         }
 
@@ -187,7 +189,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         ];
 
         if (!empty($data)) {
-            $fields = explode(',', trim($this->getGeneralConfig('fields')));
+            $fields = explode(',', $this->getGeneralConfig('fields'));
 
             foreach ($data as $field => $val) {
                 if ($field === 'name' || in_array($field, $fields, true)) {
@@ -212,7 +214,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         ];
 
         if (!empty($data)) {
-            $fields = explode(',', trim($this->getGeneralConfig('fields')));
+            $fields = explode(',', $this->getGeneralConfig('fields'));
             foreach ($data as $field => $val) {
                 if ($field === 'name' || in_array($field, $fields, true)) {
                     $address[$field] = trim($val);
@@ -313,7 +315,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     {
         // Get sync interval and fields from settings
         $sync_time = str_replace(':', ' ', $this->getGeneralConfig('sync_time'));
-        $fields = explode(',', trim($this->getGeneralConfig('productfields')));
+        $fields = explode(',', $this->getGeneralConfig('productfields'));
         $currentDate = strtotime(date('Y-m-d H:i') . ':00');
         foreach ($orders as $row) {
             // Quote id
@@ -404,8 +406,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     {
         // get smaily subdomain, username and password
         $subdomain = $this->getSubdomain();
-        $username = trim($this->getGeneralConfig('username'));
-        $password = trim($this->getGeneralConfig('password'));
+        $username = $this->getGeneralConfig('username');
+        $password = $this->getGeneralConfig('password');
         // create api url
         $apiUrl = 'https://' . $subdomain . '.sendsmaily.net/api/' . trim($endpoint, '/') . '.php';
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();

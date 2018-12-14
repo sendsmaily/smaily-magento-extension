@@ -2,14 +2,27 @@
 
 namespace Smaily\SmailyForMagento\Helper;
 
+use Magento\Framework\App\Helper\Context;
 use Magento\Store\Model\ScopeInterface;
 
 class Data extends \Magento\Framework\App\Helper\AbstractHelper
 {
+    protected $logger;
 
     const XML_PATH = 'smaily/';
 
     private $connection;
+
+    public function __construct(
+        Context $context,
+        \Psr\Log\LoggerInterface $logger
+    ) {
+        parent::__construct(
+            $context
+        );
+
+        $this->logger = $logger;
+    }
 
     /**
      * Check  Smaily Extension is enabled
@@ -157,16 +170,14 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getAutoresponders()
     {
-        $_list = $this->callApi('autoresponder', ['status' => ['ACTIVE']]);
-
-        if (isset($_list['error'])) {
-            return [];
-        }
-
+        $response = $this->callApi('autoresponder');
         $list = [];
-        foreach ($_list as $r) {
-            if (!empty($r['id']) && !empty($r['name'])) {
-                $list[$r['id']] = trim($r['name']);
+
+        if (!empty($response)) {
+            foreach ($response as $r) {
+                if (!empty($r['id']) && !empty($r['name'])) {
+                    $list[$r['id']] = trim($r['name']);
+                }
             }
         }
 
@@ -187,7 +198,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         ];
 
         if (!empty($data)) {
-            $fields = explode(',', trim($this->getGeneralConfig('fields')));
+            $fields = explode(',', $this->getGeneralConfig('fields'));
 
             foreach ($data as $field => $val) {
                 if ($field === 'name' || in_array($field, $fields, true)) {
@@ -212,7 +223,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         ];
 
         if (!empty($data)) {
-            $fields = explode(',', trim($this->getGeneralConfig('fields')));
+            $fields = explode(',', $this->getGeneralConfig('fields'));
             foreach ($data as $field => $val) {
                 if ($field === 'name' || in_array($field, $fields, true)) {
                     $address[$field] = trim($val);
@@ -327,7 +338,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     {
         // Get sync interval and fields from settings
         $sync_time = str_replace(':', ' ', $this->getGeneralConfig('sync_time'));
-        $fields = explode(',', trim($this->getGeneralConfig('productfields')));
+        $fields = explode(',', $this->getGeneralConfig('productfields'));
         $currentDate = strtotime(date('Y-m-d H:i') . ':00');
         foreach ($orders as $row) {
             // Quote id
@@ -399,15 +410,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $data = [
             'list' => 2,
         ];
-        // Api call to Smaily
-        $response = $this->callApi('contact', $data);
-        // If successful return unsubscribers
-        if (isset($response)) {
-            return $response;
-        // If has errors return empty array
-        } else {
-            return [];
-        }
+
+        // Request unsubscribers from Smaily.
+        return $this->callApi('contact', $data);
     }
     /**
      * Call to Smaily API
@@ -416,28 +421,42 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function callApi($endpoint, $data = [], $method = 'GET')
     {
+        $response = [];
         // get smaily subdomain, username and password
         $subdomain = $this->getSubdomain();
-        $username = trim($this->getGeneralConfig('username'));
-        $password = trim($this->getGeneralConfig('password'));
+        $username = $this->getGeneralConfig('username');
+        $password = $this->getGeneralConfig('password');
         // create api url
         $apiUrl = 'https://' . $subdomain . '.sendsmaily.net/api/' . trim($endpoint, '/') . '.php';
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
         $curl = $objectManager->create('\Magento\Framework\HTTP\Client\Curl');
         try {
             if ($method === 'GET') {
-                $data = http_build_query($data);
-                $apiUrl = $apiUrl . "?" . $data;
+                $data = urldecode(http_build_query($data));
+                $apiUrl = $apiUrl . '?' . $data;
                 $curl->setCredentials($username, $password);
                 $curl->get($apiUrl);
+
+                $response = (array) json_decode($curl->getBody(), true);
             } elseif ($method === 'POST') {
                 $curl->setCredentials($username, $password);
                 $curl->post($apiUrl, $data);
+
+                $response = (array) json_decode($curl->getBody(), true);
+
+                // Validate response.
+                if (!array_key_exists('code', $response)) {
+                    throw new \Exception('Something went wrong with the request.');
+                }
+                if ((int) $response['code'] !== 101) {
+                    throw new \Exception($response['message']);
+                }
             }
-            $response = json_decode($curl->getBody(), true);
         } catch (\Exception $e) {
-            $response = ['error' => true, 'message' => $e->getMessage()];
+            $this->logger->error($e->getMessage());
+            $response = [];
         }
+
         return $response;
     }
 }

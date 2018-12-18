@@ -364,15 +364,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                 $response = $this->alertCustomer($row, $fields);
                 // If successful log quote id else log error message
                 $result = '';
-                if (@$response['message'] == 'OK') {
+                if (array_key_exists('message', $response) && $response['message'] == 'OK') {
                     // Update quote sent status
                     $this->updateSentStatus($quote_id);
                     // Log message
-                    $result = 'Quote id: ' . $quote_id . ' > ' . ($response ? 'Sent' : 'Error');
+                    $result = 'Quote id: ' . $quote_id . ' > Sent';
                 } else {
-                    if (array_key_exists('error', $response)) {
-                        $result = 'Quote id: ' . $quote_id . ' > ' . $response['message'];
-                    }
+                    $result = 'Quote id: ' . $quote_id . ' > Error';
                 }
                 // create log for api response.
                 $writer = new \Zend\Log\Writer\Stream(BP. '/var/log/cronCart.log');

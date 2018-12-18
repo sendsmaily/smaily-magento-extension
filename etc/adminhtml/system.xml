@@ -17,13 +17,17 @@
                 </field>
                 <field id="subdomain" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Subdomain</label>
+                    <backend_model>Smaily\SmailyForMagento\Model\Config\Backend\Validate</backend_model>
+                    <validate>required-entry</validate>
                     <comment>For example "demo" from https://demo.sendsmaily.net/</comment>
                 </field>
                  <field id="username" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>API username</label>
+                    <validate>required-entry</validate>    
                 </field>
                 <field id="password" translate="label" type="password" sortOrder="50" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>API password</label>
+                    <validate>required-entry</validate>    
                     <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000062943-create-api-user" target="_blank">How to create API credentials?</a>]]></comment>
                 </field>
             </group>

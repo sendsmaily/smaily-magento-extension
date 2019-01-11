@@ -4,10 +4,12 @@ namespace Smaily\SmailyForMagento\Helper;
 
 use Magento\Framework\App\Helper\Context;
 use Magento\Store\Model\ScopeInterface;
+use \Magento\Framework\HTTP\Client\Curl;
 
 class Data extends \Magento\Framework\App\Helper\AbstractHelper
 {
     protected $logger;
+    protected $curl;
 
     const XML_PATH = 'smaily/';
 
@@ -15,13 +17,15 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
     public function __construct(
         Context $context,
-        \Psr\Log\LoggerInterface $logger
+        \Psr\Log\LoggerInterface $logger,
+        Curl $curl
     ) {
         parent::__construct(
             $context
         );
 
         $this->logger = $logger;
+        $this->curl = $curl;
     }
 
     /**
@@ -414,6 +418,37 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         // Request unsubscribers from Smaily.
         return $this->callApi('contact', $data);
     }
+
+    /**
+     * Validates Smaily API Credentials.
+     *
+     * @param string $subdomain     Smaily subdomain
+     * @param string $username      Smaily Api username
+     * @param string $password      Smaily Api password
+     * @return boolean $response    True if Ok, False if not authenticated, null if error.
+     */
+    public function validateApiCredentrials($subdomain, $username, $password)
+    {
+        $response = null;
+        $apiUrl = 'https://' . $subdomain . '.sendsmaily.net/api/autoresponder.php';
+
+        try {
+            $this->curl->setCredentials($username, $password);
+            $this->curl->get($apiUrl);
+            $responseStatus = $this->curl->getStatus();
+            if ($responseStatus === 401) {
+                $response = false;
+            } elseif ($responseStatus === 200) {
+                $response = true;
+            }
+        } catch (\Exception $e) {
+            $this->logger->error($e->getMessage());
+            $response = null;
+        }
+
+        return $response;
+    }
+
     /**
      * Call to Smaily API
      *
@@ -428,21 +463,19 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $password = $this->getGeneralConfig('password');
         // create api url
         $apiUrl = 'https://' . $subdomain . '.sendsmaily.net/api/' . trim($endpoint, '/') . '.php';
-        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-        $curl = $objectManager->create('\Magento\Framework\HTTP\Client\Curl');
         try {
             if ($method === 'GET') {
                 $data = urldecode(http_build_query($data));
                 $apiUrl = $apiUrl . '?' . $data;
-                $curl->setCredentials($username, $password);
-                $curl->get($apiUrl);
+                $this->curl->setCredentials($username, $password);
+                $this->curl->get($apiUrl);
 
-                $response = (array) json_decode($curl->getBody(), true);
+                $response = (array) json_decode($this->curl->getBody(), true);
             } elseif ($method === 'POST') {
-                $curl->setCredentials($username, $password);
-                $curl->post($apiUrl, $data);
+                $this->curl->setCredentials($username, $password);
+                $this->curl->post($apiUrl, $data);
 
-                $response = (array) json_decode($curl->getBody(), true);
+                $response = (array) json_decode($this->curl->getBody(), true);
 
                 // Validate response.
                 if (!array_key_exists('code', $response)) {

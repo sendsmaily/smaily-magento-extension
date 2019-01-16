@@ -31,7 +31,11 @@ class Cron
             $writer = new \Zend\Log\Writer\Stream(BP. '/var/log/cron.log');
             $logger = new \Zend\Log\Logger();
             $logger->addWriter($writer);
-            $logger->info(json_encode($response));
+            if (array_key_exists('message', $response) && $response['message'] === 'OK') {
+                $logger->info(json_encode($response));
+            } else {
+                $logger->info('Could not synchronize subscribers!');
+            }
         }
         return $this;
     }

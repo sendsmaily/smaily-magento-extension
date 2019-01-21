@@ -111,6 +111,6 @@ Usually a good place to start would be to check Magento CRON's Schedule Ahead fo
 
 ## Changelog
 
-### 1.0 - 2018
+### 0.9.0 - 2018
 
 - This is the first public release.

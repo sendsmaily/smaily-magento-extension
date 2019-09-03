@@ -174,13 +174,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getAutoresponders()
     {
-        $response = $this->callApi('autoresponder');
+        $autoresponders = $this->callApi('workflows', ['trigger_type' => 'form_submitted']);
         $list = [];
 
-        if (!empty($response)) {
-            foreach ($response as $r) {
-                if (!empty($r['id']) && !empty($r['name'])) {
-                    $list[$r['id']] = trim($r['name']);
+        if (!empty($autoresponders)) {
+            foreach ($autoresponders as $autoresponder) {
+                if (!empty($autoresponder['id']) && !empty($autoresponder['title'])) {
+                    $list[$autoresponder['id']] = trim($autoresponder['title']);
                 }
             }
         }

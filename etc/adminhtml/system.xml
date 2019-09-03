@@ -36,7 +36,7 @@
                 <field id="autoresponder_id" translate="label" type="select" sortOrder="60" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Autoresponder ID (confirmation email)</label>
                     <source_model>Smaily\SmailyForMagento\Model\Config\Source\Autoresponders</source_model>
-                    <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000017234-creating-an-autoresponder" target="_blank">How to set up an autoresponder for confirmation emails?.</a>]]></comment>
+                    <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000092458-creating-automation-workflows" target="_blank">How to set up an automation workflow for confirmation emails?</a>]]></comment>
                 </field>
             </group>
             <group id="sync" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
@@ -68,12 +68,12 @@
                 <field id="ac_ar_id" translate="label" type="select" sortOrder="110" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Autoresponder ID </label>
                     <source_model>Smaily\SmailyForMagento\Model\Config\Source\Autoresponders</source_model>
-                    <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000017234-creating-an-autoresponder" target="_blank">How to set up an autoresponder for confirmation emails?.</a>]]></comment>
+                    <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000017234-creating-an-autoresponder" target="_blank">How to set up an autoresponder for confirmation emails?</a>]]></comment>
                 </field>
                  <field id="sync_time" translate="label" type="select" sortOrder="120" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Trigger abandoned cart automation</label>
                     <source_model>Smaily\SmailyForMagento\Model\Config\Source\SyncTime</source_model>
-                    <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000017234-creating-an-autoresponder" target="_blank">How to set up an autoresponder for confirmation emails?You can link to the abandoned cart in email template with the parameter abandoned_cart_url</a>]]></comment>
+                    <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000017234-creating-an-autoresponder" target="_blank">How to set up an autoresponder for confirmation emails? You can link to the abandoned cart in email template with the parameter abandoned_cart_url</a>]]></comment>
                 </field>
                 <field id="productfields" translate="label" type="multiselect" sortOrder="130" showInDefault="1" showInWebsite="0" showInStore="0">
                         <label>Add parameters to the trigger</label>

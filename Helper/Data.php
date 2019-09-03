@@ -427,23 +427,19 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function validateApiCredentrials($subdomain, $username, $password)
     {
-        $response = null;
+        $response = false;
         $apiUrl = 'https://' . $subdomain . '.sendsmaily.net/api/autoresponder.php';
 
         try {
             $this->curl->setCredentials($username, $password);
             $this->curl->get($apiUrl);
             $responseStatus = $this->curl->getStatus();
-            if ($responseStatus === 401) {
-                $response = false;
-            } elseif ($responseStatus === 200) {
+            if ($responseStatus === 200) {
                 $response = true;
             }
         } catch (\Exception $e) {
             $this->logger->error($e->getMessage());
-            $response = null;
         }
-
         return $response;
     }
 

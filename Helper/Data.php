@@ -215,28 +215,24 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Get Subscribe/Import Customer to Smaily by email with AutoResponder ID
+     * Get Subscribe/Import Customer to Smaily by email with OPT-IN trigger.
      *
      * @return array
      *  Smaily api response
      */
-    public function subscribeAutoresponder($aid, $email, $data = [])
+    public function optInSubscriber($email, $data = [])
     {
         $address = [
             'email' => $email,
         ];
 
         if (!empty($data)) {
-            $fields = explode(',', $this->getGeneralConfig('fields'));
             foreach ($data as $field => $val) {
-                if ($field === 'name' || in_array($field, $fields, true)) {
                     $address[$field] = trim($val);
-                }
             }
         }
 
         $post = [
-            'autoresponder' => $aid,
             'addresses' => [$address],
         ];
 

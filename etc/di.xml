@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="../../../../../lib/internal/Magento/Framework/ObjectManager/etc/config.xsd">
-    <preference for="Magento\Newsletter\Controller\Subscriber\NewAction"
-                type="Smaily\SmailyForMagento\Controller\Subscriber\NewAction"/>
+    <type name="Magento\Newsletter\Model\Subscriber">
+        <plugin name="Smaily_SmailyForMagento_Subscribe"
+                type="Smaily\SmailyForMagento\Controller\Subscriber\Subscribe" />
+    </type>
 </config>

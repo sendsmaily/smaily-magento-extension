@@ -29,13 +29,22 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Check  Smaily Extension is enabled
+     * Check if Smaily Extension is enabled.
      *
      * @return bool
      */
     public function isEnabled()
     {
         return (bool) $this->getGeneralConfig('enable');
+    }
+
+    /**
+     * Check if newsletter subscribtion form opt-in sync is enabled.
+     *
+     * @return boolean
+     */
+    public function isNewsletterSubscriptionEnabled() {
+        return (bool) $this->getGeneralConfig('enableNewsletterSubscriptions');
     }
 
     /**
@@ -119,7 +128,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function getGeneralConfig($code, $storeId = null)
     {
         $tab = 'general';
-        if ($code === 'autoresponder_id') {
+        if ($code === 'enableNewsletterSubscriptions') {
             $tab = 'subscribe';
         }
         if (in_array($code, ['fields', 'sync_period', 'enableCronSync'], true)) {

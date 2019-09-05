@@ -22,21 +22,21 @@
                     <comment>For example "demo" from https://demo.sendsmaily.net/</comment>
                 </field>
                  <field id="username" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>API username</label>
+                    <label>API Username</label>
                     <validate>required-entry</validate>    
                 </field>
                 <field id="password" translate="label" type="password" sortOrder="50" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>API password</label>
+                    <label>API Password</label>
                     <validate>required-entry</validate>    
                     <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000062943-create-api-user" target="_blank">How to create API credentials?</a>]]></comment>
                 </field>
             </group>
             <group id="subscribe" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
-                <label>Newsletter subscription form</label>
-                <field id="autoresponder_id" translate="label" type="select" sortOrder="60" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Autoresponder ID (confirmation email)</label>
-                    <source_model>Smaily\SmailyForMagento\Model\Config\Source\Autoresponders</source_model>
-                    <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000092458-creating-automation-workflows" target="_blank">How to set up an automation workflow for confirmation emails?</a>]]></comment>
+                <label>Newsletter Subscription Form</label>
+                <field id="enableNewsletterSubscriptions" translate="label" type="select" sortOrder="60" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Enable Subscribers Collection</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Send subscribers from newsletter form directly to Smaily</comment>
                 </field>
             </group>
             <group id="sync" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
@@ -46,7 +46,7 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
                 <field id="fields" translate="label" type="multiselect" sortOrder="80" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Syncronize additional fields</label>
+                    <label>Syncronize Additional Fields</label>
                     <source_model>Smaily\SmailyForMagento\Model\Config\Source\Fields</source_model>
                     <comment>Select fields you wish to synchronize along with subscription data. Subscriber Email and Name fields are automatically synchronized</comment>
                 </field>
@@ -60,7 +60,7 @@
                 </field>
             </group>
             <group id="abandoned" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
-                <label>Abandoned cart</label>
+                <label>Abandoned Cart</label>
                 <field id="enableAbandonedCart" translate="label" type="select" sortOrder="100" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Enable Abandoned Cart</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
@@ -71,12 +71,12 @@
                     <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000017234-creating-an-autoresponder" target="_blank">How to set up an autoresponder for confirmation emails?</a>]]></comment>
                 </field>
                  <field id="sync_time" translate="label" type="select" sortOrder="120" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Trigger abandoned cart automation</label>
+                    <label>Trigger Abandoned Cart Automation</label>
                     <source_model>Smaily\SmailyForMagento\Model\Config\Source\SyncTime</source_model>
                     <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000017234-creating-an-autoresponder" target="_blank">How to set up an autoresponder for confirmation emails? You can link to the abandoned cart in email template with the parameter abandoned_cart_url</a>]]></comment>
                 </field>
                 <field id="productfields" translate="label" type="multiselect" sortOrder="130" showInDefault="1" showInWebsite="0" showInStore="0">
-                        <label>Add parameters to the trigger</label>
+                        <label>Add Template Parameters</label>
                         <source_model>Smaily\SmailyForMagento\Model\Config\Source\ProductFields</source_model>
                     <comment>Select fields you wish to send in autoresponder.You can use those parameters in the template and email subject to personalize abandoned cart reminder emails</comment>
                  </field>

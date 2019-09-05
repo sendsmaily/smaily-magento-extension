@@ -61,8 +61,8 @@ class Subscribe
      */
     public function beforeSubscribe(\Magento\Newsletter\Model\Subscriber $subject, $email)
     {
-        // Check Smaily extension is enabled.
-        if ($this->helper->isEnabled()) {
+        // Check Smaily extension/newsletter subscribers collection are enabled.
+        if ($this->helper->isEnabled() && $this->helper->isNewsletterSubscriptionEnabled()) {
             $autoresponderId = $this->helper->getGeneralConfig('autoresponder_id');
             $name = '';
             if ($this->_request->getPost('name')) {

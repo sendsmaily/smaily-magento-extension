@@ -28,20 +28,24 @@ class Customers
     /**
      * Get Customer/Subscribers list
      */
-    public function getList()
+    public function getList($last_update)
     {
         $contact = [];
         $exists_ids = [];
+        $subscribers = $this->subcriberFactory->create();
+        // Get only subscribers filtered by status 1 => subscribed.
+        $subscribers->addFieldToFilter('subscriber_status', ['eq' => 1]);
+        // Get subscribers from last update(all on first sync).
+        if ($last_update) {
+            $subscribers->addFieldToFilter('change_status_at', ['from' => $last_update]);
+        }
 
-        // get only subscribers filtered by status 1 => subscribed
-        $subscribers = $this->subcriberFactory->create()
-            ->addFieldToFilter('subscriber_status', ['eq' => 1])
-            ->load();
+        $subscribers->load();
         foreach ($subscribers as $s) {
             $customer_id = (int) $s->getData('customer_id');
             $customer = $customer_id ? $this->customerRepository->getById($customer_id) : false;
             if ($customer) {
-                $exists_ids[] = $customer_id;
+                $exists_ids[] = $customer_id; // TODO: WHY?
             }
 
             // get DOB

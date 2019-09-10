@@ -249,30 +249,24 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Send newsletter subscribers to Smaily
+     * Send newsletter subscribers to Smaily.
      *
-     * @return array
-     *  Smaily api response
+     * @param array $list Subscribers list in batches.
+     * @return boolean Success/Failure status
      */
     public function cronSubscribeAll($list)
     {
-        $data = [];
-        // Get unsubscribers from Smaily
-        $unsubscribers = $this->getUnsubscribers();
-        // Populate unsubscribers emails array
-        $unsubscribers_emails= [];
-        foreach ($unsubscribers as $unsubscriber) {
-            if (isset($unsubscriber['email'])) {
-                $unsubscribers_emails[] = $unsubscriber['email'];
+        $success = true;
+
+        foreach ($list as $batch) {
+            $response = $this->callApi('contact', $batch, 'POST');
+            if (!array_key_exists('message', $response) ||
+                array_key_exists('message', $response) && $response['message'] !== 'OK') {
+                    $success = false;
             }
         }
-        // Update only subscribers who are still subscribed
-        foreach ($list as $row) {
-            if (!in_array($row['email'], $unsubscribers_emails)) {
-                $data[] = $row;
-            }
-        }
-        return $this->callApi('contact', $data, 'POST');
+
+        return $success;
     }
 
     /**
@@ -408,18 +402,78 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Get Smaily unsubscribers
+     * Returns last customer synchronization update time from db.
      *
-     * @return array Unsubscribers list from smaily
+     * @return string/false Returns update time or false if not set.
      */
-    public function getUnsubscribers()
+    public function getLastCustomerSyncTime()
     {
+        if (!isset($this->connection)) {
+            $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+            $resource = $objectManager->create('\Magento\Framework\App\ResourceConnection');
+            $this->connection = $resource->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
+        }
+
+        $table = $this->connection->getTableName('smaily_customer_sync');
+
+        return $this->connection->fetchOne("SELECT last_update_at FROM $table");
+    }
+
+    /**
+     * Updates customer sync timestamp when cron runs.
+     *
+     * @param string/boolean $last_update Last update time. False if first time.
+     * @return void
+     */
+    public function updateCustomerSyncTimestamp($last_update)
+    {
+        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        if (!isset($this->connection)) {
+            $resource = $objectManager->create('\Magento\Framework\App\ResourceConnection');
+            $this->connection = $resource->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
+        }
+        $datetime = $objectManager->create('\Magento\Framework\Stdlib\DateTime\DateTime');
+        $date = $datetime->gmtDate();
+
+        $table = $this->connection->getTableName('smaily_customer_sync');
+        if ($last_update) {
+            $sql = "UPDATE $table SET last_update_at = :CURRENT_UTC_TIME";
+        } else {
+            $sql = "INSERT INTO $table (last_update_at) VALUES (:CURRENT_UTC_TIME)";
+        }
+        $binds = ['CURRENT_UTC_TIME' => $date];
+        $this->connection->query($sql, $binds);
+    }
+
+    /**
+     * Get Smaily unsubscribers emails.
+     *
+     * @return array Unsubscribers emails list from smaily.
+     */
+    public function getUnsubscribersEmails($limit, $offset = 0)
+    {
+        $unsubscribers_emails = [];
         $data = [
             'list' => 2,
+            'limit' => $limit,
         ];
 
-        // Request unsubscribers from Smaily.
-        return $this->callApi('contact', $data);
+        while (true) {
+            $data['offset'] = $offset;
+            $unsubscribers = $this->callApi('contact', $data);
+
+            if (!$unsubscribers) {
+                break;
+            }
+
+            foreach ($unsubscribers as $unsubscriber) {
+                $unsubscribers_emails[] = $unsubscriber['email'];
+            }
+
+            $offset += $limit;
+        }
+
+        return $unsubscribers_emails;
     }
 
     /**

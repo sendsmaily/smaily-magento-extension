@@ -2,11 +2,12 @@
 
 namespace Smaily\SmailyForMagento\Model;
 
-use \Magento\Framework\App\ResourceConnection;
 use \Magento\Framework\Stdlib\DateTime\DateTime;
 use Smaily\SmailyForMagento\Helper\Data as Helper;
 use Smaily\SmailyForMagento\Model\Cron\Orders;
 use Smaily\SmailyForMagento\Model\Cron\Customers;
+
+const UNSUBSCRIBERS_BATCHES_LIMIT = 2;
 
 class Cron
 {
@@ -14,20 +15,17 @@ class Cron
     protected $date;
     protected $helperData;
     protected $orders;
-    protected $resourceConnection;
 
     public function __construct(
         Customers $customers,
         DateTime $date,
         Helper $helperData,
-        Orders $orders,
-        ResourceConnection $resourceConnection
+        Orders $orders
     ) {
         $this->customers = $customers;
         $this->date =$date;
         $this->helperData = $helperData;
         $this->orders = $orders;
-        $this->resourceConnection = $resourceConnection;
     }
 
     public function subscriberSync()
@@ -37,24 +35,26 @@ class Cron
             $logger = new \Zend\Log\Logger();
             $logger->addWriter($writer);
             $logger->info('Running smaily customer synchronization!');
-            // DB connection. Get last update time.
-            $connection = $this->_resourceConnection->getConnection($this->_resourceConnection::DEFAULT_CONNECTION);
-            $last_update = $connection->fetchOne("SELECT last_update_at FROM smaily_customer_sync");
+            // Get last update time.
+            $last_update = $this->helperData->getLastCustomerSyncTime();
+            // Remove unsubscribers from Magento store.
+            $unsubscribers_list = $this->helperData->getUnsubscribersEmails(UNSUBSCRIBERS_BATCHES_LIMIT);
+            $this->customers->removeUnsubscribers($unsubscribers_list);
 
-            // import all customer to Smaily
-            $subscribers = $this->customers->getList($last_update);
-            if (!empty($subscribers)) {
-                $response = $this->helperData->cronSubscribeAll($subscribers);
-                if (array_key_exists('message', $response) && $response['message'] === 'OK') {
-                    $logger->info(json_encode($response));
+            // Import all customer to Smaily. List is in batches.
+            $subscribers_list = $this->customers->getList($last_update);
+            if (!empty($subscribers_list)) {
+                $success = $this->helperData->cronSubscribeAll($subscribers_list);
+                if ($success) {
+                    $logger->info('Customer synchronization successful!');
                 } else {
-                    $logger->info('Could not synchronize subscribers! - ' . json_encode($response));
+                    $logger->info('Could not synchronize all subscribers!');
                 }
             } else {
                 $logger->info('No updated subscribers since last sync!');
             }
 
-            $this->updateCustomerSyncTimestamp($last_update);
+            $this->helperData->updateCustomerSyncTimestamp($last_update);
         }
         return $this;
     }
@@ -66,17 +66,5 @@ class Cron
             $this->helperData->cronAbandonedcart($this->orders->getList());
         }
         return $this;
-    }
-
-    public function updateCustomerSyncTimestamp($last_update)
-    {
-        $date = $this->date->gmtDate();
-        if ($last_update) {
-            $sql = "UPDATE smaily_customer_sync SET last_update_at = :CURRENT_UTC_TIME";
-        } else {
-            $sql = "INSERT INTO smaily_customer_sync (last_update_at) VALUES (:CURRENT_UTC_TIME)";
-        }
-        $binds = ['CURRENT_UTC_TIME' => $date];
-        $connection->query($sql, $binds);
     }
 }

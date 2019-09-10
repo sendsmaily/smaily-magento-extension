@@ -2,28 +2,24 @@
 
 namespace Smaily\SmailyForMagento\Model;
 
-use \Magento\Framework\Stdlib\DateTime\DateTime;
 use Smaily\SmailyForMagento\Helper\Data as Helper;
 use Smaily\SmailyForMagento\Model\Cron\Orders;
 use Smaily\SmailyForMagento\Model\Cron\Customers;
 
-const UNSUBSCRIBERS_BATCHES_LIMIT = 2;
+const UNSUBSCRIBERS_BATCHES_LIMIT = 1000;
 
 class Cron
 {
     protected $customers;
-    protected $date;
     protected $helperData;
     protected $orders;
 
     public function __construct(
         Customers $customers,
-        DateTime $date,
         Helper $helperData,
         Orders $orders
     ) {
         $this->customers = $customers;
-        $this->date =$date;
         $this->helperData = $helperData;
         $this->orders = $orders;
     }

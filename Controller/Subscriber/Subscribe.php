@@ -63,15 +63,10 @@ class Subscribe
     {
         // Check Smaily extension/newsletter subscribers collection are enabled.
         if ($this->helper->isEnabled() && $this->helper->isNewsletterSubscriptionEnabled()) {
-            $autoresponderId = $this->helper->getGeneralConfig('autoresponder_id');
-            $name = '';
-            if ($this->_request->getPost('name')) {
-                $name = (string) $this->_request->getPost('name');
-            }
+
             // Create addtional fields array.
             $extra = [
-                'name' => $name,
-                'subscription_type' => 'Subscriber',
+                'customer_id' => '',
                 'customer_group' => 'Guest',
                 'store' => $this->_storeManager->getStore()->getName(), // Store View Name.
             ];
@@ -81,16 +76,6 @@ class Subscribe
                 // get custmer data
                 $extra['customer_id'] = $cust->getId();
                 $extra['customer_group'] = $this->helper->getCustomerGroupName($cust->getGroupId());
-            }
-
-            // split name field into firstname & lastname
-            if (!empty($name)) {
-                $name = explode(' ', trim($name));
-                $extra['firstname'] = ucfirst($name[0]);
-                unset($name[0]);
-                if (!empty($name)) {
-                    $extra['lastname'] = ucfirst(implode(' ', $name));
-                }
             }
 
             // Send customer data to Smaily for subscription.

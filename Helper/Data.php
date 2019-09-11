@@ -189,9 +189,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
         if (!empty($autoresponders)) {
             foreach ($autoresponders as $autoresponder) {
-                if (!empty($autoresponder['id']) && !empty($autoresponder['title'])) {
                     $list[$autoresponder['id']] = trim($autoresponder['title']);
-                }
             }
         }
 
@@ -312,24 +310,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $response = $this->callApi('autoresponder', $query, 'POST');
         }
         return $response;
-    }
-
-    public function abandonedCartEmail($_data, $message)
-    {
-        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-        $storeManager = $objectManager->get('\Magento\Store\Model\StoreManagerInterface');
-        $transportBuilder = $objectManager->get('\Magento\Framework\Mail\Template\TransportBuilder');
-        $store = $storeManager->getStore()->getId();
-        $transport = $transportBuilder->setTemplateIdentifier('smaily_email_template')
-            ->setTemplateOptions(['area' => 'frontend', 'store' => $store])
-            ->setTemplateVars([
-                'store' => $storeManager->getStore(),
-                'data' => $message,
-            ])
-            ->setFrom('general')
-            ->addTo($_data['email'], $_data['customer_name'])
-            ->getTransport();
-        return $transport->sendMessage();
     }
 
     /**

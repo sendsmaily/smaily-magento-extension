@@ -59,13 +59,13 @@ All development for Smaily for Magento is [handled via GitHub](https://github.co
 
 1. Go to Stores -> Configuration -> Smaily email marketing and automation -> and click Module Configuration
 2. Open General Settings Tab
-3. Insert your Smaily API authentication information to get started and press Save Config
+3. Insert your Smaily API authentication information and press Save Config to get started
 4. Under Newsletter subscription form tab select if you like to send subscribers directly to Smaily
 5. Under Subscribers synchronization tab you can enable syncronization, select additional fields to sync and frequency
 6. Under Abandoned cart tab you can enable automatic reminder emails for abandoned carts
-7. Select autoresponder and delay time. You can also add aditional template parameters
+7. Select autoresponder and delay time. You can also add additional template parameters
 8. When finished selecting all your preferences press Save Config
-9. That's it, your Magento store is now integrated with Smaily Plugin!
+9. That's it, your Magento store is now integrated with Smaily!
 
 ## Frequently Asked Questions
 

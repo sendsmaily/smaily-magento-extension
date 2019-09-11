@@ -24,21 +24,21 @@ class Subscribe
      *
      * @var Magento\Store\Model\StoreManagerInterface
      */
-    private $_storeManager;
+    private $storeManager;
 
     /**
      * Gathers extra data if customer is logged in when subscribing.
      *
      * @var Magento\Customer\Model\Session
      */
-    private $_customerSession;
+    private $customerSession;
 
     /**
      * Gather post parameters (Name field from form).
      *
      * @var Magento\Framework\App\RequestInterface
      */
-    private $_request;
+    private $request;
 
     public function __construct(
         Helper $helper,
@@ -47,9 +47,9 @@ class Subscribe
         Session $customerSession
     ) {
         $this->helper = $helper;
-        $this->_request = $request;
-        $this->_storeManager = $storeManager;
-        $this->_customerSession = $customerSession;
+        $this->request = $request;
+        $this->storeManager = $storeManager;
+        $this->customerSession = $customerSession;
     }
 
     /**
@@ -67,18 +67,18 @@ class Subscribe
             $extra = [
                 'customer_id' => '',
                 'customer_group' => 'Guest',
-                'store' => $this->_storeManager->getStore()->getName(), // Store View Name.
+                'store' => $this->storeManager->getStore()->getName(), // Store View Name.
             ];
 
-            if ($this->_customerSession->isLoggedIn()) {
-                $cust = $this->_customerSession->getCustomer();
+            if ($this->customerSession->isLoggedIn()) {
+                $cust = $this->customerSession->getCustomer();
                 // get custmer data
                 $extra['customer_id'] = $cust->getId();
                 $extra['customer_group'] = $this->helper->getCustomerGroupName($cust->getGroupId());
             }
 
             // Get all form params and add to request data.
-            $params = $this->_request->getParams();
+            $params = $this->request->getParams();
             unset($params['form_key']);
 
             foreach ($params as $key => $value) {

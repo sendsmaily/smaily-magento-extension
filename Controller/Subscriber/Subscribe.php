@@ -63,7 +63,6 @@ class Subscribe
     {
         // Check Smaily extension/newsletter subscribers collection are enabled.
         if ($this->helper->isEnabled() && $this->helper->isNewsletterSubscriptionEnabled()) {
-
             // Create addtional fields array.
             $extra = [
                 'customer_id' => '',
@@ -76,6 +75,14 @@ class Subscribe
                 // get custmer data
                 $extra['customer_id'] = $cust->getId();
                 $extra['customer_group'] = $this->helper->getCustomerGroupName($cust->getGroupId());
+            }
+
+            // Get all form params and add to request data.
+            $params = $this->_request->getParams();
+            unset($params['form_key']);
+
+            foreach ($params as $key => $value) {
+                $extra[$key] = $value;
             }
 
             // Send customer data to Smaily for subscription.

@@ -134,7 +134,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         if (in_array($code, ['fields', 'sync_period', 'enableCronSync'], true)) {
             $tab = 'sync';
         }
-        if (in_array($code, ['ac_ar_id', 'sync_time', 'productfields', 'carturl', 'enableAbandonedCart'], true)) {
+        if (in_array($code, ['ac_ar_id', 'sync_time', 'productfields', 'enableAbandonedCart'], true)) {
             $tab = 'abandoned';
         }
         if ($code === 'feed_token') {
@@ -284,7 +284,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $address = [
                 'email' => $_data['email'],
                 'name' => $_data['customer_name'],
-                'abandoned_cart_url' => $this->getGeneralConfig('carturl'),
             ];
             //If more than one product in abandoned cart iterate to products array
             if (count($emailProduct) > 10) {

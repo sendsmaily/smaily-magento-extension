@@ -77,9 +77,6 @@
                         <source_model>Smaily\SmailyForMagento\Model\Config\Source\ProductFields</source_model>
                     <comment>You can use those parameters in Smaily template to personalize abandoned cart reminder emails!</comment>
                  </field>
-                 <field id="carturl" translate="label" type="text" sortOrder="140" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Cart url</label>
-                </field>
             </group>
         </section>
     </system>

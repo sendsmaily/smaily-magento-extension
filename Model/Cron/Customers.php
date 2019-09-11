@@ -13,7 +13,7 @@ use Smaily\SmailyForMagento\Helper\Data as Helper;
 const SUBSCRIBERS_BATCH_LIMIT = 1000;
 
 /**
- * Helper class for custoemr sync cron. Responsible for generating subscribers list with data.
+ * Helper class for customer sync cron. Responsible for generating subscribers list with data.
  */
 class Customers
 {
@@ -138,6 +138,12 @@ class Customers
         return $this->connection->fetchAll($query, $binds);
     }
 
+    /**
+     * Changes customer subscription status to unsubscribed in Magento database.
+     *
+     * @param array $unsubscribers_list List of unsubscribers emails from Smaily
+     * @return void
+     */
     public function removeUnsubscribers($unsubscribers_list)
     {
         $table = $this->connection->getTableName('newsletter_subscriber');

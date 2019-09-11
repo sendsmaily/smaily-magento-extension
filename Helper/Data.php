@@ -43,7 +43,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return boolean
      */
-    public function isNewsletterSubscriptionEnabled() {
+    public function isNewsletterSubscriptionEnabled()
+    {
         return (bool) $this->getGeneralConfig('enableNewsletterSubscriptions');
     }
 
@@ -275,7 +276,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      * @return bool|array
      *  Smaily api response
      */
-    public function autoResponderAPiEmail($_data, $emailProduct)
+    public function sendAbandonedCartEmail($_data, $emailProduct)
     {
         // send data to autoresponder limit 10 products
         $autoRespId = $this->getGeneralConfig('ac_ar_id');
@@ -371,7 +372,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                     $result = 'Quote id: ' . $quote_id . ' > Error';
                 }
                 // create log for api response.
-                $writer = new \Zend\Log\Writer\Stream(BP. '/var/log/cronCart.log');
+                $writer = new \Zend\Log\Writer\Stream(BP. '/var/log/smly_cart_cron.log');
                 $logger = new \Zend\Log\Logger();
                 $logger->addWriter($writer);
                 $logger->info($result);
@@ -397,7 +398,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             'customer_name' => $row['customer_firstname'],
             'email' => $row['customer_email'],
         ];
-        return $this->autoResponderAPiEmail($_data, $responderProduct);
+        return $this->sendAbandonedCartEmail($_data, $responderProduct);
     }
 
     /**

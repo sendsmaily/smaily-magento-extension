@@ -13,40 +13,40 @@ class SyncTime implements \Magento\Framework\Option\ArrayInterface
     {
         $list = [
             [
+                'value' => '20:minutes',
+                'label' => '20 Minutes',
+            ],
+            [
+                'value' => '30:minutes',
+                'label' => '30 Minutes',
+            ],
+            [
+                'value' => '40:minutes',
+                'label' => '40 Minutes',
+            ],
+            [
+                'value' => '50:minutes',
+                'label' => '50 Minutes',
+            ],
+            [
                 'value' => '1:hour',
                 'label' => '1 Hour',
             ],
             [
                 'value' => '2:hour',
-                'label' => '2 Hour',
+                'label' => '2 Hours',
             ],
             [
                 'value' => '3:hour',
-                'label' => '3 Hour',
-            ],
-            [
-                'value' => '4:hour',
-                'label' => '4 Hour',
-            ],
-            [
-                'value' => '5:hour',
-                'label' => '5 Hour',
+                'label' => '3 Hours',
             ],
             [
                 'value' => '6:hour',
-                'label' => '6 Hour',
+                'label' => '6 Hours',
             ],
             [
-                'value' => '1:day',
-                'label' => '1 Day',
-            ],
-            [
-                'value' => '2:day',
-                'label' => '2 Days',
-            ],
-            [
-                'value' => '3:day',
-                'label' => '3 Days',
+                'value' => '12:hour',
+                'label' => '12 Hours',
             ],
         ];
 

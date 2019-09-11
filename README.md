@@ -109,6 +109,24 @@ Usually a good place to start would be to check Magento CRON's Schedule Ahead fo
 
 ## Changelog
 
+### 0.9.1
+
+#### Functionality updates
+
+- Subdomain is now parsed from full url
+- Newsletter signup form uses opt-in autoresponder workflow
+- Updated cron frequency values
+- Updated abandoned cart timing values
+- Customer synchronization is now more efficient as it uses data batching
+- Customer unsubscribed status is also updated in store's database
+- Uninstall cleans up created tables and columns
+- Removed custom newsletter and email template blocks
+- Removed subscriber observer as synchronization provides same functionality
+
+#### Bugfixes
+
+- Fixed broken links in settings from
+
 ### 0.9.0 - 2018
 
-- This is the first public release.
+- This is the first public release

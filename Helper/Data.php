@@ -445,11 +445,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $this->connection->query($sql, $binds);
     }
 
-    /**
-     * Get Smaily unsubscribers emails.
-     *
-     * @return array Unsubscribers emails list from smaily.
-     */
+     /**
+      * Get Smaily unsubscribers emails.
+      *
+      * @param integer $limit Limit number of results.
+      * @param integer $offset Page number (Not sql offset).
+      * @return array Unsubscribers emails list from smaily.
+      */
     public function getUnsubscribersEmails($limit, $offset = 0)
     {
         $unsubscribers_emails = [];
@@ -469,8 +471,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             foreach ($unsubscribers as $unsubscriber) {
                 $unsubscribers_emails[] = $unsubscriber['email'];
             }
-
-            $offset += $limit;
+            // Smaily api call offset is considered as page number, not sql offset!
+            $offset++;
         }
 
         return $unsubscribers_emails;

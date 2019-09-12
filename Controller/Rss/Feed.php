@@ -84,8 +84,8 @@ class Feed extends \Magento\Framework\App\Action\Action
             }
 
             // format price
-            $price = $this->currency->format($price, array('precision'  => 2), false) . $currencysymbol;
-            $splcPrice = $this->currency->format($splcPrice, array('precision'  => 2), false) . $currencysymbol;
+            $price = $this->currency->format($price, ['precision'  => 2], false) . $currencysymbol;
+            $splcPrice = $this->currency->format($splcPrice, ['precision'  => 2], false) . $currencysymbol;
 
             // get product detail page url from product object
             $url = $product->getProductUrl();

@@ -29,13 +29,23 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Check  Smaily Extension is enabled
+     * Check if Smaily Extension is enabled.
      *
      * @return bool
      */
     public function isEnabled()
     {
         return (bool) $this->getGeneralConfig('enable');
+    }
+
+    /**
+     * Check if newsletter subscribtion form opt-in sync is enabled.
+     *
+     * @return boolean
+     */
+    public function isNewsletterSubscriptionEnabled()
+    {
+        return (bool) $this->getGeneralConfig('enableNewsletterSubscriptions');
     }
 
     /**
@@ -119,13 +129,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function getGeneralConfig($code, $storeId = null)
     {
         $tab = 'general';
-        if ($code === 'autoresponder_id') {
+        if ($code === 'enableNewsletterSubscriptions') {
             $tab = 'subscribe';
         }
         if (in_array($code, ['fields', 'sync_period', 'enableCronSync'], true)) {
             $tab = 'sync';
         }
-        if (in_array($code, ['ac_ar_id', 'sync_time', 'productfields', 'carturl', 'enableAbandonedCart'], true)) {
+        if (in_array($code, ['ac_ar_id', 'sync_time', 'productfields', 'enableAbandonedCart'], true)) {
             $tab = 'abandoned';
         }
         if ($code === 'feed_token') {
@@ -174,14 +184,12 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getAutoresponders()
     {
-        $response = $this->callApi('autoresponder');
+        $autoresponders = $this->callApi('workflows', ['trigger_type' => 'form_submitted']);
         $list = [];
 
-        if (!empty($response)) {
-            foreach ($response as $r) {
-                if (!empty($r['id']) && !empty($r['name'])) {
-                    $list[$r['id']] = trim($r['name']);
-                }
+        if (!empty($autoresponders)) {
+            foreach ($autoresponders as $autoresponder) {
+                    $list[$autoresponder['id']] = trim($autoresponder['title']);
             }
         }
 
@@ -215,28 +223,24 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Get Subscribe/Import Customer to Smaily by email with AutoResponder ID
+     * Get Subscribe/Import Customer to Smaily by email with OPT-IN trigger.
      *
      * @return array
      *  Smaily api response
      */
-    public function subscribeAutoresponder($aid, $email, $data = [])
+    public function optInSubscriber($email, $data = [])
     {
         $address = [
             'email' => $email,
         ];
 
         if (!empty($data)) {
-            $fields = explode(',', $this->getGeneralConfig('fields'));
             foreach ($data as $field => $val) {
-                if ($field === 'name' || in_array($field, $fields, true)) {
                     $address[$field] = trim($val);
-                }
             }
         }
 
         $post = [
-            'autoresponder' => $aid,
             'addresses' => [$address],
         ];
 
@@ -244,30 +248,22 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Send newsletter subscribers to Smaily
+     * Send newsletter subscribers to Smaily.
      *
-     * @return array
-     *  Smaily api response
+     * @param array $list Subscribers list in batches.
+     * @return boolean Success/Failure status
      */
     public function cronSubscribeAll($list)
     {
-        $data = [];
-        // Get unsubscribers from Smaily
-        $unsubscribers = $this->getUnsubscribers();
-        // Populate unsubscribers emails array
-        $unsubscribers_emails= [];
-        foreach ($unsubscribers as $unsubscriber) {
-            if (isset($unsubscriber['email'])) {
-                $unsubscribers_emails[] = $unsubscriber['email'];
+        foreach ($list as $batch) {
+            $response = $this->callApi('contact', $batch, 'POST');
+            if (!array_key_exists('message', $response) ||
+                array_key_exists('message', $response) && $response['message'] !== 'OK') {
+                    return false;
             }
         }
-        // Update only subscribers who are still subscribed
-        foreach ($list as $row) {
-            if (!in_array($row['email'], $unsubscribers_emails)) {
-                $data[] = $row;
-            }
-        }
-        return $this->callApi('contact', $data, 'POST');
+
+        return true;
     }
 
     /**
@@ -276,7 +272,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      * @return bool|array
      *  Smaily api response
      */
-    public function autoResponderAPiEmail($_data, $emailProduct)
+    public function sendAbandonedCartEmail($_data, $emailProduct)
     {
         // send data to autoresponder limit 10 products
         $autoRespId = $this->getGeneralConfig('ac_ar_id');
@@ -285,7 +281,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $address = [
                 'email' => $_data['email'],
                 'name' => $_data['customer_name'],
-                'abandoned_cart_url' => $this->getGeneralConfig('carturl'),
             ];
             //If more than one product in abandoned cart iterate to products array
             if (count($emailProduct) > 10) {
@@ -313,24 +308,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $response = $this->callApi('autoresponder', $query, 'POST');
         }
         return $response;
-    }
-
-    public function abandonedCartEmail($_data, $message)
-    {
-        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-        $storeManager = $objectManager->get('\Magento\Store\Model\StoreManagerInterface');
-        $transportBuilder = $objectManager->get('\Magento\Framework\Mail\Template\TransportBuilder');
-        $store = $storeManager->getStore()->getId();
-        $transport = $transportBuilder->setTemplateIdentifier('smaily_email_template')
-            ->setTemplateOptions(['area' => 'frontend', 'store' => $store])
-            ->setTemplateVars([
-                'store' => $storeManager->getStore(),
-                'data' => $message,
-            ])
-            ->setFrom('general')
-            ->addTo($_data['email'], $_data['customer_name'])
-            ->getTransport();
-        return $transport->sendMessage();
     }
 
     /**
@@ -373,7 +350,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                     $result = 'Quote id: ' . $quote_id . ' > Error';
                 }
                 // create log for api response.
-                $writer = new \Zend\Log\Writer\Stream(BP. '/var/log/cronCart.log');
+                $writer = new \Zend\Log\Writer\Stream(BP. '/var/log/smly_cart_cron.log');
                 $logger = new \Zend\Log\Logger();
                 $logger->addWriter($writer);
                 $logger->info($result);
@@ -399,22 +376,84 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             'customer_name' => $row['customer_firstname'],
             'email' => $row['customer_email'],
         ];
-        return $this->autoResponderAPiEmail($_data, $responderProduct);
+        return $this->sendAbandonedCartEmail($_data, $responderProduct);
     }
 
     /**
-     * Get Smaily unsubscribers
+     * Returns last customer synchronization update time from db.
      *
-     * @return array Unsubscribers list from smaily
+     * @return string/false Returns update time or false if not set.
      */
-    public function getUnsubscribers()
+    public function getLastCustomerSyncTime()
     {
+        if (!isset($this->connection)) {
+            $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+            $resource = $objectManager->create('\Magento\Framework\App\ResourceConnection');
+            $this->connection = $resource->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
+        }
+
+        $table = $this->connection->getTableName('smaily_customer_sync');
+
+        return $this->connection->fetchOne("SELECT last_update_at FROM $table");
+    }
+
+    /**
+     * Updates customer sync timestamp when cron runs.
+     *
+     * @param string/boolean $last_update Last update time. False if first time.
+     * @return void
+     */
+    public function updateCustomerSyncTimestamp($last_update)
+    {
+        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        if (!isset($this->connection)) {
+            $resource = $objectManager->create('\Magento\Framework\App\ResourceConnection');
+            $this->connection = $resource->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
+        }
+        $datetime = $objectManager->create('\Magento\Framework\Stdlib\DateTime\DateTime');
+        $date = $datetime->gmtDate();
+
+        $table = $this->connection->getTableName('smaily_customer_sync');
+        if ($last_update) {
+            $sql = "UPDATE $table SET last_update_at = :CURRENT_UTC_TIME";
+        } else {
+            $sql = "INSERT INTO $table (last_update_at) VALUES (:CURRENT_UTC_TIME)";
+        }
+        $binds = ['CURRENT_UTC_TIME' => $date];
+        $this->connection->query($sql, $binds);
+    }
+
+     /**
+      * Get Smaily unsubscribers emails.
+      *
+      * @param integer $limit Limit number of results.
+      * @param integer $offset Page number (Not sql offset).
+      * @return array Unsubscribers emails list from smaily.
+      */
+    public function getUnsubscribersEmails($limit, $offset = 0)
+    {
+        $unsubscribers_emails = [];
         $data = [
             'list' => 2,
+            'limit' => $limit,
         ];
 
-        // Request unsubscribers from Smaily.
-        return $this->callApi('contact', $data);
+        while (true) {
+            $data['offset'] = $offset;
+            $unsubscribers = $this->callApi('contact', $data);
+
+            if (!$unsubscribers) {
+                break;
+            }
+
+            foreach ($unsubscribers as $unsubscriber) {
+                $unsubscribers_emails[] = $unsubscriber['email'];
+            }
+            // Smaily api call offset is considered as page number, not sql offset!
+            $offset++;
+        }
+
+        return $unsubscribers_emails;
     }
 
     /**
@@ -427,23 +466,19 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function validateApiCredentrials($subdomain, $username, $password)
     {
-        $response = null;
+        $response = false;
         $apiUrl = 'https://' . $subdomain . '.sendsmaily.net/api/autoresponder.php';
 
         try {
             $this->curl->setCredentials($username, $password);
             $this->curl->get($apiUrl);
             $responseStatus = $this->curl->getStatus();
-            if ($responseStatus === 401) {
-                $response = false;
-            } elseif ($responseStatus === 200) {
+            if ($responseStatus === 200) {
                 $response = true;
             }
         } catch (\Exception $e) {
             $this->logger->error($e->getMessage());
-            $response = null;
         }
-
         return $response;
     }
 

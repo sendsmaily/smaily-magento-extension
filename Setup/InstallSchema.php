@@ -12,6 +12,19 @@ class InstallSchema implements InstallSchemaInterface
     {
         $installer = $setup;
         $installer->startSetup();
+        if (!$installer->tableExists('smaily_customer_sync')) {
+            $table = $installer->getConnection()->newTable(
+                $installer->getTable('smaily_customer_sync')
+            )
+                ->addColumn(
+                    'last_update_at',
+                    \Magento\Framework\DB\Ddl\Table::TYPE_TIMESTAMP,
+                    null,
+                    ['nullable' => true, 'default' => null],
+                    'Last update time'
+                );
+            $installer->getConnection()->createTable($table);
+        }
         $installer->getConnection()->addColumn(
             $installer->getTable('quote'),
             'reminder_date',

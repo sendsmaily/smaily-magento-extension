@@ -18,10 +18,12 @@ class Autoresponders implements \Magento\Framework\Option\ArrayInterface
 
         // get autoresponder IDs list from Smaily
         $autoresponders = $objectManager->create('Smaily\SmailyForMagento\Helper\Data')->getAutoresponders();
-        foreach ($autoresponders as $id => $name) {
-            $list[] = ['value' => $id, 'label' => $name];
+        foreach ($autoresponders as $id => $title) {
+            $list[] = ['value' => $id, 'label' => $title];
         }
 
+        // For visual reffrence in form.
+        $list[] = ['value' => '', 'label' => '- SELECT AUTORESPONDER -'];
         return $list;
     }
 }

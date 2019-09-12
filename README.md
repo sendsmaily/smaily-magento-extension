@@ -59,19 +59,19 @@ All development for Smaily for Magento is [handled via GitHub](https://github.co
 
 1. Go to Stores -> Configuration -> Smaily email marketing and automation -> and click Module Configuration
 2. Open General Settings Tab
-3. Insert your Smaily API authentication information to get started and press Save Config
-4. Under Newsletter subscription form tab select autoresponder to use for new customer subscription
+3. Insert your Smaily API authentication information and press Save Config to get started
+4. Under Newsletter subscription form tab select if you like to send subscribers directly to Smaily
 5. Under Subscribers synchronization tab you can enable syncronization, select additional fields to sync and frequency
 6. Under Abandoned cart tab you can enable automatic reminder emails for abandoned carts
-7. Select autoresponder and delay time. You can also add aditional parameters and cart url.
-8. When finished selecting all your preferences press Save Config.
-9. That's it, your Magento store is now integrated with Smaily Plugin!
+7. Select autoresponder and delay time. You can also add additional template parameters
+8. When finished selecting all your preferences press Save Config
+9. That's it, your Magento store is now integrated with Smaily!
 
 ## Frequently Asked Questions
 
 ### Where I can find data-log for Cron?
 
-Cron update data-log is stored in the `root/var/log/` folder of Magento store. Contacts synchronization log is saved in "cron.log" file and Abandoned Cart log is stored in "cronCart.log".
+Cron update data-log is stored in the `root/var/log/` folder of Magento store. Contacts synchronization log is saved in "smly_customer_cron.log" file and Abandoned Cart log is stored in "smly_cart_cron.log".
 
 ### How can I filter RSS-feed output by category and limit results?
 
@@ -82,8 +82,6 @@ You can access RSS feed by visiting ulr `store_url/smaily/rss/feed` and you can 
 Here is a list of all the parameters available in Smaily email templating engine:
 
 - Customer name: `{{ name }}`.
-
-- Abandoned cart url: `{{ abandoned_cart_url}}`.
 
 Up to 10 products can be received in Smaily templating engine. You can refrence each product with number 1-10 behind parameter name.
 
@@ -111,6 +109,24 @@ Usually a good place to start would be to check Magento CRON's Schedule Ahead fo
 
 ## Changelog
 
+### 0.9.1
+
+#### Functionality updates
+
+- Subdomain is now parsed from full url
+- Newsletter signup form uses opt-in autoresponder workflow
+- Updated cron frequency values
+- Updated abandoned cart timing values
+- Customer synchronization is now more efficient as it uses data batching
+- Customer unsubscribed status is also updated in store's database
+- Uninstall cleans up created tables and columns
+- Removed custom newsletter and email template blocks
+- Removed subscriber observer as synchronization provides same functionality
+
+#### Bugfixes
+
+- Fixed broken links in settings from
+
 ### 0.9.0 - 2018
 
-- This is the first public release.
+- This is the first public release

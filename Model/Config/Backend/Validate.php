@@ -32,6 +32,21 @@ class Validate extends \Magento\Framework\App\Config\Value
         $username = $this->getData('groups/general/fields/username')['value'];
         $password = $this->getData('groups/general/fields/password')['value'];
 
+        // Normalize subdomain.
+        // First, try to parse as full URL. If that fails, try to parse as subdomain.sendsmaily.net, and
+        // if all else fails, then clean up subdomain and pass as is.
+        if (filter_var($subdomain, FILTER_VALIDATE_URL)) {
+            $url = parse_url($subdomain);
+            $parts = explode('.', $url['host']);
+            $subdomain = count($parts) >= 3 ? $parts[0] : '';
+        } elseif (preg_match('/^[^\.]+\.sendsmaily\.net$/', $subdomain)) {
+            $parts = explode('.', $subdomain);
+            $subdomain = $parts[0];
+        }
+        $subdomain = preg_replace('/[^a-zA-Z0-9]+/', '', $subdomain);
+        // Change current form subdomain value to parsed subdomain for saving to db.
+        $val = $this->setValue($subdomain);
+
         if (empty($subdomain)) {
             throw new \Magento\Framework\Exception\ValidatorException(__('Subdomain is required.'));
         } elseif (empty($username)) {
@@ -41,7 +56,7 @@ class Validate extends \Magento\Framework\App\Config\Value
         }
 
         $validated = $this->helper->validateApiCredentrials($subdomain, $username, $password);
-        if (isset($validated) && $validated === false) {
+        if ($validated === false) {
             throw new \Magento\Framework\Exception\ValidatorException(__('Check API credentials, unauthorized.'));
         }
 

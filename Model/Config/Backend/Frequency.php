@@ -40,10 +40,10 @@ class Frequency extends \Magento\Framework\App\Config\Value
 
         try {
             $this->configValueFactory->create()
-            ->load(self::CRON_STRING_PATH, 'path')
-            ->setValue($frequency)
-            ->setPath(self::CRON_STRING_PATH)
-            ->save();
+              ->load(self::CRON_STRING_PATH, 'path')
+              ->setValue($frequency)
+              ->setPath(self::CRON_STRING_PATH)
+              ->save();
         } catch (\Exception $e) {
             throw new \Exception(__('We can\'t save the cron expression.'));
         }

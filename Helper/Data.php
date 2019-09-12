@@ -255,17 +255,15 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function cronSubscribeAll($list)
     {
-        $success = true;
-
         foreach ($list as $batch) {
             $response = $this->callApi('contact', $batch, 'POST');
             if (!array_key_exists('message', $response) ||
                 array_key_exists('message', $response) && $response['message'] !== 'OK') {
-                    $success = false;
+                    return false;
             }
         }
 
-        return $success;
+        return true;
     }
 
     /**

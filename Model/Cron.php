@@ -39,18 +39,17 @@ class Cron
 
             // Import all customer to Smaily. List is in batches.
             $subscribers_list = $this->customers->getList($last_update);
-            if (!empty($subscribers_list)) {
+            if (empty($subscribers_list)) {
+                $logger->info('No updated subscribers since last sync!');
+            } else {
                 $success = $this->helperData->cronSubscribeAll($subscribers_list);
                 if ($success) {
                     $logger->info('Customer synchronization successful!');
+                    $this->helperData->updateCustomerSyncTimestamp($last_update);
                 } else {
                     $logger->info('Could not synchronize all subscribers!');
                 }
-            } else {
-                $logger->info('No updated subscribers since last sync!');
             }
-
-            $this->helperData->updateCustomerSyncTimestamp($last_update);
         }
         return $this;
     }

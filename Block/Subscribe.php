@@ -17,16 +17,31 @@ class Subscribe extends \Magento\Newsletter\Block\Subscribe
         $this->helper = $helper;
     }
 
+    /**
+     * Get Smaily module enabled status.
+     *
+     * @return boolean
+     */
     public function isSmailyEnabled()
     {
         return $this->helper->isEnabled();
     }
 
+    /**
+     * Get original Magetno newsletter template in HTML string format.
+     *
+     * @return string HTML of original newsletter template.
+     */
     public function originalTemplateHtml()
     {
         return $this->getOriginalTemplate()->toHtml();
     }
 
+    /**
+     * Gets original Magento Newsletter template.
+     *
+     * @return \Magento\Framework\View\Element\Template Original newsletter template.
+     */
     public function getOriginalTemplate()
     {
         return $this->
@@ -35,15 +50,20 @@ class Subscribe extends \Magento\Newsletter\Block\Subscribe
                 setTemplate('Magento_Newsletter::subscribe.phtml');
     }
 
+    /**
+     * Get newsletter template with capcha section.
+     *
+     * @return string HTML of newsletter template with captcha.
+     */
     public function getTemplateWithCaptcha()
     {
         // Get original template.
         $originalTemlate = $this->getOriginalTemplate()->toHtml();
         $originalDOM = new \DOMDocument();
         $originalDOM->loadHTML($originalTemlate);
+
         // Get captcha form. Visible when capcha is required.
         $captchaTemplate = $this->getBlockHtml('smaily.captcha');
-
         if (!empty($captchaTemplate)) {
             // Select form and action section.
             $form = $originalDOM->getElementsByTagName('form')->item(0);

@@ -1,0 +1,73 @@
+<?php
+
+namespace Smaily\SmailyForMagento\Observer;
+
+use Magento\Framework\App\ActionFlag;
+use Magento\Framework\App\Response\RedirectInterface;
+use Magento\Framework\Message\ManagerInterface;
+use Magento\Framework\Event\ObserverInterface;
+use Magento\Framework\App\Request\DataPersistorInterface;
+use Magento\Framework\App\ObjectManager;
+use Magento\Captcha\Observer\CaptchaStringResolver;
+use Magento\Captcha\Helper\Data as Helper;
+
+class NewsletterCaptchaObserver implements ObserverInterface
+{
+
+    protected $helper;
+    protected $actionFlag;
+    protected $messageManager;
+    protected $redirect;
+    protected $captchaStringResolver;
+    private $dataPersistor;
+
+    public function __construct(
+        Helper $helper,
+        ActionFlag $actionFlag,
+        ManagerInterface $messageManager,
+        RedirectInterface $redirect,
+        CaptchaStringResolver $captchaStringResolver
+    ) {
+        $this->helper = $helper;
+        $this->actionFlag = $actionFlag;
+        $this->messageManager = $messageManager;
+        $this->redirect = $redirect;
+        $this->captchaStringResolver = $captchaStringResolver;
+    }
+
+    /**
+     * Check CAPTCHA on Newsletter signup form.
+     *
+     * @param \Magento\Framework\Event\Observer $observer
+     * @return void
+     */
+    public function execute(\Magento\Framework\Event\Observer $observer)
+    {
+        $formId = 'smaily_captcha';
+        $captcha = $this->helper->getCaptcha($formId);
+        if ($captcha->isRequired()) {
+            $controller = $observer->getControllerAction();
+            if (!$captcha->isCorrect($this->captchaStringResolver->resolve($controller->getRequest(), $formId))) {
+                $this->messageManager->addError(__('Incorrect CAPTCHA.'));
+                $this->getDataPersistor()->set($formId, $controller->getRequest()->getPostValue());
+                $this->actionFlag->set('', \Magento\Framework\App\Action\Action::FLAG_NO_DISPATCH, true);
+                $this->redirect->redirect($controller->getResponse(), $this->redirect->getRedirectUrl());
+            }
+        }
+    }
+
+    /**
+     * Get Data Persistor
+     *
+     * @return DataPersistorInterface
+     */
+    private function getDataPersistor()
+    {
+        if ($this->dataPersistor === null) {
+            $this->dataPersistor = ObjectManager::getInstance()
+                ->get(DataPersistorInterface::class);
+        }
+
+        return $this->dataPersistor;
+    }
+}

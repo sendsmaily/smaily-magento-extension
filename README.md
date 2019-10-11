@@ -109,6 +109,12 @@ Usually a good place to start would be to check Magento CRON's Schedule Ahead fo
 
 ## Changelog
 
+### 0.9.2
+
+#### Bugfixes
+
+- Fix compilation issues
+
 ### 0.9.1
 
 #### Functionality updates

@@ -33,7 +33,7 @@ class Customers
         StoreManagerInterface $storeManager
     ) {
         $this->resourceConnection = $resourceConnection;
-        $this->connection = $this->resourceConnection->getConnection($this->resourceConnection::DEFAULT_CONNECTION);
+        $this->connection = $this->resourceConnection->getConnection(ResourceConnection::DEFAULT_CONNECTION);
         $this->customerRepository = $customerRepositoryFactory->create();
         $this->helperData = $helperData;
         $this->storeManager = $storeManager;

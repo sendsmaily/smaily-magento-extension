@@ -5,6 +5,7 @@ namespace Smaily\SmailyForMagento\Observer;
 use Magento\Captcha\Observer\CaptchaStringResolver;
 use Magento\Captcha\Helper\Data as Helper;
 use Magento\Framework\App\ActionFlag;
+use Magento\Framework\App\Request\Http;
 use Magento\Framework\App\Request\DataPersistorInterface;
 use Magento\Framework\App\Response\RedirectInterface;
 use Magento\Framework\App\ObjectManager;
@@ -22,9 +23,11 @@ class NewsletterCaptchaObserver implements ObserverInterface
     protected $redirect;
     protected $captchaStringResolver;
     private $dataPersistor;
+    protected $request;
 
     public function __construct(
         Helper $helper,
+        Http $request,
         ActionFlag $actionFlag,
         ManagerInterface $messageManager,
         RedirectInterface $redirect,
@@ -36,6 +39,7 @@ class NewsletterCaptchaObserver implements ObserverInterface
         $this->actionFlag = $actionFlag;
         $this->messageManager = $messageManager;
         $this->redirect = $redirect;
+        $this->request = $request;
         $this->captchaStringResolver = $captchaStringResolver;
     }
 
@@ -47,13 +51,32 @@ class NewsletterCaptchaObserver implements ObserverInterface
      */
     public function execute(\Magento\Framework\Event\Observer $observer)
     {
-        $formId = 'smaily_captcha';
-        $captcha = $this->helper->getCaptcha($formId);
-        if ($captcha->isRequired() && $this->smailyHelper->isEnabled()) {
-            $controller = $observer->getControllerAction();
+
+        if (!$this->smailyHelper->isEnabled()) {
+            return;
+        }
+
+        $captchaType = $this->smailyHelper->getCaptchaType();
+        $controller = $observer->getControllerAction();
+
+        if ($captchaType === 'magento_captcha') {
+            $formId = 'smaily_captcha';
+            $captcha = $this->helper->getCaptcha($formId);
             if (!$captcha->isCorrect($this->captchaStringResolver->resolve($controller->getRequest(), $formId))) {
                 $this->messageManager->addError(__('Incorrect CAPTCHA.'));
                 $this->getDataPersistor()->set($formId, $controller->getRequest()->getPostValue());
+                $this->actionFlag->set('', \Magento\Framework\App\Action\Action::FLAG_NO_DISPATCH, true);
+                $this->redirect->redirect($controller->getResponse(), $this->redirect->getRedirectUrl());
+            }
+        }
+
+        if ($captchaType === 'google_captcha') {
+            $response = $this->request->getParam('g-recaptcha-response');
+            $secretKey = $this->smailyHelper->getCaptchaApiSecretKey();
+            $validated = $this->smailyHelper->isCaptchaValid($response, $secretKey);
+
+            if (!$validated) {
+                $this->messageManager->addError(__('Incorrect CAPTCHA.'));
                 $this->actionFlag->set('', \Magento\Framework\App\Action\Action::FLAG_NO_DISPATCH, true);
                 $this->redirect->redirect($controller->getResponse(), $this->redirect->getRedirectUrl());
             }

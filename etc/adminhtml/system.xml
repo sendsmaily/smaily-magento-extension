@@ -23,20 +23,45 @@
                 </field>
                  <field id="username" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>API Username</label>
-                    <validate>required-entry</validate>    
+                    <validate>required-entry</validate>
                 </field>
                 <field id="password" translate="label" type="password" sortOrder="50" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>API Password</label>
-                    <validate>required-entry</validate>    
+                    <validate>required-entry</validate>
                     <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000062943-create-api-user" target="_blank">How to create API credentials?</a>]]></comment>
                 </field>
             </group>
-            <group id="subscribe" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+            <group id="subscribe" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
                 <label>Newsletter Subscription Form</label>
-                <field id="enableNewsletterSubscriptions" translate="label" type="select" sortOrder="60" showInDefault="1" showInWebsite="0" showInStore="0">
+                <field id="enableNewsletterSubscriptions" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Enable Subscribers Collection</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Send subscribers from newsletter form directly to Smaily</comment>
+                </field>
+                <field id="captcha_type" translate="label" sortOrder="20" type="select" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>CAPTCHA Type</label>
+                    <source_model>Smaily\SmailyForMagento\Model\Config\Source\CaptchaType</source_model>
+                    <comment>CAPTCHA is mandatory. If you can't see newsletter form check if Newsletter Captcha is enabled form Magento settings.</comment>
+                    <depends>
+                        <field id="enableNewsletterSubscriptions">1</field>
+                    </depends>
+                </field>
+                <field id="captcha_api_key" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Google API Key</label>
+                    <comment><![CDATA[Create new site settings <a href="https://www.google.com/recaptcha/admin/create" target="_blank"> from here</a>.]]></comment>
+                     <depends>
+                        <field id="captcha_type">google_captcha</field>
+                        <field id="enableNewsletterSubscriptions">1</field>
+                    </depends>
+                    <validate>required-entry</validate>
+                </field>
+                <field id="captcha_api_secret" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Google API Secret Key</label>
+                    <depends>
+                        <field id="captcha_type">google_captcha</field>
+                        <field id="enableNewsletterSubscriptions">1</field>
+                    </depends>
+                    <validate>required-entry</validate>
                 </field>
             </group>
             <group id="sync" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">

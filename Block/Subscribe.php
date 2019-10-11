@@ -52,6 +52,9 @@ class Subscribe extends \Magento\Newsletter\Block\Subscribe
 
     /**
      * Get newsletter template with capcha section.
+     * May return empty section when subscribers collection is enabled, but built in captcha is disabled.
+     * In that case, an empty section is shown  instead of newsletter form, to prevent bots from poluting
+     * customer db in Smaily.
      *
      * @return string HTML of newsletter template with captcha.
      */
@@ -61,25 +64,36 @@ class Subscribe extends \Magento\Newsletter\Block\Subscribe
         $originalTemlate = $this->getOriginalTemplate()->toHtml();
         $originalDOM = new \DOMDocument();
         $originalDOM->loadHTML($originalTemlate);
+        $xPath = new \DOMXPath($originalDOM);
 
-        // Get captcha form. Visible when capcha is required.
-        $captchaTemplate = $this->getBlockHtml('smaily.captcha');
-        if (!empty($captchaTemplate)) {
-            // Select form and action section.
+        $captchaType = $this->helper->getCaptchaType();
+        $subscribeCollectionEnabled = $this->helper->isNewsletterSubscriptionEnabled();
+
+        if ($captchaType === 'google_captcha') {
+            $captchaTemplate = $this->getBlockHtml('smaily.recaptcha');
+        } else {
+            // May return empty string if built-in captcha is disabled.
+            $captchaTemplate = $this->getBlockHtml('smaily.captcha');
+        }
+
+        // Only show newsletter form when captcha and collection is enabled.
+        if ($captchaTemplate && $subscribeCollectionEnabled) {
+            if ($captchaType === 'magento_captcha') {
+                // Remove newsletter class (keep only block class) from original form as it messes up css.
+                $newsletterClass = $xPath->query('//div[@class="block newsletter"]')->item(0);
+                $newsletterClass->attributes->getNamedItem('class')->nodeValue = 'block';
+            }
+             // Select form and action section.
             $form = $originalDOM->getElementsByTagName('form')->item(0);
-            $xPath = new \DOMXPath($originalDOM);
             $actionsSection = $xPath->query('//div[@class="actions"]')->item(0);
 
             // Add capcha section before action section.
             $captcha = $originalDOM->createDocumentFragment();
             $captcha->appendXML($captchaTemplate);
             $form->insertBefore($captcha, $actionsSection);
-
-            // Remove newsletter class (keep only block class) from original form as it messes up css.
-            $newsletterClass = $xPath->query('//div[@class="block newsletter"]')->item(0);
-            $newsletterClass->attributes->getNamedItem('class')->nodeValue = 'block';
+            return $originalDOM->saveHTML();
+        } else {
+            return '';
         }
-
-        return $originalDOM->saveHTML();
     }
 }

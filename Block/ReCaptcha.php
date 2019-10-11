@@ -21,7 +21,7 @@ class ReCaptcha extends Template
     /**
      * Get CAPTCHA type (magento_captcha or google_captcha).
      *
-     * @return string Captcha type.
+     * @return string CAPTCHA type.
      */
     public function getCaptchaType()
     {
@@ -29,9 +29,9 @@ class ReCaptcha extends Template
     }
 
     /**
-     * Get reCAPTCHA public api key.
+     * Get reCAPTCHA public API key.
      *
-     * @return string Captcha public key.
+     * @return string CAPTCHA public key.
      */
     public function getCaptchaApiKey()
     {

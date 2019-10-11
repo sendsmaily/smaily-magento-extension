@@ -152,7 +152,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Get reCAHPTCHA public api key.
+     * Get reCAPTCHA public API key.
      *
      * @return string public key.
      */
@@ -162,7 +162,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Get reCAPTCHA private api key.
+     * Get reCAPTCHA private API key.
      *
      * @return string private key.
      */
@@ -509,10 +509,10 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Validate reCaptcha response value.
+     * Validate reCAPTCHA response value.
      *
-     * @param string $captchaResponse Response from google captcha
-     * @param string $secret reCaptcha api secret key.
+     * @param string $captchaResponse Response from google CAPTCHA
+     * @param string $secret reCAPTCHA api secret key.
      * @return boolean
      */
     public function isCaptchaValid($captchaResponse, $secret)

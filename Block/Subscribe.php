@@ -51,12 +51,12 @@ class Subscribe extends \Magento\Newsletter\Block\Subscribe
     }
 
     /**
-     * Get newsletter template with capcha section.
-     * May return empty section when subscribers collection is enabled, but built in captcha is disabled.
+     * Get newsletter template with CAPTCHA section.
+     * May return empty section when subscribers collection is enabled, but built in CAPTCHA is disabled.
      * In that case, an empty section is shown  instead of newsletter form, to prevent bots from poluting
      * customer db in Smaily.
      *
-     * @return string HTML of newsletter template with captcha.
+     * @return string HTML of newsletter template with CAPTCHA.
      */
     public function getTemplateWithCaptcha()
     {
@@ -76,10 +76,10 @@ class Subscribe extends \Magento\Newsletter\Block\Subscribe
             $captchaTemplate = $this->getBlockHtml('smaily.captcha');
         }
 
-        // Only show newsletter form when captcha and collection is enabled.
+        // Only show newsletter form when CAPTCHA and collection is enabled.
         if ($captchaTemplate && $subscribeCollectionEnabled) {
             if ($captchaType === 'magento_captcha') {
-                // Remove newsletter class (keep only block class) from original form as it messes up css.
+                // Remove newsletter class (keep only block class) from original form as it messes up CSS.
                 $newsletterClass = $xPath->query('//div[@class="block newsletter"]')->item(0);
                 $newsletterClass->attributes->getNamedItem('class')->nodeValue = 'block';
             }
@@ -87,7 +87,7 @@ class Subscribe extends \Magento\Newsletter\Block\Subscribe
             $form = $originalDOM->getElementsByTagName('form')->item(0);
             $actionsSection = $xPath->query('//div[@class="actions"]')->item(0);
 
-            // Add capcha section before action section.
+            // Add CAPTCHA section before action section.
             $captcha = $originalDOM->createDocumentFragment();
             $captcha->appendXML($captchaTemplate);
             $form->insertBefore($captcha, $actionsSection);

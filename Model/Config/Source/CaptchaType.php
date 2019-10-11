@@ -5,7 +5,7 @@ namespace Smaily\SmailyForMagento\Model\Config\Source;
 class CaptchaType implements \Magento\Framework\Option\ArrayInterface
 {
     /**
-     * Get Option values for captcha type field.
+     * Get Option values for CAPTCHA type field.
      *
      * @return array
      */

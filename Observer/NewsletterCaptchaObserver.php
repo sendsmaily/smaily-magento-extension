@@ -68,9 +68,7 @@ class NewsletterCaptchaObserver implements ObserverInterface
                 $this->actionFlag->set('', \Magento\Framework\App\Action\Action::FLAG_NO_DISPATCH, true);
                 $this->redirect->redirect($controller->getResponse(), $this->redirect->getRedirectUrl());
             }
-        }
-
-        if ($captchaType === 'google_captcha') {
+        } elseif ($captchaType === 'google_captcha') {
             $response = $this->request->getParam('g-recaptcha-response');
             $secretKey = $this->smailyHelper->getCaptchaApiSecretKey();
             $validated = $this->smailyHelper->isCaptchaValid($response, $secretKey);

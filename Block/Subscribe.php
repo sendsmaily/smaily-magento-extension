@@ -63,7 +63,7 @@ class Subscribe extends \Magento\Newsletter\Block\Subscribe
         // Get original template.
         $originalTemlate = $this->getOriginalTemplate()->toHtml();
         $originalDOM = new \DOMDocument();
-        $originalDOM->loadHTML($originalTemlate);
+        $originalDOM->loadHTML($originalTemlate, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         $xPath = new \DOMXPath($originalDOM);
 
         $captchaType = $this->helper->getCaptchaType();

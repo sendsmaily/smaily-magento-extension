@@ -17,15 +17,11 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
     public function __construct(
         Context $context,
-        \Psr\Log\LoggerInterface $logger,
         Curl $curl
     ) {
-        parent::__construct(
-            $context
-        );
-
-        $this->logger = $logger;
+        $this->logger = $context->getLogger();
         $this->curl = $curl;
+        parent::__construct($context);
     }
 
     /**

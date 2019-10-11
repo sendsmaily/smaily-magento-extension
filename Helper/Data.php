@@ -533,6 +533,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             }
         } catch (\Exception $e) {
             $this->logger->error($e->getMessage());
+            return false;
         }
 
         return $validated;

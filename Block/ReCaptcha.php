@@ -31,7 +31,7 @@ class ReCaptcha extends Template
     /**
      * Get reCAPTCHA public api key.
      *
-     * @return void
+     * @return string Captcha public key.
      */
     public function getCaptchaApiKey()
     {

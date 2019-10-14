@@ -17,6 +17,7 @@ NOTE! One of the most noticeable shortcoming of the extension is that it allows 
 
 - Add subscribers to Smaily subscribers list
 - Magento built in subscribe newsletter form sends subscribers directly to smaily
+- Magento built-in CAPTCHA and google reCAPTCHA support
 
 ### Magento Products RSS-feed
 
@@ -108,6 +109,12 @@ Also you can determine if customer had more than 10 items in cart
 Usually a good place to start would be to check Magento CRON's Schedule Ahead for value. We have found that value of 60 works the best, if you are running daily exports.
 
 ## Changelog
+
+### 0.9.3
+
+#### Functionality update
+
+- Add Magento CAPTCHA and google reCAPTCHA option for newsletter sign-up form
 
 ### 0.9.2
 

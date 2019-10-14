@@ -1,0 +1,18 @@
+<?php
+$key = $block->getCaptchaApiKey();
+$captchaType = $block->getCaptchaType();
+if ($captchaType === 'google_captcha') : ?>
+    <script src="https://www.google.com/recaptcha/api.js" ></script>
+    <script type="text/x-magento-init">
+        {
+            "*": {
+                "Smaily_SmailyForMagento/js/captcha": { }
+            }
+        }
+    </script>
+    <div class="g-recaptcha"
+      data-sitekey="<?=  /* @noEscape */ $key ?>"
+      data-callback="smailyCaptchaSubmit"
+      data-size="invisible">
+    </div>
+<?php endif; ?>

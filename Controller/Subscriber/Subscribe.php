@@ -81,6 +81,11 @@ class Subscribe
             $params = $this->request->getParams();
             unset($params['form_key']);
 
+            // Unset CAPTCHA if set.
+            if (array_key_exists('captcha', $params)) {
+                unset($params['captcha']);
+            }
+
             foreach ($params as $key => $value) {
                 $extra[$key] = $value;
             }

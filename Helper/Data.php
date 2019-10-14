@@ -125,7 +125,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function getGeneralConfig($code, $storeId = null)
     {
         $tab = 'general';
-        if ($code === 'enableNewsletterSubscriptions') {
+        if (in_array($code, ['enableNewsletterSubscriptions', 'captcha_type', 'captcha_api_key', 'captcha_api_secret'], true)) {
             $tab = 'subscribe';
         }
         if (in_array($code, ['fields', 'sync_period', 'enableCronSync'], true)) {
@@ -139,6 +139,36 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         }
 
         return trim($this->getConfigValue(self::XML_PATH . $tab . '/' . $code, $storeId));
+    }
+
+    /**
+     * Get CAPTCHA type to use in newsletter signup form.
+     *
+     * @return string Captcha type.
+     */
+    public function getCaptchaType()
+    {
+        return $this->getGeneralConfig('captcha_type');
+    }
+
+    /**
+     * Get reCAPTCHA public API key.
+     *
+     * @return string public key.
+     */
+    public function getCaptchaApiKey()
+    {
+        return $this->getGeneralConfig('captcha_api_key');
+    }
+
+    /**
+     * Get reCAPTCHA private API key.
+     *
+     * @return string private key.
+     */
+    public function getCaptchaApiSecretKey()
+    {
+        return $this->getGeneralConfig('captcha_api_secret');
     }
 
     /**
@@ -476,6 +506,37 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $this->logger->error($e->getMessage());
         }
         return $response;
+    }
+
+    /**
+     * Validate reCAPTCHA response value.
+     *
+     * @param string $captchaResponse Response from google CAPTCHA
+     * @param string $secret reCAPTCHA api secret key.
+     * @return boolean
+     */
+    public function isCaptchaValid($captchaResponse, $secret)
+    {
+        $validated = false;
+
+        $url = 'https://www.google.com/recaptcha/api/siteverify';
+        $data = [
+            'secret' => $secret,
+            'response' => $captchaResponse,
+        ];
+
+        try {
+            $this->curl->post($url, $data);
+            $response = json_decode($this->curl->getBody(), true);
+            if ($response['success']) {
+                $validated = true;
+            }
+        } catch (\Exception $e) {
+            $this->logger->error($e->getMessage());
+            return false;
+        }
+
+        return $validated;
     }
 
     /**

@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+   <default>
+       <customer>
+           <captcha>
+               <forms>user_forgotpassword,user_login,smaily_captcha</forms>
+               <shown_to_logged_in_user>
+                   <smaily_captcha>1</smaily_captcha>
+               </shown_to_logged_in_user>
+               <always_for>
+                   <smaily_captcha>1</smaily_captcha>
+               </always_for>
+           </captcha>
+       </customer>
+       <captcha translate="label">
+           <frontend>
+               <areas>
+                   <smaily_captcha>
+                       <label>Newsletter form</label>
+                   </smaily_captcha>
+               </areas>
+           </frontend>
+       </captcha>
+   </default>
+</config>

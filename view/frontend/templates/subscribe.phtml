@@ -1,8 +1,8 @@
 <?php
-// Don't care if form collection is disabled as bots would get added also with sync only.
-$isSmailyEnabled = $block->isSmailyEnabled();
-
-if ($isSmailyEnabled) {
+$newsletterSubscriptionEnabled = $block->isNewsletterSubscriptionEnabled();
+$captchaEnabled = $block->isCaptchaEnabled();
+// TODO : Better way to render magento CAPTCHA.
+if ($newsletterSubscriptionEnabled && $captchaEnabled) {
     echo $block->getTemplateWithCaptcha();
 } else {
     echo $block->originalTemplateHtml();

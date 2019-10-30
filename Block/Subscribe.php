@@ -22,9 +22,19 @@ class Subscribe extends \Magento\Newsletter\Block\Subscribe
      *
      * @return boolean
      */
-    public function isSmailyEnabled()
+    public function isCaptchaEnabled()
     {
-        return $this->helper->isEnabled();
+        return $this->helper->isCaptchaEnabled();
+    }
+
+    /**
+     * Check if collection newsletter subscribers is enabled.
+     *
+     * @return boolean
+     */
+    public function isNewsletterSubscriptionEnabled()
+    {
+        return $this->helper->isNewsletterSubscriptionEnabled();
     }
 
     /**
@@ -67,33 +77,32 @@ class Subscribe extends \Magento\Newsletter\Block\Subscribe
         $xPath = new \DOMXPath($originalDOM);
 
         $captchaType = $this->helper->getCaptchaType();
-        $subscribeCollectionEnabled = $this->helper->isNewsletterSubscriptionEnabled();
 
         if ($captchaType === 'google_captcha') {
-            $captchaTemplate = $this->getBlockHtml('smaily.recaptcha');
+            // JS will render reCAPTCHA block.
+            return $this->getOriginalTemplate();
         } else {
             // May return empty string if built-in captcha is disabled.
             $captchaTemplate = $this->getBlockHtml('smaily.captcha');
         }
 
-        // Only show newsletter form when CAPTCHA and collection is enabled.
-        if ($captchaTemplate && $subscribeCollectionEnabled) {
-            if ($captchaType === 'magento_captcha') {
-                // Remove newsletter class (keep only block class) from original form as it messes up CSS.
-                $newsletterClass = $xPath->query('//div[@class="block newsletter"]')->item(0);
-                $newsletterClass->attributes->getNamedItem('class')->nodeValue = 'block';
-            }
+        // Only CAPTCHA section or error message when CAPTCHA is enabled, but disabled form general settings.
+        if ($captchaTemplate) {
+            // Remove newsletter class (keep only block class) from original form as it messes up CSS.
+            $newsletterClass = $xPath->query('//div[@class="block newsletter"]')->item(0);
+            $newsletterClass->attributes->getNamedItem('class')->nodeValue = 'block';
              // Select form and action section.
             $form = $originalDOM->getElementsByTagName('form')->item(0);
             $actionsSection = $xPath->query('//div[@class="actions"]')->item(0);
-
             // Add CAPTCHA section before action section.
             $captcha = $originalDOM->createDocumentFragment();
             $captcha->appendXML($captchaTemplate);
             $form->insertBefore($captcha, $actionsSection);
             return $originalDOM->saveHTML();
         } else {
-            return '';
+            return '<div style="color:red;"><p>You have enabled Smaily Newsletter form with Magento built-in CAPTCHA,
+            but the CAPTCHA is disabled in general settings.</p><p>Please enable magento CAPTCHA for Newsletter form
+            in general settings!</p></div>';
         }
     }
 }

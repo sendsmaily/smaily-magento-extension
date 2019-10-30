@@ -15,12 +15,14 @@
                             <argument name="width" xsi:type="string">50</argument>
                         </action>
                     </block>
-                    <block class="Smaily\SmailyForMagento\Block\ReCaptcha" name="smaily.recaptcha" template="Smaily_SmailyForMagento::reCaptcha.phtml" cacheable="false"/>
                 </container>
             </block>
         </referenceContainer>
         <referenceBlock name="head.components">
             <block class="Magento\Framework\View\Element\Js\Components" name="captcha_page_head_components" template="Magento_Captcha::js/components.phtml"/>
         </referenceBlock>
+        <referenceContainer name="content">
+            <block class="Smaily\SmailyForMagento\Block\ReCaptcha" name="smaily.recaptcha" template="Smaily_SmailyForMagento::reCaptcha.phtml" cacheable="false" ifconfig="smaily/general/enable"/>
+        </referenceContainer>
     </body>
 </page>

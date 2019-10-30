@@ -11,7 +11,31 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     protected $logger;
     protected $curl;
 
+    /**
+     * Settings section value.
+     */
     const XML_PATH = 'smaily/';
+
+    /**
+     * Settings page subscribe group id-s.
+     */
+    const SUBSCRIBE_SETTINGS = [
+        'enableNewsletterSubscriptions',
+        'enableCaptcha',
+        'captchaType',
+        'captchaApiKey',
+        'captchaApiSecret'
+    ];
+
+    /**
+     * Settings page sync group id-s.
+     */
+    const SYNC_SETTINGS = ['fields', 'frequency', 'enableCronSync'];
+
+    /**
+     * Settings page abandoned group id-s.
+     */
+    const ABANDONED_SETTINGS = ['autoresponderId', 'syncTime', 'productfields', 'enableAbandonedCart'];
 
     private $connection;
 
@@ -42,6 +66,16 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function isNewsletterSubscriptionEnabled()
     {
         return (bool) $this->getGeneralConfig('enableNewsletterSubscriptions');
+    }
+
+    /**
+     * Check if CAPTCHA is enabled for newsletter form.
+     *
+     * @return boolean
+     */
+    public function isCaptchaEnabled()
+    {
+        return (bool) $this->getGeneralConfig('enableCaptcha');
     }
 
     /**
@@ -125,17 +159,14 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function getGeneralConfig($code, $storeId = null)
     {
         $tab = 'general';
-        if (in_array($code, ['enableNewsletterSubscriptions', 'captcha_type', 'captcha_api_key', 'captcha_api_secret'], true)) {
+        if (in_array($code, self::SUBSCRIBE_SETTINGS, true)) {
             $tab = 'subscribe';
         }
-        if (in_array($code, ['fields', 'sync_period', 'enableCronSync'], true)) {
+        if (in_array($code, self::SYNC_SETTINGS, true)) {
             $tab = 'sync';
         }
-        if (in_array($code, ['ac_ar_id', 'sync_time', 'productfields', 'enableAbandonedCart'], true)) {
+        if (in_array($code, self::ABANDONED_SETTINGS, true)) {
             $tab = 'abandoned';
-        }
-        if ($code === 'feed_token') {
-            $tab = 'rss';
         }
 
         return trim($this->getConfigValue(self::XML_PATH . $tab . '/' . $code, $storeId));
@@ -148,7 +179,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getCaptchaType()
     {
-        return $this->getGeneralConfig('captcha_type');
+        return $this->getGeneralConfig('captchaType');
     }
 
     /**
@@ -158,7 +189,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getCaptchaApiKey()
     {
-        return $this->getGeneralConfig('captcha_api_key');
+        return $this->getGeneralConfig('captchaApiKey');
     }
 
     /**
@@ -168,7 +199,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getCaptchaApiSecretKey()
     {
-        return $this->getGeneralConfig('captcha_api_secret');
+        return $this->getGeneralConfig('captchaApiSecret');
     }
 
     /**
@@ -301,7 +332,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function sendAbandonedCartEmail($_data, $emailProduct)
     {
         // send data to autoresponder limit 10 products
-        $autoRespId = $this->getGeneralConfig('ac_ar_id');
+        $autoRespId = $this->getGeneralConfig('autoresponderId');
         $response = false;
         if (!empty($emailProduct) && !empty($_data)) {
             $address = [
@@ -344,7 +375,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function cronAbandonedcart($orders)
     {
         // Get sync interval and fields from settings
-        $sync_time = str_replace(':', ' ', $this->getGeneralConfig('sync_time'));
+        $syncTime = str_replace(':', ' ', $this->getGeneralConfig('syncTime'));
         $fields = explode(',', $this->getGeneralConfig('productfields'));
         $currentDate = strtotime(date('Y-m-d H:i') . ':00');
         foreach ($orders as $row) {
@@ -356,13 +387,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             if (!empty($row['reminder_date'])) {
                 $nextDate = strtotime($row['reminder_date']);
             } else {
-                $nextDate = strtotime($sync_time, $currentDate);
+                $nextDate = strtotime($syncTime, $currentDate);
                 $this->updateReminderDate($quote_id, date('Y-m-d H:i:s', $nextDate));
                 continue;
             }
             // Send remainder mail if reminder date has passed and mail not sent
             if ($currentDate >= $nextDate && !$isSent) {
-                $reminderUpdate = strtotime($sync_time, $currentDate);
+                $reminderUpdate = strtotime($syncTime, $currentDate);
                 // Send cart data to smaily autoresponder
                 $response = $this->alertCustomer($row, $fields);
                 // If successful log quote id else log error message

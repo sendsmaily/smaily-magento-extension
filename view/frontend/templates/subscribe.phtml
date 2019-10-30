@@ -1,8 +1,7 @@
 <?php
-$newsletterSubscriptionEnabled = $block->isNewsletterSubscriptionEnabled();
-$captchaEnabled = $block->isCaptchaEnabled();
+$shouldCheckCaptcha = $block->shouldCheckCaptcha();
 // TODO : Better way to render magento CAPTCHA.
-if ($newsletterSubscriptionEnabled && $captchaEnabled) {
+if ($shouldCheckCaptcha) {
     echo $block->getTemplateWithCaptcha();
 } else {
     echo $block->originalTemplateHtml();

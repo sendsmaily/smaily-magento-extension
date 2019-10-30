@@ -18,23 +18,13 @@ class Subscribe extends \Magento\Newsletter\Block\Subscribe
     }
 
     /**
-     * Get Smaily module enabled status.
+     * Check if CAPTCHA should be rendered.
      *
      * @return boolean
      */
-    public function isCaptchaEnabled()
+    public function shouldCheckCaptcha()
     {
-        return $this->helper->isCaptchaEnabled();
-    }
-
-    /**
-     * Check if collection newsletter subscribers is enabled.
-     *
-     * @return boolean
-     */
-    public function isNewsletterSubscriptionEnabled()
-    {
-        return $this->helper->isNewsletterSubscriptionEnabled();
+        return $this->helper->shouldCheckCaptcha();
     }
 
     /**

@@ -51,12 +51,7 @@ class NewsletterCaptchaObserver implements ObserverInterface
      */
     public function execute(\Magento\Framework\Event\Observer $observer)
     {
-        // TODO: This check should be a method shouldCheckCaptca() or something.
-        // Or add source model to disable captcha based of newsletter subscription enabled status.
-        // Problem captcha status can be enabled when newsletter susbscription is disabled.
-        if (!$this->smailyHelper->isEnabled() ||
-            !$this->smailyHelper->isNewsletterSubscriptionEnabled() ||
-            !$this->smailyHelper->isCaptchaEnabled()) {
+        if (!$this->smailyHelper->shouldCheckCaptcha()) {
             return;
         }
 

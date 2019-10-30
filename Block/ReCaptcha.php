@@ -39,12 +39,13 @@ class ReCaptcha extends Template
     }
 
     /**
-     * Get CAPTCHA enabled status.
+     * Check if CAPTCHA should be rendered.
      *
      * @return boolean
      */
-    public function isCaptchaEnabled()
+    public function shouldCheckCaptcha()
     {
-        return $this->helper->isCaptchaEnabled();
+        return $this->helper->shouldCheckCaptcha();
     }
+
 }

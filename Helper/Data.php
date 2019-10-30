@@ -79,6 +79,22 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
+     * Checks if CPATCHA should be checked.
+     *
+     * @return void
+     */
+    public function shouldCheckCaptcha()
+    {
+        $check = false;
+        // Check CAPTCHA only if module, subscriber collection and CAPTCHA is enabled.
+        if ($this->isEnabled() && $this->isNewsletterSubscriptionEnabled() && $this->isCaptchaEnabled()) {
+            $check = true;
+        }
+
+        return $check;
+    }
+
+    /**
      * Check  Smaily Cron Sync is enabled
      *
      * @return bool

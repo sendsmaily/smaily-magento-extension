@@ -1,8 +1,8 @@
 <?php
 $key = $block->getCaptchaApiKey();
-$captchaEnabled = $block->isCaptchaEnabled();
+$shouldCheckCaptcha = $block->shouldCheckCaptcha();
 $captchaType = $block->getCaptchaType();
-if ($captchaType === 'google_captcha' && $captchaEnabled) : ?>
+if ($captchaType === 'google_captcha' && $shouldCheckCaptcha) : ?>
     <script src="https://www.google.com/recaptcha/api.js" ></script>
     <script type="text/x-magento-init">
         {

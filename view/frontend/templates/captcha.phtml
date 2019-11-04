@@ -1,0 +1,17 @@
+<?php
+$shouldCheckCaptcha = $block->shouldCheckCaptcha();
+$captchaType = $block->getCaptchaType();
+$reCaptcha = $captchaType === 'google_captcha' && $shouldCheckCaptcha;
+?>
+<script type="text/x-magento-init">
+        {
+            "#smaily-additional-info": {
+                "Smaily_SmailyForMagento/js/captcha": {
+                    "reCaptcha" : "<?= $reCaptcha ?>"
+                }
+            }
+        }
+</script>
+
+
+

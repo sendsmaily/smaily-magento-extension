@@ -1,8 +1,0 @@
-<?php
-$shouldCheckCaptcha = $block->shouldCheckCaptcha();
-// TODO : Better way to render magento CAPTCHA.
-if ($shouldCheckCaptcha) {
-    echo $block->getTemplateWithCaptcha();
-} else {
-    echo $block->originalTemplateHtml();
-}

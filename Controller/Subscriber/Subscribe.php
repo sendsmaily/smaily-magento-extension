@@ -86,6 +86,11 @@ class Subscribe
                 unset($params['captcha']);
             }
 
+            // Unset reCAPTCHA if set.
+            if (array_key_exists('g-recaptcha-response', $params)) {
+                unset($params['g-recaptcha-response']);
+            }
+
             foreach ($params as $key => $value) {
                 $extra[$key] = $value;
             }

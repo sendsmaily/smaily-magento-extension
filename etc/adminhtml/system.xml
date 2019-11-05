@@ -64,6 +64,7 @@
             <depends>
               <field id="captchaType">google_captcha</field>
               <field id="enableCaptcha">1</field>
+              <field id="enableNewsletterSubscriptions">1</field>
           </depends>
           <validate>required-entry</validate>
         </field>
@@ -72,6 +73,7 @@
           <depends>
             <field id="captchaType">google_captcha</field>
             <field id="enableCaptcha">1</field>
+            <field id="enableNewsletterSubscriptions">1</field>
           </depends>
           <validate>required-entry</validate>
         </field>

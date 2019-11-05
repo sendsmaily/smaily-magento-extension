@@ -2,7 +2,6 @@
 
 namespace Smaily\SmailyForMagento\Block;
 
-
 use \Magento\Captcha\Helper\Data;
 use \Magento\Framework\View\Element\Template\Context;
 use Smaily\SmailyForMagento\Helper\Data as Helper;
@@ -31,6 +30,7 @@ class Captcha extends \Magento\Captcha\Block\Captcha
             $block = $this->getLayout()->createBlock($blockPath);
             $block->setData($this->getData());
             $html = $block->toHtml();
+            // Should render but admin disabled for smaily_captcha form.
             if (empty($html)) {
                 return $this->getErrorHtml();
             } else {
@@ -47,10 +47,8 @@ class Captcha extends \Magento\Captcha\Block\Captcha
      */
     public function getErrorHtml()
     {
-        // TODO: Style it!
-        return '<div id="smaily-captcha-error"><p style="color:red;">You have enabled Smaily Newsletter form with 
-        Magento built-in CAPTCHA, but the CAPTCHA is disabled in general settings.</p><p>
-        Please enable magento CAPTCHA for Newsletter form in Magento general settings!</p></div>';
+        return '<p id="smaily-captcha-error" style="color:red;">You have enabled Smaily Newsletter form with 
+        Magento built-in CAPTCHA, but the CAPTCHA is disabled in general settings.</p>';
     }
 
     /**

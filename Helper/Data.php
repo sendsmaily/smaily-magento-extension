@@ -16,27 +16,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     const XML_PATH = 'smaily/';
 
-    /**
-     * Settings page subscribe group id-s.
-     */
-    const SUBSCRIBE_SETTINGS = [
-        'enableNewsletterSubscriptions',
-        'enableCaptcha',
-        'captchaType',
-        'captchaApiKey',
-        'captchaApiSecret'
-    ];
-
-    /**
-     * Settings page sync group id-s.
-     */
-    const SYNC_SETTINGS = ['fields', 'frequency', 'enableCronSync'];
-
-    /**
-     * Settings page abandoned group id-s.
-     */
-    const ABANDONED_SETTINGS = ['autoresponderId', 'syncTime', 'productfields', 'enableAbandonedCart'];
-
     private $connection;
 
     public function __construct(
@@ -175,13 +154,22 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function getGeneralConfig($code, $storeId = null)
     {
         $tab = 'general';
-        if (in_array($code, self::SUBSCRIBE_SETTINGS, true)) {
+        if (in_array(
+            $code,
+            ['enableNewsletterSubscriptions',
+            'enableCaptcha',
+            'captchaType',
+            'captchaApiKey',
+            'captchaApiSecret'
+            ],
+            true
+        )) {
             $tab = 'subscribe';
         }
-        if (in_array($code, self::SYNC_SETTINGS, true)) {
+        if (in_array($code, ['fields', 'frequency', 'enableCronSync'], true)) {
             $tab = 'sync';
         }
-        if (in_array($code, self::ABANDONED_SETTINGS, true)) {
+        if (in_array($code, ['autoresponderId', 'syncTime', 'productfields', 'enableAbandonedCart'], true)) {
             $tab = 'abandoned';
         }
 

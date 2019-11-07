@@ -16,7 +16,7 @@
                 </block>
                 <block class="Magento\Framework\View\Element\Template" name="smaily.captcha.js" template="Smaily_SmailyForMagento::captcha.phtml" />
             </container>
-            <block class="Smaily\SmailyForMagento\Block\ReCaptcha" name="smaily.recaptcha" template="Smaily_SmailyForMagento::reCaptcha.phtml" cacheable="false" ifconfig="smaily/general/enable"/>
+            <block class="Smaily\SmailyForMagento\Block\ReCaptcha" name="smaily.recaptcha" template="Smaily_SmailyForMagento::reCaptcha.phtml" ifconfig="smaily/general/enable"/>
         </referenceContainer>
         <move element="form.subscribe" destination="smaily.additional.info" before="smaily.captcha" />
     </body>

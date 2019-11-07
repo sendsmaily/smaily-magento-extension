@@ -107,6 +107,12 @@ Usually a good place to start would be to check Magento CRON's Schedule Ahead fo
 
 ## Changelog
 
+### 1.0.1
+
+#### Bugfix
+
+- Fix PHP 5.6 compilation issues
+
 ### 1.0.0
 
 - Make using CAPTCHA optional for better integration with pop-up forms

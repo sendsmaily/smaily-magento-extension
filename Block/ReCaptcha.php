@@ -37,4 +37,15 @@ class ReCaptcha extends Template
     {
         return $this->helper->getCaptchaApiKey();
     }
+
+    /**
+     * Check if CAPTCHA should be rendered.
+     *
+     * @return boolean
+     */
+    public function shouldCheckCaptcha()
+    {
+        return $this->helper->shouldCheckCaptcha();
+    }
+
 }

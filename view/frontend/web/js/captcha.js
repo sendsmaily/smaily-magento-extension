@@ -1,21 +1,40 @@
-require(["jquery", "mage/validation"], function($) {
+define(["jquery", "domReady!"], function($) {
   "use strict";
-  $(document).ready(function($) {
-    var newsletterForm = $("#newsletter-validate-detail");
-    var submitButton = newsletterForm.find(":submit");
-    newsletterForm.mage("validation", {});
 
-    submitButton.click(function(event) {
-      var validated = newsletterForm.validation("isValid");
-      if (validated) {
-        event.preventDefault();
-        grecaptcha.execute();
+  $.widget("smaily.captcha", {
+    _create: function() {
+      var self = this,
+        error = false,
+        element = $(self.element[0]);
+      var newsletterBlock = element.find(".block.newsletter");
+      var newsletterForm = element.find("#newsletter-validate-detail");
+      var actionSection = newsletterForm.find(".actions");
+
+      if (element.find("#smaily-captcha-error").length > 0) {
+        error = true;
       }
-    });
 
-    window.smailyCaptchaSubmit = function(response) {
-      newsletterForm.submit();
-    };
+      if (error) {
+        var captchaError = $("#smaily-captcha-error");
+        var submitButton = newsletterForm.find(":submit");
+        submitButton.prop("disabled", true);
+        newsletterBlock.append(captchaError);
+      } else {
+        var captchaBlock = element.find(".field.captcha.required");
+        if (captchaBlock.length > 0) {
+          newsletterForm.removeClass("subscribe");
+          newsletterBlock.removeClass("newsletter");
+          actionSection.before(captchaBlock);
+        }
+      }
+      this.show();
+    },
+
+    show: function() {
+      var self = this;
+      $(self.element[0]).css("visibility", "visible");
+    }
   });
-  return;
+
+  return $.smaily.captcha;
 });

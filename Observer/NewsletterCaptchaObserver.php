@@ -51,8 +51,7 @@ class NewsletterCaptchaObserver implements ObserverInterface
      */
     public function execute(\Magento\Framework\Event\Observer $observer)
     {
-
-        if (!$this->smailyHelper->isEnabled()) {
+        if (!$this->smailyHelper->shouldCheckCaptcha()) {
             return;
         }
 

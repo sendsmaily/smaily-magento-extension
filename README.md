@@ -1,13 +1,10 @@
 # Smaily for Magento 2
 
-> **DISCLAIMER**
-> Plugin is still in development and currently being reviewed by Magento. Use at your own discretion before fully finished. All bug reports are welcome under issues tab.
-
 ## Description
 
 Smaily email marketing and automation extension module for Magento.
 
-Automatically synchronize newsletter subscribers to a Smaily subscribers list, generate rss-feed based on products for easy template import and send new newsletter subscribers directly to Smaily.
+Automatically synchronize newsletter subscribers to a Smaily subscribers list, generate RSS-feed based on products for easy template import and send new newsletter subscribers directly to Smaily.
 
 NOTE! One of the most noticeable shortcoming of the extension is that it allows only one-way synchronization, i.e. subscribers can only be exported from Magento to Smaily. It will be addressed in the next major version, after Smaily has added the capability for data export through the API.
 
@@ -109,6 +106,10 @@ Also you can determine if customer had more than 10 items in cart
 Usually a good place to start would be to check Magento CRON's Schedule Ahead for value. We have found that value of 60 works the best, if you are running daily exports.
 
 ## Changelog
+
+### 1.0.0
+
+- Make using CAPTCHA optional for better integration with pop-up forms
 
 ### 0.9.3
 

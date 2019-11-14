@@ -108,11 +108,11 @@ class Feed extends \Magento\Framework\App\Action\Action
             // Feed Item array
             $items[] =
             '<item>' .
-                '<title>' . htmlentities($product->getName()) . '</title>' .
+                '<title><![CDATA[' . $product->getName() . ']]></title>' .
                 '<link>' . $url . '</link>' .
                 '<guid isPermaLink="True">' . $url . '</guid>' .
                 '<pubDate>' . date('D, d M Y H:i:s', $createTime) . '</pubDate>' .
-                '<description>' . htmlentities(($product->getData('description'))) . '</description>' .
+                '<description><![CDATA[' . $product->getData('description') . ']]></description>' .
                 '<enclosure url="' . $image . '" />' .
                 '<smly:price>' . $splcPrice . '</smly:price>' .
                 $discount_fields .
@@ -123,7 +123,7 @@ class Feed extends \Magento\Framework\App\Action\Action
         '<?xml version="1.0" encoding="utf-8"?>' .
         '<rss xmlns:smly="https://sendsmaily.net/schema/editor/rss.xsd" version="2.0">
             <channel>
-            <title>' . $this->helperData->getConfigValue('general/store_information/name') . '</title>
+            <title><![CDATA[' . $this->helperData->getConfigValue('general/store_information/name') . ']]></title>
             <link>' . $baseUrl . '</link>
             <description>Product Feed</description>
             <lastBuildDate>' . date('D, d M Y H:i:s') . '</lastBuildDate>' .

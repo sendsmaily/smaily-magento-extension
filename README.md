@@ -107,6 +107,12 @@ Usually a good place to start would be to check Magento CRON's Schedule Ahead fo
 
 ## Changelog
 
+### 1.0.2
+
+### Bugfix
+
+- Fix RSS-feed not rendering with special characters
+
 ### 1.0.1
 
 #### Bugfix

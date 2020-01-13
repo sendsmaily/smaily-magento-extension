@@ -1,0 +1,17 @@
+tasks:
+  up:
+    usage: Start up docker containers for Magento2.
+    run:  docker-compose up -d
+  down:
+    usage: Stop docker containers for Magento 2.
+    run: docker-compose down
+  install-module:
+    usage: Installs module into the container. Defaults to Smaily_SmailyForMagento
+    options:
+      module:
+        usage: Module name
+        short: m
+        default: Smaily_SmailyForMagento
+    run:
+      - command: docker exec -it magento2 php /opt/bitnami/magento/htdocs/bin/magento module:enable ${module}
+      - command: docker exec -it magento2 php /opt/bitnami/magento/htdocs/bin/magento setup:upgrade

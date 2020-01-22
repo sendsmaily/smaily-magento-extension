@@ -1,0 +1,44 @@
+tasks:
+  build:
+    usage: Build the Magento image
+    options:
+      username:
+        usage: Username to use for base images
+        default:
+          command: id -un
+      user_id:
+        usage: User id to use for base images
+        default:
+          command: id -u
+      group:
+        usage: User group name to use for base images
+        default:
+          command: id -gn
+      group_id:
+        usage: User group id to use for base images
+        default:
+          command: id -g
+    run:
+      - command: >
+          docker-compose -f ./.docker/docker-compose.yml build
+          --build-arg username=${username}
+          --build-arg user_id=${user_id}
+          --build-arg group=${group}
+          --build-arg group_id=${group_id}
+      - command: docker image prune -f
+
+  up:
+    usage: Start containers
+    run: docker-compose -f ./.docker/docker-compose.yml up -d
+
+  down:
+    usage: Stop containers
+    run: docker-compose -f ./.docker/docker-compose.yml down
+
+  install-sampledata:
+    usage: Install sample-data for Magento store
+    run: docker exec -it magento2 install-sampledata
+
+  install-magento:
+    usage: Install Magento from CLI
+    run: docker exec -it magento2 install-magento

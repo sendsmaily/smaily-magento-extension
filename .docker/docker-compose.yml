@@ -1,9 +1,9 @@
 version: '3.7'
 
 services:
-  magento:
+  magento2:
     container_name: magento2
-    image: 'sendsmaily/magneto2'
+    image: sendsmaily/magneto2
     build:
       context: .
       args:
@@ -39,13 +39,14 @@ services:
 
   db:
     container_name: magento2_db
-    image: 'bitnami/mariadb:10.3'
+    image: mysql:5.7
     environment:
-      - MARIADB_ROOT_USER=db_user
-      - MARIADB_ROOT_PASSWORD=db_password
-      - MARIADB_DATABASE=magento2
+      - MYSQL_USER=db_user
+      - MYSQL_PASSWORD=db_password
+      - MYSQL_ROOT_PASSWORD=db_password
+      - MYSQL_DATABASE=magento2
     volumes:
-      - magento2-db-data:/bitnami/mariadb
+      - magento2-db-data:/var/lib/mysql
 
 volumes:
   magento2-data:

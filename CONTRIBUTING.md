@@ -1,3 +1,66 @@
+# Table of contents
+
+- [Setting up development environment](#setting-up-development-environment)
+  - [Tools](#tools)
+  - [Building](#building)
+  - [Starting containers](#starting-containers)
+  - [Installing Magento](#installing-magento)
+  - [Installing sample-data](#installing-sample-data)
+- [Getting published in Magento marketplace](#getting-published-in-magento-marketplace)
+  - [Testing module before submission to marketplace](#testing-module-before-submission-to-marketplace)
+  - [Limitations in Magento review](#limitations-in-magento-review)
+    - [PHP CodeSniffer, VS Code and Magento 2 coding standard integration](#php-codeSniffer,-vs-code-and-magento-2-coding-standard-integration)
+    - [Magento 2 module package testing](#magento-2-module-package-testing)
+  - [Compilation and production mode testing](#compilation-and-production-mode-testing)
+  - [Checklist for Magento marketplace](#checklist-for-magento-marketplace)
+
+# Setting up development environment
+
+## Tools
+
+This workflow uses [Tusk](https://rliebz.github.io/tusk/) - YAML-based task runner - to run tasks.
+To see all available commands run:
+```
+tusk -h
+```
+
+## Building
+
+To mirror local user to container you need to build the image first. Tusk file manages local user information. To mirror a different user you can modify default option values(`tusk build -h`).
+```
+tusk build
+```
+
+## Starting containers
+
+Starting and stopping containers have a shortcut Tusk commands available so that you can start and stop containers from this folder.
+
+To start the containers run:
+```
+tusk up
+```
+And to stop the containers run:
+```
+tusk down
+```
+
+## Installing Magento
+
+This Magento image has a built-in script for Magento installation. Magento installation also installs Smaily For Magento plugin as it is mounted before installation. To install Magento run:
+```
+tusk install-magento
+```
+
+## Installing sample-data
+
+**Installation of the sample-data must happen after you install Magento**
+
+This Magento image has a built-in script to install sample data. To install sample-data run:
+
+```
+tusk install-sampledata
+```
+
 # Getting published in Magento marketplace
 
 >Every new version of Smaily For Magento extension published needs to pass automatic and manual testing by the Magento review team!

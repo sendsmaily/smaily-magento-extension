@@ -340,78 +340,36 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Call to Smaily email API;
-     *
-     * @return bool|array
-     *  Smaily api response
-     */
-    public function sendAbandonedCartEmail($_data, $emailProduct)
-    {
-        // send data to autoresponder limit 10 products
-        $autoRespId = $this->getGeneralConfig('autoresponderId');
-        $response = false;
-        if (!empty($emailProduct) && !empty($_data)) {
-            $address = [
-                'email' => $_data['email'],
-                'name' => $_data['customer_name'],
-            ];
-            //If more than one product in abandoned cart iterate to products array
-            if (count($emailProduct) > 10) {
-                $address['over_10_products'] = 'true';
-            } elseif (count($emailProduct) > 1) {
-                $length = count($emailProduct);
-                if ($length > 10) {
-                    $length = 10;
-                }
-                for ($i=0; $i < $length; $i++) {
-                    foreach ($emailProduct[$i] as $key => $value) {
-                        $itemNumber = $i + 1;
-                        $address[$key . '_' . $itemNumber] = $value;
-                    }
-                }
-            } else {
-                foreach ($emailProduct[0] as $key => $val) {
-                    $address[$key . '_1'] = $val;
-                }
-            }
-            $query = [
-                'autoresponder' => $autoRespId,
-                'addresses' => [$address],
-            ];
-            $response = $this->callApi('autoresponder', $query, 'POST');
-        }
-        return $response;
-    }
-
-    /**
      * Call to Smaily Autoresponder api;
      *
      * @return void
      */
     public function cronAbandonedcart($orders)
     {
-        // Get sync interval and fields from settings
+        // Get sync interval and fields from settings.
         $syncTime = str_replace(':', ' ', $this->getGeneralConfig('syncTime'));
         $fields = explode(',', $this->getGeneralConfig('productfields'));
         $currentDate = strtotime(date('Y-m-d H:i') . ':00');
         foreach ($orders as $row) {
-            // Quote id
             $quote_id = $row['quote_id'];
-            // Is email sent
-            $isSent = (int) $row['is_sent'] === 1 ? true : false;
-            // Set remainder date if not already been set
-            if (!empty($row['reminder_date'])) {
-                $nextDate = strtotime($row['reminder_date']);
-            } else {
+            $newCart = empty($row['reminder_date']);
+
+            if ($newCart) {
                 $nextDate = strtotime($syncTime, $currentDate);
                 $this->updateReminderDate($quote_id, date('Y-m-d H:i:s', $nextDate));
                 continue;
+            } else {
+                $nextDate = strtotime($row['reminder_date']);
             }
-            // Send remainder mail if reminder date has passed and mail not sent
+
+            // Is email sent.
+            $isSent = (int) $row['is_sent'] === 1 ? true : false;
+            // Send remainder mail if reminder date has passed and mail not sent.
             if ($currentDate >= $nextDate && !$isSent) {
-                $reminderUpdate = strtotime($syncTime, $currentDate);
-                // Send cart data to smaily autoresponder
-                $response = $this->alertCustomer($row, $fields);
+                // Prepare fields for Smaily abandoned cart template.
+                $preparedCart = $this->prepareCartData($row, $fields);
+                // Send cart data to Smaily autoresponder.
+                $response = $this->sendAbandonedCartEmail($preparedCart);
                 // If successful log quote id else log error message
                 $result = '';
                 if (array_key_exists('message', $response) && $response['message'] == 'OK') {
@@ -431,25 +389,108 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         }
     }
 
-    private function alertCustomer($row, $fields)
+    /**
+     * Formats cart fields to standard abandoned cart template fields used in Smaily.
+     *
+     * @param array $row        Cart information.
+     * @param array $fields     Fields selected for template.
+     * @return array            Array of 'customer_data' and 'products_data' sections.
+     */
+    private function prepareCartData($row, $fields)
     {
-        $responderProduct = [];
+        // Populate customer data section.
+        $customerData = [
+            'email' => $row['customer_email']
+        ];
+
+        if (in_array('first_name', $fields, true)) {
+            $customerData['first_name'] = $row['customer_firstname'];
+        }
+
+        if (in_array('last_name', $fields, true)) {
+            $customerData['last_name'] = $row['customer_lastname'];
+        }
+        // Populate product data section.
+        $productsData = [];
+        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
 
         foreach ($row['products'] as $product) {
             $_product = [];
             foreach ($product as $field => $val) {
-                if ($field === 'name' || in_array($field, $fields, true)) {
-                    $_product['product_' . $field] = $val;
+                if (in_array($field, $fields, true)) {
+                    switch ($field) {
+                        case 'name':
+                            $_product['product_name'] = $val;
+                            break;
+                        case 'qty':
+                            $_product['product_quantity'] = $val;
+                            break;
+                        case 'description':
+                            $productObject = $objectManager->
+                                create('Magento\Catalog\Model\Product')->
+                                load($product['product_id']);
+                            $description = $productObject->getDescription();
+                            $_product['product_description'] = htmlentities($description);
+                            break;
+                        default:
+                            $_product['product_' . $field ] = $val;
+                            break;
+                    }
                 }
             }
-            $responderProduct[] = $_product;
+            $productsData[] = $_product;
         }
 
-        $_data = [
-            'customer_name' => $row['customer_firstname'],
-            'email' => $row['customer_email'],
+        return [
+            'customer_data' => $customerData,
+            'products_data' => $productsData,
         ];
-        return $this->sendAbandonedCartEmail($_data, $responderProduct);
+    }
+
+    /**
+     * Sends abandoned cart email.
+     *
+     * @param array $preparedCart   Prepared cart to send to Smaily.
+     * @return array                Smaily response.
+     */
+    public function sendAbandonedCartEmail($preparedCart)
+    {
+        $customerData = $preparedCart['customer_data'];
+        $productsData = $preparedCart['products_data'];
+
+        $autoRespId = $this->getGeneralConfig('autoresponderId');
+
+        // Populate customer data fields.
+        $address = [];
+        foreach ($customerData as $key => $value) {
+            $address[$key] = $value;
+        }
+
+        //If more than one product in abandoned cart iterate to products array
+        if (count($productsData) > 10) {
+            $address['over_10_products'] = 'true';
+        } elseif (count($productsData) > 1) {
+            $length = count($productsData);
+            if ($length > 10) {
+                $length = 10;
+            }
+            for ($i=0; $i < $length; $i++) {
+                foreach ($productsData[$i] as $key => $value) {
+                    $itemNumber = $i + 1;
+                    $address[$key . '_' . $itemNumber] = $value;
+                }
+            }
+        } else {
+            foreach ($productsData[0] as $key => $val) {
+                $address[$key . '_1'] = $val;
+            }
+        }
+        $query = [
+            'autoresponder' => $autoRespId,
+            'addresses' => [$address],
+        ];
+
+        return $this->callApi('autoresponder', $query, 'POST');
     }
 
     /**

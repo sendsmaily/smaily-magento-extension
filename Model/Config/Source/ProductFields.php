@@ -13,6 +13,14 @@ class ProductFields implements \Magento\Framework\Option\ArrayInterface
     {
         $list = [
             [
+                'value' => 'first_name',
+                'label' => 'Customer First Name'
+            ],
+            [
+                'value' => 'last_name',
+                'label' => 'Customer Last Name'
+            ],
+            [
                 'value' => 'name',
                 'label' => 'Product Name',
             ],
@@ -22,19 +30,19 @@ class ProductFields implements \Magento\Framework\Option\ArrayInterface
             ],
             [
                 'value' => 'sku',
-                'label' => 'SKU',
+                'label' => 'Product SKU',
             ],
             [
                 'value' => 'qty',
-                'label' => 'Qty',
+                'label' => 'Product Quantity',
             ],
             [
                 'value' => 'price',
-                'label' => 'Price',
+                'label' => 'Product Price',
             ],
             [
                 'value' => 'base_price',
-                'label' => 'Base Price',
+                'label' => 'Product Base Price',
             ],
         ];
 

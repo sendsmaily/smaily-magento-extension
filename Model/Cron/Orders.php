@@ -30,7 +30,7 @@ class Orders
         foreach ($quotes as $quote) {
             $itemData = $connection
                 ->fetchAll(
-                    'SELECT product_id, name, description, sku, qty, price, base_price, weight
+                    'SELECT product_id, name, description, sku, qty, price, base_price
                     FROM `quote_item`
                     WHERE quote_id = ' . $quote['entity_id']
                 );

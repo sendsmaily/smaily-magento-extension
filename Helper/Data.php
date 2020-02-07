@@ -419,9 +419,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             foreach ($product as $field => $val) {
                 if (in_array($field, $fields, true)) {
                     switch ($field) {
-                        case 'name':
-                            $_product['product_name'] = $val;
-                            break;
                         case 'qty':
                             $_product['product_quantity'] = $val;
                             break;

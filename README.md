@@ -31,7 +31,7 @@ NOTE! One of the most noticeable shortcoming of the extension is that it allows 
 ### Abandoned cart notification
 
 - Automatically notify customers about their abandoned cart
-- Send abandoned cart information to smaily for easy use on templates
+- Send abandoned cart information to Smaily for easy use on templates
 
 ## Requirements
 
@@ -79,7 +79,8 @@ You can access RSS feed by visiting ulr `store_url/smaily/rss/feed` and you can 
 
 Here is a list of all the parameters available in Smaily email templating engine:
 
-- Customer name: `{{ name }}`.
+- Customer first name: `{{ first_name }}`.
+- Customer last name: `{{ last_name }}`
 
 Up to 10 products can be received in Smaily templating engine. You can refrence each product with number 1-10 behind parameter name.
 
@@ -89,7 +90,7 @@ Up to 10 products can be received in Smaily templating engine. You can refrence 
 
 - Product SKU: `{{ product_sku_[1-10] }}`.
 
-- Product quantity: `{{ product_qty_[1-10] }}`.
+- Product quantity: `{{ product_quantity_[1-10] }}`.
 
 - Product price: `{{ product_price_[1-10] }}`.
 
@@ -106,6 +107,11 @@ Also you can determine if customer had more than 10 items in cart
 Usually a good place to start would be to check Magento CRON's Schedule Ahead for value. We have found that value of 60 works the best, if you are running daily exports.
 
 ## Changelog
+
+### 1.0.3
+
+- Add new fields ` first_name ` and `last_name` for abandoned cart export
+- Changes `product_qty` field to `product_quantity` to unify template variables across integrations
 
 ### 1.0.2
 

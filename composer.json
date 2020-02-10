@@ -1,7 +1,7 @@
 {
   "name": "smaily/smailyformagento",
   "description": "Magento 2 Smaily extension",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "type": "magento2-module",
   "license": "GPL-3.0",
   "authors": [

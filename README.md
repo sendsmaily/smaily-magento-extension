@@ -108,7 +108,7 @@ Usually a good place to start would be to check Magento CRON's Schedule Ahead fo
 
 ## Changelog
 
-### 1.0.3
+### 1.1.0
 
 - Add new fields ` first_name ` and `last_name` for abandoned cart export
 - Changes `product_qty` field to `product_quantity` to unify template variables across integrations

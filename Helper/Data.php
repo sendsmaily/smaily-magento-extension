@@ -392,35 +392,40 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     /**
      * Formats cart fields to standard abandoned cart template fields used in Smaily.
      *
-     * @param array $row        Cart information.
-     * @param array $fields     Fields selected for template.
-     * @return array            Array of 'customer_data' and 'products_data' sections.
+     * @param array $row            Cart information.
+     * @param array $selectedFields Fields selected for template.
+     * @return array                Array of 'customer_data' and 'products_data' sections.
      */
-    private function prepareCartData($row, $fields)
+    private function prepareCartData($row, $selectedFields)
     {
         // Populate customer data section.
         $customerData = [
             'email' => $row['customer_email']
         ];
 
-        if (in_array('first_name', $fields, true)) {
+        if (in_array('first_name', $selectedFields, true)) {
             $customerData['first_name'] = $row['customer_firstname'];
         }
 
-        if (in_array('last_name', $fields, true)) {
+        if (in_array('last_name', $selectedFields, true)) {
             $customerData['last_name'] = $row['customer_lastname'];
         }
         // Populate product data section.
         $productsData = [];
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-
+        $fieldsAvailable = $this->getAllAbandonedCartFields();
         foreach ($row['products'] as $product) {
             $_product = [];
-            foreach ($product as $field => $val) {
-                if (in_array($field, $fields, true)) {
+            foreach ($fieldsAvailable as $field) {
+                if (in_array($field, $selectedFields)) {
                     switch ($field) {
+                        case 'first_name':
+                        case 'last_name':
+                            // Skip customer fields.
+                            break;
                         case 'qty':
-                            $_product['product_quantity'] = $val;
+                            // Transform qty to quantity.
+                            $_product['product_quantity'] = $product[$field];
                             break;
                         case 'description':
                             $productObject = $objectManager->
@@ -430,7 +435,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                             $_product['product_description'] = htmlentities($description);
                             break;
                         default:
-                            $_product['product_' . $field ] = $val;
+                            $_product['product_' . $field ] = $product[$field];
                             break;
                     }
                 }
@@ -442,6 +447,27 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             'customer_data' => $customerData,
             'products_data' => $productsData,
         ];
+    }
+
+    /**
+     * Get all fields available for abandoned cart template.
+     * From Model\Config\Source\ProductFields
+     *
+     * @return array Array of values for abandoned cart template
+     */
+    public function getAllAbandonedCartFields()
+    {
+        $arr = [];
+
+        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        $model = $objectManager->create('Smaily\SmailyForMagento\Model\Config\Source\ProductFields');
+        $fields = $model->toOptionArray();
+
+        foreach ($fields as $field) {
+            $arr[] = $field['value'];
+        }
+
+        return $arr;
     }
 
     /**

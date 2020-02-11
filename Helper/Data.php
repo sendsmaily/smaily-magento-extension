@@ -413,6 +413,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         // Populate product data section.
         $productsData = [];
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        $priceHelper = $objectManager->create('Magento\Framework\Pricing\Helper\Data');
+
         $fieldsAvailable = $this->getAllAbandonedCartFields();
         foreach ($row['products'] as $product) {
             $_product = [];
@@ -424,15 +426,20 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                             // Skip customer fields.
                             break;
                         case 'qty':
-                            // Transform qty to quantity.
-                            $_product['product_quantity'] = $product[$field];
+                            // Transform qty to quantity and strip trailing zeroes.
+                            $_product['product_quantity'] = $this->stripTrailingZeroes($product[$field]);
                             break;
                         case 'description':
                             $productObject = $objectManager->
                                 create('Magento\Catalog\Model\Product')->
                                 load($product['product_id']);
                             $description = $productObject->getDescription();
-                            $_product['product_description'] = htmlentities($description);
+                            $_product['product_description'] = htmlspecialchars($description);
+                            break;
+                        case 'price':
+                        case 'base_price':
+                            // Format price as store displays.
+                            $_product['product_' . $field ] = $priceHelper->currency($product[$field], true, false);
                             break;
                         default:
                             $_product['product_' . $field ] = $product[$field];
@@ -514,6 +521,25 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         ];
 
         return $this->callApi('autoresponder', $query, 'POST');
+    }
+
+    /**
+     * Remove trailing zeroes from string.
+     * For example 1.1030 -> 1.103 and 1.000 -> 1
+     *
+     * @param string $value
+     * @return string
+     */
+    public function stripTrailingZeroes($value)
+    {
+        $trimmed = rtrim($value, '0');
+
+        // Remove the trailing "." if quantity 1.
+        if (substr($trimmed, -1) === '.') {
+            $trimmed = substr($trimmed, 0, -1);
+        }
+
+        return $trimmed;
     }
 
     /**

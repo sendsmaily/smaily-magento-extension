@@ -340,78 +340,36 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Call to Smaily email API;
-     *
-     * @return bool|array
-     *  Smaily api response
-     */
-    public function sendAbandonedCartEmail($_data, $emailProduct)
-    {
-        // send data to autoresponder limit 10 products
-        $autoRespId = $this->getGeneralConfig('autoresponderId');
-        $response = false;
-        if (!empty($emailProduct) && !empty($_data)) {
-            $address = [
-                'email' => $_data['email'],
-                'name' => $_data['customer_name'],
-            ];
-            //If more than one product in abandoned cart iterate to products array
-            if (count($emailProduct) > 10) {
-                $address['over_10_products'] = 'true';
-            } elseif (count($emailProduct) > 1) {
-                $length = count($emailProduct);
-                if ($length > 10) {
-                    $length = 10;
-                }
-                for ($i=0; $i < $length; $i++) {
-                    foreach ($emailProduct[$i] as $key => $value) {
-                        $itemNumber = $i + 1;
-                        $address[$key . '_' . $itemNumber] = $value;
-                    }
-                }
-            } else {
-                foreach ($emailProduct[0] as $key => $val) {
-                    $address[$key . '_1'] = $val;
-                }
-            }
-            $query = [
-                'autoresponder' => $autoRespId,
-                'addresses' => [$address],
-            ];
-            $response = $this->callApi('autoresponder', $query, 'POST');
-        }
-        return $response;
-    }
-
-    /**
      * Call to Smaily Autoresponder api;
      *
      * @return void
      */
     public function cronAbandonedcart($orders)
     {
-        // Get sync interval and fields from settings
+        // Get sync interval and fields from settings.
         $syncTime = str_replace(':', ' ', $this->getGeneralConfig('syncTime'));
         $fields = explode(',', $this->getGeneralConfig('productfields'));
         $currentDate = strtotime(date('Y-m-d H:i') . ':00');
         foreach ($orders as $row) {
-            // Quote id
             $quote_id = $row['quote_id'];
-            // Is email sent
-            $isSent = (int) $row['is_sent'] === 1 ? true : false;
-            // Set remainder date if not already been set
-            if (!empty($row['reminder_date'])) {
-                $nextDate = strtotime($row['reminder_date']);
-            } else {
+            $newCart = empty($row['reminder_date']);
+
+            if ($newCart) {
                 $nextDate = strtotime($syncTime, $currentDate);
                 $this->updateReminderDate($quote_id, date('Y-m-d H:i:s', $nextDate));
                 continue;
+            } else {
+                $nextDate = strtotime($row['reminder_date']);
             }
-            // Send remainder mail if reminder date has passed and mail not sent
+
+            // Is email sent.
+            $isSent = (int) $row['is_sent'] === 1 ? true : false;
+            // Send remainder mail if reminder date has passed and mail not sent.
             if ($currentDate >= $nextDate && !$isSent) {
-                $reminderUpdate = strtotime($syncTime, $currentDate);
-                // Send cart data to smaily autoresponder
-                $response = $this->alertCustomer($row, $fields);
+                // Prepare fields for Smaily abandoned cart template.
+                $preparedCart = $this->prepareCartData($row, $fields);
+                // Send cart data to Smaily autoresponder.
+                $response = $this->sendAbandonedCartEmail($preparedCart);
                 // If successful log quote id else log error message
                 $result = '';
                 if (array_key_exists('message', $response) && $response['message'] == 'OK') {
@@ -431,25 +389,157 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         }
     }
 
-    private function alertCustomer($row, $fields)
+    /**
+     * Formats cart fields to standard abandoned cart template fields used in Smaily.
+     *
+     * @param array $row            Cart information.
+     * @param array $selectedFields Fields selected for template.
+     * @return array                Array of 'customer_data' and 'products_data' sections.
+     */
+    private function prepareCartData($row, $selectedFields)
     {
-        $responderProduct = [];
+        // Populate customer data section.
+        $customerData = [
+            'email' => $row['customer_email']
+        ];
 
-        foreach ($row['products'] as $product) {
-            $_product = [];
-            foreach ($product as $field => $val) {
-                if ($field === 'name' || in_array($field, $fields, true)) {
-                    $_product['product_' . $field] = $val;
-                }
-            }
-            $responderProduct[] = $_product;
+        if (in_array('first_name', $selectedFields, true)) {
+            $customerData['first_name'] = $row['customer_firstname'];
         }
 
-        $_data = [
-            'customer_name' => $row['customer_firstname'],
-            'email' => $row['customer_email'],
+        if (in_array('last_name', $selectedFields, true)) {
+            $customerData['last_name'] = $row['customer_lastname'];
+        }
+        // Populate product data section.
+        $productsData = [];
+        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        $priceHelper = $objectManager->create('Magento\Framework\Pricing\Helper\Data');
+
+        $fieldsAvailable = $this->getAllAbandonedCartFields();
+        foreach ($row['products'] as $product) {
+            $_product = [];
+            foreach ($fieldsAvailable as $field) {
+                if (in_array($field, $selectedFields)) {
+                    switch ($field) {
+                        case 'first_name':
+                        case 'last_name':
+                            // Skip customer fields.
+                            break;
+                        case 'qty':
+                            // Transform qty to quantity and strip trailing zeroes.
+                            $_product['product_quantity'] = $this->stripTrailingZeroes($product[$field]);
+                            break;
+                        case 'description':
+                            $productObject = $objectManager->
+                                create('Magento\Catalog\Model\Product')->
+                                load($product['product_id']);
+                            $description = $productObject->getDescription();
+                            $_product['product_description'] = htmlspecialchars($description);
+                            break;
+                        case 'price':
+                        case 'base_price':
+                            // Format price as store displays.
+                            $_product['product_' . $field ] = $priceHelper->currency($product[$field], true, false);
+                            break;
+                        default:
+                            $_product['product_' . $field ] = $product[$field];
+                            break;
+                    }
+                }
+            }
+            $productsData[] = $_product;
+        }
+
+        return [
+            'customer_data' => $customerData,
+            'products_data' => $productsData,
         ];
-        return $this->sendAbandonedCartEmail($_data, $responderProduct);
+    }
+
+    /**
+     * Get all fields available for abandoned cart template.
+     * From Model\Config\Source\ProductFields
+     *
+     * @return array Array of values for abandoned cart template
+     */
+    public function getAllAbandonedCartFields()
+    {
+        $arr = [];
+
+        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        $model = $objectManager->create('Smaily\SmailyForMagento\Model\Config\Source\ProductFields');
+        $fields = $model->toOptionArray();
+
+        foreach ($fields as $field) {
+            $arr[] = $field['value'];
+        }
+
+        return $arr;
+    }
+
+    /**
+     * Sends abandoned cart email.
+     *
+     * @param array $preparedCart   Prepared cart to send to Smaily.
+     * @return array                Smaily response.
+     */
+    public function sendAbandonedCartEmail($preparedCart)
+    {
+        $customerData = $preparedCart['customer_data'];
+        $productsData = $preparedCart['products_data'];
+
+        $autoRespId = $this->getGeneralConfig('autoresponderId');
+
+        // Populate customer data fields.
+        $address = [];
+        foreach ($customerData as $key => $value) {
+            $address[$key] = $value;
+        }
+
+        //If more than one product in abandoned cart iterate to products array
+        if (count($productsData) > 10) {
+            $address['over_10_products'] = 'true';
+        } elseif (count($productsData) > 1) {
+            $length = count($productsData);
+            if ($length > 10) {
+                $length = 10;
+            }
+            for ($i=0; $i < $length; $i++) {
+                foreach ($productsData[$i] as $key => $value) {
+                    $itemNumber = $i + 1;
+                    $address[$key . '_' . $itemNumber] = $value;
+                }
+            }
+        } else {
+            foreach ($productsData[0] as $key => $val) {
+                $address[$key . '_1'] = $val;
+            }
+        }
+        $query = [
+            'autoresponder' => $autoRespId,
+            'addresses' => [$address],
+        ];
+
+        return $this->callApi('autoresponder', $query, 'POST');
+    }
+
+    /**
+     * Remove trailing zeroes from string.
+     * For example 1.1030 -> 1.103 and 1.000 -> 1
+     *
+     * @param string $value
+     * @return string
+     */
+    public function stripTrailingZeroes($value)
+    {
+        $trimmed = rtrim($value, '0');
+
+        // Remove the trailing "." if quantity 1.
+        if (substr($trimmed, -1) === '.') {
+            $trimmed = substr($trimmed, 0, -1);
+        }
+
+        return $trimmed;
     }
 
     /**

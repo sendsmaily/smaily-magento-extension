@@ -392,14 +392,27 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function cronSubscribeAll($list)
     {
+        $subscribers = array();
         foreach ($list as $batch) {
-            $response = $this->callApi('contact', $batch, 'POST');
-            if (!array_key_exists('message', $response) ||
-                array_key_exists('message', $response) && $response['message'] !== 'OK') {
-                    return false;
-            }
-        }
+            foreach($this->getWebsiteIds() as $websiteId) {
+                if($this->isClashingWithDefaultSettingAndOverwritten('enableCronSync', $websiteId)) {
+                    continue;
+                }
+                // Filter subscribers array by website ID.
+                $subscribers = array_filter($batch, function($ar) use ($websiteId) {
+                    return ($ar['website_id'] === (string) $websiteId);
+                });
 
+                if(empty($subscribers)) {
+                    continue;
+                }
+                $response = $this->callApi('contact', $subscribers, 'POST', $websiteId);
+                if (!array_key_exists('message', $response) ||
+                    array_key_exists('message', $response) && $response['message'] !== 'OK') {
+                    return false;
+                }
+            };
+        }
         return true;
     }
 

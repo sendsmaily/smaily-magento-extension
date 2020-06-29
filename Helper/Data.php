@@ -52,7 +52,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         Curl $curl,
         Http $request,
         State $state,
-        StoreStoreManagerInterface $storeManager,
+        StoreManagerInterface $storeManager,
         CollectionFactory $websiteCollectionFactory
 
     ) {

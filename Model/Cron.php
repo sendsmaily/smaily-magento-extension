@@ -35,8 +35,8 @@ class Cron
             $last_update = $this->helperData->getLastCustomerSyncTime();
 
             // Remove unsubscribers from each Magento website separately.
-            foreach($this->helperData->getWebsiteIds() as $websiteId) {
-                if($this->helperData->isClashingWithDefaultSettingAndOverwritten('enableCronSync', $websiteId)) {
+            foreach ($this->helperData->getWebsiteIds() as $websiteId) {
+                if ($this->helperData->isClashingWithDefaultSettingAndOverwritten('enableCronSync', $websiteId)) {
                     continue;
                 }
                 $unsubscribers_list = $this->helperData->getUnsubscribersEmails(1000, 0, $websiteId);

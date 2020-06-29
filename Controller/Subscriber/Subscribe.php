@@ -65,7 +65,7 @@ class Subscribe
         if ($this->helper->isEnabled() && $this->helper->isNewsletterSubscriptionEnabled()) {
             // Check if subscriber collection is enabled for website scope.
             $websiteId = (int) $this->storeManager->getStore()->getWebsiteId();
-            if( $this->helper->isClashingWithDefaultSettingAndOverwritten('enableNewsletterSubscriptions', $websiteId)) {
+            if ($this->helper->isClashingWithDefaultSettingAndOverwritten('enableNewsletterSubscriptions', $websiteId)) {
                 return null;
             }
 

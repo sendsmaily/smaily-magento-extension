@@ -152,7 +152,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function isClashingWithDefaultSettingAndOverwritten($setting, $websiteId) {
         $overwriteSettingTrue = (bool) $this->getGeneralConfig('overwriteDefaultSettings', $websiteId);
         $isClashingWithDefaultSetting = $this->getGeneralConfig($setting, '0') !== $this->getGeneralConfig($setting, $websiteId);
-        if( $isClashingWithDefaultSetting && $overwriteSettingTrue) {
+        if ($isClashingWithDefaultSetting && $overwriteSettingTrue) {
             return true;
         }
         return false;
@@ -182,9 +182,10 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return array Website IDs
      */
-    public function getWebsiteIds() {
+    public function getWebsiteIds()
+    {
         $ids = array();
-        foreach($this->websiteCollectionFactory->create() as $website) {
+        foreach ($this->websiteCollectionFactory->create() as $website) {
             $ids[] = (int) $website->getId();
         }
         return $ids;
@@ -341,7 +342,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      * @return array
      *  Smaily api response
      */
-    public function optInSubscriber($email, $data = [], $websiteId)
+    public function optInSubscriber($email, $data = [], $websiteId = 0)
     {
         $address = [
             'email' => $email,
@@ -371,17 +372,17 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $subscribers = array();
         foreach ($list as $batch) {
             // Subscribe customers to each website separately.
-            foreach($this->getWebsiteIds() as $websiteId) {
-                if($this->isClashingWithDefaultSettingAndOverwritten('enableCronSync', $websiteId)) {
+            foreach ($this->getWebsiteIds() as $websiteId) {
+                if ($this->isClashingWithDefaultSettingAndOverwritten('enableCronSync', $websiteId)) {
                     continue;
                 }
 
                 // Filter subscribers by website ID.
-                $subscribers = array_filter($batch, function($ar) use ($websiteId) {
+                $subscribers = array_filter($batch, function ($ar) use ($websiteId) {
                     return ($ar['website_id'] === (string) $websiteId);
                 });
 
-                if(empty($subscribers)) {
+                if (empty($subscribers)) {
                     continue;
                 }
 
@@ -411,7 +412,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $currentDate = strtotime(date('Y-m-d H:i') . ':00');
         foreach ($orders as $row) {
             $websiteId = $this->resolveCurrentWebsiteId($row['store_id']);
-            if($this->isClashingWithDefaultSettingAndOverwritten('enableAbandonedCart', $websiteId)) {
+            if ($this->isClashingWithDefaultSettingAndOverwritten('enableAbandonedCart', $websiteId)) {
                 continue;
             }
 
@@ -667,7 +668,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
       * @param integer $offset Page number (Not sql offset).
       * @return array Unsubscribers emails list from smaily.
       */
-    public function getUnsubscribersEmails($limit, $offset = 0, $websiteId)
+    public function getUnsubscribersEmails($limit, $offset = 0, $websiteId = 0)
     {
         $unsubscribers_emails = [];
         $data = [

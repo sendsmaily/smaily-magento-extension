@@ -79,7 +79,7 @@ class Customers
                 $websiteId = (int) $this->storeManager->getStore($s['store_id'])->getWebsiteId();
                 // Get fields to sync from configuration page.
                 $sync_fields = $this->helperData->getGeneralConfig('fields');
-                if($this->helperData->isClashingWithDefaultSettingAndOverwritten('fields', $websiteId)) {
+                if ($this->helperData->isClashingWithDefaultSettingAndOverwritten('fields', $websiteId)) {
                     $sync_fields = $this->helperData->getGeneralConfig('fields', $websiteId);
                 }
                 $sync_fields = explode(',', $sync_fields);
@@ -180,7 +180,9 @@ class Customers
 
         // Convert to int. Simpler for using in SQL binds.
         $intStoreIds = array_map(
-            function($value) { return (int)$value; },
+            function ($value) {
+                return (int)$value;
+            },
             $stringStoreIds
         );
 

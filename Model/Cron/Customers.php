@@ -76,6 +76,7 @@ class Customers
                     }
                 }
 
+                $websiteId = (int) $this->storeManager->getStore($s['store_id'])->getWebsiteId();
                 // Get fields to sync from configuration page.
                 $sync_fields = $this->helperData->getGeneralConfig('fields');
                 if($this->helperData->isClashingWithDefaultSettingAndOverwritten('fields', $websiteId)) {
@@ -90,6 +91,7 @@ class Customers
                     'subscription_type' => 'Subscriber',
                     'customer_group' => $customer ? $this->helperData->getCustomerGroupName($customer->getGroupId()) : 'Guest',
                     'customer_id' => $customer_id,
+                    'website_id' => $websiteId,
                     'prefix' => $customer ? $customer->getPrefix() : '',
                     'firstname' => $customer ? ucfirst($customer->getFirstname()) : '',
                     'lastname' => $customer ? ucfirst($customer->getLastname()) : '',
@@ -101,7 +103,8 @@ class Customers
                 $subscriber = [
                     'email' => $subscriberData['email'],
                     'name' => $subscriberData['name'],
-                    'store' => $this->storeManager->getStore($s['store_id'])->getName()
+                    'store' => $this->storeManager->getStore($s['store_id'])->getName(),
+                    'website_id' => $subscriberData['website_id']
                 ];
                 // Add values only selected in configuration page.
                 foreach ($subscriberData as $key => $value) {

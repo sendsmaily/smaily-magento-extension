@@ -63,6 +63,7 @@ class Subscribe
     {
         // Check Smaily extension/newsletter subscribers collection are enabled.
         if ($this->helper->isEnabled() && $this->helper->isNewsletterSubscriptionEnabled()) {
+            $websiteId = (int) $this->storeManager->getStore()->getWebsiteId();
             // Create addtional fields array.
             $extra = [
                 'customer_id' => '',
@@ -96,7 +97,7 @@ class Subscribe
             }
 
             // Send customer data to Smaily for subscription.
-            $response = $this->helper->optInSubscriber($email, $extra);
+            $response = $this->helper->optInSubscriber($email, $extra, $websiteId);
 
             // Don't want to change email before actual function so returning null.
             return null;

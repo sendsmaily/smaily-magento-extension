@@ -257,9 +257,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return string
      */
-    public function getSubdomain()
+    public function getSubdomain($websiteId)
     {
-        $domain = $this->getGeneralConfig('subdomain');
+        $domain = $this->getGeneralConfig('subdomain', $websiteId);
 
         $domain = trim(strtolower(str_replace(['https://', 'http://', '/', '.sendsmaily.net'], '', $domain)));
         return $domain;
@@ -291,7 +291,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getAutoresponders()
     {
-        $autoresponders = $this->callApi('workflows', ['trigger_type' => 'form_submitted']);
+        $websiteId = $this->resolveCurrentWebsiteId();
+        $autoresponders = $this->callApi('workflows', ['trigger_type' => 'form_submitted'], 'GET', $websiteId);
         $list = [];
 
         if (!empty($autoresponders)) {
@@ -335,7 +336,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      * @return array
      *  Smaily api response
      */
-    public function optInSubscriber($email, $data = [])
+    public function optInSubscriber($email, $data = [], $websiteId)
     {
         $address = [
             'email' => $email,
@@ -351,7 +352,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             'addresses' => [$address],
         ];
 
-        return $this->callApi('autoresponder', $post, 'POST');
+        return $this->callApi('autoresponder', $post, 'POST', $websiteId);
     }
 
     /**
@@ -380,11 +381,22 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function cronAbandonedcart($orders)
     {
-        // Get sync interval and fields from settings.
-        $syncTime = str_replace(':', ' ', $this->getGeneralConfig('syncTime'));
-        $fields = explode(',', $this->getGeneralConfig('productfields'));
+
         $currentDate = strtotime(date('Y-m-d H:i') . ':00');
         foreach ($orders as $row) {
+            $websiteId = $this->resolveCurrentWebsiteId($row['store_id']);
+            if($this->isClashingWithDefaultSettingAndOverwritten('enableAbandonedCart', $websiteId)) {
+                continue;
+            }
+            // Check if module should use default or website specific settings.
+            $isOverwriteEnabled = $this->getGeneralConfig('overwriteDefaultSettings', $websiteId);
+            if ($isOverwriteEnabled !== '1') {
+                $websiteId = 0;
+            }
+            // Get sync interval and fields from website scope settings.
+            $syncTime = str_replace(':', ' ', $this->getGeneralConfig('syncTime'));
+            $fields = explode(',', $this->getGeneralConfig('productfields'));
+
             $quote_id = $row['quote_id'];
             $newCart = empty($row['reminder_date']);
 
@@ -403,7 +415,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                 // Prepare fields for Smaily abandoned cart template.
                 $preparedCart = $this->prepareCartData($row, $fields);
                 // Send cart data to Smaily autoresponder.
-                $response = $this->sendAbandonedCartEmail($preparedCart);
+                $response = $this->sendAbandonedCartEmail($preparedCart, $websiteId);
                 // If successful log quote id else log error message
                 $result = '';
                 if (array_key_exists('message', $response) && $response['message'] == 'OK') {
@@ -517,7 +529,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      * @param array $preparedCart   Prepared cart to send to Smaily.
      * @return array                Smaily response.
      */
-    public function sendAbandonedCartEmail($preparedCart)
+    public function sendAbandonedCartEmail($preparedCart, $websiteId)
     {
         $customerData = $preparedCart['customer_data'];
         $productsData = $preparedCart['products_data'];
@@ -554,7 +566,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             'addresses' => [$address],
         ];
 
-        return $this->callApi('autoresponder', $query, 'POST');
+        return $this->callApi('autoresponder', $query, 'POST', $websiteId);
     }
 
     /**
@@ -627,7 +639,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
       * @param integer $offset Page number (Not sql offset).
       * @return array Unsubscribers emails list from smaily.
       */
-    public function getUnsubscribersEmails($limit, $offset = 0)
+    public function getUnsubscribersEmails($limit, $offset = 0, $websiteId)
     {
         $unsubscribers_emails = [];
         $data = [
@@ -637,7 +649,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
         while (true) {
             $data['offset'] = $offset;
-            $unsubscribers = $this->callApi('contact', $data);
+            $unsubscribers = $this->callApi('contact', $data, 'GET', $websiteId);
 
             if (!$unsubscribers) {
                 break;
@@ -715,13 +727,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return array
      */
-    public function callApi($endpoint, $data = [], $method = 'GET')
+    public function callApi($endpoint, $data = [], $method = 'GET', $websiteId = 0)
     {
         $response = [];
         // get smaily subdomain, username and password
-        $subdomain = $this->getSubdomain();
-        $username = $this->getGeneralConfig('username');
-        $password = $this->getGeneralConfig('password');
+        $subdomain = $this->getSubdomain($websiteId);
+        $username = $this->getGeneralConfig('username', $websiteId);
+        $password = $this->getGeneralConfig('password', $websiteId);
         // create api url
         $apiUrl = 'https://' . $subdomain . '.sendsmaily.net/api/' . trim($endpoint, '/') . '.php';
         try {

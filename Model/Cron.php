@@ -33,10 +33,13 @@ class Cron
             $logger->info('Running smaily customer synchronization!');
             // Get last update time.
             $last_update = $this->helperData->getLastCustomerSyncTime();
-            // Remove unsubscribers from Magento store.
-            $unsubscribers_list = $this->helperData->getUnsubscribersEmails(UNSUBSCRIBERS_BATCHES_LIMIT);
-            $this->customers->removeUnsubscribers($unsubscribers_list);
-
+            foreach($this->helperData->getWebsiteIds() as $websiteId) {
+                if($this->helperData->isClashingWithDefaultSettingAndOverwritten('enableCronSync', $websiteId)) {
+                    continue;
+                }
+                $unsubscribers_list = $this->helperData->getUnsubscribersEmails(1000, 0, $websiteId);
+                $this->customers->removeUnsubscribers($unsubscribers_list, $websiteId);
+            }
             // Import all customer to Smaily. List is in batches.
             $subscribers_list = $this->customers->getList($last_update);
             if (empty($subscribers_list)) {
@@ -45,7 +48,7 @@ class Cron
                 $success = $this->helperData->cronSubscribeAll($subscribers_list);
                 if ($success) {
                     $logger->info('Customer synchronization successful!');
-                    $this->helperData->updateCustomerSyncTimestamp($last_update);
+                    //$this->helperData->updateCustomerSyncTimestamp($last_update);
                 } else {
                     $logger->info('Could not synchronize all subscribers!');
                 }

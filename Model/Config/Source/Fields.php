@@ -25,10 +25,6 @@ class Fields implements \Magento\Framework\Option\ArrayInterface
                 'label' => 'Customer ID',
             ],
             [
-                'value' => 'website_id',
-                'label' => 'Website ID',
-            ],
-            [
                 'value' => 'prefix',
                 'label' => 'Prefix',
             ],

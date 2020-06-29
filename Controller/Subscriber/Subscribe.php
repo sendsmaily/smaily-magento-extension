@@ -64,6 +64,10 @@ class Subscribe
         // Check Smaily extension/newsletter subscribers collection are enabled.
         if ($this->helper->isEnabled() && $this->helper->isNewsletterSubscriptionEnabled()) {
             $websiteId = (int) $this->storeManager->getStore()->getWebsiteId();
+            if( $this->helper->isClashingWithDefaultSettingAndOverwritten('enableNewsletterSubscriptions', $websiteId)) {
+                return null;
+            }
+
             // Create addtional fields array.
             $extra = [
                 'customer_id' => '',

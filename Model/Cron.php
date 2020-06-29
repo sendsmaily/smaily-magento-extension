@@ -33,6 +33,8 @@ class Cron
             $logger->info('Running smaily customer synchronization!');
             // Get last update time.
             $last_update = $this->helperData->getLastCustomerSyncTime();
+
+            // Remove unsubscribers from each Magento website separately.
             foreach($this->helperData->getWebsiteIds() as $websiteId) {
                 if($this->helperData->isClashingWithDefaultSettingAndOverwritten('enableCronSync', $websiteId)) {
                     continue;

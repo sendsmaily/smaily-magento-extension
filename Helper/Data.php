@@ -436,8 +436,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                 $websiteId = 0;
             }
             // Get sync interval and fields from website scope settings.
-            $syncTime = str_replace(':', ' ', $this->getGeneralConfig('syncTime'));
-            $fields = explode(',', $this->getGeneralConfig('productfields'));
+            $syncTime = str_replace(':', ' ', $this->getGeneralConfig('syncTime', $websiteId));
+            $fields = explode(',', $this->getGeneralConfig('productfields', $websiteId));
 
             $quote_id = $row['quote_id'];
             $newCart = empty($row['reminder_date']);
@@ -576,7 +576,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $customerData = $preparedCart['customer_data'];
         $productsData = $preparedCart['products_data'];
 
-        $autoRespId = $this->getGeneralConfig('autoresponderId');
+        $autoRespId = $this->getGeneralConfig('autoresponderId', $websiteId);
 
         // Populate customer data fields.
         $address = [];

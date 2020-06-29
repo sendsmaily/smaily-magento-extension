@@ -112,7 +112,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Check  Smaily Cron Sync is enabled
+     * Check Smaily Cron Sync is enabled
      *
      * @return bool
      */
@@ -122,7 +122,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Check  Smaily Abandoned Cart is enabled
+     * Check Smaily Abandoned Cart is enabled
      *
      * @return bool
      */
@@ -133,7 +133,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
     /**
      * Get Magento configuration by field and website Id.
-     * $websiteId as null returns default global config.
+     * $websiteId as null will return default global config.
      *
      * @return string
      */
@@ -146,7 +146,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      * Find if website setting is different from default setting & if the default one is overwritten.
      *
      * @param string Name of setting
-     * @param string Website ID
+     * @param string|int Website ID
      * @return boolean
      */
     public function isClashingWithDefaultSettingAndOverwritten($setting, $websiteId) {
@@ -164,11 +164,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      * @param boolean|int Store ID
      * @return int Website ID
      */
-    public function resolveCurrentWebsiteId($storeId = true)
+    private function resolveCurrentWebsiteId($storeId = true)
     {
+        // For admin area
         if ($this->state->getAreaCode() === \Magento\Framework\App\Area::AREA_ADMINHTML) {
             $storeId = (int) $this->request->getParam('store', 0);
         }
+        // Public area
         // If Store ID is true, returns current store ID.
         $websiteId = $this->storeManager->getStore($storeId)->getWebsiteId();
 
@@ -394,11 +396,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     {
         $subscribers = array();
         foreach ($list as $batch) {
+            // Subscribe customers to each website separately.
             foreach($this->getWebsiteIds() as $websiteId) {
                 if($this->isClashingWithDefaultSettingAndOverwritten('enableCronSync', $websiteId)) {
                     continue;
                 }
-                // Filter subscribers array by website ID.
+
+                // Filter subscribers by website ID.
                 $subscribers = array_filter($batch, function($ar) use ($websiteId) {
                     return ($ar['website_id'] === (string) $websiteId);
                 });

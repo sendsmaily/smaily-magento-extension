@@ -42,6 +42,7 @@ class Cron
                 $unsubscribers_list = $this->helperData->getUnsubscribersEmails(1000, 0, $websiteId);
                 $this->customers->removeUnsubscribers($unsubscribers_list, $websiteId);
             }
+
             // Import all customer to Smaily. List is in batches.
             $subscribers_list = $this->customers->getList($last_update);
             if (empty($subscribers_list)) {

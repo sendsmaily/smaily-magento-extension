@@ -46,7 +46,7 @@ class Customers
     /**
      * Generate subscribers list in batches.
      *
-     * @param stirng $last_update Last update time
+     * @param string $last_update Last update time
      * @return array Subscribers batches.
      */
     public function getList($last_update)
@@ -152,6 +152,7 @@ class Customers
      * Changes customer subscription status to unsubscribed in Magento database.
      *
      * @param array $unsubscribers_list List of unsubscribers emails from Smaily
+     * @param int|string ID of website
      * @return void
      */
     public function removeUnsubscribers($unsubscribers_list, $websiteId)
@@ -168,15 +169,16 @@ class Customers
     }
 
     /**
-     * Get all Store IDs listed under website, return them as int in an array.
+     * Get all Store IDs listed under website, return them in an array.
      *
      * @param string Website ID
      * @return array[int] Store IDs in array
      */
-    public function getAllStoreIdsForWebsite($websiteId)
+    private function getAllStoreIdsForWebsite($websiteId)
     {
         $stringStoreIds = $this->storeWebsiteRelation->getStoreByWebsiteId($websiteId);
 
+        // Convert to int. Simpler for using in SQL binds.
         $intStoreIds = array_map(
             function($value) { return (int)$value; },
             $stringStoreIds

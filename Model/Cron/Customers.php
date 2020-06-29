@@ -148,13 +148,15 @@ class Customers
      * @param array $unsubscribers_list List of unsubscribers emails from Smaily
      * @return void
      */
-    public function removeUnsubscribers($unsubscribers_list)
+    public function removeUnsubscribers($unsubscribers_list, $websiteId)
     {
         $table = $this->connection->getTableName('newsletter_subscriber');
+        $storeIds = $this->getAllStoreIdsForWebsite($websiteId);
 
         foreach ($unsubscribers_list as $unsubscriber_email) {
-            $query = "UPDATE $table SET subscriber_status = '0' WHERE subscriber_email = :UNSUBSCRIBER_EMAIL";
-            $binds = ['UNSUBSCRIBER_EMAIL' => $unsubscriber_email];
+            $query = "UPDATE $table SET subscriber_status = '0' WHERE subscriber_email = :UNSUBSCRIBER_EMAIL
+                AND store_id IN (:STORE_IDS)";
+            $binds = ['UNSUBSCRIBER_EMAIL' => $unsubscriber_email, 'STORE_IDS' => implode(',', $storeIds)];
             $this->connection->query($query, $binds);
         }
     }

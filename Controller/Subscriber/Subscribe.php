@@ -61,8 +61,9 @@ class Subscribe
      */
     public function beforeSubscribe(\Magento\Newsletter\Model\Subscriber $subject, $email)
     {
-        // Check Smaily extension/newsletter subscribers collection are enabled.
+        // Check Smaily extension/newsletter subscribers collection are globally enabled.
         if ($this->helper->isEnabled() && $this->helper->isNewsletterSubscriptionEnabled()) {
+            // Check if subscriber collection is enabled for website scope.
             $websiteId = (int) $this->storeManager->getStore()->getWebsiteId();
             if( $this->helper->isClashingWithDefaultSettingAndOverwritten('enableNewsletterSubscriptions', $websiteId)) {
                 return null;

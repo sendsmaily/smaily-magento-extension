@@ -96,7 +96,7 @@ class Customers
                     'firstname' => $customer ? ucfirst($customer->getFirstname()) : '',
                     'lastname' => $customer ? ucfirst($customer->getLastname()) : '',
                     'gender' => $customer ? ($customer->getGender() == 2 ? 'Female' : 'Male') : '',
-                    'birthday' => $DOB,
+                    'birthday' => $DOB
                 ];
 
                 // Standard values always collected for subscriber.

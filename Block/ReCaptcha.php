@@ -47,5 +47,4 @@ class ReCaptcha extends Template
     {
         return $this->helper->shouldCheckCaptcha();
     }
-
 }

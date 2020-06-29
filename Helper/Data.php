@@ -54,7 +54,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         State $state,
         StoreManagerInterface $storeManager,
         CollectionFactory $websiteCollectionFactory
-
     ) {
         $this->logger = $context->getLogger();
         $this->curl = $curl;
@@ -161,7 +160,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     /**
      * Get Website ID in current State.
      *
-     * @param boolean|int Store ID
+     * @param int|null Store ID
      * @return int Website ID
      */
     private function resolveCurrentWebsiteId($storeId = true)
@@ -184,7 +183,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getWebsiteIds()
     {
-        $ids = array();
+        $ids = [];
         foreach ($this->websiteCollectionFactory->create() as $website) {
             $ids[] = (int) $website->getId();
         }
@@ -369,7 +368,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function cronSubscribeAll($list)
     {
-        $subscribers = array();
+        $subscribers = [];
         foreach ($list as $batch) {
             // Subscribe customers to each website separately.
             foreach ($this->getWebsiteIds() as $websiteId) {

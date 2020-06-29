@@ -423,18 +423,19 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function cronAbandonedcart($orders)
     {
-
         $currentDate = strtotime(date('Y-m-d H:i') . ':00');
         foreach ($orders as $row) {
             $websiteId = $this->resolveCurrentWebsiteId($row['store_id']);
             if($this->isClashingWithDefaultSettingAndOverwritten('enableAbandonedCart', $websiteId)) {
                 continue;
             }
+
             // Check if module should use default or website specific settings.
             $isOverwriteEnabled = $this->getGeneralConfig('overwriteDefaultSettings', $websiteId);
             if ($isOverwriteEnabled !== '1') {
                 $websiteId = 0;
             }
+
             // Get sync interval and fields from website scope settings.
             $syncTime = str_replace(':', ' ', $this->getGeneralConfig('syncTime', $websiteId));
             $fields = explode(',', $this->getGeneralConfig('productfields', $websiteId));

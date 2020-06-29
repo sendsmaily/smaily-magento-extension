@@ -5,6 +5,7 @@ namespace Smaily\SmailyForMagento\Model\Cron;
 use \Magento\Customer\Api\CustomerRepositoryInterfaceFactory;
 use \Magento\Framework\App\ResourceConnection;
 use \Magento\Store\Model\StoreManagerInterface;
+use \Magento\Store\Api\StoreWebsiteRelationInterface;
 use Smaily\SmailyForMagento\Helper\Data as Helper;
 
 /**
@@ -22,6 +23,7 @@ class Customers
     protected $helperData;
     protected $resourceConnection;
     protected $storeManager;
+    protected $storeWebsiteRelation;
 
     /**
      * Load objects
@@ -30,13 +32,15 @@ class Customers
         CustomerRepositoryInterfaceFactory $customerRepositoryFactory,
         Helper $helperData,
         ResourceConnection $resourceConnection,
-        StoreManagerInterface $storeManager
+        StoreManagerInterface $storeManager,
+        StoreWebsiteRelationInterface $storeWebsiteRelation
     ) {
         $this->resourceConnection = $resourceConnection;
         $this->connection = $this->resourceConnection->getConnection(ResourceConnection::DEFAULT_CONNECTION);
         $this->customerRepository = $customerRepositoryFactory->create();
         $this->helperData = $helperData;
         $this->storeManager = $storeManager;
+        $this->storeWebsiteRelation = $storeWebsiteRelation;
     }
 
     /**
@@ -75,7 +79,7 @@ class Customers
                 // Get fields to sync from configuration page.
                 $sync_fields = $this->helperData->getGeneralConfig('fields');
                 $sync_fields = explode(',', $sync_fields);
-    
+
                 // Create list with subscriber data.
                 $subscriberData = [
                     'email' => $s['subscriber_email'],
@@ -153,5 +157,23 @@ class Customers
             $binds = ['UNSUBSCRIBER_EMAIL' => $unsubscriber_email];
             $this->connection->query($query, $binds);
         }
+    }
+
+    /**
+     * Get all Store IDs listed under website, return them as int in an array.
+     *
+     * @param string Website ID
+     * @return array[int] Store IDs in array
+     */
+    public function getAllStoreIdsForWebsite($websiteId)
+    {
+        $stringStoreIds = $this->storeWebsiteRelation->getStoreByWebsiteId($websiteId);
+
+        $intStoreIds = array_map(
+            function($value) { return (int)$value; },
+            $stringStoreIds
+        );
+
+        return $intStoreIds;
     }
 }

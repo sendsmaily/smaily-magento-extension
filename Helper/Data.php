@@ -142,6 +142,23 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
+     * Get Website ID in current State.
+     *
+     * @param boolean|int Store ID
+     * @return int Website ID
+     */
+    public function resolveCurrentWebsiteId($storeId = true)
+    {
+        if ($this->state->getAreaCode() === \Magento\Framework\App\Area::AREA_ADMINHTML) {
+            $storeId = (int) $this->request->getParam('store', 0);
+        }
+        // If Store ID is true, returns current store ID.
+        $websiteId = $this->storeManager->getStore($storeId)->getWebsiteId();
+
+        return (int) $websiteId;
+    }
+
+    /**
      * Updates remainder date of Abandoned Cart
      *
      * @param string $quoteId       Cart id

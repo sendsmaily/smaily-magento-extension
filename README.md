@@ -108,6 +108,10 @@ Usually a good place to start would be to check Magento CRON's Schedule Ahead fo
 
 ## Changelog
 
+### 1.2.0
+
+- Allow setting different Smaily API accounts and module settings for every Magento website.
+
 ### 1.1.0
 
 - Add new fields ` first_name ` and `last_name` for abandoned cart export

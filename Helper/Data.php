@@ -384,6 +384,13 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                 if(empty($subscribers)) {
                     continue;
                 }
+
+                // Check if module should use website API account or default config one.
+                $isOverwriteEnabled = $this->getGeneralConfig('overwriteDefaultSettings', $websiteId);
+                if ($isOverwriteEnabled !== '1') {
+                    $websiteId = 0;
+                }
+
                 $response = $this->callApi('contact', $subscribers, 'POST', $websiteId);
                 if (!array_key_exists('message', $response) ||
                     array_key_exists('message', $response) && $response['message'] !== 'OK') {

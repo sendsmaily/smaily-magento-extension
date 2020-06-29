@@ -336,32 +336,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Subscribe/Import Customer to Smaily by email
-     *
-     * @return array
-     *  Smaily api response
-     */
-    public function subscribe($email, $data = [], $update = 0)
-    {
-        $address = [
-            'email' => $email,
-            'is_unsubscribed' => $update
-        ];
-
-        if (!empty($data)) {
-            $fields = explode(',', $this->getGeneralConfig('fields'));
-
-            foreach ($data as $field => $val) {
-                if ($field === 'name' || in_array($field, $fields, true)) {
-                    $address[$field] = trim($val);
-                }
-            }
-        }
-
-        return $this->callApi('contact', $address, 'POST');
-    }
-
-    /**
      * Get Subscribe/Import Customer to Smaily by email with OPT-IN trigger.
      *
      * @return array

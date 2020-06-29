@@ -115,13 +115,30 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Get Magento main configuration by field
+     * Get Magento configuration by field and website Id.
+     * $websiteId as null returns default global config.
      *
      * @return string
      */
-    public function getConfigValue($configPath, $storeId = null)
+    public function getConfigValue($configPath, $websiteId = null)
     {
-        return $this->scopeConfig->getValue($configPath, ScopeInterface::SCOPE_STORE, $storeId);
+        return $this->scopeConfig->getValue($configPath, ScopeInterface::SCOPE_WEBSITE, $websiteId);
+    }
+
+    /**
+     * Find if website setting is different from default setting & if the default one is overwritten.
+     *
+     * @param string Name of setting
+     * @param string Website ID
+     * @return boolean
+     */
+    public function isClashingWithDefaultSettingAndOverwritten($setting, $websiteId) {
+        $overwriteSettingTrue = (bool) $this->getGeneralConfig('overwriteDefaultSettings', $websiteId);
+        $isClashingWithDefaultSetting = $this->getGeneralConfig($setting, '0') !== $this->getGeneralConfig($setting, $websiteId);
+        if( $isClashingWithDefaultSetting && $overwriteSettingTrue) {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -172,7 +189,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return string
      */
-    public function getGeneralConfig($code, $storeId = null)
+    public function getGeneralConfig($code, $websiteId = null)
     {
         $tab = 'general';
         if (in_array($code, $this->subscribeSettings, true)) {
@@ -185,7 +202,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $tab = 'abandoned';
         }
 
-        return trim($this->getConfigValue(self::XML_PATH . $tab . '/' . $code, $storeId));
+        return trim($this->getConfigValue(self::XML_PATH . $tab . '/' . $code, $websiteId));
     }
 
     /**

@@ -78,6 +78,9 @@ class Customers
 
                 // Get fields to sync from configuration page.
                 $sync_fields = $this->helperData->getGeneralConfig('fields');
+                if($this->helperData->isClashingWithDefaultSettingAndOverwritten('fields', $websiteId)) {
+                    $sync_fields = $this->helperData->getGeneralConfig('fields', $websiteId);
+                }
                 $sync_fields = explode(',', $sync_fields);
 
                 // Create list with subscriber data.

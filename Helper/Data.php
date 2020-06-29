@@ -5,11 +5,19 @@ namespace Smaily\SmailyForMagento\Helper;
 use Magento\Framework\App\Helper\Context;
 use Magento\Store\Model\ScopeInterface;
 use \Magento\Framework\HTTP\Client\Curl;
+use \Magento\Framework\App\Request\Http;
+use \Magento\Framework\App\State;
+use \Magento\Store\Model\StoreManagerInterface;
+use \Magento\Store\Model\ResourceModel\Website\CollectionFactory;
 
 class Data extends \Magento\Framework\App\Helper\AbstractHelper
 {
     protected $logger;
     protected $curl;
+    protected $request;
+    protected $state;
+    protected $storeManager;
+    protected $websiteCollectionFactory;
 
     /**
      * Settings section value.
@@ -41,10 +49,19 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
     public function __construct(
         Context $context,
-        Curl $curl
+        Curl $curl,
+        Http $request,
+        State $state,
+        StoreStoreManagerInterface $storeManager,
+        CollectionFactory $websiteCollectionFactory
+
     ) {
         $this->logger = $context->getLogger();
         $this->curl = $curl;
+        $this->request = $request;
+        $this->state = $state;
+        $this->storeManager = $storeManager;
+        $this->websiteCollectionFactory = $websiteCollectionFactory;
         parent::__construct($context);
     }
 
@@ -158,6 +175,18 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         return (int) $websiteId;
     }
 
+    /**
+     * Get all Website IDs
+     *
+     * @return array Website IDs
+     */
+    public function getWebsiteIds() {
+        $ids = array();
+        foreach($this->websiteCollectionFactory->create() as $website) {
+            $ids[] = (int) $website->getId();
+        }
+        return $ids;
+    }
     /**
      * Updates remainder date of Abandoned Cart
      *

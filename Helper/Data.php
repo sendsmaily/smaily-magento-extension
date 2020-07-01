@@ -95,7 +95,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Checks if CPATCHA should be checked.
+     * Checks if CAPTCHA should be checked.
      *
      * @return void
      */

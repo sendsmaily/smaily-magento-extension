@@ -15,10 +15,6 @@
           <label>Enable Module</label>
           <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
         </field>
-        <field id="overwriteDefaultSettings" translate="label" type="select" sortOrder="15" showInDefault="0" showInWebsite="1" showInStore="0">
-          <label>Choose different settings for this Website</label>
-          <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-        </field>
         <field id="subdomain" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Subdomain</label>
           <backend_model>Smaily\SmailyForMagento\Model\Config\Backend\Validate</backend_model>

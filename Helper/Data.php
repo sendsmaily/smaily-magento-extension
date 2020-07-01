@@ -69,9 +69,19 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return bool
      */
-    public function isEnabled()
+    private function isEnabled()
     {
-        return (bool) $this->getGeneralConfig('enable');
+        return (bool) $this->getSmailyConfig('enable');
+    }
+
+    /**
+     * Check if Smaily Extension is enabled for specific Website.
+     *
+     * @return bool
+     */
+    public function isEnabledForWebsite($websiteId)
+    {
+        return (bool) $this->getSmailyConfig('enable', $websiteId);
     }
 
     /**
@@ -79,9 +89,19 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return boolean
      */
-    public function isNewsletterSubscriptionEnabled()
+    private function isNewsletterSubscriptionEnabled()
     {
-        return (bool) $this->getGeneralConfig('enableNewsletterSubscriptions');
+        return (bool) $this->getSmailyConfig('enableNewsletterSubscriptions');
+    }
+
+    /**
+     * Check if newsletter subscribtion form opt-in sync is enabled for specific Website.
+     *
+     * @return boolean
+     */
+    public function isNewsletterSubscriptionEnabledForWebsite($websiteId)
+    {
+        return (bool) $this->getSmailyConfig('enableNewsletterSubscriptions', $websiteId);
     }
 
     /**
@@ -89,9 +109,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return boolean
      */
-    public function isCaptchaEnabled()
+    private function isCaptchaEnabled()
     {
-        return (bool) $this->getGeneralConfig('enableCaptcha');
+        return (bool) $this->getSmailyConfig('enableCaptcha');
     }
 
     /**
@@ -111,28 +131,27 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Check Smaily Cron Sync is enabled
+     * Check Smaily Cron Sync is enabled.
      *
      * @return bool
      */
-    public function isCronEnabled()
+    public function isCronEnabledForWebsite($websiteId)
     {
-        return (bool) $this->getGeneralConfig('enableCronSync');
+        return (bool) $this->getSmailyConfig('enableCronSync', $websiteId);
     }
 
     /**
-     * Check Smaily Abandoned Cart is enabled
+     * Check Smaily Abandoned Cart is enabled.
      *
      * @return bool
      */
-    public function isAbandonedCartEnabled()
+    private function isAbandonedCartEnabledForWebsite($websiteId)
     {
-        return (bool) $this->getGeneralConfig('enableAbandonedCart');
+        return (bool) $this->getSmailyConfig('enableAbandonedCart', $websiteId);
     }
 
     /**
      * Get Magento configuration by field and website Id.
-     * $websiteId as null will return default global config.
      *
      * @return string
      */
@@ -142,38 +161,31 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Find if website setting is different from default setting & if the default one is overwritten.
+     * Get Website ID by current State area.
      *
-     * @param string Name of setting
-     * @param string|int Website ID
-     * @return boolean
+     * @return int Website ID
      */
-    public function isClashingWithDefaultSettingAndOverwritten($setting, $websiteId) {
-        $overwriteSettingTrue = (bool) $this->getGeneralConfig('overwriteDefaultSettings', $websiteId);
-        $isClashingWithDefaultSetting = $this->getGeneralConfig($setting, '0') !== $this->getGeneralConfig($setting, $websiteId);
-        if ($isClashingWithDefaultSetting && $overwriteSettingTrue) {
-            return true;
+    private function getCurrentWebsiteId()
+    {
+        // Admin area
+        if ($this->state->getAreaCode() === \Magento\Framework\App\Area::AREA_ADMINHTML) {
+            $websiteId = (int) $this->request->getParam('website', 0);
+            return (int) $websiteId;
         }
-        return false;
+        // Public area
+        $websiteId = $this->storeManager->getStore()->getWebsiteId();
+        return (int) $websiteId;
     }
 
     /**
-     * Get Website ID in current State.
+     * Get Website ID by Store ID.
      *
-     * @param int|null Store ID
+     * @param int|string Store ID
      * @return int Website ID
      */
-    private function resolveCurrentWebsiteId($storeId = true)
+    private function getWebsiteIdByStoreID($storeId)
     {
-        // For admin area
-        if ($this->state->getAreaCode() === \Magento\Framework\App\Area::AREA_ADMINHTML) {
-            $storeId = (int) $this->request->getParam('store', 0);
-        }
-        // Public area
-        // If Store ID is true, returns current store ID.
-        $websiteId = $this->storeManager->getStore($storeId)->getWebsiteId();
-
-        return (int) $websiteId;
+        return (int) $this->storeManager->getStore($storeId)->getWebsiteId();
     }
 
     /**
@@ -237,7 +249,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return string
      */
-    public function getGeneralConfig($code, $websiteId = null)
+    public function getSmailyConfig($code, $websiteId = 0)
     {
         $tab = 'general';
         if (in_array($code, $this->subscribeSettings, true)) {
@@ -260,7 +272,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getCaptchaType()
     {
-        return $this->getGeneralConfig('captchaType');
+        return $this->getSmailyConfig('captchaType');
     }
 
     /**
@@ -270,7 +282,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getCaptchaApiKey()
     {
-        return $this->getGeneralConfig('captchaApiKey');
+        return $this->getSmailyConfig('captchaApiKey');
     }
 
     /**
@@ -280,17 +292,17 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getCaptchaApiSecretKey()
     {
-        return $this->getGeneralConfig('captchaApiSecret');
+        return $this->getSmailyConfig('captchaApiSecret');
     }
 
     /**
-     * Get Smaily Subdomain
+     * Get Smaily Subdomain by website ID.
      *
      * @return string
      */
-    public function getSubdomain($websiteId)
+    public function getSubdomainByWebsiteId($websiteId)
     {
-        $domain = $this->getGeneralConfig('subdomain', $websiteId);
+        $domain = $this->getSmailyConfig('subdomain', $websiteId);
 
         $domain = trim(strtolower(str_replace(['https://', 'http://', '/', '.sendsmaily.net'], '', $domain)));
         return $domain;
@@ -322,7 +334,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getAutoresponders()
     {
-        $websiteId = $this->resolveCurrentWebsiteId();
+        $websiteId = $this->getCurrentWebsiteID();
         $autoresponders = $this->callApi('workflows', ['trigger_type' => 'form_submitted'], 'GET', $websiteId);
         $list = [];
 
@@ -372,23 +384,17 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         foreach ($list as $batch) {
             // Subscribe customers to each website separately.
             foreach ($this->getWebsiteIds() as $websiteId) {
-                if ($this->isClashingWithDefaultSettingAndOverwritten('enableCronSync', $websiteId)) {
+                if (! $this->isCronEnabledForWebsite($websiteId)) {
                     continue;
                 }
 
                 // Filter subscribers by website ID.
                 $subscribers = array_filter($batch, function ($ar) use ($websiteId) {
-                    return ($ar['website_id'] === (string) $websiteId);
+                    return ($ar['website_id'] === (int) $websiteId);
                 });
 
                 if (empty($subscribers)) {
                     continue;
-                }
-
-                // Check if module should use website API account or default config one.
-                $isOverwriteEnabled = $this->getGeneralConfig('overwriteDefaultSettings', $websiteId);
-                if ($isOverwriteEnabled !== '1') {
-                    $websiteId = 0;
                 }
 
                 $response = $this->callApi('contact', $subscribers, 'POST', $websiteId);
@@ -410,20 +416,14 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     {
         $currentDate = strtotime(date('Y-m-d H:i') . ':00');
         foreach ($orders as $row) {
-            $websiteId = $this->resolveCurrentWebsiteId($row['store_id']);
-            if ($this->isClashingWithDefaultSettingAndOverwritten('enableAbandonedCart', $websiteId)) {
+            $websiteId = $this->getWebsiteIdByStoreID($row['store_id']);
+            if (! $this->isAbandonedCartEnabledForWebsite($websiteId)) {
                 continue;
             }
 
-            // Check if module should use default or website specific settings.
-            $isOverwriteEnabled = $this->getGeneralConfig('overwriteDefaultSettings', $websiteId);
-            if ($isOverwriteEnabled !== '1') {
-                $websiteId = 0;
-            }
-
             // Get sync interval and fields from website scope settings.
-            $syncTime = str_replace(':', ' ', $this->getGeneralConfig('syncTime', $websiteId));
-            $fields = explode(',', $this->getGeneralConfig('productfields', $websiteId));
+            $syncTime = str_replace(':', ' ', $this->getSmailyConfig('syncTime', $websiteId));
+            $fields = explode(',', $this->getSmailyConfig('productfields', $websiteId));
 
             $quote_id = $row['quote_id'];
             $newCart = empty($row['reminder_date']);
@@ -562,7 +562,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $customerData = $preparedCart['customer_data'];
         $productsData = $preparedCart['products_data'];
 
-        $autoRespId = $this->getGeneralConfig('autoresponderId', $websiteId);
+        $autoRespId = $this->getSmailyConfig('autoresponderId', $websiteId);
 
         // Populate customer data fields.
         $address = [];
@@ -665,6 +665,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
       *
       * @param integer $limit Limit number of results.
       * @param integer $offset Page number (Not sql offset).
+      * @param integer $websiteId Unsubscribers under this Website ID.
       * @return array Unsubscribers emails list from smaily.
       */
     public function getUnsubscribersEmails($limit, $offset = 0, $websiteId = 0)
@@ -759,9 +760,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     {
         $response = [];
         // get smaily subdomain, username and password
-        $subdomain = $this->getSubdomain($websiteId);
-        $username = $this->getGeneralConfig('username', $websiteId);
-        $password = $this->getGeneralConfig('password', $websiteId);
+        $subdomain = $this->getSubdomainByWebsiteId($websiteId);
+        $username = $this->getSmailyConfig('username', $websiteId);
+        $password = $this->getSmailyConfig('password', $websiteId);
         // create api url
         $apiUrl = 'https://' . $subdomain . '.sendsmaily.net/api/' . trim($endpoint, '/') . '.php';
         try {

@@ -389,8 +389,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                 }
 
                 // Filter subscribers by website ID.
-                $subscribers = array_filter($batch, function ($ar) use ($websiteId) {
-                    return ($ar['website_id'] === (int) $websiteId);
+                $subscribers = array_filter($batch, function ($subscriber) use ($websiteId) {
+                    return ($subscriber['website_id'] === (int) $websiteId);
                 });
 
                 if (empty($subscribers)) {

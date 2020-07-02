@@ -384,6 +384,10 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         foreach ($list as $batch) {
             // Subscribe customers to each website separately.
             foreach ($this->getWebsiteIds() as $websiteId) {
+                if (! $this->isEnabledForWebsite($websiteId)) {
+                    continue;
+                }
+
                 if (! $this->isCronEnabledForWebsite($websiteId)) {
                     continue;
                 }

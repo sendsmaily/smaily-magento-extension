@@ -35,9 +35,14 @@ class Cron
 
         // Remove unsubscribers from each Magento website separately.
         foreach ($this->helperData->getWebsiteIds() as $websiteId) {
-            if ($this->helperData->isCronEnabledForWebsite($websiteId)) {
+            if (! $this->helperData->isEnabledForWebsite($websiteId)) {
                 continue;
             }
+
+            if (! $this->helperData->isCronEnabledForWebsite($websiteId)) {
+                continue;
+            }
+
             $unsubscribers_list = $this->helperData->getUnsubscribersEmails(1000, 0, $websiteId);
             $this->customers->removeUnsubscribers($unsubscribers_list, $websiteId);
         }

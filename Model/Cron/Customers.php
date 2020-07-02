@@ -179,12 +179,7 @@ class Customers
         $stringStoreIds = $this->storeWebsiteRelation->getStoreByWebsiteId($websiteId);
 
         // Convert to int. Simpler for using in SQL binds.
-        $intStoreIds = array_map(
-            function ($value) {
-                return (int)$value;
-            },
-            $stringStoreIds
-        );
+        $intStoreIds = array_map('intval', $stringStoreIds);
 
         return $intStoreIds;
     }

@@ -6,6 +6,7 @@ use \Magento\Customer\Api\CustomerRepositoryInterfaceFactory;
 use \Magento\Framework\App\ResourceConnection;
 use \Magento\Store\Model\StoreManagerInterface;
 use \Magento\Store\Api\StoreWebsiteRelationInterface;
+use \Magento\Store\Api\WebsiteRepositoryInterface;
 use Smaily\SmailyForMagento\Helper\Data as Helper;
 
 /**
@@ -24,6 +25,7 @@ class Customers
     protected $resourceConnection;
     protected $storeManager;
     protected $storeWebsiteRelation;
+    protected $websiteRepository;
 
     /**
      * Load objects
@@ -33,7 +35,8 @@ class Customers
         Helper $helperData,
         ResourceConnection $resourceConnection,
         StoreManagerInterface $storeManager,
-        StoreWebsiteRelationInterface $storeWebsiteRelation
+        StoreWebsiteRelationInterface $storeWebsiteRelation,
+        WebsiteRepositoryInterface $websiteRepository
     ) {
         $this->resourceConnection = $resourceConnection;
         $this->connection = $this->resourceConnection->getConnection(ResourceConnection::DEFAULT_CONNECTION);
@@ -41,6 +44,7 @@ class Customers
         $this->helperData = $helperData;
         $this->storeManager = $storeManager;
         $this->storeWebsiteRelation = $storeWebsiteRelation;
+        $this->websiteRepository = $websiteRepository;
     }
 
     /**
@@ -88,7 +92,6 @@ class Customers
                     'subscription_type' => 'Subscriber',
                     'customer_group' => $customer ? $this->helperData->getCustomerGroupName($customer->getGroupId()) : 'Guest',
                     'customer_id' => $customer_id,
-                    'website_id' => $websiteId,
                     'prefix' => $customer ? $customer->getPrefix() : '',
                     'firstname' => $customer ? ucfirst($customer->getFirstname()) : '',
                     'lastname' => $customer ? ucfirst($customer->getLastname()) : '',
@@ -101,7 +104,7 @@ class Customers
                     'email' => $subscriberData['email'],
                     'name' => $subscriberData['name'],
                     'store' => $this->storeManager->getStore($s['store_id'])->getName(),
-                    'website_id' => $subscriberData['website_id']
+                    'website' => $this->websiteRepository->getById($websiteId)->getName()
                 ];
                 // Add values only selected in configuration page.
                 foreach ($subscriberData as $key => $value) {

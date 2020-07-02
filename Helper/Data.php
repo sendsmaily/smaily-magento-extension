@@ -201,6 +201,16 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         }
         return $ids;
     }
+
+    private function getWebsiteIdForWebsiteName($websiteName) {
+        foreach ($this->websiteCollectionFactory->create() as $website) {
+            if ($website->getName() === $websiteName) {
+                return (int) $website->getId();
+            }
+        }
+        return null;
+    }
+
     /**
      * Updates remainder date of Abandoned Cart
      *
@@ -394,7 +404,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
                 // Filter subscribers by website ID.
                 $subscribers = array_filter($batch, function ($subscriber) use ($websiteId) {
-                    return ($subscriber['website_id'] === (int) $websiteId);
+                    $subscriberWebsiteId = $this->getWebsiteIdForWebsiteName($subscriber['website']);
+                    return ($subscriberWebsiteId === (int) $websiteId);
                 });
 
                 if (empty($subscribers)) {

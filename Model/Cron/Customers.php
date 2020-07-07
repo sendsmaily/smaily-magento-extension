@@ -92,6 +92,7 @@ class Customers
                     'subscription_type' => 'Subscriber',
                     'customer_group' => $customer ? $this->helperData->getCustomerGroupName($customer->getGroupId()) : 'Guest',
                     'customer_id' => $customer_id,
+                    'website' => $this->websiteRepository->getById($websiteId)->getName(),
                     'prefix' => $customer ? $customer->getPrefix() : '',
                     'firstname' => $customer ? ucfirst($customer->getFirstname()) : '',
                     'lastname' => $customer ? ucfirst($customer->getLastname()) : '',
@@ -104,7 +105,7 @@ class Customers
                     'email' => $subscriberData['email'],
                     'name' => $subscriberData['name'],
                     'store' => $this->storeManager->getStore($s['store_id'])->getName(),
-                    'website' => $this->websiteRepository->getById($websiteId)->getName()
+                    'website_id' => $websiteId
                 ];
                 // Add values only selected in configuration page.
                 foreach ($subscriberData as $key => $value) {

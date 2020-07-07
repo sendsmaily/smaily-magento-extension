@@ -202,15 +202,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         return $ids;
     }
 
-    private function getWebsiteIdForWebsiteName($websiteName) {
-        foreach ($this->websiteCollectionFactory->create() as $website) {
-            if ($website->getName() === $websiteName) {
-                return (int) $website->getId();
-            }
-        }
-        return null;
-    }
-
     /**
      * Updates remainder date of Abandoned Cart
      *
@@ -404,13 +395,15 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
                 // Filter subscribers by website ID.
                 $subscribers = array_filter($batch, function ($subscriber) use ($websiteId) {
-                    $subscriberWebsiteId = $this->getWebsiteIdForWebsiteName($subscriber['website']);
-                    return ($subscriberWebsiteId === (int) $websiteId);
+                    return ($subscriber['website_id'] === (int) $websiteId);
                 });
 
                 if (empty($subscribers)) {
                     continue;
                 }
+
+                // Using Website ID only for filtering purposes, Website Name is sent to Smaily.
+                $subscribers = $this->unsetWebsiteIds($subscribers);
 
                 $response = $this->callApi('contact', $subscribers, 'POST', $websiteId);
                 if (!array_key_exists('message', $response) ||
@@ -420,6 +413,22 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             };
         }
         return true;
+    }
+
+    /**
+     * Remove all occurrences of element website_id from array.
+     *
+     * @param array $subscribers
+     * @return array $subscribers
+     */
+    private function unsetWebsiteIds($subscribers)
+    {
+        foreach ($subscribers as $key => $subscriber) {
+            if (isset($subscriber['website_id'])) {
+                unset($subscribers[$key]['website_id']);
+            }
+        }
+        return $subscribers;
     }
 
     /**

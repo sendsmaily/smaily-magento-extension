@@ -25,7 +25,6 @@ class Customers
     protected $resourceConnection;
     protected $storeManager;
     protected $storeWebsiteRelation;
-    protected $websiteRepository;
 
     /**
      * Load objects
@@ -35,8 +34,7 @@ class Customers
         Helper $helperData,
         ResourceConnection $resourceConnection,
         StoreManagerInterface $storeManager,
-        StoreWebsiteRelationInterface $storeWebsiteRelation,
-        WebsiteRepositoryInterface $websiteRepository
+        StoreWebsiteRelationInterface $storeWebsiteRelation
     ) {
         $this->resourceConnection = $resourceConnection;
         $this->connection = $this->resourceConnection->getConnection(ResourceConnection::DEFAULT_CONNECTION);
@@ -44,7 +42,6 @@ class Customers
         $this->helperData = $helperData;
         $this->storeManager = $storeManager;
         $this->storeWebsiteRelation = $storeWebsiteRelation;
-        $this->websiteRepository = $websiteRepository;
     }
 
     /**
@@ -92,7 +89,7 @@ class Customers
                     'subscription_type' => 'Subscriber',
                     'customer_group' => $customer ? $this->helperData->getCustomerGroupName($customer->getGroupId()) : 'Guest',
                     'customer_id' => $customer_id,
-                    'website' => $this->websiteRepository->getById($websiteId)->getName(),
+                    'website' => $this->storeManager->getWebsite($websiteId)->getName(),
                     'prefix' => $customer ? $customer->getPrefix() : '',
                     'firstname' => $customer ? ucfirst($customer->getFirstname()) : '',
                     'lastname' => $customer ? ucfirst($customer->getLastname()) : '',

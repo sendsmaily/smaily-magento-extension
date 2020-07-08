@@ -41,6 +41,11 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     protected $syncSettings = ['fields', 'frequency', 'enableCronSync'];
 
     /**
+     * Settings page reCaptchaKeys group id-s.
+     */
+    protected $reCaptchaSettings = ['captchaApiKey', 'captchaApiSecret'];
+
+    /**
      * Settings page abandoned group id-s.
      */
     protected $abandonedSettings = ['autoresponderId', 'syncTime', 'productfields', 'enableAbandonedCart'];
@@ -65,16 +70,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Check if Smaily Extension is enabled.
-     *
-     * @return bool
-     */
-    private function isEnabled()
-    {
-        return (bool) $this->getSmailyConfig('enable');
-    }
-
-    /**
      * Check if Smaily Extension is enabled for specific Website.
      *
      * @return bool
@@ -82,16 +77,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function isEnabledForWebsite($websiteId)
     {
         return (bool) $this->getSmailyConfig('enable', $websiteId);
-    }
-
-    /**
-     * Check if newsletter subscribtion form opt-in sync is enabled.
-     *
-     * @return boolean
-     */
-    private function isNewsletterSubscriptionEnabled()
-    {
-        return (bool) $this->getSmailyConfig('enableNewsletterSubscriptions');
     }
 
     /**
@@ -105,25 +90,28 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Check if CAPTCHA is enabled for newsletter form.
+     * Check if CAPTCHA is enabled for newsletter form for specific Website.
      *
      * @return boolean
      */
-    private function isCaptchaEnabled()
+    private function isCaptchaEnabledForWebsite($websiteId)
     {
-        return (bool) $this->getSmailyConfig('enableCaptcha');
+        return (bool) $this->getSmailyConfig('enableCaptcha', $websiteId);
     }
 
     /**
-     * Checks if CAPTCHA should be checked.
+     * Checks if CAPTCHA should be checked for specific Website.
      *
      * @return void
      */
-    public function shouldCheckCaptcha()
+    public function shouldCheckCaptchaForWebsite($websiteId)
     {
         $check = false;
         // Check CAPTCHA only if module, subscriber collection and CAPTCHA is enabled.
-        if ($this->isEnabled() && $this->isNewsletterSubscriptionEnabled() && $this->isCaptchaEnabled()) {
+        if ($this->isEnabledForWebsite($websiteId)
+            && $this->isNewsletterSubscriptionEnabledForWebsite($websiteId)
+            && $this->isCaptchaEnabledForWebsite($websiteId)
+        ) {
             $check = true;
         }
 
@@ -165,7 +153,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      *
      * @return int Website ID
      */
-    private function getCurrentWebsiteId()
+    public function getCurrentWebsiteId()
     {
         // Admin area
         if ($this->state->getAreaCode() === \Magento\Framework\App\Area::AREA_ADMINHTML) {
@@ -256,6 +244,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         if (in_array($code, $this->subscribeSettings, true)) {
             $tab = 'subscribe';
         }
+        if (in_array($code, $this->reCaptchaSettings, true)) {
+            $tab ='reCaptchaKeys';
+        }
         if (in_array($code, $this->syncSettings, true)) {
             $tab = 'sync';
         }
@@ -267,33 +258,33 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Get CAPTCHA type to use in newsletter signup form.
+     * Get CAPTCHA type to use in newsletter signup form for specific Website.
      *
      * @return string Captcha type.
      */
-    public function getCaptchaType()
+    public function getCaptchaTypeForWebsite($websiteId)
     {
-        return $this->getSmailyConfig('captchaType');
+        return $this->getSmailyConfig('captchaType', $websiteId);
     }
 
     /**
-     * Get reCAPTCHA public API key.
+     * Get reCAPTCHA public API key from default config.
      *
      * @return string public key.
      */
     public function getCaptchaApiKey()
     {
-        return $this->getSmailyConfig('captchaApiKey');
+        return $this->getSmailyConfig('captchaApiKey', 0);
     }
 
     /**
-     * Get reCAPTCHA private API key.
+     * Get reCAPTCHA private API key from default config.
      *
      * @return string private key.
      */
     public function getCaptchaApiSecretKey()
     {
-        return $this->getSmailyConfig('captchaApiSecret');
+        return $this->getSmailyConfig('captchaApiSecret', 0);
     }
 
     /**

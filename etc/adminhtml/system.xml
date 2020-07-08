@@ -38,7 +38,7 @@
           <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
           <comment>Send subscribers from newsletter form directly to Smaily</comment>
         </field>
-        <field id="enableCaptcha" translate="label" type="select" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="enableCaptcha" translate="label" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Enable CAPTCHA</label>
           <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
           <comment>
@@ -50,35 +50,27 @@
             <field id="enableNewsletterSubscriptions">1</field>
           </depends>
         </field>
-        <field id="captchaType" translate="label" sortOrder="20" type="select" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="captchaType" translate="label" sortOrder="20" type="select" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>CAPTCHA Type</label>
           <source_model>Smaily\SmailyForMagento\Model\Config\Source\CaptchaType</source_model>
+          <comment>reCAPTCHA keys can be set under the Default Config.</comment>
           <depends>
             <field id="enableNewsletterSubscriptions">1</field>
             <field id="enableCaptcha">1</field>
           </depends>
-        </field>
-        <field id="captchaApiKey" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
-          <label>Google API Key</label>
-          <comment><![CDATA[Create new site settings <a href="https://www.google.com/recaptcha/admin/create" target="_blank"> from here</a>.]]></comment>
-            <depends>
-              <field id="captchaType">google_captcha</field>
-              <field id="enableCaptcha">1</field>
-              <field id="enableNewsletterSubscriptions">1</field>
-          </depends>
-          <validate>required-entry</validate>
-        </field>
-        <field id="captchaApiSecret" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
-          <label>Google API Secret Key</label>
-          <depends>
-            <field id="captchaType">google_captcha</field>
-            <field id="enableCaptcha">1</field>
-            <field id="enableNewsletterSubscriptions">1</field>
-          </depends>
-          <validate>required-entry</validate>
         </field>
       </group>
-      <group id="sync" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
+      <group id="reCaptchaKeys" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+        <label>Google reCAPTCHA Keys</label>
+        <field id="captchaApiKey" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+          <comment><![CDATA[Create new keys <a href="https://www.google.com/recaptcha/admin/create" target="_blank"> from here</a>.]]></comment>
+          <label>reCAPTCHA Site Key</label>
+        </field>
+        <field id="captchaApiSecret" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+          <label>reCAPTCHA Secret Key</label>
+        </field>
+      </group>
+      <group id="sync" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
         <label>Subscribers Syncronization</label>
         <field id="enableCronSync" translate="label" type="select" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Enable Syncronization</label>
@@ -95,7 +87,7 @@
           <backend_model>Smaily\SmailyForMagento\Model\Config\Backend\Frequency</backend_model>
         </field>
       </group>
-      <group id="abandoned" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
+      <group id="abandoned" translate="label" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0">
         <label>Abandoned Cart</label>
         <field id="enableAbandonedCart" translate="label" type="select" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Enable Abandoned Cart</label>

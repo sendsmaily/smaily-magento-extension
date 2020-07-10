@@ -158,7 +158,7 @@ class Feed extends \Magento\Framework\App\Action\Action
         return $collection;
     }
 
-    protected function getProductCategoryIdByCategoryName( $name )
+    protected function getProductCategoryIdByCategoryName($name)
     {
         $id = [];
         $categories = $this->categoryCollection->create()

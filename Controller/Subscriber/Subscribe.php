@@ -61,8 +61,11 @@ class Subscribe
      */
     public function beforeSubscribe(\Magento\Newsletter\Model\Subscriber $subject, $email)
     {
-        // Check Smaily extension/newsletter subscribers collection are enabled.
-        if ($this->helper->isEnabled() && $this->helper->isNewsletterSubscriptionEnabled()) {
+        $websiteId = (int) $this->storeManager->getStore()->getWebsiteId();
+        // Check Smaily extension/newsletter subscribers collection are globally enabled.
+        if ($this->helper->isEnabledForWebsite($websiteId)
+            && $this->helper->isNewsletterSubscriptionEnabledForWebsite($websiteId)) {
+
             // Create addtional fields array.
             $extra = [
                 'customer_id' => '',
@@ -96,7 +99,7 @@ class Subscribe
             }
 
             // Send customer data to Smaily for subscription.
-            $response = $this->helper->optInSubscriber($email, $extra);
+            $response = $this->helper->optInSubscriber($email, $extra, $websiteId);
 
             // Don't want to change email before actual function so returning null.
             return null;

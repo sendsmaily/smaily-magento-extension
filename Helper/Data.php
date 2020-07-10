@@ -372,7 +372,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function cronSubscribeAll($list)
     {
-        $subscribers = [];
         foreach ($list as $batch) {
             // Subscribe customers to each website separately.
             foreach ($this->getWebsiteIds() as $websiteId) {
@@ -384,17 +383,20 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                     continue;
                 }
 
-                // Filter subscribers by website ID.
-                $subscribers = array_filter($batch, function ($subscriber) use ($websiteId) {
-                    return ($subscriber['website_id'] === (int) $websiteId);
-                });
+                $subscribers = [];
+                // Using Website ID only for filtering purposes, it is not a selectable field for customer sync.
+                foreach ($batch as $subscriber) {
+                    if ($subscriber['website_id'] !== $websiteId) {
+                        continue;
+                    }
+
+                    unset($subscriber['website_id']);
+                    $subscribers[] = $subscriber;
+                }
 
                 if (empty($subscribers)) {
                     continue;
                 }
-
-                // Using Website ID only for filtering purposes, Website Name is sent to Smaily.
-                $subscribers = $this->unsetWebsiteIds($subscribers);
 
                 $response = $this->callApi('contact', $subscribers, 'POST', $websiteId);
                 if (!array_key_exists('message', $response) ||
@@ -404,22 +406,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             };
         }
         return true;
-    }
-
-    /**
-     * Remove all occurrences of element website_id from array.
-     *
-     * @param array $subscribers
-     * @return array $subscribers
-     */
-    private function unsetWebsiteIds($subscribers)
-    {
-        foreach ($subscribers as $key => $subscriber) {
-            if (isset($subscriber['website_id'])) {
-                unset($subscribers[$key]['website_id']);
-            }
-        }
-        return $subscribers;
     }
 
     /**

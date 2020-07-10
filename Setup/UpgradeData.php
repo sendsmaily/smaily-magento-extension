@@ -50,5 +50,19 @@ class UpgradeData implements UpgradeDataInterface
                 $this->configWriter->save("smaily/abandoned/sync_time", '');
             }
         }
+
+        // reCAPTCHA API keys have a new special group in default config.
+        if (version_compare($context->getVersion(), '1.2.0', '<')) {
+            $captchaApiKey = $this->scopeConfig->getValue('smaily/subscribe/captchaApiKey');
+            if (!empty($captchaApiKey)) {
+                $this->configWriter->save("smaily/reCaptchaKeys/captchaApiKey", $captchaApiKey);
+                $this->configWriter->save("smaily/subscribe/captchaApiKey", '');
+            }
+            $captchaApiSecret = $this->scopeConfig->getValue('smaily/subscribe/captchaApiSecret');
+            if (!empty($captchaApiSecret)) {
+                $this->configWriter->save("smaily/reCaptchaKeys/captchaApiSecret", $captchaApiSecret);
+                $this->configWriter->save("smaily/subscribe/captchaApiSecret", '');
+            }
+        }
     }
 }

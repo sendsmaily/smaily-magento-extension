@@ -9,7 +9,6 @@ use Smaily\SmailyForMagento\Helper\Data as Helper;
 class ReCaptcha extends Template
 {
     private $helper;
-    private $websiteId;
 
     public function __construct(
         Context $context,
@@ -17,7 +16,6 @@ class ReCaptcha extends Template
     ) {
         parent::__construct($context);
         $this->helper = $helper;
-        $this->websiteId = $this->helper->getCurrentWebsiteId();
     }
 
     /**
@@ -27,7 +25,7 @@ class ReCaptcha extends Template
      */
     public function getCaptchaType()
     {
-        return $this->helper->getCaptchaTypeForWebsite($this->websiteId);
+        return $this->helper->getCaptchaType();
     }
 
     /**
@@ -47,6 +45,7 @@ class ReCaptcha extends Template
      */
     public function shouldCheckCaptcha()
     {
-        return $this->helper->shouldCheckCaptchaForWebsite($this->websiteId);
+        return $this->helper->shouldCheckCaptcha();
     }
+
 }

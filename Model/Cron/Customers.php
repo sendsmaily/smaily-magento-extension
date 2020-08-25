@@ -5,8 +5,6 @@ namespace Smaily\SmailyForMagento\Model\Cron;
 use \Magento\Customer\Api\CustomerRepositoryInterfaceFactory;
 use \Magento\Framework\App\ResourceConnection;
 use \Magento\Store\Model\StoreManagerInterface;
-use \Magento\Store\Api\StoreWebsiteRelationInterface;
-use \Magento\Store\Api\WebsiteRepositoryInterface;
 use Smaily\SmailyForMagento\Helper\Data as Helper;
 
 /**
@@ -24,7 +22,6 @@ class Customers
     protected $helperData;
     protected $resourceConnection;
     protected $storeManager;
-    protected $storeWebsiteRelation;
 
     /**
      * Load objects
@@ -33,21 +30,19 @@ class Customers
         CustomerRepositoryInterfaceFactory $customerRepositoryFactory,
         Helper $helperData,
         ResourceConnection $resourceConnection,
-        StoreManagerInterface $storeManager,
-        StoreWebsiteRelationInterface $storeWebsiteRelation
+        StoreManagerInterface $storeManager
     ) {
         $this->resourceConnection = $resourceConnection;
         $this->connection = $this->resourceConnection->getConnection(ResourceConnection::DEFAULT_CONNECTION);
         $this->customerRepository = $customerRepositoryFactory->create();
         $this->helperData = $helperData;
         $this->storeManager = $storeManager;
-        $this->storeWebsiteRelation = $storeWebsiteRelation;
     }
 
     /**
      * Generate subscribers list in batches.
      *
-     * @param string $last_update Last update time
+     * @param stirng $last_update Last update time
      * @return array Subscribers batches.
      */
     public function getList($last_update)
@@ -77,11 +72,10 @@ class Customers
                     }
                 }
 
-                $websiteId = (int) $this->storeManager->getStore($s['store_id'])->getWebsiteId();
                 // Get fields to sync from configuration page.
-                $sync_fields = $this->helperData->getSmailyConfig('fields', $websiteId);
+                $sync_fields = $this->helperData->getGeneralConfig('fields');
                 $sync_fields = explode(',', $sync_fields);
-
+    
                 // Create list with subscriber data.
                 $subscriberData = [
                     'email' => $s['subscriber_email'],
@@ -89,20 +83,18 @@ class Customers
                     'subscription_type' => 'Subscriber',
                     'customer_group' => $customer ? $this->helperData->getCustomerGroupName($customer->getGroupId()) : 'Guest',
                     'customer_id' => $customer_id,
-                    'website' => $this->storeManager->getWebsite($websiteId)->getName(),
                     'prefix' => $customer ? $customer->getPrefix() : '',
                     'firstname' => $customer ? ucfirst($customer->getFirstname()) : '',
                     'lastname' => $customer ? ucfirst($customer->getLastname()) : '',
                     'gender' => $customer ? ($customer->getGender() == 2 ? 'Female' : 'Male') : '',
-                    'birthday' => $DOB
+                    'birthday' => $DOB,
                 ];
 
                 // Standard values always collected for subscriber.
                 $subscriber = [
                     'email' => $subscriberData['email'],
                     'name' => $subscriberData['name'],
-                    'store' => $this->storeManager->getStore($s['store_id'])->getName(),
-                    'website_id' => $websiteId
+                    'store' => $this->storeManager->getStore($s['store_id'])->getName()
                 ];
                 // Add values only selected in configuration page.
                 foreach ($subscriberData as $key => $value) {
@@ -150,35 +142,16 @@ class Customers
      * Changes customer subscription status to unsubscribed in Magento database.
      *
      * @param array $unsubscribers_list List of unsubscribers emails from Smaily
-     * @param int|string ID of website
      * @return void
      */
-    public function removeUnsubscribers($unsubscribers_list, $websiteId)
+    public function removeUnsubscribers($unsubscribers_list)
     {
         $table = $this->connection->getTableName('newsletter_subscriber');
-        $storeIds = $this->getAllStoreIdsForWebsite($websiteId);
 
         foreach ($unsubscribers_list as $unsubscriber_email) {
-            $query = "UPDATE $table SET subscriber_status = '0' WHERE subscriber_email = :UNSUBSCRIBER_EMAIL
-                AND store_id IN (:STORE_IDS)";
-            $binds = ['UNSUBSCRIBER_EMAIL' => $unsubscriber_email, 'STORE_IDS' => implode(',', $storeIds)];
+            $query = "UPDATE $table SET subscriber_status = '0' WHERE subscriber_email = :UNSUBSCRIBER_EMAIL";
+            $binds = ['UNSUBSCRIBER_EMAIL' => $unsubscriber_email];
             $this->connection->query($query, $binds);
         }
-    }
-
-    /**
-     * Get all Store IDs listed under website, return them in an array.
-     *
-     * @param string Website ID
-     * @return array[int] Store IDs in array
-     */
-    private function getAllStoreIdsForWebsite($websiteId)
-    {
-        $stringStoreIds = $this->storeWebsiteRelation->getStoreByWebsiteId($websiteId);
-
-        // Convert to int. Simpler for using in SQL binds.
-        $intStoreIds = array_map('intval', $stringStoreIds);
-
-        return $intStoreIds;
     }
 }

@@ -8,7 +8,6 @@ use Smaily\SmailyForMagento\Helper\Data as Helper;
 
 class Captcha extends \Magento\Captcha\Block\Captcha
 {
-    private $websiteId;
 
     public function __construct(
         Context $context,
@@ -16,7 +15,6 @@ class Captcha extends \Magento\Captcha\Block\Captcha
         Helper $helper
     ) {
         $this->helper = $helper;
-        $this->websiteId = $this->helper->getCurrentWebsiteId();
         parent::__construct($context, $captchaData);
     }
 
@@ -60,7 +58,7 @@ class Captcha extends \Magento\Captcha\Block\Captcha
      */
     public function shouldCheckCaptcha()
     {
-        return $this->helper->shouldCheckCaptchaForWebsite($this->websiteId);
+        return $this->helper->shouldCheckCaptcha();
     }
 
     /**
@@ -70,6 +68,6 @@ class Captcha extends \Magento\Captcha\Block\Captcha
      */
     public function getCaptchaType()
     {
-        return $this->helper->getCaptchaTypeForWebsite($this->websiteId);
+        return $this->helper->getCaptchaType();
     }
 }

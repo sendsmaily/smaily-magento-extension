@@ -51,12 +51,11 @@ class NewsletterCaptchaObserver implements ObserverInterface
      */
     public function execute(\Magento\Framework\Event\Observer $observer)
     {
-        $websiteId = $this->smailyHelper->getCurrentWebsiteId();
-        if (!$this->smailyHelper->shouldCheckCaptchaForWebsite($websiteId)) {
+        if (!$this->smailyHelper->shouldCheckCaptcha()) {
             return;
         }
 
-        $captchaType = $this->smailyHelper->getCaptchaTypeForWebsite($websiteId);
+        $captchaType = $this->smailyHelper->getCaptchaType();
         $controller = $observer->getControllerAction();
 
         if ($captchaType === 'magento_captcha') {

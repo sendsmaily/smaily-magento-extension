@@ -13,11 +13,9 @@
     }
   ],
   "autoload": {
-    "files": [
-      "registration.php"
-    ],
+    "files": ["src/registration.php"],
     "psr-4": {
-      "Smaily\\SmailyForMagento\\": ""
+      "Smaily\\SmailyForMagento\\": "src/"
     }
   }
 }

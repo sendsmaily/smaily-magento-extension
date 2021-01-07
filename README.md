@@ -13,14 +13,14 @@ NOTE! One of the most noticeable shortcoming of the extension is that it allows 
 ### Magento Newsletter Subscribers
 
 - Add subscribers to Smaily subscribers list;
-- Magento built in subscribe newsletter form sends subscribers directly to smaily;
-- Magento built-in CAPTCHA and google reCAPTCHA support.
+- Magento built in subscribe newsletter form sends subscribers directly to Smaily;
+- Magento built-in CAPTCHA and Google reCAPTCHA support.
 
 ### Magento Products RSS-feed
 
 - Generate default RSS-feed with 50 latest products for easy import to Smaily template;
-- Option to customize generated RSS-feed based on products categories;
-- Option to limit generated RSS-feed products amount with prefered value.
+- Option to customize generated RSS-feed based on product categories;
+- Option to limit generated RSS-feed products amount with preferred value.
 
 ### Two-way synchronization between Smaily and Magento
 
@@ -35,7 +35,7 @@ NOTE! One of the most noticeable shortcoming of the extension is that it allows 
 
 ## Requirements
 
-You'll need to be running Magento 2.0+ for this extension to work. Check specific PHP, Web server, Database etc. requirements for your prefered Magento version from [Magento technology stack requirements](https://devdocs.magento.com/guides/v2.0/install-gde/system-requirements-tech.html).
+You'll need to be running Magento 2.0+ for this extension to work. Check specific PHP, web server, database, etc requirements for your preferred Magento version from [Magento technology stack requirements](https://devdocs.magento.com/guides/v2.0/install-gde/system-requirements-tech.html).
 
 ## Documentation & Support
 
@@ -48,15 +48,15 @@ All development for Smaily for Magento is [handled via GitHub](https://github.co
 ## Installation
 
 1. Make sure you have Magento 2.0 and above installed;
-2. Install Smaily extension with composer. Run `composer require smaily/smailyformagento:version` in Magento root directory;
+2. Install Smaily extension with Composer. Run `composer require smaily/smailyformagento:version` in Magento root directory;
 3. For manual installation upload or extract the `SmailyForMagento` folder to your site's `/app/code/Smaily` directory. Folder structure needs to be `magento_root/app/code/Smaily/SmailyForMagento` for this module to work;
-4. Run "php bin/magento setup:upgrade";
+4. Run `php bin/magento setup:upgrade`;
 5. Extension configuration can be found from Magento administration interface, under "Stores → Configuration → Smaily Email Marketing and Automation".
 
 ## Usage
 
 1. Go to Stores -> Configuration -> Smaily email marketing and automation -> and click Module Configuration;
-2. Open General Settings Tab;
+2. Open General Settings tab;
 3. Insert your Smaily API authentication information and press Save Config to get started;
 4. Under Newsletter subscription form tab select if you like to send subscribers directly to Smaily;
 5. Under Subscribers synchronization tab you can enable syncronization, select additional fields to sync and frequency;
@@ -133,7 +133,7 @@ Usually a good place to start would be to check Magento CRON's Schedule Ahead fo
 
 #### Functionality update
 
-- Add Magento CAPTCHA and google reCAPTCHA option for newsletter sign-up form.
+- Add Magento CAPTCHA and Google reCAPTCHA option for newsletter sign-up form.
 
 ### 0.9.2
 
@@ -146,7 +146,7 @@ Usually a good place to start would be to check Magento CRON's Schedule Ahead fo
 #### Functionality updates
 
 - Subdomain is now parsed from full URL;
-- Newsletter signup form uses opt-in autoresponder workflow;
+- Newsletter sign-up form uses opt-in autoresponder workflow;
 - Updated cron frequency values;
 - Updated abandoned cart timing values;
 - Customer synchronization is now more efficient as it uses data batching;
@@ -157,7 +157,7 @@ Usually a good place to start would be to check Magento CRON's Schedule Ahead fo
 
 #### Bugfixes
 
-- Fixed broken links in settings from.
+- Fixed broken links in settings form.
 
 ### 0.9.0 - 2018
 

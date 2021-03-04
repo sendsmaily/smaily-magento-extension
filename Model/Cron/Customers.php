@@ -75,7 +75,7 @@ class Customers
                 // Get fields to sync from configuration page.
                 $sync_fields = $this->helperData->getGeneralConfig('fields');
                 $sync_fields = explode(',', $sync_fields);
-    
+
                 // Create list with subscriber data.
                 $subscriberData = [
                     'email' => $s['subscriber_email'],
@@ -84,8 +84,8 @@ class Customers
                     'customer_group' => $customer ? $this->helperData->getCustomerGroupName($customer->getGroupId()) : 'Guest',
                     'customer_id' => $customer_id,
                     'prefix' => $customer ? $customer->getPrefix() : '',
-                    'firstname' => $customer ? ucfirst($customer->getFirstname()) : '',
-                    'lastname' => $customer ? ucfirst($customer->getLastname()) : '',
+                    'first_name' => $customer ? ucfirst($customer->getFirstname()) : '',
+                    'last_name' => $customer ? ucfirst($customer->getLastname()) : '',
                     'gender' => $customer ? ($customer->getGender() == 2 ? 'Female' : 'Male') : '',
                     'birthday' => $DOB,
                 ];

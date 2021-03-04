@@ -40,7 +40,7 @@ RUN php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php')
     && EXPECTED_CHECKSUM="$(curl https://composer.github.io/installer.sig)" \
     && ACTUAL_CHECKSUM="$(php -r "echo hash_file('sha384', '/tmp/composer-setup.php');")" \
     && test "$EXPECTED_CHECKSUM" = "$ACTUAL_CHECKSUM" \
-    && php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer \
+    && php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --1 \
     && rm /tmp/composer-setup.php \
     && chown www-data:www-data $COMPOSER_HOME
 

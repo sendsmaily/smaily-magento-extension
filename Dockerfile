@@ -1,7 +1,6 @@
 FROM php:7.2-apache
 
 ENV MAGENTO_VERSION 2.2.11
-ENV INSTALL_DIR /var/www/html
 ENV COMPOSER_HOME /var/www/.composer
 
 # Install Magento requirements.
@@ -18,6 +17,7 @@ RUN apt-get update \
         libpng-dev \
         libxslt1-dev \
         libzip-dev \
+        nano \
         unzip \
         # MariaDB for mysqladmin ping in entrypoint
         mariadb-client \
@@ -46,19 +46,21 @@ RUN php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php')
 
 # Prepare server for Magento.
 RUN a2enmod rewrite \
-    && echo "memory_limit=2048M" > /usr/local/etc/php/conf.d/memory-limit.ini
+    && echo "memory_limit=2048M" > /usr/local/etc/php/conf.d/memory-limit.ini \
+    && sed -i "s/Listen 80/Listen 8000/g" /etc/apache2/ports.conf \
+    && sed -i "s/\*\:80/\*\:8000/g" /etc/apache2/sites-enabled/000-default.conf \
+    && mkdir /sample-data \
+    && chown www-data:www-data /sample-data
+
+USER www-data
 
 # Download and install Magento packages.
-RUN su www-data -s /bin/bash -c "curl -L \"https://github.com/magento/magento2/archive/${MAGENTO_VERSION}.zip\" -o /tmp/magento2.zip \
-    && unzip -q /tmp/magento2.zip -d /tmp \
-    && mv /tmp/magento2-${MAGENTO_VERSION}/* /tmp/magento2-${MAGENTO_VERSION}/.htaccess $INSTALL_DIR \
-    && composer install --no-dev"
+RUN composer create-project magento/community-edition=${MAGENTO_VERSION} ./ \
+    && chmod +x bin/magento
 
 # Download Magento sample-data.
-RUN mkdir /sample-data \
-    && chown www-data:www-data /sample-data \
-    && su www-data -s /bin/bash -c "git clone https://github.com/magento/magento2-sample-data.git /sample-data \
-    && git -C /sample-data checkout ${MAGENTO_VERSION}"
+RUN git clone https://github.com/magento/magento2-sample-data.git /sample-data \
+    && git -C /sample-data checkout ${MAGENTO_VERSION}
 
 COPY ./.sandbox/entrypoint.sh /entrypoint.sh
 

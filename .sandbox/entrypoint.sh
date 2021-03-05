@@ -14,11 +14,11 @@ done
 # Install sample data if requested.
 if [ "${MAGENTO_SAMPLEDATA}" = "1" ]; then
     echo "Installing sample-data..."
-    su www-data -s /bin/bash -c "php -f /sample-data/dev/tools/build-sample-data.php -- --ce-source=/var/www/html"
+    php -f /sample-data/dev/tools/build-sample-data.php -- --ce-source=/var/www/html
 fi
 
 # Ensure Magento is installed and up-to-date.
-su www-data -s /bin/bash -c "/var/www/html/bin/magento setup:install \
+bin/magento setup:install \
     --base-url=${MAGENTO_URL} \
     --backend-frontname=${MAGENTO_BACKEND_FRONTNAME} \
     --language=${MAGENTO_LANGUAGE} \
@@ -35,6 +35,6 @@ su www-data -s /bin/bash -c "/var/www/html/bin/magento setup:install \
     --admin-lastname=DevOps \
     --admin-email=${MAGENTO_ADMIN_EMAIL} \
     --admin-user=${MAGENTO_ADMIN_USERNAME} \
-    --admin-password=${MAGENTO_ADMIN_PASSWORD}"
+    --admin-password=${MAGENTO_ADMIN_PASSWORD}
 
 exec docker-php-entrypoint "$@"

@@ -1,7 +1,7 @@
-# USER GUIDE
+# User guide
 
 ## Smaily E-Commerce extension for Magento 2.0+
->[Smaily](https://smaily.com/) is an intentionally simple tool for sending beautiful email newsletters. 
+>[Smaily](https://smaily.com/) is an intentionally simple tool for sending beautiful email newsletters.
 
 ## Installation
 
@@ -23,13 +23,13 @@
 
 4. You can **collect newsletter subscribers directly to your Smaily account** using Magento built-in newsletter subscription form.
 
-5. We recommend to **use CATPCHA** to prevent bots from polluting your newsletter subscribers list. You can use two options - **Magento`s text-based CAPTCHA or Google reCAPTCHA**.
+5. We recommend to **use CATPCHA** to prevent bots from polluting your newsletter subscribers list. You can use two options - **Magento's text-based CAPTCHA or Google reCAPTCHA**.
 
 ![Newletter subscription form](assets/newsletter_subscription_form.png)
 
 ## Subscribers synchronization
 
-6. Enable automatic subscribers synchronization feature under **Subscribers synchronization** section. 
+6. Enable automatic subscribers synchronization feature under **Subscribers synchronization** section.
 
 7. There is an option to **import additional fields** available from store into Smaily to personalize newsletter emails.
 

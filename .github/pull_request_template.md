@@ -1,11 +1,7 @@
-# Plugin Version : X.X.X (next version number)
-
 **Version changelog**
 
-A list of changes regarding the next version release:
-
-1. Short description of the new feature/fix - #Issue/PR-Number
-2. Short description of the new feature/fix - #Issue/PR-Number
+- Short description of the new feature or fix - [[#issue-or-PR-number](link-to-issue-or-PR)]
+- Short description of the new feature or fix - [[#issue-or-PR-number](link-to-issue-or-PR)]
 
 **Release checklist**
 
@@ -16,16 +12,16 @@ A list of changes regarding the next version release:
 - [ ] Updated plugin version number
 - [ ] Updated screenshots in assets folder
 - [ ] Updated translations
-- [ ] Updated userguide.md
-- [ ] Tested module with [validation tool](https://github.com/sendsmaily/smaily-magento-extension/blob/master/CONTRIBUTING.md#magento-2-module-package-testing)
-- [ ] Tested [compiling in production mode](https://github.com/sendsmaily/smaily-magento-extension/blob/master/CONTRIBUTING.md#compilation-and-production-mode-testing)
+- [ ] Updated USERGUIDE.md
+- [ ] Ran pre-release checks. [Testing module before submitting for review](https://github.com/sendsmaily/smaily-magento-extension/blob/master/CONTRIBUTING.md#testing-module-before-submitting-for-review)
 
-**After successful review**
+**After PR merge**
 
-- [ ] [Packaged module](https://github.com/sendsmaily/smaily-magento-extension/blob/master/CONTRIBUTING.md#checklist-for-magento-marketplace) and submitted to Magento marketplace
+- [ ] Create a release
+- [ ] Submit built release ZIP-file for Magento review
 
-**After Acceptance in Magento Marketplace**
+> When Magento should reject the code review, then create a patch and re-release the version in GitHub.
 
-- [ ] Merged PR to `master` branch
-- [ ] Released new version in GitHub
+**After acceptance in Magento Marketplace**
+
 - [ ] Pinged code owners to inform marketing about new version

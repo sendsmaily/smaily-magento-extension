@@ -1,0 +1,57 @@
+version: '3.7'
+
+services:
+  magento2:
+    container_name: magento2
+    image: sendsmaily/magneto2
+    build:
+      context: ./
+    ports:
+    - '8080:8000'
+    environment:
+    - MYSQL_HOST=db
+    - MYSQL_DATABASE=magento2
+    - MYSQL_USER=root
+    - MYSQL_PASSWORD=root
+    - MAGENTO_SAMPLEDATA=1
+    - MAGENTO_LANGUAGE=et_EE
+    - MAGENTO_TIMEZONE=Europe/Tallinn
+    - MAGENTO_DEFAULT_CURRENCY=EUR
+    - MAGENTO_URL=http://localhost:8080/ # Map also port for CSS/JS refs.
+    - MAGENTO_BACKEND_FRONTNAME=admin
+    - MAGENTO_ADMIN_EMAIL=admin@smaily.sandbox
+    - MAGENTO_ADMIN_USERNAME=admin
+    - MAGENTO_ADMIN_PASSWORD=smailydev1
+    volumes:
+    - data:/var/www/html
+    - ./src:/var/www/html/app/code/Smaily/SmailyForMagento
+    depends_on:
+    - db
+
+  db:
+    container_name: magento2_db
+    image: mysql:5.7
+    environment:
+    - MYSQL_DATABASE=magento2
+    - MYSQL_ROOT_PASSWORD=root
+    volumes:
+    - db-data:/var/lib/mysql
+
+  phpmyadmin:
+    container_name: magento2_phpmyadmin
+    image: phpmyadmin/phpmyadmin
+    restart: always
+    ports:
+    - '8888:80'
+    environment:
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: root
+    depends_on:
+    - db
+
+volumes:
+  data:
+    name: docker_magento2-data
+  db-data:
+    name: docker_magento2-db-data

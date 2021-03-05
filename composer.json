@@ -1,21 +1,27 @@
 {
-  "name": "smaily/smailyformagento",
-  "description": "Magento 2 Smaily extension",
-  "version": "1.1.0",
-  "type": "magento2-module",
-  "license": "GPL-3.0",
-  "authors": [
-    {
-      "name": "Smaily",
-      "email": "info@smaily.com",
-      "homepage": "https://www.smaily.com",
-      "role": "Developer"
+    "name": "smaily/smailyformagento",
+    "description": "Smaily extension for Magento 2",
+    "version": "1.1.0",
+    "type": "magento2-module",
+    "license": "GPL-3.0",
+    "authors": [
+        {
+            "name": "Smaily",
+            "email": "info@smaily.com",
+            "homepage": "https://smaily.com",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "email": "support@smaily.com",
+        "issues": "https://github.com/sendsmaily/smaily-magento-extension/issues"
+    },
+    "autoload": {
+        "files": [
+            "src/registration.php"
+        ],
+        "psr-4": {
+            "Smaily\\SmailyForMagento\\": "src/"
+        }
     }
-  ],
-  "autoload": {
-    "files": ["src/registration.php"],
-    "psr-4": {
-      "Smaily\\SmailyForMagento\\": "src/"
-    }
-  }
 }

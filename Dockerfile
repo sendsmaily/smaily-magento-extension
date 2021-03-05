@@ -1,6 +1,6 @@
-FROM php:7.2-apache
+FROM php:7.3-apache
 
-ENV MAGENTO_VERSION 2.2.11
+ENV MAGENTO_VERSION 2.3.6
 ENV COMPOSER_HOME /var/www/.composer
 
 # Install Magento requirements.
@@ -30,6 +30,7 @@ RUN apt-get update \
     && docker-php-ext-install mbstring \
     && docker-php-ext-install pdo_mysql \
     && docker-php-ext-install soap \
+    && docker-php-ext-install sockets \
     && docker-php-ext-install xsl \
     && docker-php-ext-install zip \
     && apt-get clean \

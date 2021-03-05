@@ -24,7 +24,7 @@ services:
     - MAGENTO_ADMIN_PASSWORD=smailydev1
     volumes:
     - data:/var/www/html
-    # - ./src:/var/www/html/app/code/Smaily/SmailyForMagento
+    - ./src:/var/www/html/app/code/Smaily/SmailyForMagento
     depends_on:
     - db
 

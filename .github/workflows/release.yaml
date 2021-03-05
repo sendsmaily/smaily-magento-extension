@@ -21,6 +21,7 @@ jobs:
             *.git*
             .sandbox/*
             assets/*
+            CHANGELOG.md
             CONTRIBUTING.md
             docker-compose.yaml
             Dockerfile

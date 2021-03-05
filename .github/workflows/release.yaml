@@ -39,5 +39,5 @@ jobs:
         with:
           upload_url: ${{ steps.get_release_url.outputs.upload_url }}
           asset_path: ./release.zip
-          asset_name: smailyformagento.zip
+          asset_name: smaily-for-magento2.zip
           asset_content_type: application/zip

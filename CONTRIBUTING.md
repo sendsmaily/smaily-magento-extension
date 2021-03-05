@@ -10,13 +10,9 @@ First off, thanks for taking the time to contribute!
   - [Starting the environment](#starting-the-environment)
   - [Stopping the environment](#stopping-the-environment)
   - [Resetting the environment](#resetting-the-environment)
-- [Publishing to Magento marketplace](#publishing-to-magento-marketplace)
-  - [Testing module before submission to marketplace](#testing-module-before-submission-to-marketplace)
-  - [Limitations in Magento review](#limitations-in-magento-review)
-    - [PHP CodeSniffer, VS Code and Magento 2 coding standard integration](#php-codeSniffer,-vs-code-and-magento-2-coding-standard-integration)
-    - [Magento 2 module package testing](#magento-2-module-package-testing)
-  - [Compilation and production mode testing](#compilation-and-production-mode-testing)
-  - [Checklist for Magento marketplace](#checklist-for-magento-marketplace)
+- [Publishing to Magento Marketplace](#publishing-to-magento-marketplace)
+  - [Testing module before submitting for review](#testing-module-before-submitting-for-review)
+  - [Magento Marketplace review](#magento-marketplace-review)
 
 
 # Getting started

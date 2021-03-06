@@ -18,10 +18,10 @@
     },
     "autoload": {
         "files": [
-            "src/registration.php"
+            "registration.php"
         ],
         "psr-4": {
-            "Smaily\\SmailyForMagento\\": "src/"
+            "Smaily\\SmailyForMagento\\": ""
         }
     }
 }

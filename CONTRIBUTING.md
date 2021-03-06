@@ -99,12 +99,12 @@ In the container test the package code:
 
 Ensure production mode compiles without errors:
 
-    $ bin/magento deploy:mode:set production
+    $ php bin/magento deploy:mode:set production
 
 Once everything checks out, reset your development environment:
 
     $ rm -rf generated/metadata/* generated/code/*
-    $ bin/magento deploy:mode:set default
+    $ php bin/magento deploy:mode:set default
 
 ## Magento Marketplace review
 

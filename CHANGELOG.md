@@ -1,6 +1,11 @@
 # Changelog
 
 
+### 1.2.0
+
+- Align synchronization customer first and last name with abandoned cart [[#52](https://github.com/sendsmaily/smaily-magento-extension/pull/52)]
+
+
 ### 1.1.0
 
 - Add new fields ` first_name ` and `last_name` for abandoned cart export

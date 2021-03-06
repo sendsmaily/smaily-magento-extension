@@ -54,7 +54,7 @@ In Magento's root directory run:
 ### Manual installation
 
 1. Download ZIP-file from [Magento Marketplace](https://marketplace.magento.com) or repository's [releases](https://github.com/sendsmaily/smaily-magento-extension/releases) section;
-2. Extract `src/` directory from downloaded ZIP-file to your Magento's `app/code/Smaily/SmailyForMagento` directory.
+2. Extract downloaded ZIP-file to your Magento's `app/code/Smaily/SmailyForMagento` directory.
 
 ### After installation
 

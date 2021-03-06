@@ -1,11 +1,11 @@
-name: Create a ZIP file
+name: Build a release
 
 on:
   release:
     types: [published]
 
 jobs:
-  compress:
+  release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

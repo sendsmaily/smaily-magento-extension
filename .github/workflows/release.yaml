@@ -18,9 +18,9 @@ jobs:
         with:
           filename: release.zip
           exclusions: >
-            *.git*
-            .sandbox/*
-            assets/*
+            /.git*
+            /.sandbox*
+            /assets*
             CHANGELOG.md
             CONTRIBUTING.md
             docker-compose.yaml

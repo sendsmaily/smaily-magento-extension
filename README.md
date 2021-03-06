@@ -56,7 +56,17 @@ In Magento's root directory run:
 
 ### After installation
 
-After either installing extension via Composer or manually, upgrade Magento modules:
+Ensure Smaily for Magento is enabled:
+
+    $ php bin/magento module:status Smaily_SmailyForMagento
+
+> You should see "Module is enabled".
+
+If extension is disabled, you can enable it by running:
+
+    $ php bin/magento module:enable Smaily_SmailyForMagento
+
+Ensure Magento extension updates are applied:
 
     $ php bin/magento setup:upgrade
 

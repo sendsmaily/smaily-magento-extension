@@ -95,16 +95,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Check  Smaily Cron Sync is enabled
-     *
-     * @return bool
-     */
-    public function isCronEnabled()
-    {
-        return (bool) $this->getGeneralConfig('enableCronSync');
-    }
-
-    /**
      * Check  Smaily Abandoned Cart is enabled
      *
      * @return bool
@@ -321,25 +311,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Send newsletter subscribers to Smaily.
-     *
-     * @param array $list Subscribers list in batches.
-     * @return boolean Success/Failure status
-     */
-    public function cronSubscribeAll($list)
-    {
-        foreach ($list as $batch) {
-            $response = $this->callApi('contact', $batch, 'POST');
-            if (!array_key_exists('message', $response) ||
-                array_key_exists('message', $response) && $response['message'] !== 'OK') {
-                    return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
      * Call to Smaily Autoresponder api;
      *
      * @return void
@@ -540,83 +511,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         }
 
         return $trimmed;
-    }
-
-    /**
-     * Returns last customer synchronization update time from db.
-     *
-     * @return string/false Returns update time or false if not set.
-     */
-    public function getLastCustomerSyncTime()
-    {
-        if (!isset($this->connection)) {
-            $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-            $resource = $objectManager->create('\Magento\Framework\App\ResourceConnection');
-            $this->connection = $resource->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
-        }
-
-        $table = $this->connection->getTableName('smaily_customer_sync');
-
-        return $this->connection->fetchOne("SELECT last_update_at FROM $table");
-    }
-
-    /**
-     * Updates customer sync timestamp when cron runs.
-     *
-     * @param string/boolean $last_update Last update time. False if first time.
-     * @return void
-     */
-    public function updateCustomerSyncTimestamp($last_update)
-    {
-        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-        if (!isset($this->connection)) {
-            $resource = $objectManager->create('\Magento\Framework\App\ResourceConnection');
-            $this->connection = $resource->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
-        }
-        $datetime = $objectManager->create('\Magento\Framework\Stdlib\DateTime\DateTime');
-        $date = $datetime->gmtDate();
-
-        $table = $this->connection->getTableName('smaily_customer_sync');
-        if ($last_update) {
-            $sql = "UPDATE $table SET last_update_at = :CURRENT_UTC_TIME";
-        } else {
-            $sql = "INSERT INTO $table (last_update_at) VALUES (:CURRENT_UTC_TIME)";
-        }
-        $binds = ['CURRENT_UTC_TIME' => $date];
-        $this->connection->query($sql, $binds);
-    }
-
-     /**
-      * Get Smaily unsubscribers emails.
-      *
-      * @param integer $limit Limit number of results.
-      * @param integer $offset Page number (Not sql offset).
-      * @return array Unsubscribers emails list from smaily.
-      */
-    public function getUnsubscribersEmails($limit, $offset = 0)
-    {
-        $unsubscribers_emails = [];
-        $data = [
-            'list' => 2,
-            'limit' => $limit,
-        ];
-
-        while (true) {
-            $data['offset'] = $offset;
-            $unsubscribers = $this->callApi('contact', $data);
-
-            if (!$unsubscribers) {
-                break;
-            }
-
-            foreach ($unsubscribers as $unsubscriber) {
-                $unsubscribers_emails[] = $unsubscriber['email'];
-            }
-            // Smaily api call offset is considered as page number, not sql offset!
-            $offset++;
-        }
-
-        return $unsubscribers_emails;
     }
 
     /**

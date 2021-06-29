@@ -4,7 +4,6 @@ namespace Smaily\SmailyForMagento\Cron;
 
 use Smaily\SmailyForMagento\Helper\Config;
 use Smaily\SmailyForMagento\Helper\Data;
-use Smaily\SmailyForMagento\Model\API\Client as SmailyAPIClient;
 
 class AbandonedCart
 {
@@ -23,7 +22,6 @@ class AbandonedCart
 
     protected $config;
     protected $dataHelper;
-    protected $smailyApiClient;
 
     /**
      * Class constructor.
@@ -43,8 +41,7 @@ class AbandonedCart
         \Magento\Store\Model\StoreManagerInterface $storeManager,
         \Psr\Log\LoggerInterface $logger,
         Config $config,
-        Data $dataHelper,
-        SmailyAPIClient $smailyApiClient
+        Data $dataHelper
     )
     {
         $this->dateTime = $dateTime;
@@ -60,7 +57,6 @@ class AbandonedCart
 
         $this->config = $config;
         $this->dataHelper = $dataHelper;
-        $this->smailyApiClient = $smailyApiClient;
     }
 
     /**
@@ -87,12 +83,6 @@ class AbandonedCart
                 ]);
                 continue;
             }
-
-            // Setup Smaily API client.
-            $smailyApiCredentials = $this->config->getSmailyApiCredentials($website);
-            $this->smailyApiClient
-                ->setBaseUrl("https://${smailyApiCredentials['subdomain']}.sendsmaily.net")
-                ->setCredentials($smailyApiCredentials['username'], $smailyApiCredentials['password']);
 
             // Trigger Abandoned Cart automation workflows.
             $this->triggerAbandonedCarts($website);
@@ -210,8 +200,9 @@ class AbandonedCart
      * @return void
      */
     protected function triggerAutomationWorkflows(array $ids, \Magento\Store\Api\Data\WebsiteInterface $website) {
-        $workflowId = $this->config->getAbandonedCartAutomationId($website);
         $fields = $this->config->getAbandonedCartFields($website);
+        $smailyApiClient = $this->dataHelper->getSmailyApiClient($website);
+        $workflowId = $this->config->getAbandonedCartAutomationId($website);
 
         $this->logger->debug('Triggering Abandoned Carts', $ids);
 
@@ -285,7 +276,7 @@ class AbandonedCart
                 ];
 
                 try {
-                    $this->smailyApiClient->post('/api/autoresponder.php', $payload);
+                    $smailyApiClient->post('/api/autoresponder.php', $payload);
                 }
                 catch (\Exception $e) {
                     $this->logger->error($e->getMessage());

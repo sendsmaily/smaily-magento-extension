@@ -2,14 +2,18 @@
 
 namespace Smaily\SmailyForMagento\Helper;
 
-use Magento\Framework\App\Helper\Context;
 use Magento\Store\Model\ScopeInterface;
-use \Magento\Framework\HTTP\Client\Curl;
+
+use Smaily\SmailyForMagento\Helper\Config;
+use Smaily\SmailyForMagento\Model\API\ClientFactory as SmailyAPIClientFactory;
 
 class Data extends \Magento\Framework\App\Helper\AbstractHelper
 {
-    protected $logger;
     protected $curl;
+    protected $logger;
+
+    protected $config;
+    protected $smailyApiClientFactory;
 
     /**
      * Settings section value.
@@ -40,11 +44,17 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     private $connection;
 
     public function __construct(
-        Context $context,
-        Curl $curl
+        \Magento\Framework\App\Helper\Context $context,
+        \Magento\Framework\HTTP\Client\Curl $curl,
+        Config $config,
+        SmailyAPIClientFactory $smailyApiClientFactory
     ) {
-        $this->logger = $context->getLogger();
         $this->curl = $curl;
+        $this->logger = $context->getLogger();
+
+        $this->config = $config;
+        $this->smailyApiClientFactory = $smailyApiClientFactory;
+
         parent::__construct($context);
     }
 
@@ -230,6 +240,20 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         }
 
         return $this->callApi('contact', $address, 'POST');
+    }
+
+    /**
+     * Initialize and return an instance of Smaily API client.
+     *
+     * @param mixed|null $websiteId
+     * @access public
+     * @return Smaily\SmailyForMagento\Model\API\Client
+     */
+    public function getSmailyApiClient($websiteId = null) {
+        $credentials = $this->config->getSmailyApiCredentials($websiteId);
+        return $this->smailyApiClientFactory->create()
+            ->setBaseUrl("https://${credentials['subdomain']}.sendsmaily.net")
+            ->setCredentials($credentials['username'], $credentials['password']);
     }
 
     /**

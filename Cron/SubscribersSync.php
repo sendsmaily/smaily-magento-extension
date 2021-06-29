@@ -3,8 +3,8 @@
 namespace Smaily\SmailyForMagento\Cron;
 
 use Smaily\SmailyForMagento\Helper\Config;
+use Smaily\SmailyForMagento\Helper\Data;
 use Smaily\SmailyForMagento\Model\ResourceModel\SubscribersSyncState\Collection as SubscribersSyncStateCollection;
-use Smaily\SmailyForMagento\Model\API\Client as SmailyAPIClient;
 
 class SubscribersSync
 {
@@ -21,10 +21,10 @@ class SubscribersSync
     protected $logger;
     protected $newsletterSubscribersCollection;
     protected $resourceConnection;
-    protected $smailyApiClient;
     protected $storeManager;
 
     protected $config;
+    protected $dataHelper;
     protected $subscribersSyncStateCollection;
 
     /**
@@ -41,7 +41,7 @@ class SubscribersSync
         \Magento\Store\Model\StoreManagerInterface $storeManager,
         \Psr\Log\LoggerInterface $logger,
         Config $config,
-        SmailyAPIClient $smailyApiClient,
+        Data $dataHelper,
         SubscribersSyncStateCollection $subscribersSyncStateCollection
     ) {
         $this->customerCollection = $customerCollection;
@@ -52,7 +52,7 @@ class SubscribersSync
         $this->storeManager = $storeManager;
 
         $this->config = $config;
-        $this->smailyApiClient = $smailyApiClient;
+        $this->dataHelper = $dataHelper;
         $this->subscribersSyncStateCollection = $subscribersSyncStateCollection;
     }
 
@@ -83,12 +83,6 @@ class SubscribersSync
                 continue;
             }
 
-            // Setup Smaily API client.
-            $smailyApiCredentials = $this->config->getSmailyApiCredentials($website);
-            $this->smailyApiClient
-                ->setBaseUrl("https://${smailyApiCredentials['subdomain']}.sendsmaily.net")
-                ->setCredentials($smailyApiCredentials['username'], $smailyApiCredentials['password']);
-
             // Synchronize Newsletter Subscribers.
             $this->optOutNewsletterSubscribers($website);
             $this->syncNewsletterSubscribers($website, $lastSyncedAt);
@@ -108,9 +102,9 @@ class SubscribersSync
      */
     protected function syncNewsletterSubscribers(\Magento\Store\Api\Data\WebsiteInterface $website, $lastSyncedAt = null)
     {
-        $offset = 0;
-        $stores = $website->getStores();
+        $smailyApiClient = $this->dataHelper->getSmailyApiClient($website);
         $storeIds = $website->getStoreIds();
+        $stores = $website->getStores();
 
         $this->logger->info('Synchronizing subscribers from Magento to Smaily...', [
             'batch_size' => self::BATCH_SIZE,
@@ -147,6 +141,7 @@ class SubscribersSync
             ->order('main_table.subscriber_id ASC');
 
         // Synchronize Newsletter Subscribers to Smaily.
+        $offset = 0;
         while (true) {
             $select->limit(self::BATCH_SIZE, $offset * self::BATCH_SIZE);
 
@@ -190,7 +185,7 @@ class SubscribersSync
             }
 
             if (!empty($payload)) {
-                $this->smailyApiClient->post('/api/contact.php', $payload);
+                $smailyApiClient->post('/api/contact.php', $payload);
             }
 
             $offset += 1;
@@ -206,17 +201,18 @@ class SubscribersSync
      */
     protected function optOutNewsletterSubscribers(\Magento\Store\Api\Data\WebsiteInterface $website)
     {
-        $offset = 0;
+        $smailyApiClient = $this->dataHelper->getSmailyApiClient($website);
         $storeIds = $website->getStoreIds();
 
         $this->logger->info('Synchronizing opt-outs from Smaily to Magento...', [
             'batch_size' => self::BATCH_SIZE,
         ]);
 
+        $offset = 0;
         while (true) {
             $this->logger->debug('Fetching opt-outs at offset: ' . $offset);
 
-            $subscribers = $this->smailyApiClient->get('/api/contact.php', [
+            $subscribers = $smailyApiClient->get('/api/contact.php', [
                 'list' => 2,
                 'offset' => $offset,
                 'limit' => self::BATCH_SIZE,

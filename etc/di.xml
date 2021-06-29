@@ -1,9 +1,14 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="../../../../../lib/internal/Magento/Framework/ObjectManager/etc/config.xsd">
+    <!-- Intercept Newsletter Subscriber opt-in -->
     <type name="Magento\Newsletter\Model\Subscriber">
-        <plugin name="Smaily_SmailyForMagento_Subscribe"
-                type="Smaily\SmailyForMagento\Controller\Subscriber\Subscribe" />
+        <plugin name="Smaily_SmailyForMagento_Subscribe" type="Smaily\SmailyForMagento\Controller\Subscriber\Subscribe" />
+    </type>
+
+    <!-- Intercept module configuration save -->
+    <type name="Magento\Config\Model\Config">
+        <plugin name="Smaily_SmailyForMagento_Plugin_SaveConfig" type="Smaily\SmailyForMagento\Plugin\SaveConfig" />
     </type>
 
     <!-- Set CRON loggers -->

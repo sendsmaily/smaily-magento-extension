@@ -99,15 +99,17 @@ class Client
 
             // Handle response errors.
             if ($response === false) {
-                throw new \Exception("Smaily API request failed with error: ". curl_error($ch));
+                throw new \Exception(
+                    "Smaily API request failed with error: ". curl_error($ch),
+                    (int) curl_getinfo($ch,  CURLINFO_HTTP_CODE));
             }
 
             $json = json_decode($response, true);
             if (is_array($json) === false) {
-                throw new \Exception('Received invalid response from Smaily API: ' . $response);
+                throw new \Exception('Received invalid response from Smaily API: ' . $response, 200);
             }
             else if ($method === 'POST' && (int) $json['code'] !== 101) {
-                throw new \Exception('Smaily API responded with: ' . $json['message']);
+                throw new \Exception('Smaily API responded with: ' . $json['message'], 200);
             }
 
             return $json;

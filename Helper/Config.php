@@ -2,8 +2,6 @@
 
 namespace Smaily\SmailyForMagento\Helper;
 
-use \Magento\Store\Model\ScopeInterface;
-
 class Config extends \Magento\Framework\App\Helper\AbstractHelper
 {
     const SETTINGS_NAMESPACE = 'smaily';
@@ -11,6 +9,10 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     const SETTINGS_GROUP_GENERAL = 'general';
     const SETTINGS_GROUP_SUBSCRIBERS_SYNC = 'sync';
     const SETTINGS_GROUP_ABANDONED_CART = 'abandoned';
+
+    const SETTINGS_GENERAL_SUBDOMAIN = 'subdomain';
+    const SETTINGS_GENERAL_USERNAME = 'username';
+    const SETTINGS_GENERAL_PASSWORD = 'password';
 
     /**
      * Is module enabled?
@@ -105,9 +107,9 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     public function getSmailyApiCredentials($websiteId = null)
     {
         return [
-            'subdomain' => $this->getConfigValue('subdomain', self::SETTINGS_GROUP_GENERAL, $websiteId),
-            'username' => $this->getConfigValue('username', self::SETTINGS_GROUP_GENERAL, $websiteId),
-            'password' => $this->getConfigValue('password', self::SETTINGS_GROUP_GENERAL, $websiteId),
+            'subdomain' => $this->getConfigValue(self::SETTINGS_GENERAL_SUBDOMAIN, self::SETTINGS_GROUP_GENERAL, $websiteId),
+            'username' => $this->getConfigValue(self::SETTINGS_GENERAL_USERNAME, self::SETTINGS_GROUP_GENERAL, $websiteId),
+            'password' => $this->getConfigValue(self::SETTINGS_GENERAL_PASSWORD, self::SETTINGS_GROUP_GENERAL, $websiteId),
         ];
     }
 
@@ -123,6 +125,6 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     private function getConfigValue($setting, $group, $websiteId = null)
     {
         $path = self::SETTINGS_NAMESPACE . '/' . trim($group, '/') . '/' . trim($setting, '/');
-        return $this->scopeConfig->getValue($path, ScopeInterface::SCOPE_WEBSITE, $websiteId);
+        return $this->scopeConfig->getValue($path, \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITE, $websiteId);
     }
 }

@@ -11,6 +11,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 {
     protected $curl;
     protected $logger;
+    protected $request;
 
     protected $config;
     protected $smailyApiClientFactory;
@@ -45,12 +46,14 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
     public function __construct(
         \Magento\Framework\App\Helper\Context $context,
+        \Magento\Framework\App\Request\Http $request,
         \Magento\Framework\HTTP\Client\Curl $curl,
         Config $config,
         SmailyAPIClientFactory $smailyApiClientFactory
     ) {
         $this->curl = $curl;
         $this->logger = $context->getLogger();
+        $this->request = $request;
 
         $this->config = $config;
         $this->smailyApiClientFactory = $smailyApiClientFactory;
@@ -198,48 +201,34 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
-     * Get AutoResponders list from Smaily API
+     * Get admin store configuration page settings scope.
      *
-     * @return array
+     * @access public
+     * @return
      */
-    public function getAutoresponders()
+    public function getConfigurationCurrentWebsiteId()
     {
-        $autoresponders = $this->callApi('workflows', ['trigger_type' => 'form_submitted']);
-        $list = [];
-
-        if (!empty($autoresponders)) {
-            foreach ($autoresponders as $autoresponder) {
-                    $list[$autoresponder['id']] = trim($autoresponder['title']);
-            }
-        }
-
-        return $list;
+        return (int) $this->request->getParam('website', 0);
     }
 
     /**
-     * Subscribe/Import Customer to Smaily by email
+     * Fetch list of automation workflows from Smaily.
      *
+     * @param mixed|null $websiteId
+     * @access public
      * @return array
-     *  Smaily api response
      */
-    public function subscribe($email, $data = [], $update = 0)
+    public function getAutomationWorkflows($websiteId = null)
     {
-        $address = [
-            'email' => $email,
-            'is_unsubscribed' => $update
-        ];
-
-        if (!empty($data)) {
-            $fields = explode(',', $this->getGeneralConfig('fields'));
-
-            foreach ($data as $field => $val) {
-                if ($field === 'name' || in_array($field, $fields, true)) {
-                    $address[$field] = trim($val);
-                }
-            }
+        try {
+            return $this->getSmailyApiClient($websiteId)->get('/api/workflows.php', [
+                'trigger_type' => 'form_submitted',
+            ]);
         }
-
-        return $this->callApi('contact', $address, 'POST');
+        catch (\Exception $e) {
+            $this->logger->error('Unable to fetch automation workflows: ' . $e->getMessage());
+            return [];
+        }
     }
 
     /**

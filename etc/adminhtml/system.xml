@@ -102,8 +102,8 @@
           <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
         </field>
         <field id="autoresponderId" translate="label" type="select" sortOrder="110" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>Autoresponder ID </label>
-          <source_model>Smaily\SmailyForMagento\Model\Config\Source\Autoresponders</source_model>
+          <label>Autoresponder ID</label>
+          <source_model>Smaily\SmailyForMagento\Model\Config\Source\Workflows</source_model>
           <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000092458-creating-automation-workflows" target="_blank">How to set up an autoresponder for confirmation emails?</a>]]></comment>
         </field>
         <field id="syncTime" translate="label" type="select" sortOrder="120" showInDefault="1" showInWebsite="1" showInStore="0">

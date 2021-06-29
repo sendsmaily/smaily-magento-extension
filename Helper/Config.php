@@ -8,15 +8,23 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
 
     const SETTINGS_NAMESPACE = 'smaily';
 
+    const SETTINGS_GROUP_ABANDONED_CART = 'abandoned';
     const SETTINGS_GROUP_GENERAL = 'general';
     const SETTINGS_GROUP_SUBSCRIBERS_SYNC = 'sync';
-    const SETTINGS_GROUP_ABANDONED_CART = 'abandoned';
 
+    const SETTINGS_GENERAL_ENABLED = 'enable';
+    const SETTINGS_GENERAL_PASSWORD = 'password';
     const SETTINGS_GENERAL_SUBDOMAIN = 'subdomain';
     const SETTINGS_GENERAL_USERNAME = 'username';
-    const SETTINGS_GENERAL_PASSWORD = 'password';
 
+    const SETTINGS_SUBSCRIBERS_SYNC_ENABLED = 'enableCronSync';
+    const SETTINGS_SUBSCRIBERS_SYNC_FIELDS = 'fields';
     const SETTINGS_SUBSCRIBERS_SYNC_FREQUENCY = 'frequency';
+
+    const SETTINGS_ABANDONED_CART_ENABLED = 'enableAbandonedCart';
+    const SETTINGS_ABANDONED_CART_FIELDS = 'productfields';
+    const SETTINGS_ABANDONED_CART_INTERVAL = 'syncTime';
+    const SETTINGS_ABANDONED_CART_WORKFLOW_ID = 'autoresponderId';
 
     /**
      * Is module enabled?
@@ -27,7 +35,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function isEnabled($websiteId = null)
     {
-        return (bool)(int) $this->getConfigValue('enable', self::SETTINGS_GROUP_GENERAL, $websiteId);
+        return (bool)(int) $this->getConfigValue(self::SETTINGS_GENERAL_ENABLED, self::SETTINGS_GROUP_GENERAL, $websiteId);
     }
 
     /**
@@ -39,7 +47,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function isSubscribersSyncEnabled($websiteId = null)
     {
-        return (bool)(int) $this->getConfigValue('enableCronSync', self::SETTINGS_GROUP_SUBSCRIBERS_SYNC, $websiteId);
+        return (bool)(int) $this->getConfigValue(self::SETTINGS_SUBSCRIBERS_SYNC_ENABLED, self::SETTINGS_GROUP_SUBSCRIBERS_SYNC, $websiteId);
     }
 
     /**
@@ -50,7 +58,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      * @return array
      */
     public function getSubscribersSyncFields($websiteId = null) {
-        $fields = $this->getConfigValue('fields', self::SETTINGS_GROUP_SUBSCRIBERS_SYNC, $websiteId);
+        $fields = $this->getConfigValue(self::SETTINGS_SUBSCRIBERS_SYNC_FIELDS, self::SETTINGS_GROUP_SUBSCRIBERS_SYNC, $websiteId);
         return !empty($fields) ? explode(',', $fields) : array();
     }
 
@@ -63,7 +71,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function isAbandonedCartCronEnabled($websiteId = null)
     {
-        return (bool)(int) $this->getConfigValue('enableAbandonedCart', self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
+        return (bool)(int) $this->getConfigValue(self::SETTINGS_ABANDONED_CART_ENABLED, self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
     }
 
     /**
@@ -74,7 +82,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      * @return \DateInterval
      */
     public function getAbadonedCartAbandonInterval($websiteId = null) {
-        $interval = $this->getConfigValue('syncTime', self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
+        $interval = $this->getConfigValue(self::SETTINGS_ABANDONED_CART_INTERVAL, self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
         return \DateInterval::createFromDateString(str_replace(':', ' ', $interval));
     }
 
@@ -86,7 +94,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      * @return array
      */
     public function getAbandonedCartFields($websiteId = null) {
-        $fields = $this->getConfigValue('productfields', self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
+        $fields = $this->getConfigValue(self::SETTINGS_ABANDONED_CART_FIELDS, self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
         return !empty($fields) ? explode(',', $fields) : array();
     }
 
@@ -98,7 +106,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      * @return int
      */
     public function getAbandonedCartAutomationId($websiteId = null) {
-        return (int) $this->getConfigValue('autoresponderId', self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
+        return (int) $this->getConfigValue(self::SETTINGS_ABANDONED_CART_WORKFLOW_ID, self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
     }
 
     /**

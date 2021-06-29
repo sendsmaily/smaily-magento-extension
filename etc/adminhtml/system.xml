@@ -4,41 +4,41 @@
     <tab id="smaily_smailyformagento" translate="label" sortOrder="500">
       <label>Smaily Email Marketing and Automation</label>
     </tab>
-    <section id="smaily" translate="label" sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="1">
+    <section id="smaily" translate="label" sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="0">
       <class>separator-top</class>
       <label>Module Configuration</label>
       <tab>smaily_smailyformagento</tab>
       <resource>Smaily_SmailyForMagento::access</resource>
-      <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+      <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
         <label>General Settings</label>
-        <field id="enable" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="enable" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Enable Module</label>
           <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
         </field>
-        <field id="subdomain" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="subdomain" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Subdomain</label>
           <backend_model>Smaily\SmailyForMagento\Model\Config\Backend\Validate</backend_model>
           <validate>required-entry</validate>
           <comment>For example "demo" from https://demo.sendsmaily.net/</comment>
         </field>
-        <field id="username" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="username" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>API Username</label>
           <validate>required-entry</validate>
         </field>
-        <field id="password" translate="label" type="password" sortOrder="50" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="password" translate="label" type="password" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>API Password</label>
           <validate>required-entry</validate>
           <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000062943-create-api-user" target="_blank">How to create API credentials?</a>]]></comment>
         </field>
       </group>
-      <group id="subscribe" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+      <group id="subscribe" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
         <label>Newsletter Subscription Form</label>
-        <field id="enableNewsletterSubscriptions" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="enableNewsletterSubscriptions" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Enable Subscribers Collection</label>
           <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
           <comment>Send subscribers from newsletter form directly to Smaily</comment>
         </field>
-        <field id="enableCaptcha" translate="label" type="select" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="enableCaptcha" translate="label" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Enable CAPTCHA</label>
           <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
           <comment>
@@ -50,7 +50,7 @@
             <field id="enableNewsletterSubscriptions">1</field>
           </depends>
         </field>
-        <field id="captchaType" translate="label" sortOrder="20" type="select" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="captchaType" translate="label" sortOrder="20" type="select" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>CAPTCHA Type</label>
           <source_model>Smaily\SmailyForMagento\Model\Config\Source\CaptchaType</source_model>
           <depends>
@@ -58,7 +58,7 @@
             <field id="enableCaptcha">1</field>
           </depends>
         </field>
-        <field id="captchaApiKey" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="captchaApiKey" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Google API Key</label>
           <comment><![CDATA[Create new site settings <a href="https://www.google.com/recaptcha/admin/create" target="_blank"> from here</a>.]]></comment>
             <depends>
@@ -68,7 +68,7 @@
           </depends>
           <validate>required-entry</validate>
         </field>
-        <field id="captchaApiSecret" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="captchaApiSecret" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Google API Secret Key</label>
           <depends>
             <field id="captchaType">google_captcha</field>
@@ -78,40 +78,40 @@
           <validate>required-entry</validate>
         </field>
       </group>
-      <group id="sync" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+      <group id="sync" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
         <label>Subscribers Syncronization</label>
-        <field id="enableCronSync" translate="label" type="select" sortOrder="70" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="enableCronSync" translate="label" type="select" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Enable Syncronization</label>
           <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
         </field>
-        <field id="fields" translate="label" type="multiselect" sortOrder="80" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="fields" translate="label" type="multiselect" sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Syncronize Additional Fields</label>
           <source_model>Smaily\SmailyForMagento\Model\Config\Source\Fields</source_model>
           <comment>Select fields you wish to synchronize along with subscription data. Subscriber Email and Name fields are automatically synchronized</comment>
         </field>
-        <field id="frequency" translate="label" type="select" sortOrder="90" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="frequency" translate="label" type="select" sortOrder="90" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Frequency</label>
           <source_model>Smaily\SmailyForMagento\Model\Config\Source\Frequency</source_model>
           <backend_model>Smaily\SmailyForMagento\Model\Config\Backend\Frequency</backend_model>
         </field>
       </group>
-      <group id="abandoned" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
+      <group id="abandoned" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
         <label>Abandoned Cart</label>
-        <field id="enableAbandonedCart" translate="label" type="select" sortOrder="100" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="enableAbandonedCart" translate="label" type="select" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Enable Abandoned Cart</label>
           <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
         </field>
-        <field id="autoresponderId" translate="label" type="select" sortOrder="110" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="autoresponderId" translate="label" type="select" sortOrder="110" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Autoresponder ID </label>
           <source_model>Smaily\SmailyForMagento\Model\Config\Source\Autoresponders</source_model>
           <comment><![CDATA[<a href="http://help.smaily.com/en/support/solutions/articles/16000092458-creating-automation-workflows" target="_blank">How to set up an autoresponder for confirmation emails?</a>]]></comment>
         </field>
-        <field id="syncTime" translate="label" type="select" sortOrder="120" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="syncTime" translate="label" type="select" sortOrder="120" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Trigger Abandoned Cart Automation</label>
           <source_model>Smaily\SmailyForMagento\Model\Config\Source\SyncTime</source_model>
           <comment>This is the time when cart is considered abandoned!</comment>
         </field>
-        <field id="productfields" translate="label" type="multiselect" sortOrder="130" showInDefault="1" showInWebsite="0" showInStore="0">
+        <field id="productfields" translate="label" type="multiselect" sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Add Template Parameters</label>
           <source_model>Smaily\SmailyForMagento\Model\Config\Source\ProductFields</source_model>
           <comment>You can use those parameters in Smaily template to personalize abandoned cart reminder emails!</comment>

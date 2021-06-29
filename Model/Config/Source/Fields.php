@@ -29,11 +29,11 @@ class Fields implements \Magento\Framework\Option\ArrayInterface
                 'label' => 'Prefix',
             ],
             [
-                'value' => 'firstname',
+                'value' => 'first_name',
                 'label' => 'Firstname',
             ],
             [
-                'value' => 'lastname',
+                'value' => 'last_name',
                 'label' => 'Lastname',
             ],
             [

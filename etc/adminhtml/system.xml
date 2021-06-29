@@ -86,7 +86,7 @@
         </field>
         <field id="fields" translate="label" type="multiselect" sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Syncronize Additional Fields</label>
-          <source_model>Smaily\SmailyForMagento\Model\Config\Source\Fields</source_model>
+          <source_model>Smaily\SmailyForMagento\Model\Config\Source\SubscribersSync\Fields</source_model>
           <comment>Select fields you wish to synchronize along with subscription data. Subscriber Email and Name fields are automatically synchronized</comment>
         </field>
         <field id="frequency" translate="label" type="select" sortOrder="90" showInDefault="1" showInWebsite="0" showInStore="0">
@@ -107,12 +107,12 @@
         </field>
         <field id="syncTime" translate="label" type="select" sortOrder="120" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Trigger Abandoned Cart Automation</label>
-          <source_model>Smaily\SmailyForMagento\Model\Config\Source\SyncTime</source_model>
-          <comment>This is the time when cart is considered abandoned!</comment>
+          <source_model>Smaily\SmailyForMagento\Model\Config\Source\AbandonedCart\Interval</source_model>
+          <comment>This is the time after cart is considered abandoned!</comment>
         </field>
         <field id="productfields" translate="label" type="multiselect" sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Add Template Parameters</label>
-          <source_model>Smaily\SmailyForMagento\Model\Config\Source\ProductFields</source_model>
+          <source_model>Smaily\SmailyForMagento\Model\Config\Source\AbandonedCart\Fields</source_model>
           <comment>You can use those parameters in Smaily template to personalize abandoned cart reminder emails!</comment>
         </field>
       </group>

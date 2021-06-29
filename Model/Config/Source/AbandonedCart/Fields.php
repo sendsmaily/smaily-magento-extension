@@ -1,11 +1,11 @@
 <?php
 
-namespace Smaily\SmailyForMagento\Model\Config\Source;
+namespace Smaily\SmailyForMagento\Model\Config\Source\AbandonedCart;
 
-class ProductFields implements \Magento\Framework\Option\ArrayInterface
+class Fields implements \Magento\Framework\Option\ArrayInterface
 {
     /**
-     * Get Option values for Product field.
+     * Get options for Abandoned Cart fields.
      *
      * @return array
      */

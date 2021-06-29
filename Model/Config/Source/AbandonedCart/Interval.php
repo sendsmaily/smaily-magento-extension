@@ -1,17 +1,17 @@
 <?php
 
-namespace Smaily\SmailyForMagento\Model\Config\Source;
+namespace Smaily\SmailyForMagento\Model\Config\Source\AbandonedCart;
 
-class SyncTime implements \Magento\Framework\Option\ArrayInterface
+class Interval implements \Magento\Framework\Option\ArrayInterface
 {
     /**
-     * Get Option values for time list.
+     * Get options for Abandoned Cart abandon intervals.
      *
      * @return array
      */
     public function toOptionArray()
     {
-        $list = [
+        return [
             [
                 'value' => '20:minutes',
                 'label' => '20 Minutes',
@@ -49,7 +49,5 @@ class SyncTime implements \Magento\Framework\Option\ArrayInterface
                 'label' => '12 Hours',
             ],
         ];
-
-        return $list;
     }
 }

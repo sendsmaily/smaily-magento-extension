@@ -5,7 +5,7 @@ namespace Smaily\SmailyForMagento\Model\Config\Source\SubscribersSync;
 class Frequency implements \Magento\Framework\Option\ArrayInterface
 {
     /**
-     * Get values for Newsletter Subscribers synchronization frequencies.
+     * Get options for Newsletter Subscribers synchronization frequencies.
      *
      * @return array
      */

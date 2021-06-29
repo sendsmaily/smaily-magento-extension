@@ -11,7 +11,7 @@ class ProductFields implements \Magento\Framework\Option\ArrayInterface
      */
     public function toOptionArray()
     {
-        $list = [
+        return [
             [
                 'value' => 'first_name',
                 'label' => 'Customer First Name'
@@ -45,7 +45,5 @@ class ProductFields implements \Magento\Framework\Option\ArrayInterface
                 'label' => 'Product Base Price',
             ],
         ];
-
-        return $list;
     }
 }

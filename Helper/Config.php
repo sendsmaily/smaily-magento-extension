@@ -61,6 +61,41 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
+     * Get interval in which cart should be abandoned in.
+     *
+     * @param mixed|null $websiteId
+     * @access public
+     * @return \DateInterval
+     */
+    public function getAbadonedCartAbandonInterval($websiteId = null) {
+        $interval = $this->getConfigValue('syncTime', self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
+        return \DateInterval::createFromDateString(str_replace(':', ' ', $interval));
+    }
+
+    /**
+     * Get list of fields that should be passed along with abandoned cart.
+     *
+     * @param mixed|null $websiteId
+     * @access public
+     * @return array
+     */
+    public function getAbandonedCartFields($websiteId = null) {
+        $fields = $this->getConfigValue('productfields', self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
+        return !empty($fields) ? explode(',', $fields) : array();
+    }
+
+    /**
+     * Get abandoned cart automation workflow ID.
+     *
+     * @param mixed|null $websiteId
+     * @access public
+     * @return int
+     */
+    public function getAbandonedCartAutomationId($websiteId = null) {
+        return (int) $this->getConfigValue('autoresponderId', self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
+    }
+
+    /**
      * Returns Smaily API credentials.
      *
      * @param mixed|null $websiteId

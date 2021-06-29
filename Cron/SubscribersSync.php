@@ -18,6 +18,7 @@ class SubscribersSync
 
     protected $customerCollection;
     protected $customerGroupCollection;
+    protected $logger;
     protected $newsletterSubscribersCollection;
     protected $resourceConnection;
     protected $smailyApiClient;
@@ -38,12 +39,14 @@ class SubscribersSync
         \Magento\Framework\App\ResourceConnection $resourceConnection,
         \Magento\Newsletter\Model\ResourceModel\Subscriber\Collection $newsletterSubscribersCollection,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Psr\Log\LoggerInterface $logger,
         Config $config,
         SmailyAPIClient $smailyApiClient,
         SubscribersSyncStateCollection $subscribersSyncStateCollection
     ) {
         $this->customerCollection = $customerCollection;
         $this->customerGroupCollection = $customerGroupCollection;
+        $this->logger = $logger;
         $this->newsletterSubscribersCollection = $newsletterSubscribersCollection;
         $this->resourceConnection = $resourceConnection->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
         $this->storeManager = $storeManager;
@@ -65,11 +68,18 @@ class SubscribersSync
         $lastSyncedAt = $this->subscribersSyncStateCollection->getLastSyncedAt();
         $websites = $this->storeManager->getWebsites();
 
+        $this->logger->info('Starting Newsletter Subscribers synchronization CRON job...');
+
         foreach ($websites as $website) {
             if (
                 $this->config->isEnabled($website) === FALSE ||
                 $this->config->isSubscribersSyncEnabled($website) === FALSE
             ) {
+                $this->logger->debug('CRON is disabled for website:', [
+                    'id' => $website->getId(),
+                    'name' => $website->getName(),
+                    'code' => $website->getCode(),
+                ]);
                 continue;
             }
 
@@ -101,6 +111,10 @@ class SubscribersSync
         $offset = 0;
         $stores = $website->getStores();
         $storeIds = $website->getStoreIds();
+
+        $this->logger->info('Synchronizing subscribers from Magento to Smaily...', [
+            'batch_size' => self::BATCH_SIZE,
+        ]);
 
         // Fetch customer groups.
         $customerGroups = array();
@@ -136,8 +150,11 @@ class SubscribersSync
         while (true) {
             $select->limit(self::BATCH_SIZE, $offset * self::BATCH_SIZE);
 
+            $this->logger->debug('Fetching subscribers at offset: ' . $offset);
+
             $subscribers = $this->resourceConnection->fetchAll($select);
-            if (count($subscribers) === 0) {
+            if (empty($subscribers)) {
+                $this->logger->debug('No subscribers found at offset, breaking loop');
                 break;
             }
 
@@ -192,7 +209,13 @@ class SubscribersSync
         $offset = 0;
         $storeIds = $website->getStoreIds();
 
+        $this->logger->info('Synchronizing opt-outs from Smaily to Magento...', [
+            'batch_size' => self::BATCH_SIZE,
+        ]);
+
         while (true) {
+            $this->logger->debug('Fetching opt-outs at offset: ' . $offset);
+
             $subscribers = $this->smailyApiClient->get('/api/contact.php', [
                 'list' => 2,
                 'offset' => $offset,
@@ -200,6 +223,7 @@ class SubscribersSync
             ]);
 
             if (empty($subscribers)) {
+                $this->logger->debug('No opt-outs found at offset, breaking loop');
                 break;
             }
 

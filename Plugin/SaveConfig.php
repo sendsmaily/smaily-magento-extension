@@ -7,6 +7,7 @@ use Smaily\SmailyForMagento\Model\API\ClientFactory as SmailyAPIClientFactory;
 
 class SaveConfig
 {
+    protected $configValueFactory;
     protected $logger;
     protected $scopeConfig;
 
@@ -21,11 +22,13 @@ class SaveConfig
      */
     public function __construct(
         \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
+        \Magento\Framework\App\Config\ValueFactory $configValueFactory,
         \Psr\Log\LoggerInterface $logger,
         Config $config,
         SmailyAPIClientFactory $smailyApiClientFactory
     )
     {
+        $this->configValueFactory = $configValueFactory;
         $this->logger = $logger;
         $this->scopeConfig = $scopeConfig;
 
@@ -34,8 +37,9 @@ class SaveConfig
     }
 
     /**
-     * Override configuration save to validate Smaily API credentials.
+     * Run additional validation logic before saving configuration.
      *
+     * @param \Magento\Config\Model\Config $config
      * @access public
      * @return void
      */
@@ -45,9 +49,9 @@ class SaveConfig
             return;
         }
 
-        $subdomain = $this->resolveConfigValue($config, Config::SETTINGS_GENERAL_SUBDOMAIN);
-        $username = $this->resolveConfigValue($config, Config::SETTINGS_GENERAL_USERNAME);
-        $password = $this->resolveConfigValue($config, Config::SETTINGS_GENERAL_PASSWORD);
+        $subdomain = $this->resolveConfigValue($config, Config::SETTINGS_GENERAL_SUBDOMAIN, Config::SETTINGS_GROUP_GENERAL);
+        $username = $this->resolveConfigValue($config, Config::SETTINGS_GENERAL_USERNAME, Config::SETTINGS_GROUP_GENERAL);
+        $password = $this->resolveConfigValue($config, Config::SETTINGS_GENERAL_PASSWORD, Config::SETTINGS_GROUP_GENERAL);
 
         $client = $this->smailyApiClientFactory->create()
             ->setBaseUrl("https://${subdomain}.sendsmaily.net")
@@ -69,6 +73,29 @@ class SaveConfig
     }
 
     /**
+     * Run additional updates after configuration has been saved.
+     *
+     * @param \Magento\Config\Model\Config $config
+     * @access public
+     * @return void
+     */
+    public function afterSave(\Magento\Config\Model\Config $config)
+    {
+        if ($config->getSection() !== Config::SETTINGS_NAMESPACE) {
+            return;
+        }
+
+        // Update Newsletter Subscribers synchronization CRON job frequency.
+        $frequency = $this->resolveConfigValue($config, Config::SETTINGS_SUBSCRIBERS_SYNC_FREQUENCY, Config::SETTINGS_GROUP_SUBSCRIBERS_SYNC);
+
+        $this->configValueFactory->create()
+            ->load(Config::SUBSCRIBERS_SYNC_CRON_PATH, 'path')
+            ->setValue($frequency)
+            ->setPath(Config::SUBSCRIBERS_SYNC_CRON_PATH)
+            ->save();
+    }
+
+    /**
      * Return inherited configuration value.
      *
      * @param \Magento\Config\Model\Config $config
@@ -76,14 +103,14 @@ class SaveConfig
      * @access private
      * @return mixed
      */
-    private function resolveConfigValue(\Magento\Config\Model\Config $config, $setting)
+    private function resolveConfigValue(\Magento\Config\Model\Config $config, $setting, $group)
     {
-        $value = $config->getDataByPath('groups/' . Config::SETTINGS_GROUP_GENERAL . '/fields/' . $setting);
+        $value = $config->getDataByPath('groups/' . $group . '/fields/' . $setting);
         if (isset($value['inherit'])) {
             // Note! When switching to store view based configuration,
             // the scope (incl. website) needs to be adjusted as well.
             return $this->scopeConfig->getValue(
-                Config::SETTINGS_NAMESPACE . '/' . Config::SETTINGS_GROUP_GENERAL . '/' . $setting,
+                Config::SETTINGS_NAMESPACE . '/' . $group . '/' . $setting,
                 \Magento\Framework\App\Config\ScopeConfigInterface::SCOPE_TYPE_DEFAULT
             );
         }

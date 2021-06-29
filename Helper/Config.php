@@ -4,6 +4,8 @@ namespace Smaily\SmailyForMagento\Helper;
 
 class Config extends \Magento\Framework\App\Helper\AbstractHelper
 {
+    const SUBSCRIBERS_SYNC_CRON_PATH = 'crontab/default/jobs/smaily_subscriber_sync/schedule/cron_expr';
+
     const SETTINGS_NAMESPACE = 'smaily';
 
     const SETTINGS_GROUP_GENERAL = 'general';
@@ -13,6 +15,8 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     const SETTINGS_GENERAL_SUBDOMAIN = 'subdomain';
     const SETTINGS_GENERAL_USERNAME = 'username';
     const SETTINGS_GENERAL_PASSWORD = 'password';
+
+    const SETTINGS_SUBSCRIBERS_SYNC_FREQUENCY = 'frequency';
 
     /**
      * Is module enabled?

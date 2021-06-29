@@ -89,10 +89,9 @@
           <source_model>Smaily\SmailyForMagento\Model\Config\Source\Fields</source_model>
           <comment>Select fields you wish to synchronize along with subscription data. Subscriber Email and Name fields are automatically synchronized</comment>
         </field>
-        <field id="frequency" translate="label" type="select" sortOrder="90" showInDefault="1" showInWebsite="1" showInStore="0">
+        <field id="frequency" translate="label" type="select" sortOrder="90" showInDefault="1" showInWebsite="0" showInStore="0">
           <label>Frequency</label>
-          <source_model>Smaily\SmailyForMagento\Model\Config\Source\Frequency</source_model>
-          <backend_model>Smaily\SmailyForMagento\Model\Config\Backend\Frequency</backend_model>
+          <source_model>Smaily\SmailyForMagento\Model\Config\Source\SubscribersSync\Frequency</source_model>
         </field>
       </group>
       <group id="abandoned" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">

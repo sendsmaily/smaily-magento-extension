@@ -3,7 +3,7 @@
 namespace Smaily\SmailyForMagento\Plugin;
 
 use Smaily\SmailyForMagento\Helper\Config;
-use Smaily\SmailyForMagento\Model\API\ClientFactory as SmailyAPIClientFactory;
+use Smaily\SmailyForMagento\Model\HTTP\ClientFactory as HTTPClientFactory;
 
 class SaveConfig
 {
@@ -12,7 +12,7 @@ class SaveConfig
     protected $scopeConfig;
 
     protected $config;
-    protected $smailyApiClientFactory;
+    protected $httpClientFactory;
 
     /**
      * Class constructor.
@@ -25,7 +25,7 @@ class SaveConfig
         \Magento\Framework\App\Config\ValueFactory $configValueFactory,
         \Psr\Log\LoggerInterface $logger,
         Config $config,
-        SmailyAPIClientFactory $smailyApiClientFactory
+        HTTPClientFactory $httpClientFactory
     )
     {
         $this->configValueFactory = $configValueFactory;
@@ -33,7 +33,7 @@ class SaveConfig
         $this->scopeConfig = $scopeConfig;
 
         $this->config = $config;
-        $this->smailyApiClientFactory = $smailyApiClientFactory;
+        $this->httpClientFactory = $httpClientFactory;
     }
 
     /**
@@ -53,7 +53,7 @@ class SaveConfig
         $username = $this->resolveConfigValue($config, Config::SETTINGS_GENERAL_USERNAME, Config::SETTINGS_GROUP_GENERAL);
         $password = $this->resolveConfigValue($config, Config::SETTINGS_GENERAL_PASSWORD, Config::SETTINGS_GROUP_GENERAL);
 
-        $client = $this->smailyApiClientFactory->create()
+        $client = $this->httpClientFactory->create()
             ->setBaseUrl("https://${subdomain}.sendsmaily.net")
             ->setCredentials($username, $password);
 

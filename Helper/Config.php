@@ -10,12 +10,19 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
 
     const SETTINGS_GROUP_ABANDONED_CART = 'abandoned';
     const SETTINGS_GROUP_GENERAL = 'general';
+    const SETTINGS_GROUP_OPTIN = 'subscribe';
     const SETTINGS_GROUP_SUBSCRIBERS_SYNC = 'sync';
 
     const SETTINGS_GENERAL_ENABLED = 'enable';
     const SETTINGS_GENERAL_PASSWORD = 'password';
     const SETTINGS_GENERAL_SUBDOMAIN = 'subdomain';
     const SETTINGS_GENERAL_USERNAME = 'username';
+
+    const SETTINGS_OPTIN_ENABLED = 'enableNewsletterSubscriptions';
+    const SETTINGS_OPTIN_CAPTCHA_ENABLED = 'enableCaptcha';
+    const SETTINGS_OPTIN_CAPTCHA_TYPE = 'captchaType';
+    const SETTINGS_OPTIN_CAPTCHA_SITEKEY = 'captchaApiKey';
+    const SETTINGS_OPTIN_CAPTCHA_SECRETKEY = 'captchaApiSecret';
 
     const SETTINGS_SUBSCRIBERS_SYNC_ENABLED = 'enableCronSync';
     const SETTINGS_SUBSCRIBERS_SYNC_FIELDS = 'fields';
@@ -36,6 +43,66 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     public function isEnabled($websiteId = null)
     {
         return (bool)(int) $this->getConfigValue(self::SETTINGS_GENERAL_ENABLED, self::SETTINGS_GROUP_GENERAL, $websiteId);
+    }
+
+    /**
+     * Is Newsletter Subscriber opt-in triggering enabled?
+     *
+     * @param mixed|null $websiteId
+     * @access public
+     * @return boolean
+     */
+    public function isSubscriberOptInEnabled($websiteId = null)
+    {
+        return (bool)(int) $this->getConfigValue(self::SETTINGS_OPTIN_ENABLED, self::SETTINGS_GROUP_OPTIN, $websiteId);
+    }
+
+    /**
+     * Is Newsletter Subscriber opt-in CAPTCHA enabled?
+     *
+     * @param mixed|null $websiteId
+     * @access public
+     * @return boolean
+     */
+    public function isSubscriberOptInCaptchaEnabled($websiteId = null)
+    {
+        return (bool)(int) $this->getConfigValue(self::SETTINGS_OPTIN_CAPTCHA_ENABLED, self::SETTINGS_GROUP_OPTIN, $websiteId);
+    }
+
+    /**
+     * Get Newsletter Subscriber opt-in CAPTCHA type.
+     *
+     * @param mixed|null $websiteId
+     * @access public
+     * @return string
+     */
+    public function getSubscriberOptInCaptchaType($websiteId = null)
+    {
+        return $this->getConfigValue(self::SETTINGS_OPTIN_CAPTCHA_TYPE, self::SETTINGS_GROUP_OPTIN, $websiteId);
+    }
+
+    /**
+     * Return Google reCAPTCHA site key.
+     *
+     * @param mixed|null $websiteId
+     * @access public
+     * @return string
+     */
+    public function getSubscriberOptInCaptchaSiteKey($websiteId = null)
+    {
+        return $this->getConfigValue(self::SETTINGS_OPTIN_CAPTCHA_SITEKEY, self::SETTINGS_GROUP_OPTIN, $websiteId);
+    }
+
+    /**
+     * Return Google reCAPTCHA secret key.
+     *
+     * @param mixed|null $websiteId
+     * @access public
+     * @return string
+     */
+    public function getSubscriberOptInCaptchaSecretKey($websiteId = null)
+    {
+        return $this->getConfigValue(self::SETTINGS_OPTIN_CAPTCHA_SECRETKEY, self::SETTINGS_GROUP_OPTIN, $websiteId);
     }
 
     /**

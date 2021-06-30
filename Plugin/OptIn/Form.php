@@ -1,10 +1,10 @@
 <?php
 
-namespace Smaily\SmailyForMagento\Block;
+namespace Smaily\SmailyForMagento\Plugin\OptIn;
 
 use Smaily\SmailyForMagento\Helper\Config;
 
-class Captcha extends \Magento\Captcha\Block\Captcha
+class Form
 {
     protected $storeManager;
 
@@ -17,8 +17,6 @@ class Captcha extends \Magento\Captcha\Block\Captcha
      * @return void
      */
     public function __construct(
-        \Magento\Captcha\Helper\Data $captchaData,
-        \Magento\Framework\View\Element\Template\Context $context,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
         Config $config
     )
@@ -26,29 +24,30 @@ class Captcha extends \Magento\Captcha\Block\Captcha
         $this->storeManager = $storeManager;
 
         $this->config = $config;
-
-        parent::__construct($context, $captchaData);
     }
 
     /**
-     * Render CAPTCHA HTML, if enabled.
+     * Modify form HTML before outputting to page.
      *
-     * @access protected
+     * @param \Magento\Newsletter\Block\Subscribe $block
+     * @param string $html
+     * @access public
      * @return string
      */
-    protected function _toHtml()
+    public function afterToHtml(\Magento\Newsletter\Block\Subscribe $block, $html)
     {
         $website = $this->storeManager->getWebsite();
 
         if (
             $this->config->isEnabled($website) === false ||
             $this->config->isSubscriberOptInEnabled($website) === false ||
-            $this->config->isSubscriberOptInCaptchaEnabled($website) === false ||
-            $this->config->getSubscriberOptInCaptchaType($website) !== 'magento_captcha'
+            $this->config->isSubscriberOptInCaptchaEnabled($website) === false
         ) {
-            return '';
+            return $html;
         }
 
-        return parent::_toHtml();
+        // Add CAPTCHA container to HTML.
+        $container = $block->getChildHtml('smaily.smailyformagento.captcha');
+        return preg_replace('/(.*)(<div\s[^>]*class="actions"[^>]*>.*)/siU', '\1' . $container . '\2', $html);
     }
 }

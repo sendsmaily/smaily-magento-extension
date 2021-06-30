@@ -19,7 +19,7 @@
           <label>Subdomain</label>
           <backend_model>Smaily\SmailyForMagento\Model\Config\Backend\Subdomain</backend_model>
           <validate>required-entry</validate>
-          <comment>For example "demo" from https://demo.sendsmaily.net/</comment>
+          <comment><![CDATA[For example "demo" from https://demo.sendsmaily.net/]]></comment>
         </field>
         <field id="username" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>API Username</label>
@@ -36,16 +36,12 @@
         <field id="enableNewsletterSubscriptions" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Enable Subscribers Collection</label>
           <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-          <comment>Send subscribers from newsletter form directly to Smaily</comment>
+          <comment><![CDATA[Send subscribers from newsletter form directly to Smaily.<br><strong>Note!</strong> This disables Magento's confirmation success and unsubscribe email sending.]]></comment>
         </field>
         <field id="enableCaptcha" translate="label" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Enable CAPTCHA</label>
           <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-          <comment>
-            <![CDATA[We advice you to use CAPTCHA. This will block bots from polluting your newsletter database.
-              <br><strong>This CAPTCHA works with Magento Newsletter module.
-              If you are using custom solution, this setting may intervene with subscriber collection!</stong>]]>
-          </comment>
+          <comment><![CDATA[We advice you to use CAPTCHA. This will block bots from polluting your newsletter database.<br><strong>This CAPTCHA works with Magento Newsletter module. If you are using custom solution, this setting may intervene with subscriber collection!</stong>]]></comment>
           <depends>
             <field id="enableNewsletterSubscriptions">1</field>
           </depends>
@@ -87,7 +83,7 @@
         <field id="fields" translate="label" type="multiselect" sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Syncronize Additional Fields</label>
           <source_model>Smaily\SmailyForMagento\Model\Config\Source\SubscribersSync\Fields</source_model>
-          <comment>Select fields you wish to synchronize along with subscription data. Subscriber Email and Name fields are automatically synchronized</comment>
+          <comment><![CDATA[Select fields you wish to synchronize along with subscription data. Subscriber Email and Name fields are automatically synchronized]]></comment>
         </field>
         <field id="frequency" translate="label" type="select" sortOrder="90" showInDefault="1" showInWebsite="0" showInStore="0">
           <label>Frequency</label>
@@ -108,12 +104,12 @@
         <field id="syncTime" translate="label" type="select" sortOrder="120" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Trigger Abandoned Cart Automation</label>
           <source_model>Smaily\SmailyForMagento\Model\Config\Source\AbandonedCart\Interval</source_model>
-          <comment>This is the time after cart is considered abandoned!</comment>
+          <comment><![CDATA[This is the time after cart is considered abandoned!]]></comment>
         </field>
         <field id="productfields" translate="label" type="multiselect" sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Add Template Parameters</label>
           <source_model>Smaily\SmailyForMagento\Model\Config\Source\AbandonedCart\Fields</source_model>
-          <comment>You can use those parameters in Smaily template to personalize abandoned cart reminder emails!</comment>
+          <comment><![CDATA[You can use those parameters in Smaily template to personalize abandoned cart reminder emails!]]></comment>
         </field>
       </group>
     </section>

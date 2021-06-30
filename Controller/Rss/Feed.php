@@ -60,8 +60,10 @@ class Feed extends \Magento\Framework\App\Action\Action
 
     private function generateRssFeed($products)
     {
+        $store = $this->storeManager->getStore();
+
         // base url of store
-        $baseUrl = $this->storeManager->getStore()->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_WEB);
+        $baseUrl = $store->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_WEB);
 
         // get default curreny symbol
         $currencysymbol = $this->currency->getCurrencySymbol();
@@ -123,7 +125,7 @@ class Feed extends \Magento\Framework\App\Action\Action
         '<?xml version="1.0" encoding="utf-8"?>' .
         '<rss xmlns:smly="https://sendsmaily.net/schema/editor/rss.xsd" version="2.0">
             <channel>
-            <title><![CDATA[' . $this->helperData->getConfigValue('general/store_information/name') . ']]></title>
+            <title><![CDATA[' . $store->getName() . ']]></title>
             <link>' . $baseUrl . '</link>
             <description>Product Feed</description>
             <lastBuildDate>' . date('D, d M Y H:i:s') . '</lastBuildDate>' .

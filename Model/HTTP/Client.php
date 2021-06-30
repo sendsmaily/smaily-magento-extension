@@ -1,6 +1,6 @@
 <?php
 
-namespace Smaily\SmailyForMagento\Model\API;
+namespace Smaily\SmailyForMagento\Model\HTTP;
 
 class Client
 {
@@ -53,12 +53,13 @@ class Client
      *
      * @param string $uri
      * @param array $params
+     * @param boolean $json
      * @access public
      * @return array
      */
-    public function post($uri, $params = [])
+    public function post($uri, $params = [], $json = true)
     {
-        return $this->makeRequest('POST', $uri, $params);
+        return $this->makeRequest('POST', $uri, $params, $json);
     }
 
     /**
@@ -67,10 +68,11 @@ class Client
      * @param string $method
      * @param string $uri
      * @param array|string $params
+     * @param boolean $json
      * @access protected
      * @return array
      */
-    protected function makeRequest($method, $uri, $params = [])
+    protected function makeRequest($method, $uri, $params = [], $json = true)
     {
         $uri = $this->baseUrl . '/' . ltrim($uri, '/');
 
@@ -81,15 +83,22 @@ class Client
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FAILONERROR, true);
 
-            curl_setopt($ch, CURLOPT_USERPWD, $this->username . ":" . $this->password);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Content-Type: application/json',
-            ]);
+            // Prepare for sending JSON payload.
+            if ($json === true) {
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'Content-Type: application/json',
+                ]);
+            }
+
+            // Setup authentication.
+            if (!empty($this->username) || !empty($this->password)) {
+                curl_setopt($ch, CURLOPT_USERPWD, $this->username . ":" . $this->password);
+            }
 
             if ($method === 'POST') {
                 curl_setopt($ch, CURLOPT_URL, $uri);
                 curl_setopt($ch, CURLOPT_POST, true);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($params));
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $json === true ? json_encode($params) : http_build_query($params));
             }
             else {
                 curl_setopt($ch, CURLOPT_URL, $uri . (strpos($uri, '?') === false ? '?' : '&') . http_build_query($params));
@@ -100,16 +109,13 @@ class Client
             // Handle response errors.
             if ($response === false) {
                 throw new \Exception(
-                    "Smaily API request failed with error: ". curl_error($ch),
+                    "HTTP request failed with error: ". curl_error($ch),
                     (int) curl_getinfo($ch,  CURLINFO_HTTP_CODE));
             }
 
             $json = json_decode($response, true);
             if (is_array($json) === false) {
-                throw new \Exception('Received invalid response from Smaily API: ' . $response, 200);
-            }
-            else if ($method === 'POST' && (int) $json['code'] !== 101) {
-                throw new \Exception('Smaily API responded with: ' . $json['message'], 200);
+                throw new \Exception('Received invalid response: ' . $response, 200);
             }
 
             return $json;

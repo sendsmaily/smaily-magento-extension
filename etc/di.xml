@@ -1,9 +1,14 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="../../../../../lib/internal/Magento/Framework/ObjectManager/etc/config.xsd">
+    <!-- Intercept Newsletter Subscription form -->
+    <type name="Magento\Newsletter\Block\Subscribe">
+        <plugin name="Smaily_SmailyForMagento_Plugin_OptIn_Form" type="Smaily\SmailyForMagento\Plugin\OptIn\Form" />
+    </type>
+
     <!-- Intercept Newsletter Subscriber opt-in -->
     <type name="Magento\Newsletter\Model\Subscriber">
-        <plugin name="Smaily_SmailyForMagento_Subscribe" type="Smaily\SmailyForMagento\Controller\Subscriber\Subscribe" />
+        <plugin name="Smaily_SmailyForMagento_Plugin_OptIn" type="Smaily\SmailyForMagento\Plugin\OptIn" />
     </type>
 
     <!-- Intercept module configuration save -->

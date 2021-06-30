@@ -17,7 +17,6 @@ class SubscribersSync
     );
 
     protected $customerCollection;
-    protected $customerGroupCollection;
     protected $logger;
     protected $newsletterSubscribersCollection;
     protected $resourceConnection;
@@ -35,7 +34,6 @@ class SubscribersSync
      */
     public function __construct(
         \Magento\Customer\Model\ResourceModel\Customer\Collection $customerCollection,
-        \Magento\Customer\Model\ResourceModel\Group\Collection $customerGroupCollection,
         \Magento\Framework\App\ResourceConnection $resourceConnection,
         \Magento\Newsletter\Model\ResourceModel\Subscriber\Collection $newsletterSubscribersCollection,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
@@ -45,7 +43,6 @@ class SubscribersSync
         SubscribersSyncStateCollection $subscribersSyncStateCollection
     ) {
         $this->customerCollection = $customerCollection;
-        $this->customerGroupCollection = $customerGroupCollection;
         $this->logger = $logger;
         $this->newsletterSubscribersCollection = $newsletterSubscribersCollection;
         $this->resourceConnection = $resourceConnection->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
@@ -110,12 +107,6 @@ class SubscribersSync
             'batch_size' => self::BATCH_SIZE,
         ]);
 
-        // Fetch customer groups.
-        $customerGroups = array();
-        foreach ($this->customerGroupCollection as $customerGroup) {
-            $customerGroups[$customerGroup->getId()] = $customerGroup->getCode();
-        }
-
         // Determine list of customer fields to synchronize.
         $fieldsToSynchronize = $this->config->getSubscribersSyncFields($website);
         $fieldsToSynchronize = array_unique(array_merge(self::REQUIRED_FIELDS, $fieldsToSynchronize));
@@ -160,7 +151,7 @@ class SubscribersSync
 
                 $customerBirthday = !empty($subscriber['dob']) ? $subscriber['dob'] . ' 00:00:00' : '';
                 $customerGender = $subscriber['gender'] == 2 ? 'Female' : 'Male';
-                $customerGroupName = isset($customerGroups[$customerGroupId]) ? $customerGroups[$customerGroupId] : 'Customer';
+                $customerGroupName = $this->dataHelper->getCustomerGroupName($customerGroupId);
 
                 $customerStore = isset($stores[$subscriber['store_id']]) ? $stores[$subscriber['store_id']] : null;
 

@@ -32,8 +32,7 @@ class OptIn
         \Psr\Log\LoggerInterface $logger,
         Config $config,
         Data $dataHelper
-    )
-    {
+    ) {
         $this->captchaHelper = $captchaHelper;
         $this->captchaResolver = $captchaResolver;
         $this->customerSession = $customerSession;
@@ -57,8 +56,7 @@ class OptIn
     {
         $website = $this->storeManager->getWebsite();
 
-        if (
-            $this->isOptInEnabled() === false ||
+        if ($this->isOptInEnabled() === false ||
             $this->config->isSubscriberOptInCaptchaEnabled($website) === false
         ) {
             return;
@@ -66,16 +64,13 @@ class OptIn
 
         $captchaType = $this->config->getSubscriberOptInCaptchaType($website);
 
-        // Validate Google reCAPTCHA.
         if ($captchaType === 'google_captcha') {
             $challenge = $this->request->getParam('g-recaptcha-response');
 
             if ($this->dataHelper->verifyGoogleCaptchaResponse($challenge) === false) {
                 throw new \Magento\Framework\Exception\LocalizedException(__('Incorrect CAPTCHA.'));
             }
-        }
-        // Validate Magento CAPTCHA.
-        elseif ($captchaType === 'magento_captcha') {
+        } elseif ($captchaType === 'magento_captcha') {
             $formId = 'smaily_captcha';
             $challenge = $this->captchaResolver->resolve($this->request, $formId);
 
@@ -94,8 +89,7 @@ class OptIn
      */
     public function afterSubscribe(\Magento\Newsletter\Model\Subscriber $subscriber)
     {
-        if (
-            $this->isOptInEnabled() === false ||
+        if ($this->isOptInEnabled() === false ||
             $subscriber->getStatus() !== \Magento\Newsletter\Model\Subscriber::STATUS_SUBSCRIBED
         ) {
             return;
@@ -162,7 +156,8 @@ class OptIn
      * @access protected
      * @return boolean
      */
-    protected function isOptInEnabled() {
+    protected function isOptInEnabled()
+    {
         $website = $this->storeManager->getWebsite();
         return (
             $this->config->isEnabled($website) === true &&
@@ -182,18 +177,20 @@ class OptIn
         $website = $this->storeManager->getWebsite();
 
         // Compile subscriber payload.
-        $customer = NULL;
+        $customer = null;
         if ($this->customerSession->isLoggedIn()) {
             $customer = $this->customerSession->getCustomer();
         }
 
         $payload = [
             'email' => $subscriber->getSubscriberEmail(),
-            'customer_id' => !is_null($customer) ? $customer->getId() : "",
-            'customer_group' => !is_null($customer) ? $this->dataHelper->getCustomerGroupName((int) $customer->getGroupId()) : 'Guest',
+            'customer_id' => $customer !== null ? $customer->getId() : "",
+            'customer_group' => $customer !== null
+                ? $this->dataHelper->getCustomerGroupName((int) $customer->getGroupId())
+                : 'Guest',
             'store' => $this->storeManager->getStore($subscriber->getStoreId())->getName(),
-            'first_name' => !is_null($customer) ? $customer->getFirstname() : '',
-            'last_name' => !is_null($customer) ? $customer->getLastname() : '',
+            'first_name' => $customer !== null ? $customer->getFirstname() : '',
+            'last_name' => $customer !== null ? $customer->getLastname() : '',
         ];
 
         // Fire opt-in request to Smaily.

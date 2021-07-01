@@ -19,8 +19,7 @@ class Form
     public function __construct(
         \Magento\Store\Model\StoreManagerInterface $storeManager,
         Config $config
-    )
-    {
+    ) {
         $this->storeManager = $storeManager;
 
         $this->config = $config;
@@ -38,8 +37,7 @@ class Form
     {
         $website = $this->storeManager->getWebsite();
 
-        if (
-            $this->config->isEnabled($website) === false ||
+        if ($this->config->isEnabled($website) === false ||
             $this->config->isSubscriberOptInEnabled($website) === false ||
             $this->config->isSubscriberOptInCaptchaEnabled($website) === false
         ) {

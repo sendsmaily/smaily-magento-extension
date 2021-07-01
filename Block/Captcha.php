@@ -21,8 +21,7 @@ class Captcha extends \Magento\Captcha\Block\Captcha
         \Magento\Framework\View\Element\Template\Context $context,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
         Config $config
-    )
-    {
+    ) {
         $this->storeManager = $storeManager;
 
         $this->config = $config;
@@ -40,8 +39,7 @@ class Captcha extends \Magento\Captcha\Block\Captcha
     {
         $website = $this->storeManager->getWebsite();
 
-        if (
-            $this->config->isEnabled($website) === false ||
+        if ($this->config->isEnabled($website) === false ||
             $this->config->isSubscriberOptInEnabled($website) === false ||
             $this->config->isSubscriberOptInCaptchaEnabled($website) === false ||
             $this->config->getSubscriberOptInCaptchaType($website) !== 'magento_captcha'

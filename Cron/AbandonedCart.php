@@ -4,12 +4,14 @@ namespace Smaily\SmailyForMagento\Cron;
 
 use Smaily\SmailyForMagento\Helper\Config;
 use Smaily\SmailyForMagento\Helper\Data;
+use Smaily\SmailyForMagento\Model\HTTP\ClientException;
 
 class AbandonedCart
 {
     const BATCH_SIZE = 100;
 
     protected $dateTime;
+    protected $escaper;
     protected $logger;
     protected $pricingHelper;
     protected $productFactory;
@@ -34,6 +36,7 @@ class AbandonedCart
         \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder,
         \Magento\Framework\Api\SortOrderBuilder $sortOrderBuilder,
         \Magento\Framework\App\ResourceConnection $resourceConnection,
+        \Magento\Framework\Escaper $escaper,
         \Magento\Framework\Pricing\Helper\Data $pricingHelper,
         \Magento\Framework\Stdlib\DateTime\DateTime $dateTime,
         \Magento\Quote\Model\QuoteRepository $quoteRepository,
@@ -42,15 +45,16 @@ class AbandonedCart
         \Psr\Log\LoggerInterface $logger,
         Config $config,
         Data $dataHelper
-    )
-    {
+    ) {
         $this->dateTime = $dateTime;
+        $this->escaper = $escaper;
         $this->logger = $logger;
         $this->pricingHelper = $pricingHelper;
         $this->productFactory = $productFactory;
         $this->quoteCollection = $quoteCollection;
         $this->quoteRepository = $quoteRepository;
-        $this->resourceConnection = $resourceConnection->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
+        $this->resourceConnection = $resourceConnection
+            ->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
         $this->searchCriteriaBuilder = $searchCriteriaBuilder;
         $this->sortOrderBuilder = $sortOrderBuilder;
         $this->storeManager = $storeManager;
@@ -72,9 +76,8 @@ class AbandonedCart
         $this->logger->info('Starting Abandoned Cart CRON job...');
 
         foreach ($websites as $website) {
-            if (
-                $this->config->isEnabled($website) === FALSE ||
-                $this->config->isAbandonedCartCronEnabled($website) === FALSE
+            if ($this->config->isEnabled($website) === false ||
+                $this->config->isAbandonedCartCronEnabled($website) === false
             ) {
                 $this->logger->debug('CRON is disabled for website:', [
                     'id' => $website->getId(),
@@ -141,19 +144,18 @@ class AbandonedCart
             }
 
             // Collect quotes to postpone or trigger abandoned cart automation for.
-            $quoteIdsToTrigger = array();
-            $quoteIdsToPostpone = array();
+            $quoteIdsToTrigger = [];
+            $quoteIdsToPostpone = [];
             foreach ($quotes as $quote) {
                 $quoteId = (int) $quote['entity_id'];
                 $isSent = (bool)(int) $quote['is_sent'];
-                $abandonAt = !is_null($quote['reminder_date']) ? new \DateTimeImmutable($quote['reminder_date'], $tz) : null;
+                $abandonAt = $quote['reminder_date'] !== null
+                    ? new \DateTimeImmutable($quote['reminder_date'], $tz)
+                    : null;
 
-                // Collect postpone abandoned carts.
-                if (is_null($abandonAt)) {
+                if ($abandonAt === null) {
                     $quoteIdsToPostpone[] = $quoteId;
-                }
-                // Collect trigger abandoned carts.
-                elseif ($isSent === false && $abandonAt <= $nowAt) {
+                } elseif ($isSent === false && $abandonAt <= $nowAt) {
                     $quoteIdsToTrigger[] = $quoteId;
                 }
             }
@@ -164,7 +166,7 @@ class AbandonedCart
             // Trigger automation workflow.
             $this->triggerAutomationWorkflows($quoteIdsToTrigger, $website);
 
-            $offset += 1;
+            $offset++;
         }
     }
 
@@ -176,7 +178,8 @@ class AbandonedCart
      * @access protected
      * @return void
      */
-    protected function postponeAbandonedCarts(array $ids, \DateTimeImmutable $abandonAt) {
+    protected function postponeAbandonedCarts(array $ids, \DateTimeImmutable $abandonAt)
+    {
         if (empty($ids)) {
             return;
         }
@@ -199,7 +202,8 @@ class AbandonedCart
      * @access protected
      * @return void
      */
-    protected function triggerAutomationWorkflows(array $ids, \Magento\Store\Api\Data\WebsiteInterface $website) {
+    protected function triggerAutomationWorkflows(array $ids, \Magento\Store\Api\Data\WebsiteInterface $website)
+    {
         $fields = $this->config->getAbandonedCartFields($website);
         $smailyApiClient = $this->dataHelper->getSmailyApiClient($website);
         $workflowId = $this->config->getAbandonedCartAutomationId($website);
@@ -214,9 +218,9 @@ class AbandonedCart
             ->load();
 
         foreach ($quotes as $quote) {
-            $cart = array(
+            $cart = [
                 'email' => $quote->getCustomerEmail(),
-            );
+            ];
 
             // Collect quote information.
             if (in_array('first_name', $fields, true)) {
@@ -233,32 +237,33 @@ class AbandonedCart
                 $productsIndex = $i + 1;
 
                 if (in_array('name', $fields, true)) {
-                    $cart['product_name_' . $productsIndex] = !is_null($item) ? $item->getName() : '';
+                    $cart['product_name_' . $productsIndex] = $item !== null ? $item->getName() : '';
                 }
                 if (in_array('description', $fields, true)) {
-                    if (!is_null($item)) {
+                    if ($item !== null) {
                         $product = $this->productFactory->create()->load($item->getProductId());
-                        $cart['product_description_' . $productsIndex] = htmlspecialchars($product->getDescription());
-                    }
-                    else {
+                        $cart['product_description_' . $productsIndex] = $this->escaper->escapeHtml(
+                            $product->getDescription()
+                        );
+                    } else {
                         $cart['product_description_' . $productsIndex] = '';
                     }
                 }
                 if (in_array('sku', $fields, true)) {
-                    $cart['product_sku_' . $productsIndex] = !is_null($item) ? $item->getSku() : '';
+                    $cart['product_sku_' . $productsIndex] = $item !== null ? $item->getSku() : '';
                 }
                 if (in_array('qty', $fields, true)) {
-                    $cart['product_quantity_' . $productsIndex] = !is_null($item)
+                    $cart['product_quantity_' . $productsIndex] = $item !== null
                         ? $this->dataHelper->stripTrailingZeroes($item->getQty())
                         : '';
                 }
                 if (in_array('price', $fields, true)) {
-                    $cart['product_price_' . $productsIndex] = !is_null($item)
+                    $cart['product_price_' . $productsIndex] = $item !== null
                         ? $this->pricingHelper->currencyByStore($item->getPrice(), $quote->getStore(), true, false)
                         : '';
                 }
                 if (in_array('base_price', $fields, true)) {
-                    $cart['product_base_price_' . $productsIndex] = !is_null($item)
+                    $cart['product_base_price_' . $productsIndex] = $item !== null
                         ? $this->pricingHelper->currencyByStore($item->getBasePrice(), $quote->getStore(), true, false)
                         : '';
                 }
@@ -279,10 +284,9 @@ class AbandonedCart
                     $response = $smailyApiClient->post('/api/autoresponder.php', $payload);
 
                     if ((int) $response['code'] !== 101) {
-                        throw new \Exception('Smaily API responded with: ' . json_encode($response));
+                        throw new ClientException('Smaily API responded with: ' . json_encode($response));
                     }
-                }
-                catch (\Exception $e) {
+                } catch (\Exception $e) {
                     $this->logger->error($e->getMessage(), ['payload' => $payload]);
 
                     // Re-throw exception.

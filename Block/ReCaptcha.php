@@ -20,8 +20,7 @@ class ReCaptcha extends \Magento\Framework\View\Element\Template
         \Magento\Framework\View\Element\Template\Context $context,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
         Config $config
-    )
-    {
+    ) {
         $this->storeManager = $storeManager;
 
         $this->config = $config;

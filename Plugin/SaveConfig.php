@@ -26,8 +26,7 @@ class SaveConfig
         \Psr\Log\LoggerInterface $logger,
         Config $config,
         HTTPClientFactory $httpClientFactory
-    )
-    {
+    ) {
         $this->configValueFactory = $configValueFactory;
         $this->logger = $logger;
         $this->scopeConfig = $scopeConfig;
@@ -45,13 +44,13 @@ class SaveConfig
      */
     public function beforeSave(\Magento\Config\Model\Config $config)
     {
-        if ($config->getSection() !== Config::SETTINGS_NAMESPACE) {
+        if ($config->getSection() !== Config::NAMESPACE) {
             return;
         }
 
-        $subdomain = $this->resolveConfigValue($config, Config::SETTINGS_GENERAL_SUBDOMAIN, Config::SETTINGS_GROUP_GENERAL);
-        $username = $this->resolveConfigValue($config, Config::SETTINGS_GENERAL_USERNAME, Config::SETTINGS_GROUP_GENERAL);
-        $password = $this->resolveConfigValue($config, Config::SETTINGS_GENERAL_PASSWORD, Config::SETTINGS_GROUP_GENERAL);
+        $subdomain = $this->resolveConfigValue($config, Config::GENERAL_SUBDOMAIN, Config::GROUP_GENERAL);
+        $username = $this->resolveConfigValue($config, Config::GENERAL_USERNAME, Config::GROUP_GENERAL);
+        $password = $this->resolveConfigValue($config, Config::GENERAL_PASSWORD, Config::GROUP_GENERAL);
 
         $client = $this->httpClientFactory->create()
             ->setBaseUrl("https://${subdomain}.sendsmaily.net")
@@ -59,15 +58,15 @@ class SaveConfig
 
         try {
             $client->get('/api/workflows.php');
-        }
-        catch (\Exception $e) {
+        } catch (\Exception $e) {
             $this->logger->error("Unable to validate Smaily API credentials: " . $e->getMessage());
 
             if ($e->getCode() === 401 || $e->getCode() === 403 || $e->getCode() === 404) {
                 throw new \Magento\Framework\Exception\ValidatorException(__('Check API credentials, unauthorized.'));
-            }
-            else {
-                throw new \Exception(__('Could not validate API credentials. Please try again later.'));
+            } else {
+                throw new \Magento\Framework\Exception\ValidatorException(
+                    __('Could not validate API credentials. Please try again later.')
+                );
             }
         }
     }
@@ -81,12 +80,16 @@ class SaveConfig
      */
     public function afterSave(\Magento\Config\Model\Config $config)
     {
-        if ($config->getSection() !== Config::SETTINGS_NAMESPACE) {
+        if ($config->getSection() !== Config::NAMESPACE) {
             return;
         }
 
         // Update Newsletter Subscribers synchronization CRON job frequency.
-        $frequency = $this->resolveConfigValue($config, Config::SETTINGS_SUBSCRIBERS_SYNC_FREQUENCY, Config::SETTINGS_GROUP_SUBSCRIBERS_SYNC);
+        $frequency = $this->resolveConfigValue(
+            $config,
+            Config::SUBSCRIBERS_SYNC_FREQUENCY,
+            Config::GROUP_SUBSCRIBERS_SYNC
+        );
 
         $this->configValueFactory->create()
             ->load(Config::SUBSCRIBERS_SYNC_CRON_PATH, 'path')
@@ -110,7 +113,7 @@ class SaveConfig
             // Note! When switching to store view based configuration,
             // the scope (incl. website) needs to be adjusted as well.
             return $this->scopeConfig->getValue(
-                Config::SETTINGS_NAMESPACE . '/' . $group . '/' . $setting,
+                Config::NAMESPACE . '/' . $group . '/' . $setting,
                 \Magento\Framework\App\Config\ScopeConfigInterface::SCOPE_TYPE_DEFAULT
             );
         }

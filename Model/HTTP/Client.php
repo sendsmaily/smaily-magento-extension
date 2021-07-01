@@ -99,28 +99,28 @@ class Client
                 curl_setopt($ch, CURLOPT_URL, $uri);
                 curl_setopt($ch, CURLOPT_POST, true);
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $json === true ? json_encode($params) : http_build_query($params));
-            }
-            else {
-                curl_setopt($ch, CURLOPT_URL, $uri . (strpos($uri, '?') === false ? '?' : '&') . http_build_query($params));
+            } else {
+                $query = (strpos($uri, '?') === false ? '?' : '&') . http_build_query($params);
+                curl_setopt($ch, CURLOPT_URL, $uri . $query);
             }
 
             $response = curl_exec($ch);
 
             // Handle response errors.
             if ($response === false) {
-                throw new \Exception(
-                    "HTTP request failed with error: ". curl_error($ch),
-                    (int) curl_getinfo($ch,  CURLINFO_HTTP_CODE));
+                throw new ClientException(
+                    "HTTP request failed with error: " . curl_error($ch),
+                    (int) curl_getinfo($ch, CURLINFO_HTTP_CODE)
+                );
             }
 
             $json = json_decode($response, true);
             if (is_array($json) === false) {
-                throw new \Exception('Received invalid response: ' . $response, 200);
+                throw new ClientException('Received invalid response: ' . $response, 200);
             }
 
             return $json;
-        }
-        finally {
+        } finally {
             curl_close($ch);
         }
     }

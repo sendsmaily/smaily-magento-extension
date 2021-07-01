@@ -55,11 +55,10 @@ class Data
                     'response' => $challenge,
                 ], false);
 
-            if (isset($response['success']) and $response['success'] === true) {
+            if (isset($response['success']) && $response['success'] === true) {
                 return true;
             }
-        }
-        catch (\Exception $e) {
+        } catch (\Exception $e) {
             $this->logger->error($e->getMessage());
         }
 
@@ -77,8 +76,7 @@ class Data
     {
         try {
             return $this->customerGroupRegistry->retrieve($groupId)->getCode();
-        }
-        catch (\Magento\Framework\Exception\NoSuchEntityException $e) {
+        } catch (\Magento\Framework\Exception\NoSuchEntityException $e) {
             return 'Customer';
         }
     }
@@ -107,8 +105,7 @@ class Data
             return $this->getSmailyApiClient($websiteId)->get('/api/workflows.php', [
                 'trigger_type' => 'form_submitted',
             ]);
-        }
-        catch (\Exception $e) {
+        } catch (\Exception $e) {
             $this->logger->error('Unable to fetch automation workflows: ' . $e->getMessage());
             return [];
         }
@@ -121,7 +118,8 @@ class Data
      * @access public
      * @return Smaily\SmailyForMagento\Model\HTTP\Client
      */
-    public function getSmailyApiClient($websiteId = null) {
+    public function getSmailyApiClient($websiteId = null)
+    {
         $credentials = $this->config->getSmailyApiCredentials($websiteId);
         return $this->httpClientFactory->create()
             ->setBaseUrl("https://${credentials['subdomain']}.sendsmaily.net")

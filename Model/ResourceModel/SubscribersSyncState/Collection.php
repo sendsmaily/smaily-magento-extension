@@ -15,12 +15,12 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
     protected function _construct()
     {
         $this->_init(
-            'Smaily\SmailyForMagento\Model\SubscribersSyncState',
-            'Smaily\SmailyForMagento\Model\ResourceModel\SubscribersSyncState'
+            Smaily\SmailyForMagento\Model\SubscribersSyncState::class,
+            Smaily\SmailyForMagento\Model\ResourceModel\SubscribersSyncState::class
         );
 
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-        $this->dateTime = $objectManager->create('\Magento\Framework\Stdlib\DateTime\DateTime');
+        $this->dateTime = $objectManager->create(\Magento\Framework\Stdlib\DateTime\DateTime::class);
     }
 
     /**
@@ -33,7 +33,7 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
     {
         $select = $this->getConnection()
             ->select()
-            ->from($this->getMainTable(), array('last_update_at'))
+            ->from($this->getMainTable(), ['last_update_at'])
             ->limit(1);
 
         $data = $this->getConnection()->fetchRow($select);
@@ -55,10 +55,11 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
     {
         $this->getConnection()->insertOnDuplicate(
             $this->getMainTable(),
-            array(
+            [
                 'id' => 1,
                 'last_update_at' => $this->dateTime->gmtDate(null, $syncAt),
-            ),
-            array('last_update_at'));
+            ],
+            ['last_update_at']
+        );
     }
 }

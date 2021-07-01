@@ -25,15 +25,13 @@ class Feed extends \Magento\Framework\App\Action\Action
      * @return void
      */
     public function __construct(
-
         \Magento\Catalog\Model\ResourceModel\Category\CollectionFactory $categoryCollectionFactory,
         \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory $productCollectionFactory,
         \Magento\Framework\App\Action\Context $context,
         \Magento\Framework\Pricing\Helper\Data $pricingHelper,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
         Data $dataHelper
-    )
-    {
+    ) {
         $this->categoryCollectionFactory = $categoryCollectionFactory;
         $this->pricingHelper = $pricingHelper;
         $this->productCollectionFactory = $productCollectionFactory;
@@ -60,8 +58,7 @@ class Feed extends \Magento\Framework\App\Action\Action
 
         if (!empty($categoryName)) {
             $products = $this->getProductsByCategoryName($categoryName, $limit);
-        }
-        else {
+        } else {
             $products = $this->getLatestProducts($limit);
         }
 
@@ -123,8 +120,7 @@ class Feed extends \Magento\Framework\App\Action\Action
                 $item->addChild('price', $formattedSpecialPrice, self::SMLY_NAMESPACE_XSD);
                 $item->addChild('old_price', $formattedPrice, self::SMLY_NAMESPACE_XSD);
                 $item->addChild('discount', $discount . '%', self::SMLY_NAMESPACE_XSD);
-            }
-            else {
+            } else {
                 $formattedPrice = $this->pricingHelper->currencyByStore($price, $store, true, false);
                 $item->addChild('price', $formattedPrice, self::SMLY_NAMESPACE_XSD);
             }

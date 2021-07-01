@@ -4,17 +4,18 @@ namespace Smaily\SmailyForMagento\Cron;
 
 use Smaily\SmailyForMagento\Helper\Config;
 use Smaily\SmailyForMagento\Helper\Data;
+use Smaily\SmailyForMagento\Model\HTTP\ClientException;
 use Smaily\SmailyForMagento\Model\ResourceModel\SubscribersSyncState\Collection as SubscribersSyncStateCollection;
 
 class SubscribersSync
 {
     const BATCH_SIZE = 2500;
-    const REQUIRED_FIELDS = array(
+    const REQUIRED_FIELDS = [
         'email',
         'is_unsubscribed',
         'name',
         'store',
-    );
+    ];
 
     protected $customerCollection;
     protected $logger;
@@ -45,7 +46,8 @@ class SubscribersSync
         $this->customerCollection = $customerCollection;
         $this->logger = $logger;
         $this->newsletterSubscribersCollection = $newsletterSubscribersCollection;
-        $this->resourceConnection = $resourceConnection->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
+        $this->resourceConnection = $resourceConnection
+            ->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
         $this->storeManager = $storeManager;
 
         $this->config = $config;
@@ -68,9 +70,8 @@ class SubscribersSync
         $this->logger->info('Starting Newsletter Subscribers synchronization CRON job...');
 
         foreach ($websites as $website) {
-            if (
-                $this->config->isEnabled($website) === FALSE ||
-                $this->config->isSubscribersSyncEnabled($website) === FALSE
+            if ($this->config->isEnabled($website) === false ||
+                $this->config->isSubscribersSyncEnabled($website) === false
             ) {
                 $this->logger->debug('CRON is disabled for website:', [
                     'id' => $website->getId(),
@@ -97,8 +98,10 @@ class SubscribersSync
      * @access protected
      * @return void
      */
-    protected function syncNewsletterSubscribers(\Magento\Store\Api\Data\WebsiteInterface $website, $lastSyncedAt = null)
-    {
+    protected function syncNewsletterSubscribers(
+        \Magento\Store\Api\Data\WebsiteInterface $website,
+        $lastSyncedAt = null
+    ) {
         $smailyApiClient = $this->dataHelper->getSmailyApiClient($website);
         $storeIds = $website->getStoreIds();
         $stores = $website->getStores();
@@ -128,7 +131,10 @@ class SubscribersSync
                 ['firstname', 'lastname', 'group_id', 'dob', 'prefix', 'gender']
             )
             ->where('main_table.store_id IN (?)', $storeIds)
-            ->where('main_table.change_status_at >= ?', !is_null($lastSyncedAt) ? $lastSyncedAt->format('Y-m-d H:i:s') : 0)
+            ->where(
+                'main_table.change_status_at >= ?',
+                $lastSyncedAt !== null ? $lastSyncedAt->format('Y-m-d H:i:s') : 0
+            )
             ->order('main_table.subscriber_id ASC');
 
         // Synchronize Newsletter Subscribers to Smaily.
@@ -144,7 +150,7 @@ class SubscribersSync
                 break;
             }
 
-            $payload = array();
+            $payload = [];
             foreach ($subscribers as $subscriber) {
                 $customerGroupId = (int) $subscriber['group_id'];
                 $hasCustomer = (int) $subscriber['customer_id'] > 0;
@@ -155,22 +161,22 @@ class SubscribersSync
 
                 $customerStore = isset($stores[$subscriber['store_id']]) ? $stores[$subscriber['store_id']] : null;
 
-                $data = array(
+                $data = [
                     'email' => $subscriber['subscriber_email'],
                     'is_unsubscribed' => (int) $subscriber['subscriber_status'] === 1 ? 0 : 1,
-                    'store' => !is_null($customerStore) ? $customerStore->getName() : '',
+                    'store' => $customerStore !== null ? $customerStore->getName() : '',
                     'name' => $hasCustomer
                         ? ucfirst($subscriber['firstname']) . ' ' . ucfirst($subscriber['lastname'])
                         : '',
                     'subscription_type' => 'Subscriber',
                     'customer_group' => $hasCustomer ? $customerGroupName : 'Guest',
                     'customer_id' => $hasCustomer ? $subscriber['customer_id'] : '',
-                    'prefix' => !is_null($subscriber['prefix']) ? $subscriber['prefix'] : '',
+                    'prefix' => $subscriber['prefix'] !== null ? $subscriber['prefix'] : '',
                     'first_name' => $hasCustomer ? ucfirst($subscriber['firstname']) : '',
                     'last_name' => $hasCustomer ? ucfirst($subscriber['lastname']) : '',
                     'gender' => $hasCustomer ? $customerGender : '',
                     'birthday' => $hasCustomer ? $customerBirthday : '',
-                );
+                ];
 
                 $payload[] = array_intersect_key($data, $fieldsToSynchronize);
             }
@@ -179,11 +185,11 @@ class SubscribersSync
                 $response = $smailyApiClient->post('/api/contact.php', $payload);
 
                 if ((int) $response['code'] !== 101) {
-                    throw new \Exception('Smaily API responded with: ' . json_encode($response));
+                    throw new ClientException('Smaily API responded with: ' . json_encode($response));
                 }
             }
 
-            $offset += 1;
+            $offset++;
         }
     }
 
@@ -231,7 +237,7 @@ class SubscribersSync
                     ]
                 );
 
-            $offset += 1;
+            $offset++;
         }
     }
 }

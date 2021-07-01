@@ -6,32 +6,32 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
 {
     const SUBSCRIBERS_SYNC_CRON_PATH = 'crontab/default/jobs/smaily_subscriber_sync/schedule/cron_expr';
 
-    const SETTINGS_NAMESPACE = 'smaily';
+    const NAMESPACE = 'smaily';
 
-    const SETTINGS_GROUP_ABANDONED_CART = 'abandoned';
-    const SETTINGS_GROUP_GENERAL = 'general';
-    const SETTINGS_GROUP_OPTIN = 'subscribe';
-    const SETTINGS_GROUP_SUBSCRIBERS_SYNC = 'sync';
+    const GROUP_ABANDONED_CART = 'abandoned';
+    const GROUP_GENERAL = 'general';
+    const GROUP_OPTIN = 'subscribe';
+    const GROUP_SUBSCRIBERS_SYNC = 'sync';
 
-    const SETTINGS_GENERAL_ENABLED = 'enable';
-    const SETTINGS_GENERAL_PASSWORD = 'password';
-    const SETTINGS_GENERAL_SUBDOMAIN = 'subdomain';
-    const SETTINGS_GENERAL_USERNAME = 'username';
+    const GENERAL_ENABLED = 'enable';
+    const GENERAL_PASSWORD = 'password';
+    const GENERAL_SUBDOMAIN = 'subdomain';
+    const GENERAL_USERNAME = 'username';
 
-    const SETTINGS_OPTIN_ENABLED = 'enableNewsletterSubscriptions';
-    const SETTINGS_OPTIN_CAPTCHA_ENABLED = 'enableCaptcha';
-    const SETTINGS_OPTIN_CAPTCHA_TYPE = 'captchaType';
-    const SETTINGS_OPTIN_CAPTCHA_SITEKEY = 'captchaApiKey';
-    const SETTINGS_OPTIN_CAPTCHA_SECRETKEY = 'captchaApiSecret';
+    const OPTIN_ENABLED = 'enableNewsletterSubscriptions';
+    const OPTIN_CAPTCHA_ENABLED = 'enableCaptcha';
+    const OPTIN_CAPTCHA_TYPE = 'captchaType';
+    const OPTIN_CAPTCHA_SITEKEY = 'captchaApiKey';
+    const OPTIN_CAPTCHA_SECRETKEY = 'captchaApiSecret';
 
-    const SETTINGS_SUBSCRIBERS_SYNC_ENABLED = 'enableCronSync';
-    const SETTINGS_SUBSCRIBERS_SYNC_FIELDS = 'fields';
-    const SETTINGS_SUBSCRIBERS_SYNC_FREQUENCY = 'frequency';
+    const SUBSCRIBERS_SYNC_ENABLED = 'enableCronSync';
+    const SUBSCRIBERS_SYNC_FIELDS = 'fields';
+    const SUBSCRIBERS_SYNC_FREQUENCY = 'frequency';
 
-    const SETTINGS_ABANDONED_CART_ENABLED = 'enableAbandonedCart';
-    const SETTINGS_ABANDONED_CART_FIELDS = 'productfields';
-    const SETTINGS_ABANDONED_CART_INTERVAL = 'syncTime';
-    const SETTINGS_ABANDONED_CART_WORKFLOW_ID = 'autoresponderId';
+    const ABANDONED_CART_ENABLED = 'enableAbandonedCart';
+    const ABANDONED_CART_FIELDS = 'productfields';
+    const ABANDONED_CART_INTERVAL = 'syncTime';
+    const ABANDONED_CART_WORKFLOW_ID = 'autoresponderId';
 
     /**
      * Is module enabled?
@@ -42,7 +42,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function isEnabled($websiteId = null)
     {
-        return (bool)(int) $this->getConfigValue(self::SETTINGS_GENERAL_ENABLED, self::SETTINGS_GROUP_GENERAL, $websiteId);
+        return (bool)(int) $this->getConfigValue(self::GENERAL_ENABLED, self::GROUP_GENERAL, $websiteId);
     }
 
     /**
@@ -54,7 +54,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function isSubscriberOptInEnabled($websiteId = null)
     {
-        return (bool)(int) $this->getConfigValue(self::SETTINGS_OPTIN_ENABLED, self::SETTINGS_GROUP_OPTIN, $websiteId);
+        return (bool)(int) $this->getConfigValue(self::OPTIN_ENABLED, self::GROUP_OPTIN, $websiteId);
     }
 
     /**
@@ -66,7 +66,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function isSubscriberOptInCaptchaEnabled($websiteId = null)
     {
-        return (bool)(int) $this->getConfigValue(self::SETTINGS_OPTIN_CAPTCHA_ENABLED, self::SETTINGS_GROUP_OPTIN, $websiteId);
+        return (bool)(int) $this->getConfigValue(self::OPTIN_CAPTCHA_ENABLED, self::GROUP_OPTIN, $websiteId);
     }
 
     /**
@@ -78,7 +78,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getSubscriberOptInCaptchaType($websiteId = null)
     {
-        return $this->getConfigValue(self::SETTINGS_OPTIN_CAPTCHA_TYPE, self::SETTINGS_GROUP_OPTIN, $websiteId);
+        return $this->getConfigValue(self::OPTIN_CAPTCHA_TYPE, self::GROUP_OPTIN, $websiteId);
     }
 
     /**
@@ -90,7 +90,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getSubscriberOptInCaptchaSiteKey($websiteId = null)
     {
-        return $this->getConfigValue(self::SETTINGS_OPTIN_CAPTCHA_SITEKEY, self::SETTINGS_GROUP_OPTIN, $websiteId);
+        return $this->getConfigValue(self::OPTIN_CAPTCHA_SITEKEY, self::GROUP_OPTIN, $websiteId);
     }
 
     /**
@@ -102,7 +102,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getSubscriberOptInCaptchaSecretKey($websiteId = null)
     {
-        return $this->getConfigValue(self::SETTINGS_OPTIN_CAPTCHA_SECRETKEY, self::SETTINGS_GROUP_OPTIN, $websiteId);
+        return $this->getConfigValue(self::OPTIN_CAPTCHA_SECRETKEY, self::GROUP_OPTIN, $websiteId);
     }
 
     /**
@@ -114,7 +114,11 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function isSubscribersSyncEnabled($websiteId = null)
     {
-        return (bool)(int) $this->getConfigValue(self::SETTINGS_SUBSCRIBERS_SYNC_ENABLED, self::SETTINGS_GROUP_SUBSCRIBERS_SYNC, $websiteId);
+        return (bool)(int) $this->getConfigValue(
+            self::SUBSCRIBERS_SYNC_ENABLED,
+            self::GROUP_SUBSCRIBERS_SYNC,
+            $websiteId
+        );
     }
 
     /**
@@ -124,9 +128,10 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      * @access public
      * @return array
      */
-    public function getSubscribersSyncFields($websiteId = null) {
-        $fields = $this->getConfigValue(self::SETTINGS_SUBSCRIBERS_SYNC_FIELDS, self::SETTINGS_GROUP_SUBSCRIBERS_SYNC, $websiteId);
-        return !empty($fields) ? explode(',', $fields) : array();
+    public function getSubscribersSyncFields($websiteId = null)
+    {
+        $fields = $this->getConfigValue(self::SUBSCRIBERS_SYNC_FIELDS, self::GROUP_SUBSCRIBERS_SYNC, $websiteId);
+        return !empty($fields) ? explode(',', $fields) : [];
     }
 
     /**
@@ -138,7 +143,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function isAbandonedCartCronEnabled($websiteId = null)
     {
-        return (bool)(int) $this->getConfigValue(self::SETTINGS_ABANDONED_CART_ENABLED, self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
+        return (bool)(int) $this->getConfigValue(self::ABANDONED_CART_ENABLED, self::GROUP_ABANDONED_CART, $websiteId);
     }
 
     /**
@@ -148,8 +153,9 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      * @access public
      * @return \DateInterval
      */
-    public function getAbadonedCartAbandonInterval($websiteId = null) {
-        $interval = $this->getConfigValue(self::SETTINGS_ABANDONED_CART_INTERVAL, self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
+    public function getAbadonedCartAbandonInterval($websiteId = null)
+    {
+        $interval = $this->getConfigValue(self::ABANDONED_CART_INTERVAL, self::GROUP_ABANDONED_CART, $websiteId);
         return \DateInterval::createFromDateString(str_replace(':', ' ', $interval));
     }
 
@@ -160,9 +166,10 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      * @access public
      * @return array
      */
-    public function getAbandonedCartFields($websiteId = null) {
-        $fields = $this->getConfigValue(self::SETTINGS_ABANDONED_CART_FIELDS, self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
-        return !empty($fields) ? explode(',', $fields) : array();
+    public function getAbandonedCartFields($websiteId = null)
+    {
+        $fields = $this->getConfigValue(self::ABANDONED_CART_FIELDS, self::GROUP_ABANDONED_CART, $websiteId);
+        return !empty($fields) ? explode(',', $fields) : [];
     }
 
     /**
@@ -172,8 +179,9 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      * @access public
      * @return int
      */
-    public function getAbandonedCartAutomationId($websiteId = null) {
-        return (int) $this->getConfigValue(self::SETTINGS_ABANDONED_CART_WORKFLOW_ID, self::SETTINGS_GROUP_ABANDONED_CART, $websiteId);
+    public function getAbandonedCartAutomationId($websiteId = null)
+    {
+        return (int) $this->getConfigValue(self::ABANDONED_CART_WORKFLOW_ID, self::GROUP_ABANDONED_CART, $websiteId);
     }
 
     /**
@@ -186,9 +194,9 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     public function getSmailyApiCredentials($websiteId = null)
     {
         return [
-            'subdomain' => $this->getConfigValue(self::SETTINGS_GENERAL_SUBDOMAIN, self::SETTINGS_GROUP_GENERAL, $websiteId),
-            'username' => $this->getConfigValue(self::SETTINGS_GENERAL_USERNAME, self::SETTINGS_GROUP_GENERAL, $websiteId),
-            'password' => $this->getConfigValue(self::SETTINGS_GENERAL_PASSWORD, self::SETTINGS_GROUP_GENERAL, $websiteId),
+            'subdomain' => $this->getConfigValue(self::GENERAL_SUBDOMAIN, self::GROUP_GENERAL, $websiteId),
+            'username' => $this->getConfigValue(self::GENERAL_USERNAME, self::GROUP_GENERAL, $websiteId),
+            'password' => $this->getConfigValue(self::GENERAL_PASSWORD, self::GROUP_GENERAL, $websiteId),
         ];
     }
 
@@ -203,7 +211,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     private function getConfigValue($setting, $group, $websiteId = null)
     {
-        $path = self::SETTINGS_NAMESPACE . '/' . trim($group, '/') . '/' . trim($setting, '/');
+        $path = self::NAMESPACE . '/' . trim($group, '/') . '/' . trim($setting, '/');
         return $this->scopeConfig->getValue($path, \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITE, $websiteId);
     }
 }

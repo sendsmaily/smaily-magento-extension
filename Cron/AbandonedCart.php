@@ -276,11 +276,14 @@ class AbandonedCart
                 ];
 
                 try {
-                    $smailyApiClient->post('/api/autoresponder.php', $payload);
+                    $response = $smailyApiClient->post('/api/autoresponder.php', $payload);
+
+                    if ((int) $response['code'] !== 101) {
+                        throw new \Exception('Smaily API responded with: ' . json_encode($response));
+                    }
                 }
                 catch (\Exception $e) {
-                    $this->logger->error($e->getMessage());
-                    $this->logger->debug('Failed payload', $payload);
+                    $this->logger->error($e->getMessage(), ['payload' => $payload]);
 
                     // Re-throw exception.
                     throw $e;

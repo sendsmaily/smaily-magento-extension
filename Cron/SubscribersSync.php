@@ -176,7 +176,11 @@ class SubscribersSync
             }
 
             if (!empty($payload)) {
-                $smailyApiClient->post('/api/contact.php', $payload);
+                $response = $smailyApiClient->post('/api/contact.php', $payload);
+
+                if ((int) $response['code'] !== 101) {
+                    throw new \Exception('Smaily API responded with: ' . json_encode($response));
+                }
             }
 
             $offset += 1;

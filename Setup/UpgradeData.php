@@ -47,7 +47,8 @@ class UpgradeData implements \Magento\Framework\Setup\UpgradeDataInterface
      * @access private
      * @return void
      */
-    private function migration001() {
+    private function migration001()
+    {
         // Rename CAPTCHA configuration option paths.
         $captchaType = $this->scopeConfig->getValue('smaily/subscribe/captcha_type');
         if (!empty($captchaType)) {

@@ -12,7 +12,8 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
      * @access protected
      * @return void
      */
-    protected function _construct() {
+    protected function _construct()
+    {
         $this->_init(
             'Smaily\SmailyForMagento\Model\SubscribersSyncState',
             'Smaily\SmailyForMagento\Model\ResourceModel\SubscribersSyncState'
@@ -28,7 +29,8 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
      * @access public
      * @return \DateTimeImmutable|null
      */
-    public function getLastSyncedAt() {
+    public function getLastSyncedAt()
+    {
         $select = $this->getConnection()
             ->select()
             ->from($this->getMainTable(), array('last_update_at'))
@@ -49,7 +51,8 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
      * @access public
      * @return void
      */
-    public function updateLastSyncedAt(\DateTimeImmutable $syncAt) {
+    public function updateLastSyncedAt(\DateTimeImmutable $syncAt)
+    {
         $this->getConnection()->insertOnDuplicate(
             $this->getMainTable(),
             array(

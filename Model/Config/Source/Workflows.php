@@ -16,7 +16,8 @@ class Workflows implements \Magento\Framework\Option\ArrayInterface
      */
     public function __construct(
         Data $dataHelper
-    ) {
+    )
+    {
         $this->dataHelper = $dataHelper;
     }
 

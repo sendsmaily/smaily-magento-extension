@@ -1,17 +1,17 @@
 <?php
 
-namespace Smaily\SmailyForMagento\Model\Config\Source;
+namespace Smaily\SmailyForMagento\Model\Config\Source\AbandonedCart;
 
-class ProductFields implements \Magento\Framework\Option\ArrayInterface
+class Fields implements \Magento\Framework\Option\ArrayInterface
 {
     /**
-     * Get Option values for Product field.
+     * Get options for Abandoned Cart fields.
      *
      * @return array
      */
     public function toOptionArray()
     {
-        $list = [
+        return [
             [
                 'value' => 'first_name',
                 'label' => 'Customer First Name'
@@ -45,7 +45,5 @@ class ProductFields implements \Magento\Framework\Option\ArrayInterface
                 'label' => 'Product Base Price',
             ],
         ];
-
-        return $list;
     }
 }

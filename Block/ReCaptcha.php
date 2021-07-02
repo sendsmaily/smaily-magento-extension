@@ -2,50 +2,58 @@
 
 namespace Smaily\SmailyForMagento\Block;
 
-use \Magento\Framework\View\Element\Template;
-use \Magento\Framework\View\Element\Template\Context;
-use Smaily\SmailyForMagento\Helper\Data as Helper;
+use Smaily\SmailyForMagento\Helper\Config;
 
-class ReCaptcha extends Template
+class ReCaptcha extends \Magento\Framework\View\Element\Template
 {
-    private $helper;
+    protected $storeManager;
 
+    protected $config;
+
+    /**
+     * Class constructor.
+     *
+     * @access public
+     * @return void
+     */
     public function __construct(
-        Context $context,
-        Helper $helper
+        \Magento\Framework\View\Element\Template\Context $context,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        Config $config
     ) {
+        $this->storeManager = $storeManager;
+
+        $this->config = $config;
+
         parent::__construct($context);
-        $this->helper = $helper;
     }
 
     /**
-     * Get CAPTCHA type (magento_captcha or google_captcha).
+     * Is Google reCAPTCHA enabled?
      *
-     * @return string CAPTCHA type.
-     */
-    public function getCaptchaType()
-    {
-        return $this->helper->getCaptchaType();
-    }
-
-    /**
-     * Get reCAPTCHA public API key.
-     *
-     * @return string CAPTCHA public key.
-     */
-    public function getCaptchaApiKey()
-    {
-        return $this->helper->getCaptchaApiKey();
-    }
-
-    /**
-     * Check if CAPTCHA should be rendered.
-     *
+     * @access public
      * @return boolean
      */
-    public function shouldCheckCaptcha()
+    public function isEnabled()
     {
-        return $this->helper->shouldCheckCaptcha();
+        $website = $this->storeManager->getWebsite();
+        return (
+            $this->config->isEnabled($website) === true &&
+            $this->config->isSubscriberOptInEnabled($website) === true &&
+            $this->config->isSubscriberOptInCaptchaEnabled($website) === true &&
+            $this->config->getSubscriberOptInCaptchaType($website) === 'google_captcha'
+        );
     }
 
+    /**
+     * Get Google reCAPTCHA site key.
+     *
+     * @access public
+     * @return string
+     */
+    public function getSiteKey()
+    {
+        $website = $this->storeManager->getWebsite();
+        return $this->config->getSubscriberOptInCaptchaSiteKey($website);
+    }
 }

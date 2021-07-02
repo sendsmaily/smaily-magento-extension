@@ -11,7 +11,10 @@ class InstallSchema implements InstallSchemaInterface
     public function install(SchemaSetupInterface $setup, ModuleContextInterface $context)
     {
         $installer = $setup;
+
         $installer->startSetup();
+
+        // Ensure smaily_customer_sync table exists.
         if (!$installer->tableExists('smaily_customer_sync')) {
             $table = $installer->getConnection()->newTable(
                 $installer->getTable('smaily_customer_sync')
@@ -25,6 +28,8 @@ class InstallSchema implements InstallSchemaInterface
                 );
             $installer->getConnection()->createTable($table);
         }
+
+        // Add sent status and reminder date columns to quote table.
         $installer->getConnection()->addColumn(
             $installer->getTable('quote'),
             'reminder_date',
@@ -44,6 +49,7 @@ class InstallSchema implements InstallSchemaInterface
                 'comment' => 'Email sent'
             ]
         );
+
         $installer->endSetup();
     }
 }

@@ -1,0 +1,12 @@
+<?php if ($block->isEnabled()): ?>
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<script type="text/x-magento-init">
+    {
+        "#newsletter-validate-detail": {
+            "Smaily_SmailyForMagento/js/optin/recaptcha": {
+                "key" : "<?= /* @noEscape */ $block->getSiteKey(); ?>"
+            }
+        }
+    }
+</script>
+<?php endif; ?>

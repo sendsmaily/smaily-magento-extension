@@ -44,7 +44,7 @@ class SaveConfig
      */
     public function beforeSave(\Magento\Config\Model\Config $config)
     {
-        if ($config->getSection() !== Config::NAMESPACE) {
+        if ($config->getSection() !== Config::SETTINGS_NAMESPACE) {
             return;
         }
 
@@ -80,7 +80,7 @@ class SaveConfig
      */
     public function afterSave(\Magento\Config\Model\Config $config)
     {
-        if ($config->getSection() !== Config::NAMESPACE) {
+        if ($config->getSection() !== Config::SETTINGS_NAMESPACE) {
             return;
         }
 
@@ -113,7 +113,7 @@ class SaveConfig
             // Note! When switching to store view based configuration,
             // the scope (incl. website) needs to be adjusted as well.
             return $this->scopeConfig->getValue(
-                Config::NAMESPACE . '/' . $group . '/' . $setting,
+                Config::SETTINGS_NAMESPACE . '/' . $group . '/' . $setting,
                 \Magento\Framework\App\Config\ScopeConfigInterface::SCOPE_TYPE_DEFAULT
             );
         }

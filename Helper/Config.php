@@ -6,7 +6,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
 {
     const SUBSCRIBERS_SYNC_CRON_PATH = 'crontab/default/jobs/smaily_subscriber_sync/schedule/cron_expr';
 
-    const NAMESPACE = 'smaily';
+    const SETTINGS_NAMESPACE = 'smaily';
 
     const GROUP_ABANDONED_CART = 'abandoned';
     const GROUP_GENERAL = 'general';
@@ -211,7 +211,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     private function getConfigValue($setting, $group, $websiteId = null)
     {
-        $path = self::NAMESPACE . '/' . trim($group, '/') . '/' . trim($setting, '/');
+        $path = self::SETTINGS_NAMESPACE . '/' . trim($group, '/') . '/' . trim($setting, '/');
         return $this->scopeConfig->getValue($path, \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITE, $websiteId);
     }
 }

@@ -39,10 +39,13 @@ class UpgradeData implements \Magento\Framework\Setup\UpgradeDataInterface
         if (version_compare($context->getVersion(), '1.0.1', '<')) {
             $this->migration001();
         }
+        if (version_compare($context->getVersion(), '2.0.0', '<')) {
+            $this->migration002();
+        }
     }
 
     /**
-     * Run migrations to version 1.0.1.
+     * Run version 1.0.1 migrations.
      *
      * @access private
      * @return void
@@ -79,6 +82,38 @@ class UpgradeData implements \Magento\Framework\Setup\UpgradeDataInterface
         if (!empty($abandonedCartSyncTime)) {
             $this->configWriter->save('smaily/abandoned/syncTime', $abandonedCartSyncTime);
             $this->configWriter->save('smaily/abandoned/sync_time', '');
+        }
+    }
+
+    /**
+     * Run version 2.0.0 migrations.
+     *
+     * @access private
+     * @return void
+     */
+    private function migration002()
+    {
+        // Replace firstname with first_name, and lastname with last_name.
+        //
+        // Note! This does not affect website specific settings, and that is OK, because
+        // prior to this version, there weren't any website specific settings.
+        $fields = $this->scopeConfig->getValue('smaily/sync/fields');
+        if (!empty($fields)) {
+            $fields = explode(',', $fields);
+
+            // Replace firstname with first_name.
+            if (in_array('firstname', $fields)) {
+                $fields = array_diff($fields, ['firstname']);
+                $fields[] = 'first_name';
+            }
+
+            // Replace lastname with last_name.
+            if (in_array('lastname', $fields)) {
+                $fields = array_diff($fields, ['lastname']);
+                $fields[] = 'last_name';
+            }
+
+            $this->configWriter->save('smaily/sync/fields', implode(',', $fields));
         }
     }
 }

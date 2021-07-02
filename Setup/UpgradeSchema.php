@@ -18,7 +18,7 @@ class UpgradeSchema implements \Magento\Framework\Setup\UpgradeSchemaInterface
     public function upgrade(SchemaSetupInterface $setup, ModuleContextInterface $context)
     {
         $installer = $setup;
-		$installer->startSetup();
+        $installer->startSetup();
 
         if (version_compare($context->getVersion(), '2.0.0', '<')) {
             $this->migration001($installer);

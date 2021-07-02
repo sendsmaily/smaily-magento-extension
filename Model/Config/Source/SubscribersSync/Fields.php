@@ -1,17 +1,17 @@
 <?php
 
-namespace Smaily\SmailyForMagento\Model\Config\Source;
+namespace Smaily\SmailyForMagento\Model\Config\Source\SubscribersSync;
 
 class Fields implements \Magento\Framework\Option\ArrayInterface
 {
     /**
-     * Get Option values for Additional field.
+     * Get options for Newsletter Subscribers synchronization fields.
      *
      * @return array
      */
     public function toOptionArray()
     {
-        $list = [
+        return [
             [
                 'value' => 'subscription_type',
                 'label' => 'Subscription Type',
@@ -29,11 +29,11 @@ class Fields implements \Magento\Framework\Option\ArrayInterface
                 'label' => 'Prefix',
             ],
             [
-                'value' => 'firstname',
+                'value' => 'first_name',
                 'label' => 'Firstname',
             ],
             [
-                'value' => 'lastname',
+                'value' => 'last_name',
                 'label' => 'Lastname',
             ],
             [
@@ -45,7 +45,5 @@ class Fields implements \Magento\Framework\Option\ArrayInterface
                 'label' => 'Date Of Birth',
             ]
         ];
-
-        return $list;
     }
 }

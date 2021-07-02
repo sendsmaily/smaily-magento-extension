@@ -1,8 +1,61 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="../../../../../lib/internal/Magento/Framework/ObjectManager/etc/config.xsd">
-    <type name="Magento\Newsletter\Model\Subscriber">
-        <plugin name="Smaily_SmailyForMagento_Subscribe"
-                type="Smaily\SmailyForMagento\Controller\Subscriber\Subscribe" />
+    <!-- Intercept Newsletter Subscription form -->
+    <type name="Magento\Newsletter\Block\Subscribe">
+        <plugin name="Smaily_SmailyForMagento_Plugin_OptIn_Form" type="Smaily\SmailyForMagento\Plugin\OptIn\Form" />
     </type>
+
+    <!-- Intercept Newsletter Subscriber opt-in -->
+    <type name="Magento\Newsletter\Model\Subscriber">
+        <plugin name="Smaily_SmailyForMagento_Plugin_OptIn" type="Smaily\SmailyForMagento\Plugin\OptIn" />
+    </type>
+
+    <!-- Intercept module configuration save -->
+    <type name="Magento\Config\Model\Config">
+        <plugin name="Smaily_SmailyForMagento_Plugin_SaveConfig" type="Smaily\SmailyForMagento\Plugin\SaveConfig" />
+    </type>
+
+    <!-- Set CRON loggers -->
+    <type name="Smaily\SmailyForMagento\Cron\AbandonedCart">
+        <arguments>
+            <argument name="logger" xsi:type="object">Smaily\SmailyForMagento\Logger\Cron\AbandonedCart</argument>
+        </arguments>
+    </type>
+    <type name="Smaily\SmailyForMagento\Cron\SubscribersSync">
+        <arguments>
+            <argument name="logger" xsi:type="object">Smaily\SmailyForMagento\Logger\Cron\SubscribersSync</argument>
+        </arguments>
+    </type>
+
+    <!-- Setup CRON log handlers -->
+    <type name="Smaily\SmailyForMagento\Model\Logger\Handler\Cron">
+        <arguments>
+            <argument name="filesystem" xsi:type="object">Magento\Framework\Filesystem\Driver\File</argument>
+        </arguments>
+    </type>
+    <virtualType name="Smaily\SmailyForMagento\Model\Logger\Handler\Cron\AbandonedCart" type="Smaily\SmailyForMagento\Model\Logger\Handler\Cron">
+        <arguments>
+            <argument name="fileName" xsi:type="string">var/log/smly_cart_cron.log</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="Smaily\SmailyForMagento\Model\Logger\Handler\Cron\SubscribersSync" type="Smaily\SmailyForMagento\Model\Logger\Handler\Cron">
+        <arguments>
+            <argument name="fileName" xsi:type="string">var/log/smly_customer_cron.log</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="Smaily\SmailyForMagento\Logger\Cron\AbandonedCart" type="Magento\Framework\Logger\Monolog">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="system" xsi:type="object">Smaily\SmailyForMagento\Model\Logger\Handler\Cron\AbandonedCart</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="Smaily\SmailyForMagento\Logger\Cron\SubscribersSync" type="Magento\Framework\Logger\Monolog">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="system" xsi:type="object">Smaily\SmailyForMagento\Model\Logger\Handler\Cron\SubscribersSync</item>
+            </argument>
+        </arguments>
+    </virtualType>
 </config>

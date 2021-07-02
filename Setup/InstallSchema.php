@@ -2,16 +2,25 @@
 
 namespace Smaily\SmailyForMagento\Setup;
 
-use Magento\Framework\Setup\InstallSchemaInterface;
-use Magento\Framework\Setup\ModuleContextInterface;
-use Magento\Framework\Setup\SchemaSetupInterface;
+use \Magento\Framework\Setup\ModuleContextInterface;
+use \Magento\Framework\Setup\SchemaSetupInterface;
 
-class InstallSchema implements InstallSchemaInterface
+class InstallSchema implements \Magento\Framework\Setup\InstallSchemaInterface
 {
+    /**
+     * Run module installation logic.
+     *
+     * @param \Magento\Framework\Setup\SchemaSetupInterface $setup
+     * @param \Magento\Framework\Setup\ModuleContextInterface $context
+     * @access public
+     * @return void
+     */
     public function install(SchemaSetupInterface $setup, ModuleContextInterface $context)
     {
         $installer = $setup;
         $installer->startSetup();
+
+        // Ensure smaily_customer_sync table exists.
         if (!$installer->tableExists('smaily_customer_sync')) {
             $table = $installer->getConnection()->newTable(
                 $installer->getTable('smaily_customer_sync')
@@ -25,6 +34,8 @@ class InstallSchema implements InstallSchemaInterface
                 );
             $installer->getConnection()->createTable($table);
         }
+
+        // Add sent status and reminder date columns to quote table.
         $installer->getConnection()->addColumn(
             $installer->getTable('quote'),
             'reminder_date',
@@ -44,6 +55,7 @@ class InstallSchema implements InstallSchemaInterface
                 'comment' => 'Email sent'
             ]
         );
+
         $installer->endSetup();
     }
 }

@@ -1,17 +1,17 @@
 <?php
 
-namespace Smaily\SmailyForMagento\Model\Config\Source;
+namespace Smaily\SmailyForMagento\Model\Config\Source\SubscribersSync;
 
 class Frequency implements \Magento\Framework\Option\ArrayInterface
 {
     /**
-     * Get Option values for customer sync frequency fields.
+     * Get options for Newsletter Subscribers synchronization frequencies.
      *
      * @return array
      */
     public function toOptionArray()
     {
-        $list = [
+        return [
             [
                 'value' => '0 */4 * * *',
                 'label' => 'Every 4 hours',
@@ -29,7 +29,5 @@ class Frequency implements \Magento\Framework\Option\ArrayInterface
                 'label' => 'Once a week',
             ],
         ];
-
-        return $list;
     }
 }

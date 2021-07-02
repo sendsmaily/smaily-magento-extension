@@ -2,16 +2,22 @@
 
 namespace Smaily\SmailyForMagento\Setup;
 
-use Magento\Framework\Setup\InstallSchemaInterface;
-use Magento\Framework\Setup\ModuleContextInterface;
-use Magento\Framework\Setup\SchemaSetupInterface;
+use \Magento\Framework\Setup\ModuleContextInterface;
+use \Magento\Framework\Setup\SchemaSetupInterface;
 
-class InstallSchema implements InstallSchemaInterface
+class InstallSchema implements \Magento\Framework\Setup\InstallSchemaInterface
 {
+    /**
+     * Run module installation logic.
+     *
+     * @param \Magento\Framework\Setup\SchemaSetupInterface $setup
+     * @param \Magento\Framework\Setup\ModuleContextInterface $context
+     * @access public
+     * @return void
+     */
     public function install(SchemaSetupInterface $setup, ModuleContextInterface $context)
     {
         $installer = $setup;
-
         $installer->startSetup();
 
         // Ensure smaily_customer_sync table exists.

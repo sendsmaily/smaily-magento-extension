@@ -12,6 +12,6 @@ class SubscribersSyncState extends \Magento\Framework\Model\AbstractModel
      */
     protected function _construct()
     {
-        $this->_init(Smaily\SmailyForMagento\Model\ResourceModel\SubscribersSyncState::class);
+        $this->_init(\Smaily\SmailyForMagento\Model\ResourceModel\SubscribersSyncState::class);
     }
 }

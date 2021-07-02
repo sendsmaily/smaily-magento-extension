@@ -15,8 +15,8 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
     protected function _construct()
     {
         $this->_init(
-            Smaily\SmailyForMagento\Model\SubscribersSyncState::class,
-            Smaily\SmailyForMagento\Model\ResourceModel\SubscribersSyncState::class
+            \Smaily\SmailyForMagento\Model\SubscribersSyncState::class,
+            \Smaily\SmailyForMagento\Model\ResourceModel\SubscribersSyncState::class
         );
 
         $objectManager = \Magento\Framework\App\ObjectManager::getInstance();

@@ -109,7 +109,7 @@ class Client
             // Handle response errors.
             if ($response === false) {
                 throw new ClientException(
-                    "HTTP request failed with error: " . curl_error($ch),
+                    'HTTP request failed with error: ' . curl_error($ch),
                     (int) curl_getinfo($ch, CURLINFO_HTTP_CODE)
                 );
             }

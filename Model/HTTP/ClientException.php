@@ -2,6 +2,6 @@
 
 namespace Smaily\SmailyForMagento\Model\HTTP;
 
-class ClientException extends \Magento\Framework\Exception\LocalizedException
+class ClientException extends \Exception
 {
 }

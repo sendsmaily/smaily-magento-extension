@@ -69,7 +69,7 @@ class AbandonedCart
      * @access public
      * @return void
      */
-    public function run()
+    public function execute()
     {
         $websites = $this->storeManager->getWebsites();
 

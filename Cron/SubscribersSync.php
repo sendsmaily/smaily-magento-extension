@@ -61,7 +61,7 @@ class SubscribersSync
      * @access public
      * @return void
      */
-    public function run()
+    public function execute()
     {
         $nowAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
         $lastSyncedAt = $this->subscribersSyncStateCollection->getLastSyncedAt();

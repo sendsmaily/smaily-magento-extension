@@ -1,6 +1,6 @@
 FROM php:7.3-apache
 
-ENV MAGENTO_VERSION 2.3.6
+ENV MAGENTO_VERSION 2.4.2-p1
 ENV COMPOSER_HOME /var/www/.composer
 
 # Install Magento requirements.

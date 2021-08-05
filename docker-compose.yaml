@@ -27,6 +27,7 @@ services:
     - ./:/var/www/html/app/code/Smaily/SmailyForMagento
     depends_on:
     - db
+    - elastic
 
   db:
     container_name: magento2_db
@@ -36,6 +37,17 @@ services:
     - MYSQL_ROOT_PASSWORD=root
     volumes:
     - db-data:/var/lib/mysql
+
+  elastic:
+    container_name: magento2_elastic
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.13.3
+    ports:
+    - '9200:9200'
+    - '9300:9300'
+    environment:
+    - discovery.type=single-node
+    volumes:
+    - elastic-data:/usr/share/elasticsearch/data
 
   phpmyadmin:
     container_name: magento2_phpmyadmin
@@ -55,3 +67,5 @@ volumes:
     name: docker_magento2-data
   db-data:
     name: docker_magento2-db-data
+  elastic-data:
+    name: docker_magento2-elastic-data

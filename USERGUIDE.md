@@ -1,6 +1,6 @@
 # User guide
 
-## Smaily E-Commerce extension for Magento 2.0+
+## Smaily E-Commerce extension for Magento 2.3+
 >[Smaily](https://smaily.com/) is an intentionally simple tool for sending beautiful email newsletters.
 
 ## Installation

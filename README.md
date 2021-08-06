@@ -29,7 +29,7 @@ Automatically synchronize newsletter subscribers to a Smaily subscribers list, g
 
 ## Requirements
 
-This extension is built for Magento 2.0 and newer.
+This extension is built for Magento 2.3 and newer.
 
 Check specific PHP, web server, database, etc requirements for your preferred Magento version from [Magento technology stack requirements](https://devdocs.magento.com/guides/v2.0/install-gde/system-requirements-tech.html).
 
@@ -43,7 +43,7 @@ All development for Smaily for Magento is [handled via GitHub](https://github.co
 
 ## Installation
 
-Make sure you have Magento 2.0 (or newer) installed.
+Make sure you have Magento 2.3 (or newer) installed.
 
 ### Installing via Composer (recommended)
 

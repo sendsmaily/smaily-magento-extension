@@ -1,6 +1,11 @@
 # Changelog
 
 
+### 2.1.0
+
+- Magento 2.4 compatibility [[#63](https://github.com/sendsmaily/smaily-magento-extension/pull/63)]
+
+
 ### 2.0.0
 
 This is a complete rework of the module. The aim was to make the module configurable by website, i.e. abandoned cart, newsletter subscribers synchronization, opt-in form and Smaily API could be configured for each website. Only reasonable solution was to rebuild the module from ground up, because most (if not all) of the functionality was "Default configuration"-centric.

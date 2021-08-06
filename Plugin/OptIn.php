@@ -7,11 +7,8 @@ use Smaily\SmailyForMagento\Helper\Data;
 
 class OptIn
 {
-    protected $captchaHelper;
-    protected $captchaResolver;
     protected $customerSession;
     protected $logger;
-    protected $request;
     protected $storeManager;
 
     protected $config;
@@ -24,96 +21,18 @@ class OptIn
      * @return void
      */
     public function __construct(
-        \Magento\Captcha\Helper\Data $captchaHelper,
-        \Magento\Captcha\Observer\CaptchaStringResolver $captchaResolver,
         \Magento\Customer\Model\Session $customerSession,
-        \Magento\Framework\App\Request\Http $request,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
         \Psr\Log\LoggerInterface $logger,
         Config $config,
         Data $dataHelper
     ) {
-        $this->captchaHelper = $captchaHelper;
-        $this->captchaResolver = $captchaResolver;
         $this->customerSession = $customerSession;
         $this->logger = $logger;
-        $this->request = $request;
         $this->storeManager = $storeManager;
 
         $this->config = $config;
         $this->dataHelper = $dataHelper;
-    }
-
-    /**
-     * Run additional logic when Newsletter Subscriber is about to be subscribed.
-     *
-     * @param \Magento\Newsletter\Model\Subscriber $subscriber
-     * @param string $email
-     * @access public
-     * @return void
-     */
-    public function beforeSubscribe(\Magento\Newsletter\Model\Subscriber $subscriber, $email)
-    {
-        $website = $this->storeManager->getWebsite();
-
-        if ($this->isOptInEnabled() === false ||
-            $this->config->isSubscriberOptInCaptchaEnabled($website) === false
-        ) {
-            return;
-        }
-
-        $captchaType = $this->config->getSubscriberOptInCaptchaType($website);
-
-        if ($captchaType === 'google_captcha') {
-            $challenge = $this->request->getParam('g-recaptcha-response');
-
-            if ($this->dataHelper->verifyGoogleCaptchaResponse($challenge) === false) {
-                throw new \Magento\Framework\Exception\LocalizedException(__('Incorrect CAPTCHA.'));
-            }
-        } elseif ($captchaType === 'magento_captcha') {
-            $formId = 'smaily_captcha';
-            $challenge = $this->captchaResolver->resolve($this->request, $formId);
-
-            if ($this->captchaHelper->getCaptcha($formId)->isCorrect($challenge) === false) {
-                throw new \Magento\Framework\Exception\LocalizedException(__('Incorrect CAPTCHA.'));
-            }
-        }
-    }
-
-    /**
-     * Run additional logic after Newsletter Subscriber is subscribed.
-     *
-     * @param \Magento\Newsletter\Model\Subscriber $subscriber
-     * @access public
-     * @return void
-     */
-    public function afterSubscribe(\Magento\Newsletter\Model\Subscriber $subscriber)
-    {
-        if ($this->isOptInEnabled() === false ||
-            $subscriber->getStatus() !== \Magento\Newsletter\Model\Subscriber::STATUS_SUBSCRIBED
-        ) {
-            return;
-        }
-
-        // Fire opt-in request to Smaily.
-        $this->optInSubscriber($subscriber);
-    }
-
-    /**
-     * Run additional logic after Newsletter Subscriber confirms their subscription.
-     *
-     * @param \Magento\Newsletter\Model\Subscriber $subscriber
-     * @access public
-     * @return void
-     */
-    public function afterConfirm(\Magento\Newsletter\Model\Subscriber $subscriber)
-    {
-        if ($this->isOptInEnabled() === false) {
-            return;
-        }
-
-        // Fire opt-in request to Smaily.
-        $this->optInSubscriber($subscriber);
     }
 
     /**
@@ -129,8 +48,15 @@ class OptIn
             return;
         }
 
+        $initialImportMode = $subscriber->getImportMode();
+
         // Ensure confirmation success email sending is disabled.
         $subscriber->setImportMode(true);
+
+        // Opt-in subscriber in Smaily.
+        if ($initialImportMode !== true) {
+            $this->optInSubscriber($subscriber);
+        }
     }
 
     /**

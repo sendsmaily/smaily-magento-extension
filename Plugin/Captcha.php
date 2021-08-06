@@ -52,13 +52,15 @@ class Captcha
      * @access public
      * @return void
      */
-    public function aroundExecute(\Magento\Newsletter\Controller\Subscriber\NewAction $context, callable $proceed, ...$args)
-    {
+    public function aroundExecute(
+        \Magento\Newsletter\Controller\Subscriber\NewAction $context,
+        callable $proceed,
+        ...$args
+    ) {
         $website = $this->storeManager->getWebsite();
 
         // Validate CAPTCHA, if enabled.
-        if (
-            $this->config->isEnabled($website) === true &&
+        if ($this->config->isEnabled($website) === true &&
             $this->config->isSubscriberOptInEnabled($website) === true &&
             $this->config->isSubscriberOptInCaptchaEnabled($website) === true
         ) {

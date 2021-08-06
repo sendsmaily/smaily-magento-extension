@@ -7,6 +7,9 @@
     </type>
 
     <!-- Intercept Newsletter Subscriber opt-in -->
+    <type name="Magento\Newsletter\Controller\Subscriber\NewAction">
+        <plugin name="Smaily_SmailyForMagento_Plugin_Captcha" type="Smaily\SmailyForMagento\Plugin\Captcha" />
+    </type>
     <type name="Magento\Newsletter\Model\Subscriber">
         <plugin name="Smaily_SmailyForMagento_Plugin_OptIn" type="Smaily\SmailyForMagento\Plugin\OptIn" />
     </type>
@@ -47,6 +50,7 @@
     <virtualType name="Smaily\SmailyForMagento\Logger\Cron\AbandonedCart" type="Magento\Framework\Logger\Monolog">
         <arguments>
             <argument name="handlers" xsi:type="array">
+                <item name="debug" xsi:type="object">Smaily\SmailyForMagento\Model\Logger\Handler\Cron\AbandonedCart</item>
                 <item name="system" xsi:type="object">Smaily\SmailyForMagento\Model\Logger\Handler\Cron\AbandonedCart</item>
             </argument>
         </arguments>
@@ -54,6 +58,7 @@
     <virtualType name="Smaily\SmailyForMagento\Logger\Cron\SubscribersSync" type="Magento\Framework\Logger\Monolog">
         <arguments>
             <argument name="handlers" xsi:type="array">
+                <item name="debug" xsi:type="object">Smaily\SmailyForMagento\Model\Logger\Handler\Cron\SubscribersSync</item>
                 <item name="system" xsi:type="object">Smaily\SmailyForMagento\Model\Logger\Handler\Cron\SubscribersSync</item>
             </argument>
         </arguments>

@@ -7,6 +7,7 @@ Automatically synchronize newsletter subscribers to a Smaily subscribers list, g
 ### Magento Newsletter Subscribers
 
 - Add subscribers to Smaily subscribers list;
+- Trigger all opt-in or a specific automation workflow;
 - Magento built in subscribe newsletter form sends subscribers directly to Smaily;
 - Magento built-in CAPTCHA and Google reCAPTCHA support.
 

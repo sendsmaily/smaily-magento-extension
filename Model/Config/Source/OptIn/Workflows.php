@@ -1,6 +1,6 @@
 <?php
 
-namespace Smaily\SmailyForMagento\Model\Config\Source;
+namespace Smaily\SmailyForMagento\Model\Config\Source\OptIn;
 
 use Smaily\SmailyForMagento\Helper\Data;
 
@@ -31,7 +31,7 @@ class Workflows implements \Magento\Framework\Option\ArrayInterface
         $websiteId = $this->dataHelper->getConfigurationCurrentWebsiteId();
 
         $workflows = [
-            ['value' => '', 'label' => 'No automation workflow selected'],
+            ['value' => '', 'label' => 'No automation workflow selected - opt-in workflows are triggered'],
         ];
 
         foreach ($this->dataHelper->getAutomationWorkflows($websiteId) as $workflow) {

@@ -1,6 +1,12 @@
 # Changelog
 
 
+### 2.2.0
+
+- Include store group and website in opt-in form and synchronized data [[#67](https://github.com/sendsmaily/smaily-magento-extension/pull/67)]
+- Add automation workflow selection to Newsletter Subscriber settings [[#68](https://github.com/sendsmaily/smaily-magento-extension/pull/68)]
+
+
 ### 2.1.0
 
 - Magento 2.4 compatibility [[#63](https://github.com/sendsmaily/smaily-magento-extension/pull/63)]

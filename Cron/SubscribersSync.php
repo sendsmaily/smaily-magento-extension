@@ -15,6 +15,8 @@ class SubscribersSync
         'is_unsubscribed',
         'name',
         'store',
+        'store_group',
+        'store_website',
     ];
 
     protected $customerCollection;
@@ -103,6 +105,7 @@ class SubscribersSync
         $lastSyncedAt = null
     ) {
         $smailyApiClient = $this->dataHelper->getSmailyApiClient($website);
+        $groups = $website->getGroups();
         $storeIds = $website->getStoreIds();
         $stores = $website->getStores();
 
@@ -160,11 +163,16 @@ class SubscribersSync
                 $customerGroupName = $this->dataHelper->getCustomerGroupName($customerGroupId);
 
                 $customerStore = isset($stores[$subscriber['store_id']]) ? $stores[$subscriber['store_id']] : null;
+                $customerStoreGroup = $customerStore !== null && isset($groups[$customerStore->getGroupId()])
+                    ? $groups[$customerStore->getGroupId()]
+                    : null;
 
                 $data = [
                     'email' => $subscriber['subscriber_email'],
                     'is_unsubscribed' => (int) $subscriber['subscriber_status'] === 1 ? 0 : 1,
                     'store' => $customerStore !== null ? $customerStore->getName() : '',
+                    'store_group' => $customerStoreGroup !== null ? $customerStoreGroup->getName() : '',
+                    'store_website' => $website->getName(),
                     'name' => $hasCustomer
                         ? ucfirst($subscriber['firstname']) . ' ' . ucfirst($subscriber['lastname'])
                         : '',

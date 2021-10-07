@@ -112,7 +112,7 @@ class OptIn
         $storeGroup = $store->getGroup();
         $storeWebsite = $store->getWebsite();
 
-        $payload = [
+        $data = [
             'email' => $subscriber->getSubscriberEmail(),
             'customer_id' => $customer !== null ? $customer->getId() : "",
             'customer_group' => $customer !== null
@@ -126,10 +126,15 @@ class OptIn
         ];
 
         // Fire opt-in request to Smaily.
+        $workflowId = $this->config->getSubscriberOptInWorkflowId($website);
+
+        $payload = ['addresses' => [$data]];
+        if ($workflowId > 0) {
+            $payload['autoresponder'] = $workflowId;
+        }
+
         $response = $this->dataHelper->getSmailyApiClient($website)
-            ->post('/api/autoresponder.php', [
-                'addresses' => [$payload],
-            ]);
+            ->post('/api/autoresponder.php', $payload);
 
         if ((int) $response['code'] !== 101) {
             $this->logger->error('Smaily opt-in API request failed', ['payload' => $payload, 'response' => $response]);

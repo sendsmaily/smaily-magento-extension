@@ -19,6 +19,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     const GENERAL_USERNAME = 'username';
 
     const OPTIN_ENABLED = 'enableNewsletterSubscriptions';
+    const OPTIN_WORKFLOW_ID = 'workflowId';
     const OPTIN_CAPTCHA_ENABLED = 'enableCaptcha';
     const OPTIN_CAPTCHA_TYPE = 'captchaType';
     const OPTIN_CAPTCHA_SITEKEY = 'captchaApiKey';
@@ -55,6 +56,18 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     public function isSubscriberOptInEnabled($websiteId = null)
     {
         return (bool)(int) $this->getConfigValue(self::OPTIN_ENABLED, self::GROUP_OPTIN, $websiteId);
+    }
+
+    /**
+     * Get Newsletter Subscriber opt-in automation workflow ID.
+     *
+     * @param mixed|null $websiteId
+     * @access public
+     * @return int
+     */
+    public function getSubscriberOptInWorkflowId($websiteId = null)
+    {
+        return (int) $this->getConfigValue(self::OPTIN_WORKFLOW_ID, self::GROUP_OPTIN, $websiteId);
     }
 
     /**

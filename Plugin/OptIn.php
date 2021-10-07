@@ -108,13 +108,19 @@ class OptIn
             $customer = $this->customerSession->getCustomer();
         }
 
+        $store = $this->storeManager->getStore($subscriber->getStoreId());
+        $storeGroup = $store->getGroup();
+        $storeWebsite = $store->getWebsite();
+
         $payload = [
             'email' => $subscriber->getSubscriberEmail(),
             'customer_id' => $customer !== null ? $customer->getId() : "",
             'customer_group' => $customer !== null
                 ? $this->dataHelper->getCustomerGroupName((int) $customer->getGroupId())
                 : 'Guest',
-            'store' => $this->storeManager->getStore($subscriber->getStoreId())->getName(),
+            'store' => $store->getName(),
+            'store_group' => $storeGroup->getName(),
+            'store_website' => $storeWebsite->getName(),
             'first_name' => $customer !== null ? $customer->getFirstname() : '',
             'last_name' => $customer !== null ? $customer->getLastname() : '',
         ];

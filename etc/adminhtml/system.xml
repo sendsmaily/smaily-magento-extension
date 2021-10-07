@@ -83,7 +83,7 @@
         <field id="fields" translate="label" type="multiselect" sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Syncronize Additional Fields</label>
           <source_model>Smaily\SmailyForMagento\Model\Config\Source\SubscribersSync\Fields</source_model>
-          <comment><![CDATA[Select fields you wish to synchronize along with subscription data. Subscriber Email and Name fields are automatically synchronized]]></comment>
+          <comment><![CDATA[Select fields you wish to synchronize along with subscription data. Subscriber's email, name, store, store group and website fields are always synchronized]]></comment>
         </field>
         <field id="frequency" translate="label" type="select" sortOrder="90" showInDefault="1" showInWebsite="0" showInStore="0">
           <label>Frequency</label>

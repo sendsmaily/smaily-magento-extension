@@ -15,7 +15,7 @@
 
 ![Module configuration path](assets/stores_config_module.png)
 
-4. On extension configuration page enter your Smaily API credentials - **subdomain, username, and password**. You must create your API account in Smaily first. You can follow our [tutorial](http://help.smaily.com/en/support/solutions/articles/16000062943-create-api-user) to create one. After that, you can **validate connection** by saving configuration.
+4. On extension configuration page enter your Smaily API credentials - **subdomain, username, and password**. You must create your API account in Smaily first. You can follow our [tutorial](https://smaily.com/help/api/general/create-api-user/) to create one. After that, you can **validate connection** by saving configuration.
 
 ![API credentials section](assets/general_settings.png)
 
@@ -41,7 +41,7 @@
 
 9. Enable abandoned cart emails feature under **Abandoned Cart** section to send cart reminder emails to store customers.
 
-10. You need to create *form submitted* workflow in Smaily prior to activating this feature. You can follow our [creating automation workflows tutorial](http://help.smaily.com/en/support/solutions/articles/16000092458-creating-automation-workflows).
+10. You need to create *form submitted* workflow in Smaily prior to activating this feature. You can follow our [creating automation workflows tutorial](https://smaily.com/help/user-manual/automations/automation-workflows/).
 
 11. After creating automation in Smaily you can find this automation under **Autoresponder ID**.
 

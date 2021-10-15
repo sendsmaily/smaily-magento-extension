@@ -36,7 +36,7 @@ Check specific PHP, web server, database, etc requirements for your preferred Ma
 
 ## Documentation & Support
 
-Online documentation and code samples are available via our [Help Center](http://help.smaily.com/support/solutions/articles/16000076719-smaily-e-commerce-extension-for-magento-2-0-).
+Online documentation and code samples are available via our [Help Center](https://smaily.com/help/user-manual/integrations-et/smaily-for-magento-2/).
 
 ## Contribute
 

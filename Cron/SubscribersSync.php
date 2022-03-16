@@ -65,8 +65,6 @@ class SubscribersSync
      */
     public function execute()
     {
-        $nowAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
-        $lastSyncedAt = $this->subscribersSyncStateCollection->getLastSyncedAt();
         $websites = $this->storeManager->getWebsites();
 
         $this->logger->info('Starting Newsletter Subscribers synchronization CRON job...');
@@ -83,13 +81,16 @@ class SubscribersSync
                 continue;
             }
 
+            $nowAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+            $lastSyncedAt = $this->subscribersSyncStateCollection->getLastSyncedAt($website->getId());
+
             // Synchronize Newsletter Subscribers.
             $this->optOutNewsletterSubscribers($website);
             $this->syncNewsletterSubscribers($website, $lastSyncedAt);
-        }
 
-        // Update last synchronization date.
-        $this->subscribersSyncStateCollection->updateLastSyncedAt($nowAt);
+            // Update last synchronization date.
+            $this->subscribersSyncStateCollection->updateLastSyncedAt($website->getId(), $nowAt);
+        }
     }
 
     /**

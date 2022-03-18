@@ -14,11 +14,10 @@ class Datetime extends \Magento\Config\Block\System\Config\Form\Field
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
-        array $data = [],
-        ?\Magento\Framework\View\Helper\SecureHtmlRenderer $secureRenderer = null
+        array $data = []
     ) {
         $this->localeDate = $context->getLocaleDate();
-        parent::__construct($context, $data, $secureRenderer);
+        parent::__construct($context, $data);
     }
 
     /**

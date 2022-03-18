@@ -34,6 +34,17 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     const ABANDONED_CART_INTERVAL = 'syncTime';
     const ABANDONED_CART_WORKFLOW_ID = 'autoresponderId';
 
+    protected $configInterface;
+
+    public function __construct(
+        \Magento\Framework\App\Helper\Context $context,
+        \Magento\Framework\App\Config\ConfigResource\ConfigInterface $configInterface
+    )
+    {
+        $this->configInterface = $configInterface;
+        parent::__construct($context);
+    }
+
     /**
      * Is module enabled?
      *
@@ -226,5 +237,21 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     {
         $path = self::SETTINGS_NAMESPACE . '/' . trim($group, '/') . '/' . trim($setting, '/');
         return $this->scopeConfig->getValue($path, \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITE, $websiteId);
+    }
+
+    /**
+     * Set Magento main configuration value by field.
+     *
+     * @param string $setting
+     * @param string $value
+     * @param string $group
+     * @param string|null $websiteId
+     * @access private
+     * @return void
+     */
+    private function setConfigValue($setting, $value, $group, $websiteId = null)
+    {
+        $path = self::SETTINGS_NAMESPACE . '/' . trim($group, '/') . '/' . trim($setting, '/');
+        $this->configInterface->saveConfig($path, $value, \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITES, $websiteId);
     }
 }

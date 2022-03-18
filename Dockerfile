@@ -1,8 +1,5 @@
 FROM php:7.3-apache
 
-ENV MAGENTO_VERSION 2.4.2-p1
-ENV COMPOSER_HOME /var/www/.composer
-
 # Install Magento requirements.
 RUN apt-get update \
     && apt-get install -y \
@@ -36,15 +33,6 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Install Composer.
-RUN php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php');" \
-    && EXPECTED_CHECKSUM="$(curl https://composer.github.io/installer.sig)" \
-    && ACTUAL_CHECKSUM="$(php -r "echo hash_file('sha384', '/tmp/composer-setup.php');")" \
-    && test "$EXPECTED_CHECKSUM" = "$ACTUAL_CHECKSUM" \
-    && php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --1 \
-    && rm /tmp/composer-setup.php \
-    && chown www-data:www-data $COMPOSER_HOME
-
 # Prepare server for Magento.
 RUN a2enmod rewrite \
     && echo "memory_limit=2048M" > /usr/local/etc/php/conf.d/memory-limit.ini \
@@ -53,14 +41,23 @@ RUN a2enmod rewrite \
     && mkdir /sample-data \
     && chown www-data:www-data /sample-data
 
+# Install Composer.
+ENV COMPOSER_HOME /var/www/.composer
+RUN php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php');" \
+    && EXPECTED_CHECKSUM="$(curl https://composer.github.io/installer.sig)" \
+    && ACTUAL_CHECKSUM="$(php -r "echo hash_file('sha384', '/tmp/composer-setup.php');")" \
+    && test "$EXPECTED_CHECKSUM" = "$ACTUAL_CHECKSUM" \
+    && php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --1 \
+    && rm /tmp/composer-setup.php \
+    && chown www-data:www-data $COMPOSER_HOME
+
 USER www-data
 
-# Download and install Magento packages.
+# Download and install Magento.
+ENV MAGENTO_VERSION 2.4.2-p1
 RUN composer create-project magento/community-edition=${MAGENTO_VERSION} ./ \
-    && chmod +x bin/magento
-
-# Download Magento sample-data.
-RUN git clone https://github.com/magento/magento2-sample-data.git /sample-data \
+    && chmod +x bin/magento \
+    && git clone https://github.com/magento/magento2-sample-data.git /sample-data \
     && git -C /sample-data checkout ${MAGENTO_VERSION}
 
 COPY ./.sandbox/entrypoint.sh /entrypoint.sh

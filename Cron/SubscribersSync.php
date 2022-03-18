@@ -5,7 +5,6 @@ namespace Smaily\SmailyForMagento\Cron;
 use Smaily\SmailyForMagento\Helper\Config;
 use Smaily\SmailyForMagento\Helper\Data;
 use Smaily\SmailyForMagento\Model\HTTP\ClientException;
-use Smaily\SmailyForMagento\Model\ResourceModel\SubscribersSyncState\Collection as SubscribersSyncStateCollection;
 
 class SubscribersSync
 {
@@ -27,7 +26,6 @@ class SubscribersSync
 
     protected $config;
     protected $dataHelper;
-    protected $subscribersSyncStateCollection;
 
     /**
      * Class constructor.
@@ -42,8 +40,7 @@ class SubscribersSync
         \Magento\Store\Model\StoreManagerInterface $storeManager,
         \Psr\Log\LoggerInterface $logger,
         Config $config,
-        Data $dataHelper,
-        SubscribersSyncStateCollection $subscribersSyncStateCollection
+        Data $dataHelper
     ) {
         $this->customerCollection = $customerCollection;
         $this->logger = $logger;
@@ -54,7 +51,6 @@ class SubscribersSync
 
         $this->config = $config;
         $this->dataHelper = $dataHelper;
-        $this->subscribersSyncStateCollection = $subscribersSyncStateCollection;
     }
 
     /**
@@ -82,14 +78,14 @@ class SubscribersSync
             }
 
             $nowAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
-            $lastSyncedAt = $this->subscribersSyncStateCollection->getLastSyncedAt($website->getId());
+            $lastSyncedAt = $this->config->getSubscribersSyncLastSyncedAt($website->getId());
 
             // Synchronize Newsletter Subscribers.
             $this->optOutNewsletterSubscribers($website);
             $this->syncNewsletterSubscribers($website, $lastSyncedAt);
 
             // Update last synchronization date.
-            $this->subscribersSyncStateCollection->updateLastSyncedAt($website->getId(), $nowAt);
+            $this->config->setSubscribersSyncLastSyncedAt($website->getId(), $nowAt);
         }
     }
 
@@ -112,6 +108,7 @@ class SubscribersSync
 
         $this->logger->info('Synchronizing subscribers from Magento to Smaily...', [
             'batch_size' => self::BATCH_SIZE,
+            'since_dt' => $lastSyncedAt,
         ]);
 
         // Determine list of customer fields to synchronize.

@@ -150,13 +150,17 @@ class UpgradeData implements \Magento\Framework\Setup\UpgradeDataInterface
             ->limit(1);
 
         $lastSyncedAt = $connection->fetchRow($select);
-        $lastSyncedAt = !empty($lastSyncedAt) ? new \DateTimeImmutable($lastSyncedAt['last_update_at']) : null;
-
-        // Truncate subscribers synchronization state collection.
-        $connection->truncateTable($tableName);
+        $lastSyncedAt = !empty($lastSyncedAt)
+            ? (new \DateTimeImmutable($lastSyncedAt['last_update_at']))->format('Y-m-d H:i:s')
+            : null;
 
         foreach ($websites as $website) {
-            $this->subscribersSyncStateCollection->updateLastSyncedAt($website->getId(), $lastSyncedAt);
+            $this->configWriter->save(
+                'smaily/sync/lastSyncedAt',
+                $lastSyncedAt,
+                \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITES,
+                $website->getId()
+            );
         }
     }
 }

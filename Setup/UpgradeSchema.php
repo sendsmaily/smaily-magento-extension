@@ -23,9 +23,6 @@ class UpgradeSchema implements \Magento\Framework\Setup\UpgradeSchemaInterface
         if (version_compare($context->getVersion(), '2.0.0', '<')) {
             $this->migration001($installer);
         }
-        if (version_compare($context->getVersion(), '2.3.0', '<')) {
-            $this->migration002($installer);
-        }
 
         $installer->endSetup();
     }
@@ -54,46 +51,6 @@ class UpgradeSchema implements \Magento\Framework\Setup\UpgradeSchemaInterface
                     'type' => \Magento\Framework\DB\Ddl\Table::TYPE_INTEGER,
                     'unsigned' => true,
                 ]
-            );
-        }
-    }
-
-    /**
-     * Run version 2.3.0 migrations.
-     *
-     * @param \Magento\Framework\Setup\SchemaSetupInterface $installer
-     * @access private
-     * @return void
-     */
-    private function migration002(SchemaSetupInterface $installer)
-    {
-        $customerSyncTableName = 'smaily_customer_sync';
-
-        if ($installer->tableExists($customerSyncTableName)) {
-            // Add Website column to customer synchronization table.
-            $installer->getConnection()->addColumn(
-                $installer->getTable($customerSyncTableName),
-                'website_id',
-                [
-                    'comment' => 'Website ID',
-                    'identity' => false,
-                    'nullable' => false,
-                    'primary' => false,
-                    'type' => \Magento\Framework\DB\Ddl\Table::TYPE_SMALLINT,
-                    'unsigned' => true,
-                ]
-            );
-
-            // Add unique index on Website column in customer synchronization table.
-            $installer->getConnection()->addIndex(
-                $installer->getTable($customerSyncTableName),
-                $installer->getIdxName(
-                    $customerSyncTableName,
-                    ['website_id'],
-                    \Magento\Framework\DB\Adapter\AdapterInterface::INDEX_TYPE_UNIQUE
-                ),
-                ['website_id'],
-                \Magento\Framework\DB\Adapter\AdapterInterface::INDEX_TYPE_UNIQUE
             );
         }
     }

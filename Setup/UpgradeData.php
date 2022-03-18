@@ -52,7 +52,7 @@ class UpgradeData implements \Magento\Framework\Setup\UpgradeDataInterface
         if (version_compare($context->getVersion(), '2.0.0', '<')) {
             $this->migration002();
         }
-        if (version_compare($context->getVersion(), '3.0.0', '<')) {
+        if (version_compare($context->getVersion(), '2.3.0', '<')) {
             $this->migration003();
         }
     }
@@ -131,7 +131,7 @@ class UpgradeData implements \Magento\Framework\Setup\UpgradeDataInterface
     }
 
     /**
-     * Run version 3.0.0 migrations.
+     * Run version 2.3.0 migrations.
      *
      * @access private
      * @return void

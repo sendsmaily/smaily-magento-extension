@@ -23,7 +23,7 @@ class UpgradeSchema implements \Magento\Framework\Setup\UpgradeSchemaInterface
         if (version_compare($context->getVersion(), '2.0.0', '<')) {
             $this->migration001($installer);
         }
-        if (version_compare($context->getVersion(), '3.0.0', '<')) {
+        if (version_compare($context->getVersion(), '2.3.0', '<')) {
             $this->migration002($installer);
         }
 
@@ -59,7 +59,7 @@ class UpgradeSchema implements \Magento\Framework\Setup\UpgradeSchemaInterface
     }
 
     /**
-     * Run version 3.0.0 migrations.
+     * Run version 2.3.0 migrations.
      *
      * @param \Magento\Framework\Setup\SchemaSetupInterface $installer
      * @access private

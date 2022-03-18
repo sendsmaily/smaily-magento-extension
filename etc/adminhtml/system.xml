@@ -102,7 +102,7 @@
           <label>Last synchronized at</label>
           <frontend_model>\Smaily\SmailyForMagento\Block\Adminhtml\Form\Field\Datetime</frontend_model>
           <backend_model>\Smaily\SmailyForMagento\Model\Config\Backend\UTCTime</backend_model>
-          <comment><![CDATA[Value presents the synchronization changes range starting datetime (range ends always with CRON run datetime).<br><strong>Note!</strong> To synchronize all Newsletter Subscribers, empty the value.]]></comment>
+          <comment><![CDATA[Value presents the synchronization changes range starting datetime (range ends always with CRON run datetime). Time is in the website's configured timezone.<br><strong>Note!</strong> To synchronize all Newsletter Subscribers, empty the value.]]></comment>
         </field>
       </group>
       <group id="abandoned" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">

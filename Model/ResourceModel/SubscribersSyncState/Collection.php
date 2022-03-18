@@ -26,14 +26,16 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
     /**
      * Return last synchronization time.
      *
+     * @param integer $websiteId
      * @access public
      * @return \DateTimeImmutable|null
      */
-    public function getLastSyncedAt()
+    public function getLastSyncedAt($websiteId)
     {
         $select = $this->getConnection()
             ->select()
             ->from($this->getMainTable(), ['last_update_at'])
+            ->where('website_id = ?', $websiteId)
             ->limit(1);
 
         $data = $this->getConnection()->fetchRow($select);
@@ -47,17 +49,18 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
     /**
      * Update last synchronization time.
      *
-     * @param \DateTimeImmutable $syncAt
+     * @param integer $websiteId
+     * @param mixed $syncAt
      * @access public
      * @return void
      */
-    public function updateLastSyncedAt(\DateTimeImmutable $syncAt)
+    public function updateLastSyncedAt($websiteId, $syncAt)
     {
         $this->getConnection()->insertOnDuplicate(
             $this->getMainTable(),
             [
-                'id' => 1,
-                'last_update_at' => $this->dateTime->gmtDate(null, $syncAt),
+                'website_id' => $websiteId,
+                'last_update_at' => $syncAt !== null ? $this->dateTime->gmtDate(null, $syncAt) : null,
             ],
             ['last_update_at']
         );

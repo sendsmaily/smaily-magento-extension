@@ -38,7 +38,7 @@ class UpgradeSchema implements \Magento\Framework\Setup\UpgradeSchemaInterface
     {
         $customerSyncTableName = 'smaily_customer_sync';
 
-        // Add ID column to smaily_customer_sync table.
+        // Add ID column to customer synchronization table.
         if ($installer->tableExists($customerSyncTableName)) {
             $installer->getConnection()->addColumn(
                 $installer->getTable($customerSyncTableName),

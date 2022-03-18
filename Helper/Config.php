@@ -40,8 +40,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     public function __construct(
         \Magento\Framework\App\Helper\Context $context,
         \Magento\Framework\App\Config\ConfigResource\ConfigInterface $configInterface
-    )
-    {
+    ) {
         $this->configInterface = $configInterface;
         parent::__construct($context);
     }
@@ -169,7 +168,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     public function getSubscribersSyncLastSyncedAt($websiteId)
     {
         if ($websiteId === null) {
-            throw new \Exception('Missing website ID');
+            throw new \Magento\Framework\Exception\InvalidArgumentException('Missing website ID');
         }
 
         $dt = $this->getConfigValue(self::SUBSCRIBERS_SYNC_LAST_DT, self::GROUP_SUBSCRIBERS_SYNC, $websiteId);
@@ -187,7 +186,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     public function setSubscribersSyncLastSyncedAt($websiteId, \DateTimeImmutable $dt)
     {
         if ($websiteId === null) {
-            throw new \Exception('Missing website ID');
+            throw new \Magento\Framework\Exception\InvalidArgumentException('Missing website ID');
         }
 
         $this->setConfigValue(
@@ -277,8 +276,9 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     private function getConfigValue($setting, $group, $websiteId = null)
     {
+        $scope = \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITES;
         $path = self::SETTINGS_NAMESPACE . '/' . trim($group, '/') . '/' . trim($setting, '/');
-        return $this->scopeConfig->getValue($path, \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITES, $websiteId);
+        return $this->scopeConfig->getValue($path, $scope, $websiteId);
     }
 
     /**
@@ -293,7 +293,8 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     private function setConfigValue($setting, $value, $group, $websiteId = null)
     {
+        $scope = \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITES;
         $path = self::SETTINGS_NAMESPACE . '/' . trim($group, '/') . '/' . trim($setting, '/');
-        $this->configInterface->saveConfig($path, $value, \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITES, $websiteId);
+        $this->configInterface->saveConfig($path, $value, $scope, $websiteId);
     }
 }

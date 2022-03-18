@@ -28,11 +28,22 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     const SUBSCRIBERS_SYNC_ENABLED = 'enableCronSync';
     const SUBSCRIBERS_SYNC_FIELDS = 'fields';
     const SUBSCRIBERS_SYNC_FREQUENCY = 'frequency';
+    const SUBSCRIBERS_SYNC_LAST_DT = 'lastSyncedAt';
 
     const ABANDONED_CART_ENABLED = 'enableAbandonedCart';
     const ABANDONED_CART_FIELDS = 'productfields';
     const ABANDONED_CART_INTERVAL = 'syncTime';
     const ABANDONED_CART_WORKFLOW_ID = 'autoresponderId';
+
+    protected $configInterface;
+
+    public function __construct(
+        \Magento\Framework\App\Helper\Context $context,
+        \Magento\Framework\App\Config\ConfigResource\ConfigInterface $configInterface
+    ) {
+        $this->configInterface = $configInterface;
+        parent::__construct($context);
+    }
 
     /**
      * Is module enabled?
@@ -148,6 +159,47 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     }
 
     /**
+     * Return subscriber's synchronization last date and time in website.
+     *
+     * @param mixed $websiteId
+     * @access public
+     * @return \DateTimeImmutable|null
+     */
+    public function getSubscribersSyncLastSyncedAt($websiteId)
+    {
+        if ($websiteId === null) {
+            throw new \Magento\Framework\Exception\InvalidArgumentException('Missing website ID');
+        }
+
+        $dt = $this->getConfigValue(self::SUBSCRIBERS_SYNC_LAST_DT, self::GROUP_SUBSCRIBERS_SYNC, $websiteId);
+        return empty($dt) ? null : new \DateTimeImmutable($dt, new \DateTimeZone('UTC'));
+    }
+
+    /**
+     * Set subscribers' synchronization date and time in website.
+     *
+     * @param mixed $websiteId
+     * @param \DateTimeImmutable $dt
+     * @access public
+     * @return self
+     */
+    public function setSubscribersSyncLastSyncedAt($websiteId, \DateTimeImmutable $dt)
+    {
+        if ($websiteId === null) {
+            throw new \Magento\Framework\Exception\InvalidArgumentException('Missing website ID');
+        }
+
+        $this->setConfigValue(
+            self::SUBSCRIBERS_SYNC_LAST_DT,
+            $dt->format('Y-m-d H:i:s'),
+            self::GROUP_SUBSCRIBERS_SYNC,
+            $websiteId
+        );
+
+        return $this;
+    }
+
+    /**
      * Is Abandoned Cart CRON job enabled?
      *
      * @param mixed|null $websiteId
@@ -224,7 +276,25 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
      */
     private function getConfigValue($setting, $group, $websiteId = null)
     {
+        $scope = \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITES;
         $path = self::SETTINGS_NAMESPACE . '/' . trim($group, '/') . '/' . trim($setting, '/');
-        return $this->scopeConfig->getValue($path, \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITE, $websiteId);
+        return $this->scopeConfig->getValue($path, $scope, $websiteId);
+    }
+
+    /**
+     * Set Magento main configuration value by field.
+     *
+     * @param string $setting
+     * @param string $value
+     * @param string $group
+     * @param string|null $websiteId
+     * @access private
+     * @return void
+     */
+    private function setConfigValue($setting, $value, $group, $websiteId = null)
+    {
+        $scope = \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITES;
+        $path = self::SETTINGS_NAMESPACE . '/' . trim($group, '/') . '/' . trim($setting, '/');
+        $this->configInterface->saveConfig($path, $value, $scope, $websiteId);
     }
 }

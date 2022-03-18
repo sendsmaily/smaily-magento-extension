@@ -4,26 +4,36 @@ namespace Smaily\SmailyForMagento\Setup;
 
 use \Magento\Framework\Setup\ModuleDataSetupInterface;
 use \Magento\Framework\Setup\ModuleContextInterface;
+use Smaily\SmailyForMagento\Model\ResourceModel\SubscribersSyncState\Collection as SubscribersSyncStateCollection;
 
 class UpgradeData implements \Magento\Framework\Setup\UpgradeDataInterface
 {
     protected $configWriter;
     protected $scopeConfig;
+    protected $storeManager;
+
+    protected $subscribersSyncStateCollection;
 
     /**
      * Class constructor.
      *
      * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
      * @param \Magento\Framework\App\Config\Storage\WriterInterface $configWriter
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
      * @access public
      * @return void
      */
     public function __construct(
         \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
-        \Magento\Framework\App\Config\Storage\WriterInterface $configWriter
+        \Magento\Framework\App\Config\Storage\WriterInterface $configWriter,
+        \Magento\Store\Model\StoreManagerInterface $storeManager,
+        SubscribersSyncStateCollection $subscribersSyncStateCollection
     ) {
         $this->configWriter = $configWriter;
         $this->scopeConfig = $scopeConfig;
+        $this->storeManager = $storeManager;
+
+        $this->subscribersSyncStateCollection = $subscribersSyncStateCollection;
     }
 
     /**
@@ -41,6 +51,9 @@ class UpgradeData implements \Magento\Framework\Setup\UpgradeDataInterface
         }
         if (version_compare($context->getVersion(), '2.0.0', '<')) {
             $this->migration002();
+        }
+        if (version_compare($context->getVersion(), '2.3.0', '<')) {
+            $this->migration003();
         }
     }
 
@@ -114,6 +127,40 @@ class UpgradeData implements \Magento\Framework\Setup\UpgradeDataInterface
             }
 
             $this->configWriter->save('smaily/sync/fields', implode(',', $fields));
+        }
+    }
+
+    /**
+     * Run version 2.3.0 migrations.
+     *
+     * @access private
+     * @return void
+     */
+    private function migration003()
+    {
+        $websites = $this->storeManager->getWebsites();
+
+        $connection = $this->subscribersSyncStateCollection->getConnection();
+        $tableName = $this->subscribersSyncStateCollection->getMainTable();
+
+        // Get stored last update date.
+        $select = $connection
+            ->select()
+            ->from($tableName, ['last_update_at'])
+            ->limit(1);
+
+        $lastSyncedAt = $connection->fetchRow($select);
+        $lastSyncedAt = !empty($lastSyncedAt)
+            ? (new \DateTimeImmutable($lastSyncedAt['last_update_at']))->format('Y-m-d H:i:s')
+            : null;
+
+        foreach ($websites as $website) {
+            $this->configWriter->save(
+                'smaily/sync/lastSyncedAt',
+                $lastSyncedAt,
+                \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITES,
+                $website->getId()
+            );
         }
     }
 }

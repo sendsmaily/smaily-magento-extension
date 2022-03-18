@@ -65,10 +65,10 @@
         <field id="captchaApiKey" translate="label" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0">
           <label>Google API Key</label>
           <comment><![CDATA[Create new site settings <a href="https://www.google.com/recaptcha/admin/create" target="_blank"> from here</a>.]]></comment>
-            <depends>
-              <field id="captchaType">google_captcha</field>
-              <field id="enableCaptcha">1</field>
-              <field id="enableNewsletterSubscriptions">1</field>
+          <depends>
+            <field id="captchaType">google_captcha</field>
+            <field id="enableCaptcha">1</field>
+            <field id="enableNewsletterSubscriptions">1</field>
           </depends>
           <validate>required-entry</validate>
         </field>
@@ -96,6 +96,13 @@
         <field id="frequency" translate="label" type="select" sortOrder="90" showInDefault="1" showInWebsite="0" showInStore="0">
           <label>Frequency</label>
           <source_model>Smaily\SmailyForMagento\Model\Config\Source\SubscribersSync\Frequency</source_model>
+        </field>
+        <field id="lastSyncedAt" translate="label" type="date" sortOrder="95" showInDefault="0" showInWebsite="1" showInStore="0">
+          <can_be_empty>1</can_be_empty>
+          <label>Last synchronized at</label>
+          <frontend_model>\Smaily\SmailyForMagento\Block\Adminhtml\Form\Field\Datetime</frontend_model>
+          <backend_model>\Smaily\SmailyForMagento\Model\Config\Backend\UTCTime</backend_model>
+          <comment><![CDATA[Value presents the synchronization changes range starting datetime (range ends always with CRON run datetime). Time is in the website's configured timezone.<br><strong>Note!</strong> To synchronize all Newsletter Subscribers, empty the value.]]></comment>
         </field>
       </group>
       <group id="abandoned" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">

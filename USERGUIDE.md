@@ -33,20 +33,22 @@
 
 7. There is an option to **import additional fields** available from store into Smaily to personalize newsletter emails.
 
-8. The synchronization **frequency can be adjusted**. Available values are: every 4 hours, twice a day, every day and once a week.
+8. The synchronization **frequency can be adjusted** globally (not by website). Available values are: every 4 hours, twice a day, every day and once a week.
+
+9. Synchronization datetime range starting date can be configured per website or reset to execute full synchronization.
 
 ![Subscribers automatic sync section](assets/subscribers_sync.png)
 
 ## Abandoned cart emails
 
-9. Enable abandoned cart emails feature under **Abandoned Cart** section to send cart reminder emails to store customers.
+10. Enable abandoned cart emails feature under **Abandoned Cart** section to send cart reminder emails to store customers.
 
-10. You need to create *form submitted* workflow in Smaily prior to activating this feature. You can follow our [creating automation workflows tutorial](https://smaily.com/help/user-manual/automations/automation-workflows/).
+11. You need to create *form submitted* workflow in Smaily prior to activating this feature. You can follow our [creating automation workflows tutorial](https://smaily.com/help/user-manual/automations/automation-workflows/).
 
-11. After creating automation in Smaily you can find this automation under **Autoresponder ID**.
+12. After creating automation in Smaily you can find this automation under **Autoresponder ID**.
 
-12. You can **choose timing** when cart is considered abandoned form 20 minutes up to 12 hours.
+13. You can **choose timing** when cart is considered abandoned form 20 minutes up to 12 hours.
 
-13. There is also an option to **add additional parameters** about abandoned carts to send personalized reminder emails.
+14. There is also an option to **add additional parameters** about abandoned carts to send personalized reminder emails.
 
 ![Abandoned cart emails](assets/abandoned_cart.png)

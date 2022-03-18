@@ -1,6 +1,12 @@
 # Changelog
 
 
+### 2.3.0
+
+- Newsletter Subscribers synchronization tracking per website - [[#73](https://github.com/sendsmaily/smaily-magento-extension/pull/73)]
+- Make last synchronization datetime configurable in module settings - [[#73](https://github.com/sendsmaily/smaily-magento-extension/pull/73)]
+
+
 ### 2.2.0
 
 - Include store group and website in opt-in form and synchronized data [[#67](https://github.com/sendsmaily/smaily-magento-extension/pull/67)]

@@ -28,6 +28,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     const SUBSCRIBERS_SYNC_ENABLED = 'enableCronSync';
     const SUBSCRIBERS_SYNC_FIELDS = 'fields';
     const SUBSCRIBERS_SYNC_FREQUENCY = 'frequency';
+    const SUBSCRIBERS_SYNC_LAST_DT = 'lastSyncedAt';
 
     const ABANDONED_CART_ENABLED = 'enableAbandonedCart';
     const ABANDONED_CART_FIELDS = 'productfields';
@@ -156,6 +157,47 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     {
         $fields = $this->getConfigValue(self::SUBSCRIBERS_SYNC_FIELDS, self::GROUP_SUBSCRIBERS_SYNC, $websiteId);
         return !empty($fields) ? explode(',', $fields) : [];
+    }
+
+    /**
+     * Return subscriber's synchronization last date and time in website.
+     *
+     * @param mixed $websiteId
+     * @access public
+     * @return \DateTimeImmutable|null
+     */
+    public function getSubscribersSyncLastSyncedAt($websiteId)
+    {
+        if ($websiteId === null) {
+            throw new \Exception('Missing website ID');
+        }
+
+        $dt = $this->getConfigValue(self::SUBSCRIBERS_SYNC_LAST_DT, self::GROUP_SUBSCRIBERS_SYNC, $websiteId);
+        return empty($dt) ? null : new \DateTimeImmutable($dt, new \DateTimeZone('UTC'));
+    }
+
+    /**
+     * Set subscribers' synchronization date and time in website.
+     *
+     * @param mixed $websiteId
+     * @param \DateTimeImmutable $dt
+     * @access public
+     * @return self
+     */
+    public function setSubscribersSyncLastSyncedAt($websiteId, \DateTimeImmutable $dt)
+    {
+        if ($websiteId === null) {
+            throw new \Exception('Missing website ID');
+        }
+
+        $this->setConfigValue(
+            self::SUBSCRIBERS_SYNC_LAST_DT,
+            $dt->format('Y-m-d H:i:s'),
+            self::GROUP_SUBSCRIBERS_SYNC,
+            $websiteId
+        );
+
+        return $this;
     }
 
     /**

@@ -79,7 +79,7 @@ Ensure Magento extension updates are applied:
 2. Open `General Settings` section;
 3. Insert your Smaily API credentials and press `Save Config` to get started;
 4. Under `Newsletter subscription form` section select if you like to send newsletters subscribers to Smaily on sign-up;
-5. Under `Subscribers synchronization` section you can enable automatic newsletter subscribers syncronization, configure synchronized fields and synchronization frequency;
+5. Under `Subscribers synchronization` section you can enable automatic newsletter subscribers syncronization, configure synchronized fields, synchronization frequency and last synchronization datetime;
 6. Under `Abandoned Cart` section you can enable automatic reminder emails for abandoned carts, configure abandoned cart automation, fields and delay time;
 7. That's it, your Magento store is now integrated with Smaily!
 

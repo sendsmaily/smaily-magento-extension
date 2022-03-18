@@ -278,7 +278,7 @@ class Config extends \Magento\Framework\App\Helper\AbstractHelper
     private function getConfigValue($setting, $group, $websiteId = null)
     {
         $path = self::SETTINGS_NAMESPACE . '/' . trim($group, '/') . '/' . trim($setting, '/');
-        return $this->scopeConfig->getValue($path, \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITE, $websiteId);
+        return $this->scopeConfig->getValue($path, \Magento\Store\Model\ScopeInterface::SCOPE_WEBSITES, $websiteId);
     }
 
     /**

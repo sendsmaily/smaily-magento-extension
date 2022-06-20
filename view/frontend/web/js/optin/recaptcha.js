@@ -11,7 +11,7 @@ define(["jquery", "mage/validation"], function ($) {
             var $recaptcha = $('<div>');
             $container.append($recaptcha);
 
-            grecaptcha.render($recaptcha[0], {
+            var widget = grecaptcha.render($recaptcha[0], {
                 'sitekey': this.options.key,
                 'size': 'invisible',
                 'callback': function (token) {
@@ -19,7 +19,7 @@ define(["jquery", "mage/validation"], function ($) {
                         $form.submit();
                     }
                     else {
-                        grecaptcha.reset($recaptcha[0]);
+                        grecaptcha.reset(widget);
                     }
                 }
             });
@@ -29,7 +29,7 @@ define(["jquery", "mage/validation"], function ($) {
                 ev.preventDefault();
 
                 if ($form.validation('isValid')) {
-                    grecaptcha.execute($recaptcha[0]);
+                    grecaptcha.execute(widget);
                 }
             });
         }

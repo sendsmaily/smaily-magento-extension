@@ -1,6 +1,12 @@
 # Changelog
 
 
+### 2.3.1
+
+- Test for Magento 2.4.4 compatibility - [[#78](https://github.com/sendsmaily/smaily-magento-extension/pull/78)]
+- Convert module schema and data setup to declarative schema - [[#77](https://github.com/sendsmaily/smaily-magento-extension/pull/77)]
+
+
 ### 2.3.0
 
 - Newsletter Subscribers synchronization tracking per website - [[#73](https://github.com/sendsmaily/smaily-magento-extension/pull/73)]

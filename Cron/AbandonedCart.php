@@ -204,6 +204,10 @@ class AbandonedCart
      */
     protected function triggerAutomationWorkflows(array $ids, \Magento\Store\Api\Data\WebsiteInterface $website)
     {
+        if (empty($ids)) {
+            return;
+        }
+
         $fields = $this->config->getAbandonedCartFields($website);
         $smailyApiClient = $this->dataHelper->getSmailyApiClient($website);
         $workflowId = $this->config->getAbandonedCartAutomationId($website);

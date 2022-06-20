@@ -1,4 +1,4 @@
-FROM php:7.3-apache
+FROM php:8.1-apache
 
 # Install Magento requirements.
 RUN apt-get update \
@@ -11,6 +11,7 @@ RUN apt-get update \
         libjpeg-dev \
         libmcrypt-dev \
         libmcrypt4 \
+        libonig-dev \
         libpng-dev \
         libxslt1-dev \
         libzip-dev \
@@ -18,10 +19,10 @@ RUN apt-get update \
         unzip \
         # MariaDB for mysqladmin ping in entrypoint
         mariadb-client \
-    && pecl install mcrypt-1.0.3 \
+    && pecl install mcrypt-1.0.5 \
     && docker-php-ext-enable mcrypt \
     && docker-php-ext-install bcmath \
-    && docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/ \
+    && docker-php-ext-configure gd --with-freetype=/usr/include/ --with-jpeg=/usr/include/ \
     && docker-php-ext-install gd \
     && docker-php-ext-install intl \
     && docker-php-ext-install mbstring \
@@ -54,7 +55,7 @@ RUN php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php')
 USER www-data
 
 # Download and install Magento.
-ENV MAGENTO_VERSION 2.4.2-p1
+ENV MAGENTO_VERSION 2.4.4
 RUN composer create-project magento/community-edition=${MAGENTO_VERSION} ./ \
     && chmod +x bin/magento \
     && git clone https://github.com/magento/magento2-sample-data.git /sample-data \

@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+  <table name="quote" resource="default">
+    <column xsi:type="datetime" name="reminder_date" on_update="false" nullable="true" comment="Reminder Date"/>
+    <column xsi:type="boolean" name="is_sent" nullable="true" comment="Email sent"/>
+  </table>
+  <table name="smaily_customer_sync" resource="default" engine="innodb" comment="smaily_customer_sync">
+    <column xsi:type="int" name="id" padding="10" unsigned="true" nullable="false" identity="true" comment="ID"/>
+    <column xsi:type="timestamp" name="last_update_at" on_update="false" nullable="true" comment="Last update time"/>
+    <constraint xsi:type="primary" referenceId="PRIMARY">
+      <column name="id"/>
+    </constraint>
+  </table>
+</schema>

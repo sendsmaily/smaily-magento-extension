@@ -90,6 +90,8 @@ class AbandonedCart
             // Trigger Abandoned Cart automation workflows.
             $this->triggerAbandonedCarts($website);
         }
+
+        $this->logger->info('Finished Abandoned Cart CRON job');
     }
 
     /**
@@ -106,6 +108,11 @@ class AbandonedCart
 
         $this->logger->info('Triggering Smaily Abandoned Cart automation workflows...', [
             'batch_size' => self::BATCH_SIZE,
+            'website' => [
+                'code' => $website->getCode(),
+                'id' => $website->getId(),
+                'name' => $website->getName(),
+            ],
         ]);
 
         // Determine cart abandon time.
@@ -212,7 +219,11 @@ class AbandonedCart
         $smailyApiClient = $this->dataHelper->getSmailyApiClient($website);
         $workflowId = $this->config->getAbandonedCartAutomationId($website);
 
-        $this->logger->debug('Triggering Abandoned Carts', $ids);
+        $this->logger->debug('Triggering Abandoned Carts', [
+            'fields' => $fields,
+            'ids' => $ids,
+            'workflow_id' => $workflowId,
+        ]);
 
         // Fetch quotes.
         $quotes = $this->quoteCollection
@@ -225,6 +236,10 @@ class AbandonedCart
             $cart = [
                 'email' => $quote->getCustomerEmail(),
             ];
+
+            $this->logger->debug('Triggering Abandoned Cart for quote', [
+                'quote_id' => $quote->getId(),
+            ]);
 
             // Collect quote information.
             if (in_array('first_name', $fields, true)) {

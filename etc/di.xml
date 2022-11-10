@@ -51,7 +51,6 @@
         <arguments>
             <argument name="handlers" xsi:type="array">
                 <item name="debug" xsi:type="object">Smaily\SmailyForMagento\Model\Logger\Handler\Cron\AbandonedCart</item>
-                <item name="system" xsi:type="object">Smaily\SmailyForMagento\Model\Logger\Handler\Cron\AbandonedCart</item>
             </argument>
         </arguments>
     </virtualType>
@@ -59,7 +58,6 @@
         <arguments>
             <argument name="handlers" xsi:type="array">
                 <item name="debug" xsi:type="object">Smaily\SmailyForMagento\Model\Logger\Handler\Cron\SubscribersSync</item>
-                <item name="system" xsi:type="object">Smaily\SmailyForMagento\Model\Logger\Handler\Cron\SubscribersSync</item>
             </argument>
         </arguments>
     </virtualType>

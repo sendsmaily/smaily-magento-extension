@@ -278,32 +278,30 @@ class AbandonedCart
             // Push payload to Smaily.
             // Note! This is done one-by-one to avoid potential issues with sending abandoned cart
             // messages to recipients over-and-over.
-            if (!empty($cart)) {
-                $payload = [
-                    'autoresponder' => $workflowId,
-                    'addresses' => [$cart],
-                ];
+            $payload = [
+                'autoresponder' => $workflowId,
+                'addresses' => [$cart],
+            ];
 
-                try {
-                    $response = $smailyApiClient->post('/api/autoresponder.php', $payload);
+            try {
+                $response = $smailyApiClient->post('/api/autoresponder.php', $payload);
 
-                    if ((int) $response['code'] !== 101) {
-                        throw new ClientException('Smaily API responded with: ' . json_encode($response));
-                    }
-                } catch (\Exception $e) {
-                    $this->logger->error($e->getMessage(), ['payload' => $payload]);
-
-                    // Re-throw exception.
-                    throw $e;
+                if ((int) $response['code'] !== 101) {
+                    throw new ClientException('Smaily API responded with: ' . json_encode($response));
                 }
+            } catch (\Exception $e) {
+                $this->logger->error($e->getMessage(), ['payload' => $payload]);
 
-                // Mark quote as sent.
-                $this->resourceConnection->update(
-                    $this->quoteCollection->getMainTable(),
-                    ['is_sent' => 1],
-                    ['entity_id = ?' => $quote->getId()]
-                );
+                // Re-throw exception.
+                throw $e;
             }
+
+            // Mark quote as sent.
+            $this->resourceConnection->update(
+                $this->quoteCollection->getMainTable(),
+                ['is_sent' => 1],
+                ['entity_id = ?' => $quote->getId()]
+            );
         }
     }
 }

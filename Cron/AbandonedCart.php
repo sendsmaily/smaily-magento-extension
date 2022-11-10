@@ -130,12 +130,13 @@ class AbandonedCart
             ->select()
             ->from(
                 ['main_table' => $this->quoteCollection->getMainTable()],
-                ['entity_id', 'is_sent', 'reminder_date']
+                ['entity_id', 'reminder_date']
             )
             ->where('main_table.store_id IN (?)', $storeIds)
             ->where('main_table.is_active = ?', 1)
             ->where('main_table.items_count > ?', 0)
             ->where('main_table.customer_email IS NOT NULL')
+            ->where('main_table.is_sent IS NULL')
             ->order('main_table.entity_id ASC');
 
         $offset = 0;
@@ -155,14 +156,13 @@ class AbandonedCart
             $quoteIdsToPostpone = [];
             foreach ($quotes as $quote) {
                 $quoteId = (int) $quote['entity_id'];
-                $isSent = (bool)(int) $quote['is_sent'];
                 $abandonAt = $quote['reminder_date'] !== null
                     ? new \DateTimeImmutable($quote['reminder_date'], $tz)
                     : null;
 
                 if ($abandonAt === null) {
                     $quoteIdsToPostpone[] = $quoteId;
-                } elseif ($isSent === false && $abandonAt <= $nowAt) {
+                } elseif ($abandonAt <= $nowAt) {
                     $quoteIdsToTrigger[] = $quoteId;
                 }
             }
@@ -293,32 +293,30 @@ class AbandonedCart
             // Push payload to Smaily.
             // Note! This is done one-by-one to avoid potential issues with sending abandoned cart
             // messages to recipients over-and-over.
-            if (!empty($cart)) {
-                $payload = [
-                    'autoresponder' => $workflowId,
-                    'addresses' => [$cart],
-                ];
+            $payload = [
+                'autoresponder' => $workflowId,
+                'addresses' => [$cart],
+            ];
 
-                try {
-                    $response = $smailyApiClient->post('/api/autoresponder.php', $payload);
+            try {
+                $response = $smailyApiClient->post('/api/autoresponder.php', $payload);
 
-                    if ((int) $response['code'] !== 101) {
-                        throw new ClientException('Smaily API responded with: ' . json_encode($response));
-                    }
-                } catch (\Exception $e) {
-                    $this->logger->error($e->getMessage(), ['payload' => $payload]);
-
-                    // Re-throw exception.
-                    throw $e;
+                if ((int) $response['code'] !== 101) {
+                    throw new ClientException('Smaily API responded with: ' . json_encode($response));
                 }
+            } catch (\Exception $e) {
+                $this->logger->error($e->getMessage(), ['payload' => $payload]);
 
-                // Mark quote as sent.
-                $this->resourceConnection->update(
-                    $this->quoteCollection->getMainTable(),
-                    ['is_sent' => 1],
-                    ['entity_id = ?' => $quote->getId()]
-                );
+                // Re-throw exception.
+                throw $e;
             }
+
+            // Mark quote as sent.
+            $this->resourceConnection->update(
+                $this->quoteCollection->getMainTable(),
+                ['is_sent' => 1],
+                ['entity_id = ?' => $quote->getId()]
+            );
         }
     }
 }

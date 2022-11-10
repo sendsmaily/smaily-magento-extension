@@ -87,6 +87,8 @@ class SubscribersSync
             // Update last synchronization date.
             $this->config->setSubscribersSyncLastSyncedAt($website->getId(), $nowAt);
         }
+
+        $this->logger->info('Finished Newsletter Subscribers synchronization CRON job');
     }
 
     /**
@@ -109,6 +111,11 @@ class SubscribersSync
         $this->logger->info('Synchronizing subscribers from Magento to Smaily...', [
             'batch_size' => self::BATCH_SIZE,
             'since_dt' => $lastSyncedAt,
+            'website' => [
+                'code' => $website->getCode(),
+                'id' => $website->getId(),
+                'name' => $website->getName(),
+            ],
         ]);
 
         // Determine list of customer fields to synchronize.
@@ -213,6 +220,11 @@ class SubscribersSync
 
         $this->logger->info('Synchronizing opt-outs from Smaily to Magento...', [
             'batch_size' => self::BATCH_SIZE,
+            'website' => [
+                'code' => $website->getCode(),
+                'id' => $website->getId(),
+                'name' => $website->getName(),
+            ],
         ]);
 
         $offset = 0;

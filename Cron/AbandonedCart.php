@@ -90,6 +90,8 @@ class AbandonedCart
             // Trigger Abandoned Cart automation workflows.
             $this->triggerAbandonedCarts($website);
         }
+
+        $this->logger->info('Finished Abandoned Cart CRON job');
     }
 
     /**
@@ -106,6 +108,11 @@ class AbandonedCart
 
         $this->logger->info('Triggering Smaily Abandoned Cart automation workflows...', [
             'batch_size' => self::BATCH_SIZE,
+            'website' => [
+                'code' => $website->getCode(),
+                'id' => $website->getId(),
+                'name' => $website->getName(),
+            ],
         ]);
 
         // Determine cart abandon time.
@@ -123,12 +130,13 @@ class AbandonedCart
             ->select()
             ->from(
                 ['main_table' => $this->quoteCollection->getMainTable()],
-                ['entity_id', 'is_sent', 'reminder_date']
+                ['entity_id', 'reminder_date']
             )
             ->where('main_table.store_id IN (?)', $storeIds)
             ->where('main_table.is_active = ?', 1)
             ->where('main_table.items_count > ?', 0)
             ->where('main_table.customer_email IS NOT NULL')
+            ->where('main_table.is_sent IS NULL')
             ->order('main_table.entity_id ASC');
 
         $offset = 0;
@@ -148,14 +156,13 @@ class AbandonedCart
             $quoteIdsToPostpone = [];
             foreach ($quotes as $quote) {
                 $quoteId = (int) $quote['entity_id'];
-                $isSent = (bool)(int) $quote['is_sent'];
                 $abandonAt = $quote['reminder_date'] !== null
                     ? new \DateTimeImmutable($quote['reminder_date'], $tz)
                     : null;
 
                 if ($abandonAt === null) {
                     $quoteIdsToPostpone[] = $quoteId;
-                } elseif ($isSent === false && $abandonAt <= $nowAt) {
+                } elseif ($abandonAt <= $nowAt) {
                     $quoteIdsToTrigger[] = $quoteId;
                 }
             }
@@ -212,7 +219,11 @@ class AbandonedCart
         $smailyApiClient = $this->dataHelper->getSmailyApiClient($website);
         $workflowId = $this->config->getAbandonedCartAutomationId($website);
 
-        $this->logger->debug('Triggering Abandoned Carts', $ids);
+        $this->logger->debug('Triggering Abandoned Carts', [
+            'fields' => $fields,
+            'ids' => $ids,
+            'workflow_id' => $workflowId,
+        ]);
 
         // Fetch quotes.
         $quotes = $this->quoteCollection
@@ -225,6 +236,10 @@ class AbandonedCart
             $cart = [
                 'email' => $quote->getCustomerEmail(),
             ];
+
+            $this->logger->debug('Triggering Abandoned Cart for quote', [
+                'quote_id' => $quote->getId(),
+            ]);
 
             // Collect quote information.
             if (in_array('first_name', $fields, true)) {
@@ -278,32 +293,30 @@ class AbandonedCart
             // Push payload to Smaily.
             // Note! This is done one-by-one to avoid potential issues with sending abandoned cart
             // messages to recipients over-and-over.
-            if (!empty($cart)) {
-                $payload = [
-                    'autoresponder' => $workflowId,
-                    'addresses' => [$cart],
-                ];
+            $payload = [
+                'autoresponder' => $workflowId,
+                'addresses' => [$cart],
+            ];
 
-                try {
-                    $response = $smailyApiClient->post('/api/autoresponder.php', $payload);
+            try {
+                $response = $smailyApiClient->post('/api/autoresponder.php', $payload);
 
-                    if ((int) $response['code'] !== 101) {
-                        throw new ClientException('Smaily API responded with: ' . json_encode($response));
-                    }
-                } catch (\Exception $e) {
-                    $this->logger->error($e->getMessage(), ['payload' => $payload]);
-
-                    // Re-throw exception.
-                    throw $e;
+                if ((int) $response['code'] !== 101) {
+                    throw new ClientException('Smaily API responded with: ' . json_encode($response));
                 }
+            } catch (\Exception $e) {
+                $this->logger->error($e->getMessage(), ['payload' => $payload]);
 
-                // Mark quote as sent.
-                $this->resourceConnection->update(
-                    $this->quoteCollection->getMainTable(),
-                    ['is_sent' => 1],
-                    ['entity_id = ?' => $quote->getId()]
-                );
+                // Re-throw exception.
+                throw $e;
             }
+
+            // Mark quote as sent.
+            $this->resourceConnection->update(
+                $this->quoteCollection->getMainTable(),
+                ['is_sent' => 1],
+                ['entity_id = ?' => $quote->getId()]
+            );
         }
     }
 }

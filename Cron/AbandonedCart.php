@@ -123,12 +123,13 @@ class AbandonedCart
             ->select()
             ->from(
                 ['main_table' => $this->quoteCollection->getMainTable()],
-                ['entity_id', 'is_sent', 'reminder_date']
+                ['entity_id', 'reminder_date']
             )
             ->where('main_table.store_id IN (?)', $storeIds)
             ->where('main_table.is_active = ?', 1)
             ->where('main_table.items_count > ?', 0)
             ->where('main_table.customer_email IS NOT NULL')
+            ->where('main_table.is_sent IS NULL')
             ->order('main_table.entity_id ASC');
 
         $offset = 0;
@@ -148,14 +149,13 @@ class AbandonedCart
             $quoteIdsToPostpone = [];
             foreach ($quotes as $quote) {
                 $quoteId = (int) $quote['entity_id'];
-                $isSent = (bool)(int) $quote['is_sent'];
                 $abandonAt = $quote['reminder_date'] !== null
                     ? new \DateTimeImmutable($quote['reminder_date'], $tz)
                     : null;
 
                 if ($abandonAt === null) {
                     $quoteIdsToPostpone[] = $quoteId;
-                } elseif ($isSent === false && $abandonAt <= $nowAt) {
+                } elseif ($abandonAt <= $nowAt) {
                     $quoteIdsToTrigger[] = $quoteId;
                 }
             }

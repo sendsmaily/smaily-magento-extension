@@ -1,6 +1,13 @@
 # Changelog
 
 
+### 2.4.0
+
+- Include more context in CRON job logs [[#82](https://github.com/sendsmaily/smaily-magento-extension/pull/82)]
+- Fix CRON job logging duplicate lines [[#83](https://github.com/sendsmaily/smaily-magento-extension/pull/83)]
+- Optimize abandoned cart CRON job by excluding sent carts [[#84](https://github.com/sendsmaily/smaily-magento-extension/pull/84)]
+
+
 ### 2.3.1
 
 - Test for Magento 2.4.4 compatibility - [[#78](https://github.com/sendsmaily/smaily-magento-extension/pull/78)]

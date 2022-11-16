@@ -1,54 +1,55 @@
 # User guide
 
-## Smaily E-Commerce extension for Magento 2.3+
->[Smaily](https://smaily.com/) is an intentionally simple tool for sending beautiful email newsletters.
+[Smaily](https://smaily.com/) is an intentionally simple email marketing and automation tool. We'll give you the most easy to use tool to send beautiful newsletters. For everything else we have integrations.
 
 ## Installation
 
-1. You can get **Smaily E-Commerce extension for Magento 2.0+** from [Magento marketplace](https://marketplace.magento.com/smaily-smailyformagento.html) or download it from our [GitHub repository](https://github.com/sendsmaily/smaily-magento-extension).
+You can get **Smaily for Magento** from [Magento Marketplace](https://marketplace.magento.com/smaily-smailyformagento.html) or download it from our [GitHub repository](https://github.com/sendsmaily/smaily-magento-extension).
 
-2. To install our extension follow the [Magento extension installing guide](https://docs.magento.com/marketplace/user_guide/buyers/install-extension.html)
+Follow the [Magento extension installing guide](https://docs.magento.com/marketplace/user_guide/buyers/install-extension.html) on installing the extension.
 
-## Connecting to Smaily account
+## Connecting to your Smaily account
 
-3. To start using Smaily extension navigate to **Stores -> Configuration** section. On the configuration page, find **Smaily Email Marketing and Automation** tab, then click on **Module Configuration**
+Navigate to **Stores** → **Configuration** section.
 
-![Module configuration path](assets/stores_config_module.png)
+![Finding store configuration](assets/1_store_configuration.png)
 
-4. On extension configuration page enter your Smaily API credentials - **subdomain, username, and password**. You must create your API account in Smaily first. You can follow our [tutorial](https://smaily.com/help/api/general/create-api-user/) to create one. After that, you can **validate connection** by saving configuration.
+On the configuration page, find **Smaily Email Marketing and Automation** tab, then click on **Module Configuration**.
 
-![API credentials section](assets/general_settings.png)
+![Finding extension configuration](assets/2_extension_configuration.png)
 
-## Newsletter subscription form
+On module configuration page enter your Smaily API credentials - **subdomain**, **username**, and **password**. Please follow our guide on [creating an API user](https://smaily.com/help/api/general/create-api-user/). Make sure to click **Save Config** to validate the connection.
 
-4. You can **collect newsletter subscribers directly to your Smaily account** using Magento built-in newsletter subscription form.
+![API credentials section](assets/3_general_settings.png)
 
-5. We recommend to **use CATPCHA** to prevent bots from polluting your newsletter subscribers list. You can use two options - **Magento's text-based CAPTCHA or Google reCAPTCHA**.
+## Newsletter Subscription Form
 
-![Newletter subscription form](assets/newsletter_subscription_form.png)
+This feature allows you to collect Magento Newsletter Subscribers directly to Your Smaily account using Magento's built-in Newsletter Subscription Form.
 
-## Subscribers synchronization
+> Note! Enabling the Newsletter Subscription Form feature will disable Magento's subscriber welcome and unsubscribe confirmation email sending.
 
-6. Enable automatic subscribers synchronization feature under **Subscribers synchronization** section.
+![Newsletter Subscription Form](assets/4_newsletter_subscription_form.png)
 
-7. There is an option to **import additional fields** available from store into Smaily to personalize newsletter emails.
+We recommend **enabling CAPTCHA** to prevent bots from polluting your Newsletter Subscribers list. Both **Magento's text-based CAPTCHA** and **Google reCAPTCHA** are supported.
 
-8. The synchronization **frequency can be adjusted** globally (not by website). Available values are: every 4 hours, twice a day, every day and once a week.
+## Subscribers Synchronization
 
-9. Synchronization datetime range starting date can be configured per website or reset to execute full synchronization.
+This feature allows you to synchronize your Magento Newsletter Subscribers to Smaily. It runs as a recurring CRON job, which requires the Magento CRON to be configured.
 
-![Subscribers automatic sync section](assets/subscribers_sync.png)
+Subscribers Synchronization can be fine-tuned to suit your needs by synchronizing additional personalization fields (Subscription Type, Customer Group, Customer ID, Prefix, Firstname, Lastname, Gender and Date Of Birth), or adjusting the frequency of the synchronization (every 4 hours, twice a day, every day or once a week).
 
-## Abandoned cart emails
+![Subscribers Synchronization](assets/5_subscribers_synchronization.png)
 
-10. Enable abandoned cart emails feature under **Abandoned Cart** section to send cart reminder emails to store customers.
+Subscribers Synchronization can be configured (per website) to start synchronizing subscribers from specific date or reset to execute full synchronization.
 
-11. You need to create *form submitted* workflow in Smaily prior to activating this feature. You can follow our [creating automation workflows tutorial](https://smaily.com/help/user-manual/automations/automation-workflows/).
+![Subscribers Synchronization start date](assets/6_subscribers_synchronization_start_date.png)
 
-12. After creating automation in Smaily you can find this automation under **Autoresponder ID**.
+## Abandoned Cart
 
-13. You can **choose timing** when cart is considered abandoned form 20 minutes up to 12 hours.
+This feature enables you to send Abandoned Cart reminder emails to customers who have added products to shopping cart, but haven't finished checking out.
 
-14. There is also an option to **add additional parameters** about abandoned carts to send personalized reminder emails.
+Abandoned Cart reminder emails can be fine-tuned to suit your business needs by adjusting the time after the cart is considered abandoned, or including additional parameters to personalize the Abandoned Cart email.
 
-![Abandoned cart emails](assets/abandoned_cart.png)
+**Note!** You need to create a *form submitted* automation workflow in Smaily prior to activating this feature. Please follow our guide on [creating automation workflows](https://smaily.com/help/user-manual/automations/automation-workflows/).
+
+![Abandoned Cart](assets/7_abandoned_cart.png)

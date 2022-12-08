@@ -9,9 +9,19 @@ use Smaily\SmailyForMagento\Model\HTTP\ClientException;
 class AbandonedCart
 {
     const BATCH_SIZE = 100;
+    const FIELDS_PREFIX_MAPPING = [
+        'base_price' => 'product_base_price',
+        'description' => 'product_description',
+        'image_url' => 'product_image_url',
+        'name' => 'product_name',
+        'price' => 'product_price',
+        'qty' => 'product_quantity',
+        'sku' => 'product_sku',
+    ];
 
     protected $dateTime;
     protected $escaper;
+    protected $imageHelperFactory;
     protected $logger;
     protected $pricingHelper;
     protected $productFactory;
@@ -32,6 +42,7 @@ class AbandonedCart
      * @return void
      */
     public function __construct(
+        \Magento\Catalog\Helper\ImageFactory $imageHelperFactory,
         \Magento\Catalog\Model\ProductFactory $productFactory,
         \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder,
         \Magento\Framework\Api\SortOrderBuilder $sortOrderBuilder,
@@ -48,6 +59,7 @@ class AbandonedCart
     ) {
         $this->dateTime = $dateTime;
         $this->escaper = $escaper;
+        $this->imageHelperFactory = $imageHelperFactory;
         $this->logger = $logger;
         $this->pricingHelper = $pricingHelper;
         $this->productFactory = $productFactory;
@@ -255,36 +267,44 @@ class AbandonedCart
                 $item = isset($visibleItems[$i]) ? $visibleItems[$i] : null;
                 $productsIndex = $i + 1;
 
+                $cart = array_merge($cart, $this->buildCartPayload($fields, $productsIndex));
+
+                // Skip invalid items.
+                if ($item === null) {
+                    continue;
+                }
+
+                $product = $this->productFactory->create()->load($item->getProductId());
+
                 if (in_array('name', $fields, true)) {
-                    $cart['product_name_' . $productsIndex] = $item !== null ? $item->getName() : '';
+                    $cart['product_name_' . $productsIndex] = $item->getName();
                 }
                 if (in_array('description', $fields, true)) {
-                    if ($item !== null) {
-                        $product = $this->productFactory->create()->load($item->getProductId());
-                        $cart['product_description_' . $productsIndex] = $this->escaper->escapeHtml(
-                            $product->getDescription()
-                        );
-                    } else {
-                        $cart['product_description_' . $productsIndex] = '';
-                    }
+                    $cart['product_description_' . $productsIndex] = $this->escaper
+                        ->escapeHtml($product->getDescription());
+                }
+                if (in_array('image_url', $fields, true)) {
+                    $cart['product_image_url_' . $productsIndex] = $this->imageHelperFactory
+                        ->create()
+                        ->init($product, 'thumbnail')
+                        ->setImageFile($product->getThumbnail())
+                        ->resize(346)
+                        ->getUrl();
                 }
                 if (in_array('sku', $fields, true)) {
-                    $cart['product_sku_' . $productsIndex] = $item !== null ? $item->getSku() : '';
+                    $cart['product_sku_' . $productsIndex] = $item->getSku();
                 }
                 if (in_array('qty', $fields, true)) {
-                    $cart['product_quantity_' . $productsIndex] = $item !== null
-                        ? $this->dataHelper->stripTrailingZeroes($item->getQty())
-                        : '';
+                    $cart['product_quantity_' . $productsIndex] = $this->dataHelper
+                        ->stripTrailingZeroes($item->getQty());
                 }
                 if (in_array('price', $fields, true)) {
-                    $cart['product_price_' . $productsIndex] = $item !== null
-                        ? $this->pricingHelper->currencyByStore($item->getPrice(), $quote->getStore(), true, false)
-                        : '';
+                    $cart['product_price_' . $productsIndex] = $this->pricingHelper
+                        ->currencyByStore($item->getPrice(), $quote->getStore(), true, false);
                 }
                 if (in_array('base_price', $fields, true)) {
-                    $cart['product_base_price_' . $productsIndex] = $item !== null
-                        ? $this->pricingHelper->currencyByStore($item->getBasePrice(), $quote->getStore(), true, false)
-                        : '';
+                    $cart['product_base_price_' . $productsIndex] = $this->pricingHelper
+                        ->currencyByStore($item->getBasePrice(), $quote->getStore(), true, false);
                 }
             }
 
@@ -318,5 +338,28 @@ class AbandonedCart
                 ['entity_id = ?' => $quote->getId()]
             );
         }
+    }
+
+    /**
+     * Helper method to compile cart payload of selected fields.
+     *
+     * @param array $fields
+     * @param int $index
+     * @return array
+     */
+    protected function buildCartPayload(array $fields, $index)
+    {
+        $payload = [];
+
+        if (empty($fields)) {
+            return $payload;
+        }
+
+        foreach ($fields as $source) {
+            $target = self::FIELDS_PREFIX_MAPPING[$source] . '_' . $index;
+            $payload[$target] = '';
+        }
+
+        return $payload;
     }
 }

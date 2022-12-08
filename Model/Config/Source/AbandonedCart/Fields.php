@@ -29,6 +29,10 @@ class Fields implements \Magento\Framework\Option\ArrayInterface
                 'label' => 'Product Description',
             ],
             [
+                'value' => 'image_url',
+                'label' => 'Product Image URL',
+            ],
+            [
                 'value' => 'sku',
                 'label' => 'Product SKU',
             ],

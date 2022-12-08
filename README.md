@@ -106,6 +106,8 @@ Up to 10 products can be received in Smaily templating engine. You can refrence 
 
 - Product description: `{{ product_description_[1-10] }}`;
 
+- Product image URL: `{{ product_image_url_[1-10] }}`;
+
 - Product SKU: `{{ product_sku_[1-10] }}`;
 
 - Product quantity: `{{ product_quantity_[1-10] }}`;

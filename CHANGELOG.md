@@ -1,6 +1,11 @@
 # Changelog
 
 
+### 2.5.0
+
+- Add product image URL to abandoned cart data payload [[#88](https://github.com/sendsmaily/smaily-magento-extension/pull/88)]
+
+
 ### 2.4.0
 
 - Include more context in CRON job logs [[#82](https://github.com/sendsmaily/smaily-magento-extension/pull/82)]

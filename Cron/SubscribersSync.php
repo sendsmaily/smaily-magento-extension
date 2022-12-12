@@ -174,7 +174,8 @@ class SubscribersSync
 
                 $data = [
                     'email' => $subscriber['subscriber_email'],
-                    'is_unsubscribed' => (int) $subscriber['subscriber_status'] === 1 ? 0 : 1,
+                    'is_unsubscribed' => (int) $subscriber['subscriber_status']
+                        === \Magento\Newsletter\Model\Subscriber::STATUS_SUBSCRIBED ? 0 : 1,
                     'store' => $customerStore !== null ? $customerStore->getName() : '',
                     'store_group' => $customerStoreGroup !== null ? $customerStoreGroup->getName() : '',
                     'store_website' => $website->getName(),
@@ -218,6 +219,9 @@ class SubscribersSync
         $smailyApiClient = $this->dataHelper->getSmailyApiClient($website);
         $storeIds = $website->getStoreIds();
 
+        $timezoneUTC = new \DateTimeZone('UTC');
+        $timezoneLocal = new \DateTimeZone('Europe/Tallinn');
+
         $this->logger->info('Synchronizing opt-outs from Smaily to Magento...', [
             'batch_size' => self::BATCH_SIZE,
             'website' => [
@@ -231,29 +235,61 @@ class SubscribersSync
         while (true) {
             $this->logger->debug('Fetching opt-outs at offset: ' . $offset);
 
-            $subscribers = $smailyApiClient->get('/api/contact.php', [
+            $unsubscribers = $smailyApiClient->get('/api/contact.php', [
                 'list' => 2,
+                'fields' => 'email,unsubscribed_at',
                 'offset' => $offset,
                 'limit' => self::BATCH_SIZE,
             ]);
 
-            if (empty($subscribers)) {
+            if (empty($unsubscribers)) {
                 $this->logger->debug('No opt-outs found at offset, breaking loop');
                 break;
             }
 
-            $emailAddresses = array_column($subscribers, 'email');
+            $smailyUnsubscribers = [];
+            foreach ($unsubscribers as $unsubscriber) {
+                $email = $unsubscriber['email'];
+                $unsubscribedAt = new \DateTimeImmutable($unsubscriber['unsubscribed_at'], $timezoneLocal);
 
-            $this->newsletterSubscribersCollection
-                ->getConnection()
-                ->update(
-                    $this->newsletterSubscribersCollection->getMaintable(),
-                    ['subscriber_status' => 0],
-                    [
-                        'subscriber_email IN (?)' => $emailAddresses,
-                        'store_id IN (?)' => $storeIds,
-                    ]
-                );
+                $smailyUnsubscribers[$email] = $unsubscribedAt->setTimezone($timezoneUTC);
+            }
+
+            $select = $this->resourceConnection
+                ->select()
+                ->from(
+                    ['main_table' => $this->newsletterSubscribersCollection->getMainTable()],
+                    ['subscriber_email', 'change_status_at']
+                )
+                ->where('main_table.store_id IN (?)', $storeIds)
+                ->where('main_table.subscriber_email IN (?)', array_keys($smailyUnsubscribers))
+                ->where('main_table.subscriber_status = ?', \Magento\Newsletter\Model\Subscriber::STATUS_SUBSCRIBED);
+
+            $subscribers = $this->resourceConnection->fetchAll($select);
+
+            foreach ($subscribers as $subscriber) {
+                $emailAddress = $subscriber['subscriber_email'];
+                $changeStatusAt = new \DateTimeImmutable($subscriber['change_status_at'], $timezoneUTC);
+                $unsubscribedAt = $smailyUnsubscribers[$emailAddress];
+
+                if ($changeStatusAt >= $unsubscribedAt) {
+                    continue;
+                }
+
+                $this->newsletterSubscribersCollection
+                    ->getConnection()
+                    ->update(
+                        $this->newsletterSubscribersCollection->getMaintable(),
+                        [
+                            'subscriber_status' => \Magento\Newsletter\Model\Subscriber::STATUS_UNSUBSCRIBED,
+                            'change_status_at' => $unsubscribedAt->format('Y-m-d H:i:s'),
+                        ],
+                        [
+                            'subscriber_email = ?' => $emailAddress,
+                            'store_id IN (?)' => $storeIds,
+                        ]
+                    );
+            }
 
             $offset++;
         }

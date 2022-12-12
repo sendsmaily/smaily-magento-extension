@@ -1,6 +1,12 @@
 # Changelog
 
 
+### 2.6.0
+
+- Compare subscriber status change timestamp on newsletter subscriber sync [[#91](https://github.com/sendsmaily/smaily-magento-extension/pull/91)]
+- Fix newsletter subscribers sync unsubscribed status value [[#92](https://github.com/sendsmaily/smaily-magento-extension/pull/92)]
+
+
 ### 2.5.0
 
 - Add product image URL to abandoned cart data payload [[#88](https://github.com/sendsmaily/smaily-magento-extension/pull/88)]

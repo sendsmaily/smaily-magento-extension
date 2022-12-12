@@ -174,7 +174,8 @@ class SubscribersSync
 
                 $data = [
                     'email' => $subscriber['subscriber_email'],
-                    'is_unsubscribed' => (int) $subscriber['subscriber_status'] === 1 ? 0 : 1,
+                    'is_unsubscribed' => (int) $subscriber['subscriber_status']
+                        === \Magento\Newsletter\Model\Subscriber::STATUS_SUBSCRIBED ? 0 : 1,
                     'store' => $customerStore !== null ? $customerStore->getName() : '',
                     'store_group' => $customerStoreGroup !== null ? $customerStoreGroup->getName() : '',
                     'store_website' => $website->getName(),
@@ -262,7 +263,7 @@ class SubscribersSync
                 )
                 ->where('main_table.store_id IN (?)', $storeIds)
                 ->where('main_table.subscriber_email IN (?)', array_keys($smailyUnsubscribers))
-                ->where('main_table.subscriber_status = ?', 1);
+                ->where('main_table.subscriber_status = ?', \Magento\Newsletter\Model\Subscriber::STATUS_SUBSCRIBED);
 
             $subscribers = $this->resourceConnection->fetchAll($select);
 
@@ -280,7 +281,7 @@ class SubscribersSync
                     ->update(
                         $this->newsletterSubscribersCollection->getMaintable(),
                         [
-                            'subscriber_status' => 0,
+                            'subscriber_status' => \Magento\Newsletter\Model\Subscriber::STATUS_UNSUBSCRIBED,
                             'change_status_at' => $unsubscribedAt->format('Y-m-d H:i:s'),
                         ],
                         [

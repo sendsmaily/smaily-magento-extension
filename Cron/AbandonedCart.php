@@ -245,8 +245,14 @@ class AbandonedCart
             ->load();
 
         foreach ($quotes as $quote) {
+            $store = $quote->getStore();
+            $storeGroup = $store !== null ? $store->getGroup() : null;
+
             $cart = [
                 'email' => $quote->getCustomerEmail(),
+                'store' => $store !== null ? $store->getName() : '',
+                'store_group' => $storeGroup !== null ? $storeGroup->getName() : '',
+                'store_website' => $website->getName(),
             ];
 
             $this->logger->debug('Triggering Abandoned Cart for quote', [

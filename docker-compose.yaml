@@ -37,6 +37,11 @@ services:
     - MYSQL_ROOT_PASSWORD=root
     volumes:
     - db-data:/var/lib/mysql
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 26677
+        hard: 46677
 
   elastic:
     container_name: magento2_elastic

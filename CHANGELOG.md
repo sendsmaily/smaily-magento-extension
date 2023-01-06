@@ -1,6 +1,11 @@
 # Changelog
 
 
+### 2.7.0
+
+- Add store, store group and website to abandoned cart payload - [[#96](https://github.com/sendsmaily/smaily-magento-extension/pull/96)]
+
+
 ### 2.6.0
 
 - Compare subscriber status change timestamp on newsletter subscriber sync [[#91](https://github.com/sendsmaily/smaily-magento-extension/pull/91)]

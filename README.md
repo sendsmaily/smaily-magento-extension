@@ -98,7 +98,10 @@ You can access RSS feed by visiting ulr `store_url/smaily/rss/feed` and you can 
 Here is a list of all the parameters available in Smaily email templating engine:
 
 - Customer first name: `{{ first_name }}`;
-- Customer last name: `{{ last_name }}`.
+- Customer last name: `{{ last_name }}`;
+- Store view: `{{ store }}`;
+- Store group: `{{ store_group }}`;
+- Website: `{{ store_website }}`.
 
 Up to 10 products can be received in Smaily templating engine. You can refrence each product with number 1-10 behind parameter name:
 

@@ -327,7 +327,11 @@ class AbandonedCart
             try {
                 $response = $smailyApiClient->post('/api/autoresponder.php', $payload);
 
-                if ((int) $response['code'] !== 101) {
+                if ((int) $response['code'] === 203) {
+                    // Ignoring responses with code 203 - Invalid data submitted, because most likely
+                    // it is due to the email address of the quote being invalid.
+                    $this->logger->warning('Invalid data to send abandoned cart. Skipping...', ['payload' => $payload]);
+                } elseif ((int) $response['code'] !== 101) {
                     throw new ClientException('Smaily API responded with: ' . json_encode($response));
                 }
             } catch (\Exception $e) {

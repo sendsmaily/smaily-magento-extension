@@ -1,6 +1,11 @@
 # Changelog
 
 
+### 2.7.1
+
+- Skip abandoned carts receiving "Invalid data submitted" (code: 203) response - [[#99](https://github.com/sendsmaily/smaily-magento-extension/pull/99)]
+
+
 ### 2.7.0
 
 - Add store, store group and website to abandoned cart payload - [[#96](https://github.com/sendsmaily/smaily-magento-extension/pull/96)]

@@ -19,7 +19,7 @@ RUN apt-get update \
         unzip \
         # MariaDB for mysqladmin ping in entrypoint
         mariadb-client \
-    && pecl install mcrypt-1.0.5 \
+    && pecl install mcrypt-1.0.6 \
     && docker-php-ext-enable mcrypt \
     && docker-php-ext-install bcmath \
     && docker-php-ext-configure gd --with-freetype=/usr/include/ --with-jpeg=/usr/include/ \
@@ -55,7 +55,7 @@ RUN php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php')
 USER www-data
 
 # Download and install Magento.
-ENV MAGENTO_VERSION 2.4.5
+ENV MAGENTO_VERSION 2.4.6
 RUN composer create-project magento/community-edition=${MAGENTO_VERSION} ./ \
     && chmod +x bin/magento \
     && git clone https://github.com/magento/magento2-sample-data.git /sample-data \

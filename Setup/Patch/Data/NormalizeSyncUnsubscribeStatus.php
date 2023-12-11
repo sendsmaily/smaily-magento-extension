@@ -7,9 +7,11 @@ namespace Smaily\SmailyForMagento\Setup\Patch\Data;
 class NormalizeSyncUnsubscribeStatus implements \Magento\Framework\Setup\Patch\DataPatchInterface
 {
     private $moduleDataSetup;
+    private \Magento\Newsletter\Model\ResourceModel\Subscriber\Collection $newsletterSubscribersCollection;
 
     /**
      * @param \Magento\Framework\Setup\ModuleDataSetupInterface $moduleDataSetup
+     * @param \Magento\Newsletter\Model\ResourceModel\Subscriber\Collection $newsletterSubscribersCollection
      */
     public function __construct(
         \Magento\Framework\Setup\ModuleDataSetupInterface $moduleDataSetup,

@@ -185,7 +185,7 @@ class Feed extends \Magento\Framework\App\Action\Action
         $namespace = self::SMLY_NAMESPACE_XSD;
         $rss = <<<XML
 <?xml version="1.0" encoding="utf-8"?>
-<rss xmlns:smly="${namespace}" version="2.0">
+<rss xmlns:smly="{$namespace}" version="2.0">
 </rss>
 XML;
         return new XML($rss);

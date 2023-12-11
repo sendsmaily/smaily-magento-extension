@@ -53,7 +53,7 @@ class SaveConfig
         $password = $this->resolveConfigValue($config, Config::GENERAL_PASSWORD, Config::GROUP_GENERAL);
 
         $client = $this->httpClientFactory->create()
-            ->setBaseUrl("https://${subdomain}.sendsmaily.net")
+            ->setBaseUrl("https://{$subdomain}.sendsmaily.net")
             ->setCredentials($username, $password);
 
         try {

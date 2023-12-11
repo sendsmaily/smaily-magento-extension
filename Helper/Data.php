@@ -122,7 +122,7 @@ class Data
     {
         $credentials = $this->config->getSmailyApiCredentials($websiteId);
         return $this->httpClientFactory->create()
-            ->setBaseUrl("https://${credentials['subdomain']}.sendsmaily.net")
+            ->setBaseUrl("https://{$credentials['subdomain']}.sendsmaily.net")
             ->setCredentials($credentials['username'], $credentials['password']);
     }
 

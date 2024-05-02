@@ -15,7 +15,7 @@ class NormalizeSyncUnsubscribeStatus implements \Magento\Framework\Setup\Patch\D
      */
     public function __construct(
         \Magento\Framework\Setup\ModuleDataSetupInterface $moduleDataSetup,
-        \Magento\Newsletter\Model\ResourceModel\Subscriber\Collection $newsletterSubscribersCollection,
+        \Magento\Newsletter\Model\ResourceModel\Subscriber\Collection $newsletterSubscribersCollection
     ) {
         $this->moduleDataSetup = $moduleDataSetup;
 

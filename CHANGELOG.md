@@ -1,5 +1,9 @@
 # Changelog
 
+### 2.7.3
+
+- Fixes non-existing array key warning on subscribers synchronization [[#108](https://github.com/sendsmaily/smaily-magento-extension/pull/108)] (thanks @raulikesvatera)
+
 ### 2.7.2
 
 - PHP 8.2 compatibility [[#103](https://github.com/sendsmaily/smaily-magento-extension/pull/103)]

@@ -249,7 +249,7 @@ class SubscribersSync
 
             $smailyUnsubscribers = [];
             foreach ($unsubscribers as $unsubscriber) {
-                $email = $unsubscriber['email'];
+                $email = strtolower($unsubscriber['email']);
                 $unsubscribedAt = new \DateTimeImmutable($unsubscriber['unsubscribed_at'], $timezoneLocal);
 
                 $smailyUnsubscribers[$email] = $unsubscribedAt->setTimezone($timezoneUTC);
@@ -268,7 +268,7 @@ class SubscribersSync
             $subscribers = $this->resourceConnection->fetchAll($select);
 
             foreach ($subscribers as $subscriber) {
-                $emailAddress = $subscriber['subscriber_email'];
+                $emailAddress = strtolower($subscriber['subscriber_email']);
                 $changeStatusAt = new \DateTimeImmutable($subscriber['change_status_at'], $timezoneUTC);
                 $unsubscribedAt = $smailyUnsubscribers[$emailAddress];
 

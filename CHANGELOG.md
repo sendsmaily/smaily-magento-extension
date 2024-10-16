@@ -1,5 +1,9 @@
 # Changelog
 
+### 2.7.4
+
+- Fixes an issue where abandoned cart synchronization can fail when unknown payload field is encountered.
+
 ### 2.7.3
 
 - Fixes non-existing array key warning on subscribers synchronization [[#108](https://github.com/sendsmaily/smaily-magento-extension/pull/108)] (thanks @raulikesvatera)

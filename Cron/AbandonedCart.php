@@ -366,6 +366,10 @@ class AbandonedCart
         }
 
         foreach ($fields as $source) {
+            if (!array_key_exists($source, self::FIELDS_PREFIX_MAPPING)) {
+                continue;
+            }
+
             $target = self::FIELDS_PREFIX_MAPPING[$source] . '_' . $index;
             $payload[$target] = '';
         }

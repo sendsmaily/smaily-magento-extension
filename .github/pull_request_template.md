@@ -5,7 +5,7 @@
 
 **Release checklist**
 
-- [ ] Added `release` tag to this pull request
+- [ ] Added `release` label to this pull request
 - [ ] Updated README.md
 - [ ] Updated CHANGELOG.md
 - [ ] Updated composer.json

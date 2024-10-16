@@ -2,7 +2,7 @@
 
 ### 2.7.4
 
-- Fixes an issue where abandoned cart synchronization can fail when unknown payload field is encountered.
+- Fixes an issue where abandoned cart synchronization can fail when unknown payload field is encountered.[[#111](https://github.com/sendsmaily/smaily-magento-extension/pull/111)]
 
 ### 2.7.3
 

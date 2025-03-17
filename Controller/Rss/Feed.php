@@ -102,7 +102,7 @@ class Feed extends \Magento\Framework\App\Action\Action
             }
 
             // Compile feed item.
-            $item = $feed->addChild('item');
+            $item = $channel->addChild('item');
             $item->addChildWithCDATA('title', $product->getName());
             $item->addChildWithCDATA('link', $productUrl);
             $item->addChildWithCData('guid', $productUrl)

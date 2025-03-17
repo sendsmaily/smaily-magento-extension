@@ -1,5 +1,9 @@
 # Changelog
 
+### 2.7.5
+
+- fix: Items placement in RSS feed structure [[#114](https://github.com/sendsmaily/smaily-magento-extension/pull/114)]
+
 ### 2.7.4
 
 - Fixes an issue where abandoned cart synchronization can fail when unknown payload field is encountered.[[#111](https://github.com/sendsmaily/smaily-magento-extension/pull/111)]

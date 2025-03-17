@@ -51,6 +51,7 @@ services:
     - '9300:9300'
     environment:
     - discovery.type=single-node
+    - ES_JAVA_OPTS=-Xms256m -Xmx256m
     volumes:
     - elastic-data:/usr/share/elasticsearch/data
 

@@ -1,5 +1,9 @@
 # Changelog
 
+### 2.7.6
+
+- fix: RSS feed rendering with missing description value [[#118](https://github.com/sendsmaily/smaily-magento-extension/pull/118)]
+
 ### 2.7.5
 
 - fix: Items placement in RSS feed structure [[#114](https://github.com/sendsmaily/smaily-magento-extension/pull/114)]

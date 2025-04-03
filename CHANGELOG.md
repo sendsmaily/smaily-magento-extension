@@ -1,5 +1,10 @@
 # Changelog
 
+### 2.7.7
+
+- Adds `"is_abandoned_cart" = "true"` field to abandoned cart automation payload
+- Does not opt-in customers who received abandoned cart email
+
 ### 2.7.6
 
 - fix: RSS feed rendering with missing description value [[#118](https://github.com/sendsmaily/smaily-magento-extension/pull/118)]

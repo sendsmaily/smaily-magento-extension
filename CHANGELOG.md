@@ -3,7 +3,7 @@
 ### 2.7.7
 
 - Adds `"is_abandoned_cart" = "true"` field to abandoned cart automation payload
-- Does not opt-in customers who received abandoned cart email
+- Does not opt-in unsubscribed customers who have received abandoned cart email
 
 ### 2.7.6
 

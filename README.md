@@ -102,6 +102,7 @@ Here is a list of all the parameters available in Smaily email templating engine
 - Store view: `{{ store }}`;
 - Store group: `{{ store_group }}`;
 - Website: `{{ store_website }}`.
+- Is abandoned cart: `{{ is_abandoned_cart }}`;
 
 Up to 10 products can be received in Smaily templating engine. You can refrence each product with number 1-10 behind parameter name:
 

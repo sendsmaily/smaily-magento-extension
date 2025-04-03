@@ -320,8 +320,10 @@ class AbandonedCart
             // Note! This is done one-by-one to avoid potential issues with sending abandoned cart
             // messages to recipients over-and-over.
             $payload = [
-                'autoresponder' => $workflowId,
                 'addresses' => [$cart],
+                'autoresponder' => $workflowId,
+                'force_opt_in' => false,
+                'is_abandoned_cart' => 'true',
             ];
 
             try {

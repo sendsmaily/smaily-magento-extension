@@ -1,5 +1,10 @@
 # Changelog
 
+
+### 2.7.8
+
+- Abandoned cart `product_price` and `product_base_price` now also include taxes.
+
 ### 2.7.7
 
 - Adds `"is_abandoned_cart" = "true"` field to abandoned cart automation payload

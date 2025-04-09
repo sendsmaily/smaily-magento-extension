@@ -306,11 +306,11 @@ class AbandonedCart
                 }
                 if (in_array('price', $fields, true)) {
                     $cart['product_price_' . $productsIndex] = $this->pricingHelper
-                        ->currencyByStore($item->getPrice(), $quote->getStore(), true, false);
+                        ->currencyByStore($item->getPriceInclTax(), $quote->getStore(), true, false);
                 }
                 if (in_array('base_price', $fields, true)) {
                     $cart['product_base_price_' . $productsIndex] = $this->pricingHelper
-                        ->currencyByStore($item->getBasePrice(), $quote->getStore(), true, false);
+                        ->currencyByStore($item->getBasePriceInclTax(), $quote->getStore(), true, false);
                 }
             }
 

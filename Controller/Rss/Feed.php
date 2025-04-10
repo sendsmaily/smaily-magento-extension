@@ -13,6 +13,7 @@ class Feed extends \Magento\Framework\App\Action\Action
 
     protected $categoryCollectionFactory;
     protected $pricingHelper;
+    protected $taxHelper;
     protected $productCollectionFactory;
     protected $storeManager;
 
@@ -29,11 +30,13 @@ class Feed extends \Magento\Framework\App\Action\Action
         \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory $productCollectionFactory,
         \Magento\Framework\App\Action\Context $context,
         \Magento\Framework\Pricing\Helper\Data $pricingHelper,
+        \Magento\Tax\Model\Calculation $taxHelper,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
         Data $dataHelper
     ) {
         $this->categoryCollectionFactory = $categoryCollectionFactory;
         $this->pricingHelper = $pricingHelper;
+        $this->taxHelper = $taxHelper;
         $this->productCollectionFactory = $productCollectionFactory;
         $this->storeManager = $storeManager;
 
@@ -91,15 +94,16 @@ class Feed extends \Magento\Framework\App\Action\Action
 
         // Add products to RSS feed.
         foreach ($products as $product) {
-            $price = (float) $product->getData('price');
-            $specialPrice = (float) $product->getData('special_price');
-            $productUrl = $product->getProductUrl();
-
-            // Calculate discount.
-            $discount = 0;
-            if ($specialPrice < $price && $specialPrice > 0.0) {
-                $discount = ceil(($price - $specialPrice) / $price * 100);
+            /** @var \Magento\Catalog\Model\Product $product */
+            $price = $this->getPriceIncludingTax($product);
+            if ($price == 0.0) {
+                // Probably a grouped product.
+                continue;
             }
+            $specialPrice = $this->getFinalPriceIncludingTax($product);
+            $discount = $this->calculateDiscountPercentage($product);
+
+            $productUrl = $product->getProductUrl();
 
             // Compile feed item.
             $item = $channel->addChild('item');
@@ -189,5 +193,78 @@ class Feed extends \Magento\Framework\App\Action\Action
 </rss>
 XML;
         return new XML($rss);
+    }
+
+    /**
+     * Get product price including tax.
+     *
+     * @param \Magento\Catalog\Model\Product $product
+     * @return float
+     */
+    private function getPriceIncludingTax($product)
+    {
+        $priceExclTax = $product->getPrice();
+        $taxClassId = $product->getTaxClassId();
+
+        $taxRequest = $this->taxHelper->getRateRequest();
+        $taxRequest->setProductClassId($taxClassId);
+
+        $taxRate = $this->taxHelper->getRate($taxRequest);
+        $taxAmount = $this->taxHelper->calcTaxAmount(
+            $priceExclTax,
+            $taxRate,
+        );
+
+        return $priceExclTax + $taxAmount;
+    }
+
+    /**
+     * Get product final price including tax.
+     *
+     * @param \Magento\Catalog\Model\Product $product
+     * @return float
+     */
+    private function getFinalPriceIncludingTax($product)
+    {
+        $finalPrice = $product->getFinalPrice();
+
+        if ($finalPrice == 0.0) {
+            return 0.0;
+        }
+
+        $taxClassId = $product->getTaxClassId();
+        $taxRequest = $this->taxHelper->getRateRequest();
+        $taxRequest->setProductClassId($taxClassId);
+
+        $taxRate = $this->taxHelper->getRate($taxRequest);
+        $taxAmount = $this->taxHelper->calcTaxAmount(
+            $finalPrice,
+            $taxRate,
+        );
+
+        return $finalPrice + $taxAmount;
+    }
+
+    /**
+     * Calculate product discount percentage.
+     *
+     * @param \Magento\Catalog\Model\Product $product
+     * @return int
+     */
+    private function calculateDiscountPercentage($product)
+    {
+        $price = $product->getPrice();
+
+        if ($price == 0.0) {
+            return 0;
+        }
+
+        $finalPrice = $product->getFinalPrice();
+
+        if ($finalPrice >= $price || $finalPrice == 0.0) {
+            return 0;
+        }
+
+        return ceil(($price - $finalPrice) / $price * 100);
     }
 }

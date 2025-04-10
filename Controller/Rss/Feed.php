@@ -12,12 +12,13 @@ class Feed extends \Magento\Framework\App\Action\Action
     const RSS_DATE_FORMAT = 'r';
 
     protected $categoryCollectionFactory;
-    protected $pricingHelper;
-    protected $taxHelper;
-    protected $productCollectionFactory;
-    protected $storeManager;
-
+    protected $configurableProductType;
     protected $dataHelper;
+    protected $pricingHelper;
+    protected $productCollectionFactory;
+    protected $productRepository;
+    protected $storeManager;
+    protected $taxHelper;
 
     /**
      * Class constructor.
@@ -26,20 +27,23 @@ class Feed extends \Magento\Framework\App\Action\Action
      * @return void
      */
     public function __construct(
+        \Magento\Catalog\Api\ProductRepositoryInterface $productRepository,
         \Magento\Catalog\Model\ResourceModel\Category\CollectionFactory $categoryCollectionFactory,
         \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory $productCollectionFactory,
+        \Magento\ConfigurableProduct\Model\ResourceModel\Product\Type\Configurable $configurableProductType,
         \Magento\Framework\App\Action\Context $context,
         \Magento\Framework\Pricing\Helper\Data $pricingHelper,
-        \Magento\Tax\Model\Calculation $taxHelper,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Tax\Model\Calculation $taxHelper,
         Data $dataHelper
     ) {
         $this->categoryCollectionFactory = $categoryCollectionFactory;
+        $this->configurableProductType = $configurableProductType;
         $this->pricingHelper = $pricingHelper;
-        $this->taxHelper = $taxHelper;
         $this->productCollectionFactory = $productCollectionFactory;
+        $this->productRepository = $productRepository;
         $this->storeManager = $storeManager;
-
+        $this->taxHelper = $taxHelper;
         $this->dataHelper = $dataHelper;
 
         parent::__construct($context);
@@ -103,7 +107,7 @@ class Feed extends \Magento\Framework\App\Action\Action
             $specialPrice = $this->getFinalPriceIncludingTax($product);
             $discount = $this->calculateDiscountPercentage($product);
 
-            $productUrl = $product->getProductUrl();
+            $productUrl = $this->getProductUrl($product);
 
             // Compile feed item.
             $item = $channel->addChild('item');
@@ -266,5 +270,28 @@ XML;
         }
 
         return ceil(($price - $finalPrice) / $price * 100);
+    }
+
+    /**
+     * Get the product URL.
+     *
+     * @param \Magento\Catalog\Model\Product $product
+     */
+    private function getProductURL($product)
+    {
+        $url = $product->getProductUrl();
+
+        // Magento shows URL that results in 404 for products that are not visible.
+        // We want to return the parent product URL instead, so that the link is valid.
+        if (!$product->isVisibleInSiteVisibility()) {
+            $parentIds = $this->configurableProductType->getParentIdsByChild($product->getId());
+            if (count($parentIds) > 0) {
+                $parentId = $parentIds[0]; // Get the first parent ID
+                $parentProduct = $this->productRepository->getById($parentId);
+                return $parentProduct->getProductUrl();
+            }
+        }
+
+        return $url;
     }
 }

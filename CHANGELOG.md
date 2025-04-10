@@ -4,6 +4,8 @@
 ### 2.7.8
 
 - Abandoned cart `product_price` and `product_base_price` now also include taxes.
+- RSS-feed now shows prices including taxes.
+- RSS-feed uses parent product URL-s for configurable products that are not visible individually.
 
 ### 2.7.7
 

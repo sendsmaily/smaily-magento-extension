@@ -325,11 +325,11 @@ class AbandonedCart
                     $taxRequest->setProductClassId($productItem->getTaxClassId());
                     $taxRate = $this->taxCalculation->getRate($taxRequest);
                     $priceExclTax = $productItem->getPrice();
-                    $priceInclTax = $this->taxCalculation->calcTaxAmount(
+                    $taxAmount = $this->taxCalculation->calcTaxAmount(
                         $priceExclTax,
                         $taxRate,
                     );
-                    $originalPriceInclTax = $priceExclTax + $priceInclTax;
+                    $originalPriceInclTax = $priceExclTax + $taxAmount;
 
                     $cart['product_base_price_' . $productsIndex] = $this->pricingHelper
                         ->currencyByStore($originalPriceInclTax, $quote->getStore(), true, false);

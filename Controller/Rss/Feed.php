@@ -104,9 +104,8 @@ class Feed extends \Magento\Framework\App\Action\Action
                 // Probably a grouped product.
                 continue;
             }
-            $specialPrice = $this->getFinalPriceIncludingTax($product);
+            $finalPrice = $this->getFinalPriceIncludingTax($product);
             $discount = $this->calculateDiscountPercentage($product);
-
             $productUrl = $this->getProductUrl($product);
 
             // Compile feed item.
@@ -122,10 +121,10 @@ class Feed extends \Magento\Framework\App\Action\Action
 
             // Add pricing information to feed item.
             if ($discount > 0) {
-                $formattedSpecialPrice = $this->pricingHelper->currencyByStore($specialPrice, $store, true, false);
+                $formattedFinalPrice = $this->pricingHelper->currencyByStore($finalPrice, $store, true, false);
                 $formattedPrice = $this->pricingHelper->currencyByStore($price, $store, true, false);
 
-                $item->addChild('price', $formattedSpecialPrice, self::SMLY_NAMESPACE_XSD);
+                $item->addChild('price', $formattedFinalPrice, self::SMLY_NAMESPACE_XSD);
                 $item->addChild('old_price', $formattedPrice, self::SMLY_NAMESPACE_XSD);
                 $item->addChild('discount', $discount . '%', self::SMLY_NAMESPACE_XSD);
             } else {

@@ -31,6 +31,7 @@ class AbandonedCart
     protected $searchCriteriaBuilder;
     protected $sortOrderBuilder;
     protected $storeManager;
+    protected $taxCalculation;
 
     protected $config;
     protected $dataHelper;
@@ -53,6 +54,7 @@ class AbandonedCart
         \Magento\Quote\Model\QuoteRepository $quoteRepository,
         \Magento\Quote\Model\ResourceModel\Quote\Collection $quoteCollection,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
+        \Magento\Tax\Model\Calculation $taxCalculation,
         \Psr\Log\LoggerInterface $logger,
         Config $config,
         Data $dataHelper
@@ -70,6 +72,7 @@ class AbandonedCart
         $this->searchCriteriaBuilder = $searchCriteriaBuilder;
         $this->sortOrderBuilder = $sortOrderBuilder;
         $this->storeManager = $storeManager;
+        $this->taxCalculation = $taxCalculation;
 
         $this->config = $config;
         $this->dataHelper = $dataHelper;
@@ -309,8 +312,27 @@ class AbandonedCart
                         ->currencyByStore($item->getPriceInclTax(), $quote->getStore(), true, false);
                 }
                 if (in_array('base_price', $fields, true)) {
+                    # The base_price is considered as the product original price not the quote item price.
+                    # Quote item may have a discount and special price applied. The base price should
+                    # reflect the original product price without any discounts.
+                    $productItem = $item->getProduct();
+                    $taxRequest = $this->taxCalculation->getRateRequest(
+                        $quote->getShippingAddress(),
+                        $quote->getBillingAddress(),
+                        $quote->getCustomerTaxClassId(),
+                        $quote->getStore(),
+                    );
+                    $taxRequest->setProductClassId($productItem->getTaxClassId());
+                    $taxRate = $this->taxCalculation->getRate($taxRequest);
+                    $priceExclTax = $productItem->getPrice();
+                    $priceInclTax = $this->taxCalculation->calcTaxAmount(
+                        $priceExclTax,
+                        $taxRate,
+                    );
+                    $originalPriceInclTax = $priceExclTax + $priceInclTax;
+
                     $cart['product_base_price_' . $productsIndex] = $this->pricingHelper
-                        ->currencyByStore($item->getBasePriceInclTax(), $quote->getStore(), true, false);
+                        ->currencyByStore($originalPriceInclTax, $quote->getStore(), true, false);
                 }
             }
 

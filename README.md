@@ -118,7 +118,11 @@ Up to 10 products can be received in Smaily templating engine. You can refrence 
 
 - Product price: `{{ product_price_[1-10] }}`;
 
+Product price is the end price that the customer sees in the cart. If you have a special price set for the product, it will be shown here. This price also includes taxes and discounts.
+
 - Product base price: `{{ product_base_price_[1-10] }}`.
+
+Product base price is the price that is set in the product edit page. This price also includes taxes but no discounts.
 
 Also you can determine if customer had more than 10 items in cart:
 

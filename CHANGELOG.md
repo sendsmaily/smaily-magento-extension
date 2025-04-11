@@ -1,5 +1,14 @@
 # Changelog
 
+
+### 2.8.0
+
+> Notice! This version updates the price values in abandoned cart emails and RSS feed items to include taxes. These prices now match what customers see in the storefront. For B2B (business-to-business) stores, where tax-exclusive pricing may be expected, this behavior might not be suitable.
+
+- Abandoned cart `product_price` and `product_base_price` now also include taxes.
+- RSS-feed now shows prices including taxes.
+- RSS-feed uses parent product URL-s for configurable products that are not visible individually.
+
 ### 2.7.7
 
 - Adds `"is_abandoned_cart" = "true"` field to abandoned cart automation payload

@@ -1,5 +1,4 @@
-version: '3.7'
-
+---
 services:
   magento2:
     container_name: magento2
@@ -26,34 +25,49 @@ services:
     - data:/var/www/html
     - ./:/var/www/html/app/code/Smaily/SmailyForMagento
     depends_on:
-    - db
-    - elastic
+      db:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
 
   db:
     container_name: magento2_db
-    image: mysql:5.7
+    image: mysql:8.4
+    command: ["--tls-version=", "--admin-tls-version="]
     environment:
     - MYSQL_DATABASE=magento2
     - MYSQL_ROOT_PASSWORD=root
     volumes:
     - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-S", "/var/run/mysqld/mysqld.sock"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ulimits:
       nproc: 65535
       nofile:
         soft: 26677
         hard: 46677
 
-  elastic:
-    container_name: magento2_elastic
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.13.3
+  opensearch:
+    container_name: magento2_opensearch
+    image: opensearchproject/opensearch:2
     ports:
     - '9200:9200'
     - '9300:9300'
     environment:
     - discovery.type=single-node
-    - ES_JAVA_OPTS=-Xms256m -Xmx256m
+    - OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m
+    - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Smaily.dev1
+    - DISABLE_SECURITY_PLUGIN=true
     volumes:
-    - elastic-data:/usr/share/elasticsearch/data
+    - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   phpmyadmin:
     container_name: magento2_phpmyadmin
@@ -73,5 +87,5 @@ volumes:
     name: docker_magento2-data
   db-data:
     name: docker_magento2-db-data
-  elastic-data:
-    name: docker_magento2-elastic-data
+  opensearch-data:
+    name: docker_magento2-opensearch-data

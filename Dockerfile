@@ -1,6 +1,6 @@
-FROM php:8.2-apache
+FROM php:8.3-apache
 
-# Install Magento requirements.
+# Install required packages.
 RUN apt-get update \
     && apt-get install -y \
         git \
@@ -19,9 +19,14 @@ RUN apt-get update \
         unzip \
         # MariaDB for mysqladmin ping in entrypoint
         mariadb-client \
-    && pecl install mcrypt-1.0.6 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Install PHP extensions.
+RUN pecl install mcrypt-1.0.7 \
     && docker-php-ext-enable mcrypt \
     && docker-php-ext-install bcmath \
+    && docker-php-ext-install ftp \
     && docker-php-ext-configure gd --with-freetype=/usr/include/ --with-jpeg=/usr/include/ \
     && docker-php-ext-install gd \
     && docker-php-ext-install intl \
@@ -30,9 +35,7 @@ RUN apt-get update \
     && docker-php-ext-install soap \
     && docker-php-ext-install sockets \
     && docker-php-ext-install xsl \
-    && docker-php-ext-install zip \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    && docker-php-ext-install zip
 
 # Prepare server for Magento.
 RUN a2enmod rewrite \
@@ -55,7 +58,7 @@ RUN php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php')
 USER www-data
 
 # Download and install Magento.
-ENV MAGENTO_VERSION 2.4.6
+ENV MAGENTO_VERSION 2.4.8-p4
 RUN composer create-project magento/community-edition=${MAGENTO_VERSION} ./ \
     && chmod +x bin/magento \
     && git clone https://github.com/magento/magento2-sample-data.git /sample-data \

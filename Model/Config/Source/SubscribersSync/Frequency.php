@@ -2,7 +2,7 @@
 
 namespace Smaily\SmailyForMagento\Model\Config\Source\SubscribersSync;
 
-class Frequency implements \Magento\Framework\Option\ArrayInterface
+class Frequency implements \Magento\Framework\Data\OptionSourceInterface
 {
     /**
      * Get options for Newsletter Subscribers synchronization frequencies.
@@ -21,7 +21,7 @@ class Frequency implements \Magento\Framework\Option\ArrayInterface
                 'label' => 'Twice a day',
             ],
             [
-                'value' => '0 * */1 * *',
+                'value' => '0 0 * * *',
                 'label' => 'Every day',
             ],
             [

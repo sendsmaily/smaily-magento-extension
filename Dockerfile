@@ -58,10 +58,6 @@ RUN php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php')
     && rm /tmp/composer-setup.php \
     && chown www-data:www-data /var/www
 
-# Create a directory for VSCode Server and give ownership to www-data.
-RUN mkdir /var/www/.devcontainer \
-    && chown www-data:www-data /var/www/.devcontainer
-
 USER www-data
 
 # Download and install Magento.

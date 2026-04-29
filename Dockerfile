@@ -37,6 +37,9 @@ RUN pecl install mcrypt-1.0.7 \
     && docker-php-ext-install xsl \
     && docker-php-ext-install zip
 
+# Align www-data UID/GID with host developer UID so volume-mounted files are writable by both.
+RUN usermod -u 1000 www-data && groupmod -g 1000 www-data
+
 # Prepare server for Magento.
 RUN a2enmod rewrite \
     && echo "memory_limit=2048M" > /usr/local/etc/php/conf.d/memory-limit.ini \
@@ -53,7 +56,7 @@ RUN php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php')
     && test "$EXPECTED_CHECKSUM" = "$ACTUAL_CHECKSUM" \
     && php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer \
     && rm /tmp/composer-setup.php \
-    && chown www-data:www-data $COMPOSER_HOME
+    && chown www-data:www-data /var/www
 
 USER www-data
 

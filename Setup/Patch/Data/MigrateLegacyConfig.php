@@ -32,6 +32,12 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
  * among them): a downgrade to 2.8.x then starts with empty settings. A
  * failure before that point leaves them in place.
  *
+ * Enable Module = No turns contact sync, welcome and abandoned cart off at
+ * its scope (LegacyConfigMapper). Under a default scope with No, a website
+ * with its own Yes also gets, at its own scope, what the three resolved to
+ * there in 2.8.x — its own value, else the default scope's, else the
+ * config.xml default — so it runs as it did in 2.8.x.
+ *
  * Store-view rows: 2.8.x read every setting per website, so it never read a
  * store-view row. v3 reads the Smaily account per store view, so the
  * store-view account rows (and Enable Module) are not carried over, and an
@@ -99,6 +105,10 @@ class MigrateLegacyConfig implements DataPatchInterface
 
         $allNotices = [];
         $storeViewAccountIds = [];
+        $defaultLegacy = $byScope['default:0'] ?? [];
+        $defaultSwitches = $this->mapper->moduleSwitch($defaultLegacy) === false
+            ? $this->mapper->moduleSwitchValues($defaultLegacy)
+            : null;
         foreach ($byScope as $scopeKey => $legacy) {
             [$scope, $scopeId] = explode(':', $scopeKey, 2);
             $scope = $scope === 'default' ? ScopeConfigInterface::SCOPE_TYPE_DEFAULT : $scope;
@@ -117,6 +127,12 @@ class MigrateLegacyConfig implements DataPatchInterface
                     ? $this->encryptor->encrypt($config['value'])
                     : $config['value'];
                 $this->configWriter->save($config['path'], $value, $scope, (int)$scopeId);
+            }
+            if ($scope === 'websites' && $defaultSwitches !== null && $this->mapper->moduleSwitch($legacy) === true) {
+                $ownPaths = array_flip(array_column($result['configs'], 'path'));
+                foreach (array_diff_key($defaultSwitches, $ownPaths) as $path => $value) {
+                    $this->configWriter->save($path, $value, $scope, (int)$scopeId);
+                }
             }
 
             $this->seedAutomationMappings($legacy, $scope, (int)$scopeId);

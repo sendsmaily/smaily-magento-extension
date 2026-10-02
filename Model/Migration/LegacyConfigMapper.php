@@ -47,14 +47,15 @@ class LegacyConfigMapper
     ];
 
     /**
-     * The v3 settings that 2.8.x "Enable Module = No" stopped.
+     * The v3 settings that 2.8.x "Enable Module = No" stopped => their
+     * etc/config.xml default (a unit test keeps the two equal).
      *
-     * @var string[]
+     * @var array<string, string>
      */
-    private const MODULE_SWITCH_PATHS = [
-        Config::XML_PATH_SYNC_ENABLED,
-        Config::XML_PATH_WELCOME_ENABLED,
-        Config::XML_PATH_ABANDONED_ENABLED,
+    public const MODULE_SWITCH_DEFAULTS = [
+        Config::XML_PATH_SYNC_ENABLED => '1',
+        Config::XML_PATH_WELCOME_ENABLED => '0',
+        Config::XML_PATH_ABANDONED_ENABLED => '0',
     ];
 
     public function __construct(
@@ -147,17 +148,49 @@ class LegacyConfigMapper
         }
 
         // Enable Module = No stopped this scope's sync, opt-in and abandoned cart.
-        if (isset($legacy['general/enable']) && !$this->flag($legacy, 'general/enable')) {
+        if ($this->moduleSwitch($legacy) === false) {
             $configs = array_values(array_filter(
                 $configs,
-                static fn (array $config): bool => !in_array($config['path'], self::MODULE_SWITCH_PATHS, true)
+                static fn (array $config): bool => !isset(self::MODULE_SWITCH_DEFAULTS[$config['path']])
             ));
-            foreach (self::MODULE_SWITCH_PATHS as $path) {
+            foreach (array_keys(self::MODULE_SWITCH_DEFAULTS) as $path) {
                 $set($path, '0');
             }
         }
 
         return ['configs' => $configs, 'notices' => $notices];
+    }
+
+    /**
+     * The scope's own 2.8.x "Enable Module" value: true for Yes, false for
+     * No, null when the scope has none.
+     *
+     * @param array<string, string|null> $legacy
+     */
+    public function moduleSwitch(array $legacy): ?bool
+    {
+        return isset($legacy['general/enable']) ? $this->flag($legacy, 'general/enable') : null;
+    }
+
+    /**
+     * What contact sync, welcome and abandoned cart resolve to from one
+     * scope's legacy values with Enable Module left aside: the carried-over
+     * value, else the etc/config.xml default.
+     *
+     * @param array<string, string|null> $legacy
+     * @return array<string, string> v3 path => value
+     */
+    public function moduleSwitchValues(array $legacy): array
+    {
+        unset($legacy['general/enable']);
+        $values = [];
+        foreach ($this->map($legacy)['configs'] as $config) {
+            if (isset(self::MODULE_SWITCH_DEFAULTS[$config['path']])) {
+                $values[$config['path']] = $config['value'];
+            }
+        }
+
+        return $values + self::MODULE_SWITCH_DEFAULTS;
     }
 
     /**

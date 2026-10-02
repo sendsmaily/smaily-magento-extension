@@ -395,8 +395,9 @@ because a renamed module's declarative schema cannot.
 onto the v3 paths and, once every scope is written, deletes them at every
 scope (the plaintext password among them); a downgrade to 2.8.x starts with
 empty settings. A legacy *Enable Module = No* (default or website)
-becomes contact sync, welcome and abandoned cart off at that scope; a
-store-view Smaily account row (2.8.x never read it) is not carried over, and
+becomes contact sync, welcome and abandoned cart off at that scope (a
+website with its own Yes under a default No gets the three at its scope with
+their 2.8.x values); a store-view Smaily account row (2.8.x never read it) is not carried over, and
 an admin notice names those store views.
 
 Uninstalling removes what declarative schema does not: `Setup\Uninstall`

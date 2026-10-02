@@ -38,8 +38,11 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   unsubscribe emails suppressed, `name` → `first_name`/`last_name`,
   birthday `Y-m-d`, empty values left out, new `language`), each checked
   against `SubscriberPayloadBuilder` and 2.8.1's `Cron/SubscribersSync`.
-  Open edge: Questions item 15 (a website's own Yes under a Default
-  Config No).
+  Under a default-scope No, a website with its own Yes (decided as
+  Questions item 15) gets the three at its scope with the value they
+  resolved to there in 2.8.x — its own carried-over value, else the
+  default scope's, else the config.xml default — so it runs as in 2.8.x;
+  the test covers own values, inherited values and no own value (off).
 
 - **PRO-1398 — no merchant page shows the config-scope banner (2026-10-02,
   presentation only).** Re-checked against today's code: the "Overridden for
@@ -4745,3 +4748,8 @@ PRO-1267 (engine: Magento product-identity contract note).
     Proposed: for such a website, also write at the website the value it
     resolved to before the default's off rows (its own row, else the default's migrated
     value, else config.xml). Say yes, or keep the guide step.
+    **Decided (Erkki, 2026-10-02): yes** — built: such a website gets the
+    three at its own scope with its own carried-over value, else the
+    default scope's, else the config.xml default
+    (`LegacyConfigMapper::MODULE_SWITCH_DEFAULTS`, unit-checked against
+    `etc/config.xml`); the UPGRADING guide step is gone.

@@ -70,13 +70,18 @@ package; `setup:upgrade` runs the migration.
 | Newsletter opt-in autoresponder (`workflowId`) | Welcome automation (enabled if opt-in triggering was enabled) + a fallback row in the automation mapping table |
 | Subscriber cron sync toggle + field selection | Subscriber Synchronization (every tick carries over) |
 | Abandoned cart toggle / autoresponder / interval | Automations group (`2:hour` → 120 minutes) + a mapping fallback row |
-| *Enable Module = No* (Default Config or a website) | Subscriber Synchronization, the welcome automation and the abandoned-cart automation **off** at that scope. *Yes*, or no saved value, changes nothing |
+| *Enable Module = No* (Default Config or a website) | Subscriber Synchronization, the welcome automation and the abandoned-cart automation **off** at that scope. *Yes*, or no saved value, changes nothing — except under a Default Config with *No*, see below |
 
 Each value keeps the scope it was saved at: a website's own value stays
 that website's, and a website without one keeps using the default. One
 Smaily account saved at Default Config serves every website and store view.
 A website without its own *Enable Module* value therefore inherits the
-switched-off settings of a Default Config with *No*.
+switched-off settings of a Default Config with *No*. A website with its
+own *Enable Module = Yes* under a Default Config with *No* runs as it did
+in 2.8.x: the upgrade saves the three settings at that website with the
+value they had there — the website's own 2.8.x value, else the Default
+Config value, else the v3 default (contact sync on, welcome and abandoned
+cart off).
 
 Once the settings are migrated, the upgrade deletes the old 2.8.x settings
 (every `smaily/*` config row, at every scope — the plain-text password
@@ -88,18 +93,6 @@ undone by changing the composer version constraint alone: after a downgrade,
 enter the Smaily subdomain, username and password and the 2.8.x options
 again. If you may need to go back, note the 2.8.x settings (see *Before
 you upgrade*) or take a database backup before you upgrade.
-
-## Check after the upgrade
-
-- **A website with *Enable Module = Yes* under a Default Config with
-  *No*.** The upgrade switches contact sync, the welcome automation and the
-  abandoned-cart automation off at Default Config and writes nothing for
-  the website's *Yes*. A website's own 2.8.x value of these settings stays
-  in force; a setting the website inherited from Default Config is now
-  off. Right after `setup:upgrade`, open **Marketing > Smaily Connect >
-  Settings** with that website selected and switch on what it used:
-  **Sync contacts to Smaily** on the **Contacts** tab, and **Enabled** on
-  the *Welcome* and *Abandoned cart* cards of the **Automations** tab.
 
 ## What changes on upgrade day
 

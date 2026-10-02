@@ -144,6 +144,32 @@ class LegacyConfigMapperTest extends TestCase
         ];
     }
 
+    public function testModuleSwitchValuesAreTheCarriedOverValueElseTheConfigXmlDefault(): void
+    {
+        self::assertSame(
+            [
+                Config::XML_PATH_ABANDONED_ENABLED => '1',
+                Config::XML_PATH_SYNC_ENABLED => '1',
+                Config::XML_PATH_WELCOME_ENABLED => '0',
+            ],
+            $this->mapper->moduleSwitchValues([
+                'general/enable' => '0',
+                'abandoned/enableAbandonedCart' => '1',
+            ])
+        );
+        self::assertSame(LegacyConfigMapper::MODULE_SWITCH_DEFAULTS, $this->mapper->moduleSwitchValues([]));
+    }
+
+    public function testModuleSwitchDefaultsMatchConfigXml(): void
+    {
+        $xml = simplexml_load_file(dirname(__DIR__, 4) . '/etc/config.xml');
+        self::assertNotFalse($xml);
+        foreach (LegacyConfigMapper::MODULE_SWITCH_DEFAULTS as $path => $default) {
+            [$section, $group, $field] = explode('/', $path);
+            self::assertSame($default, (string)$xml->default->{$section}->{$group}->{$field}, $path);
+        }
+    }
+
     public function testCaptchaSettingsProduceANotice(): void
     {
         $result = $this->mapper->map([

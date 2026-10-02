@@ -34,7 +34,8 @@ use Smaily\Connect\Test\Unit\Support\StoreLocale;
  * `config:set --scope=stores`, and 2.8.x never read it. See docs/UPGRADING.md.
  *
  * PRO-3681: Enable Module = No switches contact sync, welcome and abandoned
- * cart off at its scope, and a store-view account row is not carried over.
+ * cart off at its scope (a website's own Yes under it keeps its 2.8.x
+ * values), and a store-view account row is not carried over.
  */
 class LegacyScopeUpgradeTest extends IntegrationTestCase
 {
@@ -191,7 +192,7 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
         }
     }
 
-    public function testEnableModuleNoAtTheDefaultScopeIsInheritedByAWebsiteWithoutItsOwnValue(): void
+    public function testUnderADefaultScopeWithNoAWebsiteWithItsOwnYesRunsAsIn28x(): void
     {
         $this->env->resetState();
         $this->seed('default', 0, [
@@ -201,24 +202,35 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
             'smaily/sync/enableCronSync' => '1',
             'smaily/abandoned/enableAbandonedCart' => '1',
         ]);
-        // Websites 2 and 3 have their own Yes; website 2 also its own sync
-        // switch, website 3 inherits every other setting.
-        $this->seed('websites', 2, ['smaily/general/enable' => '1', 'smaily/sync/enableCronSync' => '1']);
+        // Website 2: its own Yes and its own values for all three.
+        $this->seed('websites', 2, [
+            'smaily/general/enable' => '1',
+            'smaily/sync/enableCronSync' => '0',
+            'smaily/abandoned/enableAbandonedCart' => '0',
+            'smaily/subscribe/enableNewsletterSubscriptions' => '1',
+            'smaily/subscribe/workflowId' => '66',
+        ]);
+        // Website 3: its own Yes; the three come from the default scope.
         $this->seed('websites', 3, ['smaily/general/enable' => '1']);
 
         $this->migrate();
 
+        // Websites 1 and 4 have no own value: the default scope's No.
         foreach ([1, 4] as $websiteId) {
             self::assertFalse($this->config->isSyncEnabled($websiteId), 'Website ' . $websiteId);
             self::assertFalse($this->config->isWelcomeEnabled($websiteId), 'Website ' . $websiteId);
             self::assertFalse($this->config->isAbandonedCartEnabled($websiteId), 'Website ' . $websiteId);
         }
-        // Yes writes nothing extra: a website's own value wins, and what it
-        // inherits from the default scope is the default scope's off.
-        self::assertTrue($this->config->isSyncEnabled(2));
-        self::assertFalse($this->config->isWelcomeEnabled(2));
-        self::assertFalse($this->config->isSyncEnabled(3));
-        self::assertFalse($this->config->isAbandonedCartEnabled(3));
+        // Website 2 keeps its own values.
+        self::assertFalse($this->config->isSyncEnabled(2));
+        self::assertTrue($this->config->isWelcomeEnabled(2));
+        self::assertSame(66, $this->config->getWelcomeWorkflow(2));
+        self::assertFalse($this->config->isAbandonedCartEnabled(2));
+        // Website 3 runs on what it inherited from the default scope in 2.8.x.
+        self::assertTrue($this->config->isSyncEnabled(3));
+        self::assertTrue($this->config->isWelcomeEnabled(3));
+        self::assertSame(55, $this->config->getWelcomeWorkflow(3));
+        self::assertTrue($this->config->isAbandonedCartEnabled(3));
     }
 
     public function testEveryStoreViewLanguageResolvesAndRoutesToItsWebsiteWorkflowThroughTheOneAccount(): void

@@ -274,7 +274,13 @@ working tree, which is not what a merchant installs.
    `cron:run --group smaily_connect`, the admin checks. Then the update
    section (a fresh extraction of the ZIP and the step 3 commands again)
    and the disable section with `--safe-mode=1`, followed by re-enabling
-   with `--data-restore=1`.
+   with `--data-restore=1`. To check removal, follow the guide's
+   "remove it completely" path (disable, then `module:uninstall
+   --non-composer`, then delete the directory) and count the
+   `smaily_connect/%` and `smaily/%` rows in `core_config_data` and the
+   `smaily_connect_%` rows in `flag` before and after. A store without a
+   Smaily connection writes no flag rows, so insert one synthetic row to
+   have something to count.
 
 What a passing run shows: `module:status` answers `Module is enabled`;
 six `smaily_*` tables exist; `cron_schedule` has `success` rows for the
@@ -282,14 +288,20 @@ six `smaily_*` tables exist; `cron_schedule` has `success` rows for the
 setup, Settings and Log, and each opens Initial setup until the setup is
 completed; after an update the settings are unchanged; disabling drops the
 six tables, and re-enabling with `--data-restore=1` brings them back with
-their rows.
+their rows; uninstalling leaves no `smaily_connect/%` or `smaily/%`
+setting and no `smaily_connect_%` flag row.
 
 Afterwards return to the normal sandbox: remove `app/code/Smaily` from the
 container, then `docker compose up -d` without the override recreates the
 container with the working-tree mount (the real `app/code` directory works
 with it). Run `bin/magento deploy:mode:set default` first if the sandbox
-should not stay in production mode.
+should not stay in production mode. After an uninstall, `app/etc/config.php`
+lists the module as disabled, so run `bin/magento module:enable
+Smaily_Connect` before `setup:upgrade` and `setup:di:compile`.
 
 Last full run: 3.0.0-rc1 on Magento 2.4.8-p4, 2026-10-02 — every step
 passed in production mode; the developer/default-mode update sequence
-was run as well.
+was run as well. A second run the same day on fresh volumes added the
+admin walk in en_US and et_EE, a contact sync, an order and a product
+save without Smaily or Campaign Intelligence credentials, and the
+uninstall.

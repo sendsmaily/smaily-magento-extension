@@ -5,8 +5,8 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 — the pre-rc1 work list is closed except the final
-clean-install pass. PRO-3575 security review landed in full (browse relay,
+_Last updated: 2026-10-02 — the pre-rc1 work list is closed, including the
+final clean-install pass (PRO-3603: passed, six low findings queued). PRO-3575 security review landed in full (browse relay,
 2.8.x settings deleted after migration, 30-day cart restore link, keyed-hash
 profiling opt-out record and consent cache, https-only engine setup address,
 plain Smaily subdomain); PRO-3619 (no profiling choice or purchase marker
@@ -24,12 +24,56 @@ PRO-3591/3594/3602, PRO-1952. Earlier sessions: 2026-09-11, 2026-09-10._
   (+ remainder: the purchase marker goes only to a contact Smaily has),
   PRO-1952, PRO-1965 (+ PRO-1963), and the PRO-3575 security fixes (browse
   relay, 2.8.x settings, cart restore link, opt-out record and consent
-  cache keys, setup address and subdomain). Remaining before rc1: PRO-3603
-  (final clean-install pass, in the sandbox), then the rc1 tag on Erkki's
-  go. Milestones: rc1 2026-10-03 (may move — Erkki 2026-10-02: rc1 waits
+  cache keys, setup address and subdomain), and PRO-3603 (final
+  clean-install pass, entry below). Remaining before rc1: Erkki decides
+  which PRO-3603 findings (if any) go in before the tag, then the rc1 tag
+  on Erkki's go. Milestones: rc1 2026-10-03 (may move — Erkki 2026-10-02: rc1 waits
   for the whole list), pilot store live 2026-10-09. After the pilot:
   PRO-2506, PRO-1967, PRO-1198 (hand-over), and the UI/UX parity Stories
   (PRO-1357, PRO-1398, PRO-1385).
+
+- **PRO-3603 done — final clean-install pass of the release ZIP
+  (2026-10-02).** On fresh sandbox volumes, without the working-tree
+  mount: `bin/verify-release-zip.sh` (VERIFY OK, 352 entries, 3.0.0-rc1)
+  and `sha256sum -c` OK; installed from the ZIP into a real `app/code` in
+  production mode by `docs/INSTALLING.md` steps 1–5 — `setup:upgrade`,
+  `setup:di:compile`, `setup:static-content:deploy en_US et_EE`,
+  `cache:flush` all clean; module enabled; six `smaily_*` tables; the
+  `smaily_connect` cron group ran with `success`. Admin walked in en_US
+  and et_EE (Initial setup, Dashboard, Settings — all five tabs, Log and
+  its Details panel), no console errors. Placeholder credentials:
+  non-plain subdomain refused locally, an unknown subdomain gives "Could
+  not reach Smaily … HTTP 404", the http engine setup URL is refused,
+  Dashboard and Settings say Not connected. Synthetic data only: a
+  registration with the newsletter box, a guest newsletter signup and one
+  order queued `contact.sync` rows that closed as failed on the first
+  attempt (permanent 404, no retry), with the email masked in Details; the
+  order and a product save queued no Campaign Intelligence row (engine not
+  connected) and raised no exception. Uninstall by the guide (disable,
+  `module:uninstall --non-composer`, delete the directory): settings
+  `smaily_connect/*` 20 → 0, `smaily/*` 1 → 0, flags `smaily_connect_*`
+  2 → 0 (the legacy row and the flags were synthetic — a store without a
+  connection writes none), tables 6 → 0, control rows untouched. Then
+  back to the bind-mounted dev sandbox in default mode (`module:enable`
+  needed — `config.php` keeps the module at 0 after an uninstall).
+  INSTALLING and TESTING now say what Magento keeps after an uninstall
+  and how the uninstall is checked. Findings, all low, not fixed here
+  (verification-only task): (1) the "ready to set up" admin notice stays
+  unread after the setup is completed and after a full uninstall
+  (`Setup/Uninstall.php` does not remove it); (2) the Log's Last error
+  text is translated in the store locale at cron time
+  (`Model/Client/SmailyClient.php:203`), so an en_US admin reads Estonian
+  on an et_EE store; (3) the Dashboard "Queued today" tile counts every
+  row created today, but its caption says "events waiting to send"
+  (`Model/Adminhtml/DashboardStats.php:57`); (4) a registration with the
+  newsletter box queues two identical `contact.sync` rows (a guest signup
+  queues one); (5) Test connection with all fields empty on a fresh
+  install says "Smaily API credentials are not configured (store scope:
+  1)" (`Controller/Adminhtml/Api/TestSmaily.php`); (6) copy: the Overview
+  step says "now syncing" after a failed connection test, and the setup
+  notice says earlier settings were migrated on a fresh install. Needs
+  real credentials (pilot day): a Sent contact, workflow lists,
+  automations, the engine exchange, catalog/customer/order ingest.
 
 - **Automation docs corrected — a trigger for an unknown contact creates
   nothing (2026-10-02).** The `AutomationHandler` docblock, the user

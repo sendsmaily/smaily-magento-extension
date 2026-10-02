@@ -51,18 +51,26 @@ class VerifiedCredentials
      */
     public function isVerified(int|string|null $storeId = null): bool
     {
-        return $this->isRemembered(self::FLAG_CODE, $storeId);
+        return $this->isRemembered(self::FLAG_CODE, $this->storeCredentials($storeId));
     }
 
     /**
-     * Whether Smaily's last answer for the credentials saved for this store
-     * was that the account's package does not include API access.
-     *
-     * @param int|string|null $storeId
+     * Whether Smaily accepted the credentials saved for this website — the
+     * single account, or with per-language accounts the default fallback
+     * account: the account a connection save checks (PRO-3719).
      */
-    public function isPlanBlocked(int|string|null $storeId = null): bool
+    public function isWebsiteVerified(int $websiteId): bool
     {
-        return $this->isRemembered(self::PLAN_BLOCKED_FLAG_CODE, $storeId);
+        return $this->isRemembered(self::FLAG_CODE, $this->websiteCredentials($websiteId));
+    }
+
+    /**
+     * Whether Smaily's last answer for the credentials saved for this
+     * website was that the account's package does not include API access.
+     */
+    public function isWebsitePlanBlocked(int $websiteId): bool
+    {
+        return $this->isRemembered(self::PLAN_BLOCKED_FLAG_CODE, $this->websiteCredentials($websiteId));
     }
 
     public function accept(string $subdomain, string $username, string $password): void
@@ -88,14 +96,34 @@ class VerifiedCredentials
 
     /**
      * @param int|string|null $storeId
+     * @return string[] subdomain, username, password
      */
-    private function isRemembered(string $flagCode, int|string|null $storeId): bool
+    private function storeCredentials(int|string|null $storeId): array
     {
-        $credentials = [
+        return [
             $this->config->getSubdomain($storeId),
             $this->config->getUsername($storeId),
             $this->config->getPassword($storeId),
         ];
+    }
+
+    /**
+     * @return string[] subdomain, username, password
+     */
+    private function websiteCredentials(int $websiteId): array
+    {
+        return [
+            $this->config->getWebsiteSubdomain($websiteId),
+            $this->config->getWebsiteUsername($websiteId),
+            $this->config->getWebsitePassword($websiteId),
+        ];
+    }
+
+    /**
+     * @param string[] $credentials subdomain, username, password
+     */
+    private function isRemembered(string $flagCode, array $credentials): bool
+    {
         if (in_array('', $credentials, true)) {
             return false;
         }

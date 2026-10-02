@@ -691,12 +691,14 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
-     * The mode-A fallback language is informational only (its credentials,
-     * not this hint, are the real per-website binding) and stays at default
-     * scope, unchanged.
+     * The mode-A fallback language is saved for the target website, as the
+     * fallback account it names is (PRO-3719) — another website's save does
+     * not change it.
      */
-    public function testFallbackLanguageStaysAtDefaultScope(): void
+    public function testFallbackLanguageIsSavedAtTheTargetWebsitesScope(): void
     {
+        $this->websiteContext->method('getWebsiteId')->willReturn(3);
+
         $this->saver->save('connect', [
             'subdomain' => 'demo',
             'username' => 'api-user',
@@ -704,7 +706,7 @@ class WizardStepSaverTest extends TestCase
         ]);
 
         self::assertSame(
-            ['scope' => ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 'scopeId' => 0],
+            ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 3],
             $this->savedScope(Config::XML_PATH_FALLBACK_LANGUAGE)
         );
         self::assertSame('en', $this->savedValue(Config::XML_PATH_FALLBACK_LANGUAGE));

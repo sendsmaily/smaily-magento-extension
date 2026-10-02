@@ -27,6 +27,14 @@ class VerifiedCredentialsTest extends TestCase
     /** @var array{subdomain: string, username: string, password: string} */
     private array $saved = ['subdomain' => '', 'username' => '', 'password' => ''];
 
+    /**
+     * The account saved for the website: the same as the store view's,
+     * unless a test gives the store view another one.
+     *
+     * @var array{subdomain: string, username: string, password: string}
+     */
+    private array $websiteSaved = ['subdomain' => '', 'username' => '', 'password' => ''];
+
     private VerifiedCredentials $verified;
 
     protected function setUp(): void
@@ -51,6 +59,9 @@ class VerifiedCredentialsTest extends TestCase
         $config->method('getSubdomain')->willReturnCallback(fn () => $this->saved['subdomain']);
         $config->method('getUsername')->willReturnCallback(fn () => $this->saved['username']);
         $config->method('getPassword')->willReturnCallback(fn () => $this->saved['password']);
+        $config->method('getWebsiteSubdomain')->willReturnCallback(fn () => $this->websiteSaved['subdomain']);
+        $config->method('getWebsiteUsername')->willReturnCallback(fn () => $this->websiteSaved['username']);
+        $config->method('getWebsitePassword')->willReturnCallback(fn () => $this->websiteSaved['password']);
         $config->method('isConnected')->willReturnCallback(
             fn () => !in_array('', $this->saved, true)
         );
@@ -118,7 +129,7 @@ class VerifiedCredentialsTest extends TestCase
         $this->verified->planBlocked('demo', 'user', 'secret');
 
         self::assertFalse($this->verified->isVerified(1));
-        self::assertTrue($this->verified->isPlanBlocked(1));
+        self::assertTrue($this->verified->isWebsitePlanBlocked(1));
     }
 
     public function testAPassedCheckClearsTheBlockedPackage(): void
@@ -128,7 +139,7 @@ class VerifiedCredentialsTest extends TestCase
         $this->verified->accept('demo', 'user', 'secret');
 
         self::assertTrue($this->verified->isVerified(1));
-        self::assertFalse($this->verified->isPlanBlocked(1));
+        self::assertFalse($this->verified->isWebsitePlanBlocked(1));
     }
 
     public function testACredentialRefusalReplacesTheBlockedPackage(): void
@@ -138,7 +149,7 @@ class VerifiedCredentialsTest extends TestCase
         $this->verified->refuse('demo', 'user', 'secret');
 
         self::assertFalse($this->verified->isVerified(1));
-        self::assertFalse($this->verified->isPlanBlocked(1));
+        self::assertFalse($this->verified->isWebsitePlanBlocked(1));
     }
 
     public function testABlockedPackageOfOtherCredentialsLeavesTheSavedOnesConnected(): void
@@ -148,14 +159,14 @@ class VerifiedCredentialsTest extends TestCase
         $this->verified->planBlocked('other', 'user', 'secret');
 
         self::assertTrue($this->verified->isVerified(1));
-        self::assertFalse($this->verified->isPlanBlocked(1));
+        self::assertFalse($this->verified->isWebsitePlanBlocked(1));
     }
 
     public function testMissingCredentialsAreNotBlocked(): void
     {
         $this->verified->planBlocked('demo', 'user', 'secret');
 
-        self::assertFalse($this->verified->isPlanBlocked(1));
+        self::assertFalse($this->verified->isWebsitePlanBlocked(1));
     }
 
     public function testThePasswordIsNeverStored(): void
@@ -180,8 +191,33 @@ class VerifiedCredentialsTest extends TestCase
         self::assertFalse($this->verified->isVerified(1));
     }
 
+    /**
+     * PRO-3719: the website's status is the account saved for the website
+     * (with per-language accounts the default fallback account), not the
+     * account one of its store views holds.
+     */
+    public function testTheWebsiteIsConnectedWhenSmailyAcceptedTheWebsitesAccount(): void
+    {
+        $this->save('en-shop', 'en-user', 'en-secret');
+        $this->saved = ['subdomain' => 'et-shop', 'username' => 'et-user', 'password' => 'et-secret'];
+        $this->verified->accept('en-shop', 'en-user', 'en-secret');
+
+        self::assertTrue($this->verified->isWebsiteVerified(1));
+        self::assertFalse($this->verified->isVerified(2));
+
+        $this->verified->accept('et-shop', 'et-user', 'et-secret');
+        $this->verified->refuse('en-shop', 'en-user', 'en-secret');
+
+        self::assertFalse($this->verified->isWebsiteVerified(1));
+        self::assertTrue($this->verified->isVerified(2));
+    }
+
+    /**
+     * Saves the credentials for the website and its store views.
+     */
     private function save(string $subdomain, string $username, string $password): void
     {
         $this->saved = ['subdomain' => $subdomain, 'username' => $username, 'password' => $password];
+        $this->websiteSaved = $this->saved;
     }
 }

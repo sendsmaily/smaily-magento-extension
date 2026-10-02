@@ -59,13 +59,14 @@ class DashboardData implements ArgumentInterface
 
     /**
      * Whether Smaily accepted the saved credentials at the last real check
-     * (PRO-3560) — read at the same scope as the Connection status, the
-     * target website's default store view, so the two cannot disagree.
+     * (PRO-3560) — read for the same account as the Connection status, the
+     * one saved for the target website (PRO-3719), so the two cannot
+     * disagree.
      */
     public function isSmailyConnected(): bool
     {
-        return $this->smailyConnected ??= $this->verifiedCredentials->isVerified(
-            $this->websiteContext->getStoreId()
+        return $this->smailyConnected ??= $this->verifiedCredentials->isWebsiteVerified(
+            $this->websiteContext->getWebsiteId()
         );
     }
 
@@ -76,12 +77,12 @@ class DashboardData implements ArgumentInterface
      */
     public function isSmailyPlanBlocked(): bool
     {
-        return $this->verifiedCredentials->isPlanBlocked($this->websiteContext->getStoreId());
+        return $this->verifiedCredentials->isWebsitePlanBlocked($this->websiteContext->getWebsiteId());
     }
 
     public function getSmailySubdomain(): string
     {
-        return $this->config->getSubdomain($this->websiteContext->getStoreId());
+        return $this->config->getWebsiteSubdomain($this->websiteContext->getWebsiteId());
     }
 
     public function isEngineConnected(): bool

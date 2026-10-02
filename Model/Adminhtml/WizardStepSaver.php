@@ -217,12 +217,18 @@ class WizardStepSaver
         }
 
         // The default-fallback account (mode A): its credentials are also
-        // posted as the top-level subdomain/username/password, so the default
-        // scope IS the fallback account; the language is remembered for the
-        // admin UI's fallback picker.
+        // posted as the top-level subdomain/username/password, so the
+        // website scope IS the fallback account; the language is remembered
+        // for the admin UI's fallback picker, per website as the account is
+        // (PRO-3719).
         $fallbackLanguage = strtolower(trim((string)($data['fallback_language'] ?? '')));
         if ($fallbackLanguage !== '' && preg_match('/^[a-z]{2,3}$/', $fallbackLanguage) === 1) {
-            $this->configWriter->save(Config::XML_PATH_FALLBACK_LANGUAGE, $fallbackLanguage);
+            $this->configWriter->save(
+                Config::XML_PATH_FALLBACK_LANGUAGE,
+                $fallbackLanguage,
+                ScopeInterface::SCOPE_WEBSITES,
+                $websiteId
+            );
         }
 
         // Leaving mode A is destructive by design (the UI confirms first):

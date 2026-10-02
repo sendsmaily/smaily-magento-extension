@@ -152,6 +152,20 @@ class WizardDataTest extends TestCase
     }
 
     /**
+     * PRO-3719: each website shows its own default fallback language.
+     */
+    public function testTheFallbackLanguageIsTheSelectedWebsites(): void
+    {
+        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->config->method('getFallbackLanguage')->willReturnMap([[null, 'et'], [2, 'en']]);
+
+        $decoded = json_decode($this->viewModel->getBootJson(), true);
+
+        self::assertSame('en', $decoded['multilingual']['fallbackLanguage']);
+        self::assertSame('en', $this->viewModel->getFallbackLanguage());
+    }
+
+    /**
      * PRO-3560: filled-in credentials are not "Connected" — the Connection
      * status follows whether Smaily accepted them at the last real check.
      */
@@ -159,7 +173,7 @@ class WizardDataTest extends TestCase
     {
         $this->scopeConfig->method('isSetFlag')->willReturn(false);
         $this->config->method('isConnected')->willReturn(true);
-        $this->verifiedCredentials->expects(self::once())->method('isVerified')->with(5)->willReturn(false);
+        $this->verifiedCredentials->expects(self::once())->method('isWebsiteVerified')->with(2)->willReturn(false);
 
         $decoded = json_decode($this->viewModel->getBootJson(), true);
 
@@ -170,7 +184,7 @@ class WizardDataTest extends TestCase
     public function testSavedCredentialsSmailyAcceptedAreShownAsConnected(): void
     {
         $this->scopeConfig->method('isSetFlag')->willReturn(false);
-        $this->verifiedCredentials->method('isVerified')->with(5)->willReturn(true);
+        $this->verifiedCredentials->method('isWebsiteVerified')->with(2)->willReturn(true);
 
         $decoded = json_decode($this->viewModel->getBootJson(), true);
 
@@ -180,13 +194,18 @@ class WizardDataTest extends TestCase
 
     /**
      * PRO-3570: the Connection status is rendered into the page, so no
-     * wrong state shows before the script runs.
+     * wrong state shows before the script runs. PRO-3719: it describes the
+     * account saved for the website — the account a connection save checks
+     * — not the account the website's default store view holds.
      */
-    public function testTheConnectionStatusIsReadAtTheSelectedWebsitesStoreScope(): void
+    public function testTheConnectionStatusDescribesTheAccountSavedForTheWebsite(): void
     {
-        $this->verifiedCredentials->expects(self::once())->method('isVerified')->with(5)->willReturn(true);
-        $this->config->method('getSubdomain')->with(5)->willReturn('demo');
-        $this->config->method('getUsername')->with(5)->willReturn('api-user');
+        $this->verifiedCredentials->method('isVerified')->with(5)->willReturn(false);
+        $this->verifiedCredentials->expects(self::once())->method('isWebsiteVerified')->with(2)->willReturn(true);
+        $this->config->method('getSubdomain')->with(5)->willReturn('et-shop');
+        $this->config->method('getUsername')->with(5)->willReturn('et-user');
+        $this->config->method('getWebsiteSubdomain')->with(2)->willReturn('demo');
+        $this->config->method('getWebsiteUsername')->with(2)->willReturn('api-user');
 
         self::assertTrue($this->viewModel->isSmailyVerified());
         self::assertSame('demo', $this->viewModel->getSavedSubdomain());
@@ -245,8 +264,8 @@ class WizardDataTest extends TestCase
     public function testAPackageWithoutApiAccessIsShownAsTheReason(): void
     {
         $this->scopeConfig->method('isSetFlag')->willReturn(false);
-        $this->verifiedCredentials->method('isVerified')->with(5)->willReturn(false);
-        $this->verifiedCredentials->method('isPlanBlocked')->with(5)->willReturn(true);
+        $this->verifiedCredentials->method('isWebsiteVerified')->with(2)->willReturn(false);
+        $this->verifiedCredentials->method('isWebsitePlanBlocked')->with(2)->willReturn(true);
 
         $decoded = json_decode($this->viewModel->getBootJson(), true);
 

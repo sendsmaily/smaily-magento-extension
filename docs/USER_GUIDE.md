@@ -277,10 +277,13 @@ store view.
 **Default fallback account (per-language accounts mode).** The picked
 account handles contacts whose language cannot be matched to any account,
 and its credentials also serve every scope without a per-language
-override. After a save, the connection-status line beside the button says
-whether Smaily accepted the default fallback account — the account saved
-for the whole website — whatever language the default store view has; each
-language block's own status shows that language's account. The default
+override. The connection-status line beside the button — after a save and
+after a reload alike, and the Dashboard's Smaily status with it — says
+whether Smaily accepted the default fallback account, the account saved
+for the whole website, whatever language the default store view has; each
+language block's own status shows that language's account. On an
+installation with several websites, each website keeps its own default
+fallback account and shows its own pick. The default
 fallback account is saved for the whole website too: when you pick another
 one, enter its password in its block — until then the save is refused on
 that block's password field. A fallback account left as it is keeps its

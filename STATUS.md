@@ -12,7 +12,9 @@ per-language accounts needs the password of an account other than the
 website's), PRO-3717 (the post-save connection check pairs the website
 account with the website password) and PRO-3718 (a new default fallback
 account needs its password on the server; the form asks exactly when the
-server would refuse), listed in CHANGELOG under "Changes since
+server would refuse) and PRO-3719 (the connection status after a reload
+describes the website account the save checked; the fallback language is
+saved per website), listed in CHANGELOG under "Changes since
 3.0.0-rc3".
 2026-10-02: 3.0.0-rc3 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc3),
@@ -39,6 +41,41 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3719 — the connection status after a reload describes the account
+  the save checked; each website keeps its own fallback language
+  (2026-10-03; found during PRO-3717, reproduced in the integration
+  harness).** (1) After a save the status describes the account saved for
+  the website (PRO-3717), but on a reload `WizardData::isSmailyVerified()`,
+  boot `verified` / `planBlocked`, the finished setup's `verified` and the
+  Dashboard read `VerifiedCredentials::isVerified()` for the website's
+  default store view: in mode A with an et default store view and the en
+  fallback, *Connected* after the save, *Not connected* after a reload.
+  Now `VerifiedCredentials::isWebsiteVerified()` / `isWebsitePlanBlocked()`
+  (new; `isPlanBlocked(storeId)` removed, no other reader) read the
+  website-scope account (`Config::getWebsite*`), and every status reader
+  asks them: `WizardData` (status, `boot.verified`, `boot.planBlocked`, the
+  account name and the setup summary's subdomain and username), `SaveStep`
+  (finish) and `DashboardData` (card, verdict, subdomain). The fields
+  (`boot.connection`) and each language block's own status (`isVerified`
+  per store view) are unchanged. (2) `fallback_language` was written
+  without a scope and read at default scope, so on a multi-website install
+  the last mode-A save set every website's fallback radio. Now the save
+  writes it at the target website's scope and `Config::getFallbackLanguage
+  (?int $websiteId)` reads the website value, falling back to the
+  default-scope row an earlier save wrote — no migration, old rows keep
+  working (a website with no value of its own shows the old shared one,
+  as before). Integration `PerLanguageAccountsSaveTest` (+2, red on the
+  old code): after a mode-A save with an et default store view, a fresh
+  `WizardData` (real `Config` + `VerifiedCredentials`, the fake Smaily
+  client accepts through it as `SmailyClient` does) shows verified, the
+  `en-shop` account and `boot.verified`; with a legacy default-scope `et`
+  row, a website-7 save with fallback en leaves website 8 on et. Unit:
+  `VerifiedCredentialsTest` (+1), `WizardDataTest` (+1, status test now
+  website account), `WizardStepSaverTest` (fallback saved at website
+  scope), `DashboardDataTest`, `SaveStepTest`. USER_GUIDE (Default
+  fallback account), ARCHITECTURE, CHANGELOG. No new phrases. Not run in
+  the sandbox.
 
 - **PRO-3718 — a new default fallback account needs its password on the
   server too (2026-10-03; found by reading code during PRO-3699,
@@ -107,9 +144,9 @@ Earlier: 2026-09-11, 2026-09-10._
   checks the en password — both red on the old code (they got et-secret).
   Unit `testAKeptPasswordIsCheckedAsStored` now reads the website's
   password. USER_GUIDE (Default fallback account), CHANGELOG. Not run in
-  the sandbox. Known, not changed: after a reload the status reads the
-  default store view's account (`WizardData::isSmailyVerified`), which in
-  mode A can be another language's account than the one a save checks.
+  the sandbox. After a reload the status read the default store view's
+  account (`WizardData::isSmailyVerified`), which in mode A can be another
+  language's account than the one a save checks — fixed by PRO-3719.
 
 - **PRO-3715 — a purchase line without a SKU names the same product as the
   bought item's catalog row (2026-10-03; found by a read-only review).** An

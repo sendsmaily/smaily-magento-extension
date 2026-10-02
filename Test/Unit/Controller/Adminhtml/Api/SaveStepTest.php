@@ -36,7 +36,8 @@ class SaveStepTest extends TestCase
     public function testFinishAnswersWhetherTheConnectionIsVerified(bool $verified): void
     {
         $verifiedCredentials = $this->createMock(VerifiedCredentials::class);
-        $verifiedCredentials->method('isVerified')->with(4)->willReturn($verified);
+        $verifiedCredentials->method('isVerified')->willReturn(!$verified);
+        $verifiedCredentials->method('isWebsiteVerified')->with(3)->willReturn($verified);
 
         $this->controller(['step' => 'finish', 'data' => []], $verifiedCredentials)->execute();
 
@@ -60,7 +61,7 @@ class SaveStepTest extends TestCase
     public function testAConnectionSaveAnswersTheResultOfItsCheck(bool $accepted): void
     {
         $verifiedCredentials = $this->createMock(VerifiedCredentials::class);
-        $verifiedCredentials->expects(self::never())->method('isVerified');
+        $verifiedCredentials->expects(self::never())->method('isWebsiteVerified');
         $body = ['step' => 'connect', 'data' => ['subdomain' => 'https://Demo.sendsmaily.net/', 'username' => 'u']];
 
         $this->controller($body, $verifiedCredentials, [], $accepted)->execute();
@@ -106,7 +107,7 @@ class SaveStepTest extends TestCase
     public function testOtherStepsAnswerOnlyTheSave(): void
     {
         $verifiedCredentials = $this->createMock(VerifiedCredentials::class);
-        $verifiedCredentials->expects(self::never())->method('isVerified');
+        $verifiedCredentials->expects(self::never())->method('isWebsiteVerified');
 
         $this->controller(['step' => 'rss', 'data' => ['rss_enabled' => true]], $verifiedCredentials)->execute();
 
@@ -143,7 +144,7 @@ class SaveStepTest extends TestCase
         $stepSaver->method('isConnectionAccepted')->willReturn($connectionAccepted);
         $stepSaver->method('isStorefrontUrlChanged')->willReturn($storefrontUrlChanged);
         $websiteContext = $this->createMock(WebsiteContext::class);
-        $websiteContext->method('getStoreId')->willReturn(4);
+        $websiteContext->method('getWebsiteId')->willReturn(3);
 
         return new SaveStep(
             $context,

@@ -791,7 +791,10 @@ Initial setup, Settings, Log. Design rules:
   the single credential block for per-language blocks (each with its own
   Test connection — saved accounts re-test via `store_id` against the
   saved store-view credentials) plus a default-fallback picker whose
-  account's credentials double as the default scope. Modes `a`/`b` reveal
+  account's credentials double as the website's account; the fallback
+  language is saved per website as well (`Config::getFallbackLanguage()`
+  reads the website value, else the default-scope value saved before
+  PRO-3719). Modes `a`/`b` reveal
   the per-language workflow mapping editor on the Automations panel
   (workflow dropdowns loaded live per account). All sections show/hide
   live on mode change with no save round-trip; leaving mode `a` removes
@@ -817,8 +820,12 @@ Initial setup, Settings, Log. Design rules:
   from, the queue's deliveries included. Changed credentials hash
   differently, so they are not connected until checked. The Dashboard's
   Smaily card and verdict and the Connection status (`boot.verified` from
-  `WizardData`) all ask `isVerified()` for the target website's default
-  store view, so they cannot disagree; no page load calls Smaily. A third
+  `WizardData`) all ask `isWebsiteVerified()` for the account saved for
+  the target website — the single account, or in mode A the default
+  fallback account: the account the connection save checks — so they
+  cannot disagree, and a reload shows what the save showed (PRO-3719);
+  each mode-A language block asks `isVerified()` for its store view. No
+  page load calls Smaily. A third
   answer (PRO-3579, Woo `RefusalReason`): an error body with Smaily code
   227 ("A paid package is required") is the package, not the
   credentials — Smaily gives it before it authenticates. `SmailyClient`
@@ -828,7 +835,7 @@ Initial setup, Settings, Log. Design rules:
   accepted list to a second flag row,
   `smaily_connect_plan_blocked_credentials`; a later accept or refusal
   clears it. Such a store is *Not connected* — every request is refused —
-  and `isPlanBlocked()` (`boot.planBlocked`, the Dashboard's card and
+  and `isWebsitePlanBlocked()` (`boot.planBlocked`, the Dashboard's card and
   verdict sentence) names the package instead of the credentials. The
   verdict order is: setup incomplete > Smaily not connected > Campaign
   Intelligence account not active > failures > engine unreachable > all

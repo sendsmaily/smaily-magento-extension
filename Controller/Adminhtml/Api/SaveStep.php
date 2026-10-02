@@ -70,7 +70,9 @@ class SaveStep extends AbstractJsonAction implements HttpPostActionInterface
             $response['storefrontUrlChanged'] = $this->stepSaver->isStorefrontUrlChanged();
         }
         if ($step === 'finish') {
-            $response['verified'] = $this->verifiedCredentials->isVerified($this->websiteContext->getStoreId());
+            $response['verified'] = $this->verifiedCredentials->isWebsiteVerified(
+                $this->websiteContext->getWebsiteId()
+            );
         }
 
         return $this->jsonResponse($response);

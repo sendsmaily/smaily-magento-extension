@@ -135,13 +135,14 @@ class DashboardDataTest extends TestCase
         $queueHealth = $this->createMock(QueueHealth::class);
         $queueHealth->method('failedSince')->willReturn($failed);
 
-        // The card and the verdict judge the same scope as the Connection
-        // status: the target website's default store view.
+        // The card and the verdict judge the same account as the Connection
+        // status: the one saved for the target website (PRO-3719).
         $websiteContext = $this->createMock(WebsiteContext::class);
-        $websiteContext->method('getStoreId')->willReturn(4);
+        $websiteContext->method('getWebsiteId')->willReturn(4);
         $verifiedCredentials = $this->createMock(VerifiedCredentials::class);
-        $verifiedCredentials->method('isVerified')->with(4)->willReturn($smailyVerified);
-        $verifiedCredentials->method('isPlanBlocked')->with(4)->willReturn($planBlocked);
+        $verifiedCredentials->method('isVerified')->willReturn(!$smailyVerified);
+        $verifiedCredentials->method('isWebsiteVerified')->with(4)->willReturn($smailyVerified);
+        $verifiedCredentials->method('isWebsitePlanBlocked')->with(4)->willReturn($planBlocked);
 
         return new DashboardData(
             $this->createMock(Config::class),

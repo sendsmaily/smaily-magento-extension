@@ -8,10 +8,17 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Adminhtml;
 
+use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
+use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\FlagManager;
+use Magento\Framework\Locale\ResolverInterface;
+use Magento\Framework\Serialize\Serializer\Json;
+use Magento\Sales\Model\ResourceModel\Order\Collection as OrderCollection;
+use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
@@ -21,18 +28,26 @@ use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
 use Smaily\Connect\Model\Automation\MappingSaver;
+use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Client\CredentialCheck;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
+use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\ContactSync\Mode;
+use Smaily\Connect\Model\Engine\ConsentSource;
+use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
+use Smaily\Connect\Model\OrderOrigin;
+use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory as MappingCollectionFactory;
 use Smaily\Connect\Model\SubdomainNormalizer;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
 use Smaily\Connect\Test\Integration\Support\Fake\RequestCachedScopeConfig;
+use Smaily\Connect\ViewModel\Adminhtml\WizardData;
 
 /**
  * PRO-3683: with per-language Smaily accounts, saving the accounts gives
@@ -63,6 +78,16 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
 
     private Config $config;
 
+    private DatabaseScopeConfig $scopeConfig;
+
+    private StoreManagerInterface $storeManager;
+
+    /** What Smaily accepted, as SmailyClient remembers it. */
+    private VerifiedCredentials $verifiedCredentials;
+
+    /** @var array<string, mixed> flag data by flag code */
+    private array $flags = [];
+
     /**
      * The credentials each connection save asked Smaily about.
      *
@@ -74,8 +99,20 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
     {
         parent::setUp();
 
-        $scopeConfig = new DatabaseScopeConfig($this->connection, self::STORES);
-        $this->config = $this->objectManager->create(Config::class, ['scopeConfig' => $scopeConfig]);
+        $this->scopeConfig = new DatabaseScopeConfig($this->connection, self::STORES);
+        $this->config = $this->objectManager->create(Config::class, ['scopeConfig' => $this->scopeConfig]);
+        $flagManager = $this->createMock(FlagManager::class);
+        $flagManager->method('getFlagData')->willReturnCallback(fn (string $code) => $this->flags[$code] ?? null);
+        $flagManager->method('saveFlag')->willReturnCallback(function (string $code, $value): bool {
+            $this->flags[$code] = $value;
+
+            return true;
+        });
+        $this->verifiedCredentials = new VerifiedCredentials(
+            $flagManager,
+            $this->objectManager->get(EncryptorInterface::class),
+            $this->config
+        );
         // The saver reads the configuration as Magento does in a request: as
         // it was when the request first read it. Its end (the saver cleans
         // the config cache type) starts the next request.
@@ -98,6 +135,16 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
                 $client->method('validateCredentials')->willThrowException(
                     new AuthenticationException('refused', 401)
                 );
+            } else {
+                $client->method('validateCredentials')->willReturnCallback(
+                    function () use ($credentials): void {
+                        $this->verifiedCredentials->accept(
+                            $credentials['subdomain'],
+                            $credentials['username'],
+                            $credentials['password']
+                        );
+                    }
+                );
             }
 
             return $client;
@@ -106,6 +153,7 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
         $defaultStore = $this->createMock(StoreInterface::class);
         $defaultStore->method('getWebsiteId')->willReturn(self::WEBSITE_ID);
         $storeManager = $this->createMock(StoreManagerInterface::class);
+        $this->storeManager = $storeManager;
         $storeManager->method('getDefaultStoreView')->willReturn($defaultStore);
         $storeManager->method('getWebsite')->willReturnCallback(function (int $websiteId): Website {
             $storeIds = array_keys(array_filter(self::STORES, static fn (int $id): bool => $id === $websiteId));
@@ -375,7 +423,7 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
             'message' => 'Enter the password of the ET account so it can take over as the default fallback.',
         ]], $errors);
         $this->assertWebsiteAccount('en');
-        self::assertSame('en', $this->config->getFallbackLanguage());
+        self::assertSame('en', $this->config->getFallbackLanguage(self::WEBSITE_ID));
         $this->assertAccount(2, 'et');
     }
 
@@ -391,9 +439,87 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
         self::assertSame([], $this->postAccounts([$this->account('en'), $this->account('et', 'et-secret')], 'et'));
 
         $this->assertWebsiteAccount('et');
-        self::assertSame('et', $this->config->getFallbackLanguage());
+        self::assertSame('et', $this->config->getFallbackLanguage(self::WEBSITE_ID));
         $this->assertAccount(1, 'en');
         $this->assertAccount(2, 'et');
+    }
+
+    /**
+     * PRO-3719: after a reload, the connection status describes the account
+     * the save checked — the default fallback account saved for the
+     * website, en — not the et account of the website's default store view,
+     * which Smaily never checked.
+     */
+    public function testAfterAReloadTheStatusDescribesTheAccountTheSaveChecked(): void
+    {
+        $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'et_EE', 5 => 'en_GB']);
+        $this->saveAccounts([$this->account('en', 'en-secret'), $this->account('et', 'et-secret')]);
+        self::assertTrue($this->saver->isConnectionAccepted());
+
+        $wizardData = $this->wizardData();
+
+        self::assertTrue($wizardData->isSmailyVerified());
+        self::assertSame('en-shop', $wizardData->getSavedSubdomain());
+        self::assertTrue(json_decode($wizardData->getBootJson(), true)['verified']);
+    }
+
+    /**
+     * PRO-3719: the fallback language is saved for the website, as the
+     * fallback account is. Another website keeps its own: here the value its
+     * save stored before PRO-3719, at the default scope, which is still read
+     * for a website without a value of its own.
+     */
+    public function testEachWebsiteKeepsItsOwnFallbackLanguage(): void
+    {
+        $this->connection->insert('core_config_data', [
+            'scope' => 'default',
+            'scope_id' => 0,
+            'path' => Config::XML_PATH_FALLBACK_LANGUAGE,
+            'value' => 'et',
+        ]);
+        $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'et_EE', 5 => 'en_GB']);
+
+        $this->saveAccounts([$this->account('en', 'en-secret'), $this->account('et', 'et-secret')]);
+
+        self::assertSame('en', $this->config->getFallbackLanguage(self::WEBSITE_ID));
+        self::assertSame('et', $this->config->getFallbackLanguage(self::OTHER_WEBSITE_ID));
+        self::assertSame(
+            'en',
+            json_decode($this->wizardData()->getBootJson(), true)['multilingual']['fallbackLanguage']
+        );
+    }
+
+    /**
+     * The Connection page's view model in the next request, for the website
+     * the saver targets.
+     */
+    private function wizardData(): WizardData
+    {
+        require_once __DIR__ . '/../Support/Stub/ProductCollectionFactory.php';
+        $request = $this->createMock(RequestInterface::class);
+        $request->method('getParam')->willReturn(null);
+        $orderCollectionFactory = $this->createMock(OrderCollectionFactory::class);
+        $orderCollectionFactory->method('create')->willReturn($this->createMock(OrderCollection::class));
+        $productCollectionFactory = $this->createMock(ProductCollectionFactory::class);
+        $productCollectionFactory->method('create')->willReturn($this->createMock(ProductCollection::class));
+
+        return new WizardData(
+            $this->config,
+            $this->createMock(Mode::class),
+            $this->createMock(EngineSettings::class),
+            $this->scopeConfig,
+            new AccountResolver($this->storeManager, new LanguageResolver($this->scopeConfig)),
+            $this->createMock(ContactAudience::class),
+            $orderCollectionFactory,
+            $productCollectionFactory,
+            new Json(),
+            $this->createMock(MappingCollectionFactory::class),
+            new WebsiteContext($this->storeManager, $request),
+            $this->verifiedCredentials,
+            $this->createMock(ResolverInterface::class),
+            $this->createMock(ConsentSource::class),
+            $this->createMock(OrderOrigin::class)
+        );
     }
 
     /**

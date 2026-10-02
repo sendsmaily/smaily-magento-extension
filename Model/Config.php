@@ -168,13 +168,15 @@ class Config
     }
 
     /**
-     * The language whose per-language account is the default fallback in
-     * multilingual mode A (informational — its credentials are also stored
-     * at the default scope by the save path).
+     * The language whose per-language account is a website's default
+     * fallback in multilingual mode A (informational — its credentials are
+     * also the website's account, saved by the same save). Saved per
+     * website since PRO-3719; a value saved before that, at the default
+     * scope, is still read for a website without its own.
      */
-    public function getFallbackLanguage(): string
+    public function getFallbackLanguage(?int $websiteId = null): string
     {
-        return trim((string)$this->scopeConfig->getValue(self::XML_PATH_FALLBACK_LANGUAGE));
+        return trim((string)$this->websiteValue(self::XML_PATH_FALLBACK_LANGUAGE, $websiteId));
     }
 
     public function isSyncEnabled(?int $websiteId = null): bool

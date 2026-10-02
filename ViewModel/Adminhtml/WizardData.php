@@ -148,27 +148,32 @@ class WizardData implements ArgumentInterface
     /**
      * Whether Smaily accepted the saved credentials at the last real check
      * (PRO-3560) — what the Connection status shows. Rendered into the page
-     * so no other state shows before the script runs (PRO-3570).
+     * so no other state shows before the script runs (PRO-3570). The
+     * account is the one saved for the website — the single account, or
+     * with per-language accounts the default fallback account — the one a
+     * connection save checks, so a reload shows what the save showed
+     * (PRO-3719).
      */
     public function isSmailyVerified(): bool
     {
-        return $this->verifiedCredentials->isVerified($this->websiteContext->getStoreId());
+        return $this->verifiedCredentials->isWebsiteVerified($this->websiteContext->getWebsiteId());
     }
 
     /**
-     * The saved Smaily subdomain of the selected website.
+     * The Smaily subdomain saved for the selected website (the account the
+     * connection status describes).
      */
     public function getSavedSubdomain(): string
     {
-        return $this->config->getSubdomain($this->websiteContext->getStoreId());
+        return $this->config->getWebsiteSubdomain($this->websiteContext->getWebsiteId());
     }
 
     /**
-     * The saved Smaily API username of the selected website.
+     * The Smaily API username saved for the selected website.
      */
     public function getSavedUsername(): string
     {
-        return $this->config->getUsername($this->websiteContext->getStoreId());
+        return $this->config->getWebsiteUsername($this->websiteContext->getWebsiteId());
     }
 
     /**
@@ -210,7 +215,7 @@ class WizardData implements ArgumentInterface
             // above only says they are filled in.
             'verified' => $this->isSmailyVerified(),
             // Why not: the package has no API access, not the credentials (PRO-3579).
-            'planBlocked' => $this->verifiedCredentials->isPlanBlocked($storeId),
+            'planBlocked' => $this->verifiedCredentials->isWebsitePlanBlocked($websiteId),
             'setupCompleted' => $this->isSetupCompleted(),
             'storeId' => $storeId,
             'connection' => [
@@ -229,7 +234,7 @@ class WizardData implements ArgumentInterface
             ],
             'multilingual' => [
                 'languages' => $this->accountResolver->detectedLanguages($websiteId),
-                'fallbackLanguage' => $this->config->getFallbackLanguage(),
+                'fallbackLanguage' => $this->config->getFallbackLanguage($websiteId),
             ],
             'subscribers' => [
                 'syncEnabled' => $this->config->isSyncEnabled($websiteId),
@@ -398,12 +403,12 @@ class WizardData implements ArgumentInterface
     }
 
     /**
-     * The language whose account is the mode-A default fallback ('' = none
-     * picked yet).
+     * The language whose account is the selected website's mode-A default
+     * fallback ('' = none picked yet).
      */
     public function getFallbackLanguage(): string
     {
-        return $this->config->getFallbackLanguage();
+        return $this->config->getFallbackLanguage($this->websiteContext->getWebsiteId());
     }
 
     /**

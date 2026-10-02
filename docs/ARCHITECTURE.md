@@ -174,6 +174,14 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   the one class of change events cannot see: a CSV / `bin/magento import` run
   writes the catalog tables directly. Latency: event-driven changes ~1–2 min,
   everything else at most ~24 h.
+- **Order line `sku`.** A line is the parent order item (a configurable's
+  child item is skipped; its price is on the parent), keyed on the item's
+  SKU — for a configurable, Magento's own copy of the chosen variant's SKU.
+  An empty SKU falls back the way the catalog row does: `mag-<product
+  entity_id>`. A configurable line's `product_id` is the parent's, so an
+  empty-SKU configurable line keys on its child item instead (the variant's
+  SKU, or `mag-<variant entity_id>`) and joins the variant's own catalog row
+  (PRO-3715); any other line keeps its own product id.
 - **Order return signals (contract §5, v1.8.0):** `items[].returned_at` is
   derived from the order's own credit memos on every build
   (`OrderPayloadBuilder`), never from a one-shot event — the engine replaces

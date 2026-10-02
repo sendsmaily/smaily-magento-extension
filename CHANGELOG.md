@@ -7,6 +7,7 @@ The package version is currently `3.0.0-rc3` — the third release-candidate cut
 **Changes since 3.0.0-rc3**
 
 - Campaign Intelligence gets a category for every variant: a variant of a configurable product that has no category of its own is sent with its parent product's category. Before, such a variant was sent as uncategorized. A variant with a category of its own keeps it.
+- A purchased variant of a configurable product without a SKU is sent to Campaign Intelligence as the variant that was bought, so the purchase line names the same product as the variant's catalog entry.
 
 **Changes since 3.0.0-rc2**
 

@@ -46,6 +46,9 @@ class OrderPayloadBuilder
 
     private const ATTRIBUTION_TABLE = 'smaily_order_attribution';
 
+    /** Magento's configurable product type code (no Magento_ConfigurableProduct dependency). */
+    private const TYPE_CONFIGURABLE = 'configurable';
+
     public function __construct(
         private readonly ResourceConnection $resourceConnection
     ) {
@@ -87,6 +90,14 @@ class OrderPayloadBuilder
     private function items(OrderInterface $order): array
     {
         $returns = $this->returnsByOrderItem($order);
+        // The child line of each parent line: for a configurable, the
+        // variant that was bought (PRO-3715).
+        $childOf = [];
+        foreach ($order->getItems() as $orderItem) {
+            if ($orderItem->getParentItemId()) {
+                $childOf[(int)$orderItem->getParentItemId()] ??= $orderItem;
+            }
+        }
         $items = [];
         foreach ($order->getItems() as $orderItem) {
             // Product rows only: children of configurables carry the price on
@@ -104,7 +115,7 @@ class OrderPayloadBuilder
             $itemDiscount = abs((float)$orderItem->getDiscountAmount());
 
             $row = [
-                'sku' => $this->sku($orderItem),
+                'sku' => $this->sku($orderItem, $childOf[(int)$orderItem->getItemId()] ?? null),
                 // Integer when whole (contract examples use ints); a genuinely
                 // fractional qty (e.g. 1.5 kg) wires as a float.
                 'qty' => $qty == (int)$qty ? (int)$qty : $qty,
@@ -208,12 +219,23 @@ class OrderPayloadBuilder
      * different keys and never join — breaking attribution + cadence, and an
      * empty `sku` is a cross-product collision magnet (contract §3, "Same key
      * from every path" / catalog↔order-line fallback symmetry, PRO-1280).
+     *
+     * A configurable line's `product_id` is the PARENT's, but the variant
+     * bought has its own catalog row, so an empty-SKU configurable line keys
+     * on its child line instead — the variant's own SKU, or `mag-<variant
+     * entity_id>` (PRO-3715). Any other line keeps its own product id.
      */
-    private function sku(OrderItemInterface $orderItem): string
+    private function sku(OrderItemInterface $orderItem, ?OrderItemInterface $childItem = null): string
     {
         $sku = trim((string)$orderItem->getSku());
+        if ($sku !== '') {
+            return $sku;
+        }
+        if ($childItem !== null && $orderItem->getProductType() === self::TYPE_CONFIGURABLE) {
+            return $this->sku($childItem);
+        }
 
-        return $sku !== '' ? $sku : 'mag-' . (int)$orderItem->getProductId();
+        return 'mag-' . (int)$orderItem->getProductId();
     }
 
     /**

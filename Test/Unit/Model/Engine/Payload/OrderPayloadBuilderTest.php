@@ -126,6 +126,55 @@ class OrderPayloadBuilderTest extends TestCase
     }
 
     /**
+     * PRO-3715: an empty-SKU configurable line names the variant bought —
+     * `mag-<child product id>`, the key of the variant's own catalog row —
+     * not `mag-<parent id>`.
+     */
+    public function testEmptySkuConfigurableLineKeysOnTheVariantBought(): void
+    {
+        $parent = $this->item('', 1, 10.00, 0.0);
+        $parent->method('getItemId')->willReturn(7);
+        $parent->method('getProductId')->willReturn(17);
+        $parent->method('getProductType')->willReturn('configurable');
+        $child = $this->item('', 1, 10.00, 0.0);
+        $child->method('getParentItemId')->willReturn(7);
+        $child->method('getProductId')->willReturn(42);
+        $child->method('getProductType')->willReturn('simple');
+
+        $order = $this->order([], 10.00);
+        $order->method('getItems')->willReturn([$parent, $child]);
+
+        $payload = $this->builder->build($order);
+
+        self::assertNotNull($payload);
+        self::assertCount(1, $payload['items']);
+        self::assertSame('mag-42', $payload['items'][0]['sku']);
+    }
+
+    /**
+     * PRO-3715: only a configurable line keys on its child — an empty-SKU
+     * bundle line keeps its own product id (the bundle's catalog row).
+     */
+    public function testEmptySkuBundleLineKeepsItsOwnProductId(): void
+    {
+        $parent = $this->item('', 1, 10.00, 0.0);
+        $parent->method('getItemId')->willReturn(7);
+        $parent->method('getProductId')->willReturn(17);
+        $parent->method('getProductType')->willReturn('bundle');
+        $child = $this->item('', 1, 0.0, 0.0);
+        $child->method('getParentItemId')->willReturn(7);
+        $child->method('getProductId')->willReturn(42);
+
+        $order = $this->order([], 10.00);
+        $order->method('getItems')->willReturn([$parent, $child]);
+
+        $payload = $this->builder->build($order);
+
+        self::assertNotNull($payload);
+        self::assertSame('mag-17', $payload['items'][0]['sku']);
+    }
+
+    /**
      * Contract §5 (v1.8.0) return signals: a Magento PARTIAL refund never
      * changes the order state, so the credit memos are the only record — and
      * they are re-read on every build, because the engine replaces an order's

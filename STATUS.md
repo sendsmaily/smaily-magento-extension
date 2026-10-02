@@ -6,8 +6,9 @@
 > and fix it.
 
 _Last updated: 2026-10-03 — after the rc3 cut: PRO-3714 (a variant
-without a category of its own takes its parent's), listed in CHANGELOG
-under "Changes since 3.0.0-rc3". 2026-10-02: 3.0.0-rc3 is released as a GitHub pre-release on
+without a category of its own takes its parent's) and PRO-3715 (an
+empty-SKU configurable order line names the variant bought), listed in
+CHANGELOG under "Changes since 3.0.0-rc3". 2026-10-02: 3.0.0-rc3 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc3),
 built by the release workflow from commit a1ff618; the ZIP and its .sha256
 were checked after publishing (375 entries, checksum OK, sha256
@@ -32,6 +33,20 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3715 — a purchase line without a SKU names the same product as the
+  bought item's catalog row (2026-10-03; found by a read-only review).** An
+  empty-SKU order line fell back to `mag-<order item product_id>`; on a
+  configurable parent item that is the PARENT's id, while the variant's
+  catalog row is `mag-<child id>`, so the two never joined. Now
+  `OrderPayloadBuilder` maps each parent line to its child item (by
+  `parent_item_id`, the same signal that skips child lines), and an
+  empty-SKU `configurable` line keys on the child — its SKU, or
+  `mag-<child product id>`. Bundles and every other line keep today's key;
+  a non-empty SKU is unchanged. Wire shape unchanged (values only). Unit
+  tests: configurable → `mag-<child>`, bundle keeps `mag-<own id>`, the
+  existing simple/whitespace/normal-SKU cases unchanged. Not run in the
+  sandbox.
 
 - **PRO-3714 — a variant without categories of its own is sent with its
   visible parent's category (2026-10-03; found by a read-only review).**

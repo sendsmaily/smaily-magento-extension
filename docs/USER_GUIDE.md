@@ -508,11 +508,24 @@ panel — you do not have to keep the page open:
   exactly as long as it asked before the next attempt.
 - An admin notification appears when the engine has been unreachable for
   over an hour, or when many events failed within 24 hours.
-- Logs: `var/log/smaily_connect.log`. Verbosity (error / info / debug) is a
-  small control above the Log grid; debug verbosity logs full API requests
-  and responses — use only for troubleshooting (debug logs summarize
-  payloads, customer PII is not written to disk). Also settable via
-  `bin/magento config:set smaily_connect/logging/verbosity debug`.
+- Logs: `var/log/smaily_connect.log` on the server. By default the
+  extension writes errors only. There is no control for this in the admin:
+  a developer with shell access raises the level for troubleshooting and
+  lowers it afterwards from the Magento root:
+
+  ```
+  bin/magento config:set smaily_connect/logging/verbosity debug
+  bin/magento config:set smaily_connect/logging/verbosity error
+  ```
+
+  `info` is the middle level (batch outcomes, retries); `debug` adds every
+  Smaily API request and its response code. The command takes effect at
+  once — it clears Magento's configuration cache itself. **The detailed
+  levels write more about your contacts to a file on the server**: request
+  payloads are summarised and email addresses masked, but an error message
+  can still carry a contact's email address. Treat the file as personal
+  data, switch the level back to `error` when you are done, and delete
+  the lines you no longer need.
 - Sent queue rows are pruned after 30 days, failed rows after 90. The same
   nightly job also tidies the abandoned-cart tracker — the small table that
   remembers which carts the extension has already dealt with: a finished

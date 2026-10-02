@@ -144,12 +144,8 @@
 .smaily-dashboard .smaily-status-sent { color: #006400; }
 .smaily-dashboard .smaily-tile-link { display: inline-block; margin-top: 0.6rem; }
 
-/* --- Log page: failed banner + verbosity strip + detail slide-out ---------- */
+/* --- Log page: failed banner + detail slide-out ----------------------------- */
 .smaily-log-failed-banner { margin-bottom: 2rem; }
-.smaily-log-verbosity { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-5); }
-.smaily-log-verbosity label { font-size: var(--fs-13); font-weight: 600; color: var(--s-text); }
-.smaily-log-verbosity select { font-size: var(--fs-13); }
-.smaily-log-verbosity .note { flex-basis: 100%; margin: 0; font-size: var(--fs-12); color: var(--s-text-3); }
 .smaily-log-details { max-width: none; }
 .smaily-log-details-meta { margin-bottom: 2rem; }
 .smaily-log-details-meta th { text-align: left; padding-right: 2rem; white-space: nowrap; }

@@ -5,7 +5,10 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-2456 follow-up — five defects from Erkki's
+_Last updated: 2026-10-02 (PRO-3571 — the Log page has no logging-level
+control any more; the log stays at errors only unless a developer runs
+`bin/magento config:set smaily_connect/logging/verbosity debug|info|error`.
+Earlier the same day: PRO-2456 follow-up — five defects from Erkki's
 live-sandbox review fixed: the Dashboard menu glyph, the contact import
 block, checkbox alignment, the Intelligence connected state and the
 Overview step, which now leads on to the Dashboard or Settings. Earlier
@@ -68,6 +71,32 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   (was 2.2), and a footer under a divider offers **Go to Dashboard**
   (primary) and **Open Settings** — new phrases "Ava töölaud" / "Ava
   seaded". Checked by screenshot at 1440 and 1100 px in en_US and et_EE.
+
+- **PRO-3571 done — no one-click debug logging in the admin (2026-10-02).**
+  The Log page's "Log Verbosity" strip let any admin with Log access switch
+  `smaily_connect.log` to debug. Erkki decided (2026-10-02) to remove it, as
+  the Woo plugin leaves detailed logging to the developer (`WP_DEBUG`).
+  Removed: `log/verbosity.phtml`, its layout block, the
+  `LogVerbositySettings` ViewModel, the `api/saveverbosity` controller,
+  `Model\LogVerbositySaver`, the strip's CSS and the orphaned phrase
+  "Invalid log verbosity value." (EN + ET). Kept: the `smaily_connect/api`
+  route and `Smaily_Connect::event_log` ACL (other actions use them), the
+  `logging/verbosity` path with default `error`, `Config::getLogVerbosity()`
+  and the Logger unchanged, the source model, and the hidden `system.xml`
+  field — `config:set` rejects a path `system.xml` does not declare
+  (`Magento\Config\Model\Config\PathValidator`); `config:set` cleans the
+  config cache itself, so no `cache:flush` is needed. New
+  `Test\Unit\Model\Logger\LoggerTest` pins the gating, the path, the
+  `error` default and the `system.xml` field. USER_GUIDE (troubleshooting),
+  PILOT_CHECKLIST, CHANGELOG and ADMIN_UI_TARGET_SPEC (§2.4/§4.2 marked
+  superseded) say so. Finding: debug does not write full contact data —
+  Smaily request bodies are summarised (count + keys), the query `email` is
+  masked, responses are summarised; the engine client logs no payloads.
+  The old guide line "customer PII is not written to disk" was still too
+  strong: a curl transport error message carries the request URL, so the
+  profiling-consent lookup (`GET contact?email=`) can put an address in
+  the always-on error log. Gates: 323 unit, phpcs 0 errors, phpstan `[OK]`,
+  integration 87.
 
 - **PRO-3560 done — "Connected" means Smaily accepted the credentials
   (2026-10-02).** Before, the Dashboard and Settings > Connection said

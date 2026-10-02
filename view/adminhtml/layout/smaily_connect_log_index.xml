@@ -27,13 +27,6 @@
                     <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\LogHealth</argument>
                 </arguments>
             </block>
-            <block class="Magento\Backend\Block\Template"
-                   name="smaily.log.verbosity"
-                   template="Smaily_Connect::log/verbosity.phtml">
-                <arguments>
-                    <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\LogVerbositySettings</argument>
-                </arguments>
-            </block>
             <uiComponent name="smaily_log_grid"/>
             <block class="Magento\Backend\Block\Template"
                    name="smaily.log.url.filter.applier"

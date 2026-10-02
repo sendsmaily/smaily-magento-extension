@@ -577,6 +577,11 @@ stays untouched. Three additions:
    design-pack guidance exists for its placement (the pack never mocked this
    control); Phase B places it (e.g. a small settings strip above the grid)
    from the common shell idioms, not new visual language.
+   **Superseded (Erkki, 2026-10-02):** the control was built and then
+   removed again — the Log page has no logging-level control. The setting
+   stays at `logging/verbosity` (default `error`) and a developer changes it
+   with `bin/magento config:set`, as the WooCommerce plugin leaves detailed
+   logging to the developer (`WP_DEBUG`).
 
 **(b) Exposed options/controls** (source: A2 §G, confirmed —
 `smaily_log_grid.xml`, `log/details.phtml`):
@@ -588,7 +593,7 @@ stays untouched. Three additions:
 | Failed-24h banner | zero-state hidden; links to grid pre-filtered on status |
 | Details slide-out | status pill, attempts (N of MAX), honest retry line (5 states: sent/sending/failed-terminal/scheduled-retry/waiting-for-flush), last error (redacted), payload as-sent/queued (redacted), last response (redacted) |
 | PII redaction | `Model\Log\PayloadRedactor` — secrets never shown, emails masked |
-| Log verbosity (error/info/debug) | New — resolved (Erkki, 2026-07-14, §4.2); `logging/verbosity`, native config removed once built |
+| Log verbosity (error/info/debug) | Removed (Erkki, 2026-10-02) — developer-only via `bin/magento config:set`, see item 3 above |
 
 The pack's "Copy payload" and "Retry now" footer buttons, and the specific
 "Attempt N of 5 · next attempt ~14:26" ETA copy, are **design-implied, not
@@ -793,7 +798,7 @@ on a wizard/Settings panel today; **both** = duplicated right now.
 | `intelligence/sync_customers` | Customer sync toggle | both, same shape (`CustomerSaveAfter`) | **REMOVED** (decision 4), same note. |
 | `intelligence/sync_orders` | Order sync toggle | both, same shape (`OrderSaveAfter`) | **REMOVED** (decision 4), same note. |
 | `intelligence/browse_tracking` | Storefront browse tracking (consent-gated) | both | **ours.** Not part of decision 4 — real, distinct capability. No scope need (default-scope-only tenancy). |
-| `logging/verbosity` | Log verbosity (error/info/debug) | **native only**, default-scope-only (no `showInWebsite`/`showInStore` at all) | **ours** — resolved (Erkki, 2026-07-14): gets a home on the Log page; no native config needed. See §2.4. |
+| `logging/verbosity` | Log verbosity (error/info/debug) | **native only**, default-scope-only (no `showInWebsite`/`showInStore` at all) | **CLI only** — superseded (Erkki, 2026-10-02): no admin control; `bin/magento config:set` changes it. The hidden `system.xml` field stays because `config:set` rejects a path `system.xml` does not declare. See §2.4. |
 
 **Fields resolved by Erkki (2026-07-14) — binding, not yet implemented:**
 
@@ -823,6 +828,7 @@ on a wizard/Settings panel today; **both** = duplicated right now.
 - **`logging/verbosity`** — no scope need at all (default-scope-only).
   **Decision: gets a home on the module's own pages** (the Log page, §2.4)
   rather than staying native/CLI-only; no native config needed.
+  **Superseded (Erkki, 2026-10-02):** CLI only after all, see §2.4.
 
 **Migration constraint (record only, not solved here):** old 2.8.x installs
 have their Smaily credentials in native `core_config_data` — the 2.8.x→v3
@@ -851,7 +857,7 @@ path before and after any admin-surface reshuffle.
   send); `multilingual_mode`'s native per-website scope is dropped (one mode
   per Magento instance); `rss/enabled` drops its per-store-view granularity
   for one store-wide toggle on the RSS tab; `logging/verbosity` gets a home
-  on the Log page. Net effect: native `Stores > Configuration > Smaily`
+  on the Log page (superseded 2026-10-02: CLI only, see §2.4). Net effect: native `Stores > Configuration > Smaily`
   disappears entirely — no field keeps a native-only or native-advanced
   home. This is a Phase B implementation item (including deleting the
   Intelligence-sync observer gates per decision 4, and the migration

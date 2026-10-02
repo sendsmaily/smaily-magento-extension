@@ -127,9 +127,11 @@ the store uses cookie restriction mode, accept the cookie notice first).
    once and are not retried — fix the cause, then **Send again** on the row
    (or select rows and **Retry**). Network or server errors retry by
    themselves (1 min → 6 h, 5 attempts).
-3. More detail: the verbosity control above the Log grid → **debug**, then
-   `var/log/smaily_connect.log` on the server. Set it back to **error**
-   afterwards.
+3. More detail: on the server, `bin/magento config:set
+   smaily_connect/logging/verbosity debug`, then read
+   `var/log/smaily_connect.log`. Set it back afterwards with the same
+   command and `error` — while it is raised, the file holds more about the
+   contacts.
 4. Engine trouble: `bin/magento smaily:engine:ping`; the Dashboard and
    **Settings > Intelligence** say plainly when the Campaign Intelligence
    account is not active (fixed on the Smaily side, then **Check again**).
@@ -149,4 +151,5 @@ without personal data) in the PRO-2474 report to the orchestrator.
 - Erase the test contact if it should not stay:
   `bin/magento smaily:gdpr erase <your test address> --force` (local queues
   + engine), and remove it in Smaily.
-- Set the Log verbosity back to **error** if it was raised.
+- Set the log level back if it was raised: `bin/magento config:set
+  smaily_connect/logging/verbosity error`.

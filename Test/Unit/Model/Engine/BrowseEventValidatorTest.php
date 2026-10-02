@@ -93,7 +93,13 @@ class BrowseEventValidatorTest extends TestCase
         ]));
     }
 
-    public function testClientAssertedEmailIsRejectedAndDwellCoerced(): void
+    /**
+     * PRO-3575: the anonymous beacon asserts no identity. Neither the email
+     * nor the platform customer id is forwarded; identity reaches the engine
+     * only from server-side state (the engine-issued visitor token and the
+     * login identity merge).
+     */
+    public function testClientAssertedIdentityIsRejectedAndDwellCoerced(): void
     {
         $clean = $this->validator->sanitize([
             'event_id' => self::UUID,
@@ -108,7 +114,7 @@ class BrowseEventValidatorTest extends TestCase
         self::assertNotNull($clean);
         // Identity must never be client-asserted on the anonymous beacon.
         self::assertArrayNotHasKey('customer_email', $clean);
-        self::assertSame('42', $clean['external_id']);
+        self::assertArrayNotHasKey('external_id', $clean);
         self::assertSame(12, $clean['dwell_seconds']);
         self::assertSame('kassitoit', $clean['search_query']);
     }

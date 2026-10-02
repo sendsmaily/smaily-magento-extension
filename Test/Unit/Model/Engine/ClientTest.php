@@ -29,7 +29,7 @@ use Smaily\Connect\Model\Logger\Logger;
 
 class ClientTest extends TestCase
 {
-    /** @var array<int, array{request: RequestInterface}> */
+    /** @var array<int, array{request: RequestInterface, options: array<string, mixed>}> */
     private array $history = [];
 
     /** @var int[] */
@@ -106,6 +106,39 @@ class ClientTest extends TestCase
         self::assertTrue($response['ok']);
         self::assertSame([7], $this->sleeps);
         self::assertCount(2, $this->history);
+    }
+
+    /**
+     * PRO-3575: a back-off the engine asks for is honoured up to a fixed
+     * ceiling, so no caller ever waits on it for longer than that.
+     */
+    public function testARequestedBackOffIsHonouredUpToAFixedCeiling(): void
+    {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/ingest/ping');
+        $client = $this->createClient([
+            new Response(429, [], '{"error":"rate_limit_exceeded","retry_after_seconds":3600}'),
+            new Response(200, [], '{"ok":true}'),
+        ]);
+
+        $client->ping();
+
+        self::assertSame([60], $this->sleeps);
+    }
+
+    /**
+     * PRO-3575: every engine call bounds the connection phase as well as the
+     * whole request.
+     */
+    public function testEveryCallBoundsTheConnectionAndTheRequest(): void
+    {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/ingest/ping');
+        $client = $this->createClient([new Response(200, [], '{"ok":true}')]);
+
+        $client->ping();
+
+        $options = $this->history[0]['options'];
+        self::assertSame(10, $options['connect_timeout'] ?? null);
+        self::assertSame(30, $options['timeout'] ?? null);
     }
 
     public function testServerErrorsRetryThenThrowTransportException(): void

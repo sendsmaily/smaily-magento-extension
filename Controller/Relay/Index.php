@@ -15,6 +15,7 @@ use Magento\Framework\App\Request\InvalidRequestException;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
+use Magento\Framework\HTTP\PhpEnvironment\RemoteAddress;
 use Smaily\Connect\Model\Engine\BrowseEventValidator;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
@@ -25,7 +26,9 @@ use Smaily\Connect\Model\Logger\Logger;
  * Public browse-beacon proxy (POST smaily/relay): the storefront tracker
  * posts event batches here; the controller forwards them to the engine so
  * the API key never reaches the browser (contract: auth). Best-effort and
- * loss-tolerant — browse events are never queued (matches Woo relay).
+ * loss-tolerant — browse events are never queued (matches Woo relay), and
+ * the forward is one short attempt (Client::relayBrowse()), so the engine
+ * never holds a storefront request.
  *
  * CSRF-exempt: an anonymous beacon has no session form key; the payload is
  * strictly validated and the endpoint 404s when browse tracking is off.
@@ -43,7 +46,8 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
         private readonly BrowseEventValidator $validator,
         private readonly \Magento\Framework\App\CacheInterface $cache,
         private readonly \Magento\Framework\Stdlib\DateTime\DateTime $dateTime,
-        private readonly Logger $logger
+        private readonly Logger $logger,
+        private readonly RemoteAddress $remoteAddress
     ) {
     }
 
@@ -90,7 +94,7 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
         }
 
         try {
-            $this->client->ingest(Client::DOMAIN_BROWSE, $events);
+            $this->client->relayBrowse($events);
         } catch (EngineException $exception) {
             // Loss-tolerant by design; log at debug so a down engine cannot
             // flood the log from storefront traffic.
@@ -102,11 +106,13 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
 
     /**
      * Cheap per-IP request limiter: the store must not be usable as an
-     * authenticated amplifier against the engine.
+     * authenticated amplifier against the engine. The address is the
+     * connection's own, read through Magento's RemoteAddress: forwarding
+     * headers count only where the store itself is configured to trust them.
      */
     private function allowRequest(): bool
     {
-        $ip = (string)$this->request->getClientIp();
+        $ip = (string)$this->remoteAddress->getRemoteAddress();
         $window = intdiv($this->dateTime->gmtTimestamp(), 60);
         $key = 'smaily_relay_' . sha1($ip) . '_' . $window;
 

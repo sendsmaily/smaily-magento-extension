@@ -201,7 +201,9 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   burned, never failed, attempt counters intact); the janitor prunes them by
   its normal age rule.
 - Browse events are the exception: loss-tolerant by design, they are relayed
-  synchronously (`Controller/Relay/Index`) and never queued.
+  synchronously (`Controller/Relay/Index`) and never queued. The relay makes
+  one short attempt (`Engine\Client::relayBrowse()`: 3 s, 2 s to connect,
+  no retry, no back-off wait), so the engine never holds a storefront request.
 - **Catalog price/URL/language scope (PRO-1352/1353):** one Magento
   installation is one engine tenant with one base currency (which every
   catalog row now names, contract §3 `currency`, v1.7.0) — the plugin, not
@@ -480,8 +482,12 @@ vanilla for a future Hyvä path) reads page context from
 events for 5 s, and posts to `smaily/relay`. The relay
 (`Controller/Relay/Index`) is CSRF-exempt (anonymous beacon), strictly
 sanitized (`Engine\BrowseEventValidator` — UUID v4 event ids, event-type
-enum, **no client-asserted `customer_email`**, and no `smaily_rec_id` /
-`smaily_ctx` hints the engine has ignored since v1.7.0), rate-limited per IP, stamps
+enum, **no client-asserted `customer_email` or `external_id`** — identity
+comes only from the engine-issued visitor token and the login identity
+merge — and no `smaily_rec_id` / `smaily_ctx` hints the engine has ignored
+since v1.7.0), rate-limited per connection address (Magento's
+`RemoteAddress`: a forwarding header counts only where the store's own
+configuration names it, with its trusted proxies), stamps
 `source: plugin_magento` server-side, and forwards so the API key never
 reaches the browser. Under Magento cookie restriction mode without cookie
 consent the tracker runs in sender-side anonymous mode (contract §6):
@@ -677,7 +683,9 @@ implemented here:
   (`Engine\Settings`), never concatenated; `{email}` placeholders are
   substituted with `str_replace`.
 - Retry: 1/2/4/8/16 s on 429 (honouring `retry_after_seconds` from the
-  body) and 5xx; other 4xx never retry (`Engine\Client`).
+  body, up to 60 s) and 5xx; other 4xx never retry; every call has a 10 s
+  connect and 30 s total timeout (`Engine\Client`). The storefront browse
+  relay makes one 3 s attempt and never retries or waits.
 - Smaily marketing API: HTTP Basic; success envelope `{code:101}`, 203 =
   invalid data, 206 = email not found (`Model\Client\SmailyClient`).
 - Engine automations config (§13): every row carries all eight keys;

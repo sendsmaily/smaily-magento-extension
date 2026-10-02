@@ -28,8 +28,9 @@ use Smaily\Connect\Model\ModuleInfo;
  * - Bearer auth; the API key never reaches client-side code.
  * - Endpoint URLs come from the stored endpoints map, never concatenated.
  * - Retry policy per contract: exponential backoff 1/2/4/8/16s (max 5) on
- *   429 (honouring retry_after_seconds from the body) and 5xx; other 4xx
- *   never retry.
+ *   429 (honouring retry_after_seconds from the body, up to 60 s) and 5xx;
+ *   other 4xx never retry. The storefront browse relay is the exception:
+ *   one short attempt, never a retry or a wait (relayBrowse()).
  * - D6 ingest responses are per-item: a 200 is never all-or-nothing.
  * - Exception messages are translated with __(): they surface in the admin
  *   UI (wizard step 4, automations form, health notices).
@@ -71,6 +72,14 @@ class Client
 
     private const RETRY_DELAYS_SECONDS = [1, 2, 4, 8, 16];
     private const TIMEOUT_SECONDS = 30;
+    private const CONNECT_TIMEOUT_SECONDS = 10;
+
+    /** The ceiling on a back-off the engine asks for (429 retry_after_seconds). */
+    private const MAX_RETRY_AFTER_SECONDS = 60;
+
+    /** The storefront relay's one attempt: short enough for a shopper's request. */
+    private const RELAY_TIMEOUT_SECONDS = 3;
+    private const RELAY_CONNECT_TIMEOUT_SECONDS = 2;
 
     /**
      * @var array{request: array<int|string, mixed>, response: array{http_status: int, body: mixed}|null}|null
@@ -134,6 +143,27 @@ class Client
             'POST',
             $this->endpoint('ingest_' . $domain),
             [$wrapper => array_values($items)]
+        );
+    }
+
+    /**
+     * Forward storefront browse events from inside a shopper's request:
+     * one attempt with a short timeout, no retry and no back-off wait.
+     * Browse events are loss-tolerant (never queued), so an engine that is
+     * slow, failing or asking the store to slow down costs the batch, never
+     * a storefront worker.
+     *
+     * @param array<int, array<string, mixed>> $events
+     * @return array<string, mixed>
+     */
+    public function relayBrowse(array $events): array
+    {
+        return $this->request(
+            'POST',
+            $this->endpoint('ingest_' . self::DOMAIN_BROWSE),
+            [self::DOMAIN_WRAPPERS[self::DOMAIN_BROWSE] => array_values($events)],
+            true,
+            true
         );
     }
 
@@ -300,13 +330,23 @@ class Client
 
     /**
      * @param array<string, mixed>|null $body
+     * @param bool $singleAttempt one short attempt, no retry and no wait (the storefront relay)
      * @return array<string, mixed>
      */
-    private function request(string $method, string $url, ?array $body, bool $authenticated = true): array
-    {
+    private function request(
+        string $method,
+        string $url,
+        ?array $body,
+        bool $authenticated = true,
+        bool $singleAttempt = false
+    ): array {
         $this->lastExchange = null;
+        $retryDelays = $singleAttempt ? [] : self::RETRY_DELAYS_SECONDS;
         $options = [
-            RequestOptions::TIMEOUT => self::TIMEOUT_SECONDS,
+            RequestOptions::TIMEOUT => $singleAttempt ? self::RELAY_TIMEOUT_SECONDS : self::TIMEOUT_SECONDS,
+            RequestOptions::CONNECT_TIMEOUT => $singleAttempt
+                ? self::RELAY_CONNECT_TIMEOUT_SECONDS
+                : self::CONNECT_TIMEOUT_SECONDS,
             RequestOptions::HEADERS => [
                 'User-Agent' => ModuleInfo::USER_AGENT,
                 'Accept' => 'application/json',
@@ -371,7 +411,7 @@ class Client
                     );
                 }
 
-                if ($attempt >= count(self::RETRY_DELAYS_SECONDS)) {
+                if ($attempt >= count($retryDelays)) {
                     throw new EngineTransportException(
                         (string)__('Engine request failed with HTTP %1 after retries', $status),
                         $status,
@@ -379,14 +419,17 @@ class Client
                     );
                 }
 
-                $delay = self::RETRY_DELAYS_SECONDS[$attempt];
+                $delay = $retryDelays[$attempt];
                 if ($status === 429 && isset($errorBody['retry_after_seconds'])) {
-                    $delay = max($delay, (int)$errorBody['retry_after_seconds']);
+                    $delay = max(
+                        $delay,
+                        min((int)$errorBody['retry_after_seconds'], self::MAX_RETRY_AFTER_SECONDS)
+                    );
                 }
                 $this->sleeper->sleep($delay);
                 $attempt++;
             } catch (GuzzleException $exception) {
-                if ($attempt >= count(self::RETRY_DELAYS_SECONDS)) {
+                if ($attempt >= count($retryDelays)) {
                     // The customer endpoints carry the address in the URL that
                     // ends Guzzle's message: only the masked text goes on, and
                     // the raw exception is not chained (PRO-3572).
@@ -394,7 +437,7 @@ class Client
                         (string)__('Engine request failed: %1', TransportErrorMessage::of($exception))
                     );
                 }
-                $this->sleeper->sleep(self::RETRY_DELAYS_SECONDS[$attempt]);
+                $this->sleeper->sleep($retryDelays[$attempt]);
                 $attempt++;
             }
         }

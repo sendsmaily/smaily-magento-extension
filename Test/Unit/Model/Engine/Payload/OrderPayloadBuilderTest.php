@@ -250,6 +250,80 @@ class OrderPayloadBuilderTest extends TestCase
     }
 
     /**
+     * PRO-3584: a malformed visitor token, context or session id is left off
+     * on its own; the order keeps every other well-formed signal. A row
+     * stored before the capture checked the shape still goes out clean.
+     *
+     * @dataProvider malformedSignals
+     */
+    public function testAMalformedAttributionSignalIsLeftOffOnItsOwn(string $column, string $value, string $key): void
+    {
+        $order = $this->order([['POC-CAT', 1, 22.99, 0.0]], 22.99, Order::STATE_COMPLETE, 5);
+        $row = [
+            'rec_id' => '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+            'visitor_token' => 'vt_abc123',
+            'rec_ctx' => 'welcome',
+            'anon_session_id' => '0f8e3c1a-5b2d-4e6f-8a9b-1c2d3e4f5a6b',
+        ];
+        $row[$column] = $value;
+
+        $payload = $this->builderWithReturns([], $row)->build($order);
+
+        $expected = [
+            'smaily_rec_id' => '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+            'smaily_visitor_token' => 'vt_abc123',
+            'smaily_rec_ctx' => 'welcome',
+            'session_id' => '0f8e3c1a-5b2d-4e6f-8a9b-1c2d3e4f5a6b',
+        ];
+        unset($expected[$key]);
+        self::assertSame($expected, array_intersect_key($payload, [
+            'smaily_rec_id' => true,
+            'smaily_visitor_token' => true,
+            'smaily_rec_ctx' => true,
+            'session_id' => true,
+        ]));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string, 2: string}>
+     */
+    public static function malformedSignals(): array
+    {
+        return [
+            'visitor token without the vt_ prefix' => ['visitor_token', 'abc123', 'smaily_visitor_token'],
+            'visitor token with a space' => ['visitor_token', 'vt_abc 123', 'smaily_visitor_token'],
+            'visitor token over 64 characters' => [
+                'visitor_token', 'vt_' . str_repeat('a', 62), 'smaily_visitor_token',
+            ],
+            'visitor token with a trailing newline' => ['visitor_token', "vt_abc123\n", 'smaily_visitor_token'],
+            'context with a slash' => ['rec_ctx', 'cross/sell', 'smaily_rec_ctx'],
+            'context over 64 characters' => ['rec_ctx', str_repeat('c', 65), 'smaily_rec_ctx'],
+            'session id with a quote' => ['anon_session_id', 'sess"1', 'session_id'],
+            'session id over 64 characters' => ['anon_session_id', str_repeat('b', 65), 'session_id'],
+        ];
+    }
+
+    /**
+     * PRO-3584: well-formed values travel as before, at the 64-character
+     * bound too.
+     */
+    public function testWellFormedAttributionSignalsTravelAsBefore(): void
+    {
+        $order = $this->order([['POC-CAT', 1, 22.99, 0.0]], 22.99, Order::STATE_COMPLETE, 5);
+
+        $payload = $this->builderWithReturns([], [
+            'rec_id' => null,
+            'visitor_token' => 'vt_' . str_repeat('A', 61),
+            'rec_ctx' => 'cart_abandoned.v2-' . str_repeat('x', 46),
+            'anon_session_id' => 'wp_sess_abc123',
+        ])->build($order);
+
+        self::assertSame('vt_' . str_repeat('A', 61), $payload['smaily_visitor_token']);
+        self::assertSame('cart_abandoned.v2-' . str_repeat('x', 46), $payload['smaily_rec_ctx']);
+        self::assertSame('wp_sess_abc123', $payload['session_id']);
+    }
+
+    /**
      * Credit-memo item rows as the join returns them, oldest memo first.
      *
      * @param array<int, array{0: int, 1: float, 2: string}> $returns

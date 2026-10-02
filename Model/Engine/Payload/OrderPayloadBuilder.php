@@ -12,6 +12,7 @@ use Magento\Framework\App\ResourceConnection;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Api\Data\OrderItemInterface;
 use Magento\Sales\Model\Order;
+use Smaily\Connect\Model\Engine\AttributionShape;
 use Smaily\Connect\Model\Engine\RecId;
 
 /**
@@ -23,8 +24,9 @@ use Smaily\Connect\Model\Engine\RecId;
  * values per contract v1.4.0 amount semantics: row_total_incl_tax for
  * lines, grand_total for total_amount; items carry pre-discount unit
  * prices and post-discount line totals. Attribution fields come
- * from the smaily_order_attribution side table; a malformed rec id is
- * omitted (Engine\RecId).
+ * from the smaily_order_attribution side table; a malformed rec id
+ * (Engine\RecId), visitor token, context or session id
+ * (Engine\AttributionShape) is omitted on its own.
  *
  * Return signals (contract §5, v1.8.0) are derived from the order's OWN
  * credit memos on every build, never from a one-shot event payload: the
@@ -242,13 +244,15 @@ class OrderPayloadBuilder
         if (RecId::isValid((string)$row['rec_id'])) {
             $attribution['smaily_rec_id'] = (string)$row['rec_id'];
         }
-        if (!empty($row['visitor_token'])) {
+        // The other three are shape-checked the same way: an off-shape value
+        // is left off on its own (PRO-3584).
+        if (AttributionShape::isVisitorToken((string)$row['visitor_token'])) {
             $attribution['smaily_visitor_token'] = (string)$row['visitor_token'];
         }
-        if (!empty($row['rec_ctx'])) {
+        if (AttributionShape::isContext((string)$row['rec_ctx'])) {
             $attribution['smaily_rec_ctx'] = (string)$row['rec_ctx'];
         }
-        if (!empty($row['anon_session_id'])) {
+        if (AttributionShape::isSessionId((string)$row['anon_session_id'])) {
             $attribution['session_id'] = (string)$row['anon_session_id'];
         }
 

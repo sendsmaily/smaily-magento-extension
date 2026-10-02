@@ -5,7 +5,7 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-3580 — the welcome automation fires only for a subscription the shopper makes on the storefront, a resubscription included; not for one made in the admin, through the API or by an import. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out, and an opt-out made in Smaily reaches the engine. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
+_Last updated: 2026-10-02 (PRO-3584 — an over-long or malformed visitor token, context or session id is dropped on its own; the order keeps every other attribution signal. Earlier the same day: PRO-3580 — the welcome automation fires only for a subscription the shopper makes on the storefront, a resubscription included; not for one made in the admin, through the API or by an import. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out, and an opt-out made in Smaily reaches the engine. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
 and the Dashboard fill the content area on the pack's grey pane under a
 full-width white tab strip, in Magento's Open Sans, with 33 px buttons and
 our own text, link and status colours. Earlier the same day: PRO-3572 — a
@@ -151,6 +151,28 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   (primary) and **Open Settings** — new phrases "Ava töölaud" / "Ava
   seaded". Checked by screenshot at 1440 and 1100 px in en_US and et_EE.
 
+- **PRO-3584 done — one bad attribution cookie no longer costs the order
+  the other signals (2026-10-02).** Confirmed first with the new
+  `Test\Integration\Engine\AttributionManagerTest` (RED): under
+  `STRICT_ALL_TABLES` a 73-character visitor token failed the side-table
+  insert with MySQL 1406, which `OrderSaveAfter` swallows, so the order
+  lost all four signals; under Magento's own empty SQL mode (the adapter
+  sets `SQL_MODE=''` on connect, so this is the stock case) an over-long
+  session id was stored cut to 64 characters. New
+  `Model\Engine\AttributionShape` holds WooCommerce's PRO-1942 shapes —
+  visitor token `vt_` + alphanumerics, context and session id
+  `[A-Za-z0-9._-]` — each capped at 64 characters (the visitor token
+  `vt_` + 1–61, one difference from Woo's 1–64, so it always fits the
+  column). Applied at three points: both storefront capture scripts write
+  the visitor token and context cookies only in shape;
+  `AttributionManager::readCookies()` reads every off-shape cookie as
+  absent (the rec id via `RecId` too) instead of the old 255-character
+  cap; `OrderPayloadBuilder` omits an off-shape stored value. Each signal
+  drops on its own. `readCookies()` also feeds `CustomerLogin`'s identity
+  merge, which now gets only in-shape values. No schema change, no
+  logging added. New `OrderPayloadBuilderTest` cases (RED first). USER_GUIDE,
+  ARCHITECTURE and CHANGELOG say so.
+
 - **PRO-3580 done — only the shopper's own storefront subscription fires
   the welcome (2026-10-02).** Owner decision (2026-10-02): a storefront
   subscription fires the welcome, a storefront resubscription too; a
@@ -202,7 +224,7 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   they never carried the rec id. Same check as WooCommerce
   (`Support/RecId.php`, PRO-1710). The visitor token, context and session
   id keep only their 255-character cap (WooCommerce PRO-1942 shape-checks
-  them too) — left for a separate Story.
+  them too) — done under PRO-3584.
 
 - **PRO-3572 done — a network failure logs no contact address (2026-10-02).**
   Guzzle ends a network-failure message with the full request URL

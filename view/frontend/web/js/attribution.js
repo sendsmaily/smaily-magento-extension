@@ -16,12 +16,21 @@ define([], function () {
     // well-formed id is ever written to the cookie (PRO-3576).
     var REC_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+    // The visitor token and the context are written only in the shape the
+    // order capture accepts (Engine\AttributionShape, PRO-3584).
+    var VISITOR_TOKEN_PATTERN = /^vt_[A-Za-z0-9]{1,61}$/,
+        CONTEXT_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+
     function readParam(name) {
         return new URLSearchParams(window.location.search).get(name);
     }
 
     function validRecId(value) {
         return value && REC_ID_PATTERN.test(value) ? value : null;
+    }
+
+    function shaped(value, pattern) {
+        return value && pattern.test(value) ? value : null;
     }
 
     function getCookie(name) {
@@ -58,8 +67,8 @@ define([], function () {
 
     return function (config) {
         var recId = validRecId(readParam(config.paramRecId)),
-            visitorToken = readParam(config.paramVisitor),
-            context = readParam(config.paramContext);
+            visitorToken = shaped(readParam(config.paramVisitor), VISITOR_TOKEN_PATTERN),
+            context = shaped(readParam(config.paramContext), CONTEXT_PATTERN);
 
         // utm_content fallback exists as a defensive dead path only — the
         // engine never issues utm_content rec ids (contract: GA pollution).

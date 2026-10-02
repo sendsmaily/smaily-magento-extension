@@ -70,6 +70,12 @@ class AttributionManager
     /**
      * Read the attribution cookies from the current request.
      *
+     * Each value is shape-checked on its own (RecId, AttributionShape): an
+     * off-shape cookie reads as absent, so it can neither fail the side-table
+     * insert (its rec id, visitor token and session id columns hold 64
+     * characters) nor be stored cut short, and
+     * the order keeps every other signal (PRO-3584).
+     *
      * @return array{rec_id: ?string, visitor_token: ?string, rec_ctx: ?string, anon_session_id: ?string}
      */
     public function readCookies(): array
@@ -77,10 +83,10 @@ class AttributionManager
         $names = $this->getClientConfig();
 
         return [
-            'rec_id' => $this->cookie((string)$names['cookieRecId']),
-            'visitor_token' => $this->cookie((string)$names['cookieVisitor']),
-            'rec_ctx' => $this->cookie((string)$names['cookieContext']),
-            'anon_session_id' => $this->cookie((string)$names['cookieSession']),
+            'rec_id' => $this->cookie((string)$names['cookieRecId'], RecId::isValid(...)),
+            'visitor_token' => $this->cookie((string)$names['cookieVisitor'], AttributionShape::isVisitorToken(...)),
+            'rec_ctx' => $this->cookie((string)$names['cookieContext'], AttributionShape::isContext(...)),
+            'anon_session_id' => $this->cookie((string)$names['cookieSession'], AttributionShape::isSessionId(...)),
         ];
     }
 
@@ -112,7 +118,14 @@ class AttributionManager
         );
     }
 
-    private function cookie(string $name): ?string
+    /**
+     * The trimmed cookie value, or null when it is absent or off-shape.
+     *
+     * @param string $name
+     * @param callable(string): bool $isWellFormed
+     * @return string|null
+     */
+    private function cookie(string $name, callable $isWellFormed): ?string
     {
         if ($name === '') {
             return null;
@@ -123,6 +136,6 @@ class AttributionManager
         }
         $value = trim($value);
 
-        return $value !== '' && strlen($value) <= 255 ? $value : null;
+        return $isWellFormed($value) ? $value : null;
     }
 }

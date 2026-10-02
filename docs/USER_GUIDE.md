@@ -403,6 +403,11 @@ malformed id — from a truncated link or a test-email placeholder — in the
 link and again when it sends the order. The order still reaches Campaign
 Intelligence, without that click.
 
+The visitor token (`vt_` followed by letters and digits), the context and
+the anonymous session id (letters, digits, `.`, `_` and `-`) are checked the
+same way, each up to 64 characters. A value that does not fit is ignored on
+its own, and the order keeps every other attribution value.
+
 ### If your Campaign Intelligence account is deactivated
 
 If Smaily deactivates the Campaign Intelligence account behind this store —

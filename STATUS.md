@@ -16,6 +16,26 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3567 done — Settings > Intelligence has the tab title, the
+  description and a Save only when there is something to save
+  (2026-10-02).** `settings/index.phtml` heads the tab like its siblings:
+  "Campaign Intelligence" (existing phrase; the in-card "Campaign
+  Intelligence (optional)" heading is gone from Settings, the setup step
+  keeps it as its step title) and a one-line description. The page-wide
+  Save no longer shows there: the tab has its own footer (Save +
+  status, `#smaily-w-intelligence-save`, step `intelligence` = browse
+  tracking), hidden until `engineConnected()` runs — at load with a
+  connected engine, or right after Connect. Every Settings tab now owns its
+  footer, so the page-wide footer is never shown. New phrase: "Your store’s
+  connection to Campaign Intelligence, storefront browse tracking and
+  historical imports." → "Sinu poe ühendus Campaign Intelligence'iga, poe
+  sirvimise jälgimine ja ajaloolised impordid." (own; WooCommerce has no
+  tab descriptions — the terms are our shipped ones: "Luba poe sirvimise
+  jälgimine", "Ajaloolised impordid"). Verified by rendering the real
+  templates with stubs in headless Chrome (engine not connected: no Save;
+  Connect → Save appears; Save posts browse tracking and says "Saved.";
+  en_US and et_EE). Fidelity audit row 21 marked fixed.
+
 - **PRO-3564 done — the import cards show the pack's six states
   (2026-10-02).** The contact import (initial setup step 2, Settings >
   Contacts) and the three Settings > Intelligence imports (now one card

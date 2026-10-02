@@ -550,6 +550,8 @@ window.smailyPanelsInit = function ($) {
         // Settings only: the setup step renders the introduction without this id.
         $('#smaily-w-engine-intro').hide();
         $('#smaily-w-engine-connected').show();
+        // Settings only: browse tracking is the tab's one thing to save (PRO-3567).
+        $('#smaily-w-intelligence-footer').show();
         $('#smaily-w-engine-status').text(
             '<?= $escaper->escapeJs(__('Connected: %1 (engine %2)')) ?>'
                 .replace('%1', tenantName).replace('%2', engineVersion)

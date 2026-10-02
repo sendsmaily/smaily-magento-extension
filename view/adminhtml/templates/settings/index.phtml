@@ -95,7 +95,21 @@ $tabs = [
             <?= $block->getChildHtml('engine.automations') ?>
         </div>
     </div>
-    <div class="smaily-tab-panel" data-tab="intelligence"><?= $block->getChildHtml('panel.intelligence') ?></div>
+    <div class="smaily-tab-panel" data-tab="intelligence">
+        <h3><?= $escaper->escapeHtml(__('Campaign Intelligence')) ?></h3>
+        <p class="smaily-tab-desc"><?= $escaper->escapeHtml(__('Your store’s connection to Campaign Intelligence, storefront browse tracking and historical imports.')) ?></p>
+        <?= $block->getChildHtml('panel.intelligence') ?>
+        <?php // Only a connected engine leaves something to save here (browse
+        // tracking); before that, Connect is the tab's only action (PRO-3567).
+        // engineConnected() in panels-js.phtml shows the footer together with
+        // the connected section, at load and right after a Connect. ?>
+        <div class="smaily-tab-footer" id="smaily-w-intelligence-footer" style="display:none;">
+            <button type="button" class="action-primary" id="smaily-w-intelligence-save">
+                <span><?= $escaper->escapeHtml(__('Save')) ?></span>
+            </button>
+            <span class="smaily-result" id="smaily-w-intelligence-result"></span>
+        </div>
+    </div>
     <div class="smaily-tab-panel" data-tab="rss">
         <h3><?= $escaper->escapeHtml(__('Product RSS feed')) ?></h3>
         <p class="smaily-tab-desc"><?= $escaper->escapeHtml(__('A product feed for the RSS block of the Smaily template editor. Optional query parameters filter by category and control the amount and order of products.')) ?></p>
@@ -221,6 +235,10 @@ require(['jquery'], function ($) {
 
     $('#smaily-w-rss-save').on('click', function () {
         saveTab($(this), 'rss', '#smaily-w-rss-result');
+    });
+
+    $('#smaily-w-intelligence-save').on('click', function () {
+        saveTab($(this), 'intelligence', '#smaily-w-intelligence-result');
     });
 
     // Live reactivity across tabs: edited credentials re-render the

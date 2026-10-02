@@ -472,7 +472,9 @@ toggle; catalog, customer and order sync run automatically once connected.
 
 Browse tracking respects Magento's cookie restriction mode and sends events
 through your own server (`smaily/relay`) so the API key never reaches the
-browser.
+browser. On **Settings > Intelligence** the toggle is saved with the tab's
+**Save** button, which appears once Campaign Intelligence is connected —
+before that the tab has nothing to save, and **Connect** is its only action.
 
 ### Recommendation attribution
 

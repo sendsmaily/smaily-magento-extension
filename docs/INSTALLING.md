@@ -155,7 +155,8 @@ schema drops the tables of a disabled module on the next
 be sent), the Log, the abandoned-cart tracker, the automation workflow
 mapping, historical-import progress and order attribution. Your settings
 (connection, contact sync, automations) live in Magento's configuration
-and are kept.
+and are kept, and so is the store's record of shoppers who opted out of
+personalization. Only uninstalling removes them (see below).
 
 To keep a copy of the table contents, add `--safe-mode=1`: Magento still
 drops the tables, but first writes every table that has rows to CSV under
@@ -179,7 +180,44 @@ commands, with `bin/magento setup:upgrade --data-restore=1` if you kept a
 copy. The saved settings are picked up as they were, so the initial setup
 does not open again.
 
-**To remove it completely**, disable it as above first, then delete
-`app/code/Smaily/Connect` and run `bin/magento cache:flush`. The saved
-settings stay in `core_config_data` (paths starting with `smaily_connect/`);
-remove them only if you will not install the module again.
+**To remove it completely**, disable it as above first (that drops the
+tables), then uninstall it. Uninstalling removes the rest of the module's
+data from the store database:
+
+- every setting at every scope (`core_config_data` paths starting with
+  `smaily_connect/`), including the encrypted Smaily API password and the
+  Campaign Intelligence API key;
+- the settings an upgrade from Smaily for Magento 2.8.x kept (paths
+  starting with `smaily/`, including the old plain-text password);
+- the module's flag rows (`flag` codes starting with `smaily_connect_`):
+  the record of shoppers who opted out of personalization, the record of
+  checked credentials, and the health-check and consent-sync state.
+
+Nothing is sent to Smaily or Campaign Intelligence. Contacts and data
+already there stay there, and the Campaign Intelligence API key stays
+valid on the engine side until it is revoked there; a new install connects
+with a new setup token. Install the module again later and it starts from
+the initial setup.
+
+For a ZIP install in `app/code`, `module:uninstall` needs
+`--non-composer`. In that mode Magento only reverts the module's data
+patches; it does not delete the code, so delete the directory yourself:
+
+```bash
+bin/magento module:uninstall --non-composer Smaily_Connect
+rm -rf app/code/Smaily/Connect
+bin/magento cache:flush
+```
+
+For a composer install, Magento removes the settings, the module
+registration and the composer package in one step. It switches
+maintenance mode on and off by itself and clears the cache and the
+generated code, so production mode needs a compile afterwards:
+
+```bash
+bin/magento module:uninstall --remove-data Smaily_Connect
+bin/magento setup:di:compile                   # production mode
+```
+
+Deleting the code without running `module:uninstall` first leaves the
+settings and flag rows in the database.

@@ -26,7 +26,9 @@ package; `setup:upgrade` runs the migration.
 | Abandoned cart toggle / autoresponder / interval | Automations group (`2:hour` → 120 minutes) + a mapping fallback row |
 
 Legacy `smaily/*` config rows are left in place, so downgrading back to
-2.8.x (composer version constraint) restores the old behavior.
+2.8.x (composer version constraint) restores the old behavior. Uninstalling
+Smaily Connect removes them along with its own settings (see
+[INSTALLING.md](INSTALLING.md#disabling-or-removing-the-module)).
 
 ## What is cleaned up
 

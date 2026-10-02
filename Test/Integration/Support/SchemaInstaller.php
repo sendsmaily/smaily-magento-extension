@@ -89,6 +89,25 @@ class SchemaInstaller
     }
 
     /**
+     * Minimal mirror of the core flag table (FlagManager's storage), for the
+     * uninstall tests.
+     */
+    public function createFlag(): void
+    {
+        $this->connection->query('DROP TABLE IF EXISTS `flag`');
+        $this->connection->query(
+            'CREATE TABLE `flag` ('
+            . ' `flag_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,'
+            . ' `flag_code` VARCHAR(255) NOT NULL,'
+            . ' `state` SMALLINT UNSIGNED NOT NULL DEFAULT 0,'
+            . ' `flag_data` MEDIUMTEXT NULL,'
+            . ' `last_update` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,'
+            . ' PRIMARY KEY (`flag_id`)'
+            . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+        );
+    }
+
+    /**
      * Seed one quote row; $columns adds to or overrides the defaults.
      *
      * @param array<string, mixed> $columns

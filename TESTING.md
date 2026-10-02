@@ -52,7 +52,8 @@ queue persistence and claim/backoff/parking semantics (`smaily_event_queue`,
 `smaily_ingest_queue`), the 2.8.x → v3 settings migration (real
 `core_config_data` rows, password re-encryption, automation mapping seeding),
 the legacy schema cleanup patch (real `quote` column drops with mailed-state
-carry-over) and the queue cron jobs with the HTTP transports stubbed.
+carry-over), the uninstall removal (real `core_config_data` and `flag` rows)
+and the queue cron jobs with the HTTP transports stubbed.
 
 It needs a MySQL 8.x it can own a database on — any throwaway instance works:
 

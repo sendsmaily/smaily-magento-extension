@@ -37,6 +37,7 @@ Observer/           thin event bridges (all logic lives in Model/)
 Plugin/             newsletter email suppression, config validation,
                     checkout layout injection
 Setup/Patch/        legacy schema cleanup (Schema/), config migration (Data/)
+Setup/Uninstall.php settings + flag removal on module:uninstall
 ViewModel/          template data providers
 view/               adminhtml pages/panels/grid, frontend JS + templates
 i18n/               translation packs (en_US canonical, et_EE)
@@ -349,6 +350,14 @@ indexed for the reads their cron drains do (`status`/`domain` + `next_retry_at`,
 `Setup/Patch/Schema/MigrateLegacyQuoteColumns` drops the legacy 2.8.x
 artifacts (`quote.reminder_date`, `quote.is_sent`, `smaily_customer_sync`)
 because a renamed module's declarative schema cannot.
+
+Uninstalling removes what declarative schema does not: `Setup\Uninstall`
+deletes the `smaily_connect/*` and legacy `smaily/*` config rows at every
+scope and every `smaily_connect_*` flag row. Magento calls it on a composer
+`module:uninstall`; `module:uninstall --non-composer` (app/code) only
+reverts data patches, so `Setup/Patch/Data/RemoveSettingsOnUninstall`
+(apply is a no-op) runs the same removal from `revert()`. Disabling runs
+neither.
 
 ## Cron jobs (group `smaily_connect`)
 

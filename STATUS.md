@@ -5,7 +5,7 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-3584 — an over-long or malformed visitor token, context or session id is dropped on its own; the order keeps every other attribution signal. Earlier the same day: PRO-3580 — the welcome automation fires only for a subscription the shopper makes on the storefront, a resubscription included; not for one made in the admin, through the API or by an import. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out, and an opt-out made in Smaily reaches the engine. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
+_Last updated: 2026-10-02 (PRO-3581 — uninstalling the module removes its settings, the Smaily password and the engine key included, and its flag rows, the profiling opt-out record included; disabling keeps everything. Earlier the same day: PRO-3584 — an over-long or malformed visitor token, context or session id is dropped on its own; the order keeps every other attribution signal. Earlier the same day: PRO-3580 — the welcome automation fires only for a subscription the shopper makes on the storefront, a resubscription included; not for one made in the admin, through the API or by an import. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out, and an opt-out made in Smaily reaches the engine. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
 and the Dashboard fill the content area on the pack's grey pane under a
 full-width white tab strip, in Magento's Open Sans, with 33 px buttons and
 our own text, link and status colours. Earlier the same day: PRO-3572 — a
@@ -150,6 +150,28 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   (was 2.2), and a footer under a divider offers **Go to Dashboard**
   (primary) and **Open Settings** — new phrases "Ava töölaud" / "Ava
   seaded". Checked by screenshot at 1440 and 1100 px in en_US and et_EE.
+
+- **PRO-3581 done — uninstalling removes the module's settings and flag
+  rows (2026-10-02, parity audit R9, Woo `uninstall.php`).** Owner decision
+  (2026-10-02): uninstall removes the credentials, the keys and every other
+  setting, as Woo does. New `Setup\Uninstall` (`UninstallInterface`)
+  deletes `core_config_data` rows under `smaily_connect/` (every scope) and
+  the 2.8.x `smaily/` rows (the plaintext password the migration kept for a
+  downgrade), and every `flag` row whose code starts with `smaily_connect_`
+  (`ProfilingOptOuts`, `VerifiedCredentials`, `HealthCheck`,
+  `ContactReconcile` cursors). Magento calls it on a composer
+  `module:uninstall` (with `--remove-data`, or on the prompt; without a
+  terminal it runs anyway). `module:uninstall --non-composer` (app/code, the
+  ZIP path) calls no Uninstall class — it only reverts data patches — so the
+  new `Setup\Patch\Data\RemoveSettingsOnUninstall` (no-op `apply()`) runs
+  the same removal from `revert()`; on the composer path both run. Disabling
+  runs neither. No engine-side revoke (as Woo). Tables stay Magento's job
+  (declarative schema drops them on disable + `setup:upgrade`), so
+  INSTALLING.md says disable first, then uninstall. New
+  `Test\Integration\Setup\UninstallTest` (RED first; `flag` mirror added to
+  `SchemaInstaller`). Not run: `module:uninstall` on the sandbox (sandbox
+  reserved) — the hook wiring is read from Magento's
+  `ModuleUninstallCommand`/`ModuleUninstaller`/`UninstallCollector` source.
 
 - **PRO-3584 done — one bad attribution cookie no longer costs the order
   the other signals (2026-10-02).** Confirmed first with the new

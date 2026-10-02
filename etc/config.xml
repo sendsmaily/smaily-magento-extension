@@ -21,7 +21,6 @@
                 <sync_fields>first_name,last_name,prefix,user_phone,user_gender,birthday,customer_id,customer_group,subscription_type</sync_fields>
                 <include_guests>0</include_guests>
                 <checkout_optin_enabled>1</checkout_optin_enabled>
-                <automation_force_opt_in>0</automation_force_opt_in>
                 <suppress_optin_emails>1</suppress_optin_emails>
             </subscribers>
             <automations>

@@ -67,6 +67,14 @@ Legacy `smaily/*` config rows are left in place, so downgrading back to
 - **Cron:** jobs moved into a dedicated `smaily_connect` cron group running
   in a separate process. Ensure `bin/magento cron:run` executes every
   minute for near-real-time delivery.
+- **Automations never re-subscribe.** A welcome, first-order or
+  abandoned-cart trigger never overrides an unsubscribe the contact made in
+  Smaily, in any contact sync mode (2.8.x behaved the same). A 3.0.0
+  release-candidate install that turned on the former *Automations May
+  Re-Subscribe (Advanced)* setting keeps its stored value, but nothing reads
+  it any more: after the update its triggers honour every unsubscribe, and
+  contacts keep syncing with their real subscription state. There is
+  nothing to do.
 
 ## New in v3 (nothing to configure unless you want it)
 

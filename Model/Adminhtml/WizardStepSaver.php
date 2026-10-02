@@ -228,7 +228,6 @@ class WizardStepSaver
     {
         $this->saveFlag(Config::XML_PATH_SYNC_ENABLED, $data, 'sync_enabled', $websiteId);
         $this->saveFlag(Config::XML_PATH_INCLUDE_GUESTS, $data, 'include_guests', $websiteId);
-        $this->saveFlag(Config::XML_PATH_AUTOMATION_FORCE_OPT_IN, $data, 'automation_force_opt_in', $websiteId);
         $this->saveFlag(Config::XML_PATH_CHECKOUT_OPTIN_ENABLED, $data, 'checkout_optin_enabled', $websiteId);
         $this->saveFlag(Config::XML_PATH_SUPPRESS_OPTIN_EMAILS, $data, 'suppress_optin_emails', $websiteId);
 

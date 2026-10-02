@@ -30,7 +30,6 @@ class Config
     public const XML_PATH_SYNC_MODE = 'smaily_connect/subscribers/sync_mode';
     public const XML_PATH_SYNC_FIELDS = 'smaily_connect/subscribers/sync_fields';
     public const XML_PATH_INCLUDE_GUESTS = 'smaily_connect/subscribers/include_guests';
-    public const XML_PATH_AUTOMATION_FORCE_OPT_IN = 'smaily_connect/subscribers/automation_force_opt_in';
     public const XML_PATH_CHECKOUT_OPTIN_ENABLED = 'smaily_connect/subscribers/checkout_optin_enabled';
     public const XML_PATH_SUPPRESS_OPTIN_EMAILS = 'smaily_connect/subscribers/suppress_optin_emails';
     public const XML_PATH_WELCOME_ENABLED = 'smaily_connect/automations/welcome_enabled';
@@ -161,11 +160,6 @@ class Config
     public function includeGuests(?int $websiteId = null): bool
     {
         return $this->websiteFlag(self::XML_PATH_INCLUDE_GUESTS, $websiteId);
-    }
-
-    public function automationForceOptIn(?int $websiteId = null): bool
-    {
-        return $this->websiteFlag(self::XML_PATH_AUTOMATION_FORCE_OPT_IN, $websiteId);
     }
 
     public function isCheckoutOptinEnabled(?int $websiteId = null): bool

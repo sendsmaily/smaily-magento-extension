@@ -103,13 +103,6 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <depends><field id="sync_enabled">1</field></depends>
                 </field>
-                <field id="automation_force_opt_in" translate="label comment" type="select" sortOrder="50"
-                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
-                    <label>Automations May Re-Subscribe (Advanced)</label>
-                    <comment>Legitimate interest mode only: send force_opt_in on automation triggers, re-subscribing contacts who have unsubscribed in Smaily. Leave off to honour unsubscribes (GDPR Art. 21).</comment>
-                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <depends><field id="sync_mode">legitimate_interest</field></depends>
-                </field>
                 <field id="checkout_optin_enabled" translate="label comment" type="select" sortOrder="55"
                        showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
                     <label>Show Newsletter Checkbox At Checkout</label>

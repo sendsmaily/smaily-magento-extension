@@ -107,8 +107,7 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
             </div>
             <p class="note"><?= $escaper->escapeHtml(__('Empty values are never sent, so existing Smaily data is not wiped.')) ?></p>
         </div>
-        <?php // Orphan fields (PRO-1397): native-config-only until now, real controls added here.
-        // Native `depends` for automation_force_opt_in is sync_mode=legitimate_interest;
+        <?php // Orphan field (PRO-1397): native-config-only until now, real control added here.
         // include_guests has no mode dependency (only sync_enabled, handled above) —
         // its "always on in checkout opt-in mode" behavior is a read-time override
         // (Model\ContactSync\Mode::includeGuests()), not a save-time UI constraint. ?>
@@ -117,11 +116,6 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
             <label><input type="checkbox" id="smaily-w-include-guests"/>
                 <?= $escaper->escapeHtml(__('Include Guest Order Emails')) ?></label>
             <p class="note"><?= $escaper->escapeHtml(__('Also sync emails from guest orders (always on in checkout opt-in mode).')) ?></p>
-        </div>
-        <div class="smaily-inline-toggle" id="smaily-w-force-opt-in-row">
-            <label><input type="checkbox" id="smaily-w-force-opt-in"/>
-                <?= $escaper->escapeHtml(__('Automations May Re-Subscribe (Advanced)')) ?></label>
-            <p class="note"><?= $escaper->escapeHtml(__('Legitimate interest mode only: send force_opt_in on automation triggers, re-subscribing contacts who have unsubscribed in Smaily. Leave off to honour unsubscribes (GDPR Art. 21).')) ?></p>
         </div>
         <?php endif; ?>
         <div class="smaily-inline-toggle">

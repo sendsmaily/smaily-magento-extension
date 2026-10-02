@@ -141,7 +141,6 @@ class WizardData implements ArgumentInterface
                 'syncMode' => $this->mode->mode($websiteId),
                 'syncFields' => $this->config->getSyncFields($websiteId),
                 'includeGuests' => $this->config->includeGuests($websiteId),
-                'forceOptIn' => $this->config->automationForceOptIn($websiteId),
                 'checkoutOptin' => $this->config->isCheckoutOptinEnabled($websiteId),
                 'suppressOptinEmails' => $this->config->suppressOptinEmails($websiteId),
             ],

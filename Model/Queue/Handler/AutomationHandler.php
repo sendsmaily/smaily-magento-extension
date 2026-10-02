@@ -13,7 +13,6 @@ use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
-use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Queue\EventQueue;
@@ -35,13 +34,16 @@ use Smaily\Connect\Model\Queue\EventQueue;
  * workflow ID is never posted through the event's store-view credentials.
  * Config-default resolutions (and modes single/c) keep using the event's
  * store view as before.
+ *
+ * force_opt_in is always false, in every contact-sync mode (PRO-3577, as
+ * the WooCommerce plugin's PRO-1716): a trigger enrols a contact Smaily has
+ * never seen, but never overrides an unsubscribe the contact made in Smaily.
  */
 class AutomationHandler implements EventHandlerInterface
 {
     public function __construct(
         private readonly SmailyClientProvider $clientProvider,
         private readonly Router $router,
-        private readonly Mode $mode,
         private readonly EventQueue $eventQueue,
         private readonly Logger $logger,
         private readonly AccountResolver $accountResolver
@@ -93,7 +95,7 @@ class AutomationHandler implements EventHandlerInterface
                 $this->clientProvider->forStore($clientStoreId)->post(SmailyClient::ENDPOINT_AUTORESPONDER, [
                     'autoresponder' => $match->workflowId,
                     'addresses' => [$address],
-                    'force_opt_in' => $this->mode->automationForceOptIn($websiteId),
+                    'force_opt_in' => false,
                 ]);
                 $results[$id] = true;
             } catch (SmailyClientException $exception) {

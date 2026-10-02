@@ -5,7 +5,7 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
+_Last updated: 2026-10-02 (PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
 and the Dashboard fill the content area on the pack's grey pane under a
 full-width white tab strip, in Magento's Open Sans, with 33 px buttons and
 our own text, link and status colours. Earlier the same day: PRO-3572 — a
@@ -93,6 +93,25 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   (was 2.2), and a footer under a divider offers **Go to Dashboard**
   (primary) and **Open Settings** — new phrases "Ava töölaud" / "Ava
   seaded". Checked by screenshot at 1440 and 1100 px in en_US and et_EE.
+
+- **PRO-3577 done — no setting can re-subscribe an unsubscribed contact
+  (2026-10-02).** `AutomationHandler` sends `force_opt_in => false`
+  outright and no longer takes `ContactSync\Mode`; WooCommerce retired the
+  same setting under PRO-1716 (Erkki approved, 2026-08-04). Removed:
+  `Mode::automationForceOptIn()`, `Config::automationForceOptIn()` and
+  `XML_PATH_AUTOMATION_FORCE_OPT_IN`, the `config.xml` default, the hidden
+  `system.xml` field, the `saveFlag()` line in
+  `WizardStepSaver::saveSubscribers()`, the `forceOptIn` boot key, the
+  Settings > Contacts row with its legitimate-interest show/hide script,
+  and its two phrases (EN + ET). A stored
+  `smaily_connect/subscribers/automation_force_opt_in` row is left in
+  place and unread (no data patch, no schema change — as WooCommerce did
+  first); a save from a cached admin page that still posts the key never
+  writes it again. Without the `system.xml` field `config:set` refuses the
+  path. New `Test\Unit\Model\Queue\Handler\AutomationHandlerTest` (it
+  was RED with the setting stored on under legitimate interest) and a
+  `WizardStepSaverTest` case pin it. USER_GUIDE, UPGRADING, CHANGELOG and
+  ADMIN_UI_TARGET_SPEC say so.
 
 - **PRO-3576 done — a malformed rec id no longer costs the engine the
   order (2026-10-02).** Contract §5: the orders route validates

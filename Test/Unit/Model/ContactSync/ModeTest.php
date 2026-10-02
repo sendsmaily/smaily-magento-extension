@@ -37,27 +37,22 @@ class ModeTest extends TestCase
     {
         $this->config->method('getSyncMode')->willReturn(SyncMode::MODE_CONSENT);
         $this->config->method('includeGuests')->willReturn(false);
-        $this->config->method('automationForceOptIn')->willReturn(true);
 
         self::assertTrue($this->mode->syncsAccounts(1));
         self::assertTrue($this->mode->requiresOptin(1));
         self::assertTrue($this->mode->reconciles(1));
         self::assertFalse($this->mode->includeGuests(1));
-        // Consent never forces opt-in even when the advanced toggle is on.
-        self::assertFalse($this->mode->automationForceOptIn(1));
     }
 
     public function testLegitimateInterestPolicy(): void
     {
         $this->config->method('getSyncMode')->willReturn(SyncMode::MODE_LEGITIMATE_INTEREST);
         $this->config->method('includeGuests')->willReturn(true);
-        $this->config->method('automationForceOptIn')->willReturn(true);
 
         self::assertTrue($this->mode->syncsAccounts(1));
         self::assertFalse($this->mode->requiresOptin(1));
         self::assertFalse($this->mode->reconciles(1));
         self::assertTrue($this->mode->includeGuests(1));
-        self::assertTrue($this->mode->automationForceOptIn(1));
     }
 
     public function testCheckoutOptinPolicy(): void
@@ -70,6 +65,5 @@ class ModeTest extends TestCase
         self::assertFalse($this->mode->reconciles(1));
         // Guests are intrinsic to checkout-only mode regardless of the toggle.
         self::assertTrue($this->mode->includeGuests(1));
-        self::assertFalse($this->mode->automationForceOptIn(1));
     }
 }

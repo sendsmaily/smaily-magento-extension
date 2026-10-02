@@ -212,16 +212,27 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
-     * PRO-1397: the Subscribers tab's orphan-field controls (include_guests,
-     * automation_force_opt_in) reuse this pre-existing saveFlag() wiring —
-     * confirm it actually persists both when the template starts sending them.
+     * PRO-1397: the Subscribers tab's orphan-field control (include_guests)
+     * reuses this pre-existing saveFlag() wiring — confirm it persists.
      */
     public function testSubscriberOrphanFlagsAreSaved(): void
     {
-        $this->saver->save('subscribers', ['include_guests' => true, 'automation_force_opt_in' => false]);
+        $this->saver->save('subscribers', ['include_guests' => true]);
 
         self::assertSame('1', $this->savedValue(Config::XML_PATH_INCLUDE_GUESTS));
-        self::assertSame('0', $this->savedValue(Config::XML_PATH_AUTOMATION_FORCE_OPT_IN));
+    }
+
+    /**
+     * PRO-3577: the "force opt-in" setting is retired. A save that still
+     * carries its key (an admin page cached from before the update) saves
+     * the rest and never writes the retired path again.
+     */
+    public function testTheRetiredForceOptInKeyIsNeverSaved(): void
+    {
+        $this->saver->save('subscribers', ['include_guests' => true, 'automation_force_opt_in' => true]);
+
+        self::assertSame('1', $this->savedValue(Config::XML_PATH_INCLUDE_GUESTS));
+        self::assertFalse($this->wasSaved('smaily_connect/subscribers/automation_force_opt_in'));
     }
 
     /**
@@ -234,7 +245,6 @@ class WizardStepSaverTest extends TestCase
         $this->saver->save('subscribers', ['sync_enabled' => true]);
 
         self::assertFalse($this->wasSaved(Config::XML_PATH_INCLUDE_GUESTS));
-        self::assertFalse($this->wasSaved(Config::XML_PATH_AUTOMATION_FORCE_OPT_IN));
     }
 
     /**

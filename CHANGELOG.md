@@ -64,6 +64,7 @@ Ground-up rewrite as module `Smaily_Connect`, targeting feature parity with the 
 - Contact sync frequency presets are gone: v3 syncs in near-real-time via observers + a 15-minute consent reconcile.
 - Gender now reaches Smaily under the field name `user_gender` (2.8.x sent `gender`), the name Smaily's WooCommerce plugin uses, so one shopper syncing from two stores lands in one field. Your tick in Synchronized Fields migrates automatically; Smaily segments and templates that reference `gender` need repointing to `user_gender` once.
 - The RSS feed lists catalog-visible products only; configurable variants resolve to their parent.
+- An automation never re-subscribes a contact who unsubscribed in Smaily, in any contact sync mode. The release candidate's *Automations May Re-Subscribe (Advanced)* setting (legitimate interest mode only) is gone, the same choice the WooCommerce plugin retired. A store that had it on keeps its stored value, but nothing reads it: its welcome, first-order and abandoned-cart triggers now honour every unsubscribe, and contacts keep syncing with their real subscription state. A contact Smaily has never seen is still enrolled.
 
 ### 2.8.1
 

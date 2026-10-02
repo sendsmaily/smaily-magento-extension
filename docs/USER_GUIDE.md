@@ -255,10 +255,9 @@ The events:
   template personalization.
 - **Abandoned Cart** — see below.
 
-Whether automations may re-subscribe an unsubscribed contact
-(`force_opt_in`) follows the contact sync mode: never under consent or
-checkout-only; under legitimate interest only when the advanced toggle is
-enabled.
+An automation never re-subscribes a contact who unsubscribed in Smaily, in
+any contact sync mode: the extension always sends `force_opt_in=false`. A
+contact Smaily has never seen is still enrolled.
 
 ### Segmenting on when an automation last ran
 

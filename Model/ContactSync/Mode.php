@@ -16,15 +16,15 @@ use Smaily\Connect\Model\Config\Source\SyncMode;
  *
  * Mirrors the WooCommerce plugin's ContactSyncMode:
  * - legitimate_interest: all registered customers, no opt-in filter, no
- *   reconcile; automations honour unsubscribes unless the advanced toggle
- *   is on.
+ *   reconcile.
  * - consent (DEFAULT): only opted-in newsletter subscribers; bidirectional
- *   Smaily<->Magento reconcile; automations never re-subscribe.
+ *   Smaily<->Magento reconcile.
  * - checkout_optin: no account sync; checkout checkbox only (guests
  *   intrinsically included).
  *
  * An unknown stored value falls back to the lawful-safe default so a bogus
- * mode never broadens the audience.
+ * mode never broadens the audience. No mode lets an automation re-subscribe
+ * a contact who unsubscribed in Smaily (PRO-3577, Queue\Handler\AutomationHandler).
  */
 class Mode
 {
@@ -84,19 +84,5 @@ class Mode
     public function reconciles(?int $websiteId = null): bool
     {
         return $this->mode($websiteId) === SyncMode::MODE_CONSENT;
-    }
-
-    /**
-     * Whether automation triggers send force_opt_in=true. Consent + checkout:
-     * always false (never re-subscribe). Legitimate interest: only with the
-     * advanced toggle (GDPR Art. 21 honoured by default).
-     */
-    public function automationForceOptIn(?int $websiteId = null): bool
-    {
-        if ($this->mode($websiteId) !== SyncMode::MODE_LEGITIMATE_INTEREST) {
-            return false;
-        }
-
-        return $this->config->automationForceOptIn($websiteId);
     }
 }

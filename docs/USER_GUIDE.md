@@ -393,6 +393,12 @@ captured into first-party cookies and stamped onto the resulting order, so
 the engine can credit purchases to recommendations. This works with Full
 Page Cache because the capture runs client-side.
 
+A recommendation id must be a well-formed UUID. Campaign Intelligence
+refuses a whole order over a malformed one, so the extension ignores a
+malformed id — from a truncated link or a test-email placeholder — in the
+link and again when it sends the order. The order still reaches Campaign
+Intelligence, without that click.
+
 ### If your Campaign Intelligence account is deactivated
 
 If Smaily deactivates the Campaign Intelligence account behind this store —

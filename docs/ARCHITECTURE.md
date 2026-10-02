@@ -425,7 +425,12 @@ on FPC-cached pages. At order save (`Observer/Engine/OrderSaveAfter`, where
 (`smaily_rec_id` / `smaily_visitor_token` / `smaily_rec_ctx` /
 `session_id`). The order is the only path these reach the engine on: since
 contract v1.7.0 the engine ignores the rec id/context echo on browse
-events, so the tracker no longer sends it.
+events, so the tracker no longer sends it. The rec id is shape-checked at
+both ends (`Engine\RecId`, contract §5 — a malformed `smaily_rec_id`
+rejects the whole order): the capture scripts write the cookie only for a
+well-formed UUID, from `smaily_rec` or the guarded `utm_content` fallback,
+and `OrderPayloadBuilder` omits a malformed stored value and sends the
+order without it.
 
 ### Browse tracking
 

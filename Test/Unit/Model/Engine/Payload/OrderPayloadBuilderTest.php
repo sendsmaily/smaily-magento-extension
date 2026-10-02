@@ -196,12 +196,67 @@ class OrderPayloadBuilderTest extends TestCase
     }
 
     /**
+     * Contract §5: the engine validates smaily_rec_id as a UUID and rejects
+     * the WHOLE order over a malformed one (PRO-3576). A malformed id is left
+     * off; the order and its other attribution signals still go.
+     *
+     * @dataProvider malformedRecIds
+     */
+    public function testAMalformedRecIdIsLeftOffAndTheOrderStillGoes(string $recId): void
+    {
+        $order = $this->order([['POC-CAT', 1, 22.99, 0.0]], 22.99, Order::STATE_COMPLETE, 5);
+
+        $payload = $this->builderWithReturns([], [
+            'rec_id' => $recId,
+            'visitor_token' => 'vt_abc123',
+            'rec_ctx' => 'welcome',
+            'anon_session_id' => '0f8e3c1a-5b2d-4e6f-8a9b-1c2d3e4f5a6b',
+        ])->build($order);
+
+        self::assertNotNull($payload);
+        self::assertArrayNotHasKey('smaily_rec_id', $payload);
+        self::assertSame('vt_abc123', $payload['smaily_visitor_token']);
+        self::assertSame('welcome', $payload['smaily_rec_ctx']);
+        self::assertSame('0f8e3c1a-5b2d-4e6f-8a9b-1c2d3e4f5a6b', $payload['session_id']);
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function malformedRecIds(): array
+    {
+        return [
+            'placeholder' => ['rec_abc123'],
+            'truncated' => ['3fa85f64-5717-4562-b3fc-2c963f66af'],
+            'surrounding text' => [' 3fa85f64-5717-4562-b3fc-2c963f66afa6x'],
+            'non-hex' => ['3fa85f64-5717-4562-b3fc-2c963f66afaz'],
+            'no dashes' => ['3fa85f6457174562b3fc2c963f66afa6'],
+            'trailing newline' => ["3fa85f64-5717-4562-b3fc-2c963f66afa6\n"],
+        ];
+    }
+
+    public function testAWellFormedRecIdTravelsWithTheOrder(): void
+    {
+        $order = $this->order([['POC-CAT', 1, 22.99, 0.0]], 22.99, Order::STATE_COMPLETE, 5);
+
+        $payload = $this->builderWithReturns([], [
+            'rec_id' => '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+            'visitor_token' => null,
+            'rec_ctx' => null,
+            'anon_session_id' => null,
+        ])->build($order);
+
+        self::assertSame('3fa85f64-5717-4562-b3fc-2c963f66afa6', $payload['smaily_rec_id']);
+    }
+
+    /**
      * Credit-memo item rows as the join returns them, oldest memo first.
      *
      * @param array<int, array{0: int, 1: float, 2: string}> $returns
      *     [order_item_id, qty, credit-memo created_at]
+     * @param array<string, ?string>|false $attribution the side-table row
      */
-    private function builderWithReturns(array $returns): OrderPayloadBuilder
+    private function builderWithReturns(array $returns, array|false $attribution = false): OrderPayloadBuilder
     {
         $rows = array_map(
             static fn (array $row) => [
@@ -221,9 +276,8 @@ class OrderPayloadBuilderTest extends TestCase
         $connection = $this->createMock(AdapterInterface::class);
         $connection->method('select')->willReturn($select);
         $connection->method('fetchAll')->willReturn($rows);
-        // No row in the attribution side table: no attribution keys, which is
-        // all these cases need.
-        $connection->method('fetchRow')->willReturn(false);
+        // false = no row in the attribution side table: no attribution keys.
+        $connection->method('fetchRow')->willReturn($attribution);
 
         $resourceConnection = $this->createMock(ResourceConnection::class);
         $resourceConnection->method('getConnection')->willReturn($connection);

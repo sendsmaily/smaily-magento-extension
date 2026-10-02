@@ -16,8 +16,17 @@
 (function () {
     'use strict';
 
+    // Contract §5: the engine validates smaily_rec_id as a UUID (8-4-4-4-12
+    // hex) and rejects the whole order over a malformed one, so only a
+    // well-formed id is ever written to the cookie (PRO-3576).
+    var REC_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     function readParam(name) {
         return new URLSearchParams(window.location.search).get(name);
+    }
+
+    function validRecId(value) {
+        return value && REC_ID_PATTERN.test(value) ? value : null;
     }
 
     function getCookie(name) {
@@ -58,14 +67,14 @@
      * (mirrors the AMD dependency in the base module).
      */
     function capture(config) {
-        var recId = readParam(config.paramRecId),
+        var recId = validRecId(readParam(config.paramRecId)),
             visitorToken = readParam(config.paramVisitor),
             context = readParam(config.paramContext);
 
         // utm_content fallback exists as a defensive dead path only — the
         // engine never issues utm_content rec ids (contract: GA pollution).
         if (!recId && readParam('utm_source') === 'smaily') {
-            recId = readParam('utm_content');
+            recId = validRecId(readParam('utm_content'));
         }
 
         if (recId) {

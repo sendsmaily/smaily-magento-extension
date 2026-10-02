@@ -5,7 +5,7 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-2456 page frame — Settings, Initial setup
+_Last updated: 2026-10-02 (PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
 and the Dashboard fill the content area on the pack's grey pane under a
 full-width white tab strip, in Magento's Open Sans, with 33 px buttons and
 our own text, link and status colours. Earlier the same day: PRO-3572 — a
@@ -93,6 +93,22 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   (was 2.2), and a footer under a divider offers **Go to Dashboard**
   (primary) and **Open Settings** — new phrases "Ava töölaud" / "Ava
   seaded". Checked by screenshot at 1440 and 1100 px in en_US and et_EE.
+
+- **PRO-3576 done — a malformed rec id no longer costs the engine the
+  order (2026-10-02).** Contract §5: the orders route validates
+  `smaily_rec_id` with zod v3 `z.string().uuid()` (8-4-4-4-12 hex, no
+  version nibble — checked in the engine source) and rejects the whole
+  order over a malformed value. New `Model\Engine\RecId::isValid()` (same
+  pattern, `D` modifier so a trailing newline fails);
+  `OrderPayloadBuilder::attribution()` omits a malformed stored rec id and
+  keeps the other three signals; the storefront capture
+  (`view/frontend/web/js/attribution.js` and the Hyvä twin) writes the
+  cookie only for a well-formed id, from `smaily_rec` or the
+  `utm_source=smaily` `utm_content` fallback. Browse events are unchanged:
+  they never carried the rec id. Same check as WooCommerce
+  (`Support/RecId.php`, PRO-1710). The visitor token, context and session
+  id keep only their 255-character cap (WooCommerce PRO-1942 shape-checks
+  them too) — left for a separate Story.
 
 - **PRO-3572 done — a network failure logs no contact address (2026-10-02).**
   Guzzle ends a network-failure message with the full request URL

@@ -12,6 +12,7 @@ use Magento\Framework\App\ResourceConnection;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Api\Data\OrderItemInterface;
 use Magento\Sales\Model\Order;
+use Smaily\Connect\Model\Engine\RecId;
 
 /**
  * Order -> WireOrder (contract §5).
@@ -22,7 +23,8 @@ use Magento\Sales\Model\Order;
  * values per contract v1.4.0 amount semantics: row_total_incl_tax for
  * lines, grand_total for total_amount; items carry pre-discount unit
  * prices and post-discount line totals. Attribution fields come
- * from the smaily_order_attribution side table.
+ * from the smaily_order_attribution side table; a malformed rec id is
+ * omitted (Engine\RecId).
  *
  * Return signals (contract §5, v1.8.0) are derived from the order's OWN
  * credit memos on every build, never from a one-shot event payload: the
@@ -234,7 +236,10 @@ class OrderPayloadBuilder
         }
 
         $attribution = [];
-        if (!empty($row['rec_id'])) {
+        // Contract §5: a malformed smaily_rec_id makes the engine reject the
+        // whole order, so it is left off and the order goes without it
+        // (PRO-3576). The stored row is not rewritten.
+        if (RecId::isValid((string)$row['rec_id'])) {
             $attribution['smaily_rec_id'] = (string)$row['rec_id'];
         }
         if (!empty($row['visitor_token'])) {

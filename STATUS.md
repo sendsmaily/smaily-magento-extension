@@ -51,6 +51,15 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   files (7 pre-existing errors in `panel/connection.phtml` from PRO-3566),
   phpstan `[OK]`, integration 132.
 
+- **PRO-3641 done — admin layout leftovers (2026-10-02).** Choice cards
+  (`.smaily-choice`, width 100 %) are `box-sizing: border-box`, so their
+  padding and border stay inside the card on every page and width — the
+  admin's own reset already made them border-box; without it they stuck
+  out 34 px (measured in headless Chrome, Settings and the initial setup,
+  1400 / 700 / 560 / 420 px). Each Settings tab footer now spans its tab's
+  card: Automations and Intelligence 666 px, Contacts 680 px (it was
+  620 px under a 680 px card too); Connection and RSS stay at 620 px.
+
 - **PRO-3569 done — admin copy leftovers (2026-10-02).** The Contacts
   lawful-basis paragraph points to where the choice is changed now
   ("… you can change it later in Settings > Contacts." / "… hiljem saab

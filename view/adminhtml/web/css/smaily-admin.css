@@ -946,14 +946,27 @@
     display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); font-weight: 600; color: var(--s-text);
 }
 #smaily-rss-builder { max-width: 520px; margin-top: var(--sp-4); }
-#smaily-rss-builder .smaily-rss-builder__grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-4); }
-#smaily-rss-builder .smaily-rss-builder__field { display: flex; flex-direction: column; gap: 5px; font-size: var(--fs-13); font-weight: 600; color: var(--s-text); }
+/* The pack's compact form (PRO-2456): 12px secondary-colour labels, 13px
+ * controls with 6px 9px padding, selects with their own caret, a small
+ * "Feed URL" label 18px under the grid, and the URL as a 12.5px monospace
+ * chip with the pack's light border (#d6d6d6, no token). */
+#smaily-rss-builder .smaily-rss-builder__grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); margin-bottom: 18px; }
+#smaily-rss-builder .smaily-rss-builder__field,
+#smaily-rss-builder .smaily-rss-builder__label { font-size: var(--fs-12); font-weight: 600; color: var(--s-text-2); }
+#smaily-rss-builder .smaily-rss-builder__field { display: flex; flex-direction: column; gap: 5px; }
+#smaily-rss-builder .smaily-rss-builder__label { display: block; margin-bottom: 5px; }
 #smaily-rss-builder .smaily-rss-builder__field input,
-#smaily-rss-builder .smaily-rss-builder__field select { width: 100%; max-width: none; font-weight: 400; }
+#smaily-rss-builder .smaily-rss-builder__field select {
+    width: 100%; max-width: none; padding: 6px 9px; font-size: var(--fs-13); font-weight: 400;
+}
+#smaily-rss-builder .smaily-rss-builder__field select {
+    padding-right: 28px; appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    background: var(--s-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M0 0h8L4 5z' fill='%238a8a8a'/%3E%3C/svg%3E") no-repeat right 11px center;
+}
 #smaily-rss-builder .smaily-rss-builder__url { display: flex; gap: var(--sp-2); align-items: stretch; }
 #smaily-rss-builder .smaily-rss-builder__url input {
-    flex: 1; min-width: 0; max-width: none; font-family: var(--mono); font-size: var(--fs-13);
-    color: var(--s-text); background: var(--s-surface-3);
+    flex: 1; min-width: 0; max-width: none; padding: 9px 11px; border-color: #d6d6d6;
+    font: 12.5px/1.4 var(--mono); color: var(--s-text); background: var(--s-surface-3);
 }
 #smaily-rss-builder .note { margin-top: var(--sp-2); font-size: var(--fs-12); color: var(--s-text-3); }
 

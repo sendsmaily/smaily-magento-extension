@@ -556,6 +556,7 @@ real counterpart, see (d).
 | Number of products (1-250) | Toodete arv (1-250) |
 | Sort by | Sordi |
 | Sort order | Sortimise suund |
+| Feed URL (label above the URL chip, PRO-2456; WooCommerce plugin wording) | Voo-URL |
 | Copy | Kopeeri |
 | Date created / Date updated / Product name / Price | Loomise kuupäev / Muutmise kuupäev / Toote nimi / Hind |
 | Descending / Ascending | Kahanev / Kasvav |

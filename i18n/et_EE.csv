@@ -178,6 +178,7 @@
 "Failed","Ebaõnnestunud"
 "Failed deliveries (24 hours)","Ebaõnnestunud saadetised (24 tundi)"
 "Failure class: %1","Tõrkeklass: %1"
+"Feed URL","Voo-URL"
 "Feed URL Builder","Voo URL-i koostaja"
 "Fill in the credentials and press Test connection first.","Täida esmalt kasutajaandmed ja vajuta „Testi ühendust“."
 "Fill in the subdomain and username first.","Täida esmalt alamdomeen ja kasutajanimi."

@@ -81,6 +81,12 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   connections", "Synchronization settings" (already in our catalogs),
   "Setting up triggers for automations", "Create a connection with Campaign
   Intelligence (optional)", "Summary and last check".
+  Settings > RSS: the URL builder uses the pack's compact form — 12px
+  secondary-colour labels, 13px controls with 6px 9px padding, selects
+  with their own caret (6px 28px 6px 9px), 16px grid gaps — and the feed
+  URL sits under the pack's small "Feed URL" label (ET "Voo-URL", the
+  WooCommerce plugin's wording) as a 12.5px monospace chip with the pack's
+  #d6d6d6 border and 9px 11px padding.
 
 - **PRO-2456 evening walk-through — admin pages checked in en_US and
   et_EE at 1440, 1100 and 400 px (2026-10-02).** Every Smaily page and

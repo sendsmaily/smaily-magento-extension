@@ -45,7 +45,10 @@ $storeTriggers = [
 ];
 ?>
 <div class="smaily-card">
+    <?php // The initial setup shows this title above the card (wizard/index.phtml, PRO-3561). ?>
+    <?php if ($block->getData('context') !== 'wizard'): ?>
     <h2><?= $escaper->escapeHtml(__('Map store events to Smaily automations')) ?></h2>
+    <?php endif; ?>
     <p><?= $escaper->escapeHtml(__('Each event triggers the Smaily automation workflow you pick. The lists below come live from your Smaily account — create the workflows there first if they are missing, then press Refresh.')) ?>
        <button type="button" class="action-tertiary" id="smaily-w-refresh-workflows"><span><?= $escaper->escapeHtml(__('Refresh workflows')) ?></span></button>
     </p>

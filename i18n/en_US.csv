@@ -353,6 +353,7 @@
 "Source","Source"
 "Start import","Start import"
 "Status","Status"
+"Step %1 of %2","Step %1 of %2"
 "Stopped after %1 of %2 attempts — retrying could not change the outcome, so this row will NOT retry on its own. Fix the cause shown below, then select it in the log and press Retry.","Stopped after %1 of %2 attempts — retrying could not change the outcome, so this row will NOT retry on its own. Fix the cause shown below, then select it in the log and press Retry."
 "Stopped before an error — %1 of %2 synced so far. Press the import button to run it again.","Stopped before an error — %1 of %2 synced so far. Press the import button to run it again."
 "Store views with the %1 language sync their contacts and automations to this account.","Store views with the %1 language sync their contacts and automations to this account."

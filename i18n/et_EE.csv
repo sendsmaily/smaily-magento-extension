@@ -353,6 +353,7 @@
 "Source","Allikas"
 "Start import","Alusta importi"
 "Status","Olek"
+"Step %1 of %2","%1. samm %2-st"
 "Stopped after %1 of %2 attempts — retrying could not change the outcome, so this row will NOT retry on its own. Fix the cause shown below, then select it in the log and press Retry.","Peatus pärast %1 katset %2-st — kordamine ei muudaks tulemust, seega see rida EI proovi enam ise uuesti. Kõrvalda allpool näidatud põhjus, seejärel vali rida logis ja vajuta Proovi uuesti."
 "Stopped before an error — %1 of %2 synced so far. Press the import button to run it again.","Peatus enne viga — seni sünkroonitud %1 / %2. Uuesti käivitamiseks vajuta impordinuppu."
 "Store views with the %1 language sync their contacts and automations to this account.","Poevaated keelega %1 sünkroonivad oma kontaktid ja automaatikad sellele kontole."

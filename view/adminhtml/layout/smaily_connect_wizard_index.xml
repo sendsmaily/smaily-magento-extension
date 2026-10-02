@@ -38,6 +38,7 @@
                        template="Smaily_Connect::panel/automations.phtml">
                     <arguments>
                         <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\WizardData</argument>
+                        <argument name="context" xsi:type="string">wizard</argument>
                     </arguments>
                 </block>
                 <block class="Magento\Backend\Block\Template"

@@ -41,12 +41,9 @@ $syncFieldLabels = [
 $selectedSyncFields = $viewModel->getSelectedSyncFields();
 ?>
 <div class="smaily-card">
-    <?php // Settings already has its own "Contacts" heading + description above the
-    // card (settings/index.phtml), matching the Connection tab's pattern — the wizard
-    // has no such heading, so it keeps this in-card intro. ?>
-    <?php if (!$isSettings): ?>
-    <h2><?= $escaper->escapeHtml(__('Contact synchronisation to Smaily')) ?></h2>
-    <?php endif; ?>
+    <?php // Settings has its own "Contacts" heading + description above the card
+    // (settings/index.phtml); the wizard puts the step title above the card
+    // (wizard/index.phtml, PRO-3561). ?>
     <?php if ($isSettings): ?>
     <div class="smaily-inline-toggle">
         <label><input type="checkbox" id="smaily-w-sync-enabled"/>

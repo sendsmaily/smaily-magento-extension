@@ -536,6 +536,15 @@
     .smaily-wizard .smaily-steps li.active .smaily-step-index { border-width: 2px; }
 }
 
+/* --- Initial setup step heading (PRO-3561, pack "Setup Wizard" frames): the
+ * "Step N of 5" kicker and the step title above the step's card. ---------- */
+.smaily-wizard .smaily-step-head { max-width: 680px; margin: 0 0 18px; }
+.smaily-wizard .smaily-step-kicker-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.smaily-wizard .smaily-step-kicker {
+    font: 700 var(--fs-11)/1 var(--font); letter-spacing: .6px; text-transform: uppercase; color: var(--s-text-3);
+}
+.smaily-wizard .smaily-step-title { margin: 0; font-size: var(--fs-22); font-weight: 700; line-height: 1.25; color: var(--s-text); }
+
 /* --- Settings tabs: accent underline for the active tab. -------------------- */
 .smaily-settings .smaily-tabs li { color: var(--s-text-2); }
 .smaily-settings .smaily-tabs li.active { border-bottom-color: var(--s-accent); color: var(--s-text); }

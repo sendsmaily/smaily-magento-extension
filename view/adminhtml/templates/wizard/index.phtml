@@ -38,6 +38,24 @@ $websiteQuery = $viewModel->getWebsiteQuery();
 $settingsUrl = $block->getUrl('smaily_connect/settings', $websiteQuery);
 $dashboardUrl = $block->getUrl('smaily_connect/dashboard', $websiteQuery);
 $logUrl = $block->getUrl('smaily_connect/log', $websiteQuery);
+
+// Step N of 5 + the step title above each step's content, as the pack draws
+// them (PRO-3561). The panels below carry no title of their own here.
+$stepTitles = [
+    1 => __('Connect your Smaily account'),
+    2 => __('Contact synchronisation to Smaily'),
+    3 => __('Map store events to Smaily automations'),
+    4 => __('Campaign Intelligence (optional)'),
+    5 => __('You are all set!'),
+];
+$stepHead = static function (int $stepNo) use ($escaper, $stepTitles): string {
+    return '<div class="smaily-step-head">'
+        . '<div class="smaily-step-kicker-row"><span class="smaily-step-kicker">'
+        . $escaper->escapeHtml(__('Step %1 of %2', $stepNo, count($stepTitles)))
+        . '</span></div>'
+        . '<h3 class="smaily-step-title">' . $escaper->escapeHtml($stepTitles[$stepNo]) . '</h3>'
+        . '</div>';
+};
 ?>
 <div id="smaily-wizard" class="smaily-ui smaily-wizard">
     <!-- Styles live in view/adminhtml/web/css/smaily-admin.css (loaded via the wizard layout XML). -->
@@ -77,15 +95,15 @@ $logUrl = $block->getUrl('smaily_connect/log', $websiteQuery);
         <?php endforeach; ?>
     </ul>
 
-    <div class="smaily-step-panel" data-step="1"><?= $block->getChildHtml('panel.connection') ?></div>
-    <div class="smaily-step-panel" data-step="2"><?= $block->getChildHtml('panel.subscribers') ?></div>
-    <div class="smaily-step-panel" data-step="3"><?= $block->getChildHtml('panel.automations') ?></div>
-    <div class="smaily-step-panel" data-step="4"><?= $block->getChildHtml('panel.intelligence') ?></div>
+    <div class="smaily-step-panel" data-step="1"><?= /* @noEscape */ $stepHead(1) ?><?= $block->getChildHtml('panel.connection') ?></div>
+    <div class="smaily-step-panel" data-step="2"><?= /* @noEscape */ $stepHead(2) ?><?= $block->getChildHtml('panel.subscribers') ?></div>
+    <div class="smaily-step-panel" data-step="3"><?= /* @noEscape */ $stepHead(3) ?><?= $block->getChildHtml('panel.automations') ?></div>
+    <div class="smaily-step-panel" data-step="4"><?= /* @noEscape */ $stepHead(4) ?><?= $block->getChildHtml('panel.intelligence') ?></div>
 
     <!-- Step 5: Overview (wizard-only) -->
     <div class="smaily-step-panel" data-step="5">
+        <?= /* @noEscape */ $stepHead(5) ?>
         <div class="smaily-card">
-            <h2><?= $escaper->escapeHtml(__('You are all set!')) ?></h2>
             <?php // One of the two shows: Smaily accepted the saved credentials (PRO-3560) or not. ?>
             <p id="smaily-w-overview-connected"><?= $escaper->escapeHtml(__('Smaily Connect is now syncing in near-real-time. Here is where everything lives from now on:')) ?></p>
             <p id="smaily-w-overview-not-connected" style="display:none"><?= $escaper->escapeHtml(__('Syncing starts once Smaily accepts the credentials — check them in Settings > Connection and test the connection. Here is where everything lives from now on:')) ?></p>

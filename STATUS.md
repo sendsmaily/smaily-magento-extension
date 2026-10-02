@@ -16,6 +16,22 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3561 done — every initial-setup step shows its position and title
+  as the pack draws them (2026-10-02).** `wizard/index.phtml` renders a
+  "Step N of 5" kicker (11 px / 700 / uppercase, `--s-text-3`) and the step
+  title as a 22 px / 700 heading above each step's card (`.smaily-step-head`
+  in `smaily-admin.css`). The titles are the panels' existing ones
+  (Connect your Smaily account / Contact synchronisation to Smaily / Map
+  store events to Smaily automations / Campaign Intelligence (optional) /
+  You are all set!); the panels no longer repeat them inside the card in
+  the initial setup — Settings is unchanged (the automations panel gets
+  `context=wizard` in the wizard layout). New phrase: "Step %1 of %2" →
+  "%1. samm %2-st" (Woo `smaily-connect-et.po` "Step 1 of 6" → "1. samm
+  6-st"). Verified by rendering the real templates with stubs in headless
+  Chrome, en_US and et_EE: kicker and title on all five steps, no in-card
+  duplicate, Settings headings unchanged. Fidelity audit row 14 marked
+  fixed.
+
 - **PRO-3570 done — the Connection status follows each check without a
   reload (2026-10-02).** Settings > Connection renders the status pill and
   the account from the server-known state (`WizardData::isSmailyVerified()`,

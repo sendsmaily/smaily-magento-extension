@@ -24,7 +24,10 @@ $isSettings = $block->getData('context') === 'settings';
 $isRefused = $viewModel->isEngineRefused();
 ?>
 <div class="smaily-card">
+    <?php // The initial setup shows this title above the card (wizard/index.phtml, PRO-3561). ?>
+    <?php if ($isSettings): ?>
     <h2><?= $escaper->escapeHtml(__('Campaign Intelligence (optional)')) ?></h2>
+    <?php endif; ?>
     <?php // Marketing's introduction (GMS-11), word for word as in the WooCommerce and Shopify plugins.
     // The setup step always shows it; Settings only until the engine is
     // connected, as WooCommerce does — engineConnected() in panels-js hides

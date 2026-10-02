@@ -77,10 +77,9 @@ $modeCards = [
     <div class="smaily-card">
         <?php // Settings already has its own "Connection" heading + description above the
         // card (settings/index.phtml) — the design's return-visit frame and both sibling
-        // plugins go straight to the fields there. The wizard has no such heading, so it
-        // keeps this in-card intro. ?>
+        // plugins go straight to the fields there. The wizard puts the step title above
+        // the card (wizard/index.phtml, PRO-3561) and keeps this in-card intro. ?>
         <?php if (!$isSettings): ?>
-        <h2><?= $escaper->escapeHtml(__('Connect your Smaily account')) ?></h2>
         <p><?= $escaper->escapeHtml(__('You can find or create API credentials in Smaily under Preferences > API. The password is stored encrypted and never leaves your server.')) ?></p>
         <?php endif; ?>
         <div class="smaily-field">

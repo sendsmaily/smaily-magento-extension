@@ -122,7 +122,8 @@ notification suggesting a settings review — nothing is changed or blocked.
 The fastest path is the guided flow: **Marketing > Smaily Connect >
 Initial setup** — five steps (Connect, Contacts, Automations,
 Intelligence, Overview), each saved separately, with connection testing and
-live workflow lists built in. Completed steps stay unlocked in the step
+live workflow lists built in. Each step is headed by its position ("Step 1
+of 5") and its title. Completed steps stay unlocked in the step
 list (a rail on the left; a bar across the top on narrow screens), so you
 can move back and forward between them freely — also when
 revisiting the initial setup after finishing it. The Overview step says

@@ -642,24 +642,24 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   in-process instance — nothing stored). Fixes PRO-3603 findings 1, 5
   and 6.
 
-- **Next session opens here (2026-10-02).** 3.0.0-rc1 is out (header).
-  **Evening 2026-10-02 handoff:** UI/UX parity done today (design-pack match
-  78.0 → 94.9 %, PRO-3561–3570, 3634, 3641, 3642, 3569, 3644, setup steps on the
-  grey pane). All worker branches are merged; no worktrees left. Then: Erkki proofreads today's Estonian strings; pilot day 09.10.
-  **PRO-3614 (late 2026-10-02):** the pilot store is headless — before
-  pilot day, Erkki decides the product-link design (Questions item 12)
-  and passes the hand-off in `docs/HEADLESS_STOREFRONTS.md` "What the
-  storefront team must add" to the storefront team; contact sync and
-  automations stay off until its "Before switching anything on" passes.
-  Next: pilot day — milestone "Pilot store live", 2026-10-09. The pilot's
-  developer installs from the release ZIP per `docs/INSTALLING.md`; Erkki
-  walks `PILOT_CHECKLIST.md` with real credentials (human acceptance of
-  everything that needs a real Smaily account and engine) — PRO-2474's last
-  item. After the pilot (open backlog): PRO-3625 (remaining low hardening),
-  PRO-3573, the UI/UX parity Stories (PRO-3564–3569), PRO-2506,
-  PRO-1967, PRO-1198 (Smaily hand-over). Sandbox: run `git worktree list`
-  and remove finished agent worktrees under `.claude/worktrees` before any
-  sandbox `setup:di:compile` (they are inside the bind-mounted module).
+- **Next session opens here (2026-10-02, late evening).** 3.0.0-rc1 is out
+  (header). Done this session: PRO-3614 (headless research, docs/HEADLESS_STOREFRONTS.md),
+  PRO-3625 + PRO-3573 (hardening; the admin Log shows contact data in full
+  and the initial setup needs `::config`, both Woo parity by owner decision),
+  PRO-3660 (Storefront URL, auto-open on API-only orders), PRO-3664 (browse
+  consent as in Woo: override → cookie restriction mode → none), PRO-3666.
+  These land in a future rc2; no tag yet. Next, in order: (1) pilot day
+  09.10 — Erkki passes the storefront hand-off in HEADLESS_STOREFRONTS.md to
+  the storefront team (incl. keeping the query string on the `/<url_key>.html`
+  redirect), sets the Storefront URL, walks `PILOT_CHECKLIST.md`; PRO-2474's
+  last item and PRO-3660's human acceptance; (2) next client HC Pro (legacy
+  2.x upgrade, 4 websites): PRO-3661, PRO-3662 (spike — questions for the
+  client), PRO-3663, PRO-3665; (3) PRO-3675 (Hyvä consent event on a real
+  Hyvä store); (4) UI/UX parity PRO-1398, PRO-1385, PRO-1357; then PRO-2506,
+  PRO-1967, PRO-1198. Engine ask PRO-3649, Woo ask PRO-3673 are with their
+  teams. Erkki still proofreads today's Estonian strings. Sandbox: remove
+  finished agent worktrees under `.claude/worktrees` before any sandbox
+  `setup:di:compile` (they are inside the bind-mounted module).
 
 - **PRO-3603 done — final clean-install pass of the release ZIP
   (2026-10-02).** On fresh sandbox volumes, without the working-tree

@@ -144,8 +144,10 @@ is written in English.
 - **v3 rewrite** — shape: deadline. Gauge: PRO-2474 pilot-readiness
   checklist, items ticked out of 5 (read from the Linear issue). Milestones
   (set 2026-10-02): "rc1 tagged + pilot runbook" 2026-10-03, "Pilot store
-  live" 2026-10-09. Value 2026-10-02: 0/5.
+  live" 2026-10-09. Values: 2026-10-02 morning 0/5, evening 4/5 (rc1
+  tagged; only the pilot install is left).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
-  Stories in the Epic (state not Done/Canceled). Value 2026-10-02: 4 open
-  (PRO-2456, PRO-1357, PRO-1398, PRO-1385). Dates: none yet (2026-10-02 —
+  Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
+  in the morning, 3 in the evening (PRO-1357, PRO-1398, PRO-1385; PRO-2456
+  done). Dates: none yet (2026-10-02 —
   not asked; PRO-2456 is placed before the rc1 tag).

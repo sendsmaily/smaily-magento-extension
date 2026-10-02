@@ -38,6 +38,10 @@ Extract the release ZIP to `app/code/Smaily/Connect` and run the same
 `.sha256` file beside the ZIP; run
 `sha256sum -c smaily-connect-magento2.zip.sha256` in the download folder
 before extracting to confirm the archive is the one we built.
+[INSTALLING.md](INSTALLING.md) walks through a manual install step by
+step — the archive layout, the commands for production and developer
+mode, cron, updating to a newer release, and disabling or removing the
+module.
 
 ### Requirements
 

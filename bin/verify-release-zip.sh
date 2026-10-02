@@ -104,6 +104,7 @@ forbid "docker files"     '(docker-compose.*|Dockerfile)$'
 forbid "working status"   'STATUS\.md$'
 forbid "backlog"          'BACKLOG\.md$'
 forbid "agent guide"      'CLAUDE\.md$'
+forbid "pilot checklist"  'PILOT_CHECKLIST\.md$'
 forbid "documentation"    'docs/'
 
 # --- 3. The archive states the repo's version -------------------------------

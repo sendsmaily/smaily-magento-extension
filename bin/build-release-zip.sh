@@ -38,6 +38,7 @@ zip -q -r -X "$OUT" . \
        'phpunit.xml.dist' 'phpunit.integration.xml.dist' \
        'composer.lock' '.gitignore' \
        'CONTRIBUTING.md' 'CLAUDE.md' 'STATUS.md' 'BACKLOG.md' \
+       'PILOT_CHECKLIST.md' \
        'docs/*' \
        '*.zip' '*.zip.sha256'
 

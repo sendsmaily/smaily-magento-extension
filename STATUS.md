@@ -5,7 +5,8 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (CLAUDE.md anchors on the two Magento Epics — v3
+_Last updated: 2026-10-02 (PRO-2474: the ZIP install runbook and the
+pilot-day checklist are written. Earlier the same day: CLAUDE.md anchors on the two Magento Epics — v3
 rewrite and UI/UX parity — and names their outcome gauges; queue set for
 the pilot; `composer.lock` refreshed, gates unchanged. Previous session, 2026-09-11: PRO-2472 — the release train's packaging
 leftovers are closed: the checksum ships with the release, the module
@@ -32,6 +33,21 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   Erkki's go). Milestones: rc1 tagged + pilot runbook 2026-10-03, pilot store
   live 2026-10-09. PRO-2460 decided A — contract §3 SKU key stands, PRO-1484
   closed. After the pilot: PRO-2506, PRO-1967, PRO-1198 (Smaily hand-over).
+
+- **PRO-2474 progress (2026-10-02): runbook + pilot-day checklist written.**
+  `docs/INSTALLING.md` (public, linked from README and the User Guide's
+  manual-install section) is the ZIP install runbook: verify with the
+  `.sha256`, extract flat into `app/code/Smaily/Connect`, production vs
+  developer command sequences, the `smaily_connect` cron group, admin checks,
+  rc updates, disable/remove. Written from code and Magento source, not yet
+  run: Magento's declarative schema drops a disabled module's tables on the
+  next `setup:upgrade` (the whitelist is read from every registered module,
+  the declaration only from enabled ones), so the rollback section says so
+  and offers `--safe-mode=1` / `--data-restore=1`. `PILOT_CHECKLIST.md`
+  (repo root, internal) is Erkki's pilot-day smoke list; it is excluded from
+  the release ZIP and `bin/verify-release-zip.sh` now forbids it (local run:
+  VERIFY OK, 338 entries, `absent: pilot checklist`). Remaining for PRO-2474:
+  run the runbook on a clean sandbox, then the rc1 tag on Erkki's go.
 
 - **`composer.lock` refreshed (2026-10-02, GitHub issue #2).** `composer
   update --ignore-platform-req='ext-*'`, PHP 8.1 pin kept; `composer update

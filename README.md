@@ -59,6 +59,7 @@ See [UPGRADING.md](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/U
 | | |
 |---|---|
 | [User Guide](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/USER_GUIDE.md) | Setup, every setting explained, CLI reference, FAQ |
+| [Installing from the ZIP](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/INSTALLING.md) | Manual install without composer: verify, extract, set up, update, remove |
 | [Upgrading](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/UPGRADING.md) | Migrating from Smaily for Magento 2.8.x |
 | [Architecture](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/ARCHITECTURE.md) | How the module works inside (for developers) |
 | [Hyvä Support](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/HYVA_SUPPORT.md) | Hyvä theme compatibility: audit, compat module, verification results |

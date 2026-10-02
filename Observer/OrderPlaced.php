@@ -133,10 +133,11 @@ class OrderPlaced implements ObserverInterface
 
         // Guest-email inclusion without explicit opt-in (mode-driven toggle):
         // is_unsubscribed is omitted so Smaily's own suppression state rules.
+        // Only a mode that needs no opt-in (legitimate interest) sends it; in
+        // the consent and checkout-only modes a guest reaches Smaily only
+        // through the opt-in above (PRO-3606).
         $isGuest = (bool)$order->getCustomerIsGuest();
-        if ($isGuest && $this->mode->includeGuests($websiteId)
-            && $this->mode->mode($websiteId) !== \Smaily\Connect\Model\Config\Source\SyncMode::MODE_CHECKOUT_OPTIN
-        ) {
+        if ($isGuest && $this->mode->includeGuests($websiteId) && !$this->mode->requiresOptin($websiteId)) {
             $this->dispatcher->dispatchContactSync($email, $storeId, null, null);
         }
     }

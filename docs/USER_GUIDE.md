@@ -223,7 +223,13 @@ if Smaily is briefly unreachable — deliveries retry with backoff).
 |---|---|---|
 | **Subscribers only (consent)** — default | Only opted-in newsletter subscribers | **Yes** — a contact who unsubscribes in Smaily is unsubscribed in Magento too (and vice versa) |
 | All customers (legitimate interest) | Every registered customer; `is_unsubscribed` is omitted so Smaily manages suppression (the [historical import](#historical-import-backfill) sends each customer's status) | No |
-| Checkout opt-in only | Nobody automatically — only shoppers who tick the checkout newsletter checkbox | No |
+| Checkout opt-in only | Nobody automatically — only shoppers who tick the checkout newsletter checkbox. A signup through the newsletter form, the admin or the API alone is not synced; an unsubscribe in the store is | No |
+
+With Magento's **Need to Confirm** newsletter option on, a checkout opt-in
+waits for its confirmation email and syncs once it is confirmed. Magento
+does not record where a pending signup came from, so under checkout opt-in
+only every confirmed signup syncs, a confirmed newsletter-form signup
+included.
 
 Additional options:
 
@@ -234,8 +240,11 @@ Additional options:
   `user_gender` — the names Smaily's WooCommerce plugin uses, so a shopper
   syncing from two stores lands in one field. Empty values are omitted so
   existing Smaily values are never wiped.
-- **Include Guest Order Emails** — also sync guest-order emails (always on
-  in checkout opt-in mode).
+- **Include Guest Order Emails** — also sync the emails of guest orders
+  placed without the checkout newsletter opt-in. It applies only under
+  **All customers**. Under **Subscribers only** and **Checkout opt-in only**
+  a guest's email reaches Smaily only when the guest ticks the checkout
+  newsletter checkbox, whatever this option says.
 - **Show Newsletter Checkbox At Checkout** — adds an opt-in checkbox to the
   checkout payment step; ticking it creates a real Magento newsletter
   subscriber (double opt-in is honoured if your store requires
@@ -264,6 +273,8 @@ The events:
   A shopper who unsubscribed and subscribes again gets it again. A
   subscription made in the admin, through the API (REST, SOAP or GraphQL)
   or by an import still syncs the contact to Smaily, but sends no welcome.
+  Under **Checkout opt-in only** a newsletter-form signup syncs nothing, so
+  it sends no welcome either.
 - **First Order** — fires on a customer's first order, with
   `order_id`, `order_total`, `order_currency`, `is_first_order` fields for
   template personalization.

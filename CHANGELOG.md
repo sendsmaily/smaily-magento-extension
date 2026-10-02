@@ -8,7 +8,7 @@ Ground-up rewrite as module `Smaily_Connect`, targeting feature parity with the 
 
 **New features**
 
-- Contact-sync lawful-basis modes: subscribers only (consent, default), all customers (legitimate interest), checkout opt-in only.
+- Contact-sync lawful-basis modes: subscribers only (consent, default), all customers (legitimate interest), checkout opt-in only. Under checkout opt-in only, only the checkout newsletter checkbox creates or updates a Smaily contact: a signup through the newsletter form, the admin or the API alone sends nothing (with Magento's "Need to Confirm" on, a confirmed signup syncs, because the store cannot tell where it came from); an unsubscribe in the store still reaches Smaily. "Include guest order emails" applies only under all customers: under the other two modes a guest's email reaches Smaily only with the checkout opt-in.
 - Two-way consent sync: unsubscribes/resubscribes in Smaily mirror back onto Magento newsletter subscribers (action-log delta polling).
 - Welcome and first-order automations alongside the abandoned cart automation; per-language workflow routing for multilingual stores (store view = language).
 - Every store-event automation records its own last run on the Smaily contact — `welcome_automation_at`, `first_order_automation_at`, `abandoned_cart_automation_at` (`YYYY-MM-DD HH:MM:SS` UTC, rewritten on every run) — so you can segment on "has received the welcome letter" or "got the abandoned-cart reminder more than 30 days ago". The same field names are used by the WooCommerce and Shopify plugins, so segments transfer between stores.

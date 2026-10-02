@@ -67,7 +67,9 @@ class Mode
 
     /**
      * Guest-order emails are synced — intrinsic to checkout-only, a toggle
-     * (default off) otherwise.
+     * (default off) otherwise. A guest order without the checkout opt-in is
+     * sent only where requiresOptin() is false (Observer\OrderPlaced,
+     * PRO-3606); elsewhere only the opt-in sends a guest.
      */
     public function includeGuests(?int $websiteId = null): bool
     {

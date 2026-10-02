@@ -40,7 +40,7 @@
 "All products","Kõik tooted"
 "All systems normal","Kõik toimib normaalselt"
 "Allow personalized recommendations","Luba personaalsed soovitused"
-"Also sync emails from guest orders (always on in checkout opt-in mode).","Sünkrooni ka külalistellimuste e-posti aadressid (kassanõusoleku režiimis alati sees)."
+"Also sync emails from guest orders without the checkout newsletter opt-in. Applies only in the All customers (legitimate interest) mode; in the other modes a guest is synced only after ticking the checkout newsletter checkbox.","Sünkrooni ka nende külalistellimuste e-posti aadressid, kus kassas uudiskirja nõusolekut ei antud. Kehtib ainult režiimis „Kõik kliendid (õigustatud huvi)“; teistes režiimides sünkroonitakse külaline ainult siis, kui ta märgib kassas uudiskirja märkeruudu."
 "API Connection","API ühendus"
 "API password","API parool"
 "API username","API kasutajanimi"

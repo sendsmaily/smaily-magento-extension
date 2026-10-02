@@ -108,14 +108,14 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
             <p class="note"><?= $escaper->escapeHtml(__('Empty values are never sent, so existing Smaily data is not wiped.')) ?></p>
         </div>
         <?php // Orphan field (PRO-1397): native-config-only until now, real control added here.
-        // include_guests has no mode dependency (only sync_enabled, handled above) —
-        // its "always on in checkout opt-in mode" behavior is a read-time override
-        // (Model\ContactSync\Mode::includeGuests()), not a save-time UI constraint. ?>
+        // include_guests has no save-time mode dependency (only sync_enabled, handled
+        // above) — it takes effect only under legitimate interest, a read-time rule
+        // in Observer\OrderPlaced (PRO-3606), not a save-time UI constraint. ?>
         <?php if ($isSettings): ?>
         <div class="smaily-inline-toggle">
             <label><input type="checkbox" id="smaily-w-include-guests"/>
                 <?= $escaper->escapeHtml(__('Include Guest Order Emails')) ?></label>
-            <p class="note"><?= $escaper->escapeHtml(__('Also sync emails from guest orders (always on in checkout opt-in mode).')) ?></p>
+            <p class="note"><?= $escaper->escapeHtml(__('Also sync emails from guest orders without the checkout newsletter opt-in. Applies only in the All customers (legitimate interest) mode; in the other modes a guest is synced only after ticking the checkout newsletter checkbox.')) ?></p>
         </div>
         <?php endif; ?>
         <div class="smaily-inline-toggle">

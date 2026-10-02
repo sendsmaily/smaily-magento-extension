@@ -40,7 +40,7 @@
 "All products","All products"
 "All systems normal","All systems normal"
 "Allow personalized recommendations","Allow personalized recommendations"
-"Also sync emails from guest orders (always on in checkout opt-in mode).","Also sync emails from guest orders (always on in checkout opt-in mode)."
+"Also sync emails from guest orders without the checkout newsletter opt-in. Applies only in the All customers (legitimate interest) mode; in the other modes a guest is synced only after ticking the checkout newsletter checkbox.","Also sync emails from guest orders without the checkout newsletter opt-in. Applies only in the All customers (legitimate interest) mode; in the other modes a guest is synced only after ticking the checkout newsletter checkbox."
 "API Connection","API Connection"
 "API password","API password"
 "API username","API username"

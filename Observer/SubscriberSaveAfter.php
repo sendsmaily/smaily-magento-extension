@@ -17,6 +17,8 @@ use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Newsletter\Model\Subscriber;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Config\Source\SyncMode;
+use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\ContactSync\ReconcileGuard;
 use Smaily\Connect\Model\ContactSync\StorefrontSubscription;
 use Smaily\Connect\Model\ContactSync\SubscriberPayloadBuilder;
@@ -26,11 +28,13 @@ use Smaily\Connect\Model\Automation\Trigger;
 /**
  * Real-time newsletter subscription sync (newsletter_subscriber_save_after).
  *
- * Fires in every contact-sync mode: subscribing via the newsletter form (or
- * the checkout checkbox, which creates a native subscriber) is an explicit
- * opt-in act. Pending double-opt-in confirmations are not synced until
- * confirmed. Reconcile writes are suppressed via the guard so Smaily-origin
- * changes never echo back.
+ * Subscribing via the newsletter form (or the checkout checkbox, which
+ * creates a native subscriber) is an explicit opt-in act, so a subscription
+ * syncs in the consent and legitimate-interest modes; in the
+ * checkout-opt-in-only mode only the checkout opt-in does (PRO-3606). An
+ * unsubscribe syncs in every mode. Pending double-opt-in confirmations are
+ * not synced until confirmed. Reconcile writes are suppressed via the guard
+ * so Smaily-origin changes never echo back.
  *
  * The welcome automation fires only for a subscription the shopper makes on
  * the storefront (frontend area, or the checkout opt-in, which Luma's
@@ -43,6 +47,7 @@ class SubscriberSaveAfter implements ObserverInterface
 {
     public function __construct(
         private readonly Config $config,
+        private readonly Mode $mode,
         private readonly ReconcileGuard $guard,
         private readonly SyncDispatcher $dispatcher,
         private readonly SubscriberPayloadBuilder $payloadBuilder,
@@ -81,8 +86,12 @@ class SubscriberSaveAfter implements ObserverInterface
             return;
         }
 
-        $customer = $this->loadCustomer((int)$subscriber->getCustomerId());
         $isUnsubscribed = $status !== Subscriber::STATUS_SUBSCRIBED;
+        if (!$isUnsubscribed && !$this->syncsSubscription($subscriber, $websiteId)) {
+            return;
+        }
+
+        $customer = $this->loadCustomer((int)$subscriber->getCustomerId());
 
         $this->dispatcher->dispatchContactSync($email, $storeId, $isUnsubscribed, $customer);
 
@@ -91,6 +100,24 @@ class SubscriberSaveAfter implements ObserverInterface
             unset($address['language']);
             $this->dispatcher->dispatchAutomation(Trigger::WELCOME, $storeId, $address);
         }
+    }
+
+    /**
+     * In the checkout-opt-in-only mode the checkout checkbox is the only
+     * source of a contact, so a subscription syncs only while the checkout
+     * opt-in saves it (PRO-3606). With "Need to Confirm" on, that opt-in is
+     * saved as pending and confirmed later from the email, without the mark;
+     * the store cannot tell it from a confirmed newsletter-form signup, so a
+     * confirmation of a pending subscription syncs too.
+     */
+    private function syncsSubscription(Subscriber $subscriber, int $websiteId): bool
+    {
+        if ($this->mode->mode($websiteId) !== SyncMode::MODE_CHECKOUT_OPTIN) {
+            return true;
+        }
+
+        return $this->storefrontSubscription->isActive()
+            || (int)$subscriber->getOrigData('subscriber_status') === Subscriber::STATUS_NOT_ACTIVE;
     }
 
     private function isStorefront(): bool

@@ -13,7 +13,9 @@ namespace Smaily\Connect\Model\ContactSync;
  * frontend area: the checkout opt-in is saved while the order is placed,
  * and Luma's checkout places the order through the REST API. The
  * subscriber-save observer reads it to decide whether the welcome
- * automation fires (PRO-3580).
+ * automation fires (PRO-3580) and, in the checkout-opt-in-only mode,
+ * whether the subscription syncs at all (PRO-3606). Only the checkout
+ * opt-in sets it.
  *
  * Shared DI instance: the order-placed observer and the subscriber-save
  * observer must receive the same object.

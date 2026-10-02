@@ -92,6 +92,13 @@ class FailureMessageTest extends TestCase
                 'Smaily API credentials are not configured (store scope: 1)',
                 'Smaily API kasutajaandmed on seadistamata (poe skoop: 1)',
             ],
+            // PRO-3565: the reason a skipped row was closed without sending.
+            'skipped, not a contact' => [
+                'Skipped: Smaily does not have this contact, and the purchase marker'
+                    . ' would create it as a subscriber. Nothing was sent.',
+                'Vahele jäetud: Smailys ei ole seda kontakti ja ostu märge looks selle'
+                    . ' tellijana. Midagi ei saadetud.',
+            ],
         ];
     }
 

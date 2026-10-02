@@ -373,7 +373,7 @@ reminder that failed for good means nothing is written either.
 The field is written only to a contact Smaily already has, so it never
 creates a contact. Before sending it, the extension looks the address up in
 Smaily; when Smaily does not have it, the Log row is closed without being
-sent and says why. A shopper who unsubscribed in the store is sent as
+sent, labelled *Skipped*, and says why. A shopper who unsubscribed in the store is sent as
 unsubscribed with this field.
 
 ## Abandoned cart
@@ -611,6 +611,10 @@ panel — you do not have to keep the page open:
   reminder the store called back because the shopper bought in the
   meantime. Nothing was delivered and nothing failed, so it is labelled as
   neither.
+- **Skipped** is its own status too: a row the store closed without
+  sending anything, because sending could not have done what it was for —
+  for example the abandoned-cart purchase marker for an address Smaily does
+  not have. Details shows the reason, and the row does not retry.
 - **Details** on any row opens a slide-out with the full picture: the
   payload exactly as it was (or will be) sent, the attempt count, when the
   next automatic retry happens (or an honest "this row will not retry on

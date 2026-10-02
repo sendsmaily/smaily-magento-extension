@@ -42,6 +42,14 @@ class Collection extends SearchResult
     public const STATUS_WITHDRAWN = 'withdrawn';
 
     /**
+     * A row the queue closed without sending anything (PRO-3619): nothing
+     * was delivered, so "Sent" would be a lie here too. Stored as a terminal
+     * `sent` row with the reason in last_error — a delivered row never keeps
+     * one (PRO-3565).
+     */
+    public const STATUS_SKIPPED = 'skipped';
+
+    /**
      * Split a composite log id back into its queue and row id. Unknown
      * sources and malformed ids come back as ['', 0].
      *
@@ -113,15 +121,18 @@ class Collection extends SearchResult
                 'source' => new \Zend_Db_Expr($connection->quote($source)),
                 'type' => 'q.' . $typeColumn,
                 'entity_id' => 'q.entity_id',
-                // Only the marketing queue withdraws rows, so only its half
-                // can carry the marker; the grid label and the status filter
-                // both read this one derived column.
+                // Only the marketing queue withdraws or skips rows, so only
+                // its half can carry either marker; the grid label and the
+                // status filter both read this one derived column. Withdrawn
+                // wins: a withdrawn row may keep an earlier attempt's error.
                 'status' => $source === self::SOURCE_SMAILY
                     ? new \Zend_Db_Expr(sprintf(
-                        'CASE WHEN q.status = %s AND q.last_response = %s THEN %s ELSE q.status END',
+                        'CASE WHEN q.status = %1$s AND q.last_response = %2$s THEN %3$s'
+                        . ' WHEN q.status = %1$s AND q.last_error <> \'\' THEN %4$s ELSE q.status END',
                         $connection->quote(Event::STATUS_SENT),
                         $connection->quote(EventQueue::CANCELLED_RESPONSE),
-                        $connection->quote(self::STATUS_WITHDRAWN)
+                        $connection->quote(self::STATUS_WITHDRAWN),
+                        $connection->quote(self::STATUS_SKIPPED)
                     ))
                     : 'q.status',
                 'attempts' => 'q.attempts',

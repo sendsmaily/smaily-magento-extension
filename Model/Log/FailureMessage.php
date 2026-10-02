@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Log;
 
+use Smaily\Connect\Model\Queue\Handler\ContactSyncHandler;
+
 /**
  * What a failed row says to the merchant (PRO-2454).
  *
@@ -29,7 +31,9 @@ class FailureMessage
      * The client messages a queue row can store, as written in __() in
      * Model\Client\SmailyClient, SmailyClientProvider and
      * Exception\InvalidSubdomainException. A message added there that the
-     * queue can store is added here too, or it is shown in English.
+     * queue can store is added here too, or it is shown in English. The
+     * reason a handler closes a row without sending it is stored the same
+     * way, and is read here too.
      */
     public const TRANSLATED = [
         'Smaily refused the request because this account\'s package does not include API access.'
@@ -41,6 +45,8 @@ class FailureMessage
         'Smaily API returned code %1: %2',
         'Smaily API credentials are not configured (store scope: %1)',
         'The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.',
+        // Not an error: the reason a row was closed without sending (PRO-3619).
+        ContactSyncHandler::SKIPPED_NOT_A_CONTACT,
     ];
 
     /** What RetryPolicy prepends to a refusal it parked on the spot. */

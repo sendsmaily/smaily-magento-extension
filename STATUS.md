@@ -92,6 +92,19 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   verified store and kept "Connected" after a refused test and a refused
   save; after it, the first paint is right and both answers show at once.
 
+- **PRO-3565 in progress — Log status pills and the Details panel
+  (2026-10-02).** Step 1 done: a row the queue closed without sending
+  (PRO-3619 `markSkipped`: stored `sent` with the reason in `last_error`)
+  reads as the derived status `skipped` (`Collection::STATUS_SKIPPED`) in
+  the grid's UNION and in `QueueRowLoader`, by the same rule — withdrawn
+  wins over skipped, because a withdrawn row may keep an earlier attempt's
+  error. "Skipped" is in the status filter; Details says "Skipped —
+  nothing was sent, …" instead of "Delivered — no retries needed.", heads
+  the reason "Reason" (not "Last error") and drops the failure class for
+  it. The skip reason is read in the admin's language
+  (`FailureMessage::TRANSLATED`). Tests RED first: integration
+  `Log/LogStatusTest` (+3), unit `FailureMessageTest` (+1).
+
 - **PRO-3628 — PRO-3603 findings fixed (2026-10-02).** Test connection
   with empty fields asks "Please fill in the subdomain, username and
   password." (EN + ET) instead of "Smaily API credentials are not

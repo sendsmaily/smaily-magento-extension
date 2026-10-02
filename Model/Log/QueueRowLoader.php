@@ -18,8 +18,8 @@ use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 /**
  * Loads the queue rows the Log works on, normalized the way the Log reads
  * them: the per-queue type column becomes "type", the queue it came from
- * becomes "source", and a withdrawn row carries the derived status the grid
- * shows — so the drawer, the grid label and the status filter all read one
+ * becomes "source", and a withdrawn or skipped row carries the derived
+ * status the grid shows — so the drawer, the grid label and the status filter all read one
  * value. Both log actions that work on a single row — Details and Send
  * again — start here, and so does the mass retry's question to the guard.
  */
@@ -105,7 +105,8 @@ class QueueRowLoader
 
     /**
      * The row as the Log reads it. A withdrawn row is stored as sent with
-     * the cancelled marker in place of an API reply (PRO-2453); it reads as
+     * the cancelled marker in place of an API reply (PRO-2453), a skipped
+     * one as sent with its reason in last_error (PRO-3619); each reads as
      * its own status here, by the same rule the grid's UNION applies.
      *
      * @param array<string, mixed> $row
@@ -115,11 +116,13 @@ class QueueRowLoader
     {
         $row['source'] = $source;
         $row['type'] = (string)($row[$typeColumn] ?? '');
-        if ($source === Collection::SOURCE_SMAILY
-            && (string)($row['status'] ?? '') === Event::STATUS_SENT
-            && (string)($row['last_response'] ?? '') === EventQueue::CANCELLED_RESPONSE
-        ) {
+        if ($source !== Collection::SOURCE_SMAILY || (string)($row['status'] ?? '') !== Event::STATUS_SENT) {
+            return $row;
+        }
+        if ((string)($row['last_response'] ?? '') === EventQueue::CANCELLED_RESPONSE) {
             $row['status'] = Collection::STATUS_WITHDRAWN;
+        } elseif ((string)($row['last_error'] ?? '') !== '') {
+            $row['status'] = Collection::STATUS_SKIPPED;
         }
 
         return $row;

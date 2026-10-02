@@ -54,6 +54,8 @@ $sourceLabels = [
 // they posted the action anyway (PRO-2454).
 if ($refusal !== null) {
     $retryText = $refusal;
+} elseif ($status === 'skipped') {
+    $retryText = __('Skipped — nothing was sent, and this row will not retry: retrying could not change the reason shown below.');
 } elseif ($status === 'sent') {
     $retryText = __('Delivered — no retries needed.');
 } elseif ($status === 'sending') {
@@ -140,15 +142,16 @@ $response = $redactor->redact(isset($row['last_response']) ? (string)$row['last_
     )) ?></p>
     <?php endif; ?>
 
-    <?php $retryTerminal = $refusal !== null || $status === 'sent' || $status === 'failed'; ?>
+    <?php $retryTerminal = $refusal !== null || in_array($status, ['sent', 'failed', 'skipped'], true); ?>
     <div class="smaily-log-details-retry<?= $retryTerminal ? ' is-terminal' : '' ?>">
         <span>&#8635;</span><span><?= $escaper->escapeHtml($retryText) ?></span>
     </div>
 
     <?php if ($lastError !== ''): ?>
-    <h3><?= $escaper->escapeHtml(__('Last error')) ?><span class="smaily-log-redact-tag"><?= $escaper->escapeHtml(__('redacted')) ?></span></h3>
-    <pre class="smaily-log-details-pre smaily-log-details-error"><?= $escaper->escapeHtml($lastError) ?></pre>
-        <?php if ($failureClass !== ''): ?>
+        <?php $skipped = $status === 'skipped'; // a skip's reason is not an error ?>
+    <h3><?= $escaper->escapeHtml($skipped ? __('Reason') : __('Last error')) ?><span class="smaily-log-redact-tag"><?= $escaper->escapeHtml(__('redacted')) ?></span></h3>
+    <pre class="smaily-log-details-pre<?= $skipped ? '' : ' smaily-log-details-error' ?>"><?= $escaper->escapeHtml($lastError) ?></pre>
+        <?php if ($failureClass !== '' && !$skipped): ?>
         <p class="note"><?= $escaper->escapeHtml(__('Failure class: %1', $failureClass)) ?></p>
         <?php endif; ?>
     <?php endif; ?>

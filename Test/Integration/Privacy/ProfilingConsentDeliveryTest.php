@@ -36,6 +36,9 @@ class ProfilingConsentDeliveryTest extends IntegrationTestCase
     /** @var array<string, int> */
     private array $records = [];
 
+    /** @var array<string, bool> */
+    private array $byUnsubscribe = [];
+
     /** @var array<int, array{0: string, 1: bool}> */
     private array $engineCalls = [];
 
@@ -55,12 +58,18 @@ class ProfilingConsentDeliveryTest extends IntegrationTestCase
         $this->optOuts->method('moment')->willReturnCallback(
             fn (string $email): ?int => $this->records[$email] ?? null
         );
-        $this->optOuts->method('record')->willReturnCallback(function (string $email, int $moment): void {
-            $this->records[$email] = $moment;
-        });
+        $this->optOuts->method('record')->willReturnCallback(
+            function (string $email, int $moment, bool $byUnsubscribe = false): void {
+                $this->records[$email] = $moment;
+                $this->byUnsubscribe[$email] = $byUnsubscribe;
+            }
+        );
         $this->optOuts->method('forget')->willReturnCallback(function (string $email): void {
-            unset($this->records[$email]);
+            unset($this->records[$email], $this->byUnsubscribe[$email]);
         });
+        $this->optOuts->method('isByUnsubscribe')->willReturnCallback(
+            fn (string $email): bool => isset($this->records[$email]) && ($this->byUnsubscribe[$email] ?? false)
+        );
     }
 
     public function testAnOptOutSurvivesAnEngineOutage(): void
@@ -105,6 +114,42 @@ class ProfilingConsentDeliveryTest extends IntegrationTestCase
             $this->engineCalls,
             'The opt-out is not sent again after the opt-in'
         );
+    }
+
+    /**
+     * PRO-3594 criterion 1: profiling stopped only by the unsubscribe starts
+     * again when the shopper subscribes again, and the engine hears it.
+     */
+    public function testSubscribingAgainAfterAnUnsubscribeSwitchesProfilingBackOn(): void
+    {
+        $consent = $this->consent();
+        $consent->optOutOnUnsubscribe('person@example.com');
+        $this->runCron();
+
+        $consent->optInOnResubscribe('person@example.com');
+        $this->runCron();
+
+        self::assertTrue($consent->isAllowed('person@example.com', 0));
+        self::assertSame(
+            [['person@example.com', true], ['person@example.com', false]],
+            $this->engineCalls
+        );
+    }
+
+    /**
+     * PRO-3594 criterion 2: a profiling opt-out of the shopper's own outlasts
+     * an unsubscribe and the subscription that follows it.
+     */
+    public function testSubscribingAgainLeavesTheShoppersOwnOptOutInPlace(): void
+    {
+        $consent = $this->consent();
+        $consent->setAllowed('person@example.com', false, 0);
+        $consent->optOutOnUnsubscribe('person@example.com');
+        $consent->optInOnResubscribe('person@example.com');
+        $this->runCron();
+
+        self::assertFalse($consent->isAllowed('person@example.com', 0));
+        self::assertSame([['person@example.com', true]], $this->engineCalls);
     }
 
     private function consent(): ProfilingConsent

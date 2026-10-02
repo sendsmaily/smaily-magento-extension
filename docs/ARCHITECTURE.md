@@ -479,11 +479,21 @@ Opt-out model, default on: a shopper is profiled unless they said no.
 stops profiling (Erkki 2026-10-02, as in the WooCommerce plugin): a contact
 Smaily reads back with `is_unsubscribed = 1` is not profiled, and
 `Observer\Engine\SubscriberUnsubscribed` turns a newsletter unsubscribe into
-an opt-out (`optOutOnUnsubscribe()`: the store's record at that moment plus
-an engine row, nothing written to the contact's profiling field). That
-observer is deliberately outside the `ReconcileGuard`, so an unsubscribe
-Smaily's consent mirror writes counts too. A resubscribe does not turn
-profiling back on.
+an opt-out (`optOutOnUnsubscribe()`: the store's record at that moment,
+marked as made by unsubscribing, plus an engine row, nothing written to the
+contact's profiling field; a profiling opt-out the store already holds is
+left as it is). Subscribing again turns profiling back on (PRO-3594, Erkki
+2026-10-02): `Observer\Engine\SubscriberResubscribed` calls
+`optInOnResubscribe()`, which lifts only a record made by unsubscribing —
+forget, an engine opt-in row, cache `1` so a read before Smaily hears the
+subscription cannot record the unsubscribe again. In `ProfilingOptOuts`
+such a record is `{"at": moment, "by": "unsubscribe"}`; a plain moment
+(every entry written before PRO-3594) is a profiling opt-out of its own. A
+mirror read back from Smaily keeps the origin too (`is_unsubscribed = 1`
+without `smaily_rec_profiling = 0` is by unsubscribing), and a record made
+by unsubscribing is never carried to the contact's profiling field. Both
+observers are deliberately outside the `ReconcileGuard`, so an unsubscribe
+or a subscription Smaily's consent mirror writes counts too.
 
 - **The page** (My Account > Personalization: `Controller\Privacy\Index`
   and `Save`, the nav link `Block\Account\PersonalizationLink`) exists

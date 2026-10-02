@@ -34,6 +34,9 @@ class ProfilingConsentTest extends TestCase
     /** @var array<string, int> moment by address */
     private array $records = [];
 
+    /** @var array<string, bool> whether the record came only from unsubscribing, by address */
+    private array $byUnsubscribe = [];
+
     /** @var array<int, array<int, array<string, mixed>>> */
     private array $smailyWrites = [];
 
@@ -293,6 +296,95 @@ class ProfilingConsentTest extends TestCase
     }
 
     /**
+     * PRO-3594: subscribing again switches profiling back on when the opt-out
+     * came only from unsubscribing — not when the shopper opted out of
+     * profiling on their own.
+     */
+    public function testAnUnsubscribeIsKeptAsAnOptOutByUnsubscribing(): void
+    {
+        $this->consent()->optOutOnUnsubscribe('person@example.com');
+
+        self::assertSame(['person@example.com' => true], $this->byUnsubscribe);
+    }
+
+    public function testSubscribingAgainSwitchesProfilingBackOnAfterAnUnsubscribe(): void
+    {
+        $consent = $this->consent();
+        $consent->optOutOnUnsubscribe('person@example.com');
+        $this->enqueued = [];
+        // Smaily may not have heard the resubscribe yet.
+        $this->contact = ['email' => 'person@example.com', 'is_unsubscribed' => '1'];
+
+        $consent->optInOnResubscribe('Person@Example.com');
+
+        self::assertSame([], $this->records);
+        self::assertSame([[
+            'event_type' => EventType::ENGINE_PROFILING_CONSENT,
+            'payload' => ['email' => 'person@example.com', 'opt_out' => false],
+            'entity_id' => 'person@example.com',
+        ]], $this->enqueued, 'The engine hears the opt-in on the queue');
+        self::assertTrue($consent->isAllowed('person@example.com', 1));
+    }
+
+    public function testSubscribingAgainLeavesAProfilingOptOutOfItsOwnInPlace(): void
+    {
+        $this->records['person@example.com'] = self::NOW - 3600;
+        $consent = $this->consent();
+
+        $consent->optOutOnUnsubscribe('person@example.com');
+        $consent->optInOnResubscribe('person@example.com');
+
+        self::assertSame(['person@example.com' => self::NOW - 3600], $this->records);
+        self::assertSame([], $this->byUnsubscribe, 'The unsubscribe does not replace the shopper\'s own opt-out');
+        self::assertSame([], $this->enqueued);
+        self::assertFalse($consent->isAllowed('person@example.com', 1));
+    }
+
+    public function testSubscribingWithoutAnOptOutChangesNothing(): void
+    {
+        $this->consent()->optInOnResubscribe('person@example.com');
+
+        self::assertSame([], $this->enqueued);
+    }
+
+    public function testAnOptOutByUnsubscribingIsNotWrittenToTheSmailyContact(): void
+    {
+        $this->records['person@example.com'] = self::NOW - 3600;
+        $this->byUnsubscribe['person@example.com'] = true;
+        $this->contact = ['email' => 'person@example.com', 'is_unsubscribed' => '0'];
+
+        self::assertFalse($this->consent()->isAllowed('person@example.com', 1));
+        self::assertSame([], $this->smailyWrites, 'The unsubscribe reaches Smaily on its own');
+        self::assertSame(['person@example.com' => true], $this->byUnsubscribe);
+    }
+
+    /**
+     * @return array<string, array{0: array<string, string>, 1: bool}>
+     */
+    public static function smailySideOptOutOrigins(): array
+    {
+        return [
+            'unsubscribe only' => [['email' => 'person@example.com', 'is_unsubscribed' => '1'], true],
+            'unsubscribe and profiling opt-out' => [['email' => 'person@example.com', 'is_unsubscribed' => '1',
+                'smaily_rec_profiling' => '0'], false],
+            'profiling opt-out' => [['email' => 'person@example.com', 'is_unsubscribed' => '0',
+                'smaily_rec_profiling' => '0'], false],
+        ];
+    }
+
+    /**
+     * @param array<string, string> $contact
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('smailySideOptOutOrigins')]
+    public function testAnOptOutReadFromSmailyKeepsItsOrigin(array $contact, bool $byUnsubscribe): void
+    {
+        $this->contact = $contact;
+
+        self::assertFalse($this->consent()->isAllowed('person@example.com', 1));
+        self::assertSame(['person@example.com' => $byUnsubscribe], $this->byUnsubscribe);
+    }
+
+    /**
      * PRO-3591: My Account shows a preference only when the store knows it.
      * A shopper the store holds no opt-out for, whose contact Smaily could not
      * read, has no known preference — although the gate still profiles them
@@ -373,12 +465,18 @@ class ProfilingConsentTest extends TestCase
         $optOuts->method('moment')->willReturnCallback(
             fn (string $email): ?int => $this->records[$email] ?? null
         );
-        $optOuts->method('record')->willReturnCallback(function (string $email, int $moment): void {
-            $this->records[$email] = $moment;
-        });
+        $optOuts->method('record')->willReturnCallback(
+            function (string $email, int $moment, bool $byUnsubscribe = false): void {
+                $this->records[$email] = $moment;
+                $this->byUnsubscribe[$email] = $byUnsubscribe;
+            }
+        );
         $optOuts->method('forget')->willReturnCallback(function (string $email): void {
-            unset($this->records[$email]);
+            unset($this->records[$email], $this->byUnsubscribe[$email]);
         });
+        $optOuts->method('isByUnsubscribe')->willReturnCallback(
+            fn (string $email): bool => isset($this->records[$email]) && ($this->byUnsubscribe[$email] ?? false)
+        );
 
         $cache = $this->createMock(CacheInterface::class);
         $cache->method('load')->willReturnCallback(fn (string $key): string|false => $this->cache[$key] ?? false);

@@ -22,7 +22,9 @@ use Smaily\Connect\Model\Queue\EventType;
 /**
  * Shopper profiling consent (opt-out model, default on). Profile unless the
  * shopper opted out of profiling OR unsubscribed from marketing: leaving
- * marketing also stops profiling (PRO-3578, Woo F3-31; Erkki 2026-10-02).
+ * marketing also stops profiling (PRO-3578, Woo F3-31; Erkki 2026-10-02),
+ * and subscribing again starts it again, unless the shopper also opted out
+ * of profiling on its own (PRO-3594, Erkki 2026-10-02).
  *
  * A choice goes to the Smaily contact (smaily_rec_profiling 0/1 +
  * smaily_rec_profiling_ts), into the store's own durable record
@@ -105,8 +107,9 @@ class ProfilingConsent
         if (!$allowed && $optOutMoment === null) {
             // An opt-out made in Smaily (or an unsubscribe there) the store
             // did not know: kept as a mirror (moment 0, so any dated opt-in
-            // is newer — Woo PRO-3192) and carried to the engine.
-            $this->optOuts->record($email, 0);
+            // is newer — Woo PRO-3192), with its origin, and carried to the
+            // engine.
+            $this->optOuts->record($email, 0, (string)($fields['smaily_rec_profiling'] ?? '') !== '0');
             $this->queueForEngine($email, true, gmdate(self::TIMESTAMP_FORMAT, $this->dateTime->gmtTimestamp()));
         } elseif ($allowed && $optOutMoment !== null) {
             if ($this->isNewerOptIn($fields, $optOutMoment)) {
@@ -118,9 +121,12 @@ class ProfilingConsent
                 // PRO-3191/3192 parity: a contact without an answer, or with
                 // an older one, does not lift the store's opt-out. Carried to
                 // the contact so Smaily agrees — never to a contact Smaily
-                // does not have, since the write would create one.
+                // does not have, since the write would create one, and never
+                // for an opt-out by unsubscribing (PRO-3594): the unsubscribe
+                // reaches Smaily on its own, and a profiling field written
+                // for it would outlast the shopper subscribing again.
                 $allowed = false;
-                if ($found) {
+                if ($found && !$this->optOuts->isByUnsubscribe($email)) {
                     $moment = $this->dateTime->gmtTimestamp();
                     $this->writeToContact($email, false, $storeId, gmdate(self::TIMESTAMP_FORMAT, $moment));
                     $this->optOuts->record($email, $moment);
@@ -222,9 +228,11 @@ class ProfilingConsent
 
     /**
      * The shopper unsubscribed from marketing, which also stops profiling:
-     * kept as the store's opt-out at this moment, so an older opt-in on the
-     * contact cannot lift it, and queued for the engine. Nothing is written
-     * to the Smaily contact — the unsubscribe itself reaches Smaily.
+     * kept as the store's opt-out by unsubscribing at this moment, so an
+     * older opt-in on the contact cannot lift it, and queued for the engine.
+     * A profiling opt-out the shopper made on its own stays as it is, so
+     * subscribing again does not lift it. Nothing is written to the Smaily
+     * contact — the unsubscribe itself reaches Smaily.
      */
     public function optOutOnUnsubscribe(string $email): void
     {
@@ -233,10 +241,33 @@ class ProfilingConsent
             return;
         }
 
-        $moment = $this->dateTime->gmtTimestamp();
-        $this->optOuts->record($email, $moment);
-        $this->queueForEngine($email, true, gmdate(self::TIMESTAMP_FORMAT, $moment));
         $this->remember($email, '0');
+        if ($this->optOuts->moment($email) !== null && !$this->optOuts->isByUnsubscribe($email)) {
+            return;
+        }
+
+        $moment = $this->dateTime->gmtTimestamp();
+        $this->optOuts->record($email, $moment, true);
+        $this->queueForEngine($email, true, gmdate(self::TIMESTAMP_FORMAT, $moment));
+    }
+
+    /**
+     * The shopper subscribed to marketing again (PRO-3594): an opt-out that
+     * came only from unsubscribing is lifted and the engine hears the opt-in
+     * through the queue. A profiling opt-out of the shopper's own stays.
+     * Cached as allowed, so a read before Smaily hears the subscription does
+     * not take the unsubscribe for a new one.
+     */
+    public function optInOnResubscribe(string $email): void
+    {
+        $email = strtolower(trim($email));
+        if ($email === '' || !$this->optOuts->isByUnsubscribe($email)) {
+            return;
+        }
+
+        $this->optOuts->forget($email);
+        $this->queueForEngine($email, false, '');
+        $this->remember($email, '1');
     }
 
     private function cacheKey(string $email): string

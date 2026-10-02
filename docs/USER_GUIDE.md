@@ -611,8 +611,11 @@ panel — you do not have to keep the page open:
 - **Unsubscribing from marketing also stops profiling.** When Campaign
   Intelligence is connected, a newsletter unsubscribe — in the store, or in
   Smaily and mirrored back — also opts the shopper out of personalized
-  recommendations. Subscribing again does not turn profiling back on; the
-  shopper does that under **My Account > Personalization**.
+  recommendations. Subscribing again — in the store, or in Smaily and
+  mirrored back — turns profiling back on, and Campaign Intelligence is told
+  through the same queued delivery. It stays off when the shopper also
+  opted out of personalized recommendations on their own, under
+  **My Account > Personalization** or in Smaily.
 - **Data subject requests**:
   `bin/magento smaily:gdpr export <email>` (Art. 15) and
   `bin/magento smaily:gdpr erase <email> --force` (Art. 17, idempotent).

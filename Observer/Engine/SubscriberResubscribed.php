@@ -15,15 +15,16 @@ use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 
 /**
- * An unsubscribe from marketing also stops profiling (PRO-3578, Woo F3-31;
- * Erkki 2026-10-02) — newsletter_subscriber_save_after.
+ * Subscribing to marketing again switches profiling back on when the
+ * opt-out came only from unsubscribing (PRO-3594, Erkki 2026-10-02) —
+ * newsletter_subscriber_save_after. A profiling opt-out the shopper made on
+ * its own stays; ProfilingConsent tells the two apart.
  *
- * Deliberately NOT behind the ReconcileGuard: an unsubscribe Smaily's consent
- * mirror writes onto the subscriber is the shopper's unsubscribe too.
- * Subscribing again turns profiling back on (SubscriberResubscribed), unless
- * the shopper also opted out of profiling on its own (PRO-3594).
+ * Deliberately NOT behind the ReconcileGuard, like SubscriberUnsubscribed: a
+ * subscription Smaily's consent mirror writes onto the subscriber is the
+ * shopper's subscription too.
  */
-class SubscriberUnsubscribed implements ObserverInterface
+class SubscriberResubscribed implements ObserverInterface
 {
     public function __construct(
         private readonly Settings $settings,
@@ -39,12 +40,12 @@ class SubscriberUnsubscribed implements ObserverInterface
         $subscriber = $observer->getEvent()->getData('subscriber');
         if (!$subscriber instanceof Subscriber
             || !$subscriber->isStatusChanged()
-            || (int)$subscriber->getStatus() !== Subscriber::STATUS_UNSUBSCRIBED
+            || (int)$subscriber->getStatus() !== Subscriber::STATUS_SUBSCRIBED
             || !$this->settings->isConnected()
         ) {
             return;
         }
 
-        $this->profilingConsent->optOutOnUnsubscribe((string)$subscriber->getEmail());
+        $this->profilingConsent->optInOnResubscribe((string)$subscriber->getEmail());
     }
 }

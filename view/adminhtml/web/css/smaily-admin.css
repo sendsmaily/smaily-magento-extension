@@ -199,6 +199,12 @@
 .smaily-log-details__id { display: block; margin-bottom: 5px; font: 400 var(--fs-12)/1 var(--mono); color: var(--s-text-3); }
 .smaily-log-details__title { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
 .smaily-log-details__type { font: 700 17px/1.3 var(--font); color: var(--s-text); word-break: break-word; }
+/* Magento's `.modal-title span` (14px, italic, 10px left margin) outranks
+ * the header parts above once log-actions.js moves them into the title. */
+.smaily-log-details-modal .modal-title span { font-style: normal; margin-left: 0; }
+.smaily-log-details-modal .modal-title .smaily-log-details__id { font-size: var(--fs-12); }
+.smaily-log-details-modal .modal-title .smaily-log-details__type { font-size: 17px; }
+.smaily-log-details-modal .modal-title .smaily-pill { font-size: var(--fs-11); }
 .smaily-log-details { max-width: none; font-size: var(--fs-13); }
 .smaily-log-details__summary { display: grid; grid-template-columns: auto 1fr; gap: 7px var(--sp-4); margin: 0 0 var(--sp-5); font-size: var(--fs-13); }
 .smaily-log-details__summary dt { margin: 0; font-weight: 400; color: var(--s-text-3); }

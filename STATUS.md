@@ -34,7 +34,11 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   takes the full row and Quick links moves under it, so the table no
   longer scrolls sideways with its Updated column cut off (1100 px, both
   languages); the Failed tile's ATTENTION badge wraps under the label
-  instead of sticking out of the tile (et_EE). No behaviour change.
+  instead of sticking out of the tile (et_EE). Log > Details: the panel
+  header (event id, type, status pill) no longer picks up Magento's
+  `.modal-title span` rule — it was italic, every part 14 px and indented
+  10 px; now 12 px mono id, 17 px type, 11 px pill, upright. No behaviour
+  change.
 
 - **PRO-3642 done — skipped and withdrawn rows are not deliveries for Send
   again, and the Dashboard reads them as the Log does (2026-10-02).**

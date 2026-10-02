@@ -7,7 +7,7 @@
 
 _Last updated: 2026-10-02 (CLAUDE.md anchors on the two Magento Epics — v3
 rewrite and UI/UX parity — and names their outcome gauges; queue set for
-the pilot. Previous session, 2026-09-11: PRO-2472 — the release train's packaging
+the pilot; `composer.lock` refreshed, gates unchanged. Previous session, 2026-09-11: PRO-2472 — the release train's packaging
 leftovers are closed: the checksum ships with the release, the module
 manifest and the composer manifest agree, and MSI is documented as optional.
 Earlier the same day: PRO-2476 — the sandbox admin logs in without a
@@ -32,6 +32,21 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   Erkki's go). Milestones: rc1 tagged + pilot runbook 2026-10-03, pilot store
   live 2026-10-09. PRO-2460 decided A — contract §3 SKU key stands, PRO-1484
   closed. After the pilot: PRO-2506, PRO-1967, PRO-1198 (Smaily hand-over).
+
+- **`composer.lock` refreshed (2026-10-02, GitHub issue #2).** `composer
+  update --ignore-platform-req='ext-*'`, PHP 8.1 pin kept; `composer update
+  --dry-run` now reports nothing to modify. Patch/minor moves only (symfony
+  6.4.x patches, polyfills 1.43, nikic/php-parser 5.9, composer/semver 3.5,
+  composer/class-map-generator 1.8, phpunit 10.5.65); PHPStan stays at the
+  2.2.5 cap. One downgrade: `league/flysystem` 2.x now carries security
+  advisory PKSA-w9tt-7782-78jx, so composer refuses it and resolves
+  `magento/module-remote-storage` 100.4.2 instead of 100.4.5 — six packages
+  leave the lock (flysystem, its S3 adapter, `aws/aws-sdk-php` and three of
+  their helpers). 100.4.2 declares
+  `php ~7.4||~8.1`; `composer install` checks against the pinned 8.1, so the
+  PHP 8.3 CI jobs still install. No module code uses either. Gates on the new
+  lock, identical to the old: 299 unit, phpcs 0 errors / 997 warnings,
+  phpstan `[OK]`, integration 87 tests.
 
 - **PRO-2472 done — the 3.0.0-rc1 release train's packaging leftovers are
   closed (2026-09-11).** Four small things, no behaviour change in the

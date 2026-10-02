@@ -486,6 +486,12 @@ profiling back on.
   to a contact Smaily does not have — the upsert would create one. When
   Smaily cannot be read, the record decides; a shopper without an entry is
   profiled (fail open, as before).
+- **An opt-out made in Smaily** — `smaily_rec_profiling = 0` or
+  `is_unsubscribed = 1` on a contact the record has no entry for — is
+  recorded as a mirror (moment 0, so any dated opt-in is newer) and queued
+  for the engine on the read that finds it (a My Account visit, or the
+  identity merge at login). The rule throughout: every change to the record
+  queues one engine row, and nothing else does.
 - **Delivery** is `Queue\Handler\ProfilingConsentHandler`, on the normal
   retry ladder, behind the same sending gate as the identity merge. A row is
   sent only while it still matches the record: a retry or a Send again of a

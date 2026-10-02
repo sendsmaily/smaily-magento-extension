@@ -96,7 +96,13 @@ class ProfilingConsent
         $allowed = (string)($fields['is_unsubscribed'] ?? '') !== '1'
             && (string)($fields['smaily_rec_profiling'] ?? '') !== '0';
 
-        if ($allowed && $optOutMoment !== null) {
+        if (!$allowed && $optOutMoment === null) {
+            // An opt-out made in Smaily (or an unsubscribe there) the store
+            // did not know: kept as a mirror (moment 0, so any dated opt-in
+            // is newer — Woo PRO-3192) and carried to the engine.
+            $this->optOuts->record($email, 0);
+            $this->queueForEngine($email, true, gmdate(self::TIMESTAMP_FORMAT, $this->dateTime->gmtTimestamp()));
+        } elseif ($allowed && $optOutMoment !== null) {
             if ($this->isNewerOptIn($fields, $optOutMoment)) {
                 // The newest choice is an opt-in made after the store's
                 // opt-out: it wins here and at the engine.

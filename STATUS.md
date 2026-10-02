@@ -5,7 +5,7 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
+_Last updated: 2026-10-02 (PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out, and an opt-out made in Smaily reaches the engine. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
 and the Dashboard fill the content area on the pack's grey pane under a
 full-width white tab strip, in Magento's Open Sans, with 33 px buttons and
 our own text, link and status colours. Earlier the same day: PRO-3572 — a
@@ -74,6 +74,8 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   Log page is a native grid and has no Smaily frame.
 
 - **PRO-3578 in progress — profiling consent hardening (2026-10-02,
+
+- **PRO-3578 done — profiling consent hardening (2026-10-02,
   parity audit P3 + R1 + R2, Woo PRO-3189/3191/3192/3434).** Slice 1: the
   engine opt-out (and opt-in) is no longer one direct, never-retried call.
   `ProfilingConsent::setAllowed()` writes the Smaily contact as before,
@@ -115,6 +117,20 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   carried to a FOUND contact (`0` + now, record moment set to now); never to
   a not-found one. A Smaily read error lets the record decide (no entry =
   fail open, as before).
+  Slice 5: an opt-out recorded in Smaily reaches the engine. A read that
+  finds `smaily_rec_profiling = 0` or `is_unsubscribed = 1` on a contact the
+  record has no entry for records a mirror (moment 0, Woo PRO-3192) and
+  queues the engine opt-out. Invariant: every change to the record queues
+  exactly one engine row; nothing else does (no re-send on every read as
+  Woo does). Reads happen on My Account > Personalization and in the
+  identity-merge handler at login, so a Smaily-side opt-out reaches the
+  engine at the shopper's next visit, not immediately.
+  Not done here (follow-ups): PRO-3189's "show only a known preference" on
+  My Account; the erasure does not clear the record's hash entry; a §10 404
+  closes the row, so an address the engine learns later is not re-sent its
+  opt-out until a later record change; `bin/magento setup:di:compile` not
+  run (sandbox reserved) — the new `LockManagerInterface` dependency relies
+  on core `app/etc/di.xml`'s preference.
 
 - **PRO-2456 follow-up — the owner's live-sandbox review (2026-10-02).**
   Marketing > Smaily Connect > Dashboard shows no missing-glyph box: the

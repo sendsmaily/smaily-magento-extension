@@ -252,6 +252,46 @@ class ProfilingConsentTest extends TestCase
         self::assertTrue($this->consent()->isAllowed('person@example.com', 1));
     }
 
+    /**
+     * @return array<string, array{0: array<string, string>}>
+     */
+    public static function smailySideOptOuts(): array
+    {
+        return [
+            'profiling opt-out' => [['email' => 'person@example.com', 'is_unsubscribed' => '0',
+                'smaily_rec_profiling' => '0']],
+            'unsubscribe' => [['email' => 'person@example.com', 'is_unsubscribed' => '1']],
+        ];
+    }
+
+    /**
+     * @param array<string, string> $contact
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('smailySideOptOuts')]
+    public function testAnOptOutMadeInSmailyReachesTheEngine(array $contact): void
+    {
+        $this->contact = $contact;
+
+        self::assertFalse($this->consent()->isAllowed('person@example.com', 1));
+        self::assertSame(['person@example.com' => 0], $this->records, 'Kept as a mirror: any dated opt-in is newer');
+        self::assertSame([[
+            'event_type' => EventType::ENGINE_PROFILING_CONSENT,
+            'payload' => ['email' => 'person@example.com', 'opt_out' => true, 'opted_out_at' => self::NOW_Z],
+            'entity_id' => 'person@example.com',
+        ]], $this->enqueued);
+        self::assertSame([], $this->smailyWrites);
+    }
+
+    public function testAnOptOutTheStoreAlreadyHoldsIsNotQueuedAgain(): void
+    {
+        $this->records['person@example.com'] = self::NOW - 3600;
+        $this->contact = ['email' => 'person@example.com', 'is_unsubscribed' => '0', 'smaily_rec_profiling' => '0'];
+
+        self::assertFalse($this->consent()->isAllowed('person@example.com', 1));
+        self::assertSame([], $this->enqueued);
+        self::assertSame(['person@example.com' => self::NOW - 3600], $this->records);
+    }
+
     private function consent(): ProfilingConsent
     {
         $provider = $this->createMock(SmailyClientProvider::class);

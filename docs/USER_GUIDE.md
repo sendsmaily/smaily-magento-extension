@@ -554,7 +554,11 @@ panel — you do not have to keep the page open:
   only the newest choice reaches the engine. The store's own record of an
   opt-out holds even when Smaily cannot be reached or a write to Smaily
   failed; an older "yes" on the Smaily contact never overrides a newer "no"
-  made in the store (the store writes its "no" back to the contact instead). When a shopper who opted out
+  made in the store (the store writes its "no" back to the contact instead).
+  An opt-out recorded on the Smaily contact (`smaily_rec_profiling` = 0)
+  reaches Campaign Intelligence too, the next time the store reads the
+  shopper's preference — when they open **My Account > Personalization** or
+  log in. When a shopper who opted out
   logs in, their earlier anonymous browsing is not linked to their account.
 - **Unsubscribing from marketing also stops profiling.** When Campaign
   Intelligence is connected, a newsletter unsubscribe — in the store, or in

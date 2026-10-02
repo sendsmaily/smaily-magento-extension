@@ -337,7 +337,7 @@ this tab. Native config for both is removed once built.
 **Superseded for `automation_force_opt_in` (2026-10-02):** the setting is
 retired — an automation never re-subscribes a contact who unsubscribed in
 Smaily, in any mode. The control, the `system.xml` field and the config
-path's reader are gone; a stored row is left unread.
+path's reader are gone; the update deletes a stored row at every scope.
 
 **(c) EST+ENG text** (source: our own i18n):
 
@@ -804,7 +804,7 @@ on a wizard/Settings panel today; **both** = duplicated right now.
 | `subscribers/sync_mode` | Lawful-basis preset | both, same shape | **ours.** |
 | `subscribers/sync_fields` | Extra contact fields synced | both, same shape | **ours.** |
 | `subscribers/include_guests` | Include guest-order emails | **native only** — no control in `subscribers.phtml`/`ConfigOverrides::FIELD_ANCHORS`, though `WizardStepSaver::saveSubscribers()` already has a dead `saveFlag()` call ready to accept it | **ours** — resolved (Erkki, 2026-07-14): real control built on the Subscribers tab; see §2.3.B. |
-| `subscribers/automation_force_opt_in` | "Automations May Re-Subscribe (Advanced)" | **native only**, same shape as `include_guests` (dead `saveFlag()` call, no template control) | **retired** (2026-10-02): no control, no `system.xml` field, nothing reads a stored row — automations always send `force_opt_in=false`; see §2.3.B. |
+| `subscribers/automation_force_opt_in` | "Automations May Re-Subscribe (Advanced)" | **native only**, same shape as `include_guests` (dead `saveFlag()` call, no template control) | **retired** (2026-10-02): no control, no `system.xml` field, the update deletes a stored row — automations always send `force_opt_in=false`; see §2.3.B. |
 | `subscribers/checkout_optin_enabled` | Checkout newsletter checkbox | both | **ours.** |
 | `subscribers/suppress_optin_emails` | Suppress Magento's own opt-in emails | both | **ours.** |
 | `automations/welcome_enabled` / `welcome_workflow` | Welcome automation | both | **ours.** |

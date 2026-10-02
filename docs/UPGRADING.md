@@ -37,6 +37,10 @@ Smaily Connect removes them along with its own settings (see
   abandoned carts are carried over first — nobody gets a duplicate
   reminder because of the upgrade.
 - The orphaned dynamic cron-expression config row is removed.
+- The stored value of the retired *Automations May Re-Subscribe (Advanced)*
+  setting (`smaily_connect/subscribers/automation_force_opt_in`, a 3.0.0
+  release-candidate setting) is deleted at every scope. No other setting is
+  touched.
 
 ## Behavior changes to review after upgrading
 
@@ -73,8 +77,8 @@ Smaily Connect removes them along with its own settings (see
   abandoned-cart trigger never overrides an unsubscribe the contact made in
   Smaily, in any contact sync mode (2.8.x behaved the same). A 3.0.0
   release-candidate install that turned on the former *Automations May
-  Re-Subscribe (Advanced)* setting keeps its stored value, but nothing reads
-  it any more: after the update its triggers honour every unsubscribe, and
+  Re-Subscribe (Advanced)* setting loses its stored value in the update
+  (see *What is cleaned up*): its triggers honour every unsubscribe, and
   contacts keep syncing with their real subscription state. There is
   nothing to do.
 

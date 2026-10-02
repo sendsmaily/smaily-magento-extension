@@ -104,6 +104,13 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   it. The skip reason is read in the admin's language
   (`FailureMessage::TRANSLATED`). Tests RED first: integration
   `Log/LogStatusTest` (+3), unit `FailureMessageTest` (+1).
+  Step 2 done: the grid's Status column draws each status as the pack's
+  pill (`Model\Log\StatusPill` maps status → `.smaily-pill--{variant}`:
+  pending/sending amber, sent green, failed red, withdrawn/skipped grey;
+  `Ui\Component\LogStatusColumn` puts it on each row as `status_pill`; JS
+  `grid/columns/status-pill` = the stock select column with the template
+  `grid/cells/status-pill.html`, so filter and sorting are unchanged).
+  Tests RED first: unit `StatusPillTest` (+8), `LogStatusColumnTest` (+1).
 
 - **PRO-3628 — PRO-3603 findings fixed (2026-10-02).** Test connection
   with empty fields asks "Please fill in the subdomain, username and

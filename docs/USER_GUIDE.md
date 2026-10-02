@@ -590,7 +590,9 @@ panel — you do not have to keep the page open:
 - **Marketing > Smaily Connect > Log** — every delivery in one grid:
   Smaily (contact syncs, automation triggers) and Campaign Intelligence
   (catalog, customers, orders, browse events), told apart by the
-  **Source** column, with status, attempts and the last error. The error
+  **Source** column, with status (a coloured pill: amber while a row waits
+  or is being sent, green when delivered, red when failed, grey when
+  withdrawn or skipped), attempts and the last error. The error
   column shows what the other side actually said, not our internal name
   for the failure. A Smaily delivery error reads in your admin language,
   whatever the language of the store that sent the row; the log file

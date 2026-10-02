@@ -53,6 +53,73 @@ class TestSmailyTest extends TestCase
         );
     }
 
+    /**
+     * PRO-3575: a subdomain that would change the request host is refused
+     * before any client is built — neither the posted nor the stored
+     * password is sent.
+     *
+     * @dataProvider refusedBodyProvider
+     * @param array<string, mixed> $body
+     */
+    public function testASubdomainThatIsNotPlainIsRefusedWithoutARequest(array $body): void
+    {
+        $clientFactory = $this->createMock(SmailyClientFactory::class);
+        $clientFactory->expects(self::never())->method('create');
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->expects(self::never())->method('forStore');
+
+        $this->controller($body, $clientFactory, $clientProvider)->execute();
+
+        self::assertFalse($this->response['connected']);
+        self::assertSame(
+            'The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.',
+            $this->response['error']
+        );
+    }
+
+    /**
+     * @return array<string, array{array<string, mixed>}>
+     */
+    public static function refusedBodyProvider(): array
+    {
+        return [
+            'typed credentials' => [['subdomain' => 'engine.example#', 'username' => 'user', 'password' => 'secret']],
+            'the saved password' => [['subdomain' => 'engine.example#', 'username' => 'user', 'store_id' => '1']],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function controller(
+        array $body,
+        SmailyClientFactory $clientFactory,
+        SmailyClientProvider $clientProvider
+    ): TestSmaily {
+        $request = $this->createMock(HttpRequest::class);
+        $request->method('getContent')->willReturn((string)json_encode($body));
+        $context = $this->createMock(Context::class);
+        $context->method('getRequest')->willReturn($request);
+
+        $result = $this->createMock(Json::class);
+        $result->method('setData')->willReturnCallback(function (array $data) use ($result) {
+            $this->response = $data;
+
+            return $result;
+        });
+        $jsonFactory = $this->createMock(JsonFactory::class);
+        $jsonFactory->method('create')->willReturn($result);
+
+        return new TestSmaily(
+            $context,
+            $jsonFactory,
+            new JsonSerializer(),
+            $clientFactory,
+            $clientProvider,
+            new SubdomainNormalizer()
+        );
+    }
+
     private function pressTestConnection(\Throwable $refusal): void
     {
         $request = $this->createMock(HttpRequest::class);

@@ -310,6 +310,44 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
+     * PRO-3575: a subdomain that would change the request host is refused
+     * with a message; nothing is saved and Smaily is not asked, so the stored
+     * password is never sent with it.
+     *
+     * @dataProvider refusedConnectionProvider
+     * @param array<string, mixed> $data
+     */
+    public function testASubdomainThatIsNotPlainIsRefusedAndNothingIsSaved(array $data): void
+    {
+        $this->accountResolver->method('storeIdsForAccountKey')->willReturn([5]);
+        $this->clientFactory->expects(self::never())->method('create');
+
+        $errors = $this->saver->save('connect', $data);
+
+        self::assertSame([[
+            'field' => 'subdomain',
+            'message' => 'The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.',
+        ]], $errors);
+        self::assertSame([], $this->saved);
+    }
+
+    /**
+     * @return array<string, array{array<string, mixed>}>
+     */
+    public static function refusedConnectionProvider(): array
+    {
+        return [
+            'the account' => [['subdomain' => 'engine.example#', 'username' => 'api-user', 'password' => '']],
+            'a per-language account' => [[
+                'subdomain' => 'demo',
+                'username' => 'api-user',
+                'multilingual_mode' => 'a',
+                'accounts' => [['language' => 'et', 'subdomain' => 'engine.example?', 'username' => 'et-user']],
+            ]],
+        ];
+    }
+
+    /**
      * The mode-A fallback language is informational only (its credentials,
      * not this hint, are the real per-website binding) and stays at default
      * scope, unchanged.

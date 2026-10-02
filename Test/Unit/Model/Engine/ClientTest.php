@@ -316,11 +316,11 @@ class ClientTest extends TestCase
             new Response(200, [], '{"tenant_id":"t1","api_key":"sk_x","endpoints":{}}'),
         ]);
 
-        $response = $client->setupExchange('https://engine.example/setup/tok_abc123');
+        $response = $client->setupExchange('https://intelligence.smaily.com/setup/tok_abc123');
 
         self::assertSame('t1', $response['tenant_id']);
         $request = $this->history[0]['request'];
-        self::assertSame('https://engine.example/api/setup/exchange', (string)$request->getUri());
+        self::assertSame('https://intelligence.smaily.com/api/setup/exchange', (string)$request->getUri());
         $body = json_decode((string)$request->getBody(), true);
         self::assertSame('tok_abc123', $body['setup_token']);
         self::assertSame('magento', $body['plugin_info']['platform']);
@@ -328,22 +328,133 @@ class ClientTest extends TestCase
         self::assertSame('', $request->getHeaderLine('Authorization'));
     }
 
-    /**
-     * Scheme and explicit port are preserved (mirrors Woo parse_setup_url):
-     * dropping the port would break any engine not served on 443.
-     */
-    public function testSetupExchangePreservesSchemeAndPort(): void
+    public function testABareSetupTokenIsExchangedAtTheSmailyEngine(): void
     {
         $client = $this->createClient([
             new Response(200, [], '{"tenant_id":"t1","api_key":"sk_x","endpoints":{}}'),
         ]);
 
-        $client->setupExchange('http://172.20.0.1:9876/setup/tok_dev');
+        $client->setupExchange('tok_abc123');
+
+        self::assertSame(
+            'https://intelligence.smaily.com/api/setup/exchange',
+            (string)$this->history[0]['request']->getUri()
+        );
+    }
+
+    /**
+     * An explicit port on the Smaily engine host is kept (mirrors Woo
+     * parse_setup_url).
+     */
+    public function testSetupExchangeKeepsAnExplicitPort(): void
+    {
+        $client = $this->createClient([
+            new Response(200, [], '{"tenant_id":"t1","api_key":"sk_x","endpoints":{}}'),
+        ]);
+
+        $client->setupExchange('https://intelligence.smaily.com:8443/setup/tok_dev');
 
         $request = $this->history[0]['request'];
-        self::assertSame('http://172.20.0.1:9876/api/setup/exchange', (string)$request->getUri());
+        self::assertSame('https://intelligence.smaily.com:8443/api/setup/exchange', (string)$request->getUri());
         $body = json_decode((string)$request->getBody(), true);
         self::assertSame('tok_dev', $body['setup_token']);
+    }
+
+    /**
+     * PRO-3575: the setup address must be an https address on the Smaily
+     * engine host; any other address is refused before a request is made.
+     *
+     * @dataProvider refusedSetupAddressProvider
+     */
+    public function testASetupAddressOutsideTheSmailyEngineIsRefusedWithoutARequest(string $setupUrl): void
+    {
+        $client = $this->createClient([
+            new Response(200, [], '{"tenant_id":"t1","api_key":"sk_x","endpoints":{}}'),
+        ]);
+
+        try {
+            $client->setupExchange($setupUrl);
+            self::fail('Expected an EngineRequestException');
+        } catch (EngineRequestException $exception) {
+            self::assertSame(
+                'The setup URL must be an https address on intelligence.smaily.com.',
+                $exception->getMessage()
+            );
+        }
+        self::assertSame([], $this->history);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function refusedSetupAddressProvider(): array
+    {
+        return [
+            'another host' => ['https://engine.example/setup/tok_abc123'],
+            'plain http' => ['http://intelligence.smaily.com/setup/tok_abc123'],
+            'an IP address over http' => ['http://172.20.0.1:9876/setup/tok_dev'],
+            'a look-alike host' => ['https://intelligence.smaily.com.engine.example/setup/tok_abc123'],
+            'user info before another host' => ['https://intelligence.smaily.com@engine.example/setup/tok_abc123'],
+        ];
+    }
+
+    /**
+     * PRO-3575: the engine's reply is returned for storing only when the
+     * engine base URL and every endpoint are https addresses on the Smaily
+     * engine host.
+     *
+     * @dataProvider refusedReplyProvider
+     */
+    public function testAReplyNamingAnAddressOutsideTheSmailyEngineIsRefused(string $reply): void
+    {
+        $client = $this->createClient([new Response(200, [], $reply)]);
+
+        $this->expectException(EngineRequestException::class);
+        $this->expectExceptionMessage(
+            'The engine answered with an address that is not an https address on intelligence.smaily.com,'
+            . ' so the connection was not saved.'
+        );
+        $client->setupExchange('https://intelligence.smaily.com/setup/tok_abc123');
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function refusedReplyProvider(): array
+    {
+        $tenant = '"tenant_id":"t1","api_key":"sk_x"';
+        $ping = '"ingest_ping":"https://intelligence.smaily.com/api/v1/ingest/ping"';
+
+        return [
+            'an endpoint on another host' => [
+                '{' . $tenant . ',"endpoints":{' . $ping
+                . ',"ingest_orders":"https://engine.example/api/v1/ingest/orders"}}',
+            ],
+            'an endpoint over plain http' => [
+                '{' . $tenant . ',"endpoints":{"ingest_ping":"http://intelligence.smaily.com/api/v1/ingest/ping"}}',
+            ],
+            'an endpoint that is not a string' => ['{' . $tenant . ',"endpoints":{"ingest_ping":["x"]}}'],
+            'an endpoints value that is not a map' => ['{' . $tenant . ',"endpoints":"https://engine.example"}'],
+            'the engine base URL on another host' => [
+                '{' . $tenant . ',"engine_base_url":"https://engine.example","endpoints":{' . $ping . '}}',
+            ],
+        ];
+    }
+
+    public function testAReplyOnTheSmailyEngineIsReturnedForStoring(): void
+    {
+        $reply = [
+            'tenant_id' => 't1',
+            'api_key' => 'sk_x',
+            'engine_base_url' => 'https://intelligence.smaily.com',
+            'endpoints' => [
+                'ingest_ping' => 'https://intelligence.smaily.com/api/v1/ingest/ping',
+                'customer_export' => 'https://intelligence.smaily.com/api/v1/customer/{email}/export',
+            ],
+        ];
+        $client = $this->createClient([new Response(200, [], (string)json_encode($reply))]);
+
+        self::assertSame($reply, $client->setupExchange('https://intelligence.smaily.com/setup/tok_abc123'));
     }
 
     /**

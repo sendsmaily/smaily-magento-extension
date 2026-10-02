@@ -149,15 +149,15 @@ includes the API; press Test Connection again after the package is changed.
 
 | Field | Notes |
 |---|---|
-| Subdomain | Your Smaily subdomain. Pasting the full URL (`https://demo.sendsmaily.net`) also works — it is normalized on save. |
+| Subdomain | Your Smaily subdomain. Pasting the full URL (`https://demo.sendsmaily.net`) also works — it is normalized on save. The subdomain must be a plain one, such as `demo`: letters, digits and hyphens only. Any other value is refused on save and on Test Connection, and nothing is sent to Smaily with it. |
 | API Username / Password | Create these in Smaily under *Preferences > API*. The password is stored encrypted. |
 | Multilingual Mode | See [Multilingual stores](#multilingual-stores). |
 
 Use the **Test Connection** button next to the fields for instant feedback
 on the credentials as typed — no save needed; a successful test also
-refreshes the automation workflow dropdowns. Saving always succeeds; if the
-saved credentials are wrong you get a clear warning instead of a blocked
-save.
+refreshes the automation workflow dropdowns. Saving succeeds whenever the
+subdomain is a plain one; if the saved credentials are wrong you get a clear
+warning instead of a blocked save.
 
 Credentials can be set per **website**, or per **store view** when each
 language uses its own Smaily account (multilingual mode "Per-language
@@ -411,6 +411,13 @@ connected.
 2. Paste it on **Settings > Intelligence** (or Initial setup step 4) and save.
    The token is exchanged immediately and never stored; the status row shows
    the connected tenant.
+
+The setup URL must be an https address on `intelligence.smaily.com`; a bare
+token is exchanged there too. Any other address is refused before anything is
+sent. The connection is saved only when every address the engine answers
+with is an https address on `intelligence.smaily.com` as well — otherwise the
+admin says so and the store is not connected. A connection saved earlier
+keeps working as it is.
 
 ### What syncs
 

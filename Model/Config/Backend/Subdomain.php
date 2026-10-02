@@ -12,13 +12,17 @@ use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Config\Value;
 use Magento\Framework\Data\Collection\AbstractDb;
+use Magento\Framework\Exception\ValidatorException;
 use Magento\Framework\Model\Context;
 use Magento\Framework\Model\ResourceModel\AbstractResource;
 use Magento\Framework\Registry;
+use Smaily\Connect\Model\Client\Exception\InvalidSubdomainException;
+use Smaily\Connect\Model\SmailyUrl;
 use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
- * Normalizes the configured Smaily subdomain before saving.
+ * Normalizes the configured Smaily subdomain before saving, and refuses one
+ * that is not a plain Smaily subdomain.
  */
 class Subdomain extends Value
 {
@@ -43,7 +47,11 @@ class Subdomain extends Value
      */
     public function beforeSave()
     {
-        $this->setValue($this->normalizer->normalize((string)$this->getValue()));
+        $subdomain = $this->normalizer->normalize((string)$this->getValue());
+        if ($subdomain !== '' && !SmailyUrl::isPlainSubdomain($subdomain)) {
+            throw new ValidatorException(__('%1', (new InvalidSubdomainException())->getMessage()));
+        }
+        $this->setValue($subdomain);
 
         return parent::beforeSave();
     }

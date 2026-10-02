@@ -19,6 +19,7 @@ use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
 use Smaily\Connect\Model\Automation\Mapping;
 use Smaily\Connect\Model\Automation\MappingSaver;
 use Smaily\Connect\Model\Client\CredentialCheck;
+use Smaily\Connect\Model\Client\Exception\InvalidSubdomainException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
@@ -27,6 +28,7 @@ use Smaily\Connect\Model\Config\Source\SyncFields;
 use Smaily\Connect\Model\Config\Source\SyncMode;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
+use Smaily\Connect\Model\SmailyUrl;
 use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
@@ -101,6 +103,20 @@ class WizardStepSaver
 
         if ($subdomain === '' || $username === '') {
             return [['field' => 'subdomain', 'message' => (string)__('Subdomain and username are required.')]];
+        }
+
+        // Every subdomain in the post must be a plain one before anything is
+        // saved or checked: a refused value never meets the stored password.
+        $subdomains = [$subdomain];
+        foreach ((array)($data['accounts'] ?? []) as $account) {
+            if (is_array($account)) {
+                $subdomains[] = $this->normalizer->normalize((string)($account['subdomain'] ?? ''));
+            }
+        }
+        foreach ($subdomains as $candidate) {
+            if ($candidate !== '' && !SmailyUrl::isPlainSubdomain($candidate)) {
+                return [['field' => 'subdomain', 'message' => (new InvalidSubdomainException())->getMessage()]];
+            }
         }
 
         $this->configWriter->save(Config::XML_PATH_SUBDOMAIN, $subdomain, ScopeInterface::SCOPE_WEBSITES, $websiteId);

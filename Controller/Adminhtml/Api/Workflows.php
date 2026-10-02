@@ -13,9 +13,11 @@ use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
+use Smaily\Connect\Model\Client\Exception\InvalidSubdomainException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
+use Smaily\Connect\Model\SmailyUrl;
 use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
@@ -51,6 +53,9 @@ class Workflows extends AbstractJsonAction implements HttpPostActionInterface
         $password = (string)($body['password'] ?? '');
 
         try {
+            if ($subdomain !== '' && !SmailyUrl::isPlainSubdomain($subdomain)) {
+                throw new InvalidSubdomainException();
+            }
             if ($subdomain !== '' && $username !== '' && $password !== '') {
                 $client = $this->clientFactory->create([
                     'subdomain' => $subdomain,

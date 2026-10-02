@@ -10,6 +10,7 @@ namespace Smaily\Connect\Model\Engine;
 
 use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\Psr7\Uri;
 use GuzzleHttp\RequestOptions;
 use Magento\Framework\App\ProductMetadataInterface;
 use Magento\Store\Model\StoreManagerInterface;
@@ -68,6 +69,13 @@ class Client
     ];
 
     public const DEFAULT_SETUP_BASE_URL = 'https://intelligence.smaily.com';
+
+    /**
+     * The hosts a setup address and the engine's setup reply may name: the
+     * Smaily engine's production host (contract "Base context"; the setup
+     * default of the WooCommerce and Shopify plugins). Always over https.
+     */
+    public const ENGINE_HOSTS = ['intelligence.smaily.com'];
     public const COMPATIBLE_ENGINE_MAJOR = 1;
 
     private const RETRY_DELAYS_SECONDS = [1, 2, 4, 8, 16];
@@ -100,19 +108,49 @@ class Client
      * Exchange a one-time setup token (or full setup URL) for tenant
      * credentials. The caller persists the response via Settings.
      *
+     * Only an https address on ENGINE_HOSTS is called, and a reply is
+     * returned only when its engine base URL and every endpoint are https
+     * addresses on ENGINE_HOSTS too.
+     *
      * @return array<string, mixed>
      */
     public function setupExchange(string $setupInput): array
     {
         [$baseUrl, $token] = $this->parseSetupInput($setupInput);
+        if (!$this->isEngineUrl($baseUrl)) {
+            throw new EngineRequestException(
+                (string)__('The setup URL must be an https address on %1.', implode(', ', self::ENGINE_HOSTS)),
+                400
+            );
+        }
         if ($token === '') {
             throw new EngineRequestException((string)__('Setup token is empty or unrecognized'), 400);
         }
 
-        return $this->request('POST', $baseUrl . '/api/setup/exchange', [
+        $response = $this->request('POST', $baseUrl . '/api/setup/exchange', [
             'setup_token' => $token,
             'plugin_info' => $this->pluginInfo(),
         ], false);
+
+        $endpoints = $response['endpoints'] ?? [];
+        $urls = is_array($endpoints) ? array_values($endpoints) : [$endpoints];
+        if (array_key_exists('engine_base_url', $response)) {
+            $urls[] = $response['engine_base_url'];
+        }
+        foreach ($urls as $url) {
+            if (!is_string($url) || !$this->isEngineUrl($url)) {
+                throw new EngineRequestException(
+                    (string)__(
+                        'The engine answered with an address that is not an https address on %1,'
+                        . ' so the connection was not saved.',
+                        implode(', ', self::ENGINE_HOSTS)
+                    ),
+                    400
+                );
+            }
+        }
+
+        return $response;
     }
 
     /**
@@ -483,9 +521,8 @@ class Client
             }
 
             // Preserve the pasted scheme and port (mirrors the Woo plugin's
-            // parse_setup_url): Smaily's production setup URLs are always
-            // https, and dropping an explicit port breaks any engine that is
-            // not on 443 (self-hosted/dev deploys).
+            // parse_setup_url); setupExchange() then accepts only https on
+            // ENGINE_HOSTS.
             $scheme = (string)($parts['scheme'] ?? 'https');
             $base = $scheme . '://' . $host;
             if (isset($parts['port'])) {
@@ -496,6 +533,21 @@ class Client
         }
 
         return [self::DEFAULT_SETUP_BASE_URL, $input];
+    }
+
+    /**
+     * Whether a URL is an https address on ENGINE_HOSTS, read with the same
+     * URI parser the request itself uses.
+     */
+    private function isEngineUrl(string $url): bool
+    {
+        try {
+            $uri = new Uri($url);
+        } catch (\InvalidArgumentException) {
+            return false;
+        }
+
+        return $uri->getScheme() === 'https' && in_array($uri->getHost(), self::ENGINE_HOSTS, true);
     }
 
     /**

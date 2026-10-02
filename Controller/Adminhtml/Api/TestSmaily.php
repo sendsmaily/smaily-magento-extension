@@ -14,10 +14,12 @@ use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
+use Smaily\Connect\Model\Client\Exception\InvalidSubdomainException;
 use Smaily\Connect\Model\Client\Exception\PlanBlockedException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
+use Smaily\Connect\Model\SmailyUrl;
 use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
@@ -52,6 +54,10 @@ class TestSmaily extends AbstractJsonAction implements HttpPostActionInterface
         $username = trim((string)($body['username'] ?? ''));
         $password = (string)($body['password'] ?? '');
         $storeId = isset($body['store_id']) && $body['store_id'] !== '' ? (int)$body['store_id'] : null;
+
+        if ($subdomain !== '' && !SmailyUrl::isPlainSubdomain($subdomain)) {
+            return $this->jsonResponse(['connected' => false, 'error' => (new InvalidSubdomainException())->getMessage()]);
+        }
 
         if ($password === '' && $storeId !== null) {
             try {

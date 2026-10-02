@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\RequestInterface;
 use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
+use Smaily\Connect\Model\Client\Exception\InvalidSubdomainException;
 use Smaily\Connect\Model\Client\Exception\PlanBlockedException;
 use Smaily\Connect\Model\Client\Exception\TransportException;
 use Smaily\Connect\Model\Client\HttpClientFactory;
@@ -313,9 +314,29 @@ class SmailyClientTest extends TestCase
     }
 
     /**
+     * PRO-3575: a stored subdomain that is not a plain Smaily subdomain never
+     * becomes a request host, so no request and no password leave the store.
+     */
+    public function testASubdomainThatIsNotPlainSendsNoRequest(): void
+    {
+        $client = $this->createClient([new Response(200, [], '[]')], 'engine.example#');
+
+        try {
+            $client->validateCredentials();
+            self::fail('Expected an InvalidSubdomainException');
+        } catch (InvalidSubdomainException $exception) {
+            self::assertSame(
+                'The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.',
+                $exception->getMessage()
+            );
+        }
+        self::assertSame([], $this->history);
+    }
+
+    /**
      * @param array<int, Response|callable> $responses
      */
-    private function createClient(array $responses): SmailyClient
+    private function createClient(array $responses, string $subdomain = 'demo'): SmailyClient
     {
         $this->history = [];
         $handlerStack = HandlerStack::create(new MockHandler($responses));
@@ -345,7 +366,7 @@ class SmailyClientTest extends TestCase
             $factory,
             $logger,
             $this->verifiedCredentials,
-            'demo',
+            $subdomain,
             'user',
             'secret'
         );

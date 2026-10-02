@@ -15,6 +15,7 @@ use GuzzleHttp\RequestOptions;
 use Psr\Http\Message\ResponseInterface;
 use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
+use Smaily\Connect\Model\Client\Exception\InvalidSubdomainException;
 use Smaily\Connect\Model\Client\Exception\PlanBlockedException;
 use Smaily\Connect\Model\Client\Exception\TransportException;
 use Smaily\Connect\Model\Logger\Logger;
@@ -81,6 +82,7 @@ class SmailyClient
      * @return array<int|string, mixed>
      * @throws ApiException on a non-101 response envelope
      * @throws TransportException on an HTTP error status or a network failure
+     * @throws InvalidSubdomainException when the subdomain is not one plain label
      */
     public function post(string $endpoint, array $payload): array
     {
@@ -127,6 +129,7 @@ class SmailyClient
      * @throws AuthenticationException when credentials are rejected
      * @throws PlanBlockedException when the account's package has no API access
      * @throws TransportException on network failure
+     * @throws InvalidSubdomainException when the subdomain is not one plain label
      */
     public function validateCredentials(): void
     {
@@ -273,8 +276,14 @@ class SmailyClient
         return $seconds > 0 ? $seconds : null;
     }
 
+    /**
+     * @throws InvalidSubdomainException when the subdomain is not one plain label
+     */
     private function getHttpClient(): HttpClient
     {
+        if (!SmailyUrl::isPlainSubdomain($this->subdomain)) {
+            throw new InvalidSubdomainException();
+        }
         if ($this->httpClient === null) {
             $this->httpClient = $this->httpClientFactory->create([
                 'base_uri' => SmailyUrl::forSubdomain($this->subdomain) . '/',

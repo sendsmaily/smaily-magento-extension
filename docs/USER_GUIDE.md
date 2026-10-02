@@ -551,7 +551,8 @@ panel — you do not have to keep the page open:
   as a queued delivery (type `engine.profiling_consent` in the **Log**), so
   an engine outage only delays it: it is retried like every other delivery.
   A delivery that waits while the shopper changes their mind is not sent —
-  only the newest choice reaches the engine.
+  only the newest choice reaches the engine. When a shopper who opted out
+  logs in, their earlier anonymous browsing is not linked to their account.
 - **Data subject requests**:
   `bin/magento smaily:gdpr export <email>` (Art. 15) and
   `bin/magento smaily:gdpr erase <email> --force` (Art. 17, idempotent).

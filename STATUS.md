@@ -5,7 +5,7 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
+_Last updated: 2026-10-02 (PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
 and the Dashboard fill the content area on the pack's grey pane under a
 full-width white tab strip, in Magento's Open Sans, with 33 px buttons and
 our own text, link and status colours. Earlier the same day: PRO-3572 — a
@@ -91,6 +91,12 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   phpstan `[OK]`, integration 89 (`ProfilingConsentDeliveryTest`: an
   opt-out survives an engine outage; an older choice on the ladder cannot
   undo a newer one).
+  Slice 2: the login identity merge skips an opted-out shopper.
+  `IdentityMergeHandler` asks `ProfilingConsent::isAllowed()` at the
+  customer's store view (looked up by `customer_external_id`; default scope
+  when the account is gone) and closes the row as sent without a call. On
+  the cron, not in `Observer/Engine/CustomerLogin`, so login never waits on
+  a Smaily read.
 
 - **PRO-2456 follow-up — the owner's live-sandbox review (2026-10-02).**
   Marketing > Smaily Connect > Dashboard shows no missing-glyph box: the

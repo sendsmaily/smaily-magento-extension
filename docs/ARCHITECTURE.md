@@ -473,6 +473,11 @@ Opt-out model, default on: a shopper is profiled unless they said no.
   older answer never undoes a newer one at the engine. A §10 404 (the engine
   holds nothing for that address) also closes the row — there is nothing to
   exclude.
+- **Identity merge.** `Queue\Handler\IdentityMergeHandler` asks
+  `isAllowed()` (at the customer's store view, whose Smaily account holds
+  the contact) before each merge; an opted-out shopper's row closes as sent
+  without a call, so their browsing stays anonymous. Asked on the cron, not
+  in the login observer, so a login never waits on a Smaily read.
 
 ## Admin UI
 

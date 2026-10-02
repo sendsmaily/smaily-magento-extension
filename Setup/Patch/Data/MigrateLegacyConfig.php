@@ -17,6 +17,7 @@ use Magento\Framework\Setup\Patch\DataPatchInterface;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Migration\LegacyConfigMapper;
+use Smaily\Connect\Model\Migration\MigrationOutcome;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
 
 /**
@@ -36,7 +37,8 @@ class MigrateLegacyConfig implements DataPatchInterface
         private readonly LegacyConfigMapper $mapper,
         private readonly WriterInterface $configWriter,
         private readonly EncryptorInterface $encryptor,
-        private readonly NotifierInterface $notifier
+        private readonly NotifierInterface $notifier,
+        private readonly MigrationOutcome $migrationOutcome
     ) {
     }
 
@@ -109,6 +111,8 @@ class MigrateLegacyConfig implements DataPatchInterface
         foreach (array_unique($allNotices) as $notice) {
             $this->notifier->addNotice('Smaily Connect upgrade', $notice);
         }
+        // AddSetupNotice, next in this run, says the settings were migrated.
+        $this->migrationOutcome->markMigrated();
 
         return $this;
     }

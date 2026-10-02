@@ -110,8 +110,9 @@ sell on the default website is sent with the price and link of the first
 website it is assigned to.
 
 After installation the admin notifications show "Smaily Connect is ready to
-set up", with a link to this guide; finishing the initial setup marks it as
-read. After a major version upgrade the module posts a one-time admin
+set up", with a link to this guide; after an upgrade from 2.8.x it also says
+that the earlier settings were migrated. Finishing the initial setup marks
+it as read. After a major version upgrade the module posts a one-time admin
 notification suggesting a settings review — nothing is changed or blocked.
 
 ---
@@ -124,8 +125,11 @@ Intelligence, Overview), each saved separately, with connection testing and
 live workflow lists built in. Completed steps stay unlocked in the step
 list (a rail on the left; a bar across the top on narrow screens), so you
 can move back and forward between them freely — also when
-revisiting the initial setup after finishing it. The Overview step ends
-with **Go to Dashboard** and **Open Settings**. Everything it writes
+revisiting the initial setup after finishing it. The Overview step says
+that Smaily Connect is syncing only when Smaily accepted the saved
+credentials; otherwise it says that syncing starts once Smaily accepts them
+and points you to **Settings > Connection**. It ends with **Go to
+Dashboard** and **Open Settings**. Everything it writes
 lands in the regular configuration, so you can fine-tune it later on the
 **Settings > Connection** tab — its own Test Connection / Save Connection
 footer and connection-status line (Connected / Not connected, with the

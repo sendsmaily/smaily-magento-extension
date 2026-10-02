@@ -27,7 +27,16 @@ PRO-3591/3594/3602, PRO-1952. Earlier sessions: 2026-09-11, 2026-09-10._
   `Model\Adminhtml\SetupNotice::markRead()`, found by its user-guide URL)
   and deleted on uninstall by both paths (`Setup\Uninstall` and the
   `RemoveSettingsOnUninstall` revert); without Magento_AdminNotification
-  (no `adminnotification_inbox` table) both do nothing.
+  (no `adminnotification_inbox` table) both do nothing. Copy: the
+  Overview step says "now syncing" only when Smaily accepted the saved
+  credentials (`boot.verified` on load, then the `verified` field that
+  `SaveStep` now answers for the finish step); otherwise "Syncing starts
+  once Smaily accepts the credentials — check them in Settings >
+  Connection …" (EN + ET). The setup notice says the earlier settings
+  were migrated only when `MigrateLegacyConfig` moved 2.8.x settings in
+  the same setup run (`Model\Migration\MigrationOutcome`, a shared
+  in-process instance — nothing stored). Fixes PRO-3603 findings 1, 5
+  and 6.
 
 - **Next session opens here (2026-10-02).** Done today: PRO-2456 (+ page
   frame), PRO-2474 runbook, pilot-day checklist and clean ZIP install,

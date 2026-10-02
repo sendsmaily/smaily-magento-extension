@@ -18,7 +18,8 @@ use Magento\Framework\Stdlib\DateTime\DateTime;
  *
  * Statuses: open (tracked), mailed (automation fired), completed (order
  * placed), expired (aged out unmailed), erased (Art. 17 tombstone — see
- * anonymizeForEmail()).
+ * anonymizeForEmail()), skipped (not mailed: its address had a reminder in
+ * the last 24 hours — see markSkipped()).
  */
 class StateManager
 {
@@ -27,6 +28,7 @@ class StateManager
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_EXPIRED = 'expired';
     public const STATUS_ERASED = 'erased';
+    public const STATUS_SKIPPED = 'skipped';
 
     /**
      * Statuses nothing further happens to: the cron's gate and the retention
@@ -37,6 +39,7 @@ class StateManager
         self::STATUS_COMPLETED,
         self::STATUS_EXPIRED,
         self::STATUS_ERASED,
+        self::STATUS_SKIPPED,
     ];
 
     private const TABLE_NAME = 'smaily_abandoned_cart';
@@ -92,6 +95,45 @@ class StateManager
             ],
             ['status', 'abandoned_at', 'mail_sent_at']
         );
+    }
+
+    /**
+     * Record that a quote is not mailed because its address already had a
+     * reminder for another cart in the last 24 hours (PRO-3693). Terminal,
+     * so the cron does not weigh the quote again; no mail_sent_at, so the
+     * skip does not count as a reminder.
+     */
+    public function markSkipped(int $quoteId, int $storeId, ?string $email): void
+    {
+        $connection = $this->resourceConnection->getConnection(self::CONNECTION);
+        $connection->insertOnDuplicate(
+            $this->table(),
+            [
+                'quote_id' => $quoteId,
+                'store_id' => $storeId,
+                'email' => $email,
+                'status' => self::STATUS_SKIPPED,
+                'abandoned_at' => $this->dateTime->gmtDate(),
+            ],
+            ['status', 'abandoned_at']
+        );
+    }
+
+    /**
+     * Whether a reminder went to this address — delivered or still waiting in
+     * the queue, for any cart — at or after $since (UTC, `Y-m-d H:i:s`). The
+     * address is compared in any case.
+     */
+    public function hasReminderSince(string $email, string $since): bool
+    {
+        $connection = $this->resourceConnection->getConnection(self::CONNECTION);
+        $select = $connection->select()
+            ->from($this->table(), ['quote_id'])
+            ->where('LOWER(email) = ?', strtolower($email))
+            ->where('mail_sent_at >= ?', $since)
+            ->limit(1);
+
+        return $connection->fetchOne($select) !== false;
     }
 
     /**

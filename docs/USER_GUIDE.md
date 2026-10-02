@@ -442,7 +442,11 @@ A cart counts as abandoned when it has items and an email address and has
 been idle past the **cutoff** (default 30 minutes, minimum 10). The email can
 come from a signed-in customer, an order in progress, or the address a guest
 types at checkout. Carts older than 24 hours are never mailed — a recovering
-cron never blasts stale reminders. Each cart is mailed **once**.
+cron never blasts stale reminders. Each cart is mailed **once**, and one
+email address gets at most **one reminder in 24 hours**, whatever number of
+carts carry it (compared in any case): a further cart of that address within
+24 hours of a reminder is not mailed, now or later, and its row in the
+[Log](#the-log-and-troubleshooting) is *Skipped* and says why.
 
 **When a guest's cart gets its email.** Magento's own checkout keeps a
 guest's email in the browser until the payment step. While the abandoned-cart
@@ -876,7 +880,9 @@ card — you do not have to keep the page open:
 - **Skipped** is its own status too: a row the store closed without
   sending anything, because sending could not have done what it was for:
   the abandoned-cart purchase marker for an address Smaily does not have,
-  an automation trigger with no Smaily workflow mapped to it, a
+  an abandoned-cart reminder for an address that got one for another cart
+  in the last 24 hours, an automation trigger with no Smaily workflow mapped
+  to it, a
   personalization choice the shopper has changed since (the newer choice
   is sent on its own row), or linking the browsing of a shopper who opted
   out of personalized recommendations to their address. Details shows the
@@ -941,7 +947,7 @@ card — you do not have to keep the page open:
 - Sent queue rows are pruned after 30 days, failed rows after 90. The same
   nightly job also tidies the abandoned-cart tracker — the small table that
   remembers which carts the extension has already dealt with: a finished
-  record (reminded, purchased, expired, erased) is dropped 30 days on, and
+  record (reminded, skipped, purchased, expired, erased) is dropped 30 days on, and
   so is any record whose cart Magento has already deleted. A cart that is
   still in the store and still being watched is never touched.
 
@@ -1065,8 +1071,9 @@ with a workflow selected; the cart needs an email address (a guest's cart on
 Magento's own checkout gets one two seconds after the guest types a valid
 address in the email field — see [Abandoned cart](#abandoned-cart)); the
 cart must be idle past the cutoff but younger than 24 h; each cart is only
-ever mailed once; and Smaily must already have the address as a contact
-that has not unsubscribed.
+ever mailed once, and an address that got a reminder for another cart in the
+last 24 hours gets none (the Log shows that row as *Skipped*); and Smaily
+must already have the address as a contact that has not unsubscribed.
 
 **The checkout checkbox doesn't show.** It renders on the Luma/Knockout
 checkout payment step — including Hyvä's default Luma-fallback checkout.

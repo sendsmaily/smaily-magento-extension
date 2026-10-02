@@ -51,6 +51,22 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   (the cron's gate) skips the three, a second run is a no-op. The quote
   scan uses `LOWER()` on unindexed columns — a full scan of `quote`, as the
   queue scan already is; an admin one-off.
+  (3) One abandoned-cart reminder per address per 24 h, across carts:
+  `Cron\AbandonedCart` asks `StateManager::hasReminderSince()` (any row,
+  `LOWER(email)`, `mail_sent_at` in the last 24 h — sent or queued) and
+  marks such a cart with the new terminal side-table status `skipped`
+  (no `mail_sent_at`; the column comment in db_schema.xml lists it — a
+  comment-only diff on setup:upgrade) plus a queue row stored already
+  closed as Skipped (`EventQueue::enqueue()` / `dispatchAutomation()` take
+  an optional skip reason) with `SKIPPED_RECENTLY_REMINDED` (EN + ET). The
+  side table has no "skipped" before this (the Log's Skipped is the queue's);
+  `expired` was the only unused terminal value and means "aged out", so it
+  was not reused. Integration `Cron\AbandonedCartTest` (new; real tracker +
+  queue, Magento's quote collection and the payload builder stubbed, a
+  quote collection factory stub as for products): skipped in another case
+  with the Log reading Skipped and the flusher claiming only the other
+  row; two carts in one run; a reminder older than 24 h; a skipped cart is
+  not weighed again and does not start a new 24 h.
 
 - **PRO-3693 — a guest's email reaches the cart as soon as it is typed on
   Magento's own checkout (2026-10-02, owner-approved design, Woo parity).**

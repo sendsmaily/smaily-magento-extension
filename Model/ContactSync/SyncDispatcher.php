@@ -78,10 +78,17 @@ class SyncDispatcher
      * is POSTed — a retry then resends the moment the store event happened,
      * which is the moment a merchant means. See Trigger::MARKER_FIELDS.
      *
+     * A $skipReason records the automation in the Log as skipped, with the
+     * reason, instead of queueing it to be sent.
+     *
      * @param array<string, string|int> $address must contain "email"
      */
-    public function dispatchAutomation(string $trigger, int $storeId, array $address): void
-    {
+    public function dispatchAutomation(
+        string $trigger,
+        int $storeId,
+        array $address,
+        ?string $skipReason = null
+    ): void {
         $marker = Trigger::MARKER_FIELDS[$trigger] ?? null;
         if ($marker !== null) {
             $address[$marker] = gmdate(Trigger::MARKER_STAMP_FORMAT);
@@ -97,7 +104,9 @@ class SyncDispatcher
                 'address' => $address,
             ],
             (string)($address['email'] ?? ''),
-            $this->websiteId($storeId)
+            $this->websiteId($storeId),
+            null,
+            $skipReason
         );
     }
 

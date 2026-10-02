@@ -88,7 +88,7 @@
         <column xsi:type="int" name="quote_id" unsigned="true" nullable="false" comment="Quote ID"/>
         <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" default="0" comment="Store View ID"/>
         <column xsi:type="varchar" name="email" nullable="true" length="255" comment="Customer Email"/>
-        <column xsi:type="varchar" name="status" nullable="false" length="16" default="open" comment="open|mailed|completed|expired|erased"/>
+        <column xsi:type="varchar" name="status" nullable="false" length="16" default="open" comment="open|mailed|completed|expired|erased|skipped"/>
         <column xsi:type="boolean" name="newsletter_optin" nullable="false" default="false" comment="Checkout Newsletter Opt-In"/>
         <column xsi:type="timestamp" name="abandoned_at" on_update="false" nullable="true" comment="Marked Abandoned At"/>
         <column xsi:type="timestamp" name="mail_sent_at" on_update="false" nullable="true" comment="Automation Triggered At"/>

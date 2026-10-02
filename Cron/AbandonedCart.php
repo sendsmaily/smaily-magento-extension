@@ -32,10 +32,19 @@ use Smaily\Connect\Model\Logger\Logger;
  * a long-broken cron must not blast stale reminders on recovery). Send
  * state lives in the smaily_abandoned_cart side table; delivery, retries
  * and the event log come from the queue.
+ *
+ * One address gets at most one reminder per REMINDER_INTERVAL, whatever
+ * number of carts carry it (PRO-3693): a cart whose address had a reminder
+ * for another cart in that time is closed as skipped, in the side table and
+ * as a skipped row in the Log.
  */
 class AbandonedCart
 {
+    public const SKIPPED_RECENTLY_REMINDED = 'Skipped: this address already got an abandoned-cart reminder'
+        . ' for another cart in the last 24 hours. Nothing was sent.';
+
     private const MAX_AGE_SECONDS = 86400;
+    private const REMINDER_INTERVAL_SECONDS = 86400;
     private const BATCH_SIZE = 100;
 
     public function __construct(
@@ -116,6 +125,7 @@ class AbandonedCart
 
         $handled = $this->stateManager->filterAlreadyHandled(array_keys($quotes));
         $candidates = array_diff_key($quotes, array_flip($handled));
+        $remindedSince = $this->dateTime->gmtDate('Y-m-d H:i:s', $now - self::REMINDER_INTERVAL_SECONDS);
 
         $mailed = 0;
         foreach ($candidates as $quote) {
@@ -128,6 +138,17 @@ class AbandonedCart
             }
 
             if (($address['email'] ?? '') === '') {
+                continue;
+            }
+
+            if ($this->stateManager->hasReminderSince((string)$address['email'], $remindedSince)) {
+                $this->stateManager->markSkipped((int)$quote->getId(), $storeId, $address['email']);
+                $this->dispatcher->dispatchAutomation(
+                    Trigger::ABANDONED_CART,
+                    $storeId,
+                    $address,
+                    self::SKIPPED_RECENTLY_REMINDED
+                );
                 continue;
             }
 

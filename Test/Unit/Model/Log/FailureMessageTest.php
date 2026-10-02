@@ -117,6 +117,13 @@ class FailureMessageTest extends TestCase
                 'Vahele jäetud: ostja loobus personaalsetest soovitustest, seega tema sirvimist ei seota'
                     . ' tema e-posti aadressiga. Midagi ei saadetud.',
             ],
+            // PRO-3693: one abandoned-cart reminder per address in 24 hours.
+            'skipped, recently reminded' => [
+                'Skipped: this address already got an abandoned-cart reminder for another cart'
+                    . ' in the last 24 hours. Nothing was sent.',
+                'Vahele jäetud: sellele aadressile saadeti viimase 24 tunni jooksul juba teise ostukorvi'
+                    . ' meeldetuletus. Midagi ei saadetud.',
+            ],
         ];
     }
 

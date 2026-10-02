@@ -490,6 +490,20 @@ the moment the reminder was created, inside the signature; the link expires
 nothing. A link without `ts` (issued before links carried it) is accepted for
 30 days after the tracker row's `mail_sent_at`, and is expired without one.
 
+**One reminder per address per 24 hours (PRO-3693).** Before it marks a
+candidate `mailed`, the cron asks `StateManager::hasReminderSince()` whether
+any tracker row with the resolved address (`LOWER(email)`) has a
+`mail_sent_at` in the last 24 hours — a reminder delivered or still queued,
+for any cart, whatever the row's status now. If so the cart is marked
+`skipped` (terminal, no `mail_sent_at`, so it is never weighed again and does
+not start a new 24 hours) and the automation is recorded through
+`SyncDispatcher::dispatchAutomation()` with a skip reason: `EventQueue::enqueue()`
+stores the row already closed as skipped (`sent`, no `sent_payload`,
+`Cron\AbandonedCart::SKIPPED_RECENTLY_REMINDED` in `last_error`, translated by
+`Log\FailureMessage`), so the Log shows what would have gone out and why it
+did not, and the flusher never claims it. The cron marks before it moves to
+the next candidate, so two carts of one address in one run get one reminder.
+
 **Where a guest's email comes from (PRO-3693).** Magento's checkout keeps a
 guest's email in the browser (`quote.guestEmail`) and sends it only with
 set-payment-information / place-order; `isEmailAvailable` saves nothing and

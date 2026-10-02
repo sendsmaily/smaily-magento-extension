@@ -353,6 +353,7 @@
 "Skipped: Smaily does not have this contact, and the purchase marker would create it as a subscriber. Nothing was sent.","Vahele jäetud: Smailys ei ole seda kontakti ja ostu märge looks selle tellijana. Midagi ei saadetud."
 "Skipped: the shopper has since changed their personalization preference, and the newer preference is sent in its own row. Nothing was sent.","Vahele jäetud: ostja on vahepeal oma personaliseerimise eelistust muutnud ja uuem eelistus saadetakse eraldi real. Midagi ei saadetud."
 "Skipped: the shopper opted out of personalized recommendations, so their browsing is not linked to their address. Nothing was sent.","Vahele jäetud: ostja loobus personaalsetest soovitustest, seega tema sirvimist ei seota tema e-posti aadressiga. Midagi ei saadetud."
+"Skipped: this address already got an abandoned-cart reminder for another cart in the last 24 hours. Nothing was sent.","Vahele jäetud: sellele aadressile saadeti viimase 24 tunni jooksul juba teise ostukorvi meeldetuletus. Midagi ei saadetud."
 "Smaily","Smaily"
 "Smaily account for %1","Smaily konto keelele %1"
 "Smaily API credentials are not configured (store scope: %1)","Smaily API kasutajaandmed on seadistamata (poe skoop: %1)"

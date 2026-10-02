@@ -353,6 +353,7 @@
 "Skipped: Smaily does not have this contact, and the purchase marker would create it as a subscriber. Nothing was sent.","Skipped: Smaily does not have this contact, and the purchase marker would create it as a subscriber. Nothing was sent."
 "Skipped: the shopper has since changed their personalization preference, and the newer preference is sent in its own row. Nothing was sent.","Skipped: the shopper has since changed their personalization preference, and the newer preference is sent in its own row. Nothing was sent."
 "Skipped: the shopper opted out of personalized recommendations, so their browsing is not linked to their address. Nothing was sent.","Skipped: the shopper opted out of personalized recommendations, so their browsing is not linked to their address. Nothing was sent."
+"Skipped: this address already got an abandoned-cart reminder for another cart in the last 24 hours. Nothing was sent.","Skipped: this address already got an abandoned-cart reminder for another cart in the last 24 hours. Nothing was sent."
 "Smaily","Smaily"
 "Smaily account for %1","Smaily account for %1"
 "Smaily API credentials are not configured (store scope: %1)","Smaily API credentials are not configured (store scope: %1)"

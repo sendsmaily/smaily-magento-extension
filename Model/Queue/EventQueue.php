@@ -59,6 +59,10 @@ class EventQueue
      * Passing a deterministic $eventUuid makes the enqueue idempotent:
      * a duplicate is silently skipped.
      *
+     * A $skipReason stores the row already closed as skipped, the shape
+     * markSkipped() gives it: the Log shows what would have been sent and
+     * why it was not, and the flusher never claims it.
+     *
      * @param array<int|string, mixed> $payload
      * @return bool true when queued, false when skipped as a duplicate
      */
@@ -67,7 +71,8 @@ class EventQueue
         array $payload,
         ?string $entityId = null,
         int $websiteId = 0,
-        ?string $eventUuid = null
+        ?string $eventUuid = null,
+        ?string $skipReason = null
     ): bool {
         $event = $this->eventFactory->create();
         $event->addData([
@@ -79,6 +84,11 @@ class EventQueue
             'status' => Event::STATUS_PENDING,
             'attempts' => 0,
         ]);
+        if ($skipReason !== null) {
+            $event->addData($this->terminalFields(null) + [
+                'last_error' => mb_substr($skipReason, 0, self::MAX_ERROR_LENGTH),
+            ]);
+        }
 
         try {
             $this->eventResource->save($event);

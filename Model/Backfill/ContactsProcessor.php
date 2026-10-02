@@ -11,43 +11,46 @@ namespace Smaily\Connect\Model\Backfill;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Framework\Api\SearchCriteriaBuilder;
-use Magento\Newsletter\Model\ResourceModel\Subscriber\CollectionFactory as SubscriberCollectionFactory;
-use Magento\Newsletter\Model\Subscriber;
-use Magento\Store\Model\StoreManagerInterface;
-use Magento\Store\Model\Website;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Config\Source\SyncMode;
+use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\ContactSync\SubscriberPayloadBuilder;
 use Smaily\Connect\Model\Logger\Logger;
 
 /**
- * Backfills all existing newsletter subscribers of a website into Smaily
- * (both subscribed and unsubscribed, with is_unsubscribed set — the same
- * audience as the legacy 2.8.x full sync).
+ * Backfills a website's existing contacts into Smaily: the audience of the
+ * website's contact-sync mode (Model\Backfill\ContactAudience, PRO-3582),
+ * each contact with its real subscription status (is_unsubscribed set).
  *
- * Cursor = last processed subscriber_id; each tick processes pages until
- * the time budget is spent, so a large base imports across several cron
- * runs without ever blocking the cron group.
+ * The cursor is the last processed subscriber_id while the walk is in the
+ * subscribers; under "All customers" it then moves on to the other
+ * registered customers as "customer:{entity_id}". Each tick processes pages
+ * until the time budget is spent, so a large base imports across several
+ * cron runs without ever blocking the cron group.
  *
  * The website's stored "Enable subscriber synchronization" answer gates
  * this import exactly as it gates the live paths and the reconcile tick —
- * one stored answer owns every outbound contact path (PRO-1764).
+ * one stored answer owns every outbound contact path (PRO-1764). The mode is
+ * read on every tick, so a mode changed mid-import decides what the rest of
+ * the walk sends.
  */
 class ContactsProcessor implements ProcessorInterface
 {
     private const PAGE_SIZE = 500;
     private const TIME_BUDGET_SECONDS = 20;
+    private const CUSTOMER_CURSOR = 'customer:';
 
     public function __construct(
         private readonly JobManager $jobManager,
-        private readonly SubscriberCollectionFactory $subscriberCollectionFactory,
+        private readonly ContactAudience $audience,
+        private readonly Mode $mode,
         private readonly CustomerRepositoryInterface $customerRepository,
         private readonly SearchCriteriaBuilder $searchCriteriaBuilder,
         private readonly SubscriberPayloadBuilder $payloadBuilder,
         private readonly SmailyClientProvider $clientProvider,
-        private readonly StoreManagerInterface $storeManager,
         private readonly Config $config,
         private readonly Logger $logger
     ) {
@@ -61,48 +64,50 @@ class ContactsProcessor implements ProcessorInterface
         // Same stored answer, same website resolution as the live paths
         // (Observer\SubscriberSaveAfter, Cron\ContactReconcile). A job that
         // never started completes having sent nothing, its total 0 rather
-        // than a subscriber count promising a sync that will not happen; a
+        // than a contact count promising a sync that will not happen; a
         // job switched off mid-import stops at this page boundary like an
         // admin cancel, so the total it discovered and the contacts it has
-        // already sent are reported as they really are.
-        if (!$this->config->isSyncEnabled($job->getWebsiteId())) {
+        // already sent are reported as they really are. "Checkout opt-in
+        // only" imports nobody, so it ends the same way.
+        $websiteId = $job->getWebsiteId();
+        $mode = $this->mode->mode($websiteId);
+        if (!$this->config->isSyncEnabled($websiteId) || $mode === SyncMode::MODE_CHECKOUT_OPTIN) {
             if ($job->getData('total_count') === null) {
                 $job->setData('total_count', 0);
                 $this->jobManager->complete($job);
             } else {
                 $this->jobManager->cancel($job);
             }
-            $this->logger->info('Contacts backfill stopped — subscriber synchronization is off', [
-                'website_id' => $job->getWebsiteId(),
+            $this->logger->info('Contacts backfill stopped — the contact-sync settings import nobody', [
+                'website_id' => $websiteId,
+                'mode' => $mode,
             ]);
 
             return;
         }
 
-        $storeIds = $this->websiteStoreIds($job->getWebsiteId());
-        if (!$storeIds) {
-            $this->jobManager->fail($job, sprintf('Website %d has no stores', $job->getWebsiteId()));
+        if (!$this->audience->storeIds($websiteId)) {
+            $this->jobManager->fail($job, sprintf('Website %d has no stores', $websiteId));
 
             return;
         }
 
         if ($job->getData('total_count') === null) {
-            $job->setData('total_count', $this->countSubscribers($storeIds));
+            $job->setData('total_count', $this->audience->count($websiteId, $mode));
         }
         $this->jobManager->markRunning($job);
 
         $deadline = microtime(true) + self::TIME_BUDGET_SECONDS;
         do {
-            $cursor = (int)$job->getCursorValue();
-            $page = $this->loadPage($storeIds, $cursor);
+            [$page, $newCursor] = $this->loadPage($websiteId, $mode, (string)$job->getCursorValue());
             if (!$page) {
                 $this->jobManager->complete($job);
 
                 return;
             }
 
-            [$processed, $failed, $newCursor] = $this->sendPage($page);
-            $this->jobManager->recordProgress($job, $processed, $failed, (string)$newCursor);
+            [$processed, $failed] = $this->sendPage($page);
+            $this->jobManager->recordProgress($job, $processed, $failed, $newCursor);
 
             if ($this->jobManager->isCancelled($job)) {
                 return; // Admin cancel — stop cleanly at the page boundary.
@@ -111,49 +116,50 @@ class ContactsProcessor implements ProcessorInterface
     }
 
     /**
-     * @param int[] $storeIds
-     * @return Subscriber[]
+     * The next page after $cursor and the cursor that follows it: the
+     * subscribers first, then — under "All customers" only — the other
+     * registered customers.
+     *
+     * @return array{list<array{id: int, email: string, store_id: int, customer_id: int, subscribed: bool}>, string}
      */
-    private function loadPage(array $storeIds, int $cursor): array
+    private function loadPage(int $websiteId, string $mode, string $cursor): array
     {
-        $collection = $this->subscriberCollectionFactory->create();
-        $collection->addFieldToFilter('store_id', ['in' => $storeIds])
-            ->addFieldToFilter('subscriber_id', ['gt' => $cursor])
-            ->setOrder('subscriber_id', 'ASC')
-            ->setPageSize(self::PAGE_SIZE);
-
-        $subscribers = [];
-        foreach ($collection->getItems() as $subscriber) {
-            if ($subscriber instanceof Subscriber) {
-                $subscribers[] = $subscriber;
+        if (!str_starts_with($cursor, self::CUSTOMER_CURSOR)) {
+            $page = $this->audience->subscriberPage($websiteId, (int)$cursor, self::PAGE_SIZE);
+            if ($page) {
+                return [$page, (string)$page[count($page) - 1]['id']];
             }
+            $cursor = self::CUSTOMER_CURSOR . '0';
+        }
+        if ($mode !== SyncMode::MODE_LEGITIMATE_INTEREST) {
+            return [[], $cursor];
         }
 
-        return $subscribers;
+        $afterId = (int)substr($cursor, strlen(self::CUSTOMER_CURSOR));
+        $page = $this->audience->customerPage($websiteId, $afterId, self::PAGE_SIZE);
+
+        return [$page, $page ? self::CUSTOMER_CURSOR . $page[count($page) - 1]['id'] : $cursor];
     }
 
     /**
-     * @param Subscriber[] $subscribers
-     * @return array{int, int, int} processed, failed, new cursor
+     * @param list<array{id: int, email: string, store_id: int, customer_id: int, subscribed: bool}> $page
+     * @return array{int, int} processed, failed
      */
-    private function sendPage(array $subscribers): array
+    private function sendPage(array $page): array
     {
-        $customers = $this->loadCustomers($subscribers);
+        $customers = $this->loadCustomers($page);
 
         $byStore = [];
-        $cursor = 0;
-        foreach ($subscribers as $subscriber) {
-            $cursor = max($cursor, (int)$subscriber->getId());
-            $email = (string)$subscriber->getEmail();
-            if ($email === '') {
+        foreach ($page as $contact) {
+            if ($contact['email'] === '') {
                 continue;
             }
 
-            $byStore[(int)$subscriber->getStoreId()][] = $this->payloadBuilder->build(
-                $email,
-                (int)$subscriber->getStoreId(),
-                (int)$subscriber->getStatus() !== Subscriber::STATUS_SUBSCRIBED,
-                $customers[(int)$subscriber->getCustomerId()] ?? null
+            $byStore[$contact['store_id']][] = $this->payloadBuilder->build(
+                $contact['email'],
+                $contact['store_id'],
+                !$contact['subscribed'],
+                $customers[$contact['customer_id']] ?? null
             );
         }
 
@@ -173,20 +179,19 @@ class ContactsProcessor implements ProcessorInterface
             }
         }
 
-        return [$processed, $failed, $cursor];
+        return [$processed, $failed];
     }
 
     /**
-     * @param Subscriber[] $subscribers
+     * @param list<array{id: int, email: string, store_id: int, customer_id: int, subscribed: bool}> $page
      * @return array<int, CustomerInterface>
      */
-    private function loadCustomers(array $subscribers): array
+    private function loadCustomers(array $page): array
     {
         $customerIds = [];
-        foreach ($subscribers as $subscriber) {
-            $customerId = (int)$subscriber->getCustomerId();
-            if ($customerId > 0) {
-                $customerIds[] = $customerId;
+        foreach ($page as $contact) {
+            if ($contact['customer_id'] > 0) {
+                $customerIds[] = $contact['customer_id'];
             }
         }
         if (!$customerIds) {
@@ -203,30 +208,5 @@ class ContactsProcessor implements ProcessorInterface
         }
 
         return $customers;
-    }
-
-    /**
-     * @param int[] $storeIds
-     */
-    private function countSubscribers(array $storeIds): int
-    {
-        $collection = $this->subscriberCollectionFactory->create();
-        $collection->addFieldToFilter('store_id', ['in' => $storeIds]);
-
-        return $collection->getSize();
-    }
-
-    /**
-     * @return int[]
-     */
-    private function websiteStoreIds(int $websiteId): array
-    {
-        try {
-            $website = $this->storeManager->getWebsite($websiteId);
-        } catch (\Exception) {
-            return [];
-        }
-
-        return $website instanceof Website ? array_map('intval', $website->getStoreIds()) : [];
     }
 }

@@ -8,7 +8,6 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\ViewModel\Adminhtml;
 
-use Magento\Customer\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
@@ -19,9 +18,11 @@ use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Automation\Mapping;
 use Smaily\Connect\Model\Automation\Trigger;
+use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Source\MultilingualMode;
+use Smaily\Connect\Model\Config\Source\SyncMode;
 use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
@@ -35,7 +36,7 @@ use Smaily\Connect\Model\SmailyUrl;
  */
 class WizardData implements ArgumentInterface
 {
-    /** @var array{customers: int, orders: int, products: int}|null */
+    /** @var array{orders: int, products: int}|null */
     private ?array $storeTotals = null;
 
     public function __construct(
@@ -44,7 +45,7 @@ class WizardData implements ArgumentInterface
         private readonly EngineSettings $engineSettings,
         private readonly ScopeConfigInterface $scopeConfig,
         private readonly AccountResolver $accountResolver,
-        private readonly CustomerCollectionFactory $customerCollectionFactory,
+        private readonly ContactAudience $contactAudience,
         private readonly OrderCollectionFactory $orderCollectionFactory,
         private readonly ProductCollectionFactory $productCollectionFactory,
         private readonly Json $serializer,
@@ -213,15 +214,44 @@ class WizardData implements ArgumentInterface
     }
 
     /**
-     * Three collection counts, asked for twice per render (the template and
+     * The selected website's saved contact-sync mode — the one the contacts
+     * import reads when it runs.
+     */
+    public function getSyncMode(): string
+    {
+        return $this->mode->mode($this->websiteContext->getWebsiteId());
+    }
+
+    /**
+     * How many contacts the contacts import would send from the selected
+     * website under each contact-sync mode (PRO-3582) — the estimate follows
+     * the mode picked on the panel.
+     *
+     * @return array<string, int> mode => contacts
+     */
+    public function getContactImportCounts(): array
+    {
+        $counts = [];
+        foreach ([
+            SyncMode::MODE_CONSENT,
+            SyncMode::MODE_LEGITIMATE_INTEREST,
+            SyncMode::MODE_CHECKOUT_OPTIN,
+        ] as $mode) {
+            $counts[$mode] = $this->contactAudience->count($this->websiteContext->getWebsiteId(), $mode);
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Two collection counts, asked for twice per render (the template and
      * the boot JSON), so they are counted once per request.
      *
-     * @return array{customers: int, orders: int, products: int}
+     * @return array{orders: int, products: int}
      */
     public function getStoreTotals(): array
     {
         return $this->storeTotals ??= [
-            'customers' => $this->customerCollectionFactory->create()->getSize(),
             'orders' => $this->orderCollectionFactory->create()->getSize(),
             'products' => $this->productCollectionFactory->create()->getSize(),
         ];

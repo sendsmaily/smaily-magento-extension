@@ -5,7 +5,7 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-3591 — My Account > Personalization shows a preference only when the store knows it, otherwise an opt-out button. PRO-3579 — My Account > Personalization appears only where Campaign Intelligence is live, and a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-3579 — My Account > Personalization appears only where Campaign Intelligence is live, and a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-3579 — a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-1952 — a product with no real category is synced with `tags.category_defaulted: "true"`. Earlier the same day: PRO-3581 — uninstalling the module removes its settings, the Smaily password and the engine key included, and its flag rows, the profiling opt-out record included; disabling keeps everything. Earlier the same day: PRO-3584 — an over-long or malformed visitor token, context or session id is dropped on its own; the order keeps every other attribution signal. Earlier the same day: PRO-3580 — the welcome automation fires only for a subscription the shopper makes on the storefront, a resubscription included; not for one made in the admin, through the API or by an import. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out, and an opt-out made in Smaily reaches the engine. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
+_Last updated: 2026-10-02 (PRO-3582 — the contact import sends the audience of the website's contact-sync mode, each contact with its real subscription status, and the import estimate counts that audience. Earlier the same day: PRO-3591 — My Account > Personalization shows a preference only when the store knows it, otherwise an opt-out button. PRO-3579 — My Account > Personalization appears only where Campaign Intelligence is live, and a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-3579 — My Account > Personalization appears only where Campaign Intelligence is live, and a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-3579 — a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-1952 — a product with no real category is synced with `tags.category_defaulted: "true"`. Earlier the same day: PRO-3581 — uninstalling the module removes its settings, the Smaily password and the engine key included, and its flag rows, the profiling opt-out record included; disabling keeps everything. Earlier the same day: PRO-3584 — an over-long or malformed visitor token, context or session id is dropped on its own; the order keeps every other attribution signal. Earlier the same day: PRO-3580 — the welcome automation fires only for a subscription the shopper makes on the storefront, a resubscription included; not for one made in the admin, through the API or by an import. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out, and an opt-out made in Smaily reaches the engine. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
 and the Dashboard fill the content area on the pack's grey pane under a
 full-width white tab strip, in Magento's Open Sans, with 33 px buttons and
 our own text, link and status colours. Earlier the same day: PRO-3572 — a
@@ -252,6 +252,33 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   `SchemaInstaller`). Not run: `module:uninstall` on the sandbox (sandbox
   reserved) — the hook wiring is read from Magento's
   `ModuleUninstallCommand`/`ModuleUninstaller`/`UninstallCollector` source.
+
+- **PRO-3582 done — the contact import follows the contact-sync mode
+  (2026-10-02, parity audit R7).** Owner decision (2026-10-02): the import
+  sends exactly the audience the live sync would send under the website's
+  mode, as WooCommerce does; a non-subscriber goes with their real
+  subscription status. New `Model\Backfill\ContactAudience` (plain SQL on
+  `newsletter_subscriber` and `customer_entity`): consent = the website's
+  subscribers with status subscribed or unsubscribed (the two
+  `SubscriberSaveAfter` sends; a pending or unconfirmed signup is no longer
+  imported as unsubscribed); legitimate interest = those, then every other
+  customer of the website, matched out by customer id or by address for a
+  never-linked guest subscription, sent as unsubscribed (a customer without
+  a store of the website goes through its default store); checkout opt-in
+  only = nobody, the job ends at 0 like the switched-off case.
+  `ContactsProcessor` walks subscribers, then (legitimate interest only)
+  customers with the cursor `customer:{id}`; a cursor from a running job
+  stays valid. `count()` reads the same queries, so the estimate equals the
+  walk. The estimate's first count is now "N contacts to import" for the
+  saved mode, swapped live when another mode is picked; orders and products
+  stay. New phrases "%1 contact to import" / "%1 contacts to import" (ET
+  "%1 kontakt importimiseks" / "%1 kontakti importimiseks") replace the
+  unused "%1 customer(s)". Three orphaned collection-factory test stubs
+  removed. New `Test\Integration\Backfill\ContactAudienceTest` (real
+  SQL, each mode) and `ContactsProcessorTest` / `WizardDataTest` cases.
+  Not covered: guest-order emails under "Include guest order emails" are
+  synced live but not imported (WooCommerce does not import them either).
+  USER_GUIDE and CHANGELOG say so; see Questions item 9.
 
 - **PRO-3584 done — one bad attribution cookie no longer costs the order
   the other signals (2026-10-02).** Confirmed first with the new
@@ -3484,3 +3511,15 @@ PRO-1267 (engine: Magento product-identity contract note).
    on a headless storefront (PWA Studio and similar) goes through GraphQL,
    which the rule counts as "the API", so no welcome. No supported theme is
    headless today. Say if a headless store must count as the storefront.
+9. PRO-3582 — the contact import under "All customers" (Medium urgency;
+   reversible until a store runs the import). Following the decision, a
+   customer who is not a newsletter subscriber is imported as
+   unsubscribed (`is_unsubscribed=1`). Smaily takes the store's status, so
+   a contact Smaily already holds as subscribed — for example from a Smaily
+   signup form — is set to unsubscribed by the import, and the merchant
+   cannot email the non-subscribers this mode exists for. The live sync
+   under this mode omits `is_unsubscribed` instead (Smaily manages
+   suppression), as WooCommerce's import does. Confirm the import should
+   send unsubscribed, or say to omit the status for non-subscribers (then
+   a brand-new contact may be created subscribed — unverified, WooCommerce
+   PRO-3407).

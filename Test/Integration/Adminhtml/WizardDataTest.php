@@ -9,7 +9,6 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Integration\Adminhtml;
 
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
-use Magento\Customer\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Serialize\Serializer\Json;
@@ -17,6 +16,7 @@ use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollection
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
+use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\ContactSync\Mode;
@@ -45,7 +45,6 @@ class WizardDataTest extends IntegrationTestCase
     {
         parent::setUp();
 
-        require_once __DIR__ . '/../Support/Stub/CustomerCollectionFactory.php';
         require_once __DIR__ . '/../Support/Stub/ProductCollectionFactory.php';
 
         $defaultStore = $this->createMock(StoreInterface::class);
@@ -61,7 +60,7 @@ class WizardDataTest extends IntegrationTestCase
             $this->createMock(EngineSettings::class),
             $this->objectManager->get(ScopeConfigInterface::class),
             $this->createMock(AccountResolver::class),
-            $this->createMock(CustomerCollectionFactory::class),
+            $this->createMock(ContactAudience::class),
             $this->createMock(OrderCollectionFactory::class),
             $this->createMock(ProductCollectionFactory::class),
             $this->objectManager->get(Json::class),

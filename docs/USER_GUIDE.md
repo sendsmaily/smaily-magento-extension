@@ -222,7 +222,7 @@ if Smaily is briefly unreachable — deliveries retry with backoff).
 | Mode | Who is synced | Smaily unsubscribes mirror back? |
 |---|---|---|
 | **Subscribers only (consent)** — default | Only opted-in newsletter subscribers | **Yes** — a contact who unsubscribes in Smaily is unsubscribed in Magento too (and vice versa) |
-| All customers (legitimate interest) | Every registered customer; `is_unsubscribed` is omitted so Smaily manages suppression | No |
+| All customers (legitimate interest) | Every registered customer; `is_unsubscribed` is omitted so Smaily manages suppression (the [historical import](#historical-import-backfill) sends each customer's status) | No |
 | Checkout opt-in only | Nobody automatically — only shoppers who tick the checkout newsletter checkbox | No |
 
 Additional options:
@@ -457,8 +457,24 @@ Historical imports live on the **Settings** page (or the CLI) and run in
 the background, a chunk per cron minute, without ever blocking live
 traffic:
 
-- **Contacts → Smaily** — Settings > **Contacts** tab (per website;
-  both subscribed and unsubscribed, so suppression state is correct).
+- **Contacts → Smaily** — Settings > **Contacts** tab (per website).
+  The import sends the contacts the website's
+  [contact sync mode](#contact-sync-mode-lawful-basis) covers:
+  - **Subscribers only** — the newsletter subscribers, subscribed and
+    unsubscribed.
+  - **All customers** — those subscribers, then every other registered
+    customer of the website.
+  - **Checkout opt-in only** — nobody: a contact reaches Smaily only when
+    a shopper ticks the checkout checkbox, so the import finishes at 0.
+
+  Every contact goes with its subscription status in the store: someone
+  subscribed to the newsletter as subscribed, everyone else as
+  unsubscribed. Nobody becomes subscribed by being imported, and a contact
+  Smaily already has takes the store's status. A signup still waiting for its confirmation email counts
+  as not subscribed (under subscribers only it is not imported at all); it
+  syncs as subscribed once it is confirmed. Guest-order emails are not
+  imported. The estimate above the **Start import** button counts these
+  contacts for the mode picked on the panel.
   The import obeys that website's **Sync contacts to Smaily**
   switch exactly like the live syncs do: with the switch off the import
   button is disabled and says so, and an import started any other way

@@ -121,6 +121,40 @@ class SchemaInstaller
     }
 
     /**
+     * Minimal mirrors of the core customer_entity and newsletter_subscriber
+     * tables — only the columns the contact import's audience reads.
+     */
+    public function createContactTables(): void
+    {
+        $this->dropContactTables();
+        $this->connection->query(
+            'CREATE TABLE `customer_entity` ('
+            . ' `entity_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,'
+            . ' `website_id` SMALLINT UNSIGNED NULL,'
+            . ' `email` VARCHAR(255) NULL,'
+            . ' `store_id` SMALLINT UNSIGNED NULL DEFAULT 0,'
+            . ' PRIMARY KEY (`entity_id`)'
+            . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+        );
+        $this->connection->query(
+            'CREATE TABLE `newsletter_subscriber` ('
+            . ' `subscriber_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,'
+            . ' `store_id` SMALLINT UNSIGNED NULL DEFAULT 0,'
+            . ' `customer_id` INT UNSIGNED NOT NULL DEFAULT 0,'
+            . ' `subscriber_email` VARCHAR(150) NULL,'
+            . ' `subscriber_status` INT NOT NULL DEFAULT 0,'
+            . ' PRIMARY KEY (`subscriber_id`)'
+            . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+        );
+    }
+
+    public function dropContactTables(): void
+    {
+        $this->connection->query('DROP TABLE IF EXISTS `customer_entity`');
+        $this->connection->query('DROP TABLE IF EXISTS `newsletter_subscriber`');
+    }
+
+    /**
      * Render one declarative <table> node as CREATE TABLE DDL.
      */
     private function tableDdl(\SimpleXMLElement $table): string

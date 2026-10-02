@@ -10,8 +10,6 @@ namespace Smaily\Connect\Test\Unit\ViewModel\Adminhtml;
 
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
-use Magento\Customer\Model\ResourceModel\Customer\Collection as CustomerCollection;
-use Magento\Customer\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Sales\Model\ResourceModel\Order\Collection as OrderCollection;
@@ -20,8 +18,10 @@ use Magento\Store\Model\ScopeInterface;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
+use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Config\Source\SyncMode;
 use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
@@ -55,11 +55,13 @@ class WizardDataTest extends TestCase
     /** @var VerifiedCredentials&\PHPUnit\Framework\MockObject\MockObject */
     private $verifiedCredentials;
 
+    /** @var ContactAudience&\PHPUnit\Framework\MockObject\MockObject */
+    private $contactAudience;
+
     private WizardData $viewModel;
 
     protected function setUp(): void
     {
-        require_once __DIR__ . '/../../Support/Stub/CustomerCollectionFactory.php';
         require_once __DIR__ . '/../../Support/Stub/ProductCollectionFactory.php';
 
         $this->config = $this->createMock(Config::class);
@@ -72,10 +74,7 @@ class WizardDataTest extends TestCase
         $this->websiteContext->method('getStoreId')->willReturn(5);
         $this->verifiedCredentials = $this->createMock(VerifiedCredentials::class);
 
-        $customerCollection = $this->createMock(CustomerCollection::class);
-        $customerCollection->method('getSize')->willReturn(0);
-        $customerCollectionFactory = $this->createMock(CustomerCollectionFactory::class);
-        $customerCollectionFactory->method('create')->willReturn($customerCollection);
+        $this->contactAudience = $this->createMock(ContactAudience::class);
 
         $orderCollection = $this->createMock(OrderCollection::class);
         $orderCollection->method('getSize')->willReturn(0);
@@ -93,7 +92,7 @@ class WizardDataTest extends TestCase
             $this->createMock(EngineSettings::class),
             $this->scopeConfig,
             $this->accountResolver,
-            $customerCollectionFactory,
+            $this->contactAudience,
             $orderCollectionFactory,
             $productCollectionFactory,
             new Json(),
@@ -217,5 +216,34 @@ class WizardDataTest extends TestCase
         $this->config->expects(self::once())->method('isSyncEnabled')->with(2)->willReturn(false);
 
         self::assertFalse($this->viewModel->isSyncEnabled());
+    }
+
+    /**
+     * PRO-3582: the import estimate counts the audience the import sends,
+     * for every mode the panel offers, on the selected website.
+     */
+    public function testContactImportCountsFollowEachModesAudienceOnTheSelectedWebsite(): void
+    {
+        $this->contactAudience->method('count')->willReturnMap([
+            [2, SyncMode::MODE_CONSENT, 5],
+            [2, SyncMode::MODE_LEGITIMATE_INTEREST, 7],
+            [2, SyncMode::MODE_CHECKOUT_OPTIN, 0],
+        ]);
+
+        self::assertSame(
+            [
+                SyncMode::MODE_CONSENT => 5,
+                SyncMode::MODE_LEGITIMATE_INTEREST => 7,
+                SyncMode::MODE_CHECKOUT_OPTIN => 0,
+            ],
+            $this->viewModel->getContactImportCounts()
+        );
+    }
+
+    public function testGetSyncModeReadsAtTheSelectedWebsiteScope(): void
+    {
+        $this->mode->expects(self::once())->method('mode')->with(2)->willReturn(SyncMode::MODE_LEGITIMATE_INTEREST);
+
+        self::assertSame(SyncMode::MODE_LEGITIMATE_INTEREST, $this->viewModel->getSyncMode());
     }
 }

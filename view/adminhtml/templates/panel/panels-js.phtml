@@ -487,6 +487,12 @@ window.smailyPanelsInit = function ($) {
         $(document).on('change', 'input[name=smaily-w-mode]', function () {
             $('input[name=smaily-w-mode]').closest('.smaily-choice').removeClass('is-selected');
             $(this).closest('.smaily-choice').addClass('is-selected');
+            // The import estimate counts this mode's audience (PRO-3582).
+            var $estimate = $('#smaily-w-backfill-estimate');
+            var estimate = $estimate.attr('data-estimate-' + $(this).val());
+            if (estimate) {
+                $estimate.text(estimate);
+            }
         });
         $('input[name=smaily-w-mode]:checked').trigger('change');
 

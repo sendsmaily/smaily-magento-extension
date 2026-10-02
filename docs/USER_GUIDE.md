@@ -553,6 +553,11 @@ panel — you do not have to keep the page open:
   A delivery that waits while the shopper changes their mind is not sent —
   only the newest choice reaches the engine. When a shopper who opted out
   logs in, their earlier anonymous browsing is not linked to their account.
+- **Unsubscribing from marketing also stops profiling.** When Campaign
+  Intelligence is connected, a newsletter unsubscribe — in the store, or in
+  Smaily and mirrored back — also opts the shopper out of personalized
+  recommendations. Subscribing again does not turn profiling back on; the
+  shopper does that under **My Account > Personalization**.
 - **Data subject requests**:
   `bin/magento smaily:gdpr export <email>` (Art. 15) and
   `bin/magento smaily:gdpr erase <email> --force` (Art. 17, idempotent).

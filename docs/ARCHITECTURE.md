@@ -453,7 +453,15 @@ events still flow with `session_id` + `event_id` but the
 ### Profiling consent
 
 Opt-out model, default on: a shopper is profiled unless they said no.
-`Model\Privacy\ProfilingConsent` owns the answer.
+`Model\Privacy\ProfilingConsent` owns the answer. Leaving marketing also
+stops profiling (Erkki 2026-10-02, as in the WooCommerce plugin): a contact
+Smaily reads back with `is_unsubscribed = 1` is not profiled, and
+`Observer\Engine\SubscriberUnsubscribed` turns a newsletter unsubscribe into
+an opt-out (`optOutOnUnsubscribe()`: the store's record at that moment plus
+an engine row, nothing written to the contact's profiling field). That
+observer is deliberately outside the `ReconcileGuard`, so an unsubscribe
+Smaily's consent mirror writes counts too. A resubscribe does not turn
+profiling back on.
 
 - **A choice** (My Account > Personalization, `setAllowed()`) goes three
   ways: to the Smaily contact (`smaily_rec_profiling` 0/1 +

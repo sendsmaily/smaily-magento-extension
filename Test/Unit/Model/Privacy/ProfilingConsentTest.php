@@ -39,17 +39,16 @@ class ProfilingConsentTest extends TestCase
     /** @var array<string, string> */
     private array $cache = [];
 
+    /** @var array<string, string> what Smaily answers for the contact */
+    private array $contact = [];
+
     private SmailyClient&MockObject $smailyClient;
     private Settings&MockObject $engineSettings;
 
     protected function setUp(): void
     {
-        $this->enqueued = [];
-        $this->records = [];
-        $this->smailyWrites = [];
-        $this->cache = [];
-
         $this->smailyClient = $this->createMock(SmailyClient::class);
+        $this->smailyClient->method('get')->willReturnCallback(fn (): array => $this->contact);
         $this->smailyClient->method('post')->willReturnCallback(
             function (string $endpoint, array $body): array {
                 $this->smailyWrites[] = $body;
@@ -124,6 +123,34 @@ class ProfilingConsentTest extends TestCase
 
         self::assertSame([], $this->enqueued);
         self::assertSame(['person@example.com' => self::NOW], $this->records, 'The choice is kept all the same');
+    }
+
+    public function testAContactWhoUnsubscribedInSmailyIsNotProfiled(): void
+    {
+        $this->contact = ['email' => 'person@example.com', 'is_unsubscribed' => '1', 'smaily_rec_profiling' => '1'];
+
+        self::assertFalse($this->consent()->isAllowed('person@example.com', 1));
+    }
+
+    public function testASubscribedContactWithoutAPreferenceIsProfiled(): void
+    {
+        $this->contact = ['email' => 'person@example.com', 'is_unsubscribed' => '0'];
+
+        self::assertTrue($this->consent()->isAllowed('person@example.com', 1));
+    }
+
+    public function testAnUnsubscribeInTheStoreStopsProfiling(): void
+    {
+        $consent = $this->consent();
+        $consent->optOutOnUnsubscribe('Person@Example.com');
+
+        self::assertSame(['person@example.com' => self::NOW], $this->records);
+        self::assertSame(
+            ['email' => 'person@example.com', 'opt_out' => true, 'opted_out_at' => self::NOW_Z],
+            $this->enqueued[0]['payload']
+        );
+        self::assertFalse($consent->isAllowed('person@example.com', 1));
+        self::assertSame([], $this->smailyWrites, 'The unsubscribe itself tells Smaily; no profiling field is written');
     }
 
     private function consent(): ProfilingConsent

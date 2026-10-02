@@ -19,9 +19,9 @@ use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 
 /**
- * Shopper profiling consent (opt-out model, default on) — a separate lawful
- * axis from marketing consent (a marketing unsubscribe is not an Art. 21
- * profiling objection).
+ * Shopper profiling consent (opt-out model, default on). Profile unless the
+ * shopper opted out of profiling OR unsubscribed from marketing: leaving
+ * marketing also stops profiling (PRO-3578, Woo F3-31; Erkki 2026-10-02).
  *
  * A choice goes to the Smaily contact (smaily_rec_profiling 0/1 +
  * smaily_rec_profiling_ts), into the store's own durable record
@@ -66,8 +66,10 @@ class ProfilingConsent
         try {
             $contact = $this->smailyClientProvider->forStore($storeId)
                 ->get(SmailyClient::ENDPOINT_CONTACT, ['email' => $email]);
-            $value = $contact['smaily_rec_profiling'] ?? ($contact[0]['smaily_rec_profiling'] ?? null);
-            if ($value !== null && (string)$value === '0') {
+            $fields = isset($contact[0]) && is_array($contact[0]) ? $contact[0] : $contact;
+            if ((string)($fields['is_unsubscribed'] ?? '') === '1'
+                || (string)($fields['smaily_rec_profiling'] ?? '') === '0'
+            ) {
                 $allowed = false;
             }
         } catch (\Smaily\Connect\Model\Client\Exception\ApiException $exception) {
@@ -119,6 +121,25 @@ class ProfilingConsent
         $this->queueForEngine($email, !$allowed, $timestamp);
 
         $this->cache->save($allowed ? '1' : '0', self::CACHE_PREFIX . sha1($email), [], self::CACHE_TTL_SECONDS);
+    }
+
+    /**
+     * The shopper unsubscribed from marketing, which also stops profiling:
+     * kept as the store's opt-out at this moment, so an older opt-in on the
+     * contact cannot lift it, and queued for the engine. Nothing is written
+     * to the Smaily contact — the unsubscribe itself reaches Smaily.
+     */
+    public function optOutOnUnsubscribe(string $email): void
+    {
+        $email = strtolower(trim($email));
+        if ($email === '') {
+            return;
+        }
+
+        $moment = $this->dateTime->gmtTimestamp();
+        $this->optOuts->record($email, $moment);
+        $this->queueForEngine($email, true, gmdate('Y-m-d\TH:i:s\Z', $moment));
+        $this->cache->save('0', self::CACHE_PREFIX . sha1($email), [], self::CACHE_TTL_SECONDS);
     }
 
     /**

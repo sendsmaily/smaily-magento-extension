@@ -35,4 +35,7 @@
     <event name="customer_login">
         <observer name="smaily_connect_engine_identity_merge" instance="Smaily\Connect\Observer\Engine\CustomerLogin"/>
     </event>
+    <event name="newsletter_subscriber_save_after">
+        <observer name="smaily_connect_engine_unsubscribe" instance="Smaily\Connect\Observer\Engine\SubscriberUnsubscribed"/>
+    </event>
 </config>

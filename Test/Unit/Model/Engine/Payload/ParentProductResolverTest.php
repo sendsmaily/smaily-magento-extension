@@ -24,6 +24,9 @@ class ParentProductResolverTest extends TestCase
     /** @var int how many times the super-link lookup ran */
     private int $lookups = 0;
 
+    /** @var array<int, mixed> the product id of each category-product query */
+    private array $categoryLookups = [];
+
     public function testConfigurableChildResolvesToItsParentEntityId(): void
     {
         $resolver = $this->createResolver('42');
@@ -78,16 +81,51 @@ class ParentProductResolverTest extends TestCase
     }
 
     /**
-     * @param string|false $fetchOneResult parent entity id or false (no row)
+     * PRO-3714: a variant reads its parent's category ids with one query per
+     * parent, shared by its siblings.
      */
-    private function createResolver(string|false $fetchOneResult): ParentProductResolver
+    public function testAVariantReadsItsParentsCategoryIdsOncePerParent(): void
+    {
+        $resolver = $this->createResolver('42', ['5', '9']);
+
+        self::assertSame([5, 9], $resolver->parentCategoryIds(7));
+        self::assertSame([5, 9], $resolver->parentCategoryIds(8));
+        self::assertSame([42], $this->categoryLookups, 'One category query for the shared parent');
+    }
+
+    /**
+     * PRO-3714: a product that is not a variant has no parent categories and
+     * runs no category query.
+     */
+    public function testAProductThatIsNotAVariantHasNoParentCategories(): void
+    {
+        $resolver = $this->createResolver(false, ['5']);
+
+        self::assertSame([], $resolver->parentCategoryIds(9));
+        self::assertSame([], $this->categoryLookups);
+    }
+
+    /**
+     * @param string|false $fetchOneResult parent entity id or false (no row)
+     * @param string[] $categoryIds what the category-product query answers
+     */
+    private function createResolver(string|false $fetchOneResult, array $categoryIds = []): ParentProductResolver
     {
         $this->lookups = 0;
+        $this->categoryLookups = [];
+        $whereProductId = null;
 
         $select = $this->createMock(Select::class);
-        foreach (['from', 'join', 'where', 'order', 'limit'] as $method) {
+        foreach (['from', 'join', 'order', 'limit'] as $method) {
             $select->method($method)->willReturnSelf();
         }
+        $select->method('where')->willReturnCallback(
+            function (string $condition, $value = null) use ($select, &$whereProductId) {
+                $whereProductId = $value;
+
+                return $select;
+            }
+        );
 
         $this->connection = $this->createMock(AdapterInterface::class);
         $this->connection->method('select')->willReturn($select);
@@ -96,6 +134,13 @@ class ParentProductResolverTest extends TestCase
                 $this->lookups++;
 
                 return $fetchOneResult;
+            }
+        );
+        $this->connection->method('fetchCol')->willReturnCallback(
+            function () use ($categoryIds, &$whereProductId) {
+                $this->categoryLookups[] = $whereProductId;
+
+                return $categoryIds;
             }
         );
 

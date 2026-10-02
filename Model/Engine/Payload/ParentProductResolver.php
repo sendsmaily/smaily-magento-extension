@@ -30,6 +30,7 @@ class ParentProductResolver
 {
     private const SUPER_LINK_TABLE = 'catalog_product_super_link';
     private const PRODUCT_ENTITY_TABLE = 'catalog_product_entity';
+    private const CATEGORY_PRODUCT_TABLE = 'catalog_category_product';
 
     /**
      * Per-request memo: entity id -> emitted tags.product_id string.
@@ -37,6 +38,13 @@ class ParentProductResolver
      * @var array<int, string>
      */
     private array $resolved = [];
+
+    /**
+     * Per-request memo: parent entity id -> its category ids.
+     *
+     * @var array<int, int[]>
+     */
+    private array $parentCategoryIds = [];
 
     public function __construct(
         private readonly ResourceConnection $resourceConnection,
@@ -65,6 +73,40 @@ class ParentProductResolver
     public function isConfigurableChild(int $entityId): bool
     {
         return $entityId > 0 && $this->productIdOf($entityId) !== (string)$entityId;
+    }
+
+    /**
+     * The category ids of a configurable child's parent product, or [] when
+     * the product is not a configurable child (PRO-3714: a variant without
+     * categories of its own is sent with its parent's category).
+     *
+     * One query on the category-product link table — the same rows
+     * `Product::getCategoryIds()` reads — instead of loading the parent
+     * product, memoized per parent so all siblings in a backfill page share
+     * it. A failed lookup reads as no categories, never blocks a payload.
+     *
+     * @return int[]
+     */
+    public function parentCategoryIds(int $childId): array
+    {
+        if (!$this->isConfigurableChild($childId)) {
+            return [];
+        }
+        $parentId = (int)$this->productIdOf($childId);
+
+        if (!array_key_exists($parentId, $this->parentCategoryIds)) {
+            try {
+                $connection = $this->resourceConnection->getConnection();
+                $select = $connection->select()
+                    ->from($this->resourceConnection->getTableName(self::CATEGORY_PRODUCT_TABLE), ['category_id'])
+                    ->where('product_id = ?', $parentId);
+                $this->parentCategoryIds[$parentId] = array_map('intval', $connection->fetchCol($select));
+            } catch (\Throwable) {
+                $this->parentCategoryIds[$parentId] = [];
+            }
+        }
+
+        return $this->parentCategoryIds[$parentId];
     }
 
     /**

@@ -5,7 +5,9 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 — 3.0.0-rc3 is released as a GitHub pre-release on
+_Last updated: 2026-10-03 — after the rc3 cut: PRO-3714 (a variant
+without a category of its own takes its parent's), listed in CHANGELOG
+under "Changes since 3.0.0-rc3". 2026-10-02: 3.0.0-rc3 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc3),
 built by the release workflow from commit a1ff618; the ZIP and its .sha256
 were checked after publishing (375 entries, checksum OK, sha256
@@ -30,6 +32,22 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3714 — a variant without categories of its own is sent with its
+  visible parent's category (2026-10-03; found by a read-only review).**
+  `CatalogPayloadBuilder` read only the child's own `getCategoryIds()`, and
+  a typical configurable child has none, so it went as `uncategorized` +
+  `tags.category_defaulted: "true"`. Now, when the variant's own ids give
+  no real category, the builder runs the same `categoryPath()` on the
+  parent's category ids: `ParentProductResolver::parentCategoryIds()` — the
+  parent `productIdOf()` resolves (lowest id when several), one
+  `catalog_category_product` query per parent (the rows
+  `Product::getCategoryIds()` reads), memoized, [] for a non-variant with
+  no query. `category_defaulted` is set only when neither has a category.
+  A variant with its own categories and a non-variant are unchanged. Wire
+  shape unchanged (values only). Unit tests: parent's category used, own
+  category kept, both empty → defaulted; resolver: one query per shared
+  parent, none for a non-variant. Not run in the sandbox.
 
 - **PRO-3711 — a busy store keeps sending abandoned-cart reminders
   (2026-10-02; found by reading the code).** `Cron\AbandonedCart` loaded the

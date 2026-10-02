@@ -4,6 +4,10 @@
 
 The package version is currently `3.0.0-rc3` — the third release-candidate cut of everything below. Release candidates are GitHub pre-releases for pilot stores; composer still resolves 2.8.1 as the newest stable release.
 
+**Changes since 3.0.0-rc3**
+
+- Campaign Intelligence gets a category for every variant: a variant of a configurable product that has no category of its own is sent with its parent product's category. Before, such a variant was sent as uncategorized. A variant with a category of its own keeps it.
+
 **Changes since 3.0.0-rc2**
 
 - Abandoned-cart reminders reach a guest who leaves Magento's checkout on the shipping step: Magento keeps a guest's email in the browser until the payment step, so such a cart had no email and was never reminded. While the abandoned-cart automation is on, the guest's email is now saved to the cart as soon as the checkout's email field holds a valid address (Luma-based themes and Hyvä's Luma-based checkout). One IP address (an IPv6 address with the rest of its /64) can save an email at most 30 times in 10 minutes, one cart takes at most five addresses, and the whole installation saves at most 2,000 an hour; behind a reverse proxy, Magento has to be set up to see the shopper's own IP address, as the user guide describes. While the automation is off, the checkout sends nothing. Who receives a reminder is unchanged: only a contact Smaily already has that has not unsubscribed.

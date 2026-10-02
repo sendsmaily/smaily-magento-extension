@@ -91,7 +91,10 @@ class CatalogPayloadBuilder
         $scopeStoreId = $this->storeIdForProduct($product);
         $priceProduct = $this->scopedTo($product, $scopeStoreId);
         $languageValues = $this->languageValues($product, $priceProduct, $scopeStoreId);
-        $categoryPath = $this->categoryPath($product);
+        // A variant without a category of its own takes its configurable
+        // parent's (PRO-3714); only when neither has one is it defaulted.
+        $categoryPath = $this->categoryPath((array)$product->getCategoryIds())
+            ?? $this->categoryPath($this->parentProductResolver->parentCategoryIds((int)$product->getId()));
 
         $item = [
             'sku' => $this->sku($product),
@@ -419,19 +422,20 @@ class CatalogPayloadBuilder
     }
 
     /**
-     * The slug path of the product's deepest category.
+     * The slug path of the deepest of the given categories (a product's
+     * category ids).
      *
-     * Null when the product has no real category: none assigned, none
-     * loadable, or only the root.
+     * Null when there is no real category: none given, none loadable, or
+     * only the root.
      *
-     * @param Product $product
+     * @param array<int|string> $categoryIds
      * @return string|null
      */
-    private function categoryPath(Product $product): ?string
+    private function categoryPath(array $categoryIds): ?string
     {
         $deepest = null;
         $deepestLevel = -1;
-        foreach (array_map('intval', (array)$product->getCategoryIds()) as $categoryId) {
+        foreach (array_map('intval', $categoryIds) as $categoryId) {
             try {
                 $category = $this->categoryRepository->get($categoryId);
             } catch (NoSuchEntityException) {

@@ -436,6 +436,58 @@ class CatalogPayloadBuilderTest extends TestCase
         self::assertSame('true', $item['tags']['category_defaulted']);
     }
 
+    /**
+     * PRO-3714: a variant (configurable child) without a category of its own
+     * is sent with its parent's category, and so is not marked defaulted.
+     */
+    public function testVariantWithoutACategoryOfItsOwnIsSentWithItsParentsCategory(): void
+    {
+        $item = $this->createBuilder('17', null, null, null, null, $this->shirtCategories(), '', null, [5])
+            ->build($this->product(42, 'SHIRT-S'));
+
+        self::assertSame('shirts', $item['category_path']);
+        self::assertSame('shirts', $item['tags']['category_path']);
+        self::assertArrayNotHasKey('category_defaulted', $item['tags']);
+    }
+
+    /**
+     * PRO-3714: a variant with a category of its own keeps it.
+     */
+    public function testVariantWithACategoryOfItsOwnKeepsIt(): void
+    {
+        $item = $this->createBuilder('17', null, null, null, null, $this->shirtCategories(), '', null, [5])
+            ->build($this->product(42, 'SHIRT-S', 19.99, [], 'https://shop.example/shirt', [6]));
+
+        self::assertSame('shirts/linen', $item['category_path']);
+        self::assertArrayNotHasKey('category_defaulted', $item['tags']);
+    }
+
+    /**
+     * PRO-3714: only a variant whose parent has no category either is sent
+     * with the placeholder and marked defaulted.
+     */
+    public function testVariantWhoseParentHasNoCategoryEitherIsMarkedCategoryDefaulted(): void
+    {
+        $item = $this->createBuilder('17', null, null, null, null, $this->shirtCategories())
+            ->build($this->product(42, 'SHIRT-S'));
+
+        self::assertSame('uncategorized', $item['category_path']);
+        self::assertSame('true', $item['tags']['category_defaulted']);
+    }
+
+    private function shirtCategories(): CategoryRepositoryInterface&MockObject
+    {
+        $categories = [
+            2 => $this->category(1, '1/2', 'default-category'),
+            5 => $this->category(2, '1/2/5', 'shirts'),
+            6 => $this->category(3, '1/2/5/6', 'linen'),
+        ];
+        $categoryRepository = $this->createMock(CategoryRepositoryInterface::class);
+        $categoryRepository->method('get')->willReturnCallback(static fn (int $id) => $categories[$id]);
+
+        return $categoryRepository;
+    }
+
     private function category(int $level, string $path, string $urlKey): Category&MockObject
     {
         $category = $this->createMock(Category::class);
@@ -464,6 +516,9 @@ class CatalogPayloadBuilderTest extends TestCase
         return $storeManager;
     }
 
+    /**
+     * @param int[] $parentCategoryIds what the resolver answers for the parent's category ids
+     */
     private function createBuilder(
         string $resolvedProductId,
         ?Emulation $emulation = null,
@@ -472,10 +527,12 @@ class CatalogPayloadBuilderTest extends TestCase
         ?ProductRepositoryInterface $productRepository = null,
         ?CategoryRepositoryInterface $categoryRepository = null,
         string $storefrontUrl = '',
-        ?ImageHelperFactory $imageHelperFactory = null
+        ?ImageHelperFactory $imageHelperFactory = null,
+        array $parentCategoryIds = []
     ): CatalogPayloadBuilder {
         $parentResolver = $this->createMock(ParentProductResolver::class);
         $parentResolver->method('productIdOf')->with(42)->willReturn($resolvedProductId);
+        $parentResolver->method('parentCategoryIds')->with(42)->willReturn($parentCategoryIds);
 
         if ($storeManager === null) {
             $storeManager = $this->createMock(StoreManagerInterface::class);

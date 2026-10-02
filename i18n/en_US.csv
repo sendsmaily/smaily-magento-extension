@@ -397,7 +397,7 @@
 "Subdomain","Subdomain"
 "Subdomain and username are required.","Subdomain and username are required."
 "Subscribe to our newsletter","Subscribe to our newsletter"
-"Subscriber sync frequency is no longer configurable: v3 runs a daily full sync plus a 15-minute consent reconcile.","Subscriber sync frequency is no longer configurable: v3 runs a daily full sync plus a 15-minute consent reconcile."
+"Subscriber sync frequency is no longer configurable: v3 syncs in near-real-time (observers + durable queue) with a 15-minute Smaily→Magento consent reconcile.","Subscriber sync frequency is no longer configurable: v3 syncs in near-real-time (observers + durable queue) with a 15-minute Smaily→Magento consent reconcile."
 "Subscriber Synchronization","Subscriber Synchronization"
 "Subscribers only (consent)","Subscribers only (consent)"
 "Subscription type","Subscription type"

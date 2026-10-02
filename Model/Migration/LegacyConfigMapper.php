@@ -17,7 +17,7 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * testable without a database.
  *
  * Notes on deliberate drops (surfaced as notices):
- * - sync frequency: v3 uses a fixed daily full sync + 15-min reconcile.
+ * - sync frequency: v3 syncs as changes happen + a 15-min consent reconcile.
  * - captcha settings: v3 relies on Magento's native reCAPTCHA module.
  * - lastSyncedAt: the v3 reconcile cursor is sequence-based.
  *
@@ -119,8 +119,8 @@ class LegacyConfigMapper
         }
         if (isset($legacy['sync/frequency'])) {
             $notices[] = (string)__(
-                'Subscriber sync frequency is no longer configurable: '
-                . 'v3 runs a daily full sync plus a 15-minute consent reconcile.'
+                'Subscriber sync frequency is no longer configurable: v3 syncs in near-real-time '
+                . '(observers + durable queue) with a 15-minute Smaily→Magento consent reconcile.'
             );
         }
 

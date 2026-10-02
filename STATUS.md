@@ -27,6 +27,13 @@ OK). Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3694 — the 2.x sync-frequency upgrade notice says what 3.0 does
+  (2026-10-02).** `LegacyConfigMapper`'s notice no longer promises "a daily
+  full sync" (3.0 has none); it now reads, in UPGRADING's words, "v3 syncs
+  in near-real-time (observers + durable queue) with a 15-minute
+  Smaily→Magento consent reconcile" (EN + ET; the old rows are replaced).
+  `MigrateLegacyConfigTest` pins the full EN and ET texts.
+
 - **PRO-3683 — per-language accounts follow a store view's language change
   (2026-10-02).** A mode-A Connection save (`WizardStepSaver::saveConnect`,
   posted mode `a` with `accounts`) walks every store view of the website
@@ -84,9 +91,8 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   "Smaily Connect upgrade" (`MigrateLegacyConfig`) go through `__()`, as the
   PRO-3681 notice does; EN + ET rows in `i18n/`. New integration test
   `MigrateLegacyConfigTest::testTheDeliberateDropNoticesAreInEstonianInAnEstonianAdmin`.
-  Texts unchanged — the frequency notice still says "a daily full sync",
-  which UPGRADING and the CHANGELOG ("near-real-time") contradict; raised
-  for a follow-up.
+  Texts unchanged then; the frequency notice's "a daily full sync" is
+  corrected by PRO-3694 (above).
 
 - **PRO-3680 — two docs name only today's code and releases (2026-10-02,
   docs only).** ADMIN_UI_TARGET_SPEC §4.2: the sources paragraph names

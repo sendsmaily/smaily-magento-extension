@@ -176,7 +176,11 @@ class MigrateLegacyConfigTest extends IntegrationTestCase
 
         $notices = $this->env->getNotifier()->getNotifications();
         $descriptions = implode(' | ', array_column($notices, 'description'));
-        self::assertStringContainsString('sync frequency is no longer configurable', $descriptions);
+        self::assertStringContainsString(
+            'Subscriber sync frequency is no longer configurable: v3 syncs in near-real-time'
+            . ' (observers + durable queue) with a 15-minute Smaily→Magento consent reconcile.',
+            $descriptions
+        );
         self::assertStringContainsString('reCAPTCHA', $descriptions);
     }
 
@@ -200,8 +204,9 @@ class MigrateLegacyConfigTest extends IntegrationTestCase
         );
         self::assertSame(
             [
-                'Tellijate sünkroonimise sagedust ei saa enam seadistada: v3 teeb kord päevas'
-                . ' täieliku sünkroonimise ja iga 15 minuti järel nõusolekute ühtlustamise.',
+                'Tellijate sünkroonimise sagedust ei saa enam seadistada: v3 sünkroonib peaaegu'
+                . ' reaalajas (observerid + püsiv järjekord) ja ühtlustab iga 15 minuti järel'
+                . ' nõusolekud Smailyst Magentosse.',
                 'Varasemaid uudiskirja captcha seadistusi üle ei toodud: lülita selle asemel'
                 . ' uudiskirja vormidele sisse Magento sisseehitatud reCAPTCHA (Stores >'
                 . ' Configuration > Security > Google reCAPTCHA Storefront).',

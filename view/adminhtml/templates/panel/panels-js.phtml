@@ -372,6 +372,8 @@ window.smailyPanelsInit = function ($) {
 
     function engineConnected(tenantName, engineVersion) {
         $('#smaily-w-engine-disconnected').hide();
+        // Settings only: the setup step renders the introduction without this id.
+        $('#smaily-w-engine-intro').hide();
         $('#smaily-w-engine-connected').show();
         $('#smaily-w-engine-status').text(
             '<?= $escaper->escapeJs(__('Connected: %1 (engine %2)')) ?>'

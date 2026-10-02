@@ -397,8 +397,9 @@ engine-run automations (replenishment reminders, win-back, …).
 
 Campaign Intelligence is an **optional paid add-on** (€250/month), added to
 your regular Smaily monthly payment. Contact Smaily to activate it, or set it
-up later. Initial setup step 4 and **Settings > Intelligence** open with
-this introduction.
+up later. Initial setup step 4 always opens with this introduction;
+**Settings > Intelligence** shows it only until Campaign Intelligence is
+connected.
 
 ### Connecting
 

@@ -94,6 +94,9 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 - **PRO-3565 in progress — Log status pills and the Details panel
   (2026-10-02).** Step 1 done: a row the queue closed without sending
+
+- **PRO-3565 done — Log status pills and the Details panel
+  (2026-10-02).** Step 1: a row the queue closed without sending
   (PRO-3619 `markSkipped`: stored `sent` with the reason in `last_error`)
   reads as the derived status `skipped` (`Collection::STATUS_SKIPPED`) in
   the grid's UNION and in `QueueRowLoader`, by the same rule — withdrawn
@@ -111,6 +114,31 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   `grid/columns/status-pill` = the stock select column with the template
   `grid/cells/status-pill.html`, so filter and sorting are unchanged).
   Tests RED first: unit `StatusPillTest` (+8), `LogStatusColumnTest` (+1).
+  Step 3: Details is Magento's slide modal narrowed to the pack's 452 px
+  panel (the closest Magento-native equivalent: Magento's scrim, focus on
+  the close button, Escape, focus back to the row link). `log-actions.js`
+  moves the loaded `[data-smaily-details-head]` (Event #id, type, status
+  pill) into the modal title (the dialog's label) and pins
+  `[data-smaily-details-foot]` below the scrolling body. Attempt history
+  comes from `Model\Log\AttemptHistory` — built from the row's attempts,
+  timestamps and latest outcome only (no new table: the row keeps no
+  per-attempt record, so earlier failures have no time; the panel says so).
+  Footer: **Send again** (the pack's "Retry now"; terminology wins) only when
+  `Details` gets `resend_url`, i.e. `ResendGuard` cleared the row — same rule
+  as the grid; it confirms first and disables itself, then posts to the
+  existing `log/resend` route. **Copy payload** copies the text of the
+  redacted `[data-smaily-payload]` block (clipboard API, execCommand
+  fallback) with an InlineStatus. Dark code blocks, section heads, summary
+  grid and timeline per the pack (Log rules only in `smaily-admin.css`).
+  Tests RED first: unit `AttemptHistoryTest` (+8), `DetailsTest` (+4, with a
+  `RawFactory` stub). Verified in headless Chrome from a scratch harness
+  (the real template rendered with stubbed rows, the real column JS with
+  Magento's modal and select stubbed): 45 checks in en_US + et_EE — pill
+  colours, 452 px / right-docked, header + label, pinned footer, Send again
+  only on a cleared row and confirmation first, clipboard = shown redacted
+  text (no raw address or secret), Escape and Enter-on-close close the panel
+  with focus returned, 400 px viewport fits, no console errors. Not yet
+  seen on the real admin (the sandbox was not used).
 
 - **PRO-3628 — PRO-3603 findings fixed (2026-10-02).** Test connection
   with empty fields asks "Please fill in the subdomain, username and

@@ -8,7 +8,14 @@
  * Payloads and responses are passed through the PayloadRedactor: secrets
  * are never shown, email addresses are masked.
  *
- * @var \Magento\Framework\View\Element\Template $block
+ * The design pack's Details panel (PRO-3565): the [data-smaily-details-head]
+ * header (event id, type, status pill) and the [data-smaily-details-foot]
+ * footer are moved into the modal's own header and foot by
+ * js/grid/columns/log-actions.js. "Copy payload" copies the text of the
+ * [data-smaily-payload] block — the redacted payload shown here, never the
+ * stored one.
+ *
+ * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
  */
 
@@ -28,6 +35,11 @@ $resendRecord = $block->getData('resend_record');
 // classification is shown beside them, not in place of them.
 $lastError = (string)$block->getData('last_error');
 $failureClass = (string)$block->getData('failure_class');
+$statusPill = (string)$block->getData('status_pill');
+/** @var list<array{attempt: int|null, result: string, at: string|null, latest_error: bool}> $history */
+$history = (array)$block->getData('history');
+/** @var string|null $resendUrl set only for a row the guard clears (PRO-2454) */
+$resendUrl = $block->getData('resend_url');
 
 if (!$row) {
     ?>
@@ -97,58 +109,97 @@ $payload = $sentPayload !== ''
     ? $redactor->redact($sentPayload)
     : ((string)($row['payload'] ?? '') === '' ? '' : $redactor->redactDecoded($decodedPayload));
 $response = $redactor->redact(isset($row['last_response']) ? (string)$row['last_response'] : null);
+// The response block reads as an error while the row's latest attempt failed.
+$responseIsError = $status === 'failed' || ($attempts > 0 && in_array($status, ['pending', 'sending'], true));
+$skipped = $status === 'skipped'; // a skip's reason is not an error
+
+$resultLabels = [
+    \Smaily\Connect\Model\Log\AttemptHistory::QUEUED => __('Queued'),
+    \Smaily\Connect\Model\Log\AttemptHistory::FAILED => __('Failed'),
+    \Smaily\Connect\Model\Log\AttemptHistory::DELIVERED => __('Delivered'),
+    \Smaily\Connect\Model\Log\AttemptHistory::SKIPPED => __('Skipped'),
+    \Smaily\Connect\Model\Log\AttemptHistory::WITHDRAWN => __('Withdrawn'),
+    \Smaily\Connect\Model\Log\AttemptHistory::SCHEDULED => __('Scheduled'),
+    \Smaily\Connect\Model\Log\AttemptHistory::WAITING => __('Waiting'),
+    \Smaily\Connect\Model\Log\AttemptHistory::IN_PROGRESS => __('In progress'),
+];
+// An earlier failure has no time of its own: the row stores its latest
+// attempt only, and the panel says so rather than inventing one.
+$historyIsPartial = false;
+foreach ($history as $entry) {
+    if ($entry['result'] === \Smaily\Connect\Model\Log\AttemptHistory::FAILED && $entry['at'] === null) {
+        $historyIsPartial = true;
+    }
+}
+$formatDate = static fn (string $date): string => (string)$block->formatDate($date, \IntlDateFormatter::MEDIUM, true);
 ?>
 <div class="smaily-ui smaily-log-details">
-    <table class="admin__table-secondary smaily-log-details-meta">
-        <tr>
-            <th><?= $escaper->escapeHtml(__('Source')) ?></th>
-            <td><?= $escaper->escapeHtml((string)($sourceLabels[$row['source']] ?? $row['source'])) ?></td>
-        </tr>
-        <tr>
-            <th><?= $escaper->escapeHtml(__('Type')) ?></th>
-            <td><code><?= $escaper->escapeHtml((string)$row['type']) ?></code></td>
-        </tr>
+    <span class="smaily-log-details__head" data-smaily-details-head>
+        <span class="smaily-log-details__id"><?= $escaper->escapeHtml(__('Event #%1', (string)$row['id'])) ?></span>
+        <span class="smaily-log-details__title">
+            <span class="smaily-log-details__type"><?= $escaper->escapeHtml((string)$row['type']) ?></span>
+            <span class="smaily-pill smaily-pill--<?= $escaper->escapeHtmlAttr($statusPill) ?>"><span class="smaily-pill__dot"></span><?= $escaper->escapeHtml((string)($statusLabels[$status] ?? $status)) ?></span>
+        </span>
+    </span>
+
+    <dl class="smaily-log-details__summary">
+        <dt><?= $escaper->escapeHtml(__('Source')) ?></dt>
+        <dd><?= $escaper->escapeHtml((string)($sourceLabels[$row['source']] ?? $row['source'])) ?></dd>
         <?php if (!empty($row['entity_id'])): ?>
-        <tr>
-            <th><?= $escaper->escapeHtml(__('Entity')) ?></th>
-            <td><?= $escaper->escapeHtml((string)$row['entity_id']) ?></td>
-        </tr>
+        <dt><?= $escaper->escapeHtml(__('Entity')) ?></dt>
+        <dd><?= $escaper->escapeHtml((string)$row['entity_id']) ?></dd>
         <?php endif; ?>
-        <tr>
-            <th><?= $escaper->escapeHtml(__('Status')) ?></th>
-            <?php $statusPill = ['pending' => 'pending', 'sending' => 'pending', 'sent' => 'sent', 'failed' => 'failed'][$status] ?? 'neutral'; ?>
-            <td><span class="smaily-pill smaily-pill--<?= $escaper->escapeHtmlAttr($statusPill) ?>"><span class="smaily-pill__dot"></span><?= $escaper->escapeHtml((string)($statusLabels[$status] ?? $status)) ?></span></td>
-        </tr>
-        <tr>
-            <th><?= $escaper->escapeHtml(__('Attempts')) ?></th>
-            <td><?= $escaper->escapeHtml(__('%1 of %2', $attempts, $maxAttempts)) ?></td>
-        </tr>
-        <tr>
-            <th><?= $escaper->escapeHtml(__('Created')) ?></th>
-            <td><?= $escaper->escapeHtml($block->formatDate((string)$row['created_at'], \IntlDateFormatter::MEDIUM, true)) ?></td>
-        </tr>
-        <tr>
-            <th><?= $escaper->escapeHtml(__('Updated')) ?></th>
-            <td><?= $escaper->escapeHtml($block->formatDate((string)$row['updated_at'], \IntlDateFormatter::MEDIUM, true)) ?></td>
-        </tr>
-    </table>
+        <dt><?= $escaper->escapeHtml(__('Attempts')) ?></dt>
+        <dd><?= $escaper->escapeHtml(__('%1 of %2', $attempts, $maxAttempts)) ?></dd>
+        <dt><?= $escaper->escapeHtml(__('Created')) ?></dt>
+        <dd><?= $escaper->escapeHtml($formatDate((string)$row['created_at'])) ?></dd>
+        <dt><?= $escaper->escapeHtml(__('Updated')) ?></dt>
+        <dd><?= $escaper->escapeHtml($formatDate((string)$row['updated_at'])) ?></dd>
+    </dl>
 
     <?php if ($resendRecord !== null): ?>
     <p class="note"><?= $escaper->escapeHtml(__(
         'Re-sent from event #%1 by %2 on %3',
         $resendRecord['of'],
         $resendRecord['by'],
-        $block->formatDate($resendRecord['at'], \IntlDateFormatter::MEDIUM, true)
+        $formatDate($resendRecord['at'])
     )) ?></p>
+    <?php endif; ?>
+
+    <h3><?= $escaper->escapeHtml(__('Attempt history')) ?></h3>
+    <ol class="smaily-log-timeline">
+        <?php foreach ($history as $entry): ?>
+        <li class="smaily-log-timeline__item is-<?= $escaper->escapeHtmlAttr($entry['result']) ?>">
+            <span class="smaily-log-timeline__dot"></span>
+            <span class="smaily-log-timeline__body">
+                <span class="smaily-log-timeline__title">
+                    <?php if ($entry['attempt'] !== null): ?>
+                        <?= $escaper->escapeHtml(__('Attempt %1', $entry['attempt'])) ?>
+                        <span class="smaily-log-timeline__badge"><?= $escaper->escapeHtml((string)($resultLabels[$entry['result']] ?? $entry['result'])) ?></span>
+                    <?php else: ?>
+                        <?= $escaper->escapeHtml((string)($resultLabels[$entry['result']] ?? $entry['result'])) ?>
+                    <?php endif; ?>
+                </span>
+                <?php if ($entry['at'] !== null): ?>
+                <span class="smaily-log-timeline__time"><?= $escaper->escapeHtml($formatDate($entry['at'])) ?></span>
+                <?php endif; ?>
+                <?php if ($entry['latest_error'] && $lastError !== ''): ?>
+                <span class="smaily-log-timeline__detail"><?= $escaper->escapeHtml(mb_strimwidth($lastError, 0, 140, '…')) ?></span>
+                <?php endif; ?>
+            </span>
+        </li>
+        <?php endforeach; ?>
+    </ol>
+    <?php if ($historyIsPartial): ?>
+    <p class="note"><?= $escaper->escapeHtml(__('The row keeps only its latest attempt, so earlier attempts are listed without a time or an error.')) ?></p>
     <?php endif; ?>
 
     <?php $retryTerminal = $refusal !== null || in_array($status, ['sent', 'failed', 'skipped'], true); ?>
     <div class="smaily-log-details-retry<?= $retryTerminal ? ' is-terminal' : '' ?>">
-        <span>&#8635;</span><span><?= $escaper->escapeHtml($retryText) ?></span>
+        <span aria-hidden="true">&#8635;</span><span><?= $escaper->escapeHtml($retryText) ?></span>
     </div>
 
     <?php if ($lastError !== ''): ?>
-        <?php $skipped = $status === 'skipped'; // a skip's reason is not an error ?>
     <h3><?= $escaper->escapeHtml($skipped ? __('Reason') : __('Last error')) ?><span class="smaily-log-redact-tag"><?= $escaper->escapeHtml(__('redacted')) ?></span></h3>
     <pre class="smaily-log-details-pre<?= $skipped ? '' : ' smaily-log-details-error' ?>"><?= $escaper->escapeHtml($lastError) ?></pre>
         <?php if ($failureClass !== '' && !$skipped): ?>
@@ -158,17 +209,36 @@ $response = $redactor->redact(isset($row['last_response']) ? (string)$row['last_
 
     <h3><?= $escaper->escapeHtml($payloadTitle) ?><span class="smaily-log-redact-tag"><?= $escaper->escapeHtml(__('PII redacted')) ?></span></h3>
     <?php if ($payload !== ''): ?>
-        <pre class="smaily-log-details-pre"><?= $escaper->escapeHtml($payload) ?></pre>
+        <pre class="smaily-log-details-pre" data-smaily-payload><?= $escaper->escapeHtml($payload) ?></pre>
     <?php else: ?>
         <p class="note"><?= $escaper->escapeHtml(__('No payload stored for this row.')) ?></p>
     <?php endif; ?>
 
     <h3><?= $escaper->escapeHtml(__('Last response')) ?><span class="smaily-log-redact-tag"><?= $escaper->escapeHtml(__('PII redacted')) ?></span></h3>
     <?php if ($response !== ''): ?>
-        <pre class="smaily-log-details-pre"><?= $escaper->escapeHtml($response) ?></pre>
+        <pre class="smaily-log-details-pre<?= $responseIsError ? ' smaily-log-details-error' : '' ?>"><?= $escaper->escapeHtml($response) ?></pre>
     <?php else: ?>
         <p class="note"><?= $escaper->escapeHtml($noResponseText) ?></p>
     <?php endif; ?>
 
     <p class="note"><?= $escaper->escapeHtml(__('Sensitive values (passwords, API keys) are never shown here, and email addresses are masked.')) ?></p>
+
+    <?php if ($resendUrl !== null || $payload !== ''): ?>
+    <div class="smaily-log-details__foot" data-smaily-details-foot>
+        <?php if ($resendUrl !== null): ?>
+        <form method="post" action="<?= $escaper->escapeUrl((string)$resendUrl) ?>" data-smaily-resend
+              data-confirm-title="<?= $escaper->escapeHtmlAttr(__('Send again')) ?>"
+              data-confirm-message="<?= $escaper->escapeHtmlAttr(__('Send this event again? A new attempt is queued; the failed row is kept as history.')) ?>">
+            <input type="hidden" name="form_key" value="<?= $escaper->escapeHtmlAttr($block->getFormKey()) ?>"/>
+            <button type="submit" class="smaily-log-details__resend"><span><?= $escaper->escapeHtml(__('Send again')) ?></span></button>
+        </form>
+        <?php endif; ?>
+        <?php if ($payload !== ''): ?>
+        <button type="button" class="smaily-log-details__copy" data-smaily-copy
+                data-copied="<?= $escaper->escapeHtmlAttr(__('Copied to the clipboard.')) ?>"
+                data-failed="<?= $escaper->escapeHtmlAttr(__('Copying failed — select the payload and copy it manually.')) ?>"><?= $escaper->escapeHtml(__('Copy payload')) ?></button>
+        <?php endif; ?>
+        <span class="smaily-inline-status is-idle" data-smaily-copy-status role="status" aria-live="polite"></span>
+    </div>
+    <?php endif; ?>
 </div>

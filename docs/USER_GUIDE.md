@@ -617,7 +617,12 @@ panel — you do not have to keep the page open:
   sending anything, because sending could not have done what it was for —
   for example the abandoned-cart purchase marker for an address Smaily does
   not have. Details shows the reason, and the row does not retry.
-- **Details** on any row opens a slide-out with the full picture: the
+- **Details** on any row opens a narrow panel on the right with the full
+  picture. Its header names the event (its id and type) and shows its
+  status. The attempt history lists what happened in order: when the row
+  was queued, each attempt and its outcome, and the next attempt when one is
+  scheduled. The row stores only its latest attempt, so earlier attempts are
+  listed without a time or an error, and the panel says so. Below it: the
   payload exactly as it was (or will be) sent, the attempt count, when the
   next automatic retry happens (or an honest "this row will not retry on
   its own"), the last error — with our internal failure class beside it —
@@ -629,7 +634,10 @@ panel — you do not have to keep the page open:
   reached the server — skipped because no workflow is mapped, withdrawn,
   or stopped before any request — says that nothing was sent for it.
   Sensitive values (passwords, API keys) are never shown, and email
-  addresses are masked.
+  addresses are masked. At the bottom, **Send again** appears on exactly the
+  rows where the grid offers it (it asks first, like the grid's button), and
+  **Copy payload** copies the payload as the panel shows it — masked, never
+  the stored original. Escape or the close button closes the panel.
 - When deliveries failed in the last 24 hours, a banner above the grid
   says so and links straight to the grid pre-filtered to failed rows; the
   dashboard's failed-deliveries tile links to the same view.

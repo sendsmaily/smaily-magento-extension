@@ -10,16 +10,19 @@ namespace Smaily\Connect\Controller\Adminhtml\Log;
 
 use Magento\Backend\App\Action;
 use Magento\Backend\App\Action\Context;
+use Magento\Backend\Block\Template;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\Controller\Result\Raw;
 use Magento\Framework\Controller\Result\RawFactory;
-use Magento\Framework\View\Element\Template;
+use Magento\Framework\UrlInterface;
 use Magento\Framework\View\LayoutInterface;
+use Smaily\Connect\Model\Log\AttemptHistory;
 use Smaily\Connect\Model\Log\FailureMessage;
 use Smaily\Connect\Model\Log\PayloadRedactor;
 use Smaily\Connect\Model\Log\QueueRowLoader;
 use Smaily\Connect\Model\Log\Resend;
 use Smaily\Connect\Model\Log\ResendGuard;
+use Smaily\Connect\Model\Log\StatusPill;
 use Smaily\Connect\Model\Queue\PayloadDecoder;
 use Smaily\Connect\Ui\Component\QueueStatusOptions;
 
@@ -29,6 +32,11 @@ use Smaily\Connect\Ui\Component\QueueStatusOptions;
  * Details action loads into a slide-out modal. It also carries what the
  * grid cannot show (PRO-2454): why a row may not be sent again, and — for a
  * row that was — which failed row it repeats, at whose hand.
+ *
+ * The panel (PRO-3565) heads with the event id and its status pill, lists
+ * the attempts in order and ends with "Send again" — offered only for a row
+ * the guard clears, so the panel can never double-send — and "Copy payload",
+ * which copies the redacted payload the panel shows.
  */
 class Details extends Action implements HttpGetActionInterface
 {
@@ -44,7 +52,10 @@ class Details extends Action implements HttpGetActionInterface
         private readonly ResendGuard $resendGuard,
         private readonly Resend $resend,
         private readonly PayloadDecoder $payloadDecoder,
-        private readonly QueueStatusOptions $statusOptions
+        private readonly QueueStatusOptions $statusOptions,
+        private readonly AttemptHistory $attemptHistory,
+        private readonly StatusPill $statusPill,
+        private readonly UrlInterface $urlBuilder
     ) {
         parent::__construct($context);
     }
@@ -86,6 +97,13 @@ class Details extends Action implements HttpGetActionInterface
             'resend_record' => $this->resend->recordOf($payload),
             'last_error' => $this->failureMessage->forDisplay($lastError),
             'failure_class' => $this->failureMessage->failureClass($lastError),
+            'status_pill' => $this->statusPill->variant((string)($row['status'] ?? '')),
+            'history' => $this->attemptHistory->entries($row),
+            // The same rule as the grid's "Send again" action (LogActions):
+            // only a row the guard asked about AND cleared.
+            'resend_url' => $row && $reason === ''
+                ? $this->urlBuilder->getUrl('smaily_connect/log/resend', ['log_id' => $logId])
+                : null,
         ]]);
 
         return $result->setContents($block->toHtml());

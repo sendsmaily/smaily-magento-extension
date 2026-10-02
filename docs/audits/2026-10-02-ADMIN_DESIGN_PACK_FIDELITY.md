@@ -64,8 +64,8 @@ regularly; **low** = detail or rare state.
 | 15 | Initial setup, Settings | Error state: the pack has a transaction-level error banner plus danger styling and a message on the offending field; ours shows the error inline beside the button only. | med | fixed — a failed save shows an error banner above the form, marks the field the error names (danger border + message under it) and says "Saving failed." beside the button; editing the field removes the mark (PRO-3562) |
 | 16 | Initial setup | Completed revisit: the pack shows a read-only summary card with a Completed pill and "Edit credentials"; ours reopens on the Overview step and shows the editable form. | med | fixed — a finished setup reopens on step 1 as a read-only summary (Subdomain, API username, Status pill) with a Completed pill beside the kicker and "Edit credentials" in the footer, which returns the form; Continue and the rail still lead through every step; no resting "Saved" status (PRO-3563) |
 | 17 | Backfill (Contacts, Intelligence) | No status pill in the card header, no "X of Y · %" line under the bar, the idle Start import is secondary rather than primary, no footer divider. | med | deferred — the state rendering is JavaScript |
-| 18 | Log | Status column is plain text; the pack shows status pills in the grid. | med | deferred — needs a grid column renderer |
-| 19 | Log > Details | Magento's wide modal slide instead of a 452 px panel; header without event id and status pill; no attempt-history timeline; no "Retry now" / "Copy payload" footer; light payload block instead of a dark code block. | med | deferred — data and behaviour |
+| 18 | Log | Status column is plain text; the pack shows status pills in the grid. | med | fixed — a Pill per row; withdrawn and skipped have their own labels (PRO-3565) |
+| 19 | Log > Details | Magento's wide modal slide instead of a 452 px panel; header without event id and status pill; no attempt-history timeline; no "Retry now" / "Copy payload" footer; light payload block instead of a dark code block. | med | fixed — Magento's slide modal narrowed to 452 px with event id + status Pill in the header, the attempts the row stores in order, dark code blocks, and a Send again / Copy payload footer with InlineStatus (PRO-3565) |
 | 20 | Settings > Connection (multilingual stores) | Per-language credential blocks lack the pack's dashed reactive region, language chip, two-column grid and per-block status. | med | deferred — multilingual stores only; not rendered live |
 | 21 | Settings > Intelligence | No tab title and description above the card; the page-wide Save stays below the canvas (also before the engine is connected, when there is nothing to save). The pack has no Intelligence frame. | low | deferred — needs new copy |
 | 22 | Dashboard | Degraded state: no warning banner above the verdict, the "Review failures" button is orange rather than danger red; healthy state: no secondary "Open event log" button. | low | deferred — optional in the target spec |
@@ -81,6 +81,7 @@ regularly; **low** = detail or rare state.
 | API subdomain | Subdomain |
 | Save & continue | Continue |
 | Event log | Log |
+| Retry now (Details footer) | Send again — the same guarded action as the grid's per-row button |
 | Resume setup wizard / Open Settings / View event log / Documentation | Settings / Log / Initial setup (the user guide is linked from the Overview step) |
 
 ## Verification of the fixes

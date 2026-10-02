@@ -617,13 +617,21 @@ stays untouched. Three additions:
 | PII redaction | `Model\Log\PayloadRedactor` — secrets never shown, emails masked |
 | Log verbosity (error/info/debug) | Removed (Erkki, 2026-10-02) — developer-only via `bin/magento config:set`, see item 3 above |
 
-The pack's "Copy payload" and "Retry now" footer buttons, and the specific
-"Attempt N of 5 · next attempt ~14:26" ETA copy, are **design-implied, not
-independently confirmed present** — A2's option table lists a "Retry" mass
-action and an "honest retry line" concept but does not separately confirm a
-slide-out-footer "Retry now"/"Copy payload" button pair exists today;
-Phase B should verify these two buttons against `log/details.phtml` before
-treating them as already-shipped vs. a small gap to close.
+**Built (PRO-3565, 2026-10-02).** The grid's Status column is a Pill per
+row (pending/sending amber, sent green, failed red, withdrawn and skipped
+grey with their own labels). Details is Magento's slide modal narrowed to
+the pack's 452 px right-docked panel — the closest Magento-native
+equivalent, which keeps Magento's scrim, focus handling, Escape and close
+button. Its header carries the event id, type and status Pill; the body
+lists the attempts in order from what the queue row stores (attempt count,
+timestamps, latest outcome — the row keeps no per-attempt record, so an
+earlier failure is listed without a time or error, and the panel says so);
+payload and responses are the pack's dark code blocks; the footer has the
+pack's two actions and an InlineStatus. The pack's "Retry now" is labelled
+**Send again**: it is the same guarded action as the grid's per-row Send
+again (PRO-2454 — offered only where `ResendGuard` clears the row), and the
+shared terminology wins over the pack's copy. "Copy payload" copies the
+redacted payload the panel shows.
 
 **(c) EST+ENG text** (source: our own i18n):
 
@@ -902,7 +910,8 @@ path before and after any admin-surface reshuffle.
 - **Stray glyph before the Dashboard nav label** (PRO-1357 finding #1) —
   standalone menu-label bug, not covered by either analysis; fix directly
   against the admin menu XML/text, no design-spec dependency.
-- **Log slide-out "Retry now"/"Copy payload" buttons and the exact
+- ~~**Log slide-out "Retry now"/"Copy payload" buttons**~~ — built
+  (PRO-3565; "Retry now" is labelled Send again, see §2.4). **The exact
   failed-24h filter combination** (status=failed/parked AND created≥
   now-24h) — flagged in §2.4(b) as design-implied but not independently
   confirmed present in current code; verify against `Controller\Adminhtml\

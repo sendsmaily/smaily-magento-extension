@@ -149,14 +149,53 @@
 
 /* --- Log page: failed banner + detail slide-out ----------------------------- */
 .smaily-log-failed-banner { margin-bottom: 2rem; }
-.smaily-log-details { max-width: none; }
-.smaily-log-details-meta { margin-bottom: 2rem; }
-.smaily-log-details-meta th { text-align: left; padding-right: 2rem; white-space: nowrap; }
-.smaily-log-details h3 { margin: 2rem 0 0.8rem; }
-.smaily-log-details-pre { background: #f8f8f8; border: 1px solid #e3e3e3; border-radius: 4px; padding: 1.2rem; max-height: 40rem; overflow: auto; white-space: pre-wrap; word-break: break-word; }
-.smaily-log-details-error { background: #fff5f5; border-color: #e22626; }
-.smaily-log-details .smaily-status-failed { color: #e22626; font-weight: 600; }
-.smaily-log-details .smaily-status-sent { color: #006400; }
+/* Details panel (PRO-3565): the design pack's 452 px right-docked panel, built
+ * on Magento's own slide modal (scrim, focus handling, Escape and the close
+ * button stay Magento's). The loaded header and footer are moved into the
+ * modal's header and below its scrolling body by log-actions.js. */
+.modal-slide.smaily-log-details-modal { left: auto; width: 452px; max-width: 100%; }
+.smaily-log-details-modal .modal-inner-wrap { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: var(--s-surface); box-shadow: var(--shadow-panel); color: var(--s-text); font-family: var(--font); }
+.smaily-log-details-modal .modal-header { flex: 0 0 auto; position: relative; margin: 0; padding: var(--sp-4) 62px var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--s-border); }
+.smaily-log-details-modal .modal-title { margin: 0; padding: 0; border: 0; min-height: 0; font: 700 var(--fs-16)/1.3 var(--font); color: var(--s-text); }
+.smaily-log-details-modal .action-close { position: absolute; top: var(--sp-4); right: var(--sp-5); display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid #d6d6d6; border-radius: var(--r-2); background: var(--s-surface); color: var(--s-text-2); }
+.smaily-log-details-modal .action-close:before { font-size: 1.4rem; line-height: 1; }
+.smaily-log-details-modal .action-close:hover { border-color: var(--s-border-strong); color: var(--s-text); }
+.smaily-log-details-modal .modal-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 18px var(--sp-5); }
+.smaily-log-details-modal :is(.action-close, .smaily-log-details__resend, .smaily-log-details__copy):focus-visible { outline: 2px solid var(--s-link); outline-offset: 2px; box-shadow: none; }
+.smaily-log-details__head { display: block; }
+.smaily-log-details__id { display: block; margin-bottom: 5px; font: 400 var(--fs-12)/1 var(--mono); color: var(--s-text-3); }
+.smaily-log-details__title { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+.smaily-log-details__type { font: 700 17px/1.3 var(--font); color: var(--s-text); word-break: break-word; }
+.smaily-log-details { max-width: none; font-size: var(--fs-13); }
+.smaily-log-details__summary { display: grid; grid-template-columns: auto 1fr; gap: 7px var(--sp-4); margin: 0 0 var(--sp-5); font-size: var(--fs-13); }
+.smaily-log-details__summary dt { margin: 0; font-weight: 400; color: var(--s-text-3); }
+.smaily-log-details__summary dd { margin: 0; color: var(--s-text); word-break: break-word; }
+.smaily-log-details h3 { margin: var(--sp-5) 0 10px; font: 700 var(--fs-11)/1.35 var(--font); letter-spacing: .5px; text-transform: uppercase; color: var(--s-text-3); }
+.smaily-log-details .note { margin: var(--sp-2) 0 0; font-size: var(--fs-12); color: var(--s-text-3); }
+.smaily-log-details .smaily-log-details-retry { margin-top: var(--sp-3); }
+.smaily-log-details-pre { margin: var(--sp-2) 0 0; padding: var(--sp-3) 14px; border: 0; border-radius: var(--r-3); background: #1f2329; color: #e6e6e6; font: 400 var(--fs-12)/1.6 var(--mono); max-height: 40rem; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+.smaily-log-details-error { background: #2a1f1e; color: #f2c9c2; border: 1px solid #6b3a33; }
+.smaily-log-timeline { margin: 0 0 var(--sp-4); padding: 0; list-style: none; }
+.smaily-log-timeline__item { position: relative; display: flex; gap: var(--sp-3); margin: 0; padding-bottom: 14px; --dot: var(--s-text-3); --ring: rgba(138, 138, 138, .13); --badge-fg: var(--s-neutral); --badge-bg: var(--s-neutral-soft); --badge-bd: var(--s-neutral-border); }
+.smaily-log-timeline__item:not(:last-child)::after { content: ""; position: absolute; left: 4.5px; top: 20px; bottom: 2px; width: 2px; background: #e0e0e0; }
+.smaily-log-timeline__item:last-child { padding-bottom: 0; }
+.smaily-log-timeline__item.is-failed { --dot: var(--s-bar-error); --ring: rgba(215, 44, 13, .13); --badge-fg: var(--s-danger); --badge-bg: var(--s-danger-soft); --badge-bd: var(--s-danger-border); }
+.smaily-log-timeline__item.is-delivered { --dot: var(--s-bar-success); --ring: rgba(76, 175, 80, .13); --badge-fg: var(--s-success); --badge-bg: var(--s-success-soft); --badge-bd: var(--s-success-border); }
+.smaily-log-timeline__item:is(.is-scheduled, .is-waiting, .is-in_progress) { --dot: var(--s-link); --ring: rgba(25, 121, 195, .13); --badge-fg: var(--s-info); --badge-bg: var(--s-info-soft); --badge-bd: var(--s-info-border); }
+.smaily-log-timeline__dot { flex: 0 0 auto; width: 11px; height: 11px; margin-top: 3px; border-radius: 50%; background: var(--dot); box-shadow: 0 0 0 3px var(--ring); }
+.smaily-log-timeline__body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.smaily-log-timeline__title { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); font-weight: 700; color: var(--s-text); }
+.smaily-log-timeline__badge { padding: 0 6px; border: 1px solid var(--badge-bd); border-radius: var(--r-2); background: var(--badge-bg); color: var(--badge-fg); font-size: 10px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; }
+.smaily-log-timeline__time { margin: 3px 0 2px; font: 400 var(--fs-12)/1.3 var(--mono); color: var(--s-text-3); }
+.smaily-log-timeline__detail { font-size: var(--fs-12); color: var(--s-text-2); word-break: break-word; }
+.smaily-log-details__foot { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); padding: 14px var(--sp-5); border-top: 1px solid var(--s-border); background: var(--s-surface); }
+.smaily-log-details__foot form { margin: 0; }
+.smaily-log-details__resend { padding: var(--sp-2) 15px; border: 1px solid var(--s-border-strong); border-radius: var(--r-2); background: var(--s-surface); color: var(--s-text); font: 700 var(--fs-13)/1 var(--font); cursor: pointer; }
+.smaily-log-details__resend:hover { background: var(--s-surface-3); }
+.smaily-log-details__resend:disabled { opacity: .6; cursor: default; }
+.smaily-log-details__copy { padding: var(--sp-2) var(--sp-3); border: 1px solid transparent; background: transparent; color: var(--s-link); font: 600 var(--fs-13)/1 var(--font); cursor: pointer; }
+.smaily-log-details__copy:hover { color: var(--s-link-hover); text-decoration: underline; background: transparent; }
+.smaily-log-details__foot .smaily-inline-status { white-space: normal; line-height: 1.4; }
 
 /* ========================================================================= *
  * PRO-1281 Stage A — reusable design-system components.

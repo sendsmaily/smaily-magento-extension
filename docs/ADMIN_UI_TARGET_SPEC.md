@@ -68,6 +68,24 @@ running admin against, instead of two documents that might disagree.
    store-view scope) — leave those as currently shipped until Erkki rules on
    them specifically.
 
+### Page frame decisions (2026-10-02)
+
+Erkki decided two things about the frame around every Smaily page (Settings,
+Initial setup, Dashboard; the Log page is a native grid and has no Smaily
+frame). They bind over the pack where the two differ.
+
+1. **The pack's background.** A grey pane (`--s-bg`) spans the whole
+   content area, the Settings tab strip is a white bar across the same
+   width, and white cards sit on the grey. The frame has no width cap;
+   cards, fields and inputs keep their own max-widths, so forms stay
+   readable and left-aligned. Pack-compliant.
+2. **Magento's Open Sans, not the pack's system stack.** Our content uses
+   the font family of the admin around it, so a page shows one family. The
+   pack's sizes, weights and colours stay. `--font` names Magento's stack.
+   This is a deliberate deviation from the pack's "system fonts only".
+   A style audit counts a font-family difference against the pack as
+   accepted under this decision.
+
 ---
 
 ## 2. Per-screen target spec

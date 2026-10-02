@@ -5,7 +5,10 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-3572 — a network failure on a Smaily or
+_Last updated: 2026-10-02 (PRO-2456 page frame — Settings, Initial setup
+and the Dashboard fill the content area on the pack's grey pane under a
+full-width white tab strip, in Magento's Open Sans. Earlier the same day:
+PRO-3572 — a network failure on a Smaily or
 engine call no longer carries a contact's email into the log, a queue row's
 last error or the admin: the request URL in Guzzle's message is masked.
 Earlier the same day: PRO-3571 — the Log page has no logging-level
@@ -53,6 +56,19 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   tag on Erkki's go remains). Milestones: rc1 tagged + pilot runbook 2026-10-03, pilot store
   live 2026-10-09. PRO-2460 decided A — contract §3 SKU key stands, PRO-1484
   closed. After the pilot: PRO-2506, PRO-1967, PRO-1198 (Smaily hand-over).
+
+- **PRO-2456 page frame — the admin pages feel native (2026-10-02).**
+  Owner decisions, recorded in `docs/ADMIN_UI_TARGET_SPEC.md` "Page frame
+  decisions": the pack's background on every Smaily page, and Magento's
+  Open Sans instead of the pack's system stack. Settings, Initial setup and
+  the Dashboard have no width cap any more: the grey pane spans the content
+  area at 1440 and 1920 px (no empty band on the right), Settings has a
+  full-width white tab strip (13 px / 600 tabs), the wizard pane lost its
+  bordered box, the Dashboard sits on the grey pane with the pack's 12–18 px
+  spacing and panel headers with dividers. Cards keep their own measure
+  (Automations and Intelligence 666 px, setup steps and their footer
+  680 px). CSS only. The Log page is a native grid and has no Smaily
+  frame.
 
 - **PRO-2456 follow-up — the owner's live-sandbox review (2026-10-02).**
   Marketing > Smaily Connect > Dashboard shows no missing-glyph box: the

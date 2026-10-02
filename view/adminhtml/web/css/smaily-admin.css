@@ -53,8 +53,10 @@
   --fs-11:11px; --fs-12:12px; --fs-13:13px; --fs-14:14px;
   --fs-16:16px; --fs-18:18px; --fs-22:22px; --fs-28:28px;
 
-  /* Font stacks (system only) */
-  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  /* Font stacks. --font is Magento's own admin face, not the pack's system
+   * stack: one family per page, the pack's sizes and weights kept (owner
+   * decision 2026-10-02, ADMIN_UI_TARGET_SPEC.md "Page frame decisions"). */
+  --font:"Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 
   /* Elevation */
@@ -64,7 +66,9 @@
 }
 
 /* --- Shared panel chrome (wizard steps + settings tabs) ------------------ */
-.smaily-ui { max-width: 76rem; }
+/* Page frame (PRO-2456, 2026-10-02): no width cap — our pages span the
+ * content area like native ones; cards, fields and inputs keep their own
+ * max-widths. */
 .smaily-ui .smaily-card { background: #fff; border: 1px solid #e3e3e3; border-radius: 4px; padding: 2rem; margin-bottom: 2rem; }
 .smaily-ui .smaily-field { margin-bottom: 1.6rem; max-width: 44rem; }
 .smaily-ui .smaily-field label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
@@ -100,19 +104,12 @@
 .smaily-wizard .smaily-step-panel.active { display: block; }
 
 /* --- Settings tabs ---------------------------------------------------------- */
-/* PRO-1391 final polish: Magento admin's own body font is the "Open Sans"
- * webfont (with default, un-antialiased smoothing) — a genuinely different
- * stack from the design pack's system-font recipe (--font, above), which is
- * also what the rest of this sheet's components (pill, choice-card, etc.)
- * already opt into. Switching our own pages onto --font (no new asset — same
- * OS-installed fonts the design pack renders with) plus matching smoothing
- * closes that gap. PRO-2456 widened it from .smaily-settings to every page
- * of ours (.smaily-ui: wizard, Settings, Dashboard) — the wizard is the
- * first screen a merchant sees and still rendered in Open Sans. */
-.smaily-ui { font-family: var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-.smaily-ui input, .smaily-ui select, .smaily-ui button { font-family: var(--font); }
-.smaily-settings .smaily-tabs { display: flex; gap: 0; margin: 0 0 3rem; padding: 0; list-style: none; border-bottom: 1px solid #e3e3e3; }
-.smaily-settings .smaily-tabs li { padding: 1rem 2rem; margin-bottom: -1px; border-bottom: 2px solid transparent; color: #666; cursor: pointer; }
+/* Our content inherits Magento's Open Sans and its font smoothing (PRO-2456,
+ * 2026-10-02): the system-stack override is gone, so a Smaily page shows one
+ * family, like the title and menu around it. The tab strip is the pack's
+ * white bar across the content area, the grey pane directly below it. */
+.smaily-settings .smaily-tabs { display: flex; gap: var(--sp-1); margin: 0; padding: 0 var(--sp-6); list-style: none; background: var(--s-surface); border-bottom: 1px solid var(--s-border); }
+.smaily-settings .smaily-tabs li { padding: 13px 16px 11px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: #666; cursor: pointer; font-size: var(--fs-13); font-weight: 600; line-height: 1; white-space: nowrap; }
 .smaily-settings .smaily-tabs li:hover { color: #333; }
 .smaily-settings .smaily-tabs li.active { border-color: #eb5202; color: #333; font-weight: 700; }
 .smaily-settings .smaily-tab-panel { display: none; }
@@ -120,21 +117,21 @@
 .smaily-settings .smaily-footer .note { margin: 0; }
 
 /* --- Dashboard ------------------------------------------------------------- */
-.smaily-dashboard { max-width: 110rem; }
-.smaily-dashboard .smaily-verdict { display: flex; align-items: center; gap: 2rem; padding: 1.6rem 2rem; margin-bottom: 2rem; border-radius: 4px; border: 1px solid; font-size: 1.6rem; }
+.smaily-dashboard { background: var(--s-bg); padding: 22px var(--sp-6) 26px; }
+.smaily-dashboard .smaily-verdict { display: flex; align-items: center; gap: 2rem; padding: 1.6rem 2rem; margin-bottom: 18px; border-radius: 4px; border: 1px solid; font-size: 1.6rem; }
 .smaily-dashboard .smaily-verdict-ok { background: #f2f8ec; border-color: #79a22e; }
 .smaily-dashboard .smaily-verdict-degraded { background: #fffbf0; border-color: #eb5202; }
 .smaily-dashboard .smaily-verdict-incomplete { background: #fffbf0; border-color: #eb5202; }
 .smaily-dashboard .smaily-verdict-action { margin-left: auto; white-space: nowrap; }
-.smaily-dashboard .smaily-connections { display: flex; gap: 2rem; margin-bottom: 2rem; flex-wrap: wrap; }
+.smaily-dashboard .smaily-connections { display: flex; gap: var(--sp-3); margin-bottom: 18px; flex-wrap: wrap; }
 .smaily-dashboard .smaily-connection { flex: 1 1 20rem; background: #fff; border: 1px solid #e3e3e3; border-radius: 4px; padding: 1.2rem 1.6rem; display: flex; align-items: center; gap: 1rem; }
 .smaily-dashboard .smaily-dot { width: 1rem; height: 1rem; border-radius: 50%; background: #d0d0d0; flex-shrink: 0; }
 .smaily-dashboard .smaily-connection.is-on .smaily-dot { background: #79a22e; }
 .smaily-dashboard .smaily-connection.is-off .smaily-dot { background: #d0d0d0; }
 .smaily-dashboard .smaily-connection-state { color: #666; margin-left: auto; text-align: right; }
-.smaily-dashboard .smaily-tiles { display: flex; gap: 2rem; margin-bottom: 2rem; flex-wrap: wrap; }
+.smaily-dashboard .smaily-tiles { display: flex; gap: var(--sp-3); margin-bottom: 18px; flex-wrap: wrap; }
 /* Tiles use the Stage A .smaily-tile component (BEM); layout only lives here. */
-.smaily-dashboard .smaily-columns { display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap; }
+.smaily-dashboard .smaily-columns { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
 .smaily-dashboard .smaily-activity { flex: 2 1 40rem; min-width: 0; }
 .smaily-dashboard .smaily-activity .admin__table-wrapper { overflow-x: auto; }
 .smaily-dashboard .smaily-quick-links { flex: 1 1 24rem; }
@@ -507,15 +504,16 @@
 }
 .smaily-wizard #smaily-w-back:hover { color: var(--s-link-hover); text-decoration: underline; }
 @media (min-width: 1024px) {
-    .smaily-wizard { max-width: 110rem; }
+    /* The grey pane spans the content area (pack frame, PRO-2456
+     * 2026-10-02): no width cap, no bordered and rounded box. */
     .smaily-wizard #smaily-wizard-main {
         display: grid; grid-template-columns: 232px minmax(0, 1fr);
-        background: var(--s-bg); border: 1px solid var(--s-border); border-radius: 6px;
+        background: var(--s-bg);
     }
     .smaily-wizard #smaily-wizard-main > * { grid-column: 2; }
     .smaily-wizard #smaily-wizard-main > .smaily-steps {
         grid-column: 1; grid-row: 1 / span 2; flex-direction: column; margin: 0; padding: 14px 0;
-        background: var(--s-surface-2); border-right: 1px solid var(--s-border); border-radius: 6px 0 0 6px;
+        background: var(--s-surface-2); border-right: 1px solid var(--s-border);
     }
     .smaily-wizard .smaily-step-panel.active { padding: 26px 30px 0; }
     .smaily-wizard #smaily-wizard-main > .smaily-footer { margin: 0 30px 26px; }
@@ -794,3 +792,38 @@
     color: var(--s-text); background: var(--s-surface-3);
 }
 #smaily-rss-builder .note { margin-top: var(--sp-2); font-size: var(--fs-12); color: var(--s-text-3); }
+
+/* --- Page frame (PRO-2456, 2026-10-02; owner decision: the pack's frame on
+ * every Smaily page) ---------------------------------------------------------
+ * The frame spans the content area, so the cards that had no measure of their
+ * own get one: the pack's card width on Settings, the pack's step width in the
+ * initial setup. Cards nested in a card fill their parent. */
+.smaily-settings [data-tab="automations"] .smaily-card,
+.smaily-settings [data-tab="intelligence"] .smaily-card { max-width: 666px; }
+.smaily-wizard .smaily-step-panel .smaily-card { max-width: 680px; }
+.smaily-settings .smaily-card .smaily-card,
+.smaily-wizard .smaily-step-panel .smaily-card .smaily-card { max-width: none; }
+/* The page-wide Save (tabs without their own footer) sits on the grey pane. */
+.smaily-settings #smaily-settings-global-footer { margin-top: 0; padding: 0 28px var(--sp-6); background: var(--s-bg); }
+/* Initial setup footer: the pack's 12px gap, and the step's measure, so the
+ * buttons stay with the card above them (as the Settings tab footers do). */
+.smaily-wizard .smaily-footer { gap: var(--sp-3); }
+.smaily-wizard #smaily-wizard-main > .smaily-footer,
+.smaily-wizard .smaily-overview-footer { max-width: 680px; }
+
+/* Dashboard lower panels: the header and every row carry the padding, with
+ * dividers between them (pack Dashboard). The Quick links heading outranks
+ * the generic card heading above (.smaily-ui .smaily-card > h2). */
+.smaily-dashboard .smaily-activity,
+.smaily-dashboard .smaily-quick-links { padding: 0; margin-bottom: 0; border-radius: var(--r-3); overflow: hidden; }
+.smaily-dashboard .smaily-activity-head { margin: 0; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--s-border); }
+.smaily-dashboard .smaily-activity-head a { font-size: var(--fs-12); }
+.smaily-dashboard .smaily-card.smaily-quick-links > h2 {
+    margin: 0; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--s-border);
+    font-size: var(--fs-14);
+}
+.smaily-dashboard .smaily-quick-links ul { margin: 0; }
+.smaily-dashboard .smaily-quick-links li { padding: var(--sp-3) var(--sp-4); border-top: 0; border-bottom: 1px solid var(--s-border); }
+.smaily-dashboard .smaily-quick-links li:last-child { border-bottom: 0; }
+.smaily-dashboard .smaily-activity > .smaily-empty { margin: 0; padding: var(--sp-3) var(--sp-4); }
+.smaily-dashboard .smaily-activity .admin__table-wrapper { padding: 0 var(--sp-4) var(--sp-1); }

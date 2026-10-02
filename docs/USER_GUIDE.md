@@ -424,6 +424,14 @@ shipping step is still reminded, without ever reaching the payment step. Carts
 older than 24 hours are never mailed — a recovering cron never blasts stale
 reminders. Each cart is mailed **once**.
 
+That covers only the reminders Smaily Connect sends. Before you switch the
+abandoned-cart automation on, list which modules in your store send
+abandoned-cart emails today, and switch those emails off there — for example
+a Magento extension such as Mageplaza SMTP or Avada Email Marketing, or Adobe
+Commerce's own email reminder rules. Otherwise a shopper gets two reminders
+for one cart. The setting's note on **Settings > Automations** (and Initial
+setup step 3) says the same.
+
 The automation receives up to 10 products as numbered fields
 (`product_name_1`, `product_sku_1`, `product_quantity_1`, `product_price_1`
 (incl. tax), `product_base_price_1`, `product_description_1`,

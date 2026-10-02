@@ -33,6 +33,16 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   with store-view credentials (the rows the old detector flagged) — all
   five tabs and the setup steps show no scope banner; the website selector
   beside the tab strip names the website being edited.
+
+- **PRO-3665 — switching abandoned-cart reminders on says to switch off any other sender (2026-10-02).**
+  A note under the trigger cards in `panel/automations.phtml` (so Settings > Automations and the
+  setup's step 3): "If another tool also sends abandoned-cart emails (for example an extension such
+  as Mageplaza SMTP or Avada Email Marketing, or Adobe Commerce's own email reminder rules), switch
+  those emails off there, so a shopper does not get two reminders for one cart." (EN + ET). The
+  hidden `system.xml` field is unchanged. USER_GUIDE "Abandoned cart" says to list today's senders
+  before switching on; PILOT_CHECKLIST §0 has the matching line. `docs/UPGRADING.md` has no
+  before-you-upgrade checklist, so it has no line. No detection of other modules. Rendered with the
+  real template and stub data in headless Chrome, Settings EN and setup ET.
 - **Storefront URL and consent slice tightened after a simplification review (2026-10-02, behaviour-neutral).** `StorefrontUrl::apply()` reads and normalizes each store's value once per request; `ensureSession()` returns nothing; `WizardData::isStorefrontDisclosureOpen()`; `normalize()` drops the redundant `pass` check (`parse_url` sets `user`, `''` included, whenever a password is given).
 - **PRO-3666 — the 3.0.0 changelog's admin-home entry once (2026-10-02).** Three merged copies on
   one line became one entry with every detail any copy carried; no other CHANGELOG bullet repeats.

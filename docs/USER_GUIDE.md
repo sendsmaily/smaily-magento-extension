@@ -288,8 +288,9 @@ The events:
 - **Abandoned Cart** — see below.
 
 An automation never re-subscribes a contact who unsubscribed in Smaily, in
-any contact sync mode: the extension always sends `force_opt_in=false`. A
-contact Smaily has never seen is still enrolled.
+any contact sync mode: the extension always sends `force_opt_in=false`. An
+automation reaches only a contact Smaily already has: for an address Smaily
+does not have, the trigger creates no contact and sends nothing.
 
 ### Segmenting on when an automation last ran
 

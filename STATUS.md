@@ -61,6 +61,14 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   Erkki 2026-10-02: rc1 waits for the whole list), pilot store live
   2026-10-09. After the pilot: PRO-2506, PRO-1967, PRO-1198 (hand-over).
 
+- **Automation docs corrected — a trigger for an unknown contact creates
+  nothing (2026-10-02).** The `AutomationHandler` docblock, the user
+  guide's automation section and the CHANGELOG's PRO-3577 bullet said a
+  trigger enrols a contact Smaily has never seen. Owner's fact
+  (2026-10-02): without force opt-in, a trigger for an address Smaily does
+  not have creates no contact and sends nothing. All three now say so;
+  ARCHITECTURE carried no such claim. Comment and docs only.
+
 - **PRO-3575 (consent cache key) done — keyed hash (2026-10-02).** The
   second half of the opt-out-record hardening. `ProfilingConsent` keeps
   both of its cache entries — the preference (`smaily_profiling_…`) and

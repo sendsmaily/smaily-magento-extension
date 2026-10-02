@@ -65,7 +65,8 @@ class WizardStepSaver
         private readonly MappingSaver $mappingSaver,
         private readonly SmailyClientProvider $smailyClientProvider,
         private readonly ConfigRowNormalizer $rowNormalizer,
-        private readonly CredentialCheck $credentialCheck
+        private readonly CredentialCheck $credentialCheck,
+        private readonly SetupNotice $setupNotice
     ) {
     }
 
@@ -416,6 +417,8 @@ class WizardStepSaver
             ScopeInterface::SCOPE_WEBSITES,
             $websiteId
         );
+        // The install's "ready to set up" notice has done its job.
+        $this->setupNotice->markRead();
 
         return [];
     }

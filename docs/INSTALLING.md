@@ -117,7 +117,7 @@ bin/magento cron:run --group smaily_connect
   **Dashboard**, **Initial setup**, **Settings**, **Log**. Log out and in
   again if the menu does not show yet.
 - A system message "Smaily Connect is ready to set up" appears in the
-  admin notifications.
+  admin notifications. Finishing the initial setup marks it as read.
 - On a fresh install every Smaily Connect page opens **Initial setup**
   until it is completed once. Continue with
   [Connecting your Smaily account](USER_GUIDE.md#connecting-your-smaily-account).
@@ -192,13 +192,12 @@ data from the store database:
   migrated them);
 - the module's flag rows (`flag` codes starting with `smaily_connect_`):
   the record of shoppers who opted out of personalization, the record of
-  checked credentials, and the health-check and consent-sync state.
+  checked credentials, and the health-check and consent-sync state;
+- the admin notice "Smaily Connect is ready to set up".
 
-Magento's own records of the module stay after an uninstall: the admin
-notice "Smaily Connect is ready to set up" (mark it as read or remove it
-under **System > Other Settings > Notifications**), the list of the
-module's applied setup patches (so installing again does not add that
-notice a second time), and the line `'Smaily_Connect' => 0` in
+Magento's own records of the module stay after an uninstall: the list of
+the module's applied setup patches (so installing again does not add the
+"ready to set up" notice again), and the line `'Smaily_Connect' => 0` in
 `app/etc/config.php`. None of them holds a setting or shopper data; a
 later install enables the module again with the step 3 `module:enable`.
 

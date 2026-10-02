@@ -108,6 +108,28 @@ class SchemaInstaller
     }
 
     /**
+     * Minimal mirror of Magento_AdminNotification's inbox table (where the
+     * admin notices land), for the setup notice tests.
+     */
+    public function createAdminNotificationInbox(): void
+    {
+        $this->connection->query('DROP TABLE IF EXISTS `adminnotification_inbox`');
+        $this->connection->query(
+            'CREATE TABLE `adminnotification_inbox` ('
+            . ' `notification_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,'
+            . ' `severity` SMALLINT UNSIGNED NOT NULL DEFAULT 0,'
+            . ' `date_added` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,'
+            . ' `title` VARCHAR(255) NOT NULL,'
+            . ' `description` TEXT NULL,'
+            . ' `url` VARCHAR(255) NULL,'
+            . ' `is_read` SMALLINT UNSIGNED NOT NULL DEFAULT 0,'
+            . ' `is_remove` SMALLINT UNSIGNED NOT NULL DEFAULT 0,'
+            . ' PRIMARY KEY (`notification_id`)'
+            . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+        );
+    }
+
+    /**
      * Seed one quote row; $columns adds to or overrides the defaults.
      *
      * @param array<string, mixed> $columns

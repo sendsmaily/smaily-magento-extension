@@ -22,6 +22,12 @@ PRO-3591/3594/3602, PRO-1952. Earlier sessions: 2026-09-11, 2026-09-10._
   configured (store scope: 1)": `TestSmaily` keeps the saved password only
   when the subdomain and username are filled in (or when a per-language
   account block posts its store view alone) and saved credentials exist.
+  The "ready to set up" admin notice is marked read when the initial
+  setup is finished (`WizardStepSaver` finish step →
+  `Model\Adminhtml\SetupNotice::markRead()`, found by its user-guide URL)
+  and deleted on uninstall by both paths (`Setup\Uninstall` and the
+  `RemoveSettingsOnUninstall` revert); without Magento_AdminNotification
+  (no `adminnotification_inbox` table) both do nothing.
 
 - **Next session opens here (2026-10-02).** Done today: PRO-2456 (+ page
   frame), PRO-2474 runbook, pilot-day checklist and clean ZIP install,

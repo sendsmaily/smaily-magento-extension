@@ -15,6 +15,7 @@ use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\Adminhtml\SetupNotice;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
@@ -60,6 +61,9 @@ class WizardStepSaverTest extends TestCase
     /** @var WebsiteContext&\PHPUnit\Framework\MockObject\MockObject */
     private $websiteContext;
 
+    /** @var SetupNotice&\PHPUnit\Framework\MockObject\MockObject */
+    private $setupNotice;
+
     /** @var array<int, array{path: string, value: mixed, scope: string, scopeId: int}> */
     private array $saved = [];
 
@@ -77,6 +81,7 @@ class WizardStepSaverTest extends TestCase
         $this->accountResolver = $this->createMock(AccountResolver::class);
         $this->mappingSaver = $this->createMock(MappingSaver::class);
         $this->websiteContext = $this->createMock(WebsiteContext::class);
+        $this->setupNotice = $this->createMock(SetupNotice::class);
 
         $this->saved = [];
         $this->configWriter->method('save')->willReturnCallback(
@@ -104,7 +109,8 @@ class WizardStepSaverTest extends TestCase
             $this->mappingSaver,
             $this->clientProvider,
             new ConfigRowNormalizer(),
-            new CredentialCheck($this->clientFactory, $this->config)
+            new CredentialCheck($this->clientFactory, $this->config),
+            $this->setupNotice
         );
     }
 
@@ -472,5 +478,17 @@ class WizardStepSaverTest extends TestCase
             ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 7],
             $this->savedScope(WizardStepSaver::XML_PATH_SETUP_COMPLETED)
         );
+    }
+
+    /**
+     * PRO-3628: finishing the initial setup marks the "ready to set up"
+     * admin notice read; saving any other step leaves it alone.
+     */
+    public function testFinishMarksTheSetupNoticeRead(): void
+    {
+        $this->setupNotice->expects(self::once())->method('markRead');
+
+        $this->saver->save('rss', ['rss_enabled' => true]);
+        $this->saver->save('finish', []);
     }
 }

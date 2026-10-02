@@ -11,6 +11,7 @@ namespace Smaily\Connect\Test\Integration\Setup;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Setup\ModuleContextInterface;
 use Magento\Framework\Setup\SchemaSetupInterface;
+use Smaily\Connect\Model\Adminhtml\SetupNotice;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
@@ -28,6 +29,7 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  * Uninstall class (`module:uninstall`, composer installs) and the
  * revertable data patch (`module:uninstall --non-composer`, app/code
  * installs). Disabling runs neither, and the patch's apply() changes nothing.
+ * PRO-3628: both paths also remove the "ready to set up" admin notice.
  */
 class UninstallTest extends IntegrationTestCase
 {
@@ -35,13 +37,16 @@ class UninstallTest extends IntegrationTestCase
     {
         parent::setUp();
 
-        (new SchemaInstaller($this->connection))->createFlag();
+        $schema = new SchemaInstaller($this->connection);
+        $schema->createFlag();
+        $schema->createAdminNotificationInbox();
         $this->seedStoreData();
     }
 
     protected function tearDown(): void
     {
         $this->connection->query('DROP TABLE IF EXISTS `flag`');
+        $this->connection->query('DROP TABLE IF EXISTS `adminnotification_inbox`');
         parent::tearDown();
     }
 
@@ -67,11 +72,30 @@ class UninstallTest extends IntegrationTestCase
     {
         $configBefore = $this->configPaths();
         $flagsBefore = $this->flagCodes();
+        $noticesBefore = $this->noticeTitles();
 
         $this->patch()->apply();
 
         self::assertSame($configBefore, $this->configPaths());
         self::assertSame($flagsBefore, $this->flagCodes());
+        self::assertSame($noticesBefore, $this->noticeTitles());
+    }
+
+    /**
+     * Magento_AdminNotification may be disabled: there is no notice to
+     * remove, and the settings still go.
+     */
+    public function testWithoutTheNotificationTableBothPathsStillRemoveTheSettings(): void
+    {
+        $this->connection->query('DROP TABLE `adminnotification_inbox`');
+        $setup = $this->createMock(SchemaSetupInterface::class);
+        $setup->method('getConnection')->willReturn($this->connection);
+        $setup->method('getTable')->willReturnArgument(0);
+
+        (new Uninstall())->uninstall($setup, $this->createMock(ModuleContextInterface::class));
+        $this->patch()->revert();
+
+        self::assertSame(['general/locale/code', 'smailyXconnect/foo/bar'], $this->configPaths());
     }
 
     private function patch(): RemoveSettingsOnUninstall
@@ -120,12 +144,32 @@ class UninstallTest extends IntegrationTestCase
         foreach ($flags as $code) {
             $this->connection->insert('flag', ['flag_code' => $code, 'flag_data' => '{}']);
         }
+
+        $notices = [
+            ['Smaily Connect is ready to set up', SetupNotice::URL],
+            ['Smaily Connect upgrade', null],
+            ['Magento security update', 'https://example.com/security'],
+        ];
+        foreach ($notices as [$title, $url]) {
+            $this->connection->insert('adminnotification_inbox', ['title' => $title, 'url' => $url]);
+        }
     }
 
     private function assertOnlyForeignRowsRemain(): void
     {
         self::assertSame(['general/locale/code', 'smailyXconnect/foo/bar'], $this->configPaths());
         self::assertSame(['catalog_website_attribute_is_sync_required', 'smailyXconnect_foo'], $this->flagCodes());
+        self::assertSame(['Magento security update', 'Smaily Connect upgrade'], $this->noticeTitles());
+    }
+
+    /**
+     * @return string[]
+     */
+    private function noticeTitles(): array
+    {
+        return $this->connection->fetchCol(
+            $this->connection->select()->from('adminnotification_inbox', ['title'])->order('title')
+        );
     }
 
     /**

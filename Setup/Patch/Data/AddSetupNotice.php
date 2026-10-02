@@ -10,9 +10,12 @@ namespace Smaily\Connect\Setup\Patch\Data;
 
 use Magento\Framework\Notification\NotifierInterface;
 use Magento\Framework\Setup\Patch\DataPatchInterface;
+use Smaily\Connect\Model\Adminhtml\SetupNotice;
 
 /**
  * Points the merchant at the setup wizard after installation/upgrade.
+ * Finishing the setup marks the notice read; uninstalling removes it
+ * (Model\Adminhtml\SetupNotice).
  */
 class AddSetupNotice implements DataPatchInterface
 {
@@ -49,8 +52,7 @@ class AddSetupNotice implements DataPatchInterface
                 . ' in a few guided steps. Existing settings from an earlier version were migrated automatically.'
                 . ' The full user guide is linked below under Read Details.'
             ),
-            // Hosted on GitHub for now — update once a hosted docs site exists.
-            'https://github.com/erkkimarkus/magento-connect/blob/v3/docs/USER_GUIDE.md'
+            SetupNotice::URL
         );
 
         return $this;

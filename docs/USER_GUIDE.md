@@ -109,7 +109,9 @@ with the price and link of your default website; a product that does not
 sell on the default website is sent with the price and link of the first
 website it is assigned to.
 
-After a major version upgrade the module posts a one-time admin
+After installation the admin notifications show "Smaily Connect is ready to
+set up", with a link to this guide; finishing the initial setup marks it as
+read. After a major version upgrade the module posts a one-time admin
 notification suggesting a settings review — nothing is changed or blocked.
 
 ---

@@ -52,8 +52,9 @@ queue persistence and claim/backoff/parking semantics (`smaily_event_queue`,
 `smaily_ingest_queue`), the 2.8.x → v3 settings migration (real
 `core_config_data` rows, password re-encryption, automation mapping seeding),
 the legacy schema cleanup patch (real `quote` column drops with mailed-state
-carry-over), the uninstall removal (real `core_config_data` and `flag` rows)
-and the queue cron jobs with the HTTP transports stubbed.
+carry-over), the uninstall removal (real `core_config_data`, `flag` and
+`adminnotification_inbox` rows) and the queue cron jobs with the HTTP
+transports stubbed.
 
 It needs a MySQL 8.x it can own a database on — any throwaway instance works:
 
@@ -288,8 +289,10 @@ six `smaily_*` tables exist; `cron_schedule` has `success` rows for the
 setup, Settings and Log, and each opens Initial setup until the setup is
 completed; after an update the settings are unchanged; disabling drops the
 six tables, and re-enabling with `--data-restore=1` brings them back with
-their rows; uninstalling leaves no `smaily_connect/%` or `smaily/%`
-setting and no `smaily_connect_%` flag row.
+their rows; finishing the initial setup marks the "Smaily Connect is
+ready to set up" notice as read; uninstalling leaves no `smaily_connect/%`
+or `smaily/%` setting, no `smaily_connect_%` flag row and no "ready to set
+up" notice.
 
 Afterwards return to the normal sandbox: remove `app/code/Smaily` from the
 container, then `docker compose up -d` without the override recreates the

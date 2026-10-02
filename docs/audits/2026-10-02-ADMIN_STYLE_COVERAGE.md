@@ -14,6 +14,8 @@ element visuals) and §5 (accepted micro-value differences). Companion:
 
 ## Summary
 
+*Evening re-measure: 90.9 % (Open Sans accepted) — see [Re-measure (evening 2026-10-02)](#re-measure-evening-2026-10-02).*
+
 **Overall: 77.9 %** — 2,070 of 2,656 compared properties match.
 Strict reading (pack-internal conflicts resolved by a token counted as
 *not* matching): 75.6 %. Unweighted mean of the per-component figures: 70.0 %
@@ -347,3 +349,149 @@ Details (the sandbox log is empty; the grid status column is read from
 `smaily_log_grid.xml`), non-healthy Dashboard verdicts (the sandbox is
 healthy; one verdict instance measured), multilingual routing cards (one
 store language).
+
+## Re-measure (evening 2026-10-02)
+
+**Overall: 90.9 %** — 2,415 of the same 2,656 compared properties match
+(strict 88.4 %). Basis: Magento's Open Sans counted as accepted, per the
+owner's page frame decision (target spec "Page frame decisions"); without
+that, 90.4 % (strict 87.9 %).
+
+| | Morning (above) | After the page frame (PRO-2456) | Evening |
+|---|---|---|---|
+| Overall, font accepted | 78.0 % | 85.0 % | **90.9 %** |
+| Overall, font not accepted | 77.9 % | 77.0 % | 90.4 % |
+| Strict, font accepted | 75.6 % | 82.5 % | 88.4 % |
+| Missing properties (pack element not rendered) | 163 | 163 | 63 |
+
+### Method
+
+The same probe as the morning: the same 2,656 rows (screen, element,
+property, pack value), the same comparison rules and tolerances, the same
+accepted, resolved and equivalent classes. Each row was evaluated again
+against the element the screen walkers resolve today. The walkers changed
+only where the markup moved since the morning:
+
+- An element that was missing in the morning and exists now is measured
+  against the row's pack values: the "Step N of 5" kicker, the step title
+  above the step content, the import card's header pill and "X of Y" line,
+  the Log grid's status pill, the Details panel's attempt history and its
+  footer button (Send again, measured as the pack's Retry now).
+- The step 1 card is found inside its wrapper; the step intro is the first
+  paragraph in the step card; the Dashboard connection label is
+  `.smaily-connection-label`; the Intelligence tab title stands for the
+  morning's in-card heading; the code blocks and section heads are matched
+  by role (payload, response), not by position.
+- A finished import shows the pack's secondary **Run again** (Backfill
+  frames). That button, and the three Intelligence import cards' buttons
+  that replace the morning's three secondary "Import …" buttons, are
+  measured against the pack's backfill secondary button (8 px 15 px). The
+  import card's outcome line is measured as the pack's body line in its
+  done colour (#1f7a34) and as the morning's backfill status row.
+
+The sandbox store had not finished its initial setup, so every page except
+step 1 of the initial setup redirected there. Every screen was therefore
+drawn in the browser: the live admin page (Magento's head, chrome and CSS)
+with its content replaced by the real templates rendered with stub data
+mirroring the morning state — setup finished, Smaily verified, the three
+store triggers active, Campaign Intelligence connected with four engine
+triggers off, the imports finished, the Dashboard healthy with no activity,
+the Log with a failed row and its Details panel. Every request other than a
+page or asset load was refused, and every `fetch()` answered locally. The
+Details row is a failed row with its attempts used up (so Send again is
+offered), where the morning drew a failed row with a retry scheduled; this
+moves the retry line from the info colours to the neutral ones (two rows).
+
+### Per screen (coverage, font accepted)
+
+| Screen | Morning | Frame | Evening | Compared | Match | Acc./equiv. | Resolved | Differs | Missing | Strict |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Initial setup › 1 Connect | 87 % | 88 % | **91 %** | 225 | 172 | 28 | 5 | 10 | 10 | 89 % |
+| Initial setup › 2 Contacts | 78 % | 80 % | **91 %** | 253 | 198 | 22 | 9 | 14 | 10 | 87 % |
+| Initial setup › 3 Automations | 84 % | 85 % | **87 %** | 332 | 254 | 33 | 1 | 34 | 10 | 86 % |
+| Initial setup › 4 Intelligence | 82 % | 84 % | **88 %** | 163 | 120 | 20 | 4 | 9 | 10 | 86 % |
+| Initial setup › 5 Overview | 81 % | 83 % | **87 %** | 151 | 112 | 18 | 1 | 10 | 10 | 86 % |
+| Dashboard | 69 % | 81 % | **94 %** | 258 | 209 | 20 | 14 | 6 | 9 | 89 % |
+| Settings › Connection | 81 % | 98 % | **98 %** | 171 | 142 | 19 | 7 | 3 | 0 | 94 % |
+| Settings › Contacts | 72 % | 88 % | **97 %** | 178 | 148 | 10 | 14 | 6 | 0 | 89 % |
+| Settings › Automations | 86 % | 91 % | **91 %** | 587 | 460 | 70 | 2 | 55 | 0 | 90 % |
+| Settings › Intelligence | 58 % | 86 % | **95 %** | 101 | 83 | 10 | 3 | 5 | 0 | 92 % |
+| Settings › RSS | 62 % | 82 % | **82 %** | 132 | 91 | 15 | 2 | 20 | 4 | 80 % |
+| Log (grid page) | 68 % | 68 % | **100 %** | 31 | 23 | 5 | 3 | 0 | 0 | 90 % |
+| Log › Details | 41 % | 41 % | **92 %** | 74 | 62 | 5 | 1 | 6 | 0 | 91 % |
+| *Backfill / import blocks (cross-cut)* | 60 % | 64 % | **93 %** | 112 | 85 | 7 | 12 | 8 | 0 | 82 % |
+
+### Per component (coverage, font accepted)
+
+| Component | Morning | Frame | Evening | Strict | Adoption morning → evening |
+|---|---|---|---|---|---|
+| Tab strip | 42 % | 100 % | 100 % | 100 % | 30 / 30 → 30 / 30 |
+| Pill | 97 % | 97 % | 100 % | 100 % | 26 / 27 → 27 / 27 |
+| Button primary | 87 % | 98 % | 100 % | 100 % | 12 / 12 → 12 / 12 |
+| ChoiceCard | 100 % | 100 % | 100 % | 92 % | 24 / 24 → 24 / 24 |
+| Backfill card | 39 % | 39 % | 100 % | 96 % | 8 / 12 → 12 / 12 |
+| Banner | 100 % | 100 % | 100 % | 81 % | 5 / 5 → 5 / 5 |
+| Connection card | 41 % | 52 % | 100 % | 100 % | 13 / 13 → 13 / 13 |
+| Tile | 98 % | 100 % | 100 % | 95 % | 17 / 17 → 17 / 17 |
+| Button secondary | 69 % | 78 % | 99 % | 99 % | 7 / 9 → 9 / 9 |
+| Verdict hero | 83 % | 88 % | 96 % | 71 % | 4 / 4 → 4 / 4 |
+| Step rail | 91 % | 91 % | 91 % | 90 % | 57 / 82 → 57 / 82 |
+| Trigger card | 90 % | 90 % | 90 % | 90 % | 78 / 78 → 78 / 78 |
+| Grey content pane | 70 % | 88 % | 88 % | 88 % | 16 / 16 → 16 / 16 |
+| Log details panel | 19 % | 19 % | 88 % | 86 % | 6 / 7 → 7 / 7 |
+| ProgressBar | 87 % | 87 % | 87 % | 33 % | 6 / 6 → 6 / 6 |
+| InlineStatus | 77 % | 89 % | 85 % | 70 % | 8 / 8 → 8 / 8 |
+| Field label + note | 83 % | 83 % | 83 % | 83 % | 18 / 19 → 18 / 19 |
+| Dashboard panels + quick links | 42 % | 77 % | 83 % | 75 % | 16 / 17 → 16 / 17 |
+| Footer divider | 68 % | 80 % | 82 % | 61 % | 9 / 10 → 10 / 10 |
+| Button ghost / tertiary | 72 % | 80 % | 80 % | 80 % | 5 / 5 → 5 / 5 |
+| Input / select | 78 % | 78 % | 78 % | 78 % | 29 / 29 → 29 / 29 |
+| Tab / step heading | 44 % | 44 % | 77 % | 74 % | 19 / 28 → 27 / 28 |
+| Card / panel | 36 % | 42 % | 42 % | 42 % | 11 / 11 → 11 / 11 |
+
+InlineStatus drops from 89 % (frame) to 85 %: the import card's outcome line
+now stands where the morning measured a separate inline status, and it is
+the pack's 13 px / 400 body line, not a 600-weight status (three rows).
+
+### Remaining gaps, by size
+
+1. **Initial setup — step content on a card, not on the pane** (H9; 5 steps,
+   about 20 rows): the pack puts fields directly on the grey pane; ours keeps
+   a white card (background, border, 20 px padding, 4 px radius). With it:
+   the 13 px intro (pack 14 px / 1.5, 22 px below; H8), the step title's
+   0 px bottom margin (pack 6 px) and the footer's 0 px top margin (pack
+   26 px; H10).
+2. **Initial setup — the rail's sub-labels** (H11; 50 rows, all missing):
+   the pack's 11 px muted line under each step name needs EN + ET copy.
+3. **Trigger cards** (M5–M8; 32 rows on step 3 and Settings › Automations):
+   5 px radius and `--shadow-1` (pack 6 px, flat), the active card's 3 px
+   green left bar, 14 px controls with the native select arrow (pack 13 px,
+   7 px 26 px 7 px 10 px with a custom caret).
+4. **Settings › RSS builder** (M10–M13; 20 rows): 13 px / #303030 labels
+   (pack 12 px / #5a5a5a), 14 px controls with 8 px 11 px padding (pack
+   13 px, 6 px 9 px), the feed URL chip's border and size, and the pack's
+   small "Feed URL" label (needs copy).
+5. **Card measures and corners** (H32, M1, M2): Settings cards are 620 /
+   680 px border-box (pack 666 / 706 px outer); Automations and Intelligence
+   cards keep 4 px radius and 20 px padding (pack 6 px, 20 px 22 px); tab
+   footers follow their card's width (620 / 666 / 680 px) where the probe
+   reads the pack's 620 px.
+6. **"Refresh workflows"** (M9): Magento's tertiary button (14 px, #007bdb,
+   6 px 14 px) instead of the pack's ghost (13 px, #1979c3, 9 px 14 px).
+7. Small ones: the spinner (13 px outer, pack 17 px; L1), the progress track
+   (8 px, pack 10 px; L2), the verdict dot ring (the bar green at 13 %, pack
+   #2b9e46 at 13 %), the Dashboard's in-content title row (deliberate, not
+   added), the wizard frame radius (the page frame decision removed the box).
+
+### Walk-through fixes the same evening
+
+Committed separately (PRO-2456), checked in en_US and et_EE at 1440, 1100
+and 400 px: the initial setup draws step 1 open server-side (no jump on
+load); the Campaign Intelligence automations' Daily cap and Test emails
+fields fit their placeholders, that card keeps 24 px below Save Automations
+and its heading matches the store-events card; a multilingual Connection tab
+keeps one card width; radios use the accent colour; the Dashboard's
+recent-activity table no longer scrolls sideways at 1100 px and the Failed
+tile's badge stays in the tile; the Log Details header is no longer italic,
+14 px and indented by Magento's `.modal-title span` rule (this last fix is
+in the numbers above: the header pill's size and font style).

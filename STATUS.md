@@ -30,7 +30,7 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   Connection tab's default-account card, error banner and footer share the
   mode cards' 680 px measure (were 620 px under 680 px cards); radio
   buttons (the fallback account) use the accent colour like the
-  checkboxes. Dashboard: below about 1300 px the recent-activity panel
+  checkboxes. Dashboard: below about 1110 px window width the recent-activity panel
   takes the full row and Quick links moves under it, so the table no
   longer scrolls sideways with its Updated column cut off (1100 px, both
   languages); the Failed tile's ATTENTION badge wraps under the label
@@ -39,6 +39,12 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   `.modal-title span` rule — it was italic, every part 14 px and indented
   10 px; now 12 px mono id, 17 px type, 11 px pill, upright. No behaviour
   change.
+  Style coverage re-measured on the morning's 2,656 rows (Open Sans
+  accepted): 78.0 % morning → 85.0 % after the page frame → 90.9 % now
+  (strict 88.4 %); largest remaining gaps: the step content card in the
+  initial setup, the rail sub-labels (need copy), trigger-card details and
+  the RSS builder controls — `docs/audits/2026-10-02-ADMIN_STYLE_COVERAGE.md`
+  "Re-measure (evening 2026-10-02)".
 
 - **PRO-3642 done — skipped and withdrawn rows are not deliveries for Send
   again, and the Dashboard reads them as the Log does (2026-10-02).**

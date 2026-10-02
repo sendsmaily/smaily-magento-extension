@@ -962,8 +962,6 @@
 .smaily-settings [data-tab="subscribers"] .smaily-tab-footer { max-width: 680px; }
 .smaily-settings [data-tab="automations"] .smaily-tab-footer,
 .smaily-settings [data-tab="intelligence"] .smaily-tab-footer { max-width: 666px; }
-/* The page-wide Save (tabs without their own footer) sits on the grey pane. */
-.smaily-settings #smaily-settings-global-footer { margin-top: 0; padding: 0 28px var(--sp-6); background: var(--s-bg); }
 /* Initial setup footer: the pack's 12px gap, and the step's measure, so the
  * buttons stay with the card above them (as the Settings tab footers do). */
 .smaily-wizard .smaily-footer { gap: var(--sp-3); }

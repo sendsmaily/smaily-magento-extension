@@ -121,13 +121,6 @@ $tabs = [
             <span class="smaily-result" id="smaily-w-rss-result"></span>
         </div>
     </div>
-
-    <div class="smaily-footer" id="smaily-settings-global-footer">
-        <div>
-            <span class="smaily-result" id="smaily-s-save-result"></span>
-            <button type="button" class="action-primary" id="smaily-s-save"><span><?= $escaper->escapeHtml(__('Save')) ?></span></button>
-        </div>
-    </div>
 </div>
 
 <?= $block->getChildHtml('panel.js') ?>
@@ -159,15 +152,10 @@ require(['jquery'], function ($) {
         });
         $('.smaily-tab-panel').removeClass('active')
             .filter('[data-tab=' + tab + ']').addClass('active');
-        $('#smaily-s-save-result').text('');
-        // Hide the page-wide generic-Save footer whenever the active tab
-        // renders its own footer — so tabs that grow a tab-scoped footer
-        // later opt out automatically, no tab-name list.
-        var hasOwnFooter = $('.smaily-tab-panel.active .smaily-tab-footer').length > 0;
-        $('#smaily-settings-global-footer').toggle(!hasOwnFooter);
         if (tab === 'automations' && !workflowsLoaded) {
             workflowsLoaded = true;
-            panels.loadWorkflows('#smaily-s-save-result');
+            // A workflow-list error shows beside the tab's Save (PRO-3641).
+            panels.loadWorkflows('#smaily-w-automations-result');
         }
         if (updateUrl && window.history && window.history.replaceState) {
             var url = new URL(window.location.href);
@@ -193,11 +181,11 @@ require(['jquery'], function ($) {
         activate($(this).data('tab'), true);
     });
 
-    // Shared by the generic Save button (other tabs) and Connection's own
-    // Save Connection button — same per-tab AJAX save, different button/status.
-    // A failed save shows the error banner above the tab's form and marks the
-    // field that caused it; the status beside the button says the save
-    // failed (PRO-3562).
+    // Shared by every tab's own Save button — the same per-tab AJAX save,
+    // each with its own status. Every tab has its own footer, so there is no
+    // page-wide Save (PRO-3641). A failed save shows the error banner above
+    // the tab's form and marks the field that caused it; the status beside
+    // the button says the save failed (PRO-3562).
     function saveTab($button, step, resultSelector) {
         var $panel = $('.smaily-tab-panel.active');
         $button.prop('disabled', true);
@@ -216,10 +204,6 @@ require(['jquery'], function ($) {
                 $button.prop('disabled', false);
             });
     }
-
-    $('#smaily-s-save').on('click', function () {
-        saveTab($(this), steps[active], '#smaily-s-save-result');
-    });
 
     $('#smaily-w-connection-save').on('click', function () {
         saveTab($(this), 'connect', '#smaily-w-test-result');

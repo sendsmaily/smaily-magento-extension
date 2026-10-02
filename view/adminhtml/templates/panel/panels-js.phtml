@@ -124,6 +124,17 @@ window.smailyPanelsInit = function ($) {
         return error;
     }
 
+    // A failed Test connection answer as a form error: the test endpoint
+    // names the fields at fault like the save endpoint does; a per-language
+    // account block prefixes them with its "accounts.<language>." key.
+    function testError(data, prefix) {
+        var error = new Error(data.error || '<?= $escaper->escapeJs(__('Connection failed.')) ?>');
+        error.errors = (data.errors || []).map(function (entry) {
+            return {field: prefix + entry.field, message: entry.message};
+        });
+        return error;
+    }
+
     function fieldInput(key) {
         var plain = {
             subdomain: '#smaily-w-subdomain',
@@ -697,20 +708,28 @@ window.smailyPanelsInit = function ($) {
         // Per-language account connection tests (mode A).
         $(document).on('click', '.smaily-ml-test', function () {
             var $block = $(this).closest('.smaily-ml-account');
+            var $panel = $block.closest('.smaily-step-panel, .smaily-tab-panel');
             var $result = $block.find('.smaily-result');
+            var language = String($block.data('language'));
             var creds = mlAccountRequestCreds($block);
+            clearFormErrors($panel);
             if (!creds) {
-                result($result, '<?= $escaper->escapeJs(__('Enter the password for this account first.')) ?>', false);
+                showFormErrors($panel, formError(
+                    '<?= $escaper->escapeJs(__('Enter the password for this account first.')) ?>',
+                    ['accounts.' + language + '.password']
+                ));
+                result($result, '<?= $escaper->escapeJs(__('Connection failed.')) ?>', false);
                 return;
             }
             result($result, '<?= $escaper->escapeJs(__('Testing…')) ?>', true);
             post(urls.test, creds).then(function (data) {
-                result($result, data.connected
-                    ? '<?= $escaper->escapeJs(__('Connected!')) ?>'
-                    : (data.error || '<?= $escaper->escapeJs(__('Connection failed.')) ?>'), data.connected);
                 if (data.connected) {
+                    result($result, '<?= $escaper->escapeJs(__('Connected!')) ?>', true);
                     loadMappingWorkflows();
+                    return;
                 }
+                showFormErrors($panel, testError(data, 'accounts.' + language + '.'));
+                result($result, '<?= $escaper->escapeJs(__('Connection failed.')) ?>', false);
             });
         });
 
@@ -722,22 +741,31 @@ window.smailyPanelsInit = function ($) {
             mlCredentialTimer = setTimeout(loadMappingWorkflows, 1200);
         });
 
-        // Connection test.
+        // Connection test. A failed test is shown like a failed save
+        // (PRO-3641): the error banner above the form, the field at fault
+        // marked, and the status beside the button says the test failed.
         $('#smaily-w-test').on('click', function () {
+            var $panel = $(this).closest('.smaily-step-panel, .smaily-tab-panel');
+            clearFormErrors($panel);
             result('#smaily-w-test-result', '<?= $escaper->escapeJs(__('Testing…')) ?>', true);
             post(urls.test, credentials()).then(function (data) {
                 connected = !!data.connected;
                 if (data.checked) {
                     setConnectionStatus(!!data.connected, data.accountName);
                 }
-                result('#smaily-w-test-result', data.connected
-                    ? '<?= $escaper->escapeJs(__('Connected! Continue to the next step.')) ?>'
-                    : (data.error || '<?= $escaper->escapeJs(__('Connection failed.')) ?>'), data.connected);
                 if (data.connected) {
+                    result(
+                        '#smaily-w-test-result',
+                        '<?= $escaper->escapeJs(__('Connected! Continue to the next step.')) ?>',
+                        true
+                    );
                     // Changed credentials re-render the dependent workflow
                     // dropdowns without saving anything.
                     loadWorkflows(null);
+                    return;
                 }
+                showFormErrors($panel, testError(data, ''));
+                result('#smaily-w-test-result', '<?= $escaper->escapeJs(__('Connection failed.')) ?>', false);
             });
         });
 

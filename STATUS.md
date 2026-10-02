@@ -59,6 +59,24 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   1400 / 700 / 560 / 420 px). Each Settings tab footer now spans its tab's
   card: Automations and Intelligence 666 px, Contacts 680 px (it was
   620 px under a 680 px card too); Connection and RSS stay at 620 px.
+  The workflow list's error on Settings > Automations shows beside **Save
+  Automations** (`#smaily-w-automations-result`) instead of in the
+  page-wide footer, which every tab had hidden since PRO-3567; that footer
+  (`#smaily-settings-global-footer`, its Save, its CSS and the JS that
+  toggled it) is gone. A failed **Test connection** follows the failed-save
+  model of PRO-3562: banner above the form, *Connection failed.* beside the
+  button, the field at fault marked with the message under it — on Settings
+  > Connection, initial setup step 1 and in each per-language account block
+  (its fields as `accounts.<language>.<field>`; "Enter the password for this
+  account first." marks that block's password). `TestSmaily` now answers
+  `errors: [{field, message}]` like the save endpoint: `subdomain` for a
+  refused subdomain, and each posted field that is empty when there is
+  nothing to test with; a refusal by Smaily or no answer names no field
+  (banner only). No new phrases. Unit-tested (`TestSmailyTest`); verified
+  by rendering the real templates with stubs in headless Chrome (Settings
+  en_US, initial setup et_EE, per-language accounts; refused subdomain,
+  empty fields, refused credentials, success; the Automations tab with a
+  failing workflow list).
 
 - **PRO-3569 done — admin copy leftovers (2026-10-02).** The Contacts
   lawful-basis paragraph points to where the choice is changed now

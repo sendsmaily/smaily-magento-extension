@@ -100,10 +100,11 @@ class TestSmailyTest extends TestCase
 
         self::assertFalse($this->response['connected']);
         self::assertFalse($this->response['checked']);
-        self::assertSame(
-            'The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.',
-            $this->response['error']
-        );
+        $message = 'The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.';
+        self::assertSame($message, $this->response['error']);
+        // PRO-3641: the answer names the field at fault, so the form marks it
+        // as a failed save does (PRO-3562).
+        self::assertSame([['field' => 'subdomain', 'message' => $message]], $this->response['errors']);
     }
 
     /**
@@ -121,11 +122,17 @@ class TestSmailyTest extends TestCase
      * PRO-3628: Test connection with nothing to test asks the merchant to
      * fill in the fields in plain words — a fresh install has no saved
      * credentials, and fields cleared in the form are not the saved ones.
+     * PRO-3641: the answer names each empty field, so the form marks them.
      *
      * @dataProvider nothingToTestProvider
      * @param array<string, mixed> $body
+     * @param string[] $emptyFields
      */
-    public function testNothingToTestAsksForTheCredentials(array $body, bool $savedCredentials): void
+    public function testNothingToTestAsksForTheCredentials(
+        array $body,
+        bool $savedCredentials,
+        array $emptyFields
+    ): void
     {
         $clientProvider = $this->createMock(SmailyClientProvider::class);
         if ($savedCredentials) {
@@ -140,27 +147,39 @@ class TestSmailyTest extends TestCase
 
         $this->controller($body, $clientFactory, $clientProvider)->execute();
 
+        $message = 'Please fill in the subdomain, username and password.';
         self::assertSame(
-            ['connected' => false, 'checked' => false, 'error' => 'Please fill in the subdomain, username and password.'],
+            [
+                'connected' => false,
+                'checked' => false,
+                'error' => $message,
+                'errors' => array_map(
+                    static fn (string $field): array => ['field' => $field, 'message' => $message],
+                    $emptyFields
+                ),
+            ],
             $this->response
         );
     }
 
     /**
-     * @return array<string, array{array<string, mixed>, bool}>
+     * @return array<string, array{array<string, mixed>, bool, string[]}>
      */
     public static function nothingToTestProvider(): array
     {
         $empty = ['subdomain' => '', 'username' => '', 'password' => '', 'store_id' => 1];
+        $all = ['subdomain', 'username', 'password'];
 
         return [
-            'all fields empty on a fresh install' => [$empty, false],
-            'all fields empty, credentials saved' => [$empty, true],
-            'username cleared, credentials saved' => [['subdomain' => 'demo'] + $empty, true],
+            'all fields empty on a fresh install' => [$empty, false, $all],
+            'all fields empty, credentials saved' => [$empty, true, $all],
+            'username cleared, credentials saved' => [['subdomain' => 'demo'] + $empty, true, ['username', 'password']],
             'subdomain and username typed, no saved password' => [
                 ['subdomain' => 'demo', 'username' => 'user', 'password' => '', 'store_id' => 1],
                 false,
+                ['password'],
             ],
+            'a per-language account block with nothing saved' => [['store_id' => 1], false, []],
         ];
     }
 

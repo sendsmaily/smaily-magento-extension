@@ -186,9 +186,12 @@ When a save fails — in the initial setup or on a Settings tab — an error
 banner above the form says why, the status beside the button says *Saving
 failed.*, and the field that caused it is marked in red with the message
 under it (for example an empty subdomain or username, or a subdomain that is
-not a plain one, also in a per-language account block). Editing the marked
-field removes the mark; the banner goes with the last mark, or with the next
-save.
+not a plain one, also in a per-language account block). A Test connection
+that fails is shown the same way, with *Connection failed.* beside the
+button: the banner gives Smaily's reason or what is missing, and the field
+at fault is marked when there is one (an empty field, or a subdomain that is
+not a plain one). Editing the marked field removes the mark; the banner goes
+with the last mark, or with the next save or test.
 
 Credentials can be set per **website**, or per **store view** when each
 language uses its own Smaily account (multilingual mode "Per-language
@@ -306,6 +309,8 @@ to store events. Only enabled workflows with the **"form submitted"**
 trigger are listed — that is the only trigger type the Smaily API can
 enroll contacts into; workflows with other triggers (e.g. "subscribed to
 list") cannot be fired by an integration and are therefore not offered.
+When the list cannot be loaded on **Settings > Automations**, the reason
+shows beside the tab's **Save Automations** button.
 The events:
 
 - **Welcome** — fires when a shopper subscribes to the newsletter in your

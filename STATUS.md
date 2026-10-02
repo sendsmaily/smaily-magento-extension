@@ -73,8 +73,6 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   style coverage 78.0 → 85.0 % (font difference counted as accepted). The
   Log page is a native grid and has no Smaily frame.
 
-- **PRO-3578 in progress — profiling consent hardening (2026-10-02,
-
 - **PRO-3578 done — profiling consent hardening (2026-10-02,
   parity audit P3 + R1 + R2, Woo PRO-3189/3191/3192/3434).** Slice 1: the
   engine opt-out (and opt-in) is no longer one direct, never-retried call.

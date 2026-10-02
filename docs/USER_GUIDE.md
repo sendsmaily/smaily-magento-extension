@@ -376,6 +376,11 @@ The optional Smaily recommendation engine: your catalog, customers, orders
 and (opt-in) browsing behavior power personalized recommendations and
 engine-run automations (replenishment reminders, win-back, …).
 
+Campaign Intelligence is an **optional paid add-on** (€250/month), added to
+your regular Smaily monthly payment. Contact Smaily to activate it, or set it
+up later. Initial setup step 4 and **Settings > Intelligence** open with
+this introduction.
+
 ### Connecting
 
 1. Get a one-time **setup URL/token** from Smaily.

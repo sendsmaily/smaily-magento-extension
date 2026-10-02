@@ -25,7 +25,9 @@ $isRefused = $viewModel->isEngineRefused();
 ?>
 <div class="smaily-card">
     <h2><?= $escaper->escapeHtml(__('Campaign Intelligence (optional)')) ?></h2>
-    <p><?= $escaper->escapeHtml(__('The Smaily recommendation engine uses your catalog, orders and (opt-in) browsing behavior to personalize newsletters and run smart automations like replenishment reminders and win-back. Skip this step if you do not have an Intelligence subscription — you can connect any time later.')) ?></p>
+    <?php // Marketing's introduction (GMS-11), word for word as in the WooCommerce and Shopify plugins. ?>
+    <p><?= $escaper->escapeHtml(__('Campaign Intelligence uses your store’s product, customer and order data to create personalised product recommendations for Smaily campaigns and automations. This helps you send more relevant emails with less manual work.')) ?></p>
+    <p><?= $escaper->escapeHtml(__('Campaign Intelligence is an optional paid add-on (€250/month), added to your regular Smaily monthly payment. Contact Smaily to activate it, or set it up later.')) ?></p>
     <div id="smaily-w-engine-disconnected">
         <div class="smaily-field">
             <label for="smaily-w-setup-url"><?= $escaper->escapeHtml(__('Setup URL or token from Smaily')) ?></label>

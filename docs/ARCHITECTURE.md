@@ -427,8 +427,12 @@ email, idle past cutoff, younger than 24 h), diffs against the
 `smaily_abandoned_cart` side table, marks `mailed` **before** dispatching
 (a crash costs one reminder, never a duplicate), and enqueues the
 automation. The payload's `abandoned_cart_url` is an HMAC-signed
-`smaily/cart/restore` link (`AbandonedCart\RestoreTokenManager`, keyed with
-the installation crypt key) that restores the exact quote.
+`smaily/cart/restore?id=&ts=&token=` link (`AbandonedCart\RestoreTokenManager`,
+keyed with the installation crypt key) that restores the exact quote. `ts` is
+the moment the reminder was created, inside the signature; the link expires
+30 days later and then lands on the cart page with a notice, restoring
+nothing. A link without `ts` (issued before links carried it) is accepted for
+30 days after the tracker row's `mail_sent_at`, and is expired without one.
 
 **The exit signal (PRO-2453, Woo PRO-1723 parity).** A follow-up series has
 to stop when the shopper buys, and a Smaily-only "has ordered since" rule

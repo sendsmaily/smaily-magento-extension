@@ -79,11 +79,12 @@ class PayloadBuilder
                 $group = $store->getGroup();
                 $address['store_group'] = $group ? (string)$group->getName() : '';
                 $address['store_website'] = (string)$store->getWebsite()->getName();
-                // A tokenized recovery link that restores this exact quote.
-                $address['abandoned_cart_url'] = $store->getUrl('smaily/cart/restore', [
-                    'id' => (int)$quote->getId(),
-                    'token' => $this->restoreTokenManager->generate((int)$quote->getId()),
-                ]);
+                // A signed recovery link that restores this exact quote
+                // for 30 days from now, when the reminder is created.
+                $address['abandoned_cart_url'] = $store->getUrl(
+                    'smaily/cart/restore',
+                    $this->restoreTokenManager->linkParams((int)$quote->getId())
+                );
             }
         } catch (LocalizedException) {
             // Store context is decorative; the address stays valid without it.

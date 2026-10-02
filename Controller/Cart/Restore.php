@@ -21,9 +21,10 @@ use Magento\Quote\Model\Quote;
 use Smaily\Connect\Model\AbandonedCart\RestoreTokenManager;
 
 /**
- * Abandoned cart recovery link target (GET smaily/cart/restore?id=&token=):
+ * Abandoned cart recovery link target (GET smaily/cart/restore?id=&ts=&token=):
  * restores the shopper's still-active quote into the checkout session so the
  * {{abandoned_cart_url}} in the reminder email brings back the exact cart.
+ * An expired link lands on the cart page with a notice and restores nothing.
  */
 class Restore implements HttpGetActionInterface
 {
@@ -48,8 +49,17 @@ class Restore implements HttpGetActionInterface
         $redirect->setPath('checkout/cart');
 
         $quoteId = (int)$this->request->getParam('id');
-        $token = (string)$this->request->getParam('token');
-        if ($quoteId <= 0 || !$this->tokenManager->validate($quoteId, $token)) {
+        $verdict = $this->tokenManager->check(
+            $quoteId,
+            (string)$this->request->getParam('ts'),
+            (string)$this->request->getParam('token')
+        );
+        if ($verdict === RestoreTokenManager::EXPIRED) {
+            $this->messageManager->addNoticeMessage((string)__('This cart link has expired.'));
+
+            return $redirect;
+        }
+        if ($verdict !== RestoreTokenManager::VALID) {
             return $redirect;
         }
 

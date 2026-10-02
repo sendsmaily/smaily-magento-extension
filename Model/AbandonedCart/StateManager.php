@@ -141,6 +141,21 @@ class StateManager
     }
 
     /**
+     * When the reminder for a quote was sent (UTC, `Y-m-d H:i:s`), or null
+     * when none was.
+     */
+    public function mailSentAt(int $quoteId): ?string
+    {
+        $connection = $this->resourceConnection->getConnection(self::CONNECTION);
+        $select = $connection->select()
+            ->from($this->table(), ['mail_sent_at'])
+            ->where('quote_id = ?', $quoteId);
+        $sentAt = $connection->fetchOne($select);
+
+        return is_string($sentAt) && $sentAt !== '' ? $sentAt : null;
+    }
+
+    /**
      * Quote IDs in a terminal status, which must not be (re)mailed.
      *
      * @param int[] $quoteIds

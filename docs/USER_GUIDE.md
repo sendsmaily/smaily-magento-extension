@@ -358,7 +358,9 @@ Your Smaily template decides which of them to show.
 
 `{{abandoned_cart_url}}` is a secure recovery link that restores the exact
 cart when clicked (a signed link; carts belonging to a registered customer
-ask them to sign in first).
+ask them to sign in first). The link expires 30 days after the reminder is
+created: an expired link opens the cart page with the notice "This cart link
+has expired." and restores nothing.
 
 ## Product RSS feed
 

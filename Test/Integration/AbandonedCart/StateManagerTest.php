@@ -86,4 +86,21 @@ class StateManagerTest extends IntegrationTestCase
             'A repopulated tombstone is still terminal, so no reminder is scheduled'
         );
     }
+
+    /**
+     * An abandoned-cart restore link from before links carried their issue
+     * moment is dated by the moment the reminder was sent.
+     */
+    public function testTheMomentAReminderWasSentIsReadBackOnlyForAMailedQuote(): void
+    {
+        $this->stateManager->markMailed(31, 1, self::SUBJECT);
+        $this->stateManager->setNewsletterOptin(32, 1, self::SUBJECT, true);
+
+        $sentAt = $this->stateManager->mailSentAt(31);
+
+        self::assertNotNull($sentAt);
+        self::assertEqualsWithDelta(time(), strtotime($sentAt . ' UTC'), 60);
+        self::assertNull($this->stateManager->mailSentAt(32), 'A tracked quote that was never mailed');
+        self::assertNull($this->stateManager->mailSentAt(33), 'An untracked quote');
+    }
 }

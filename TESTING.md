@@ -214,7 +214,8 @@ the engine contract from a private repository and carries internal audits, so
 the package would leak both to anyone who unzips it. The documentation set
 lives on GitHub instead and the shipped README links to it there by URL — when
 you add a documentation link to README, CHANGELOG or an admin template, make it
-the repository URL, never a relative `docs/` path.
+the repository URL, never a relative path to a file the package does not ship
+(`docs/`, `TESTING.md`, `CONTRIBUTING.md`, `BACKLOG.md`).
 
 **`composer validate --strict` stays yellow, on purpose.** Its one warning —
 "the version field is present, it is recommended to leave it out" — is an

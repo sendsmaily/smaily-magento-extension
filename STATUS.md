@@ -89,6 +89,9 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   Pre-tag packaging fixes: `TESTING.md` and a worktree's `.git` pointer file
   no longer ship (both forbidden by the verifier; worktree run: VERIFY OK,
   336 entries); the User Guide names the browse-tracking toggle by its admin label.
+  The shipped README and CHANGELOG link `TESTING.md`, `CONTRIBUTING.md` and
+  `BACKLOG.md` by GitHub URL — those files do not ship, so a relative link
+  was dead inside the ZIP.
 
 - **`composer.lock` refreshed (2026-10-02, GitHub issue #2).** `composer
   update --ignore-platform-req='ext-*'`, PHP 8.1 pin kept; `composer update

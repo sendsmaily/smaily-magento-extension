@@ -2,7 +2,22 @@
 
 ### 3.0.0 (unreleased)
 
-The package version is currently `3.0.0-rc1` — the release-candidate cut of everything below. Nothing is published: composer still resolves 2.8.1 as the newest stable release.
+The package version is currently `3.0.0-rc2` — the second release-candidate cut of everything below. Release candidates are GitHub pre-releases for pilot stores; composer still resolves 2.8.1 as the newest stable release.
+
+**Changes since 3.0.0-rc1**
+
+- Stores that sell on a separate (headless) storefront: a new guide, `docs/HEADLESS_STOREFRONTS.md`, says which features work with a separate storefront application, how product links are built and what the storefront team needs to do; the new **Storefront URL** setting puts the product links in the catalog sync and the RSS feed on the storefront's address.
+- Storefront browse tracking asks for marketing consent the way the WooCommerce plugin does: the store's own consent function first, then Magento's cookie notice, otherwise no consent. While no consent source is connected, Settings > Intelligence and an admin notification recommend one.
+- The admin Log shows contact data in full for debugging, as the WooCommerce plugin's log does; passwords and API keys are never shown.
+- The initial setup needs the settings permission, as Settings does.
+- The server log file masks every email address, also a URL-encoded or JSON-escaped one and one quoted in an error that Smaily or Campaign Intelligence sends back.
+- The Smaily API password and the Campaign Intelligence API key are marked sensitive, so `app:config:dump` does not write them to `config.php`.
+- Input hardening: the RSS feed is cached by the parameters it applies, and the RSS feed, the cart restore link, the browse tracking endpoint and the checkout opt-in read a request value that is not a single string as invalid input instead of answering with an error page.
+- The release package is built from the committed source tree, and composer's dist installs leave out the same development files.
+- The admin pages follow the Smaily Connect design across the initial setup, Dashboard, Settings and Log: step positions and titles, error banners that mark the field at fault, import cards with status pills, colored Log statuses, the Details panel with **Send again** and **Copy payload**, and *Skipped* for rows closed without being sent.
+- Upgrading from 2.8.x: where *Enable Module* was *No*, contact sync and the welcome and abandoned-cart automations stay off; Smaily account values saved at store-view scope are not carried over, and an admin notice names those store views. `docs/UPGRADING.md` lists what to note down before the upgrade and what changes on upgrade day.
+- Switching abandoned-cart reminders on says to switch off any other tool that sends them, so a shopper does not get two reminders for one cart.
+- This changelog lists each feature once.
 
 Ground-up rewrite as module `Smaily_Connect`, targeting feature parity with the Smaily Connect plugins for WooCommerce and Shopify. Upgrading from 2.8.x is seamless: the composer package name is unchanged and all settings (including the previously plaintext API password, now encrypted) migrate automatically during `setup:upgrade`. Once migrated, the old 2.8.x settings (`smaily/*`, every scope) are deleted, so going back to 2.8.x starts with empty settings (see `docs/UPGRADING.md`).
 

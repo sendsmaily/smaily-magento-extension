@@ -5,14 +5,21 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 — 3.0.0-rc1 is released as a GitHub pre-release on
-the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc1),
-built by the release workflow from commit 9af1d9e; the ZIP and its .sha256
-were checked after publishing (354 files, checksum OK). Milestone "rc1 tagged
-+ pilot runbook" reached. Done before the tag: parity work (PRO-3576–3584,
-3591, 3594, 3602, 3606, 3610, 3616, 3619), PRO-1952, PRO-1965/1963, PRO-3560,
-PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
-(PRO-2456 page frame), PRO-3603, PRO-3628. Earlier: 2026-09-11, 2026-09-10._
+_Last updated: 2026-10-02 — 3.0.0-rc2 is prepared, not published: the
+version is `3.0.0-rc2` (composer.json, `ModuleInfo::VERSION`, the upstream
+proposal; composer.lock content-hash refreshed), CHANGELOG has a "Changes
+since 3.0.0-rc1" list, and UPGRADING's "What changes on upgrade day" adds
+three payload differences checked against `SubscriberPayloadBuilder` and
+2.8.1's `Cron/SubscribersSync` (names no longer upper-cased; an unknown
+gender left out instead of `Male`; `store`, `store_group` and
+`store_website` left out when the store view cannot be found, where 2.8.x
+sent `store` and `store_group` empty). The
+ZIP builds and verifies locally from the prepared commit. It awaits the
+owner's go to tag and publish (a GitHub pre-release on the fork, as rc1).
+3.0.0-rc1 is released as a GitHub pre-release on the fork
+(https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc1),
+built by the release workflow from commit 9af1d9e (354 files, checksum
+OK). Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
@@ -728,8 +735,10 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   PRO-3625 + PRO-3573 (hardening; the admin Log shows contact data in full
   and the initial setup needs `::config`, both Woo parity by owner decision),
   PRO-3660 (Storefront URL, auto-open on API-only orders), PRO-3664 (browse
-  consent as in Woo: override → cookie restriction mode → none), PRO-3666.
-  These land in a future rc2; no tag yet. Next, in order: (1) pilot day
+  consent as in Woo: override → cookie restriction mode → none), PRO-3666,
+  and since then PRO-1398, PRO-3665, PRO-3661, PRO-3681. All of it is in
+  3.0.0-rc2, which is prepared (header) and awaits the owner's go to
+  publish; no tag yet. Next, in order: (1) pilot day
   09.10 — Erkki passes the storefront hand-off in HEADLESS_STOREFRONTS.md to
   the storefront team (incl. keeping the query string on the `/<url_key>.html`
   redirect), sets the Storefront URL, walks `PILOT_CHECKLIST.md`; PRO-2474's
@@ -3639,7 +3648,7 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   merchant recovery).
 
 **All 6 v3 phases implemented** (~110 files) on branch `v3`, version
-**3.0.0-rc1 — unreleased**. Current truth:
+**3.0.0-rc2 — unreleased**. Current truth:
 
 - **PRO-1391 final-polish done — four refinements on Settings > Connection
   after Erkki's side-by-side review of the PRO-1391 visual-fidelity pass.**

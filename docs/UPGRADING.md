@@ -122,6 +122,21 @@ The contact fields Smaily receives change too:
   them before). A Smaily template or segment that uses `name` must use
   `first_name` and `last_name` instead. Smaily keeps the `name` values it
   has, but they are no longer updated.
+- **First and last names are sent as stored.** 2.8.x upper-cased the
+  first letter of `first_name` and `last_name` (*mari* became *Mari*). v3
+  sends them as they are saved on the customer account, so a name saved
+  in lower case reaches Smaily in lower case.
+- **An unknown gender is left out.** 2.8.x sent `Male` for a customer
+  whose gender is not set or is *Not Specified*. v3 sends `user_gender`
+  (see *Behavior changes to review after upgrading*) only for `Male` and
+  `Female`, and leaves the field out for every other customer. A segment
+  on `Male` therefore no longer includes customers without a gender.
+- **`store` and `store_group` are sent only when the store view is
+  known.** 2.8.x always sent `store`, `store_group` and `store_website`,
+  with an empty `store` and `store_group` when it could not find the
+  contact's store view. v3 sends the three fields with the names of the
+  contact's store view, store and website, and leaves all three out when
+  that store view cannot be found, so Smaily keeps the values it has.
 - **Birthday is sent as `YYYY-MM-DD`** (for example `1990-05-17`); 2.8.x
   sent `1990-05-17 00:00:00`.
 - **An empty value is left out instead of sent empty.** 2.8.x sent `''`

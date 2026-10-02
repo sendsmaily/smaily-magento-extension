@@ -36,6 +36,7 @@ $userGuideUrl = 'https://github.com/erkkimarkus/magento-connect/blob/v3/docs/USE
 // installation's default one.
 $websiteQuery = $viewModel->getWebsiteQuery();
 $settingsUrl = $block->getUrl('smaily_connect/settings', $websiteQuery);
+$dashboardUrl = $block->getUrl('smaily_connect/dashboard', $websiteQuery);
 $logUrl = $block->getUrl('smaily_connect/log', $websiteQuery);
 ?>
 <div id="smaily-wizard" class="smaily-ui smaily-wizard">
@@ -86,7 +87,7 @@ $logUrl = $block->getUrl('smaily_connect/log', $websiteQuery);
         <div class="smaily-card">
             <h2><?= $escaper->escapeHtml(__('You are all set!')) ?></h2>
             <p><?= $escaper->escapeHtml(__('Smaily Connect is now syncing in near-real-time. Here is where everything lives from now on:')) ?></p>
-            <ul style="line-height:2.2;">
+            <ul class="smaily-overview-links">
                 <li><a href="<?= $escaper->escapeUrl($settingsUrl) ?>"><?= $escaper->escapeHtml(__('Settings')) ?></a> — <?= $escaper->escapeHtml(__('every setting from the initial setup as always-available tabs, including the historical imports and the RSS feed URL builder')) ?></li>
                 <li><a href="<?= $escaper->escapeUrl($logUrl) ?>"><?= $escaper->escapeHtml(__('Log')) ?></a> — <?= $escaper->escapeHtml(__('every delivery to Smaily and Campaign Intelligence with retry; check here first if something seems off')) ?></li>
                 <li><?= $escaper->escapeHtml(__('Product RSS feed for the Smaily template editor:')) ?> <code><?= $escaper->escapeHtml($block->getBaseUrl() . 'smaily/rss/feed') ?></code><br/>
@@ -95,6 +96,18 @@ $logUrl = $block->getUrl('smaily_connect/log', $websiteQuery);
                 <li><a href="<?= $escaper->escapeUrl($userGuideUrl) ?>" target="_blank" rel="noopener noreferrer"><?= $escaper->escapeHtml(__('User Guide')) ?></a> — <?= $escaper->escapeHtml(__('the full merchant documentation: every feature, setting and troubleshooting steps')) ?></li>
             </ul>
             <p class="note"><?= $escaper->escapeHtml(__('Tip: make sure the Magento cron runs every minute — deliveries are queued and flushed by the smaily_connect cron group.')) ?></p>
+        </div>
+        <?php // The step footer (Back/Continue) is hidden here; this one moves
+        // the merchant on: the Dashboard first, Settings as the alternative. ?>
+        <div class="smaily-footer smaily-overview-footer">
+            <div>
+                <a class="action-secondary" href="<?= $escaper->escapeUrl($settingsUrl) ?>">
+                    <span><?= $escaper->escapeHtml(__('Open Settings')) ?></span>
+                </a>
+                <a class="action-primary" href="<?= $escaper->escapeUrl($dashboardUrl) ?>">
+                    <span><?= $escaper->escapeHtml(__('Go to Dashboard')) ?></span>
+                </a>
+            </div>
         </div>
     </div>
 

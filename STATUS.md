@@ -5,7 +5,11 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-2474 — the release ZIP installs on a clean
+_Last updated: 2026-10-02 (PRO-2456 follow-up — five defects from Erkki's
+live-sandbox review fixed: the Dashboard menu glyph, the contact import
+block, checkbox alignment, the Intelligence connected state and the
+Overview step, which now leads on to the Dashboard or Settings. Earlier
+the same day: PRO-2474 — the release ZIP installs on a clean
 Magento 2.4.8-p4 in production mode exactly as `docs/INSTALLING.md` says;
 the update and disable/restore paths work, and the runbook now says what
 `--safe-mode=1` really keeps; only the rc1 tag on Erkki's go remains.
@@ -60,6 +64,10 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   its label. Intelligence: "Connected: … (engine …)" is the pack's success
   Banner instead of Magento's message box, and the body copy, the browse
   tracking checkbox and its muted, indented note keep the card's spacing.
+  Overview ("You are all set!"): the link list wraps at body line height
+  (was 2.2), and a footer under a divider offers **Go to Dashboard**
+  (primary) and **Open Settings** — new phrases "Ava töölaud" / "Ava
+  seaded". Checked by screenshot at 1440 and 1100 px in en_US and et_EE.
 
 - **PRO-3560 done — "Connected" means Smaily accepted the credentials
   (2026-10-02).** Before, the Dashboard and Settings > Connection said

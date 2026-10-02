@@ -122,7 +122,8 @@ Intelligence, Overview), each saved separately, with connection testing and
 live workflow lists built in. Completed steps stay unlocked in the step
 list (a rail on the left; a bar across the top on narrow screens), so you
 can move back and forward between them freely — also when
-revisiting the initial setup after finishing it. Everything it writes
+revisiting the initial setup after finishing it. The Overview step ends
+with **Go to Dashboard** and **Open Settings**. Everything it writes
 lands in the regular configuration, so you can fine-tune it later on the
 **Settings > Connection** tab — its own Test Connection / Save Connection
 footer and connection-status line (Connected / Not connected, with the

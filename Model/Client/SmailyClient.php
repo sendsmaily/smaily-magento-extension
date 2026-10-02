@@ -162,12 +162,16 @@ class SmailyClient
                 $this->retryAfterSeconds($exception->getResponse())
             );
         } catch (GuzzleException $exception) {
+            // Guzzle's message ends with the request URL, query included — the
+            // contact lookup's email with it. Only the masked text goes on,
+            // and the raw exception is not chained (PRO-3572).
+            $error = TransportErrorMessage::of($exception);
             $this->logger->error('Smaily API transport error', [
                 'method' => $method,
                 'endpoint' => $uri,
-                'error' => $exception->getMessage(),
+                'error' => $error,
             ]);
-            throw new TransportException((string)__('Smaily API request failed: %1', $exception->getMessage()), 0, $exception);
+            throw new TransportException((string)__('Smaily API request failed: %1', $error));
         }
 
         $body = (string)$response->getBody();

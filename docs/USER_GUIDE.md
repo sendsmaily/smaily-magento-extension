@@ -522,8 +522,10 @@ panel — you do not have to keep the page open:
   Smaily API request and its response code. The command takes effect at
   once — it clears Magento's configuration cache itself. **The detailed
   levels write more about your contacts to a file on the server**: request
-  payloads are summarised and email addresses masked, but an error message
-  can still carry a contact's email address. Treat the file as personal
+  payloads are summarised and email addresses masked, and a network failure
+  is logged with the address it called but without its query string or the
+  contact's address — but a message that Smaily or Campaign Intelligence
+  sends back can still carry a contact's email address. Treat the file as personal
   data, switch the level back to `error` when you are done, and delete
   the lines you no longer need.
 - Sent queue rows are pruned after 30 days, failed rows after 90. The same

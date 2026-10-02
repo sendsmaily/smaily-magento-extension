@@ -14,6 +14,7 @@ use GuzzleHttp\RequestOptions;
 use Magento\Framework\App\ProductMetadataInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Client\HttpClientFactory;
+use Smaily\Connect\Model\Client\TransportErrorMessage;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
@@ -358,10 +359,11 @@ class Client
                 $attempt++;
             } catch (GuzzleException $exception) {
                 if ($attempt >= count(self::RETRY_DELAYS_SECONDS)) {
+                    // The customer endpoints carry the address in the URL that
+                    // ends Guzzle's message: only the masked text goes on, and
+                    // the raw exception is not chained (PRO-3572).
                     throw new EngineTransportException(
-                        (string)__('Engine request failed: %1', $exception->getMessage()),
-                        0,
-                        $exception
+                        (string)__('Engine request failed: %1', TransportErrorMessage::of($exception))
                     );
                 }
                 $this->sleeper->sleep(self::RETRY_DELAYS_SECONDS[$attempt]);

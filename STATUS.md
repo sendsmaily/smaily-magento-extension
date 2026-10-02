@@ -5,7 +5,10 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-3571 — the Log page has no logging-level
+_Last updated: 2026-10-02 (PRO-3572 — a network failure on a Smaily or
+engine call no longer carries a contact's email into the log, a queue row's
+last error or the admin: the request URL in Guzzle's message is masked.
+Earlier the same day: PRO-3571 — the Log page has no logging-level
 control any more; the log stays at errors only unless a developer runs
 `bin/magento config:set smaily_connect/logging/verbosity debug|info|error`.
 Earlier the same day: PRO-2456 follow-up — five defects from Erkki's
@@ -72,6 +75,27 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   (primary) and **Open Settings** — new phrases "Ava töölaud" / "Ava
   seaded". Checked by screenshot at 1440 and 1100 px in en_US and et_EE.
 
+- **PRO-3572 done — a network failure logs no contact address (2026-10-02).**
+  Guzzle ends a network-failure message with the full request URL
+  (`cURL error N: … for https://…`). The Smaily consent lookup
+  (`GET contact?email=`) carries the address in the query; the engine's
+  customer endpoints (`customer/{email}/…` export, delete, opt-out) carry
+  it in the path. New `Model\Client\TransportErrorMessage::of()` keeps
+  every URL's scheme, host, port and path, drops query and fragment, and
+  writes `{email}` for a path segment holding an `@`. `SmailyClient` logs
+  and throws only that text; `Engine\Client` throws only that text; neither
+  chains the raw Guzzle exception any more (Monolog would print a chained
+  message if the exception ever reached it). Fixed at the source, so every
+  reader of the message is clean: the always-on error log, the
+  ProfilingConsent / ContactSyncHandler / backfill / reconcile / health
+  logs, `RetryPolicy` → `smaily_event_queue.last_error`, `FlushIngestQueue`
+  → `smaily_ingest_queue.last_error`, the backfill job's error, the admin
+  Log (whose email
+  masker never matched the `%40` form), the admin AJAX replies and the
+  GDPR / ping CLI output. Messages that Smaily or the engine send back
+  (ApiException, engine 4xx) are not touched. Gates: 326 unit, phpcs 0
+  errors, phpstan `[OK]`, integration 87.
+
 - **PRO-3571 done — no one-click debug logging in the admin (2026-10-02).**
   The Log page's "Log Verbosity" strip let any admin with Log access switch
   `smaily_connect.log` to debug. Erkki decided (2026-10-02) to remove it, as
@@ -95,7 +119,7 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   The old guide line "customer PII is not written to disk" was still too
   strong: a curl transport error message carries the request URL, so the
   profiling-consent lookup (`GET contact?email=`) can put an address in
-  the always-on error log. Gates: 323 unit, phpcs 0 errors, phpstan `[OK]`,
+  the always-on error log (fixed by PRO-3572). Gates: 323 unit, phpcs 0 errors, phpstan `[OK]`,
   integration 87.
 
 - **PRO-3560 done — "Connected" means Smaily accepted the credentials

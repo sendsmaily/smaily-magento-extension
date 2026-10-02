@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Unit\Model\Engine;
 
 use GuzzleHttp\Client as HttpClient;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
@@ -210,6 +211,38 @@ class ClientTest extends TestCase
         self::assertStringContainsString('kati%20k%C3%A4bi%40example.com', $path);
     }
 
+    /**
+     * PRO-3572: the customer endpoints carry the address in the path, and
+     * Guzzle's network-failure message ends with the full request URL. The
+     * message is logged, stored on queue rows and shown in the admin.
+     */
+    public function testANetworkFailureOnACustomerEndpointCarriesNoAddress(): void
+    {
+        $this->settings->method('getEndpoint')->with('customer_opt_out')
+            ->willReturn('https://engine.example/api/v1/customer/{email}/opt-out?source=magento');
+        $failure = static fn (RequestInterface $request) => new ConnectException(
+            'cURL error 7: Failed to connect to engine.example port 443 after 3 ms: Could not connect to server '
+            . '(see https://curl.se/libcurl/c/libcurl-errors.html) for ' . $request->getUri(),
+            $request
+        );
+        $client = $this->createClient(array_fill(0, 6, $failure));
+
+        try {
+            $client->customerOptOut('person@example.com', true, 'user_preference', '2026-10-02T00:00:00Z');
+            self::fail('Expected an EngineTransportException');
+        } catch (EngineTransportException $exception) {
+            self::assertStringContainsString('cURL error 7', $exception->getMessage());
+            self::assertStringContainsString(
+                'https://engine.example/api/v1/customer/{email}/opt-out',
+                $exception->getMessage()
+            );
+            for ($link = $exception; $link !== null; $link = $link->getPrevious()) {
+                self::assertStringNotContainsString('person', $link->getMessage());
+                self::assertStringNotContainsString('source=', $link->getMessage());
+            }
+        }
+    }
+
     public function testSetupExchangeParsesFullUrlInput(): void
     {
         $client = $this->createClient([
@@ -247,7 +280,7 @@ class ClientTest extends TestCase
     }
 
     /**
-     * @param array<int, Response> $responses
+     * @param array<int, Response|callable> $responses
      */
     private function createClient(array $responses): Client
     {

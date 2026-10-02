@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Unit\Model\Client;
 
 use GuzzleHttp\Client as HttpClient;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
@@ -30,6 +31,9 @@ class SmailyClientTest extends TestCase
 
     /** @var VerifiedCredentials&\PHPUnit\Framework\MockObject\MockObject */
     private $verifiedCredentials;
+
+    /** @var array<int, array{level: string, message: string, context: array<string, mixed>}> */
+    private array $logged = [];
 
     public function testGetReturnsDecodedBody(): void
     {
@@ -181,6 +185,48 @@ class SmailyClientTest extends TestCase
         }
     }
 
+    /**
+     * PRO-3572: Guzzle's network-failure message ends with the full request
+     * URL, and the contact lookup puts the address in the query string.
+     */
+    public function testANetworkFailureLogsTheEndpointButNoQueryValue(): void
+    {
+        $client = $this->createClient([self::networkFailure()]);
+
+        try {
+            $client->get(SmailyClient::ENDPOINT_CONTACT, ['email' => 'person@example.com']);
+            self::fail('Expected a TransportException');
+        } catch (TransportException $exception) {
+            self::assertSame(0, $exception->getHttpStatus());
+        }
+
+        $errors = array_values(array_filter($this->logged, static fn (array $entry) => $entry['level'] === 'error'));
+        self::assertCount(1, $errors);
+        $line = json_encode($errors[0], JSON_UNESCAPED_SLASHES);
+        self::assertStringContainsString('cURL error 28', (string)$line);
+        self::assertStringContainsString('https://demo.sendsmaily.net/api/contact.php', (string)$line);
+        $this->assertCarriesNoContact((string)$line);
+    }
+
+    public function testANetworkFailureLeavesNoQueryValueAtDebugLevelOrInTheException(): void
+    {
+        $client = $this->createClient([self::networkFailure()]);
+
+        try {
+            $client->get(SmailyClient::ENDPOINT_CONTACT, ['email' => 'person@example.com']);
+            self::fail('Expected a TransportException');
+        } catch (TransportException $exception) {
+            // Callers log, store and display this message (queue last_error,
+            // the admin Log, the debug log of the consent lookup).
+            self::assertStringContainsString('cURL error 28', $exception->getMessage());
+            for ($link = $exception; $link !== null; $link = $link->getPrevious()) {
+                $this->assertCarriesNoContact($link->getMessage());
+            }
+        }
+
+        $this->assertCarriesNoContact((string)json_encode($this->logged, JSON_UNESCAPED_SLASHES));
+    }
+
     public function testMalformedBodyThrowsTransportException(): void
     {
         $client = $this->createClient([new Response(200, [], 'not json')]);
@@ -190,7 +236,7 @@ class SmailyClientTest extends TestCase
     }
 
     /**
-     * @param array<int, Response> $responses
+     * @param array<int, Response|callable> $responses
      */
     private function createClient(array $responses): SmailyClient
     {
@@ -208,14 +254,44 @@ class SmailyClientTest extends TestCase
 
         $this->verifiedCredentials = $this->createMock(VerifiedCredentials::class);
 
+        $this->logged = [];
+        $logger = $this->createMock(Logger::class);
+        foreach (['error', 'info', 'debug'] as $level) {
+            $logger->method($level)->willReturnCallback(
+                function (string $message, array $context = []) use ($level): void {
+                    $this->logged[] = ['level' => $level, 'message' => $message, 'context' => $context];
+                }
+            );
+        }
+
         return new SmailyClient(
             $factory,
-            $this->createMock(Logger::class),
+            $logger,
             $this->verifiedCredentials,
             'demo',
             'user',
             'secret'
         );
+    }
+
+    /**
+     * A connect timeout worded exactly as Guzzle's curl handler words it.
+     */
+    private static function networkFailure(): callable
+    {
+        return static fn (RequestInterface $request) => new ConnectException(
+            'cURL error 28: Connection timed out after 10001 milliseconds '
+            . '(see https://curl.se/libcurl/c/libcurl-errors.html) for ' . $request->getUri(),
+            $request
+        );
+    }
+
+    private function assertCarriesNoContact(string $text): void
+    {
+        self::assertStringNotContainsString('person@example.com', $text);
+        self::assertStringNotContainsString('person%40example.com', $text);
+        self::assertStringNotContainsString('person', $text);
+        self::assertStringNotContainsString('email=', $text);
     }
 
     private function request(int $index): RequestInterface

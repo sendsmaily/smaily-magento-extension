@@ -274,6 +274,17 @@ removes the per-store-view credential overrides (the panel asks for
 confirmation first); workflow mappings are kept but stop being used
 outside the per-language modes.
 
+**When a store view's language changes (per-language accounts mode).**
+Saving the Connection panel gives every store view the account of its
+current language. After you change a store view's locale, open
+Settings > Connection, check the block of its new language and save:
+until then the store view keeps using the account of its old language.
+The block of a language with no saved account of its own shows the
+account its store views use now. A password left empty is kept: a store
+view that moves to a language takes the password saved for that
+language's account. When you enter a new account for the language, enter
+its password too.
+
 ---
 
 ## Contact synchronization

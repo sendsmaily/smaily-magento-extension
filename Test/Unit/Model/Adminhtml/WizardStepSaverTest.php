@@ -563,13 +563,14 @@ class WizardStepSaverTest extends TestCase
     public function testModeAPerLanguageAccountsResolveStoreViewsWithinTheTargetWebsite(): void
     {
         $this->accountResolver->expects(self::once())
-            ->method('storeIdsForAccountKey')
-            ->with('et', 0)
-            ->willReturn([5]);
+            ->method('storeLanguages')
+            ->with(0)
+            ->willReturn([5 => 'et']);
 
         $this->saver->save('connect', [
             'subdomain' => 'demo',
             'username' => 'api-user',
+            'multilingual_mode' => 'a',
             'accounts' => [
                 ['language' => 'et', 'subdomain' => 'demo-et', 'username' => 'et-user'],
             ],

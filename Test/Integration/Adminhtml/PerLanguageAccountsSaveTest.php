@@ -1,0 +1,284 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+
+declare(strict_types=1);
+
+namespace Smaily\Connect\Test\Integration\Adminhtml;
+
+use Magento\Framework\App\Cache\TypeListInterface;
+use Magento\Framework\App\Config\Storage\WriterInterface;
+use Magento\Framework\App\RequestInterface;
+use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Store\Api\Data\StoreInterface;
+use Magento\Store\Model\StoreManagerInterface;
+use Magento\Store\Model\Website;
+use Smaily\Connect\Model\Adminhtml\SetupNotice;
+use Smaily\Connect\Model\Adminhtml\WebsiteContext;
+use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
+use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
+use Smaily\Connect\Model\Automation\MappingSaver;
+use Smaily\Connect\Model\Client\CredentialCheck;
+use Smaily\Connect\Model\Client\SmailyClientFactory;
+use Smaily\Connect\Model\Client\SmailyClientProvider;
+use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Multilingual\AccountResolver;
+use Smaily\Connect\Model\Multilingual\LanguageResolver;
+use Smaily\Connect\Model\SubdomainNormalizer;
+use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
+
+/**
+ * PRO-3683: with per-language Smaily accounts, saving the accounts gives
+ * every store view of the website the account of its current language —
+ * a store view whose language changed stops using the old language's
+ * account, and one whose language has no account uses the website's. Read
+ * back through the real Config getters over core_config_data.
+ */
+class PerLanguageAccountsSaveTest extends IntegrationTestCase
+{
+    private const WEBSITE_ID = 7;
+
+    private const OTHER_WEBSITE_ID = 8;
+
+    /** Store view id => website id. */
+    private const STORES = [1 => self::WEBSITE_ID, 2 => self::WEBSITE_ID, 3 => self::WEBSITE_ID,
+        5 => self::WEBSITE_ID, 4 => self::OTHER_WEBSITE_ID];
+
+    private const LOCALE = 'general/locale/code';
+
+    private WizardStepSaver $saver;
+
+    private Config $config;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $scopeConfig = new DatabaseScopeConfig($this->connection, self::STORES);
+        $this->config = $this->objectManager->create(Config::class, ['scopeConfig' => $scopeConfig]);
+
+        $defaultStore = $this->createMock(StoreInterface::class);
+        $defaultStore->method('getWebsiteId')->willReturn(self::WEBSITE_ID);
+        $storeManager = $this->createMock(StoreManagerInterface::class);
+        $storeManager->method('getDefaultStoreView')->willReturn($defaultStore);
+        $storeManager->method('getWebsite')->willReturnCallback(function (int $websiteId): Website {
+            $website = $this->createMock(Website::class);
+            $website->method('getStoreIds')->willReturn(
+                array_keys(array_filter(self::STORES, static fn (int $id): bool => $id === $websiteId))
+            );
+
+            return $website;
+        });
+        $request = $this->createMock(RequestInterface::class);
+        $request->method('getParam')->willReturn(null);
+
+        $this->saver = new WizardStepSaver(
+            $this->objectManager->get(WriterInterface::class),
+            $this->objectManager->get(EncryptorInterface::class),
+            $this->createMock(TypeListInterface::class),
+            new SubdomainNormalizer(),
+            new AccountResolver($storeManager, new LanguageResolver($scopeConfig)),
+            $this->config,
+            new WebsiteContext($storeManager, $request),
+            $storeManager,
+            $this->objectManager->get(MappingSaver::class),
+            $this->createMock(SmailyClientProvider::class),
+            new ConfigRowNormalizer(),
+            new CredentialCheck($this->createMock(SmailyClientFactory::class), $this->config),
+            $this->createMock(SetupNotice::class)
+        );
+
+        // The other website's store view holds its own Estonian account.
+        $this->setStoreLocale(4, 'et_EE');
+        foreach ([
+            Config::XML_PATH_SUBDOMAIN => 'other-et',
+            Config::XML_PATH_USERNAME => 'other-et-user',
+            Config::XML_PATH_PASSWORD => $this->encrypt('other-et-secret'),
+        ] as $path => $value) {
+            $this->connection->insert('core_config_data', [
+                'scope' => 'stores',
+                'scope_id' => 4,
+                'path' => $path,
+                'value' => $value,
+            ]);
+        }
+    }
+
+    public function testAStoreViewWhoseLanguageChangedGetsTheNewLanguagesAccount(): void
+    {
+        $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'et_EE', 5 => 'en_GB']);
+        $this->saveAccounts([$this->account('en', 'en-secret'), $this->account('et', 'et-secret')]);
+
+        $this->setStoreLocale(3, 'fi_FI');
+        $this->saveAccounts([$this->account('en'), $this->account('et'), $this->account('fi', 'fi-secret')]);
+
+        $this->assertAccount(3, 'fi');
+        $this->assertAccount(2, 'et', 'An empty password keeps the saved one');
+        $this->assertAccount(1, 'en');
+        $this->assertOtherWebsiteUntouched();
+    }
+
+    public function testAnEmptyPasswordTakesThePasswordOfAStoreViewThatUsesTheAccount(): void
+    {
+        $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'et_EE', 5 => 'fi_FI']);
+        $this->saveAccounts([
+            $this->account('en', 'en-secret'),
+            $this->account('et', 'et-secret'),
+            $this->account('fi', 'fi-secret'),
+        ]);
+
+        $this->setStoreLocale(3, 'fi_FI');
+        $this->saveAccounts([$this->account('en'), $this->account('et'), $this->account('fi')]);
+
+        $this->assertAccount(3, 'fi');
+        $this->assertAccount(5, 'fi');
+        $this->assertAccount(2, 'et');
+    }
+
+    /**
+     * @param array<int, array<string, string>> $finnishBlock
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('noFinnishAccount')]
+    public function testAStoreViewWhoseLanguageHasNoAccountUsesTheWebsitesAccount(array $finnishBlock): void
+    {
+        $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'et_EE', 5 => 'en_GB']);
+        $this->saveAccounts([$this->account('en', 'en-secret'), $this->account('et', 'et-secret')]);
+
+        $this->setStoreLocale(3, 'fi_FI');
+        $this->saveAccounts(array_merge([$this->account('en'), $this->account('et')], $finnishBlock));
+
+        $this->assertAccount(3, 'en', 'The website account (the en fallback) serves store view 3');
+        foreach ([Config::XML_PATH_SUBDOMAIN, Config::XML_PATH_USERNAME, Config::XML_PATH_PASSWORD] as $path) {
+            self::assertSame([], $this->storeViewRows(3, $path), $path);
+        }
+        $this->assertAccount(2, 'et');
+        $this->assertOtherWebsiteUntouched();
+    }
+
+    /**
+     * @return array<string, array{0: array<int, array<string, string>>}>
+     */
+    public static function noFinnishAccount(): array
+    {
+        return [
+            'no block' => [[]],
+            'blank block' => [[['language' => 'fi', 'subdomain' => '', 'username' => '', 'password' => '']]],
+        ];
+    }
+
+    public function testABlockWithOnlyASubdomainLeavesItsStoreViewsAsTheyAre(): void
+    {
+        $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'et_EE', 5 => 'en_GB']);
+        $this->saveAccounts([$this->account('en', 'en-secret'), $this->account('et', 'et-secret')]);
+
+        $this->saveAccounts([
+            $this->account('en'),
+            ['language' => 'et', 'subdomain' => 'changed-et', 'username' => '', 'password' => ''],
+        ]);
+
+        $this->assertAccount(2, 'et');
+        $this->assertAccount(3, 'et');
+    }
+
+    /**
+     * A mode-A save as the Connection panel posts it: the en account is the
+     * fallback, so its credentials are also the top-level ones.
+     *
+     * @param array<int, array<string, string>> $accounts
+     */
+    private function saveAccounts(array $accounts): void
+    {
+        $errors = $this->saver->save('connect', [
+            'subdomain' => $accounts[0]['subdomain'],
+            'username' => $accounts[0]['username'],
+            'password' => $accounts[0]['password'],
+            'multilingual_mode' => 'a',
+            'fallback_language' => 'en',
+            'accounts' => $accounts,
+        ]);
+        self::assertSame([], $errors);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function account(string $language, string $password = ''): array
+    {
+        return [
+            'language' => $language,
+            'subdomain' => $language . '-shop',
+            'username' => $language . '-user',
+            'password' => $password,
+        ];
+    }
+
+    private function assertAccount(int $storeId, string $language, string $message = ''): void
+    {
+        self::assertSame(
+            [$language . '-shop', $language . '-user', $language . '-secret'],
+            [
+                $this->config->getSubdomain($storeId),
+                $this->config->getUsername($storeId),
+                $this->config->getPassword($storeId),
+            ],
+            $message
+        );
+    }
+
+    private function assertOtherWebsiteUntouched(): void
+    {
+        self::assertSame(
+            ['other-et', 'other-et-user', 'other-et-secret'],
+            [$this->config->getSubdomain(4), $this->config->getUsername(4), $this->config->getPassword(4)]
+        );
+    }
+
+    /**
+     * @param array<int, string> $locales store view id => locale
+     */
+    private function setLocales(array $locales): void
+    {
+        foreach ($locales as $storeId => $locale) {
+            $this->setStoreLocale($storeId, $locale);
+        }
+    }
+
+    private function setStoreLocale(int $storeId, string $locale): void
+    {
+        $this->connection->delete('core_config_data', [
+            'scope = ?' => 'stores',
+            'scope_id = ?' => $storeId,
+            'path = ?' => self::LOCALE,
+        ]);
+        $this->connection->insert('core_config_data', [
+            'scope' => 'stores',
+            'scope_id' => $storeId,
+            'path' => self::LOCALE,
+            'value' => $locale,
+        ]);
+    }
+
+    private function encrypt(string $value): string
+    {
+        /** @var EncryptorInterface $encryptor */
+        $encryptor = $this->objectManager->get(EncryptorInterface::class);
+
+        return $encryptor->encrypt($value);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function storeViewRows(int $storeId, string $path): array
+    {
+        return $this->connection->fetchAll(
+            $this->connection->select()->from('core_config_data')
+                ->where('scope = ?', 'stores')
+                ->where('scope_id = ?', $storeId)
+                ->where('path = ?', $path)
+        );
+    }
+}

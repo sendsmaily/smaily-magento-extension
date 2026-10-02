@@ -180,6 +180,9 @@ class WizardStepSaver
             }
         }
 
+        // The accounts the store views hold before anything below is saved.
+        $heldAccounts = is_array($data['accounts'] ?? null) ? $this->heldAccounts($websiteId) : [];
+
         $this->configWriter->save(Config::XML_PATH_SUBDOMAIN, $subdomain, ScopeInterface::SCOPE_WEBSITES, $websiteId);
         $this->configWriter->save(Config::XML_PATH_USERNAME, $username, ScopeInterface::SCOPE_WEBSITES, $websiteId);
         if ($password !== '' && !$this->credentialCheck->isKeptPassword($password)) {
@@ -204,41 +207,8 @@ class WizardStepSaver
             $mode = $previousMode;
         }
 
-        // Mode A: per-language accounts land as store-view scoped credentials
-        // on every store view of this website speaking that language.
-        foreach ((array)($data['accounts'] ?? []) as $account) {
-            if (!is_array($account)) {
-                continue;
-            }
-            $language = (string)($account['language'] ?? '');
-            $accountSubdomain = $this->normalizer->normalize((string)($account['subdomain'] ?? ''));
-            $accountUsername = trim((string)($account['username'] ?? ''));
-            $accountPassword = (string)($account['password'] ?? '');
-            if ($language === '' || $accountSubdomain === '' || $accountUsername === '') {
-                continue;
-            }
-            foreach ($this->accountResolver->storeIdsForAccountKey($language, $websiteId) as $storeId) {
-                $this->configWriter->save(
-                    Config::XML_PATH_SUBDOMAIN,
-                    $accountSubdomain,
-                    ScopeInterface::SCOPE_STORES,
-                    $storeId
-                );
-                $this->configWriter->save(
-                    Config::XML_PATH_USERNAME,
-                    $accountUsername,
-                    ScopeInterface::SCOPE_STORES,
-                    $storeId
-                );
-                if ($accountPassword !== '' && !$this->credentialCheck->isKeptPassword($accountPassword)) {
-                    $this->configWriter->save(
-                        Config::XML_PATH_PASSWORD,
-                        $this->encryptor->encrypt($accountPassword),
-                        ScopeInterface::SCOPE_STORES,
-                        $storeId
-                    );
-                }
-            }
+        if ($mode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS && is_array($data['accounts'] ?? null)) {
+            $this->savePerLanguageAccounts($data['accounts'], $heldAccounts);
         }
 
         // The default-fallback account (mode A): its credentials are also
@@ -286,6 +256,109 @@ class WizardStepSaver
         $this->checkCredentials($subdomain, $username, $password);
 
         return [];
+    }
+
+    /**
+     * Each store view of the website with its current language and the
+     * account it uses now: its subdomain and username, and its password.
+     *
+     * @return array<int, array{language: string, account: string, password: string}>
+     */
+    private function heldAccounts(int $websiteId): array
+    {
+        $held = [];
+        foreach ($this->accountResolver->storeLanguages($websiteId) as $storeId => $language) {
+            $held[$storeId] = [
+                'language' => $language,
+                'account' => $this->config->getSubdomain($storeId) . "\n" . $this->config->getUsername($storeId),
+                'password' => $this->config->getPassword($storeId),
+            ];
+        }
+
+        return $held;
+    }
+
+    /**
+     * Mode A: every store view of this website gets the account of its
+     * current language as store-view credentials, so a store view whose
+     * language changed stops using the old language's account (PRO-3683).
+     * A language whose block has no subdomain and no username has no
+     * account: its store views lose their store-view credentials and use
+     * the website's account. A block with only one of the two is skipped,
+     * its store views keep what they have. An empty password keeps the
+     * saved one: a store view that already uses the account keeps its own,
+     * any other store view gets the password of a store view that uses it.
+     *
+     * @param array<mixed> $posted
+     * @param array<int, array{language: string, account: string, password: string}> $held
+     */
+    private function savePerLanguageAccounts(array $posted, array $held): void
+    {
+        $accounts = [];
+        $skipped = [];
+        foreach ($posted as $account) {
+            if (!is_array($account) || (string)($account['language'] ?? '') === '') {
+                continue;
+            }
+            $language = (string)$account['language'];
+            $subdomain = $this->normalizer->normalize((string)($account['subdomain'] ?? ''));
+            $username = trim((string)($account['username'] ?? ''));
+            if ($subdomain === '' || $username === '') {
+                if ($subdomain !== '' || $username !== '') {
+                    $skipped[$language] = true;
+                }
+                continue;
+            }
+            $password = (string)($account['password'] ?? '');
+            $accounts[$language] = [
+                'subdomain' => $subdomain,
+                'username' => $username,
+                'password' => $this->credentialCheck->isKeptPassword($password) ? '' : $password,
+            ];
+        }
+
+        foreach ($held as $storeId => $store) {
+            if (isset($skipped[$store['language']])) {
+                continue;
+            }
+            $account = $accounts[$store['language']] ?? null;
+            if ($account === null) {
+                foreach ([Config::XML_PATH_SUBDOMAIN, Config::XML_PATH_USERNAME, Config::XML_PATH_PASSWORD] as $path) {
+                    $this->configWriter->delete($path, ScopeInterface::SCOPE_STORES, $storeId);
+                }
+                continue;
+            }
+            $this->configWriter->save(
+                Config::XML_PATH_SUBDOMAIN,
+                $account['subdomain'],
+                ScopeInterface::SCOPE_STORES,
+                $storeId
+            );
+            $this->configWriter->save(
+                Config::XML_PATH_USERNAME,
+                $account['username'],
+                ScopeInterface::SCOPE_STORES,
+                $storeId
+            );
+            $password = $account['password'];
+            $key = $account['subdomain'] . "\n" . $account['username'];
+            if ($password === '' && $store['account'] !== $key) {
+                foreach ($held as $other) {
+                    if ($other['account'] === $key && $other['password'] !== '') {
+                        $password = $other['password'];
+                        break;
+                    }
+                }
+            }
+            if ($password !== '') {
+                $this->configWriter->save(
+                    Config::XML_PATH_PASSWORD,
+                    $this->encryptor->encrypt($password),
+                    ScopeInterface::SCOPE_STORES,
+                    $storeId
+                );
+            }
+        }
     }
 
     /**

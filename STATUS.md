@@ -27,6 +27,25 @@ OK). Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3683 — per-language accounts follow a store view's language change
+  (2026-10-02).** A mode-A Connection save (`WizardStepSaver::saveConnect`,
+  posted mode `a` with `accounts`) walks every store view of the website
+  being saved (`AccountResolver::storeLanguages`) and gives each one the
+  account of its current language at store-view scope. A store view whose
+  language has no account in the post (no block, or subdomain and username
+  both empty) loses its store-view `smaily_connect/connection/subdomain`,
+  `username` and `password` rows and uses the website's account; a block
+  with only one of the two is skipped, as before. An empty password keeps
+  the saved one: a store view already on that account keeps its own, any
+  other store view gets the password of a store view that uses it (read
+  before the save). Only store views of the website being saved are
+  touched. A posted `accounts` list outside mode A no longer writes
+  store-view rows. Integration test `Adminhtml\PerLanguageAccountsSaveTest`
+  (real save path, `Config` over `DatabaseScopeConfig`): et→fi with an fi
+  account (typed or kept password), et→fi without one (no block / blank
+  block → website account, rows gone), half-blank block, other website
+  untouched. USER_GUIDE: "When a store view's language changes".
+
 - **PRO-3681 — the owner's four upgrade-day decisions for 2.x → 3.0
   (2026-10-02, Questions item 14 decided; changes what the upgrade
   writes).** `LegacyConfigMapper`: a scope's `smaily/general/enable` = 0

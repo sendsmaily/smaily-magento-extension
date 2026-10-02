@@ -57,6 +57,27 @@ class AccountResolver
     }
 
     /**
+     * Every store view of the given website with its current language
+     * ('' when its locale gives none).
+     *
+     * @return array<int, string> store view id => language
+     */
+    public function storeLanguages(int $websiteId): array
+    {
+        $website = $this->website($websiteId);
+        if ($website === null) {
+            return [];
+        }
+
+        $languages = [];
+        foreach ($website->getStoreIds() as $storeId) {
+            $languages[(int)$storeId] = $this->languageResolver->forStore((int)$storeId);
+        }
+
+        return $languages;
+    }
+
+    /**
      * A representative store view, within the given website, for credential
      * resolution ('default' = default scope).
      */

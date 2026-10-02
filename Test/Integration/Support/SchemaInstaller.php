@@ -71,7 +71,8 @@ class SchemaInstaller
      * Minimal mirror of the core quote table, for the tests that join or
      * patch it. The legacy reminder_date/is_sent columns are part of the
      * stub because the 2.8.x schema patch exists to drop them, and that
-     * patch reads store_id too.
+     * patch reads store_id too. customer_id, is_active and items_count are
+     * what the guest-cart email capture checks.
      */
     public function createQuote(): void
     {
@@ -80,10 +81,30 @@ class SchemaInstaller
             'CREATE TABLE `quote` ('
             . ' `entity_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,'
             . ' `store_id` SMALLINT UNSIGNED NOT NULL DEFAULT 0,'
+            . ' `customer_id` INT UNSIGNED NULL,'
+            . ' `is_active` SMALLINT UNSIGNED NULL DEFAULT 1,'
+            . ' `items_count` INT UNSIGNED NULL DEFAULT 0,'
             . ' `customer_email` VARCHAR(255) NULL,'
             . ' `reminder_date` TIMESTAMP NULL,'
             . ' `is_sent` SMALLINT NULL,'
             . ' PRIMARY KEY (`entity_id`)'
+            . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+        );
+    }
+
+    /**
+     * Minimal mirror of the core quote_id_mask table (a guest cart's masked
+     * id), for the guest-cart email capture tests.
+     */
+    public function createQuoteIdMask(): void
+    {
+        $this->connection->query('DROP TABLE IF EXISTS `quote_id_mask`');
+        $this->connection->query(
+            'CREATE TABLE `quote_id_mask` ('
+            . ' `entity_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,'
+            . ' `quote_id` INT UNSIGNED NOT NULL,'
+            . ' `masked_id` VARCHAR(32) NULL,'
+            . ' PRIMARY KEY (`entity_id`, `quote_id`)'
             . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
         );
     }

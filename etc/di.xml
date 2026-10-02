@@ -8,6 +8,7 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
     <preference for="Smaily\Connect\Model\Engine\SleeperInterface" type="Smaily\Connect\Model\Engine\Sleeper"/>
+    <preference for="Smaily\Connect\Api\GuestCartEmailInterface" type="Smaily\Connect\Model\AbandonedCart\GuestCartEmail"/>
 
     <!-- Dedicated log channel: var/log/smaily_connect.log -->
     <virtualType name="Smaily\Connect\Logger\Handler" type="Magento\Framework\Logger\Handler\Base">

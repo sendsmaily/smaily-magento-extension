@@ -95,10 +95,11 @@ class PayloadBuilder
 
     /**
      * Resolves the recipient email with the same fallback order as the cron's
-     * quote selection: quote.customer_email (set once payment info is entered),
-     * then the billing address email, then the shipping address email. Guests
-     * who abandon at/before the shipping step have an empty customer_email and
-     * carry their email only on the quote address (PRO-1275).
+     * quote selection: quote.customer_email (set once payment info is entered,
+     * or for a guest on Magento's own checkout as soon as a valid email is
+     * typed — GuestCartEmail, PRO-3693), then the billing address email, then
+     * the shipping address email, where other checkouts may keep a guest's
+     * email (PRO-1275).
      *
      * @param Quote $quote
      */

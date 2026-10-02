@@ -95,12 +95,13 @@ class AbandonedCart
             ->setOrder('entity_id', 'ASC')
             ->setPageSize(self::BATCH_SIZE);
 
-        // A guest who abandons at/before the shipping step has an empty
-        // quote.customer_email — Magento fills that column only once payment
-        // info is submitted. The email exists on the quote address (billing,
-        // then shipping) from the moment it is typed, so widen the selection to
-        // any quote carrying an email in EITHER place (PayloadBuilder resolves
-        // the recipient with the same fallback order). PRO-1275.
+        // Magento fills quote.customer_email only once payment info is
+        // submitted; on its own checkout the checkout email field puts a
+        // guest's typed email there earlier (GuestCartEmail, PRO-3693). Other
+        // checkouts may keep it on the quote address (billing, then shipping)
+        // only, so widen the selection to any quote carrying an email in
+        // EITHER place (PayloadBuilder resolves the recipient with the same
+        // fallback order). PRO-1275.
         $this->requireAnyEmail($collection);
 
         $quotes = [];

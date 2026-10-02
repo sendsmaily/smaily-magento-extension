@@ -23,14 +23,18 @@ class PrivacyForm implements ArgumentInterface
     ) {
     }
 
-    public function isProfilingAllowed(): bool
+    /**
+     * The shopper's choice where the store knows it, null where it does not
+     * (PRO-3591): the page then offers only an opt-out.
+     */
+    public function getKnownPreference(): ?bool
     {
         if (!$this->customerSession->isLoggedIn()) {
-            return true;
+            return null;
         }
         $customer = $this->customerSession->getCustomerData();
 
-        return $this->profilingConsent->isAllowed(
+        return $this->profilingConsent->knownPreference(
             (string)$customer->getEmail(),
             $customer->getStoreId()
         );

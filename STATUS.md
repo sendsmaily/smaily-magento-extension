@@ -5,7 +5,7 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-3579 — My Account > Personalization appears only where Campaign Intelligence is live, and a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-3579 — a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-1952 — a product with no real category is synced with `tags.category_defaulted: "true"`. Earlier the same day: PRO-3581 — uninstalling the module removes its settings, the Smaily password and the engine key included, and its flag rows, the profiling opt-out record included; disabling keeps everything. Earlier the same day: PRO-3584 — an over-long or malformed visitor token, context or session id is dropped on its own; the order keeps every other attribution signal. Earlier the same day: PRO-3580 — the welcome automation fires only for a subscription the shopper makes on the storefront, a resubscription included; not for one made in the admin, through the API or by an import. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out, and an opt-out made in Smaily reaches the engine. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
+_Last updated: 2026-10-02 (PRO-3591 — My Account > Personalization shows a preference only when the store knows it, otherwise an opt-out button. PRO-3579 — My Account > Personalization appears only where Campaign Intelligence is live, and a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-3579 — My Account > Personalization appears only where Campaign Intelligence is live, and a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-3579 — a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-1952 — a product with no real category is synced with `tags.category_defaulted: "true"`. Earlier the same day: PRO-3581 — uninstalling the module removes its settings, the Smaily password and the engine key included, and its flag rows, the profiling opt-out record included; disabling keeps everything. Earlier the same day: PRO-3584 — an over-long or malformed visitor token, context or session id is dropped on its own; the order keeps every other attribution signal. Earlier the same day: PRO-3580 — the welcome automation fires only for a subscription the shopper makes on the storefront, a resubscription included; not for one made in the admin, through the API or by an import. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out, and an opt-out made in Smaily reaches the engine. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
 and the Dashboard fill the content area on the pack's grey pane under a
 full-width white tab strip, in Magento's Open Sans, with 33 px buttons and
 our own text, link and status colours. Earlier the same day: PRO-3572 — a
@@ -58,7 +58,7 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   live 2026-10-09. PRO-2460 decided A — contract §3 SKU key stands, PRO-1484
   closed. After the pilot: PRO-2506, PRO-1967, PRO-1198 (Smaily hand-over).
 
-- **PRO-3579 in progress — a package without the API is not "credentials
+- **PRO-3579 done — a package without the API is not "credentials
   refused" (2026-10-02, parity audit R5, Woo PRO-1686 `RefusalReason`).**
   Smaily answers `HTTP 403 {"code":227}` ("A paid package is required",
   confirmed in Smaily's response-code docs) before it checks the
@@ -99,6 +99,31 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   anyway. The R3 open question (does a profiling-only `POST contact` create
   a subscribed contact?) stays open; it now matters only on stores with
   live Campaign Intelligence.
+
+- **PRO-3591 done — My Account > Personalization shows only a known
+  preference (2026-10-02, Woo PRO-3189).** The page used `isAllowed()`,
+  which fails open when Smaily cannot be read, so it ticked "Allow" for a
+  shopper whose choice the store did not know. New
+  `ProfilingConsent::knownPreference()`: the store's record or a successful
+  Smaily read (a found contact, or Smaily saying it has none) is known;
+  the fail-open answer is now cached as `?` (the gate still reads it as
+  "profile", so `isAllowed()` and its callers are unchanged), and
+  `knownPreference()` drops a cached `?` and asks Smaily again before it
+  answers, so a recovered Smaily is seen on the next visit. Unknown →
+  `PrivacyForm::getKnownPreference()` null → the page (Luma and the Hyvä
+  twin) says the preference could not be loaded and offers one **Opt out of
+  personalized recommendations** button: the same form without the tick
+  box, which `Save` already reads as an opt-out. New phrases (EN + ET, for
+  Erkki's proofread): "We could not load your personalization preference
+  right now. Please try again later." / "Me ei saanud praegu sinu
+  personaliseerimise eelistust laadida. Palun proovi hiljem uuesti."; "Opt
+  out of personalized recommendations" / "Loobu personaalsetest
+  soovitustest" (both after the WooCommerce `.po`).
+  Gates after PRO-3579 + PRO-3591: 409 unit, phpcs 0 errors, phpstan
+  `[OK]`, integration 89. Not run: `bin/magento setup:di:compile` (new
+  constructor dependencies on `Controller\Privacy\Index`/`Save` and the new
+  `Block\Account\PersonalizationLink`) and a storefront walk on the sandbox
+  (reserved) — both for the next sandbox pass.
 
 - **PRO-2456 page frame — the admin pages feel native (2026-10-02).**
   Owner decisions, recorded in `docs/ADMIN_UI_TARGET_SPEC.md` "Page frame

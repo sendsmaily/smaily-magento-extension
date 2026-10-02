@@ -292,6 +292,69 @@ class ProfilingConsentTest extends TestCase
         self::assertSame(['person@example.com' => self::NOW - 3600], $this->records);
     }
 
+    /**
+     * PRO-3591: My Account shows a preference only when the store knows it.
+     * A shopper the store holds no opt-out for, whose contact Smaily could not
+     * read, has no known preference — although the gate still profiles them
+     * (fail open).
+     */
+    public function testAPreferenceSmailyCouldNotReadIsNotKnown(): void
+    {
+        $this->contact = new SmailyClientException('Smaily is down');
+        $consent = $this->consent();
+
+        self::assertNull($consent->knownPreference('person@example.com', 1));
+        self::assertTrue($consent->isAllowed('person@example.com', 1));
+    }
+
+    public function testTheStoreRecordIsKnownWhenSmailyCannotBeRead(): void
+    {
+        $this->contact = new SmailyClientException('Smaily is down');
+        $this->records['person@example.com'] = self::NOW - 3600;
+
+        self::assertFalse($this->consent()->knownPreference('person@example.com', 1));
+    }
+
+    /**
+     * @return array<string, array{0: array<string, string>|\Throwable, 1: bool}>
+     */
+    public static function successfulReads(): array
+    {
+        return [
+            'opted in' => [['email' => 'person@example.com', 'is_unsubscribed' => '0',
+                'smaily_rec_profiling' => '1'], true],
+            'opted out' => [['email' => 'person@example.com', 'is_unsubscribed' => '0',
+                'smaily_rec_profiling' => '0'], false],
+            'no answer yet' => [['email' => 'person@example.com', 'is_unsubscribed' => '0'], true],
+            'not a Smaily contact' => [
+                new ApiException('Contact not found', ApiException::CODE_EMAIL_NOT_FOUND),
+                true,
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, string>|\Throwable $contact
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('successfulReads')]
+    public function testAPreferenceSmailyAnsweredIsKnown(array|\Throwable $contact, bool $expected): void
+    {
+        $this->contact = $contact;
+
+        self::assertSame($expected, $this->consent()->knownPreference('person@example.com', 1));
+    }
+
+    public function testAGuessIsCheckedWithSmailyAgainOnTheNextVisit(): void
+    {
+        $consent = $this->consent();
+        $this->contact = new SmailyClientException('Smaily is down');
+        self::assertNull($consent->knownPreference('person@example.com', 1));
+
+        $this->contact = ['email' => 'person@example.com', 'is_unsubscribed' => '0', 'smaily_rec_profiling' => '0'];
+
+        self::assertFalse($consent->knownPreference('person@example.com', 1));
+    }
+
     private function consent(): ProfilingConsent
     {
         $provider = $this->createMock(SmailyClientProvider::class);
@@ -321,6 +384,11 @@ class ProfilingConsentTest extends TestCase
         $cache->method('load')->willReturnCallback(fn (string $key): string|false => $this->cache[$key] ?? false);
         $cache->method('save')->willReturnCallback(function (string $data, string $key): bool {
             $this->cache[$key] = $data;
+
+            return true;
+        });
+        $cache->method('remove')->willReturnCallback(function (string $key): bool {
+            unset($this->cache[$key]);
 
             return true;
         });

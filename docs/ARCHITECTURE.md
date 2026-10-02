@@ -490,7 +490,12 @@ profiling back on.
   only while `Engine\Settings::isSendingAllowed()` — connected and not
   refused, Woo PRO-2513/PRO-3189 parity (PRO-3579). Elsewhere both actions
   forward to `noroute` and the link renders nothing; stored choices are
-  untouched.
+  untouched. It shows `knownPreference()`, not `isAllowed()` (PRO-3591,
+  Woo PRO-3189): the fail-open answer is cached as a guess (`?`, read by
+  the gate as "profile"), and `knownPreference()` asks Smaily again over a
+  cached guess and returns null when the answer is still a guess. Null
+  renders a notice and an opt-out button (a form without the tick box,
+  which `Save` reads as an opt-out).
 - **A choice** (My Account > Personalization, `setAllowed()`) goes three
   ways: to the Smaily contact (`smaily_rec_profiling` 0/1 +
   `smaily_rec_profiling_ts`, Z-suffixed), into the store's own record

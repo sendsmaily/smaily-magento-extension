@@ -43,6 +43,13 @@ class ProfilingConsent
     private const TIMESTAMP_FORMAT = 'Y-m-d\TH:i:s\Z';
 
     /**
+     * Cached when Smaily could not be read and the store holds no opt-out:
+     * the gate profiles (fail open), but the preference is not known
+     * (PRO-3591).
+     */
+    private const CACHED_GUESS = '?';
+
+    /**
      * How far in the future a contact's profiling timestamp may lie and still
      * count: only drift between one store's servers, which stamp and compare
      * with the same clock (Woo PRO-3434).
@@ -73,7 +80,7 @@ class ProfilingConsent
         $cacheKey = self::CACHE_PREFIX . sha1($email);
         $cached = $this->cache->load($cacheKey);
         if ($cached !== false) {
-            return $cached === '1';
+            return $cached === '1' || $cached === self::CACHED_GUESS;
         }
 
         $optOutMoment = $this->optOuts->moment($email);
@@ -128,15 +135,39 @@ class ProfilingConsent
     }
 
     /**
+     * The preference as far as the store knows it, for display on My Account
+     * (PRO-3591, Woo PRO-3189): the store's record or a successful Smaily
+     * read. Null when Smaily could not be read and the store holds no
+     * opt-out — the case where isAllowed() fails open. A cached guess is
+     * checked with Smaily again first, so the page never shows a guess as
+     * the shopper's answer.
+     */
+    public function knownPreference(string $email, int|string|null $storeId = null): ?bool
+    {
+        $email = strtolower(trim($email));
+        if ($email === '') {
+            return null;
+        }
+
+        $cacheKey = self::CACHE_PREFIX . sha1($email);
+        if ($this->cache->load($cacheKey) === self::CACHED_GUESS) {
+            $this->cache->remove($cacheKey);
+        }
+        $allowed = $this->isAllowed($email, $storeId);
+
+        return $this->cache->load($cacheKey) === self::CACHED_GUESS ? null : $allowed;
+    }
+
+    /**
      * Smaily could not be read: the store's own record decides, and a
      * shopper the store holds no opt-out for is profiled (fail open, the
-     * model's accepted residual risk — Woo F3-31).
+     * model's accepted residual risk — Woo F3-31) — cached as a guess.
      */
     private function fallback(string $email, string $cacheKey, ?int $optOutMoment, \Throwable $exception): bool
     {
         $this->logger->debug('Profiling consent read failed', ['error' => $exception->getMessage()]);
         $allowed = $optOutMoment === null;
-        $this->cache->save($allowed ? '1' : '0', $cacheKey, [], self::CACHE_TTL_SECONDS);
+        $this->cache->save($allowed ? self::CACHED_GUESS : '0', $cacheKey, [], self::CACHE_TTL_SECONDS);
 
         return $allowed;
     }

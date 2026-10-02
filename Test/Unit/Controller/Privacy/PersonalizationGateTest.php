@@ -62,7 +62,11 @@ class PersonalizationGateTest extends TestCase
         self::assertSame('noroute', $this->forwardedTo);
     }
 
-    public function testASavedFormIsKeptWhereCampaignIntelligenceIsLive(): void
+    /**
+     * The tick left out is an opt-out — which is also all the "could not
+     * load your preference" button posts (PRO-3591).
+     */
+    public function testAFormWithoutTheTickOptsOutWhereCampaignIntelligenceIsLive(): void
     {
         $consent = $this->createMock(ProfilingConsent::class);
         $consent->expects(self::once())->method('setAllowed')->with('person@example.com', false, 1);

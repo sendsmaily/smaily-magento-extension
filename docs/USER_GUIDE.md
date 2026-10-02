@@ -568,7 +568,12 @@ panel — you do not have to keep the page open:
   Personalization**. The page and its menu link exist only while Campaign
   Intelligence is connected and the account is active; on a store without
   it the page is not found, because nothing personalizes recommendations
-  there. The choice is stored on the Smaily contact, kept by the
+  there. The page shows the shopper's choice only when the store knows it —
+  from its own record of an opt-out, or from a successful read of the Smaily
+  contact. When Smaily cannot be read and the store holds no opt-out, the
+  page says the preference could not be loaded and offers a single **Opt
+  out of personalized recommendations** button instead of a tick box, so
+  the shopper can still opt out. The choice is stored on the Smaily contact, kept by the
   store itself, and enforced by the engine. It reaches Campaign Intelligence
   as a queued delivery (type `engine.profiling_consent` in the **Log**), so
   an engine outage only delays it: it is retried like every other delivery.

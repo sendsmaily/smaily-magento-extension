@@ -16,7 +16,8 @@ server would refuse) and PRO-3719 (the connection status after a reload
 describes the website account the save checked; the fallback language is
 saved per website), listed in CHANGELOG under "Changes since
 3.0.0-rc3"; PRO-3675 (the Hyvä tracker's consent event checked against
-Hyvä's sources; documentation only).
+Hyvä's sources; documentation only); PRO-3724 (browse tracking counts a
+cookie-notice acceptance only for the current website).
 2026-10-02: 3.0.0-rc3 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc3),
 built by the release workflow from commit a1ff618; the ZIP and its .sha256
@@ -55,6 +56,32 @@ Earlier: 2026-09-11, 2026-09-10._
   `SyncDispatcher::recordSkippedAutomation()` / `EventQueue::enqueueSkipped()`
   (no flag parameter); `StateManager::eraseForEmail()` serves `LocalEraser`,
   its active-cart tombstone leaves erased carts out with a LEFT JOIN.
+
+- **PRO-3724 — browse tracking counts a cookie-notice acceptance only for
+  the current website (2026-10-03; found during PRO-3675; owner design: as
+  Magento itself does).** Both trackers took any `user_allowed_save_cookie`
+  as consent, but the cookie is a JSON map of the website ids the shopper
+  accepted on (`{"1":1}`), so on websites sharing a cookie domain an
+  acceptance on one website started tracking on the other. Now (Luma
+  `tracker.js`, Hyvä `smaily-tracker.js`) only the current website's entry
+  counts, read as Magento's cookie helper (`isUserNotAllowSaveCookie()`:
+  `!empty($accepted[$websiteId])`) and Hyvä's notice (`isAllowedSaveCookie()`,
+  `!!` of the entry; 1.4.0, 1.5.2, csp 1.5.2) read it; the website id comes
+  from the server (`websiteId` in the tracker config, `ViewModel\EngineState`,
+  `StoreManager::getWebsite()`), since neither theme exposes it to other
+  scripts. A value that does not parse is no consent: the cookie helper
+  treats it as no website accepted (Hyvä's notice and Magento_GoogleAnalytics
+  call `JSON.parse` unguarded and throw). Luma's core `notices.js` hides its
+  banner on any cookie value (not per website), so on Luma a shopper who
+  accepted on website 1 sees no notice on website 2 and stays untracked
+  there — Magento's server-side check treats them as not accepted there
+  too; Hyvä's notice shows per website. The consent override still decides
+  first. New harness `Test/Js/tracker-consent.html`
+  (real Luma and Hyvä scripts, 10 scenarios each, 40 checks; red on the old
+  trackers: 12 checks — other website, `{"2":0}`, unparseable); unit test
+  for `websiteId`. ARCHITECTURE, HYVA_SUPPORT (tracker bullet, consent row),
+  TESTING, CHANGELOG. The user guide's consent section does not describe
+  the cookie check, so it is unchanged. Not re-run on a store.
 
 - **PRO-3675 — the Hyvä tracker starts on the event Hyvä's cookie notice
   really dispatches (2026-10-03; documentation only).** PRO-3664 took the

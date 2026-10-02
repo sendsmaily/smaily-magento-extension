@@ -51,16 +51,21 @@ bitexpert/phpstan-magento releases the fix it carries on its unreleased
 bin/test-js.sh              # headless Chrome; CHROME=/path/to/chrome to pick one
 ```
 
-Each page under `Test/Js/` loads Magento's own checkout JS from `vendor/`
-(so `composer install` first), applies the module's mixin as
-`view/frontend/requirejs-config.js` declares it, stubs the rest of the
-checkout, and ends with `RESULT: PASS` or `RESULT: FAIL`; the script exits
-non-zero on a failure. `Test/Js/email-mixin.html` drives Magento's checkout
+Each page under `Test/Js/` ends with `RESULT: PASS` or `RESULT: FAIL`; the
+script exits non-zero on a failure. `Test/Js/email-mixin.html` loads
+Magento's own checkout JS from `vendor/` (so `composer install` first),
+applies the module's mixin as `view/frontend/requirejs-config.js` declares
+it and stubs the rest of the checkout. `Test/Js/email-mixin.html` drives Magento's checkout
 email component through typing, validation and its typing pause and checks
 when the guest's email goes to the cart (one request per change of a valid
 address, none for an invalid value, a signed-in customer or a website with the
 abandoned-cart automation off). Chrome's virtual
-time runs the pauses without waiting for them. CI does not run it yet.
+time runs the pauses without waiting for them. `Test/Js/tracker-consent.html`
+runs the real Luma and Hyvä browse trackers, one fresh frame per scenario
+(document.cookie, sendBeacon and the Luma tracker's jQuery stubbed), and
+checks Magento's cookie notice consent: accepted on another website, on this
+website, not parseable, accepted later on the page, and the consent override
+first. CI does not run the harness yet.
 
 ## Integration tests (real MySQL)
 

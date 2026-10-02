@@ -651,7 +651,12 @@ plugin (F3-50, one standard signal, no per-vendor code): the store's own
 `window.smailyConnect.consentOverride()` when defined, else
 `user_allowed_save_cookie` under Magento cookie restriction mode
 (`cookieRestriction` in the tracker config, from `ViewModel\EngineState`),
-else no consent. Without consent the tracker sends nothing and writes no
+else no consent. The cookie is a JSON map of the website ids the shopper
+accepted on (`{"1":1}`) and one cookie domain can serve several websites,
+so only the current website's entry is consent (`websiteId` in the tracker
+config), as Magento's cookie helper (`isUserNotAllowSaveCookie()`) and
+Hyvä's cookie notice read it; a value that does not parse is no consent,
+as in the cookie helper. Without consent the tracker sends nothing and writes no
 `smaily_anon_sid` (the attribution scripts only expose `ensureSession()`;
 the tracker calls it on consent). Consent that arrives later on the page —
 Magento's `user:allowed:save:cookie` (jQuery, Luma), Hyvä's

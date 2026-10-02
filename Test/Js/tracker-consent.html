@@ -1,0 +1,214 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the browse tracker's consent under Magento cookie
+  restriction mode (PRO-3724): the Luma tracker (view/frontend/web/js/tracker.js
+  with attribution.js) and the Hyvä tracker (compat/hyva/.../smaily-tracker.js
+  with smaily-attribution.js), the real scripts, each scenario in a fresh
+  frame. Stubbed: document.cookie (file:// pages keep no cookies),
+  navigator.sendBeacon, and jQuery as far as the Luma tracker uses it. The
+  cookie notice's cookie user_allowed_save_cookie holds the website ids the
+  shopper accepted on, e.g. {"1":1}. Run it with bin/test-js.sh; the page ends
+  with "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>tracker consent harness</title>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var COOKIE = 'user_allowed_save_cookie';
+    var failures = 0;
+    var passes = 0;
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function trackerConfig(websiteId) {
+        return {
+            relayUrl: 'https://store.example/smaily/relay/',
+            cookieRestriction: true,
+            websiteId: websiteId,
+            attribution: {
+                paramRecId: 'smaily_rec_id',
+                paramVisitor: 'smaily_visitor_token',
+                paramContext: 'smaily_ctx',
+                cookieRecId: 'smaily_rec_id',
+                cookieVisitor: 'smaily_visitor_token',
+                cookieContext: 'smaily_rec_ctx',
+                cookieSession: 'smaily_anon_sid',
+                ttlRecIdDays: 30,
+                ttlVisitorDays: 365,
+                ttlContextDays: 30,
+                ttlSessionDays: 1
+            }
+        };
+    }
+
+    // Runs in the frame before the scripts under test.
+    function stubs(cookieValue, override) {
+        return [
+            'var jar = {};',
+            'Object.defineProperty(document, "cookie", {configurable: true,',
+            '  get: function () { return Object.keys(jar).map(function (k) { return k + "=" + jar[k]; }).join("; "); },',
+            '  set: function (v) { var pair = v.split(";")[0], i = pair.indexOf("=");',
+            '    jar[pair.slice(0, i)] = pair.slice(i + 1); }});',
+            cookieValue === null ? '' : 'jar.' + COOKIE + ' = ' + JSON.stringify(encodeURIComponent(cookieValue)) + ';',
+            'window.beacons = [];',
+            'navigator.sendBeacon = function (url, blob) { window.beacons.push(blob); return true; };',
+            'window.smailyPageContext = {type: "category", categoryPath: "Gear"};',
+            override === undefined ? ''
+                : 'window.smailyConnect = {consentOverride: function () { return ' + override + '; }};'
+        ].join('\n');
+    }
+
+    function lumaFrame(websiteId) {
+        return [
+            '<script>',
+            'var factories = {}, pendingName = null, handlers = {};',
+            'function define(name, deps, factory) {',
+            '  if (typeof name !== "string") { factory = deps; deps = name; name = pendingName; }',
+            '  factories[name] = {deps: deps, factory: factory}; }',
+            'define.amd = {};',
+            'function $() { return {on: function (events, handler) {',
+            '  events.split(" ").forEach(function (e) { (handlers[e] = handlers[e] || []).push(handler); }); }}; }',
+            '$.ajax = function () { window.ajaxCalls = (window.ajaxCalls || 0) + 1; };',
+            'window.acceptCookieNotice = function () {',
+            '  (handlers["user:allowed:save:cookie"] || []).forEach(function (h) { h({}); }); };',
+            '<\/script>',
+            '<script>pendingName = "Smaily_Connect/js/attribution";<\/script>',
+            '<script src="../../view/frontend/web/js/attribution.js"><\/script>',
+            '<script>pendingName = "Smaily_Connect/js/tracker";<\/script>',
+            '<script src="../../view/frontend/web/js/tracker.js"><\/script>',
+            '<script>',
+            'var att = factories["Smaily_Connect/js/attribution"].factory();',
+            'factories["Smaily_Connect/js/tracker"].factory($, att)(' + JSON.stringify(trackerConfig(websiteId)) + ');',
+            '<\/script>'
+        ].join('\n');
+    }
+
+    function hyvaFrame(websiteId) {
+        return [
+            '<script>',
+            'window.acceptCookieNotice = function () {',
+            '  window.dispatchEvent(new CustomEvent("user-allowed-save-cookie")); };',
+            '<\/script>',
+            '<script type="application/json" id="smaily-tracker-config">'
+                + JSON.stringify(trackerConfig(websiteId)) + '<\/script>',
+            '<script src="../../compat/hyva/view/frontend/web/js/smaily-attribution.js"><\/script>',
+            '<script src="../../compat/hyva/view/frontend/web/js/smaily-tracker.js"><\/script>'
+        ].join('\n');
+    }
+
+    // Opens a page of the given website with the given cookie value, lets the
+    // shopper act on it, then leaves the page (pagehide flushes the queue).
+    function page(theme, websiteId, cookieValue, options) {
+        options = options || {};
+
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe');
+
+            frame.onload = function () {
+                var win = frame.contentWindow,
+                    result;
+
+                try {
+                    if (options.accept) {
+                        win.eval('jar.' + COOKIE + ' = '
+                            + JSON.stringify(encodeURIComponent(options.accept)) + ';');
+                        win.acceptCookieNotice();
+                    }
+                    win.dispatchEvent(new win.Event('pagehide'));
+                    result = {
+                        sessionCookie: win.document.cookie.indexOf('smaily_anon_sid=') !== -1,
+                        beacons: win.beacons.slice()
+                    };
+                } catch (error) {
+                    reject(error);
+
+                    return;
+                }
+                Promise.all(result.beacons.map(function (blob) {
+                    return blob.text();
+                })).then(function (bodies) {
+                    result.events = [];
+                    bodies.forEach(function (body) {
+                        result.events = result.events.concat(JSON.parse(body).events);
+                    });
+                    frame.remove();
+                    resolve(result);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><script>'
+                + stubs(cookieValue, options.override) + '<\/script>'
+                + (theme === 'Luma' ? lumaFrame(websiteId) : hyvaFrame(websiteId))
+                + '</head><body></body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function tracked(label, result) {
+        check(label + ': the browse event is sent',
+            result.events.length === 1 && result.events[0].event_type === 'category_view');
+        check(label + ': the session cookie is written', result.sessionCookie);
+    }
+
+    function notTracked(label, result) {
+        check(label + ': no event is sent', result.beacons.length === 0);
+        check(label + ': no session cookie is written', !result.sessionCookie);
+    }
+
+    async function run(theme) {
+        var p = function (websiteId, cookieValue, options) {
+            return page(theme, websiteId, cookieValue, options);
+        };
+
+        log('# ' + theme);
+        notTracked(theme + ', accepted on website 1, page of website 2', await p(2, '{"1":1}'));
+        tracked(theme + ', accepted on website 2, page of website 2', await p(2, '{"2":1}'));
+        tracked(theme + ', accepted on websites 1 and 2, page of website 2', await p(2, '{"1":1,"2":1}'));
+        tracked(theme + ', accepted on website 1, page of website 1', await p(1, '{"1":1}'));
+        notTracked(theme + ', website 2 not accepted ({"2":0})', await p(2, '{"2":0}'));
+        notTracked(theme + ', a cookie value that does not parse', await p(2, 'yes'));
+        notTracked(theme + ', no cookie', await p(2, null));
+        tracked(theme + ', accepted on website 1, then accepts the notice on website 2',
+            await p(2, '{"1":1}', {accept: '{"1":1,"2":1}'}));
+        tracked(theme + ', the consent override says yes, cookie for website 1 only',
+            await p(2, '{"1":1}', {override: true}));
+        notTracked(theme + ', the consent override says no, cookie for website 2',
+            await p(2, '{"2":1}', {override: false}));
+    }
+
+    run('Luma').then(function () {
+        return run('Hyvä');
+    }).then(function () {
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    }).catch(function (error) {
+        document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    });
+</script>
+</body>
+</html>

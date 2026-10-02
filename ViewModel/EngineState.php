@@ -12,6 +12,7 @@ use Magento\Cookie\Helper\Cookie as CookieHelper;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\UrlInterface;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
+use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\Settings;
 
@@ -25,7 +26,8 @@ class EngineState implements ArgumentInterface
         private readonly AttributionManager $attributionManager,
         private readonly CookieHelper $cookieHelper,
         private readonly UrlInterface $urlBuilder,
-        private readonly Json $serializer
+        private readonly Json $serializer,
+        private readonly StoreManagerInterface $storeManager
     ) {
     }
 
@@ -53,6 +55,9 @@ class EngineState implements ArgumentInterface
             // restriction mode is off, which is truthy in JS and would make
             // the tracker wait for a cookie notice the store never shows.
             'cookieRestriction' => (bool)$this->cookieHelper->isCookieRestrictionModeEnabled(),
+            // The cookie notice's cookie lists the websites the shopper
+            // accepted on; the tracker reads it for this website only.
+            'websiteId' => (int)$this->storeManager->getWebsite()->getId(),
             'attribution' => $this->attributionManager->getClientConfig(),
         ]);
     }

@@ -125,6 +125,21 @@ class ProfilingOptOutsTest extends TestCase
         );
     }
 
+    /**
+     * PRO-3575: the address's key is the one its entry is written under —
+     * keyed with the store's secret — and ProfilingConsent keeps its cache
+     * entries under it too.
+     */
+    public function testTheAddressKeyIsTheKeyedFormTheRecordIsWrittenUnder(): void
+    {
+        $this->optOuts->record('person@example.com', 1790000000);
+
+        $key = $this->optOuts->addressKey('person@example.com');
+        self::assertSame([$key], array_keys($this->flags[ProfilingOptOuts::FLAG_CODE]));
+        self::assertNotSame(sha1('person@example.com'), $key);
+        self::assertNotSame($key, $this->optOuts('another-store-key')->addressKey('person@example.com'));
+    }
+
     public function testAWriteMovesAnEntryKeptUnderThePlainHashToTheKeyedForm(): void
     {
         $this->flags[ProfilingOptOuts::FLAG_CODE] = [

@@ -98,6 +98,17 @@ class ProfilingOptOuts
     }
 
     /**
+     * The address's current key, keyed with the store's secret — the one its
+     * entry is written under, and the one ProfilingConsent keeps its cache
+     * entries under, so no cache key carries a plain hash of the address
+     * (PRO-3575).
+     */
+    public function addressKey(string $email): string
+    {
+        return $this->keys($email)[0];
+    }
+
+    /**
      * @param callable(array<string, mixed>): array<string, mixed> $change
      */
     private function change(callable $change): void

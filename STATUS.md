@@ -61,6 +61,19 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   Erkki 2026-10-02: rc1 waits for the whole list), pilot store live
   2026-10-09. After the pilot: PRO-2506, PRO-1967, PRO-1198 (hand-over).
 
+- **PRO-3575 (consent cache key) done — keyed hash (2026-10-02).** The
+  second half of the opt-out-record hardening. `ProfilingConsent` keeps
+  both of its cache entries — the preference (`smaily_profiling_…`) and
+  whether Smaily has the contact (`smaily_profiling_contact_…`) — under
+  `ProfilingOptOuts::addressKey()`, the HMAC with the newest crypt key the
+  opt-out record writes under (the record's own `keys()`, now exposed; no
+  second HMAC). Entries under the old `sha1(address)` keys are simply not
+  found and expire within a day: no migration. Tests RED first:
+  `ProfilingConsentTest` (cache keys carry the keyed hash, no plain hash),
+  `ProfilingOptOutsTest` (the address key is the keyed form the record is
+  written under, and differs per crypt key). Gates: unit 555, phpcs 0
+  errors, phpstan `[OK]`, integration 120.
+
 - **PRO-3619 remainder done — the purchase marker goes only to a contact
   Smaily has (2026-10-02).** Owner decision (Erkki 2026-10-02, question
   11): yes. `ContactSyncHandler` reads the contact (`GET contact.php`)
@@ -119,9 +132,8 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   old line in `env.php`), then the plain `sha1(address)` of the record's
   first form; `record()` and `forget()` remove every form of the address
   and `record()` writes the newest, so no opt-out is lost. Callers
-  unchanged (`ProfilingConsent` not touched). Not changed here: the
-  consent cache key in `ProfilingConsent::cacheKey()` is still
-  `sha1(address)` (reported). New `ProfilingOptOutsTest` cases (RED
+  unchanged (`ProfilingConsent` not touched). The consent cache keys
+  follow in the "consent cache key" entry above. New `ProfilingOptOutsTest` cases (RED
   first): the key is not a plain hash and another crypt key cannot read
   it; a write moves a plain-hash entry and leaves others; forget removes a
   plain-hash entry; an opt-out survives a key rotation. Gates: unit 505,

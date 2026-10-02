@@ -35,7 +35,8 @@ use Smaily\Connect\Model\Queue\EventType;
  *
  * A read resolves the Smaily contact against the store's record, and the
  * newest choice wins (Woo PRO-3191/3192/3434): only an opt-in on the contact
- * stamped after the store's opt-out lifts it. Reads are cached for a day; when
+ * stamped after the store's opt-out lifts it. Reads are cached for a day, under
+ * the opt-out record's keyed hash of the address (PRO-3575); when
  * Smaily cannot be read the store's record decides, and a shopper it holds
  * no opt-out for is profiled (fail open, the Woo posture).
  */
@@ -270,7 +271,7 @@ class ProfilingConsent
 
     private function cacheKey(string $email): string
     {
-        return self::CACHE_PREFIX . sha1($email);
+        return self::CACHE_PREFIX . $this->optOuts->addressKey($email);
     }
 
     /**
@@ -295,7 +296,7 @@ class ProfilingConsent
         }
         $this->cache->save(
             $fields === null ? '0' : '1',
-            self::CONTACT_CACHE_PREFIX . sha1($email),
+            self::CONTACT_CACHE_PREFIX . $this->optOuts->addressKey($email),
             [],
             self::CACHE_TTL_SECONDS
         );
@@ -309,7 +310,7 @@ class ProfilingConsent
      */
     private function hasContact(string $email, int|string|null $storeId): bool
     {
-        $known = $this->cache->load(self::CONTACT_CACHE_PREFIX . sha1($email));
+        $known = $this->cache->load(self::CONTACT_CACHE_PREFIX . $this->optOuts->addressKey($email));
         if ($known !== false) {
             return $known === '1';
         }

@@ -180,6 +180,29 @@ class ProfilingConsentTest extends TestCase
         self::assertCount(2 * $writes, $this->smailyWrites);
     }
 
+    /**
+     * PRO-3575: the cache keys carry the opt-out record's keyed hash of the
+     * address, never a plain hash anyone can compute from an address.
+     */
+    public function testTheCacheKeysCarryTheKeyedHashOfTheAddress(): void
+    {
+        $this->contact = ['email' => 'person@example.com', 'is_unsubscribed' => '0'];
+        $consent = $this->consent();
+        $consent->isAllowed('person@example.com', 1);
+        $consent->setAllowed('person@example.com', false, 1);
+
+        self::assertEqualsCanonicalizing(
+            [
+                'smaily_profiling_' . self::keyedHash('person@example.com'),
+                'smaily_profiling_contact_' . self::keyedHash('person@example.com'),
+            ],
+            array_keys($this->cache)
+        );
+        foreach (array_keys($this->cache) as $key) {
+            self::assertStringNotContainsString(sha1('person@example.com'), $key);
+        }
+    }
+
     public function testAFailedSmailyWriteStillQueuesTheEngineAndKeepsTheChoice(): void
     {
         $this->smailyClient = $this->createMock(SmailyClient::class);
@@ -545,6 +568,9 @@ class ProfilingConsentTest extends TestCase
         $optOuts->method('isByUnsubscribe')->willReturnCallback(
             fn (string $email): bool => isset($this->records[$email]) && ($this->byUnsubscribe[$email] ?? false)
         );
+        $optOuts->method('addressKey')->willReturnCallback(
+            static fn (string $email): string => self::keyedHash($email)
+        );
 
         $cache = $this->createMock(CacheInterface::class);
         $cache->method('load')->willReturnCallback(fn (string $key): string|false => $this->cache[$key] ?? false);
@@ -575,6 +601,14 @@ class ProfilingConsentTest extends TestCase
 
     private function cacheKey(string $email): string
     {
-        return 'smaily_profiling_' . sha1($email);
+        return 'smaily_profiling_' . self::keyedHash($email);
+    }
+
+    /**
+     * What the opt-out record keys an address by in this test.
+     */
+    private static function keyedHash(string $email): string
+    {
+        return hash_hmac('sha256', $email, 'unit-test-crypt-key');
     }
 }

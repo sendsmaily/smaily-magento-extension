@@ -8,6 +8,7 @@ The package version is currently `3.0.0-rc3` — the third release-candidate cut
 
 - Campaign Intelligence gets a category for every variant: a variant of a configurable product that has no category of its own is sent with its parent product's category. Before, such a variant was sent as uncategorized. A variant with a category of its own keeps it.
 - A purchased variant of a configurable product without a SKU is sent to Campaign Intelligence as the variant that was bought, so the purchase line names the same product as the variant's catalog entry.
+- Switching from per-language Smaily accounts back to one account cannot save one account's subdomain and username with another account's password: the single-account fields can show the default store view's per-language account, and saved with an empty password, that account went to the whole website with the default fallback account's password, so Smaily refused it and syncing stopped. An empty password now keeps the saved one only for the account saved for the website; for any other account the save is refused on the password field until its password is entered (EN + ET).
 
 **Changes since 3.0.0-rc2**
 

@@ -271,8 +271,11 @@ class WizardStepSaver
      * per-language block is compared with the store view it was drawn
      * from (`WizardData::getMultilingualAccounts`); a block without both
      * a subdomain and a username saves no account and needs none. In the
-     * other modes the single account is compared with the website's store
-     * view, as the Connection panel draws it.
+     * other modes the single account is compared with the account saved at
+     * website scope, the scope it is written to and whose password an empty
+     * one keeps — not with the website's store view the panel draws it
+     * from, which after mode A can still hold a per-language account
+     * (PRO-3699).
      *
      * @param array<string, mixed> $data
      * @return array<int, array{field: string, message: string}>
@@ -286,9 +289,13 @@ class WizardStepSaver
         int $websiteId
     ): array {
         if ($mode !== MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS) {
-            $storeId = $this->websiteContext->getStoreId();
-
-            return $this->isChangedWithoutPassword($subdomain, $username, $password, $storeId)
+            return $this->isChangedWithoutPassword(
+                $subdomain,
+                $username,
+                $password,
+                $this->config->getWebsiteSubdomain($websiteId),
+                $this->config->getWebsiteUsername($websiteId)
+            )
                 ? [[
                     'field' => 'password',
                     'message' => (string)__('The subdomain or username changed — enter the password of this account.'),
@@ -312,7 +319,8 @@ class WizardStepSaver
                 $accountSubdomain,
                 $accountUsername,
                 (string)($account['password'] ?? ''),
-                $storeId
+                $this->config->getSubdomain($storeId),
+                $this->config->getUsername($storeId)
             )) {
                 $errors[] = [
                     'field' => 'accounts.' . $language . '.password',
@@ -329,20 +337,20 @@ class WizardStepSaver
 
     /**
      * Whether a post keeps the saved password for an account other than
-     * the one the store view holds.
+     * the saved one.
      */
     private function isChangedWithoutPassword(
         string $subdomain,
         string $username,
         string $password,
-        int $storeId
+        string $savedSubdomain,
+        string $savedUsername
     ): bool {
         if ($password !== '' && !$this->credentialCheck->isKeptPassword($password)) {
             return false;
         }
 
-        return strcasecmp($subdomain, $this->config->getSubdomain($storeId)) !== 0
-            || $username !== $this->config->getUsername($storeId);
+        return strcasecmp($subdomain, $savedSubdomain) !== 0 || $username !== $savedUsername;
     }
 
     /**

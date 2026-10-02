@@ -77,6 +77,8 @@ class WizardStepSaverTest extends TestCase
         // so an empty password keeps it (PRO-3690).
         $this->config->method('getSubdomain')->willReturn('demo');
         $this->config->method('getUsername')->willReturn('api-user');
+        $this->config->method('getWebsiteSubdomain')->willReturn('demo');
+        $this->config->method('getWebsiteUsername')->willReturn('api-user');
         $this->clientProvider = $this->createMock(SmailyClientProvider::class);
         $this->clientFactory = $this->createMock(SmailyClientFactory::class);
 

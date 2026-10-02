@@ -6,9 +6,11 @@
 > and fix it.
 
 _Last updated: 2026-10-03 — after the rc3 cut: PRO-3714 (a variant
-without a category of its own takes its parent's) and PRO-3715 (an
-empty-SKU configurable order line names the variant bought), listed in
-CHANGELOG under "Changes since 3.0.0-rc3". 2026-10-02: 3.0.0-rc3 is released as a GitHub pre-release on
+without a category of its own takes its parent's), PRO-3715 (an empty-SKU
+configurable order line names the variant bought) and PRO-3699 (leaving
+per-language accounts needs the password of an account other than the
+website's), listed in CHANGELOG under "Changes since 3.0.0-rc3".
+2026-10-02: 3.0.0-rc3 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc3),
 built by the release workflow from commit a1ff618; the ZIP and its .sha256
 were checked after publishing (375 entries, checksum OK, sha256
@@ -63,6 +65,38 @@ Earlier: 2026-09-11, 2026-09-10._
   shape unchanged (values only). Unit tests: parent's category used, own
   category kept, both empty → defaulted; resolver: one query per shared
   parent, none for a non-variant. Not run in the sandbox.
+
+- **PRO-3699 — leaving per-language accounts cannot save one account with
+  another's password (2026-10-03; found by reading code during PRO-3690,
+  reproduced in the integration harness).** After mode A the single-account
+  fields show the website's default store view's account (its store-view
+  rows, `WebsiteContext::getStoreId()` / boot JSON). Saved unchanged with an
+  empty password, that subdomain and username went to website scope with the
+  website's own password — the fallback account's — and the store-view rows
+  were then removed: with the default store view's language not the fallback
+  language, every store view was left on e.g. `et-shop` / `et-user` with the
+  en password (measured on the old code), so Smaily refused it. The PRO-3690
+  rule did not catch it: it compared the single account with the default
+  store view, which still held the per-language account. Now the single
+  account (every mode but A) is compared with the account saved at website
+  scope (`Config::getWebsiteSubdomain` / `getWebsiteUsername`, new) — the
+  scope the save writes and whose password an empty one keeps; a mismatch
+  without a password is refused with the existing PRO-3690 field error
+  (`password`, EN + ET). The check runs before any write, so the mode change
+  and the store-view teardown in the same request do not affect it. Picked
+  over making the panel show the website account: one comparison target on
+  the server closes the path whatever the form shows. Known client-side
+  side effect: panels-js still compares with `boot.connection` (the store
+  view's account), so after leaving mode A it lets the shown account through
+  to the server refusal and asks for a password for the fallback account the
+  server would accept. Integration `PerLanguageAccountsSaveTest` (+3; the
+  harness's website mock gains `getStores` / `getDefaultStore`, store view 2
+  et is website 7's default): unchanged et account without a password →
+  refused, nothing saved, mode A stays; en fallback without a password and
+  et with its password → every store view on that account. The first two are
+  red on the old code. Unit `WizardStepSaverTest` stubs the new getters.
+  USER_GUIDE (Default fallback account), CHANGELOG (new "Changes since
+  3.0.0-rc3"). Not run in the sandbox.
 
 - **PRO-3711 — a busy store keeps sending abandoned-cart reminders
   (2026-10-02; found by reading the code).** `Cron\AbandonedCart` loaded the
@@ -206,7 +240,7 @@ Earlier: 2026-09-11, 2026-09-10._
   `accounts.<language>.password`, "The subdomain or username of the %1
   account changed — enter its password."; in the other modes, the single
   account against the website's store view (`WebsiteContext::getStoreId`,
-  as the boot JSON) — field `password`, "The subdomain or username changed
+  as the boot JSON; since PRO-3699 against the website-scope account) — field `password`, "The subdomain or username changed
   — enter the password of this account." (EN + ET). The subdomain is
   compared in any case, the username exactly; a block without both values
   saves no account and is not checked. The single account did not require

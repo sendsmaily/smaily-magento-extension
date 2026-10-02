@@ -96,6 +96,24 @@ class Config
     }
 
     /**
+     * The Smaily subdomain saved for a website (its own, else the default
+     * scope's) — the scope a single-account Connection save writes to.
+     */
+    public function getWebsiteSubdomain(int $websiteId): string
+    {
+        return trim((string)$this->websiteValue(self::XML_PATH_SUBDOMAIN, $websiteId));
+    }
+
+    /**
+     * The Smaily API username saved for a website (its own, else the
+     * default scope's).
+     */
+    public function getWebsiteUsername(int $websiteId): string
+    {
+        return trim((string)$this->websiteValue(self::XML_PATH_USERNAME, $websiteId));
+    }
+
+    /**
      * Whether a complete set of API credentials is configured for the scope.
      *
      * @param int|string|null $storeId

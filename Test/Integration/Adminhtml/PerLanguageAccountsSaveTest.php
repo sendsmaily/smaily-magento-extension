@@ -13,6 +13,7 @@ use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Store\Api\Data\StoreInterface;
+use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
 use Smaily\Connect\Model\Adminhtml\SetupNotice;
@@ -47,6 +48,12 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
     private const STORES = [1 => self::WEBSITE_ID, 2 => self::WEBSITE_ID, 3 => self::WEBSITE_ID,
         5 => self::WEBSITE_ID, 4 => self::OTHER_WEBSITE_ID];
 
+    /**
+     * Website id => its default store view id, the store view the
+     * Connection panel draws the single account from.
+     */
+    private const DEFAULT_STORES = [self::WEBSITE_ID => 2, self::OTHER_WEBSITE_ID => 4];
+
     private const LOCALE = 'general/locale/code';
 
     private WizardStepSaver $saver;
@@ -65,10 +72,16 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
         $storeManager = $this->createMock(StoreManagerInterface::class);
         $storeManager->method('getDefaultStoreView')->willReturn($defaultStore);
         $storeManager->method('getWebsite')->willReturnCallback(function (int $websiteId): Website {
+            $storeIds = array_keys(array_filter(self::STORES, static fn (int $id): bool => $id === $websiteId));
+            $stores = [];
+            foreach ($storeIds as $storeId) {
+                $stores[$storeId] = $this->createMock(Store::class);
+                $stores[$storeId]->method('getId')->willReturn($storeId);
+            }
             $website = $this->createMock(Website::class);
-            $website->method('getStoreIds')->willReturn(
-                array_keys(array_filter(self::STORES, static fn (int $id): bool => $id === $websiteId))
-            );
+            $website->method('getStoreIds')->willReturn($storeIds);
+            $website->method('getStores')->willReturn($stores);
+            $website->method('getDefaultStore')->willReturn($stores[self::DEFAULT_STORES[$websiteId]]);
 
             return $website;
         });
@@ -217,6 +230,87 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
 
         $this->assertAccount(2, 'et');
         $this->assertAccount(3, 'et');
+    }
+
+    /**
+     * PRO-3699: after per-language accounts, the single account fields show
+     * the default store view's account — store view 2's et account, not the
+     * website's en fallback. Saved unchanged as the single account with an
+     * empty password, it would be written for the whole website with the en
+     * password. It is refused on the password field, and nothing is saved:
+     * the store views keep their accounts and mode A stays.
+     */
+    public function testLeavingPerLanguageAccountsWithTheDefaultStoreViewsAccountNeedsItsPassword(): void
+    {
+        $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'et_EE', 5 => 'en_GB']);
+        $this->saveAccounts([$this->account('en', 'en-secret'), $this->account('et', 'et-secret')]);
+
+        $errors = $this->saveSingle($this->account('et'));
+
+        self::assertSame([[
+            'field' => 'password',
+            'message' => 'The subdomain or username changed — enter the password of this account.',
+        ]], $errors);
+        self::assertSame('a', $this->config->getMultilingualMode(self::WEBSITE_ID));
+        $this->assertAccount(2, 'et');
+        $this->assertAccount(3, 'et');
+        $this->assertAccount(1, 'en');
+    }
+
+    /**
+     * PRO-3699: leaving per-language accounts keeps a working account — the
+     * website's own (the en fallback) with an empty password, the default
+     * store view's account with its password; every store view of the
+     * website then uses it.
+     *
+     * @param array<string, string> $single
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('singleAccountAfterPerLanguageAccounts')]
+    public function testLeavingPerLanguageAccountsKeepsAWorkingAccount(array $single, string $language): void
+    {
+        $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'et_EE', 5 => 'en_GB']);
+        $this->saveAccounts([$this->account('en', 'en-secret'), $this->account('et', 'et-secret')]);
+
+        self::assertSame([], $this->saveSingle($single));
+
+        foreach ([1, 2, 3, 5] as $storeId) {
+            $this->assertAccount($storeId, $language, 'Store view ' . $storeId);
+        }
+        $this->assertOtherWebsiteUntouched();
+    }
+
+    /**
+     * @return array<string, array{0: array<string, string>, 1: string}>
+     */
+    public static function singleAccountAfterPerLanguageAccounts(): array
+    {
+        return [
+            'the website account, empty password' => [
+                ['subdomain' => 'en-shop', 'username' => 'en-user', 'password' => ''],
+                'en',
+            ],
+            'the default store view account, its password' => [
+                ['subdomain' => 'et-shop', 'username' => 'et-user', 'password' => 'et-secret'],
+                'et',
+            ],
+        ];
+    }
+
+    /**
+     * A single-account save as the Connection panel posts it after the mode
+     * is switched away from per-language accounts.
+     *
+     * @param array<string, string> $account
+     * @return array<int, array{field: string, message: string}>
+     */
+    private function saveSingle(array $account): array
+    {
+        return $this->saver->save('connect', [
+            'subdomain' => $account['subdomain'],
+            'username' => $account['username'],
+            'password' => $account['password'],
+            'multilingual_mode' => 'single',
+        ]);
     }
 
     /**

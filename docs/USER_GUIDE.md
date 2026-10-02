@@ -280,7 +280,13 @@ and its credentials also serve every scope without a per-language
 override. Switching the multilingual mode away from per-language accounts
 removes the per-store-view credential overrides (the panel asks for
 confirmation first); workflow mappings are kept but stop being used
-outside the per-language modes.
+outside the per-language modes. The single account is saved for the whole
+website, and a password left empty keeps the password of the default
+fallback account. So with an empty password the save goes through only for
+the fallback account's subdomain and username; the fields can show another
+account — the one of the default store view's language — and to keep that
+account instead, enter its password. Until then the save is refused on the
+password field.
 
 **When a store view's language changes (per-language accounts mode).**
 Saving the Connection panel gives every store view the account of its

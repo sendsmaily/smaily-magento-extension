@@ -118,8 +118,10 @@ class LegacyConfigMapper
             }
         }
         if (isset($legacy['sync/frequency'])) {
-            $notices[] = 'Subscriber sync frequency is no longer configurable: '
-                . 'v3 runs a daily full sync plus a 15-minute consent reconcile.';
+            $notices[] = (string)__(
+                'Subscriber sync frequency is no longer configurable: '
+                . 'v3 runs a daily full sync plus a 15-minute consent reconcile.'
+            );
         }
 
         // Abandoned cart.
@@ -142,9 +144,11 @@ class LegacyConfigMapper
 
         // Captcha settings are replaced by Magento's native reCAPTCHA.
         if ($this->flag($legacy, 'subscribe/enableCaptcha')) {
-            $notices[] = 'The legacy newsletter captcha settings were not migrated: '
+            $notices[] = (string)__(
+                'The legacy newsletter captcha settings were not migrated: '
                 . 'enable Magento\'s built-in reCAPTCHA for newsletter forms instead '
-                . '(Stores > Configuration > Security > Google reCAPTCHA Storefront).';
+                . '(Stores > Configuration > Security > Google reCAPTCHA Storefront).'
+            );
         }
 
         // Enable Module = No stopped this scope's sync, opt-in and abandoned cart.

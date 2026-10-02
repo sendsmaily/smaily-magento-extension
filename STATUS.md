@@ -79,6 +79,15 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   none, so nothing changes in code or fixtures. ARCHITECTURE and
   UPSTREAM_PROPOSAL cite v1.8.2.
 
+- **The earlier 2.x upgrade notices are translated (2026-10-02).** The
+  sync-frequency and captcha notices (`LegacyConfigMapper`) and their title
+  "Smaily Connect upgrade" (`MigrateLegacyConfig`) go through `__()`, as the
+  PRO-3681 notice does; EN + ET rows in `i18n/`. New integration test
+  `MigrateLegacyConfigTest::testTheDeliberateDropNoticesAreInEstonianInAnEstonianAdmin`.
+  Texts unchanged — the frequency notice still says "a daily full sync",
+  which UPGRADING and the CHANGELOG ("near-real-time") contradict; raised
+  for a follow-up.
+
 - **PRO-3680 — two docs name only today's code and releases (2026-10-02,
   docs only).** ADMIN_UI_TARGET_SPEC §4.2: the sources paragraph names
   `WizardStepSaver`, the panel templates and `WizardData` as today's ground

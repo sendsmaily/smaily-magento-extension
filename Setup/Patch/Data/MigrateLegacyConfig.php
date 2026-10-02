@@ -149,7 +149,7 @@ class MigrateLegacyConfig implements DataPatchInterface
         ]);
 
         foreach (array_unique($allNotices) as $notice) {
-            $this->notifier->addNotice('Smaily Connect upgrade', $notice);
+            $this->notifier->addNotice((string)__('Smaily Connect upgrade'), $notice);
         }
         $this->noticeStoreViewAccounts($storeViewAccountIds);
         // AddSetupNotice, next in this run, says the settings were migrated.

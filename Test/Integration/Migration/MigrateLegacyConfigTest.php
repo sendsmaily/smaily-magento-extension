@@ -16,6 +16,7 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
 use Smaily\Connect\Setup\Patch\Data\MigrateLegacyConfig;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\DataSetup;
+use Smaily\Connect\Test\Unit\Support\StoreLocale;
 
 /**
  * The 2.8.x -> v3 settings migration against real core_config_data rows:
@@ -177,6 +178,36 @@ class MigrateLegacyConfigTest extends IntegrationTestCase
         $descriptions = implode(' | ', array_column($notices, 'description'));
         self::assertStringContainsString('sync frequency is no longer configurable', $descriptions);
         self::assertStringContainsString('reCAPTCHA', $descriptions);
+    }
+
+    public function testTheDeliberateDropNoticesAreInEstonianInAnEstonianAdmin(): void
+    {
+        $this->seedLegacyRows('default', 0, [
+            'smaily/sync/frequency' => '0 */4 * * *',
+            'smaily/subscribe/enableCaptcha' => '1',
+        ]);
+        StoreLocale::use('et_EE');
+        try {
+            $this->applyPatch();
+        } finally {
+            StoreLocale::reset();
+        }
+
+        $notices = $this->env->getNotifier()->getNotifications();
+        self::assertSame(
+            ['Smaily Connecti uuendus', 'Smaily Connecti uuendus'],
+            array_column($notices, 'title')
+        );
+        self::assertSame(
+            [
+                'Tellijate sünkroonimise sagedust ei saa enam seadistada: v3 teeb kord päevas'
+                . ' täieliku sünkroonimise ja iga 15 minuti järel nõusolekute ühtlustamise.',
+                'Varasemaid uudiskirja captcha seadistusi üle ei toodud: lülita selle asemel'
+                . ' uudiskirja vormidele sisse Magento sisseehitatud reCAPTCHA (Stores >'
+                . ' Configuration > Security > Google reCAPTCHA Storefront).',
+            ],
+            array_column($notices, 'description')
+        );
     }
 
     public function testRunningThePatchTwiceIsIdempotent(): void

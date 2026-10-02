@@ -78,36 +78,57 @@ class SyncDispatcher
      * is POSTed — a retry then resends the moment the store event happened,
      * which is the moment a merchant means. See Trigger::MARKER_FIELDS.
      *
-     * A $skipReason records the automation in the Log as skipped, with the
-     * reason, instead of queueing it to be sent.
+     * @param array<string, string|int> $address must contain "email"
+     */
+    public function dispatchAutomation(string $trigger, int $storeId, array $address): void
+    {
+        $this->eventQueue->enqueue(
+            EventType::AUTOMATION_TRIGGER,
+            $this->automationPayload($trigger, $storeId, $address),
+            (string)($address['email'] ?? ''),
+            $this->websiteId($storeId)
+        );
+    }
+
+    /**
+     * Records an automation in the Log as skipped, with the reason, instead
+     * of queueing it to be sent; the row shows what dispatchAutomation()
+     * would have sent.
      *
      * @param array<string, string|int> $address must contain "email"
      */
-    public function dispatchAutomation(
-        string $trigger,
-        int $storeId,
-        array $address,
-        ?string $skipReason = null
-    ): void {
+    public function recordSkippedAutomation(string $trigger, int $storeId, array $address, string $reason): void
+    {
+        $this->eventQueue->enqueueSkipped(
+            EventType::AUTOMATION_TRIGGER,
+            $this->automationPayload($trigger, $storeId, $address),
+            $reason,
+            (string)($address['email'] ?? ''),
+            $this->websiteId($storeId)
+        );
+    }
+
+    /**
+     * An automation's queue payload, its address stamped with the trigger's
+     * own run marker.
+     *
+     * @param array<string, string|int> $address
+     * @return array<string, mixed>
+     */
+    private function automationPayload(string $trigger, int $storeId, array $address): array
+    {
         $marker = Trigger::MARKER_FIELDS[$trigger] ?? null;
         if ($marker !== null) {
             $address[$marker] = gmdate(Trigger::MARKER_STAMP_FORMAT);
         }
 
-        $this->eventQueue->enqueue(
-            EventType::AUTOMATION_TRIGGER,
-            [
-                'trigger_type' => $trigger,
-                'store_id' => $storeId,
-                'website_id' => $this->websiteId($storeId),
-                'language' => $this->languageResolver->forStore($storeId),
-                'address' => $address,
-            ],
-            (string)($address['email'] ?? ''),
-            $this->websiteId($storeId),
-            null,
-            $skipReason
-        );
+        return [
+            'trigger_type' => $trigger,
+            'store_id' => $storeId,
+            'website_id' => $this->websiteId($storeId),
+            'language' => $this->languageResolver->forStore($storeId),
+            'address' => $address,
+        ];
     }
 
     /**

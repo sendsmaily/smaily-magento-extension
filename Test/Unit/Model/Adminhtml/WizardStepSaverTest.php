@@ -439,7 +439,7 @@ class WizardStepSaverTest extends TestCase
      */
     public function testAPerLanguageBlockWithAnotherAccountAndNoPasswordIsRefused(): void
     {
-        $this->accountResolver->method('storeIdForAccountKey')->with('fi', 0)->willReturn(3);
+        $this->accountResolver->method('storeLanguages')->with(0)->willReturn([3 => 'fi']);
         $this->clientFactory->expects(self::never())->method('create');
 
         $errors = $this->saver->save('connect', [
@@ -465,7 +465,7 @@ class WizardStepSaverTest extends TestCase
      */
     public function testANewFallbackBlockWithoutAPasswordShowsOneError(): void
     {
-        $this->accountResolver->method('storeIdForAccountKey')->with('fi', 0)->willReturn(3);
+        $this->accountResolver->method('storeLanguages')->with(0)->willReturn([3 => 'fi']);
         $this->clientFactory->expects(self::never())->method('create');
 
         $errors = $this->saver->save('connect', [
@@ -488,7 +488,6 @@ class WizardStepSaverTest extends TestCase
 
     public function testAPerLanguageBlockWithItsOwnAccountKeepsItsPassword(): void
     {
-        $this->accountResolver->method('storeIdForAccountKey')->willReturn(3);
         $this->accountResolver->method('storeLanguages')->willReturn([3 => 'fi']);
 
         $errors = $this->saver->save('connect', [
@@ -729,11 +728,73 @@ class WizardStepSaverTest extends TestCase
             'username' => 'api-user',
             'multilingual_mode' => 'a',
             'accounts' => [
-                ['language' => 'et', 'subdomain' => 'demo-et', 'username' => 'et-user'],
+                ['language' => 'et', 'subdomain' => 'demo-et', 'username' => 'et-user', 'password' => 'et-secret'],
             ],
         ]);
 
         self::assertTrue($this->wasSavedAtScope(Config::XML_PATH_USERNAME, ScopeInterface::SCOPE_STORES, 5));
+    }
+
+    /**
+     * A per-language block is compared with the account of the first store
+     * view of its language in the website's store view order — the store
+     * view AccountResolver::storeIdForAccountKey() names — not with a later
+     * one or the lowest id.
+     *
+     * @dataProvider representativeStoreViewProvider
+     * @param array<int, string> $storeLanguages
+     */
+    public function testAPerLanguageBlockIsComparedWithTheFirstStoreViewOfItsLanguage(
+        array $storeLanguages,
+        bool $refused
+    ): void {
+        $config = $this->createMock(Config::class);
+        $config->method('getSubdomain')->willReturnCallback(
+            static fn (?int $storeId = null): string => $storeId === 4 ? 'fi-shop' : 'demo'
+        );
+        $config->method('getUsername')->willReturn('api-user');
+        $config->method('getWebsiteSubdomain')->willReturn('demo');
+        $config->method('getWebsiteUsername')->willReturn('api-user');
+        $this->accountResolver->method('storeLanguages')->with(0)->willReturn($storeLanguages);
+        $normalizer = $this->createMock(SubdomainNormalizer::class);
+        $normalizer->method('normalize')->willReturnArgument(0);
+        $saver = new WizardStepSaver(
+            $this->configWriter,
+            $this->createMock(EncryptorInterface::class),
+            $this->createMock(TypeListInterface::class),
+            $normalizer,
+            $this->accountResolver,
+            $config,
+            $this->websiteContext,
+            $this->createMock(StoreManagerInterface::class),
+            $this->mappingSaver,
+            $this->clientProvider,
+            new ConfigRowNormalizer(),
+            new CredentialCheck($this->clientFactory, $config),
+            $this->setupNotice
+        );
+
+        $errors = $saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'multilingual_mode' => 'a',
+            'accounts' => [
+                ['language' => 'fi', 'subdomain' => 'fi-shop', 'username' => 'api-user', 'password' => ''],
+            ],
+        ]);
+
+        self::assertSame($refused ? ['accounts.fi.password'] : [], array_column($errors, 'field'));
+    }
+
+    /**
+     * @return array<string, array{0: array<int, string>, 1: bool}>
+     */
+    public static function representativeStoreViewProvider(): array
+    {
+        return [
+            'the first fi store view holds the account' => [[2 => 'et', 4 => 'fi', 1 => 'fi'], false],
+            'a later fi store view holds the account' => [[1 => 'fi', 4 => 'fi'], true],
+        ];
     }
 
     public function testSubscriberFieldsAreSavedAtWebsiteScope(): void

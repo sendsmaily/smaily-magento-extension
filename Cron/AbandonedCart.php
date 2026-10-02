@@ -127,7 +127,15 @@ class AbandonedCart
             return;
         }
 
-        $remindedSince = $this->dateTime->gmtDate('Y-m-d H:i:s', $now - self::REMINDER_INTERVAL_SECONDS);
+        // The addresses reminded in the last 24 hours, read once; a reminder
+        // this run enqueues joins them, so two carts of one address in one
+        // run get one reminder.
+        $reminded = $this->stateManager->addressesRemindedSince(
+            $this->dateTime->gmtDate('Y-m-d H:i:s', $now - self::REMINDER_INTERVAL_SECONDS)
+        );
+        $trackedAddresses = $this->stateManager->trackedAddresses(
+            array_map(static fn (Quote $quote): int => (int)$quote->getId(), $candidates)
+        );
 
         $mailed = 0;
         foreach ($candidates as $quote) {
@@ -143,9 +151,10 @@ class AbandonedCart
                 continue;
             }
 
-            if ($this->stateManager->hasReminderSince((string)$address['email'], $remindedSince)) {
-                $this->stateManager->markSkipped((int)$quote->getId(), $storeId, $address['email']);
-                $this->dispatcher->dispatchAutomation(
+            $quoteId = (int)$quote->getId();
+            if (isset($reminded[strtolower((string)$address['email'])])) {
+                $this->stateManager->markSkipped($quoteId, $storeId, $address['email']);
+                $this->dispatcher->recordSkippedAutomation(
                     Trigger::ABANDONED_CART,
                     $storeId,
                     $address,
@@ -156,7 +165,11 @@ class AbandonedCart
 
             // Mark first, dispatch second: if we crash in between, the shopper
             // misses one reminder instead of receiving a duplicate.
-            $this->stateManager->markMailed((int)$quote->getId(), $storeId, $address['email']);
+            $this->stateManager->markMailed($quoteId, $storeId, $address['email']);
+            $remindedAddress = $trackedAddresses[$quoteId] ?? strtolower((string)$address['email']);
+            if ($remindedAddress !== '') {
+                $reminded[$remindedAddress] = true;
+            }
             $this->dispatcher->dispatchAutomation(Trigger::ABANDONED_CART, $storeId, $address);
             $mailed++;
         }

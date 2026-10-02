@@ -406,7 +406,8 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   later checkout opt-in may write the address the shopper types afresh onto
   the row while the status stays `erased`, so no reminder is scheduled.
   **An active cart the tracker has not seen gets a tombstone too
-  (PRO-3693)**: `StateManager::tombstoneActiveQuotesForEmail()` reads the
+  (PRO-3693)**: `StateManager::eraseForEmail()`, after the tracked rows,
+  reads the
   active quotes whose `customer_email` or any `quote_address.email` is the
   address (case-insensitive) and writes an `erased` row for each one that
   is not erased yet — inserted, or an existing row (an `open` opt-in row
@@ -517,19 +518,21 @@ page held only handled carts and a newer cart was never loaded. The
 exclusion is in the SQL, before the LIMIT, so the page holds only
 candidates.
 
-**One reminder per address per 24 hours (PRO-3693).** Before it marks a
-candidate `mailed`, the cron asks `StateManager::hasReminderSince()` whether
-any tracker row with the resolved address (`LOWER(email)`) has a
-`mail_sent_at` in the last 24 hours — a reminder delivered or still queued,
-for any cart, whatever the row's status now. If so the cart is marked
+**One reminder per address per 24 hours (PRO-3693).** Once per page of
+candidates the cron reads `StateManager::addressesRemindedSince()`: the
+addresses (lower-cased) of the tracker rows with a `mail_sent_at` in the last
+24 hours — a reminder delivered or still queued, for any cart, whatever the
+row's status now. A candidate whose resolved address is in that set is marked
 `skipped` (terminal, no `mail_sent_at`, so it is never weighed again and does
 not start a new 24 hours) and the automation is recorded through
-`SyncDispatcher::dispatchAutomation()` with a skip reason: `EventQueue::enqueue()`
+`SyncDispatcher::recordSkippedAutomation()`: `EventQueue::enqueueSkipped()`
 stores the row already closed as skipped (`sent`, no `sent_payload`,
 `Cron\AbandonedCart::SKIPPED_RECENTLY_REMINDED` in `last_error`, translated by
 `Log\FailureMessage`), so the Log shows what would have gone out and why it
-did not, and the flusher never claims it. The cron marks before it moves to
-the next candidate, so two carts of one address in one run get one reminder.
+did not, and the flusher never claims it. A cart the cron marks `mailed` adds
+the address its row holds (`StateManager::trackedAddresses()`, or the
+resolved address for a new row) to the set before the next candidate, so two
+carts of one address in one run get one reminder.
 
 **Where a guest's email comes from (PRO-3693).** Magento's checkout keeps a
 guest's email in the browser (`quote.guestEmail`) and sends it only with

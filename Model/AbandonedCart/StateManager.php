@@ -120,20 +120,54 @@ class StateManager
     }
 
     /**
-     * Whether a reminder went to this address — delivered or still waiting in
-     * the queue, for any cart — at or after $since (UTC, `Y-m-d H:i:s`). The
-     * address is compared in any case.
+     * The addresses a reminder went to — delivered or still waiting in the
+     * queue, for any cart — at or after $since (UTC, `Y-m-d H:i:s`),
+     * lower-cased, as the keys of a set.
+     *
+     * @return array<string, true>
      */
-    public function hasReminderSince(string $email, string $since): bool
+    public function addressesRemindedSince(string $since): array
     {
         $connection = $this->resourceConnection->getConnection(self::CONNECTION);
         $select = $connection->select()
-            ->from($this->table(), ['quote_id'])
-            ->where('LOWER(email) = ?', strtolower($email))
-            ->where('mail_sent_at >= ?', $since)
-            ->limit(1);
+            ->distinct()
+            ->from($this->table(), ['email'])
+            ->where('email IS NOT NULL')
+            ->where('mail_sent_at >= ?', $since);
 
-        return $connection->fetchOne($select) !== false;
+        $addresses = [];
+        foreach ($connection->fetchCol($select) as $email) {
+            $addresses[strtolower((string)$email)] = true;
+        }
+
+        return $addresses;
+    }
+
+    /**
+     * The address the tracked row of each given quote holds, lower-cased
+     * ('' for a row without one); a quote without a row is left out.
+     * markMailed() keeps the address of a row that exists, so this is the
+     * address a reminder for the quote counts for.
+     *
+     * @param int[] $quoteIds
+     * @return array<int, string>
+     */
+    public function trackedAddresses(array $quoteIds): array
+    {
+        if ($quoteIds === []) {
+            return [];
+        }
+        $connection = $this->resourceConnection->getConnection(self::CONNECTION);
+        $select = $connection->select()
+            ->from($this->table(), ['quote_id', 'email'])
+            ->where('quote_id IN (?)', $quoteIds);
+
+        $addresses = [];
+        foreach ($connection->fetchPairs($select) as $quoteId => $email) {
+            $addresses[(int)$quoteId] = strtolower((string)$email);
+        }
+
+        return $addresses;
     }
 
     /**
@@ -222,6 +256,20 @@ class StateManager
     }
 
     /**
+     * Art. 17 erasure of a contact's carts: every tracked cart of the address
+     * becomes a tombstone (anonymizeForEmail()), and so does every active
+     * cart that holds the address without a tracked row for it
+     * (tombstoneActiveQuotesForEmail()). The address is expected already
+     * lowercased.
+     *
+     * @return int the rows anonymised plus the carts newly marked
+     */
+    public function eraseForEmail(string $email): int
+    {
+        return $this->anonymizeForEmail($email) + $this->tombstoneActiveQuotesForEmail($email);
+    }
+
+    /**
      * Turn every tracked cart of a contact into an email-less tombstone
      * (Art. 17 erasure). The address is expected already lowercased.
      *
@@ -255,17 +303,26 @@ class StateManager
      * address on the next sweep. The core quote rows are only read: the
      * tombstone is what makes excludeHandled() skip them.
      *
+     * A cart already erased is left out in SQL, with a LEFT JOIN on the
+     * unique quote_id as excludeHandled() does.
+     *
      * @return int the carts newly marked
      */
-    public function tombstoneActiveQuotesForEmail(string $email): int
+    private function tombstoneActiveQuotesForEmail(string $email): int
     {
         $connection = $this->resourceConnection->getConnection(self::CONNECTION);
         $quoteTable = $this->resourceConnection->getTableName('quote', self::CONNECTION);
+        $erasedJoin = static fn (string $quoteIdColumn): string => $connection->quoteInto(
+            'erased_state.quote_id = ' . $quoteIdColumn . ' AND erased_state.status = ?',
+            self::STATUS_ERASED
+        );
 
         $byCart = $connection->select()
-            ->from($quoteTable, ['entity_id', 'store_id'])
-            ->where('is_active = ?', 1)
-            ->where('LOWER(customer_email) = ?', $email);
+            ->from(['quote_table' => $quoteTable], ['entity_id', 'store_id'])
+            ->joinLeft(['erased_state' => $this->table()], $erasedJoin('quote_table.entity_id'), [])
+            ->where('quote_table.is_active = ?', 1)
+            ->where('LOWER(quote_table.customer_email) = ?', $email)
+            ->where('erased_state.quote_id IS NULL');
         $byAddress = $connection->select()
             ->from(['quote_table' => $quoteTable], ['entity_id', 'store_id'])
             ->join(
@@ -273,23 +330,15 @@ class StateManager
                 'address.quote_id = quote_table.entity_id',
                 []
             )
+            ->joinLeft(['erased_state' => $this->table()], $erasedJoin('quote_table.entity_id'), [])
             ->where('quote_table.is_active = ?', 1)
-            ->where('LOWER(address.email) = ?', $email);
+            ->where('LOWER(address.email) = ?', $email)
+            ->where('erased_state.quote_id IS NULL');
         $either = $connection->select();
         $either->union([$byCart, $byAddress]);
-        $storeByQuote = $connection->fetchPairs($either);
-        if (!$storeByQuote) {
-            return 0;
-        }
 
-        $erased = $connection->fetchCol(
-            $connection->select()
-                ->from($this->table(), ['quote_id'])
-                ->where('quote_id IN (?)', array_map('intval', array_keys($storeByQuote)))
-                ->where('status = ?', self::STATUS_ERASED)
-        );
         $rows = [];
-        foreach (array_diff_key($storeByQuote, array_flip(array_map('intval', $erased))) as $quoteId => $storeId) {
+        foreach ($connection->fetchPairs($either) as $quoteId => $storeId) {
             $rows[] = [
                 'quote_id' => (int)$quoteId,
                 'store_id' => (int)$storeId,

@@ -43,6 +43,19 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **Simplification pass, behaviour-neutral (2026-10-03).** One
+  `Model\RateLimit\FixedWindowCounter` holds the relay's and the guest
+  cart email's cache counters (same keys, limits, TTLs);
+  `WizardStepSaver::saveConnect()` reads each posted password and the
+  fallback language once, takes each block's store view from
+  `heldAccounts` (same first-in-order store view, new unit test) and
+  shares `deleteStoreViewCredentials()`; the abandoned-cart cron reads the
+  addresses reminded in 24 h once per page (`addressesRemindedSince()`,
+  `trackedAddresses()`; `hasReminderSince()` removed); the skip path uses
+  `SyncDispatcher::recordSkippedAutomation()` / `EventQueue::enqueueSkipped()`
+  (no flag parameter); `StateManager::eraseForEmail()` serves `LocalEraser`,
+  its active-cart tombstone leaves erased carts out with a LEFT JOIN.
+
 - **PRO-3675 — the Hyvä tracker starts on the event Hyvä's cookie notice
   really dispatches (2026-10-03; documentation only).** PRO-3664 took the
   window event `user-allowed-save-cookie` from memory. Checked against the

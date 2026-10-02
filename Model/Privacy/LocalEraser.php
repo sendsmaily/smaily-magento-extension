@@ -124,8 +124,7 @@ class LocalEraser
         }
         $counts[self::ABANDONED_CART_LABEL] = [
             'removed' => 0,
-            'anonymised' => $this->cartState->anonymizeForEmail($email)
-                + $this->cartState->tombstoneActiveQuotesForEmail($email),
+            'anonymised' => $this->cartState->eraseForEmail($email),
         ];
 
         return $counts;

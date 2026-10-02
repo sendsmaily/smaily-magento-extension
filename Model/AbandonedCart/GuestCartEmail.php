@@ -8,7 +8,6 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\AbandonedCart;
 
-use Magento\Framework\App\CacheInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\HTTP\PhpEnvironment\RemoteAddress;
@@ -17,6 +16,7 @@ use Magento\Framework\Validator\EmailAddress;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Api\GuestCartEmailInterface;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
 
 /**
  * Magento's checkout keeps a guest's email in the browser until the payment
@@ -69,7 +69,7 @@ class GuestCartEmail implements GuestCartEmailInterface
         private readonly EmailAddress $emailValidator,
         private readonly Config $config,
         private readonly StoreManagerInterface $storeManager,
-        private readonly CacheInterface $cache,
+        private readonly FixedWindowCounter $counter,
         private readonly DateTime $dateTime,
         private readonly RemoteAddress $remoteAddress
     ) {
@@ -100,14 +100,11 @@ class GuestCartEmail implements GuestCartEmailInterface
         }
 
         $writesKey = 'smaily_cart_email_writes_' . $quoteId;
-        $writes = (int)$this->cache->load($writesKey);
-        if ($writes >= self::MAX_WRITES_PER_CART) {
-            return false;
-        }
         $storeKey = 'smaily_cart_email_store_'
             . intdiv($this->dateTime->gmtTimestamp(), self::STORE_WINDOW_SECONDS);
-        $storeWrites = (int)$this->cache->load($storeKey);
-        if ($storeWrites >= self::MAX_WRITES_PER_HOUR) {
+        if ($this->counter->isExhausted($writesKey, self::MAX_WRITES_PER_CART)
+            || $this->counter->isExhausted($storeKey, self::MAX_WRITES_PER_HOUR)
+        ) {
             return false;
         }
 
@@ -120,8 +117,8 @@ class GuestCartEmail implements GuestCartEmailInterface
         if ($updated < 1) {
             return false;
         }
-        $this->cache->save((string)($writes + 1), $writesKey, [], self::WRITES_TTL_SECONDS);
-        $this->cache->save((string)($storeWrites + 1), $storeKey, [], 2 * self::STORE_WINDOW_SECONDS);
+        $this->counter->hit($writesKey, self::WRITES_TTL_SECONDS);
+        $this->counter->hit($storeKey, 2 * self::STORE_WINDOW_SECONDS);
 
         return true;
     }
@@ -179,13 +176,7 @@ class GuestCartEmail implements GuestCartEmailInterface
         $window = intdiv($this->dateTime->gmtTimestamp(), self::RATE_WINDOW_SECONDS);
         $key = 'smaily_cart_email_' . sha1($caller) . '_' . $window;
 
-        $count = (int)$this->cache->load($key);
-        if ($count >= self::RATE_LIMIT_PER_WINDOW) {
-            return false;
-        }
-        $this->cache->save((string)($count + 1), $key, [], 2 * self::RATE_WINDOW_SECONDS);
-
-        return true;
+        return $this->counter->allow($key, self::RATE_LIMIT_PER_WINDOW, 2 * self::RATE_WINDOW_SECONDS);
     }
 
     /**

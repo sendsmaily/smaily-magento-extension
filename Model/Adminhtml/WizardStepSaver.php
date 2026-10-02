@@ -131,7 +131,18 @@ class WizardStepSaver
         $this->storefrontUrlChanged = false;
         $subdomain = $this->normalizer->normalize((string)($data['subdomain'] ?? ''));
         $username = trim((string)($data['username'] ?? ''));
-        $password = (string)($data['password'] ?? '');
+        // Every posted password is read once as a new password, or '' when
+        // the post keeps the saved one (empty or the masked placeholder).
+        $password = $this->newPassword((string)($data['password'] ?? ''));
+        if (is_array($data['accounts'] ?? null)) {
+            foreach ($data['accounts'] as $index => $account) {
+                if (is_array($account)) {
+                    $data['accounts'][$index]['password'] = $this->newPassword(
+                        (string)($account['password'] ?? '')
+                    );
+                }
+            }
+        }
 
         // Each error names the field that caused it, so the form can mark
         // that field (PRO-3562); a per-language account's fields are
@@ -182,19 +193,32 @@ class WizardStepSaver
 
         $previousMode = $this->config->getMultilingualMode($websiteId) ?: MultilingualMode::MODE_SINGLE;
         $postedMode = strtolower((string)($data['multilingual_mode'] ?? 'single'));
-        $mode = in_array($postedMode, ['single', 'a', 'b', 'c'], true) ? $postedMode : $previousMode;
+        $postedModeValid = in_array($postedMode, ['single', 'a', 'b', 'c'], true);
+        $mode = $postedModeValid ? $postedMode : $previousMode;
+        $fallbackLanguage = strtolower(trim((string)($data['fallback_language'] ?? '')));
 
-        $errors = $this->changedAccountPasswordErrors($data, $mode, $subdomain, $username, $password, $websiteId);
+        // The accounts the store views hold before anything below is saved.
+        $heldAccounts = $mode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS && is_array($data['accounts'] ?? null)
+            ? $this->heldAccounts($websiteId)
+            : [];
+
+        $errors = $this->changedAccountPasswordErrors(
+            $data,
+            $mode,
+            $subdomain,
+            $username,
+            $password,
+            $fallbackLanguage,
+            $heldAccounts,
+            $websiteId
+        );
         if ($errors !== []) {
             return $errors;
         }
 
-        // The accounts the store views hold before anything below is saved.
-        $heldAccounts = is_array($data['accounts'] ?? null) ? $this->heldAccounts($websiteId) : [];
-
         $this->configWriter->save(Config::XML_PATH_SUBDOMAIN, $subdomain, ScopeInterface::SCOPE_WEBSITES, $websiteId);
         $this->configWriter->save(Config::XML_PATH_USERNAME, $username, ScopeInterface::SCOPE_WEBSITES, $websiteId);
-        if ($password !== '' && !$this->credentialCheck->isKeptPassword($password)) {
+        if ($password !== '') {
             $this->configWriter->save(
                 Config::XML_PATH_PASSWORD,
                 $this->encryptor->encrypt($password),
@@ -203,7 +227,7 @@ class WizardStepSaver
             );
         }
 
-        if ($mode === $postedMode) {
+        if ($postedModeValid) {
             $this->configWriter->save(
                 Config::XML_PATH_MULTILINGUAL_MODE,
                 $mode,
@@ -221,7 +245,6 @@ class WizardStepSaver
         // website scope IS the fallback account; the language is remembered
         // for the admin UI's fallback picker, per website as the account is
         // (PRO-3719).
-        $fallbackLanguage = strtolower(trim((string)($data['fallback_language'] ?? '')));
         if ($fallbackLanguage !== '' && preg_match('/^[a-z]{2,3}$/', $fallbackLanguage) === 1) {
             $this->configWriter->save(
                 Config::XML_PATH_FALLBACK_LANGUAGE,
@@ -242,11 +265,7 @@ class WizardStepSaver
             $website = $this->storeManager->getWebsite($websiteId);
             if ($website instanceof Website) {
                 foreach ($website->getStores() as $store) {
-                    foreach (
-                        [Config::XML_PATH_SUBDOMAIN, Config::XML_PATH_USERNAME, Config::XML_PATH_PASSWORD] as $path
-                    ) {
-                        $this->configWriter->delete($path, ScopeInterface::SCOPE_STORES, (int)$store->getId());
-                    }
+                    $this->deleteStoreViewCredentials((int)$store->getId());
                 }
             }
         }
@@ -286,7 +305,13 @@ class WizardStepSaver
      * other than the one saved there needs its password as well, asked for
      * on the fallback block's password field (PRO-3718).
      *
+     * Each password is the post's new password, or '' when it keeps the
+     * saved one. A block's store view is the first store view of the website
+     * with the block's language, in the website's store view order, taken
+     * from the accounts the store views held before the save.
+     *
      * @param array<string, mixed> $data
+     * @param array<int, array{language: string, account: string, password: string}> $heldAccounts
      * @return array<int, array{field: string, message: string}>
      */
     private function changedAccountPasswordErrors(
@@ -295,6 +320,8 @@ class WizardStepSaver
         string $subdomain,
         string $username,
         string $password,
+        string $fallbackLanguage,
+        array $heldAccounts,
         int $websiteId
     ): array {
         $websiteAccountChanged = $this->isChangedWithoutPassword(
@@ -318,7 +345,7 @@ class WizardStepSaver
                 continue;
             }
             $language = (string)($account['language'] ?? '');
-            $storeId = $language === '' ? null : $this->accountResolver->storeIdForAccountKey($language, $websiteId);
+            $storeId = $language === '' ? null : $this->representativeStoreId($heldAccounts, $language);
             $accountSubdomain = $this->normalizer->normalize((string)($account['subdomain'] ?? ''));
             $accountUsername = trim((string)($account['username'] ?? ''));
             if ($storeId === null || $accountSubdomain === '' || $accountUsername === '') {
@@ -343,7 +370,6 @@ class WizardStepSaver
 
         // The top-level credentials: the default fallback account, asked for
         // on its block unless that block already has its own error.
-        $fallbackLanguage = strtolower(trim((string)($data['fallback_language'] ?? '')));
         if ($websiteAccountChanged && $fallbackLanguage !== '') {
             $websiteAccountError = [
                 'field' => 'accounts.' . $fallbackLanguage . '.password',
@@ -361,8 +387,45 @@ class WizardStepSaver
     }
 
     /**
-     * Whether a post keeps the saved password for an account other than
-     * the saved one.
+     * The first store view, in the website's store view order, that held an
+     * account for the language — the store view
+     * AccountResolver::storeIdForAccountKey() names.
+     *
+     * @param array<int, array{language: string, account: string, password: string}> $heldAccounts
+     */
+    private function representativeStoreId(array $heldAccounts, string $language): ?int
+    {
+        foreach ($heldAccounts as $storeId => $store) {
+            if ($store['language'] === $language) {
+                return $storeId;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * A posted password as a new password, or '' when the post keeps the
+     * saved one: no password, or the masked placeholder.
+     */
+    private function newPassword(string $password): string
+    {
+        return $this->credentialCheck->isKeptPassword($password) ? '' : $password;
+    }
+
+    /**
+     * Removes a store view's own credentials, so it uses the website's.
+     */
+    private function deleteStoreViewCredentials(int $storeId): void
+    {
+        foreach ([Config::XML_PATH_SUBDOMAIN, Config::XML_PATH_USERNAME, Config::XML_PATH_PASSWORD] as $path) {
+            $this->configWriter->delete($path, ScopeInterface::SCOPE_STORES, $storeId);
+        }
+    }
+
+    /**
+     * Whether a post keeps the saved password ('') for an account other
+     * than the saved one.
      */
     private function isChangedWithoutPassword(
         string $subdomain,
@@ -371,7 +434,7 @@ class WizardStepSaver
         string $savedSubdomain,
         string $savedUsername
     ): bool {
-        if ($password !== '' && !$this->credentialCheck->isKeptPassword($password)) {
+        if ($password !== '') {
             return false;
         }
 
@@ -429,11 +492,10 @@ class WizardStepSaver
                 }
                 continue;
             }
-            $password = (string)($account['password'] ?? '');
             $accounts[$language] = [
                 'subdomain' => $subdomain,
                 'username' => $username,
-                'password' => $this->credentialCheck->isKeptPassword($password) ? '' : $password,
+                'password' => (string)($account['password'] ?? ''),
             ];
         }
 
@@ -443,9 +505,7 @@ class WizardStepSaver
             }
             $account = $accounts[$store['language']] ?? null;
             if ($account === null) {
-                foreach ([Config::XML_PATH_SUBDOMAIN, Config::XML_PATH_USERNAME, Config::XML_PATH_PASSWORD] as $path) {
-                    $this->configWriter->delete($path, ScopeInterface::SCOPE_STORES, $storeId);
-                }
+                $this->deleteStoreViewCredentials($storeId);
                 continue;
             }
             $this->configWriter->save(
@@ -495,10 +555,12 @@ class WizardStepSaver
      * belong to another language's account, and which the configuration
      * read in this request still shows after leaving mode A removed it
      * (PRO-3717).
+     *
+     * $password is the post's new password, or '' when it keeps the saved one.
      */
     private function checkCredentials(string $subdomain, string $username, string $password, int $websiteId): void
     {
-        if ($password === '' || $this->credentialCheck->isKeptPassword($password)) {
+        if ($password === '') {
             $password = $this->config->getWebsitePassword($websiteId);
         }
 

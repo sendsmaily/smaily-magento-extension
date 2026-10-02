@@ -16,6 +16,7 @@ use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use Smaily\Connect\Model\AbandonedCart\GuestCartEmail;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\FakeCache;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
@@ -316,7 +317,7 @@ class GuestCartEmailTest extends IntegrationTestCase
             new EmailAddress(),
             $this->objectManager->get(Config::class),
             $storeManager,
-            $this->cache,
+            new FixedWindowCounter($this->cache),
             $this->clock,
             $this->remoteAddress
         );

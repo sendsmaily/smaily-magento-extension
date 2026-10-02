@@ -31,6 +31,7 @@ use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\SleeperInterface;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
 
 /**
  * PRO-3575: the storefront browse relay rate-limits by the connection's own
@@ -183,7 +184,7 @@ class IndexTest extends TestCase
             $settings,
             $client,
             new BrowseEventValidator(),
-            $cache,
+            new FixedWindowCounter($cache),
             $dateTime,
             $this->createMock(Logger::class),
             new RemoteAddress($request)

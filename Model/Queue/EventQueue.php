@@ -59,10 +59,6 @@ class EventQueue
      * Passing a deterministic $eventUuid makes the enqueue idempotent:
      * a duplicate is silently skipped.
      *
-     * A $skipReason stores the row already closed as skipped, the shape
-     * markSkipped() gives it: the Log shows what would have been sent and
-     * why it was not, and the flusher never claims it.
-     *
      * @param array<int|string, mixed> $payload
      * @return bool true when queued, false when skipped as a duplicate
      */
@@ -71,8 +67,42 @@ class EventQueue
         array $payload,
         ?string $entityId = null,
         int $websiteId = 0,
-        ?string $eventUuid = null,
-        ?string $skipReason = null
+        ?string $eventUuid = null
+    ): bool {
+        return $this->insert($eventType, $payload, $entityId, $websiteId, $eventUuid, []);
+    }
+
+    /**
+     * Add an event already closed as skipped, the shape markSkipped() gives
+     * a row: the Log shows what would have been sent and why it was not, and
+     * the flusher never claims it.
+     *
+     * @param array<int|string, mixed> $payload
+     */
+    public function enqueueSkipped(
+        string $eventType,
+        array $payload,
+        string $reason,
+        ?string $entityId = null,
+        int $websiteId = 0
+    ): bool {
+        return $this->insert($eventType, $payload, $entityId, $websiteId, null, $this->terminalFields(null) + [
+            'last_error' => mb_substr($reason, 0, self::MAX_ERROR_LENGTH),
+        ]);
+    }
+
+    /**
+     * @param array<int|string, mixed> $payload
+     * @param array<string, mixed> $closedFields the fields of a row stored already closed
+     * @return bool true when stored, false when skipped as a duplicate
+     */
+    private function insert(
+        string $eventType,
+        array $payload,
+        ?string $entityId,
+        int $websiteId,
+        ?string $eventUuid,
+        array $closedFields
     ): bool {
         $event = $this->eventFactory->create();
         $event->addData([
@@ -84,10 +114,8 @@ class EventQueue
             'status' => Event::STATUS_PENDING,
             'attempts' => 0,
         ]);
-        if ($skipReason !== null) {
-            $event->addData($this->terminalFields(null) + [
-                'last_error' => mb_substr($skipReason, 0, self::MAX_ERROR_LENGTH),
-            ]);
+        if ($closedFields !== []) {
+            $event->addData($closedFields);
         }
 
         try {

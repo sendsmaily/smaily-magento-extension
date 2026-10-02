@@ -21,6 +21,7 @@ use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
 
 /**
  * Public browse-beacon proxy (POST smaily/relay): the storefront tracker
@@ -44,7 +45,7 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
         private readonly Settings $settings,
         private readonly Client $client,
         private readonly BrowseEventValidator $validator,
-        private readonly \Magento\Framework\App\CacheInterface $cache,
+        private readonly FixedWindowCounter $counter,
         private readonly \Magento\Framework\Stdlib\DateTime\DateTime $dateTime,
         private readonly Logger $logger,
         private readonly RemoteAddress $remoteAddress
@@ -116,13 +117,7 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
         $window = intdiv($this->dateTime->gmtTimestamp(), 60);
         $key = 'smaily_relay_' . sha1($ip) . '_' . $window;
 
-        $count = (int)$this->cache->load($key);
-        if ($count >= self::RATE_LIMIT_PER_MINUTE) {
-            return false;
-        }
-        $this->cache->save((string)($count + 1), $key, [], 120);
-
-        return true;
+        return $this->counter->allow($key, self::RATE_LIMIT_PER_MINUTE, 120);
     }
 
     /**

@@ -64,7 +64,10 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   `composer.lock` and archives. A local build therefore needs the change
   committed. composer.json requires `guzzlehttp/guzzle ^7.4`; the lock
   changed only its content-hash (`composer update --lock`, Guzzle stays
-  7.15.5).
+  7.15.5). (6) Every workflow `uses:` is pinned to the full commit SHA its
+  major tag pointed to on 2026-10-02 (checkout v4.4.0, upload-artifact
+  v4.6.2, setup-php 2.37.2 — dereferenced from the annotated tag), with the
+  version as a comment. No Dependabot config exists, so a bump is manual.
 
 - **PRO-3644 done — copy consistency leftovers (2026-10-02).** (1) The
   failed-events banner on the Dashboard and the Log has a singular: "1

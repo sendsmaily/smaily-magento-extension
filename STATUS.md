@@ -79,6 +79,17 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   none, so nothing changes in code or fixtures. ARCHITECTURE and
   UPSTREAM_PROPOSAL cite v1.8.2.
 
+- **PRO-3680 — two docs name only today's code and releases (2026-10-02,
+  docs only).** ADMIN_UI_TARGET_SPEC §4.2: the sources paragraph names
+  `WizardStepSaver`, the panel templates and `WizardData` as today's ground
+  truth and marks `ModuleConfigPaths`/`ConfigOverrides` as history (removed
+  with PRO-1461); the `include_guests` row says "both" (system.xml + the
+  Subscribers tab checkbox saved by `WizardStepSaver::saveSubscribers()`);
+  the migration note keeps the path constraint and marks
+  `OverrideDetector`/`OverrideClearer` as history. UPSTREAM_PROPOSAL's header
+  no longer says "unreleased" / "no public GitHub release": rc1 and rc2 are
+  GitHub pre-releases on the fork, upstream has none.
+
 - **PRO-3663 — Mageplaza One Step Checkout, read from source (2026-10-02,
   docs only, no code change).** Read from public mirrors of the extension's
   source (2.8.2 and 4.0.10; the current release is 4.4.x) and its public

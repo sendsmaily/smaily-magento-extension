@@ -795,12 +795,15 @@ is the outcome, not a "shrinks to advanced" compromise.
 Source: `etc/adminhtml/system.xml` (native fields, backend models, scope
 flags), `etc/config.xml` (defaults), `Model/Config.php` +
 `Model/Engine/Settings.php` (typed path constants + scoped getters),
-`Model/Config/ModuleConfigPaths.php` (the PRO-1274 allowlist — which paths
-the module already treats as "its own"), `Model/Adminhtml/WizardStepSaver.php`
-(what our own Settings/Wizard AJAX save actually writes, and at what scope),
-`ViewModel/Adminhtml/ConfigOverrides.php` (which fields the Settings page
-currently renders a control for — its `FIELD_ANCHORS` map is the ground
-truth for "is this field really on our own page today").
+`Model/Adminhtml/WizardStepSaver.php` (what our own Settings/Wizard AJAX
+save actually writes, and at what scope), and the panel templates in
+`view/adminhtml/templates/panel/` with `ViewModel/Adminhtml/WizardData.php`
+(which fields our own pages render a control for today). History: the
+inventory was first drawn from two more sources, `Model/Config/ModuleConfigPaths.php`
+(the PRO-1274 allowlist of the module's own paths) and
+`ViewModel/Adminhtml/ConfigOverrides.php` (its `FIELD_ANCHORS` map of the
+fields on our own page). Both were removed with the website selector
+(PRO-1461) and are not in the code today.
 
 Legend: **native** = declared in `system.xml`; **ours** = has a live control
 on a wizard/Settings panel today; **both** = duplicated right now.
@@ -816,7 +819,7 @@ on a wizard/Settings panel today; **both** = duplicated right now.
 | `subscribers/sync_enabled` | Master subscriber-sync toggle | both (native: website scope; ours: default scope) | **ours.** |
 | `subscribers/sync_mode` | Lawful-basis preset | both, same shape | **ours.** |
 | `subscribers/sync_fields` | Extra contact fields synced | both, same shape | **ours.** |
-| `subscribers/include_guests` | Include guest-order emails | **native only** — no control in `subscribers.phtml`/`ConfigOverrides::FIELD_ANCHORS`, though `WizardStepSaver::saveSubscribers()` already has a dead `saveFlag()` call ready to accept it | **ours** — resolved (Erkki, 2026-07-14): real control built on the Subscribers tab; see §2.3.B. |
+| `subscribers/include_guests` | Include guest-order emails | both (native: `system.xml`; ours: the Subscribers tab checkbox in `panel/subscribers.phtml`, saved by `WizardStepSaver::saveSubscribers()`) | **ours** — resolved (Erkki, 2026-07-14): real control built on the Subscribers tab; see §2.3.B. |
 | `subscribers/automation_force_opt_in` | "Automations May Re-Subscribe (Advanced)" | **native only**, same shape as `include_guests` (dead `saveFlag()` call, no template control) | **retired** (2026-10-02): no control, no `system.xml` field, the update deletes a stored row — automations always send `force_opt_in=false`; see §2.3.B. |
 | `subscribers/checkout_optin_enabled` | Checkout newsletter checkbox | both | **ours.** |
 | `subscribers/suppress_optin_emails` | Suppress Magento's own opt-in emails | both | **ours.** |
@@ -870,12 +873,14 @@ have their Smaily credentials in native `core_config_data` — the 2.8.x→v3
 migration (`Setup\Patch\Data\MigrateLegacyConfig` +
 `Model\Migration\LegacyConfigMapper`) writes into the SAME `smaily_connect/…`
 paths this inventory covers, including seeding website-scope rows 1:1 from
-the legacy per-website config (the rows PRO-1274's `OverrideDetector` exists
-to find). Moving a field's *editing surface* (which admin page renders the
-control) does not touch stored `core_config_data` rows or the migration
-patch — `ScopeConfig` resolves by path regardless of which `system.xml`
-declares it, and `OverrideDetector`/`OverrideClearer` already key off the
-typed `Model\Config\ModuleConfigPaths` allowlist, not `system.xml` presence.
+the legacy per-website config. Moving a field's *editing surface* (which
+admin page renders the control) does not touch stored `core_config_data`
+rows or the migration patch — `ScopeConfig` resolves by path regardless of
+which `system.xml` declares it. (History: PRO-1274's `OverrideDetector` and
+`OverrideClearer`, which found and cleared such website rows by the
+`ModuleConfigPaths` allowlist, were removed with the website selector,
+PRO-1461; no code finds or clears a leftover website row today — clearing
+on save is tracked separately.)
 The constraint that DOES apply: no implementation of this inventory may
 rename or restructure a config *path* without an explicit value-migration
 step — an upgrading merchant's stored credentials must resolve at the same

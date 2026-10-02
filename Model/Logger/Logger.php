@@ -17,6 +17,11 @@ use Smaily\Connect\Model\Config\Source\LogVerbosity;
  *
  * Errors are always logged; info and debug respect the configured verbosity
  * so busy stores are not flooded (legacy extension issue #113).
+ *
+ * Every email address in the message and in the context's text is masked
+ * (EmailMask) before it is written: the file sits on the server outside the
+ * admin's roles, and an error text that Smaily or Campaign Intelligence sends
+ * back can quote a contact's address.
  */
 class Logger
 {
@@ -31,7 +36,7 @@ class Logger
      */
     public function error(string $message, array $context = []): void
     {
-        $this->logger->error($message, $context);
+        $this->logger->error(EmailMask::apply($message), $this->mask($context));
     }
 
     /**
@@ -40,7 +45,7 @@ class Logger
     public function info(string $message, array $context = []): void
     {
         if (in_array($this->config->getLogVerbosity(), [LogVerbosity::INFO, LogVerbosity::DEBUG], true)) {
-            $this->logger->info($message, $context);
+            $this->logger->info(EmailMask::apply($message), $this->mask($context));
         }
     }
 
@@ -50,7 +55,26 @@ class Logger
     public function debug(string $message, array $context = []): void
     {
         if ($this->config->getLogVerbosity() === LogVerbosity::DEBUG) {
-            $this->logger->debug($message, $context);
+            $this->logger->debug(EmailMask::apply($message), $this->mask($context));
         }
+    }
+
+    /**
+     * The context with every address in its text masked, at any depth.
+     *
+     * @param array<int|string, mixed> $context
+     * @return array<int|string, mixed>
+     */
+    private function mask(array $context): array
+    {
+        foreach ($context as $key => $value) {
+            if (is_string($value)) {
+                $context[$key] = EmailMask::apply($value);
+            } elseif (is_array($value)) {
+                $context[$key] = $this->mask($value);
+            }
+        }
+
+        return $context;
     }
 }

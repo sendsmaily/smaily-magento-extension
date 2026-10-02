@@ -684,12 +684,13 @@ card — you do not have to keep the page open:
   Smaily API request and its response code. The command takes effect at
   once — it clears Magento's configuration cache itself. **The detailed
   levels write more about your contacts to a file on the server**: request
-  payloads are summarized and email addresses masked, and a network failure
-  is logged with the address it called but without its query string or the
-  contact's address — but a message that Smaily or Campaign Intelligence
-  sends back can still carry a contact's email address. Treat the file as personal
-  data, switch the level back to `error` when you are done, and delete
-  the lines you no longer need.
+  payloads are summarized, a network failure is logged with the address it
+  called but without its query string or the contact's address, and every
+  email address written to the file is masked to its first characters
+  (`j***@e***.com`) — also one that is URL-encoded or JSON-escaped, or
+  quoted in a message Smaily or Campaign Intelligence sends back. Treat the
+  file as personal data all the same, switch the level back to `error` when
+  you are done, and delete the lines you no longer need.
 - Sent queue rows are pruned after 30 days, failed rows after 90. The same
   nightly job also tidies the abandoned-cart tracker — the small table that
   remembers which carts the extension has already dealt with: a finished

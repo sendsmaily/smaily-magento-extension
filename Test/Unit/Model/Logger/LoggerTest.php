@@ -78,4 +78,43 @@ class LoggerTest extends TestCase
             $system->xpath('//section[@id="smaily_connect"]/group[@id="logging"]/field[@id="verbosity"]')
         );
     }
+
+    /**
+     * The file sits outside the admin's roles: an address in the message or
+     * anywhere in the context — an error text Smaily or Campaign
+     * Intelligence sent back included — is masked before it is written.
+     */
+    public function testAddressesAreMaskedBeforeTheyReachTheFile(): void
+    {
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->method('getValue')->willReturn('debug');
+
+        $written = [];
+        $psrLogger = $this->createMock(LoggerInterface::class);
+        $psrLogger->method('debug')->willReturnCallback(
+            static function (string $message, array $context) use (&$written): void {
+                $written = [$message, $context];
+            }
+        );
+
+        $logger = new Logger(
+            $psrLogger,
+            new Config($scopeConfig, $this->createMock(EncryptorInterface::class))
+        );
+        $logger->debug('Sync failed for jane@example.com', [
+            'error' => 'Engine request failed with HTTP 422: unknown customer jane%40example.com',
+            'nested' => ['body' => '{"email":"jane\\u0040example.com"}', 'attempt' => 2],
+        ]);
+
+        self::assertSame(
+            [
+                'Sync failed for j***@e***.com',
+                [
+                    'error' => 'Engine request failed with HTTP 422: unknown customer j***%40e***.com',
+                    'nested' => ['body' => '{"email":"j***\\u0040e***.com"}', 'attempt' => 2],
+                ],
+            ],
+            $written
+        );
+    }
 }

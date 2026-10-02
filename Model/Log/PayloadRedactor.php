@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Log;
 
+use Smaily\Connect\Model\Logger\EmailMask;
+
 /**
  * Prepares stored queue payloads/responses for display in the admin log
  * drill-down. Two rules, applied recursively:
@@ -28,9 +30,6 @@ class PayloadRedactor
     private const SECRET_KEY_PATTERN =
         '/pass|secret|token|api[_-]?key|authorization|signature|credential/i';
 
-    private const EMAIL_PATTERN =
-        '/[A-Za-z0-9!#$%&\'*+\/=?^_`{|}~.-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/';
-
     /**
      * Redact a stored payload/response string for display. JSON is walked
      * recursively and re-encoded pretty-printed; anything else is treated
@@ -44,7 +43,7 @@ class PayloadRedactor
 
         $decoded = json_decode($raw, true);
 
-        return is_array($decoded) ? $this->redactDecoded($decoded) : $this->maskEmails($raw);
+        return is_array($decoded) ? $this->redactDecoded($decoded) : EmailMask::apply($raw);
     }
 
     /**
@@ -79,29 +78,9 @@ class PayloadRedactor
                 $result[$key] = $this->redactArray($value);
                 continue;
             }
-            $result[$key] = is_string($value) ? $this->maskEmails($value) : $value;
+            $result[$key] = is_string($value) ? EmailMask::apply($value) : $value;
         }
 
         return $result;
-    }
-
-    /**
-     * Mask every email address in a string: first character of the local
-     * part and of the domain are kept, the top-level domain stays readable.
-     */
-    private function maskEmails(string $text): string
-    {
-        return (string)preg_replace_callback(
-            self::EMAIL_PATTERN,
-            static function (array $match): string {
-                [$local, $domain] = explode('@', $match[0], 2);
-                $labels = explode('.', $domain);
-                $tld = array_pop($labels);
-
-                return mb_substr($local, 0, 1) . '***@'
-                    . mb_substr((string)($labels[0] ?? ''), 0, 1) . '***.' . $tld;
-            },
-            $text
-        );
     }
 }

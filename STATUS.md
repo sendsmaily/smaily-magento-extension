@@ -52,7 +52,12 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   (`etc/di.xml`, `TypePool`), so `app:config:dump` keeps their ciphertext
   out of `config.php`. The consent cache was already keyed by the opt-out
   record's HMAC (`ProfilingOptOuts::addressKey()`, PRO-3575) — confirmed,
-  no change.
+  no change. (4) PRO-3573 + server error text: `Model\Logger\Logger`
+  masks every address in the message and the context (any depth) through
+  the new `Model\Logger\EmailMask`, which also finds URL-encoded (`%40`,
+  `%2540`) and JSON-escaped (`\u0040`) addresses; an error text Smaily or
+  the engine sends back reaches the file masked. The queue rows keep the
+  text as received.
 
 - **PRO-3644 done — copy consistency leftovers (2026-10-02).** (1) The
   failed-events banner on the Dashboard and the Log has a singular: "1

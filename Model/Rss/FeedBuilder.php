@@ -16,6 +16,7 @@ use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductColl
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Store\Api\Data\StoreInterface;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\StorefrontUrl;
 
 /**
  * Builds the Smaily product RSS 2.0 feed (smly namespace) used by the
@@ -40,7 +41,8 @@ class FeedBuilder
         private readonly CategoryRepositoryInterface $categoryRepository,
         private readonly Visibility $visibility,
         private readonly ImageHelperFactory $imageHelperFactory,
-        private readonly Logger $logger
+        private readonly Logger $logger,
+        private readonly StorefrontUrl $storefrontUrl
     ) {
     }
 
@@ -84,7 +86,7 @@ class FeedBuilder
         $channel->addChild('lastBuildDate', gmdate(DATE_RSS));
 
         foreach ($this->loadProducts($store, $categoryId, $limit, $sortBy, $sortOrder) as $product) {
-            $this->addItem($channel, $product);
+            $this->addItem($channel, $product, (int)$store->getId());
         }
 
         return (string)$rss->asXML();
@@ -137,13 +139,16 @@ class FeedBuilder
         return $products;
     }
 
-    private function addItem(XmlElement $channel, Product $product): void
+    private function addItem(XmlElement $channel, Product $product, int $storeId): void
     {
+        // A store with a separate storefront links there (PRO-3660).
+        $productUrl = $this->storefrontUrl->apply($product->getProductUrl(), $storeId);
+
         /** @var XmlElement $item */
         $item = $channel->addChild('item');
         $item->addChild('title', htmlspecialchars((string)$product->getName()));
-        $item->addChild('link', htmlspecialchars($product->getProductUrl()));
-        $guid = $item->addChild('guid', htmlspecialchars($product->getProductUrl()));
+        $item->addChild('link', htmlspecialchars($productUrl));
+        $guid = $item->addChild('guid', htmlspecialchars($productUrl));
         $guid->addAttribute('isPermaLink', 'true');
 
         $createdAt = (string)$product->getCreatedAt();

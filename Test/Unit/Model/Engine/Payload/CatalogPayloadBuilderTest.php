@@ -10,6 +10,7 @@ namespace Smaily\Connect\Test\Unit\Model\Engine\Payload;
 
 use Magento\Catalog\Api\CategoryRepositoryInterface;
 use Magento\Catalog\Api\ProductRepositoryInterface;
+use Magento\Catalog\Helper\Image as ImageHelper;
 use Magento\Catalog\Helper\ImageFactory as ImageHelperFactory;
 use Magento\Catalog\Model\Category;
 use Magento\Catalog\Model\Product;
@@ -29,7 +30,9 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Payload\ParentProductResolver;
+use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
+use Smaily\Connect\Model\StorefrontUrl;
 
 /**
  * PRO-1231: every catalog row (upsert and tombstone alike) carries the §3
@@ -38,6 +41,8 @@ use Smaily\Connect\Model\Multilingual\LanguageResolver;
  */
 class CatalogPayloadBuilderTest extends TestCase
 {
+    private const IMAGE_URL = 'https://backend.example.com/media/catalog/product/o/a/oak.jpg';
+
     public static function setUpBeforeClass(): void
     {
         require_once __DIR__ . '/../../../Support/Stub/ImageFactory.php';
@@ -96,6 +101,39 @@ class CatalogPayloadBuilderTest extends TestCase
     }
 
     /**
+     * PRO-3660: a store with a separate storefront sends each product link
+     * on the storefront's address — the path and the query string stay —
+     * and its image links unchanged.
+     */
+    public function testProductLinkStartsWithTheStorefrontUrlAndKeepsPathAndQuery(): void
+    {
+        $builder = $this->createBuilder(
+            '42',
+            storefrontUrl: 'https://shop.example.com',
+            imageHelperFactory: $this->imageHelperFactory(self::IMAGE_URL)
+        );
+
+        $item = $builder->build($this->product(
+            42,
+            'OAK',
+            productUrl: 'http://backend.example.com:8080/oak-table.html?___store=en&a=1'
+        ));
+
+        self::assertSame('https://shop.example.com/oak-table.html?___store=en&a=1', $item['product_url']);
+        self::assertSame(self::IMAGE_URL, $item['image_url']);
+    }
+
+    public function testWithoutAStorefrontUrlTheProductAndImageLinksAreMagentosOwn(): void
+    {
+        $builder = $this->createBuilder('42', imageHelperFactory: $this->imageHelperFactory(self::IMAGE_URL));
+
+        $item = $builder->build($this->product(42, 'OAK', productUrl: 'https://backend.example.com/oak-table.html?x=1'));
+
+        self::assertSame('https://backend.example.com/oak-table.html?x=1', $item['product_url']);
+        self::assertSame(self::IMAGE_URL, $item['image_url']);
+    }
+
+    /**
      * PRO-1352/1353: price must always come from the ONE canonical store
      * scope (the default store view), never whatever scope the caller
      * happened to load the product in (e.g. an admin edit under a
@@ -140,7 +178,8 @@ class CatalogPayloadBuilderTest extends TestCase
             new ImageHelperFactory(),
             $this->createMock(LanguageResolver::class),
             $parentResolver,
-            $this->createMock(Emulation::class)
+            $this->createMock(Emulation::class),
+            $this->storefrontUrl('')
         );
 
         $item = $builder->build($loadedProduct);
@@ -186,7 +225,8 @@ class CatalogPayloadBuilderTest extends TestCase
             new ImageHelperFactory(),
             $this->createMock(LanguageResolver::class),
             $parentResolver,
-            $this->createMock(Emulation::class)
+            $this->createMock(Emulation::class),
+            $this->storefrontUrl('')
         );
 
         $item = $builder->build($product);
@@ -430,7 +470,9 @@ class CatalogPayloadBuilderTest extends TestCase
         ?StoreManagerInterface $storeManager = null,
         ?StockRegistryStorage $stockRegistryStorage = null,
         ?ProductRepositoryInterface $productRepository = null,
-        ?CategoryRepositoryInterface $categoryRepository = null
+        ?CategoryRepositoryInterface $categoryRepository = null,
+        string $storefrontUrl = '',
+        ?ImageHelperFactory $imageHelperFactory = null
     ): CatalogPayloadBuilder {
         $parentResolver = $this->createMock(ParentProductResolver::class);
         $parentResolver->method('productIdOf')->with(42)->willReturn($resolvedProductId);
@@ -451,11 +493,34 @@ class CatalogPayloadBuilderTest extends TestCase
             $categoryRepository ?? $this->createMock(CategoryRepositoryInterface::class),
             $stockRegistry,
             $stockRegistryStorage ?? $this->createMock(StockRegistryStorage::class),
-            new ImageHelperFactory(),
+            $imageHelperFactory ?? new ImageHelperFactory(),
             $this->createMock(LanguageResolver::class),
             $parentResolver,
-            $emulation ?? $this->createMock(Emulation::class)
+            $emulation ?? $this->createMock(Emulation::class),
+            $this->storefrontUrl($storefrontUrl)
         );
+    }
+
+    private function storefrontUrl(string $saved): StorefrontUrl
+    {
+        $config = $this->createMock(Config::class);
+        $config->method('getStorefrontUrl')->willReturn($saved);
+
+        return new StorefrontUrl($config);
+    }
+
+    /**
+     * An image helper factory whose helper answers $url for every image.
+     */
+    private function imageHelperFactory(string $url): ImageHelperFactory
+    {
+        $helper = $this->createMock(ImageHelper::class);
+        $helper->method('init')->willReturnSelf();
+        $helper->method('getUrl')->willReturn($url);
+        $factory = $this->createMock(ImageHelperFactory::class);
+        $factory->method('create')->willReturn($helper);
+
+        return $factory;
     }
 
     /**

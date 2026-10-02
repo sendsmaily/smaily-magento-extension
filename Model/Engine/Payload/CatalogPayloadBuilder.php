@@ -25,6 +25,7 @@ use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
+use Smaily\Connect\Model\StorefrontUrl;
 
 /**
  * Product -> WireProduct (contract §3).
@@ -64,7 +65,8 @@ class CatalogPayloadBuilder
         private readonly ImageHelperFactory $imageHelperFactory,
         private readonly LanguageResolver $languageResolver,
         private readonly ParentProductResolver $parentProductResolver,
-        private readonly Emulation $emulation
+        private readonly Emulation $emulation,
+        private readonly StorefrontUrl $storefrontUrl
     ) {
     }
 
@@ -252,15 +254,20 @@ class CatalogPayloadBuilder
      * reads the rewrite and the base URL off the product's OWN store, so a
      * canonical-scoped product would keep emitting the canonical store's
      * link no matter which store is emulated around it (PRO-1458).
+     *
+     * A store with a separate storefront gets the link on the storefront's
+     * address (PRO-3660).
      */
     private function productUrl(Product $product, int $storeId): string
     {
         $this->emulation->startEnvironmentEmulation($storeId, Area::AREA_FRONTEND, true);
         try {
-            return (string)$product->getProductUrl();
+            $url = (string)$product->getProductUrl();
         } finally {
             $this->emulation->stopEnvironmentEmulation();
         }
+
+        return $this->storefrontUrl->apply($url, $storeId);
     }
 
     /**

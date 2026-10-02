@@ -26,6 +26,7 @@ class Config
     public const XML_PATH_PASSWORD = 'smaily_connect/connection/password';
     public const XML_PATH_MULTILINGUAL_MODE = 'smaily_connect/connection/multilingual_mode';
     public const XML_PATH_FALLBACK_LANGUAGE = 'smaily_connect/connection/fallback_language';
+    public const XML_PATH_STOREFRONT_URL = 'smaily_connect/connection/storefront_url';
     public const XML_PATH_SYNC_ENABLED = 'smaily_connect/subscribers/sync_enabled';
     public const XML_PATH_SYNC_MODE = 'smaily_connect/subscribers/sync_mode';
     public const XML_PATH_SYNC_FIELDS = 'smaily_connect/subscribers/sync_fields';
@@ -104,6 +105,21 @@ class Config
         return $this->getSubdomain($storeId) !== ''
             && $this->getUsername($storeId) !== ''
             && $this->getPassword($storeId) !== '';
+    }
+
+    /**
+     * The address of a separate (headless) storefront as saved for the
+     * store's website ('' when there is none) — see StorefrontUrl.
+     *
+     * @param int|string|null $storeId
+     */
+    public function getStorefrontUrl(int|string|null $storeId = null): string
+    {
+        return trim((string)$this->scopeConfig->getValue(
+            self::XML_PATH_STOREFRONT_URL,
+            ScopeInterface::SCOPE_STORE,
+            $storeId
+        ));
     }
 
     /**

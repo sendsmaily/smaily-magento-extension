@@ -40,7 +40,10 @@ use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
  *   been handled, and the module may not touch the core `quote` table. Take
  *   the row away and a still-active idle quote is picked up by the next
  *   sweep and mailed to the address just erased, so what stays behind is an
- *   email-less tombstone with status `erased`.
+ *   email-less tombstone with status `erased`. An active cart that holds the
+ *   address on the cart or on one of its addresses, but has no such row yet,
+ *   gets one too (PRO-3693): the scan would otherwise mail it on its next
+ *   sweep. The core quote rows are read, never changed.
  *
  * Rows are found by decoding, never by searching the raw JSON text — see
  * PayloadAnonymizer. Erasure is idempotent by construction: an anonymised
@@ -121,7 +124,8 @@ class LocalEraser
         }
         $counts[self::ABANDONED_CART_LABEL] = [
             'removed' => 0,
-            'anonymised' => $this->cartState->anonymizeForEmail($email),
+            'anonymised' => $this->cartState->anonymizeForEmail($email)
+                + $this->cartState->tombstoneActiveQuotesForEmail($email),
         ];
 
         return $counts;

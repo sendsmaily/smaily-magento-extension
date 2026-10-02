@@ -93,6 +93,24 @@ class SchemaInstaller
     }
 
     /**
+     * Minimal mirror of the core quote_address table — the columns the
+     * erasure reads to find the carts that hold an address.
+     */
+    public function createQuoteAddress(): void
+    {
+        $this->connection->query('DROP TABLE IF EXISTS `quote_address`');
+        $this->connection->query(
+            'CREATE TABLE `quote_address` ('
+            . ' `address_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,'
+            . ' `quote_id` INT UNSIGNED NOT NULL DEFAULT 0,'
+            . ' `address_type` VARCHAR(10) NULL,'
+            . ' `email` VARCHAR(255) NULL,'
+            . ' PRIMARY KEY (`address_id`)'
+            . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+        );
+    }
+
+    /**
      * Minimal mirror of the core quote_id_mask table (a guest cart's masked
      * id), for the guest-cart email capture tests.
      */

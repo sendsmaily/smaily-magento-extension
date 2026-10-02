@@ -391,6 +391,15 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   quote keeps the row `erased` instead of marking it `completed`, and a
   later checkout opt-in may write the address the shopper types afresh onto
   the row while the status stays `erased`, so no reminder is scheduled.
+  **An active cart the tracker has not seen gets a tombstone too
+  (PRO-3693)**: `StateManager::tombstoneActiveQuotesForEmail()` reads the
+  active quotes whose `customer_email` or any `quote_address.email` is the
+  address (case-insensitive) and writes an `erased` row for each one that
+  is not erased yet — inserted, or an existing row (an `open` opt-in row
+  under another address, say) turned into one. Without it, a cart idle less
+  than the cutoff, or a guest's typed email the scan has not reached yet,
+  would be mailed on the next sweep. The quote rows are only read. Its
+  count is added to the cart rows' `anonymised` count.
   Counts and exported rows come back under merchant-facing labels (Queued
   messages, Engine queue, Abandoned carts), which is what the CLI prints.
   `smaily_order_attribution` is deliberately untouched: it holds only

@@ -1009,7 +1009,13 @@ card — you do not have to keep the page open:
   erased, but the record itself stays, because it is what tells the extension
   that this cart has already been dealt with — remove it and a cart that is
   still sitting in the store would be picked up as a fresh abandoned cart and
-  a reminder sent to the address you just erased. The erased record is not kept
+  a reminder sent to the address you just erased. A cart still open in the
+  store that holds the address — on the cart, or on its billing or shipping
+  address — gets such an erased record too, also one the extension has not
+  dealt with yet (idle for less than the cutoff, or a guest's typed email), so
+  no abandoned-cart reminder goes out for it after the erasure; the cart
+  itself is not changed, and it counts among the anonymized carts the command
+  prints. The erased record is not kept
   forever: it goes with the ordinary 30-day tidy-up above, or sooner if the
   cart itself is deleted. If that shopper's cart later turns into an order,
   the record stays marked erased. If they come back, type their address at

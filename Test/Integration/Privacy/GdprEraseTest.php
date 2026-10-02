@@ -23,6 +23,7 @@ use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
@@ -57,6 +58,17 @@ class GdprEraseTest extends IntegrationTestCase
         $this->ingestQueue = $this->objectManager->create(IngestQueue::class);
         $this->stateManager = $this->objectManager->create(StateManager::class);
         $this->eraser = $this->objectManager->create(LocalEraser::class);
+
+        $schema = new SchemaInstaller($this->connection);
+        $schema->createQuote();
+        $schema->createQuoteAddress();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->connection->query('DROP TABLE IF EXISTS `quote_address`');
+        $this->connection->query('DROP TABLE IF EXISTS `quote`');
+        parent::tearDown();
     }
 
     public function testErasureDeletesSendableRowsAndAnonymisesTheRest(): void
@@ -136,6 +148,59 @@ class GdprEraseTest extends IntegrationTestCase
                 self::CART_LABEL => ['removed' => 0, 'anonymised' => 0],
             ],
             $this->eraser->erase(self::SUBJECT)
+        );
+    }
+
+    /**
+     * PRO-3693: an active cart that holds the address but that the tracker
+     * has not seen yet — idle less than the cutoff, or a guest's typed email —
+     * is never mailed after the erasure: the cron's own gate skips it. The
+     * core quote rows are not changed.
+     */
+    public function testAnActiveCartTheTrackerHasNotSeenIsNeverMailedAfterTheErasure(): void
+    {
+        $schema = new SchemaInstaller($this->connection);
+        // On the cart itself, in another case.
+        $schema->seedQuote(21, ['is_active' => 1, 'items_count' => 1, 'customer_email' => 'Erase-Test-1@Example.test']);
+        // Only on the billing address.
+        $schema->seedQuote(22, ['is_active' => 1, 'items_count' => 1, 'store_id' => 2]);
+        $this->connection->insert('quote_address', [
+            'quote_id' => 22,
+            'address_type' => 'billing',
+            'email' => self::SUBJECT,
+        ]);
+        // Tracked under another address (the checkout opt-in), the subject's on the cart.
+        $schema->seedQuote(23, ['is_active' => 1, 'items_count' => 1, 'customer_email' => self::SUBJECT]);
+        $this->stateManager->setNewsletterOptin(23, 1, 'earlier@example.test', true);
+        // Ordered already: an inactive cart is never mailed.
+        $schema->seedQuote(24, ['is_active' => 0, 'items_count' => 1, 'customer_email' => self::SUBJECT]);
+        // Someone else's.
+        $schema->seedQuote(25, ['is_active' => 1, 'items_count' => 1, 'customer_email' => self::BYSTANDER]);
+        $quotesBefore = $this->fetchAll('quote', 'entity_id');
+
+        self::assertSame([], $this->stateManager->filterAlreadyHandled([21, 22, 23, 24, 25]));
+
+        self::assertSame(
+            ['removed' => 0, 'anonymised' => 3],
+            $this->eraser->erase(self::SUBJECT)[self::CART_LABEL]
+        );
+
+        $handled = $this->stateManager->filterAlreadyHandled([21, 22, 23, 24, 25]);
+        sort($handled);
+        self::assertSame([21, 22, 23], $handled, 'The scan skips every active cart that holds the erased address');
+        $rows = array_column($this->fetchAll(self::CART_TABLE, 'quote_id'), null, 'quote_id');
+        self::assertSame(['21', '22', '23'], array_map('strval', array_keys($rows)));
+        foreach ($rows as $row) {
+            self::assertSame(StateManager::STATUS_ERASED, $row['status']);
+            self::assertNull($row['email']);
+        }
+        self::assertSame('2', (string)$rows[22]['store_id']);
+        self::assertSame($quotesBefore, $this->fetchAll('quote', 'entity_id'), 'The core quote rows are not changed');
+
+        // A second run finds nothing new.
+        self::assertSame(
+            ['removed' => 0, 'anonymised' => 0],
+            $this->eraser->erase(self::SUBJECT)[self::CART_LABEL]
         );
     }
 

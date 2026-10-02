@@ -199,6 +199,67 @@ class StateManager
     }
 
     /**
+     * Mark every active cart that holds a contact's address — on the cart
+     * itself or on one of its addresses — as an erased tombstone (Art. 17
+     * erasure, PRO-3693). The address is expected already lowercased.
+     *
+     * anonymizeForEmail() reaches only the carts this table already tracks
+     * under the address. A cart the scan has not picked up yet (idle less
+     * than the cutoff, or a guest's typed email the scan has not seen) has no
+     * row, or one without this address, and would be mailed to the erased
+     * address on the next sweep. The core quote rows are only read: the
+     * tombstone is what makes filterAlreadyHandled() skip them.
+     *
+     * @return int the carts newly marked
+     */
+    public function tombstoneActiveQuotesForEmail(string $email): int
+    {
+        $connection = $this->resourceConnection->getConnection(self::CONNECTION);
+        $quoteTable = $this->resourceConnection->getTableName('quote', self::CONNECTION);
+
+        $byCart = $connection->select()
+            ->from($quoteTable, ['entity_id', 'store_id'])
+            ->where('is_active = ?', 1)
+            ->where('LOWER(customer_email) = ?', $email);
+        $byAddress = $connection->select()
+            ->from(['quote_table' => $quoteTable], ['entity_id', 'store_id'])
+            ->join(
+                ['address' => $this->resourceConnection->getTableName('quote_address', self::CONNECTION)],
+                'address.quote_id = quote_table.entity_id',
+                []
+            )
+            ->where('quote_table.is_active = ?', 1)
+            ->where('LOWER(address.email) = ?', $email);
+        $either = $connection->select();
+        $either->union([$byCart, $byAddress]);
+        $storeByQuote = $connection->fetchPairs($either);
+        if (!$storeByQuote) {
+            return 0;
+        }
+
+        $erased = $connection->fetchCol(
+            $connection->select()
+                ->from($this->table(), ['quote_id'])
+                ->where('quote_id IN (?)', array_map('intval', array_keys($storeByQuote)))
+                ->where('status = ?', self::STATUS_ERASED)
+        );
+        $rows = [];
+        foreach (array_diff_key($storeByQuote, array_flip(array_map('intval', $erased))) as $quoteId => $storeId) {
+            $rows[] = [
+                'quote_id' => (int)$quoteId,
+                'store_id' => (int)$storeId,
+                'email' => null,
+                'status' => self::STATUS_ERASED,
+            ];
+        }
+        if ($rows) {
+            $connection->insertOnDuplicate($this->table(), $rows, ['email', 'status']);
+        }
+
+        return count($rows);
+    }
+
+    /**
      * The tracked carts of a contact, for the Art. 15 export. The address is
      * expected already lowercased.
      *

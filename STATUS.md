@@ -38,6 +38,19 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   (INSTALLING has no proxy note, so nothing there). Integration
   `GuestCartEmailTest`: IPv4 limit, IPv6 /64 grouping, IPv4-mapped,
   store-wide ceiling (2000 real writes on 401 carts), per-cart cap.
+  (2) The Art. 17 erase now also tombstones every ACTIVE quote whose
+  `customer_email` or a `quote_address.email` is the address
+  (`StateManager::tombstoneActiveQuotesForEmail()`, from `LocalEraser`;
+  status `erased`, inserted or overwriting a non-erased row; core quote
+  rows only read; counted under "Abandoned carts … anonymized"). Before,
+  a cart under the cutoff or not yet scanned had no row and was mailed to
+  the erased address on the next sweep. Integration `GdprEraseTest`
+  (quote + new quote_address mirrors): cart email in another case, billing
+  address only, an opt-in row under another address, inactive and
+  bystander carts left alone, quotes unchanged, `filterAlreadyHandled()`
+  (the cron's gate) skips the three, a second run is a no-op. The quote
+  scan uses `LOWER()` on unindexed columns — a full scan of `quote`, as the
+  queue scan already is; an admin one-off.
 
 - **PRO-3693 — a guest's email reaches the cart as soon as it is typed on
   Magento's own checkout (2026-10-02, owner-approved design, Woo parity).**

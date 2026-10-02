@@ -68,7 +68,13 @@
 /* --- Shared panel chrome (wizard steps + settings tabs) ------------------ */
 /* Page frame (PRO-2456, 2026-10-02): no width cap — our pages span the
  * content area like native ones; cards, fields and inputs keep their own
- * max-widths. */
+ * max-widths. Our own text and link colours, so Magento's brown body text
+ * and #007bdb links do not leak into our components (Magento colours the
+ * headings itself, so they are named here). Classed anchors (buttons,
+ * banner actions, tile links) keep their component colours. */
+.smaily-ui, .smaily-ui :is(h1, h2, h3, h4) { color: var(--s-text); }
+.smaily-ui a:not([class]) { color: var(--s-link); }
+.smaily-ui a:not([class]):hover { color: var(--s-link-hover); }
 .smaily-ui .smaily-card { background: #fff; border: 1px solid #e3e3e3; border-radius: 4px; padding: 2rem; margin-bottom: 2rem; }
 .smaily-ui .smaily-field { margin-bottom: 1.6rem; max-width: 44rem; }
 .smaily-ui .smaily-field label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
@@ -77,8 +83,8 @@
 .smaily-ui .smaily-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; gap: 2rem; }
 .smaily-ui .smaily-footer > div { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; max-width: 40rem; }
 .smaily-ui .smaily-result { margin-left: 1rem; }
-.smaily-ui .smaily-result.ok { color: #006400; }
-.smaily-ui .smaily-result.err { color: #e22626; }
+.smaily-ui .smaily-result.ok { color: var(--s-success); }
+.smaily-ui .smaily-result.err { color: var(--s-danger); }
 .smaily-ui .smaily-inline-toggle { margin-bottom: 1rem; }
 .smaily-ui progress { width: 100%; max-width: 40rem; height: 1.4rem; }
 .smaily-ui #smaily-w-fields label { display: inline-block; width: 16rem; }
@@ -685,12 +691,12 @@
 .smaily-ui select { padding: 7px 10px; cursor: pointer; }
 .smaily-ui .action-primary {
     padding: 9px 18px; border-radius: var(--r-2); border-color: #d44f00; font-weight: 700; font-size: var(--fs-13);
-    text-shadow: none;
+    line-height: 1; text-shadow: none;
 }
 .smaily-ui .action-secondary {
     padding: 9px 16px; background: var(--s-surface); border: 1px solid var(--s-border-strong);
     border-radius: var(--r-2); color: var(--s-text); font-weight: 700; font-size: var(--fs-13);
-    text-shadow: none;
+    line-height: 1; text-shadow: none;
 }
 .smaily-ui .action-secondary:hover { background: var(--s-surface-3); border-color: var(--s-border-strong); color: var(--s-text); }
 
@@ -768,7 +774,7 @@
 .smaily-ui .smaily-overview-links code { font-family: var(--mono); font-size: var(--fs-12); word-break: break-all; }
 .smaily-wizard .smaily-overview-footer { margin-top: 0; padding: 18px 0 26px; border-top: 1px solid var(--s-border); }
 .smaily-wizard .smaily-overview-footer a.action-primary,
-.smaily-wizard .smaily-overview-footer a.action-secondary { display: inline-block; line-height: 1.36; text-decoration: none; }
+.smaily-wizard .smaily-overview-footer a.action-secondary { display: inline-block; line-height: 1; text-decoration: none; }
 .smaily-wizard .smaily-overview-footer a.action-primary { color: #fff; }
 
 /* --- Settings > RSS tab (PRO-2456, pack Settings "RSS tab" frame) --------- *

@@ -16,7 +16,7 @@ Settings** with the same website selected.
 
 | 2.8.x group > field | Read at | In v3 |
 |---|---|---|
-| General Settings > Enable Module | default, each website | **Not carried over** — see *Set again after the upgrade* |
+| General Settings > Enable Module | default, each website | *No* switches Subscriber Synchronization, the welcome automation and the abandoned-cart automation off, same scope — see *What migrates automatically* |
 | General Settings > Subdomain, API Username | default, each website | Settings > Connection, same scope. The API Password carries over too (encrypted); you do not need to note it |
 | Newsletter Subscription Form > Enable Subscribers Collection, Autoresponder ID | default, each website | Welcome automation, same scope: on when both are set |
 | Newsletter Subscription Form > Enable CAPTCHA, CAPTCHA Type | default, each website | Not carried over — see *Captcha* below |
@@ -26,9 +26,10 @@ Settings** with the same website selected.
 | Abandoned Cart > Add Template Parameters | default, each website | Not carried over — every product field is sent |
 
 Also note what in Smaily depends on the store's data, because some of it
-changes (see *Behavior changes to review after upgrading*): segments or
-templates that use the `gender` field, and RSS feed URLs in your templates
-that use the `category` parameter. Check that `bin/magento cron:run` runs
+changes (see *What changes on upgrade day* and *Behavior changes to review
+after upgrading*): segments or templates that use the `gender` or `name`
+field, and RSS feed URLs in your templates that use the `category`
+parameter. Check that `bin/magento cron:run` runs
 every minute on the server. Note which installed modules send
 abandoned-cart emails today (for example Mageplaza SMTP, Avada Email
 Marketing, or Adobe Commerce's own email reminder rules), and switch those
@@ -37,20 +38,17 @@ shopper does not get two reminders for one cart.
 
 **Values saved at store-view scope.** 2.8.x reads every setting per
 website, so a `smaily/*` value at store-view scope (possible only through
-`bin/magento config:set --scope=stores`) has no effect there. List them
-before you upgrade:
+`bin/magento config:set --scope=stores`) has no effect there. The upgrade
+keeps it that way, so there is nothing to do before you upgrade:
 
-```sql
-SELECT scope_id, path FROM core_config_data
-WHERE path LIKE 'smaily/%' AND scope = 'stores';
-```
-
-The upgrade carries such a value over at its store view. v3 reads the Smaily
-account (subdomain, username, password) per store view, so a store-view
-`smaily/general/*` value **replaces the website's account for that store
-view** after the upgrade. Delete those rows before you upgrade. v3 reads
-every other setting per website, as 2.8.x does: those store-view values
-stay without effect.
+- A store-view Smaily account value (Subdomain, API Username, API
+  Password) is **not carried over**: every store view uses its website's
+  Smaily account, as in 2.8.x. An admin notice (*Smaily Connect upgrade:
+  store-view Smaily account not carried over*) names each store view
+  whose account value was left out, with its website.
+- A store-view *Enable Module* value is not carried over either.
+- Every other store-view value is carried over at its store view. v3 reads
+  those settings per website, as 2.8.x does, so they stay without effect.
 
 ## Steps
 
@@ -72,10 +70,13 @@ package; `setup:upgrade` runs the migration.
 | Newsletter opt-in autoresponder (`workflowId`) | Welcome automation (enabled if opt-in triggering was enabled) + a fallback row in the automation mapping table |
 | Subscriber cron sync toggle + field selection | Subscriber Synchronization (every tick carries over) |
 | Abandoned cart toggle / autoresponder / interval | Automations group (`2:hour` → 120 minutes) + a mapping fallback row |
+| *Enable Module = No* (Default Config or a website) | Subscriber Synchronization, the welcome automation and the abandoned-cart automation **off** at that scope. *Yes*, or no saved value, changes nothing |
 
 Each value keeps the scope it was saved at: a website's own value stays
 that website's, and a website without one keeps using the default. One
 Smaily account saved at Default Config serves every website and store view.
+A website without its own *Enable Module* value therefore inherits the
+switched-off settings of a Default Config with *No*.
 
 Once the settings are migrated, the upgrade deletes the old 2.8.x settings
 (every `smaily/*` config row, at every scope — the plain-text password
@@ -88,14 +89,53 @@ enter the Smaily subdomain, username and password and the 2.8.x options
 again. If you may need to go back, note the 2.8.x settings (see *Before
 you upgrade*) or take a database backup before you upgrade.
 
-## Set again after the upgrade
+## Check after the upgrade
 
-- **Enable Module.** v3 has no module switch, and the upgrade does not read
-  it. A website (or Default Config) where 2.8.x had *Enable Module = No*
-  starts its subscriber sync, welcome and abandoned-cart automation in v3
-  if those settings are on at that scope or inherited from Default Config.
-  Right after `setup:upgrade`, switch them off for that website in
-  **Smaily Connect > Settings**.
+- **A website with *Enable Module = Yes* under a Default Config with
+  *No*.** The upgrade switches contact sync, the welcome automation and the
+  abandoned-cart automation off at Default Config and writes nothing for
+  the website's *Yes*. A website's own 2.8.x value of these settings stays
+  in force; a setting the website inherited from Default Config is now
+  off. Right after `setup:upgrade`, open **Marketing > Smaily Connect >
+  Settings** with that website selected and switch on what it used:
+  **Sync contacts to Smaily** on the **Contacts** tab, and **Enabled** on
+  the *Welcome* and *Abandoned cart* cards of the **Automations** tab.
+
+## What changes on upgrade day
+
+Two v3 defaults apply from the first request after `setup:upgrade`. Both
+are per website, on **Marketing > Smaily Connect > Settings > Contacts**
+(and in step 2 of the initial setup):
+
+- **The checkout newsletter checkbox is on.** 2.8.x had no checkout
+  checkbox. v3 adds one to the checkout payment step while contact sync is
+  on and the store view is connected to Smaily. To keep checkout as it
+  was, untick **Show a newsletter checkbox at checkout**.
+- **Magento's own newsletter emails are suppressed.** Magento's
+  subscription-confirmed ("confirmation success") email and its
+  unsubscribe email are not sent for a store view connected to Smaily.
+  2.8.x suppressed them only on a website with *Enable Subscribers
+  Collection* on. Magento's double opt-in confirmation *request* email is
+  always sent. To have Magento send them again, untick **Let Smaily send
+  the opt-in confirmation emails (suppresses Magento's own)**.
+
+The contact fields Smaily receives change too:
+
+- **`name` is not sent any more.** 2.8.x sent a customer's full name as
+  `name` (*First Last*). v3 sends the first name as `first_name` and
+  the last name as `last_name`, when **First Name** and **Last Name** are
+  ticked under **Extra fields to sync with each contact** (Settings >
+  Contacts; the 2.8.x ticks carry over, so tick them if you did not sync
+  them before). A Smaily template or segment that uses `name` must use
+  `first_name` and `last_name` instead. Smaily keeps the `name` values it
+  has, but they are no longer updated.
+- **Birthday is sent as `YYYY-MM-DD`** (for example `1990-05-17`); 2.8.x
+  sent `1990-05-17 00:00:00`.
+- **An empty value is left out instead of sent empty.** 2.8.x sent `''`
+  for a selected field the contact has no value for, which wiped the value
+  in Smaily. v3 leaves the field out, so Smaily keeps the value it has.
+- **New field `language`:** the language of the contact's store view, from
+  its locale (for example `et` for `et_EE`), on every contact.
 
 ## What is cleaned up
 

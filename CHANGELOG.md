@@ -74,6 +74,7 @@ Ground-up rewrite as module `Smaily_Connect`, targeting feature parity with the 
 
 **Behavior changes**
 
+- Upgrading from 2.8.x: where *Enable Module* was *No* (Default Config or a website), contact sync, the welcome and the abandoned-cart automation are switched off at that scope; a Smaily account value saved at store-view scope (which 2.8.x never used) is not carried over, and an admin notice names those store views. On upgrade day the checkout newsletter checkbox is on, Magento's own subscription-confirmed and unsubscribe emails are suppressed, and contacts carry `first_name` / `last_name` instead of `name` (see `docs/UPGRADING.md`).
 - Contact sync frequency presets are gone: v3 syncs in near-real-time via observers + a 15-minute consent reconcile.
 - Gender now reaches Smaily under the field name `user_gender` (2.8.x sent `gender`), the name Smaily's WooCommerce plugin uses, so one shopper syncing from two stores lands in one field. Your tick in Synchronized Fields migrates automatically; Smaily segments and templates that reference `gender` need repointing to `user_gender` once.
 - The RSS feed lists catalog-visible products only; configurable variants resolve to their parent.

@@ -394,7 +394,10 @@ because a renamed module's declarative schema cannot.
 `Setup/Patch/Data/MigrateLegacyConfig` maps the 2.8.x `smaily/*` config rows
 onto the v3 paths and, once every scope is written, deletes them at every
 scope (the plaintext password among them); a downgrade to 2.8.x starts with
-empty settings.
+empty settings. A legacy *Enable Module = No* (default or website)
+becomes contact sync, welcome and abandoned cart off at that scope; a
+store-view Smaily account row (2.8.x never read it) is not carried over, and
+an admin notice names those store views.
 
 Uninstalling removes what declarative schema does not: `Setup\Uninstall`
 deletes the `smaily_connect/*` and legacy `smaily/*` config rows at every

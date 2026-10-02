@@ -16,6 +16,31 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3681 — the owner's four upgrade-day decisions for 2.x → 3.0
+  (2026-10-02, Questions item 14 decided; changes what the upgrade
+  writes).** `LegacyConfigMapper`: a scope's `smaily/general/enable` = 0
+  (default or website) becomes `sync_enabled`, `welcome_enabled` and
+  `abandoned_enabled` = 0 at that scope (any carried-over value of the
+  three replaced); 1 or absent writes nothing extra. `MigrateLegacyConfig`:
+  at store-view scope the subdomain/username/password rows and Enable
+  Module are not mapped (still deleted with every `smaily/*` row); every
+  other store-view row is mapped at its store view as before, where v3
+  does not read it. One admin inbox notice "Smaily Connect upgrade:
+  store-view Smaily account not carried over" names each such store view
+  as "Store view name (Website name)" (store manager names, never the
+  values; EN + ET); a store view that no longer exists is skipped.
+  `LegacyScopeUpgradeTest` reads it back through the real getters: website
+  4's No → its three off; Default Config No → websites without their own
+  value off; a store-view username is not active, every store view uses
+  its website's account; notice text EN and ET. UPGRADING: the "do it by
+  hand" steps are replaced by what the upgrade does; new "What changes on
+  upgrade day" (checkout checkbox on, Magento's confirmation-success and
+  unsubscribe emails suppressed, `name` → `first_name`/`last_name`,
+  birthday `Y-m-d`, empty values left out, new `language`), each checked
+  against `SubscriberPayloadBuilder` and 2.8.1's `Cron/SubscribersSync`.
+  Open edge: Questions item 15 (a website's own Yes under a Default
+  Config No).
+
 - **PRO-1398 — no merchant page shows the config-scope banner (2026-10-02,
   presentation only).** Re-checked against today's code: the "Overridden for
   X" banner, its `ConfigOverrides` field anchors (the Contacts tab's
@@ -67,7 +92,7 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   store view's account. Documented in `docs/UPGRADING.md` (new "Before you
   upgrade: what to note down" checklist with the 2.8.x labels and scopes,
   "Set again after the upgrade", store-view query); the migration change is
-  Questions item 14.
+  Questions item 14 (decided; built as PRO-3681, above).
 
 - **Storefront URL and consent slice tightened after a simplification review (2026-10-02, behaviour-neutral).** `StorefrontUrl::apply()` reads and normalizes each store's value once per request; `ensureSession()` returns nothing; `WizardData::isStorefrontDisclosureOpen()`; `normalize()` drops the redundant `pass` check (`parse_url` sets `user`, `''` included, whenever a password is given).
 - **PRO-3666 — the 3.0.0 changelog's admin-home entry once (2026-10-02).** Three merged copies on
@@ -4698,3 +4723,25 @@ PRO-1267 (engine: Magento product-identity contract note).
     store-view `smaily/general/*` rows over (2.8.x never read them) and
     post an admin notice naming the store views. Say yes, (a) only, or
     keep the documentation.
+    **Decided (Erkki, 2026-10-02, PRO-3681):** (1) Enable Module = No —
+    yes, the upgrade writes contact sync, welcome and abandoned cart = 0 at
+    the scope where it is 0 (default or website); 1 or absent writes
+    nothing extra. (2) Store-view account rows — not carried over; an admin
+    notice names the store views. (3) 3.0's new defaults stay (checkout
+    checkbox on, Magento's opt-in emails suppressed), stated in UPGRADING.
+    (4) `name` is not sent again; UPGRADING names `first_name` /
+    `last_name` and the smaller payload differences. Built, see "Where we
+    are".
+
+15. PRO-3681 — a website with its own *Enable Module = Yes* under a
+    Default Config with *No* (Medium urgency: a multi-website 2.8.x store
+    that uses Smaily on one website only has exactly this shape; one-way
+    door, store data). Decision (1) writes the three off rows at Default
+    Config and nothing for the website's Yes, so every one of the three
+    settings that website inherited from Default Config is off after the
+    upgrade — 2.8.x ran them for that website as Default Config set them.
+    Built as decided, pinned by `LegacyScopeUpgradeTest`, and UPGRADING
+    "Check after the upgrade" tells the merchant to switch them on again.
+    Proposed: for such a website, also write at the website the value it
+    resolved to before the default's off rows (its own row, else the default's migrated
+    value, else config.xml). Say yes, or keep the guide step.

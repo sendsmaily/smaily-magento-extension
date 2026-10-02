@@ -48,11 +48,11 @@ class Restore implements HttpGetActionInterface
         $redirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
         $redirect->setPath('checkout/cart');
 
-        $quoteId = (int)$this->request->getParam('id');
+        $quoteId = (int)$this->stringParam('id');
         $verdict = $this->tokenManager->check(
             $quoteId,
-            (string)$this->request->getParam('ts'),
-            (string)$this->request->getParam('token')
+            $this->stringParam('ts'),
+            $this->stringParam('token')
         );
         if ($verdict === RestoreTokenManager::EXPIRED) {
             $this->messageManager->addNoticeMessage((string)__('This cart link has expired.'));
@@ -90,5 +90,20 @@ class Restore implements HttpGetActionInterface
         $this->checkoutSession->replaceQuote($quote);
 
         return $redirect;
+    }
+
+    /**
+     * A query value as a string; one that is not a single string counts as absent.
+     *
+     * A repeated key (?ts[]=1) arrives as an array, so the link reads as invalid.
+     *
+     * @param string $name
+     * @return string
+     */
+    private function stringParam(string $name): string
+    {
+        $value = $this->request->getParam($name);
+
+        return is_string($value) ? $value : '';
     }
 }

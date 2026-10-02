@@ -45,6 +45,23 @@ class FeedBuilder
     }
 
     /**
+     * The limit, sort field and sort order as the feed applies them: an
+     * out-of-range limit is clamped, an unknown field or order falls back to
+     * the default. The feed's cache key is built from these, so requests that
+     * differ only in invalid values share one cache entry.
+     *
+     * @return array{int, string, string}
+     */
+    public static function normalize(int $limit, string $sortBy, string $sortOrder): array
+    {
+        return [
+            max(1, min($limit ?: self::DEFAULT_LIMIT, self::MAX_LIMIT)),
+            in_array($sortBy, self::SORT_FIELDS, true) ? $sortBy : 'created_at',
+            strtolower($sortOrder) === 'asc' ? 'ASC' : 'DESC',
+        ];
+    }
+
+    /**
      * Build the RSS XML for a store.
      */
     public function build(
@@ -54,9 +71,7 @@ class FeedBuilder
         string $sortBy,
         string $sortOrder
     ): string {
-        $limit = max(1, min($limit ?: self::DEFAULT_LIMIT, self::MAX_LIMIT));
-        $sortBy = in_array($sortBy, self::SORT_FIELDS, true) ? $sortBy : 'created_at';
-        $sortOrder = strtolower($sortOrder) === 'asc' ? 'ASC' : 'DESC';
+        [$limit, $sortBy, $sortOrder] = self::normalize($limit, $sortBy, $sortOrder);
 
         $rss = new XmlElement(
             '<?xml version="1.0" encoding="UTF-8"?>'

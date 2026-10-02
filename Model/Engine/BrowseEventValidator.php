@@ -38,9 +38,9 @@ class BrowseEventValidator
      */
     public function sanitize(array $event): ?array
     {
-        $eventId = (string)($event['event_id'] ?? '');
-        $sessionId = trim((string)($event['session_id'] ?? ''));
-        $eventType = (string)($event['event_type'] ?? '');
+        $eventId = $this->text($event, 'event_id');
+        $sessionId = trim($this->text($event, 'session_id'));
+        $eventType = $this->text($event, 'event_type');
 
         if (preg_match(self::UUID_PATTERN, $eventId) !== 1
             || $sessionId === '' || strlen($sessionId) > 64
@@ -70,7 +70,7 @@ class BrowseEventValidator
         // Rec-link attribution runs on the order-level cookie->order path
         // (§5, Engine\AttributionManager), which is untouched.
         foreach (['sku', 'category_path', 'search_query', 'smaily_visitor_token'] as $field) {
-            $value = trim((string)($event[$field] ?? ''));
+            $value = trim($this->text($event, $field));
             if ($value !== '' && strlen($value) <= 255) {
                 $clean[$field] = $value;
             }
@@ -81,5 +81,19 @@ class BrowseEventValidator
         }
 
         return $clean;
+    }
+
+    /**
+     * A field's value as text; a field that is not a scalar (an array or an
+     * object in the posted JSON) counts as empty, so it fails validation
+     * instead of the request.
+     *
+     * @param array<string, mixed> $event
+     */
+    private function text(array $event, string $field): string
+    {
+        $value = $event[$field] ?? '';
+
+        return is_scalar($value) ? (string)$value : '';
     }
 }

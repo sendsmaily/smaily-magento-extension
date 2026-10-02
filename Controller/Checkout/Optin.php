@@ -112,7 +112,10 @@ class Optin implements HttpPostActionInterface, CsrfAwareActionInterface
      */
     private function isFormKeyValid(array $body): bool
     {
-        $submitted = (string)($body['form_key'] ?? '');
+        $submitted = $body['form_key'] ?? '';
+        if (!is_string($submitted)) {
+            return false;
+        }
 
         try {
             return $submitted !== '' && hash_equals($this->formKey->getFormKey(), $submitted);

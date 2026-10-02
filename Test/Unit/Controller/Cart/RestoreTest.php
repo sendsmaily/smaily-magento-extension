@@ -82,14 +82,46 @@ class RestoreTest extends TestCase
         self::assertSame([], $this->notices);
     }
 
-    private function controller(string $verdict): Restore
+    /**
+     * A repeated query key (?ts[]=…) arrives as an array; Magento turns the
+     * warning a string cast would raise into an error page, so the link must
+     * read as invalid instead.
+     */
+    public function testAnArrayTypedParameterReadsAsAnInvalidLinkNotAnError(): void
     {
+        $this->cartRepository->expects(self::never())->method('get');
+        $this->checkoutSession->expects(self::never())->method('replaceQuote');
+
+        set_error_handler(static function (int $level, string $message): bool {
+            throw new \ErrorException($message, 0, $level);
+        }, E_WARNING);
+        try {
+            $this->controller(
+                RestoreTokenManager::INVALID,
+                ['id' => ['42'], 'ts' => ['1790000000'], 'token' => ['signed']],
+                [0, '', '']
+            )->execute();
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertSame('checkout/cart', $this->redirectPath);
+        self::assertSame([], $this->notices);
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     * @param array{int, string, string} $checked what the token manager is asked
+     */
+    private function controller(
+        string $verdict,
+        array $query = ['id' => '42', 'ts' => '1790000000', 'token' => 'signed'],
+        array $checked = [42, '1790000000', 'signed']
+    ): Restore {
         $request = $this->createMock(RequestInterface::class);
-        $request->method('getParam')->willReturnMap([
-            ['id', null, '42'],
-            ['ts', null, '1790000000'],
-            ['token', null, 'signed'],
-        ]);
+        $request->method('getParam')->willReturnCallback(
+            static fn (string $name): mixed => $query[$name] ?? null
+        );
 
         $redirect = $this->createMock(Redirect::class);
         $redirect->method('setPath')->willReturnCallback(function (string $path) use ($redirect): Redirect {
@@ -101,7 +133,7 @@ class RestoreTest extends TestCase
         $resultFactory->method('create')->willReturn($redirect);
 
         $tokens = $this->createMock(RestoreTokenManager::class);
-        $tokens->method('check')->with(42, '1790000000', 'signed')->willReturn($verdict);
+        $tokens->method('check')->with(...$checked)->willReturn($verdict);
 
         $messages = $this->createMock(ManagerInterface::class);
         $messages->method('addNoticeMessage')->willReturnCallback(function (string $text) use ($messages) {

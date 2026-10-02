@@ -54,13 +54,18 @@ class Feed implements HttpGetActionInterface
 
         $categoryParam = $this->request->getParam('category');
         $categoryId = is_numeric($categoryParam) ? (int)$categoryParam : null;
-        $limit = (int)$this->request->getParam('limit', FeedBuilder::DEFAULT_LIMIT);
-        $sort = (string)$this->request->getParam('sort', 'created_at');
-        $order = (string)$this->request->getParam('order', 'desc');
+        // A value that is not a single string (?limit[]=1) counts as absent.
+        [$limit, $sort, $order] = FeedBuilder::normalize(
+            (int)$this->stringParam('limit'),
+            $this->stringParam('sort'),
+            $this->stringParam('order')
+        );
         $store = $this->storeManager->getStore();
 
         // Server-side cache: the feed is unauthenticated and rebuilding it
-        // loads up to 250 products, so identical requests must not hit the DB.
+        // loads up to 250 products, so requests for the same feed must not hit
+        // the DB — keyed by the normalized values, so varying an invalid
+        // parameter cannot bypass the cache.
         $cacheKey = 'smaily_rss_' . sha1(implode('|', [
             (int)$store->getId(),
             (string)$categoryId,
@@ -83,5 +88,18 @@ class Feed implements HttpGetActionInterface
         $result->setContents($xml);
 
         return $result;
+    }
+
+    /**
+     * A query value as a string; one that is not a single string counts as absent.
+     *
+     * @param string $name
+     * @return string
+     */
+    private function stringParam(string $name): string
+    {
+        $value = $this->request->getParam($name);
+
+        return is_string($value) ? $value : '';
     }
 }

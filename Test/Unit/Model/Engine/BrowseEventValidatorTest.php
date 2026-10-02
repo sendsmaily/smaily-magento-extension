@@ -118,4 +118,37 @@ class BrowseEventValidatorTest extends TestCase
         self::assertSame(12, $clean['dwell_seconds']);
         self::assertSame('kassitoit', $clean['search_query']);
     }
+
+    /**
+     * A field posted as a JSON array or object fails validation instead of
+     * raising an "Array to string conversion" warning (an error page in
+     * Magento).
+     */
+    public function testNonScalarFieldsFailValidationWithoutAWarning(): void
+    {
+        set_error_handler(static function (int $level, string $message): bool {
+            throw new \ErrorException($message, 0, $level);
+        }, E_WARNING);
+        try {
+            $rejected = $this->validator->sanitize([
+                'event_id' => [self::UUID],
+                'session_id' => 'sess-123',
+                'event_type' => 'product_view',
+            ]);
+            $clean = $this->validator->sanitize([
+                'event_id' => self::UUID,
+                'session_id' => 'sess-123',
+                'event_type' => 'product_view',
+                'sku' => ['ABC-1'],
+                'search_query' => ['q' => 'kassitoit'],
+            ]);
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertNull($rejected);
+        self::assertNotNull($clean);
+        self::assertArrayNotHasKey('sku', $clean);
+        self::assertArrayNotHasKey('search_query', $clean);
+    }
 }

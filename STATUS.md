@@ -39,6 +39,16 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   produces the storefront pattern — design options are in "Questions /
   tasks for Erkki" item 12. Docs only, no code changed.
 
+- **PRO-3625 — low-severity hardening after the rc1 review (2026-10-02).**
+  (1) The RSS feed's cache key is built from the normalized limit, sort
+  and order (`FeedBuilder::normalize()`, which `build()` uses too), so
+  varied invalid values share one entry. (2) Array-typed request values
+  no longer reach a string cast on the storefront: the RSS feed, the cart
+  restore link (`id`, `ts`, `token`), the browse relay's event fields
+  (`BrowseEventValidator`) and the checkout opt-in's `form_key` read a
+  non-string as absent/invalid — Magento's error handler turned the
+  "Array to string conversion" warning into a 500.
+
 - **PRO-3644 done — copy consistency leftovers (2026-10-02).** (1) The
   failed-events banner on the Dashboard and the Log has a singular: "1
   event failed in the last 24 hours" / "Viimase 24 tunni jooksul

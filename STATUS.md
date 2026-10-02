@@ -16,6 +16,33 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3564 done — the import cards show the pack's six states
+  (2026-10-02).** The contact import (initial setup step 2, Settings >
+  Contacts) and the three Settings > Intelligence imports (now one card
+  each: Catalog / Customers / Orders, replacing the stacked button rows) are
+  the pack's Backfill card: white card (18/20 padding, 6 px radius,
+  `--shadow-1`), a status pill in the header (Pending / Running / Done /
+  Stopped / Cancelled), the bar with "X of Y" and the percentage under it,
+  the outcome line with its icon and colour (the shipped outcome copy), the
+  failures link under it, and the controls under a divider with the pack's
+  compact buttons. Idle: no pill, no bar, **Start import** primary; queued
+  and running: only **Cancel import** (status "Importing…" while running);
+  ended: **Run again** — secondary after Done, primary after Stopped or
+  Cancelled (the pack's Resume / Start over are not built: a run always
+  starts fresh, target spec §2.5 d). `panels-js.phtml` drives every card
+  through one `backfillUi()` / `renderBackfill()`. New phrases: "Catalog" →
+  "Kataloog" (own, from "Impordi kataloog"), "Customers" → "Kliendid" and
+  "Orders" → "Tellimused" (Woo `smaily-connect-et.po`), "Running" →
+  "Töötab" (Woo "Running…" → "Töötab…"), "Done" → "Valmis" (own "Done, %1
+  of %2 synced." → "Valmis, …"), "Stopped" → "Peatunud" (own), "Cancelled"
+  → "Katkestatud" (own "Cancelled — …" → "Katkestatud — …"), "Run again" →
+  "Käivita uuesti" (Woo "Re-run when ready." → "Käivita uuesti, kui
+  valmis."), "Importing…" → "Impordin…" (Woo, verbatim). Dropped as unused:
+  "Import catalog / customers / orders", "Importing… %1 / %2". Verified by
+  rendering the real templates with stubs in headless Chrome (all six
+  states plus queued, en_US and et_EE, Start → queued → Cancel → cancelled,
+  the sync-off case). Fidelity audit row 17 marked fixed.
+
 - **PRO-3563 done — a finished initial setup reopens on a connection
   summary (2026-10-02).** The pack's completed-revisit frame: with
   `setupCompleted`, `wizard/index.phtml` renders step 1 as a read-only

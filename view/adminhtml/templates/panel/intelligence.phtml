@@ -86,27 +86,39 @@ $isRefused = $viewModel->isEngineRefused();
             <p class="note"><?= $escaper->escapeHtml(__('Off by default. Respects Magento cookie restriction mode; events flow through your own server, so the API key never reaches the browser.')) ?></p>
         </div>
         <?php if ($isSettings): ?>
-        <div class="smaily-card" style="background:#f8f8f8;">
-            <strong><?= $escaper->escapeHtml(__('Historical imports to Campaign Intelligence')) ?></strong>
+        <?php // One pack "Backfill" card per import (PRO-3564); panels-js.phtml renders the states. ?>
+        <div class="smaily-backfill-imports">
+            <strong class="smaily-backfill-imports__title"><?= $escaper->escapeHtml(__('Historical imports to Campaign Intelligence')) ?></strong>
             <p class="note"><?= $escaper->escapeHtml($isRefused
                 ? __('Imports are unavailable while the account is not active — there is nowhere to send the data. They come back as soon as the account does.')
                 : __('Send your existing data to the engine in the background — one chunk per cron minute. Imports are resumable and safe to re-run: deliveries are deduplicated on the receiving side.')) ?></p>
             <?php if (!$isRefused): ?>
             <?php foreach ([
-                'catalog' => __('Import catalog'),
-                'customers' => __('Import customers'),
-                'orders' => __('Import orders'),
+                'catalog' => __('Catalog'),
+                'customers' => __('Customers'),
+                'orders' => __('Orders'),
             ] as $jobType => $label): ?>
-            <div class="smaily-import-row" data-job-type="<?= $escaper->escapeHtmlAttr($jobType) ?>">
-                <button type="button" class="action-secondary smaily-w-engine-import">
-                    <span><?= $escaper->escapeHtml($label) ?></span>
-                </button>
-                <button type="button" class="action-tertiary smaily-w-engine-cancel" style="display:none;">
-                    <span><?= $escaper->escapeHtml(__('Cancel import')) ?></span>
-                </button>
-                <span class="smaily-result"></span>
-                <div class="smaily-progress" style="display:none;">
-                    <div class="smaily-progress__track"><div class="smaily-progress__fill"></div></div>
+            <div class="smaily-card smaily-backfill-card" data-job-type="<?= $escaper->escapeHtmlAttr($jobType) ?>" data-state="idle">
+                <div class="smaily-backfill-card__head">
+                    <strong class="smaily-backfill-card__title"><?= $escaper->escapeHtml($label) ?></strong>
+                    <span class="smaily-pill smaily-backfill-card__pill" style="display:none;"><span class="smaily-pill__dot"></span><span class="smaily-backfill-card__pill-text"></span></span>
+                </div>
+                <div class="smaily-backfill-card__progress" style="display:none;">
+                    <div class="smaily-progress">
+                        <div class="smaily-progress__track"><div class="smaily-progress__fill"></div></div>
+                    </div>
+                    <div class="smaily-backfill-card__count"><span class="smaily-backfill-card__done"></span><span class="smaily-backfill-card__pct"></span></div>
+                </div>
+                <div class="smaily-backfill-verdict" style="display:none;"><span class="smaily-backfill-verdict__icon"></span><span class="smaily-backfill-verdict__text"></span></div>
+                <div class="smaily-backfill-card__link" style="display:none;"></div>
+                <div class="smaily-backfill-card__controls">
+                    <button type="button" class="action-primary smaily-backfill-card__start">
+                        <span><?= $escaper->escapeHtml(__('Start import')) ?></span>
+                    </button>
+                    <button type="button" class="action-secondary smaily-backfill-card__cancel" style="display:none;">
+                        <span><?= $escaper->escapeHtml(__('Cancel import')) ?></span>
+                    </button>
+                    <span class="smaily-result"></span>
                 </div>
             </div>
             <?php endforeach; ?>

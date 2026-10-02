@@ -400,67 +400,132 @@ window.smailyPanelsInit = function ($) {
         }, 4000);
     }
 
+    // The parts of one Backfill card (PRO-3564, pack "Backfill" frames).
+    function backfillUi($card) {
+        return {
+            card: $card,
+            pill: $card.find('.smaily-backfill-card__pill'),
+            progress: $card.find('.smaily-backfill-card__progress'),
+            bar: $card.find('.smaily-progress'),
+            done: $card.find('.smaily-backfill-card__done'),
+            pct: $card.find('.smaily-backfill-card__pct'),
+            verdict: $card.find('.smaily-backfill-verdict'),
+            link: $card.find('.smaily-backfill-card__link'),
+            start: $card.find('.smaily-backfill-card__start'),
+            cancel: $card.find('.smaily-backfill-card__cancel'),
+            result: $card.find('.smaily-result')
+        };
+    }
+
     // Drives the Stage A .smaily-progress component: width lives on __fill,
     // the state class picks the color (running = striped accent; done/failed/
-    // stopped recolor and stop animating).
-    function setProgress(ui, percent, state) {
+    // stopped recolor and stop animating). Under the bar: "X of Y" and the
+    // percentage.
+    function setProgress(ui, data, percent, state) {
         var pct = Math.max(0, Math.min(100, parseInt(percent, 10) || 0));
-        ui.bar.show()
-            .removeClass('is-running is-done is-failed is-stopped')
+        ui.progress.show();
+        ui.bar.removeClass('is-running is-done is-failed is-stopped')
             .addClass('is-' + state)
             .find('.smaily-progress__fill').css('width', pct + '%');
+        ui.done.text('<?= $escaper->escapeJs(__('%1 of %2')) ?>'
+            .replace('%1', data.processed).replace('%2', data.total || '?'));
+        ui.pct.text(pct + '%');
+    }
+
+    // One state per render, as the pack draws them: idle (no pill, no bar,
+    // Start import as the primary action), queued and running (only Cancel),
+    // and the four outcomes (pill, bar, the outcome line, Run again).
+    var backfillStates = {
+        pending: {pill: 'pending', label: '<?= $escaper->escapeJs(__('Pending')) ?>'},
+        running: {pill: 'pending', label: '<?= $escaper->escapeJs(__('Running')) ?>'},
+        done: {pill: 'sent', label: '<?= $escaper->escapeJs(__('Done')) ?>', icon: '✓'},
+        failures: {pill: 'sent', label: '<?= $escaper->escapeJs(__('Done')) ?>', icon: '!'},
+        stopped: {pill: 'failed', label: '<?= $escaper->escapeJs(__('Stopped')) ?>', icon: '×', primary: true},
+        cancelled: {pill: 'off', label: '<?= $escaper->escapeJs(__('Cancelled')) ?>', icon: '—', primary: true}
+    };
+
+    function backfillState(data) {
+        if (data.status === 'completed') {
+            return data.failed ? 'failures' : 'done';
+        }
+        if (data.status === 'failed') {
+            return 'stopped';
+        }
+        return backfillStates[data.status] ? data.status : 'idle';
     }
 
     function renderBackfill(jobType, data, ui) {
-        var text;
-        if (data.status === 'pending') {
+        var state = backfillState(data);
+        var look = backfillStates[state] || {};
+        var finished = !!look.icon;
+        var text = '';
+        ui.card.attr('data-state', state).toggleClass('is-finished', finished);
+        ui.pill.toggle(state !== 'idle')
+            .removeClass('smaily-pill--pending smaily-pill--sent smaily-pill--failed smaily-pill--off')
+            .addClass(look.pill ? 'smaily-pill--' + look.pill : '')
+            .find('.smaily-backfill-card__pill-text').text(look.label || '');
+        ui.cancel.toggle(state === 'pending' || state === 'running');
+        ui.start.toggle(state === 'idle' || finished)
+            .toggleClass('action-primary', state === 'idle' || !!look.primary)
+            .toggleClass('action-secondary', finished && !look.primary)
+            .find('span').text(finished
+                ? '<?= $escaper->escapeJs(__('Run again')) ?>'
+                : '<?= $escaper->escapeJs(__('Start import')) ?>');
+        ui.link.hide().empty();
+        if (!finished) {
+            ui.verdict.hide();
+        }
+        if (state === 'idle') {
+            // Queued, running and the outcomes come from the server; idle
+            // shows nothing that suggests an import (PRO-1357 #7/#8).
+            ui.progress.hide();
+            result(ui.result, '');
+            return;
+        }
+        if (state === 'pending') {
             // Queued, but the cron tick hasn't picked it up yet — no page has
             // been processed, so a "0 / ?" progress bar would just look stuck.
             // Reassure instead of showing fake progress; Cancel stays available.
-            ui.bar.hide();
-            ui.cancel.show();
+            ui.progress.hide();
             result(ui.result,
                 '<?= $escaper->escapeJs(__('Queued — the import starts on the next scheduled run…')) ?>', true);
             scheduleNextPoll(jobType, ui);
             return;
         }
-        if (data.status === 'running') {
-            setProgress(ui, data.percent, 'running');
-            ui.cancel.show();
-            result(ui.result,
-                '<?= $escaper->escapeJs(__('Importing… %1 / %2')) ?>'
-                    .replace('%1', data.processed).replace('%2', data.total || '?'), true);
+        if (state === 'running') {
+            setProgress(ui, data, data.percent, 'running');
+            result(ui.result, '<?= $escaper->escapeJs(__('Importing…')) ?>', true);
             scheduleNextPoll(jobType, ui);
             return;
         }
-        ui.cancel.hide();
-        if (data.status === 'completed' && !data.failed) {
-            setProgress(ui, 100, 'done');
+        result(ui.result, '');
+        if (state === 'done') {
+            setProgress(ui, data, 100, 'done');
             text = '<?= $escaper->escapeJs(__('Done, %1 of %2 synced.')) ?>'
                 .replace('%1', data.processed).replace('%2', data.total || data.processed);
-            result(ui.result, withDate(text, data), true);
-        } else if (data.status === 'completed') {
-            setProgress(ui, data.percent, 'failed');
+        } else if (state === 'failures') {
+            setProgress(ui, data, data.percent, 'failed');
             text = '<?= $escaper->escapeJs(__('Done, %1 of %2 synced — %3 failed.')) ?>'
                 .replace('%1', data.processed)
                 .replace('%2', data.total || data.processed + data.failed)
                 .replace('%3', data.failed);
-            result(ui.result, withDate(text, data), false,
-                {label: '<?= $escaper->escapeJs(__('View them in the Log')) ?>', href: urls.logFailed});
-        } else if (data.status === 'failed') {
-            setProgress(ui, data.percent, 'failed');
+            ui.link.append($('<a></a>').attr('href', urls.logFailed)
+                .text('<?= $escaper->escapeJs(__('View them in the Log')) ?>')).show();
+        } else if (state === 'stopped') {
+            setProgress(ui, data, data.percent, 'failed');
             text = '<?= $escaper->escapeJs(__('Stopped before an error — %1 of %2 synced so far. Press the import button to run it again.')) ?>'
                 .replace('%1', data.processed).replace('%2', data.total || '?');
             if (data.error) {
                 text += ' ' + data.error;
             }
-            result(ui.result, withDate(text, data), false);
-        } else if (data.status === 'cancelled') {
-            setProgress(ui, data.percent, 'stopped');
+        } else {
+            setProgress(ui, data, data.percent, 'stopped');
             text = '<?= $escaper->escapeJs(__('Cancelled — %1 of %2 synced. Starting again begins a fresh import.')) ?>'
                 .replace('%1', data.processed).replace('%2', data.total || '?');
-            result(ui.result, withDate(text, data), true);
         }
+        ui.verdict.attr('data-state', state).show();
+        ui.verdict.find('.smaily-backfill-verdict__icon').text(look.icon);
+        ui.verdict.find('.smaily-backfill-verdict__text').text(withDate(text, data));
     }
 
     function pollBackfill(jobType, ui, action) {
@@ -674,39 +739,19 @@ window.smailyPanelsInit = function ($) {
             });
         });
 
-        // Contacts import (wizard step 2 + Settings > Subscribers).
-        if ($('#smaily-w-backfill').length) {
-            var contactsUi = {
-                bar: $('#smaily-w-backfill-bar'),
-                result: '#smaily-w-backfill-result',
-                cancel: $('#smaily-w-backfill-cancel')
-            };
-            $('#smaily-w-backfill').on('click', function () {
-                startBackfill('contacts', contactsUi);
-            });
-            contactsUi.cancel.on('click', function () {
-                cancelBackfill('contacts', contactsUi);
-            });
-            // Persisted last-run outcome (and live progress of a job that
-            // is already running) renders without pressing anything.
-            pollBackfill('contacts', contactsUi, 'status');
-        }
-
-        // Engine imports (Settings only).
-        $('.smaily-import-row').each(function () {
-            var $row = $(this),
-                jobType = $row.data('job-type'),
-                ui = {
-                    bar: $row.find('.smaily-progress'),
-                    result: $row.find('.smaily-result'),
-                    cancel: $row.find('.smaily-w-engine-cancel')
-                };
-            $row.find('.smaily-w-engine-import').on('click', function () {
+        // Imports: contacts (wizard step 2 + Settings > Contacts) and the
+        // engine imports (Settings > Intelligence), one Backfill card each.
+        $('.smaily-backfill-card[data-job-type]').each(function () {
+            var ui = backfillUi($(this)),
+                jobType = String($(this).data('job-type'));
+            ui.start.on('click', function () {
                 startBackfill(jobType, ui);
             });
             ui.cancel.on('click', function () {
                 cancelBackfill(jobType, ui);
             });
+            // Persisted last-run outcome (and live progress of a job that
+            // is already running) renders without pressing anything.
             pollBackfill(jobType, ui, 'status');
         });
 

@@ -89,8 +89,6 @@
 .smaily-ui progress { width: 100%; max-width: 40rem; height: 1.4rem; }
 .smaily-ui #smaily-w-fields label { display: inline-block; width: 16rem; }
 .smaily-ui .smaily-muted { opacity: 0.5; }
-.smaily-ui .smaily-import-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
-.smaily-ui .smaily-import-row progress { flex-basis: 100%; }
 
 /* --- Multilingual routing (mode cards, per-language accounts, mapping) ---- */
 .smaily-ui .smaily-ml-table { width: 100%; max-width: 56rem; border-collapse: collapse; }
@@ -479,16 +477,51 @@
  * PRO-2456 (pack "Backfill" frames): title, 13px body copy, progress, then
  * one controls row under a divider — Start import, Cancel and the status
  * sit on one line, and a long status wraps beside the buttons instead of
- * dropping below them with an indent. */
-.smaily-ui .smaily-backfill-card { background: var(--s-surface-2); margin-bottom: 0; }
-.smaily-backfill-card__title { display: block; font-size: var(--fs-14); font-weight: 700; color: var(--s-text); }
-.smaily-ui .smaily-backfill-card > p.note { margin: var(--sp-1) 0 0; font-size: var(--fs-13); line-height: 1.45; color: var(--s-text-2); }
-.smaily-backfill-card .smaily-progress { margin-top: var(--sp-4); }
+ * dropping below them with an indent.
+ * PRO-3564 (the pack's six states): a white card with the state pill in the
+ * header, "X of Y" and the percentage under the bar, the outcome line with
+ * its icon, and the pack's compact buttons. The selectors outrank the tab
+ * and step card rules further down (the card sits inside their card). */
+.smaily-ui .smaily-card div.smaily-backfill-card {
+    max-width: none; margin: 0; padding: 18px 20px; background: var(--s-surface);
+    border: 1px solid var(--s-border); border-radius: 6px; box-shadow: var(--shadow-1); color: var(--s-text);
+}
+.smaily-ui .smaily-card div.smaily-backfill-card + .smaily-backfill-card { margin-top: var(--sp-3); }
+.smaily-backfill-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); margin-bottom: 14px; }
+.smaily-backfill-card__title { display: block; min-width: 0; font-size: 15px; font-weight: 700; color: var(--s-text); }
+.smaily-backfill-card__pill { flex: 0 0 auto; }
+.smaily-ui .smaily-card .smaily-backfill-card p.note { margin: 0; font-size: var(--fs-13); line-height: 1.45; color: var(--s-text-2); }
+.smaily-ui .smaily-card .smaily-backfill-card p.note + p.note { margin-top: var(--sp-1); }
+.smaily-backfill-card.is-finished .smaily-backfill-card__intro { display: none; }
+.smaily-backfill-card__progress { margin-bottom: var(--sp-3); }
+.smaily-backfill-card__count { display: flex; justify-content: space-between; gap: var(--sp-3); margin-top: 7px; font-size: var(--fs-12); }
+.smaily-backfill-card__done { font-weight: 700; color: var(--s-text); font-variant-numeric: tabular-nums; }
+.smaily-backfill-card__pct { font: var(--fs-11)/1 var(--mono); color: var(--s-text-3); align-self: center; }
+.smaily-backfill-verdict { display: flex; gap: var(--sp-2); align-items: flex-start; font-size: var(--fs-13); line-height: 1.45; color: var(--s-text-2); }
+.smaily-backfill-verdict__icon {
+    flex: 0 0 auto; width: 20px; height: 20px; margin-top: 1px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font: 700 var(--fs-12)/1 var(--font); color: #fff; background: var(--s-neutral);
+}
+.smaily-backfill-verdict__text { min-width: 0; }
+.smaily-backfill-verdict[data-state="done"] { color: var(--s-success); }
+.smaily-backfill-verdict[data-state="done"] .smaily-backfill-verdict__icon { background: var(--s-success); }
+.smaily-backfill-verdict[data-state="failures"] { color: var(--s-warning); }
+.smaily-backfill-verdict[data-state="failures"] .smaily-backfill-verdict__icon { background: var(--s-bar-warning); }
+.smaily-backfill-verdict[data-state="stopped"] { color: var(--s-danger); }
+.smaily-backfill-verdict[data-state="stopped"] .smaily-backfill-verdict__icon { background: var(--s-bar-error); }
+.smaily-backfill-verdict[data-state="cancelled"] .smaily-backfill-verdict__icon { color: var(--s-text-2); background: var(--s-neutral-soft); }
+.smaily-backfill-card__link { margin-top: 10px; font-size: var(--fs-13); font-weight: 600; }
 .smaily-backfill-card__controls {
     display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
     margin-top: var(--sp-4); padding-top: 14px; border-top: 1px solid var(--s-border);
 }
+.smaily-ui .smaily-backfill-card__controls .action-primary,
+.smaily-ui .smaily-backfill-card__controls .action-secondary { padding: 8px 15px; }
 .smaily-backfill-card__controls .smaily-result.smaily-inline-status { flex: 1 1 16rem; min-width: 0; margin-left: var(--sp-1); white-space: normal; line-height: 1.4; }
+/* Settings > Intelligence: the imports heading and note above the cards. */
+.smaily-backfill-imports__title { display: block; font-size: var(--fs-14); font-weight: 700; color: var(--s-text); }
+.smaily-ui .smaily-backfill-imports > p.note { margin: var(--sp-1) 0 var(--sp-3); font-size: var(--fs-13); line-height: 1.45; color: var(--s-text-2); }
 
 /* ========================================================================= *
  * PRO-1281 Stage B — the visual system applied to the screens.
@@ -686,11 +719,6 @@
 .smaily-log-details-retry { display: flex; gap: var(--sp-2); align-items: center; background: var(--s-info-soft); border: 1px solid var(--s-info-border); color: var(--s-info); border-radius: var(--r-3); padding: 11px 14px; font-size: var(--fs-13); line-height: 1.45; }
 .smaily-log-details-retry.is-terminal { background: var(--s-neutral-soft); border-color: var(--s-neutral-border); color: var(--s-text-2); }
 .smaily-log-redact-tag { display: inline-block; font-size: 10px; font-weight: 700; color: var(--s-parked); background: var(--s-parked-soft); border: 1px solid var(--s-parked-border); border-radius: var(--r-2); padding: 0 6px; text-transform: uppercase; letter-spacing: .3px; margin-left: 6px; vertical-align: middle; }
-
-/* --- Backfill: progress + terminal verdict line --------------------------- */
-.smaily-import-row { align-items: flex-start; }
-.smaily-backfill-verdict { display: flex; gap: var(--sp-2); align-items: flex-start; font-size: var(--fs-13); line-height: 1.45; }
-.smaily-backfill-verdict__icon { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font: 700 var(--fs-12)/1 var(--font); }
 
 /* --- Settings website selector (RFC_MULTI_WEBSITE.md §2, PRO-1461) --------- *
  * Own chrome next to the tab strip, shown only on 2+-website installs. */

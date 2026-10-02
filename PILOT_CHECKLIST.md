@@ -50,7 +50,7 @@ uses, and that you cancel or refund it afterwards.
 | **Overview** step: **Finish**. | "You are all set!"; after that, Smaily Connect pages open the **Dashboard** instead of Initial setup. |
 | On the server: `bin/magento smaily:engine:ping`. | `Connected. Tenant: …, engine version: …, ping: {…}`. "Ping failed: …" is red — see §9. |
 | Dashboard. | Connection strip: **Smaily** and **Campaign Intelligence** both **Connected**; **Browse tracking** shows **Script live on storefront**. |
-| Decide with the engine side whether the existing tenant needs the store's history. If it does: **Settings > Intelligence** → **Historical imports to Campaign Intelligence** → **Import catalog**, **Import customers**, **Import orders**. | Live sync covers changes from now on only. Each import shows "Importing… n / total" and ends "Done, n of total synced." — one chunk per cron minute. |
+| Decide with the engine side whether the existing tenant needs the store's history. If it does: **Settings > Intelligence** → **Historical imports to Campaign Intelligence** → **Start import** on the Catalog, Customers and Orders cards. | Live sync covers changes from now on only. Each card shows *Running* with "n of total" under its progress bar and ends *Done* — "Done, n of total synced." — one chunk per cron minute. |
 
 ## 3. Contact sync (one test subscriber)
 

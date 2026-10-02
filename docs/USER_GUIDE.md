@@ -562,25 +562,29 @@ traffic:
   it off stops at its next chunk and is reported as cancelled, keeping the
   count it had genuinely sent.
 - **Catalog / Customers / Orders → Campaign Intelligence** — Settings >
-  **Intelligence** tab
+  **Intelligence** tab, one card per import.
 
-Each import button shows live progress right where you started it, and a
-**Cancel import** button appears while a job is running — the background
-worker stops cleanly at its next page boundary. A cancelled import is
+Each import is a card. Before its first run it offers **Start import**.
+Once started, a status pill in the card's header says where it is —
+*Pending* (queued for the next cron run), *Running*, *Done*, *Stopped* or
+*Cancelled* — and a progress bar shows how far it got, with "X of Y" and the
+percentage under it. While a job is queued or running the card offers only
+**Cancel import** — the background worker stops cleanly at its next page
+boundary. After it ends, **Run again** starts a fresh import. A cancelled import is
 terminal: starting the same import again begins a fresh run from the
 beginning. (An import interrupted by an error, on the other hand, resumes
 from its last cursor.) Imports are safe to re-run either way: deliveries
 are deduplicated on the receiving side.
 
 After an import finishes, its outcome and timestamp stay visible on the
-panel — you do not have to keep the page open:
+card — you do not have to keep the page open:
 
 - **"Done, X of Y synced"** — everything landed.
 - **"Done, X of Y synced — N failed"** — individual items failed
   permanently, with a link to the Log pre-filtered to those rows. Items
   still waiting for an automatic retry are *not* counted as failed.
 - **"Stopped before an error"** — the job itself hit an error and stopped
-  at a page boundary; nothing was lost, press the import button to run it
+  at a page boundary; nothing was lost, press **Run again** to run it
   again.
 - **"Cancelled"** — stopped on your request; starting again begins a
   fresh import.

@@ -498,7 +498,7 @@ hide.
 | Connect | Ühenda |
 | Enable storefront browse tracking (product views, searches, cart activity) | Luba poe sirvimise jälgimine (tootevaatamised, otsingud, ostukorvitegevus) |
 | Historical imports to Campaign Intelligence | Ajaloolised impordid Campaign Intelligence'i |
-| Import catalog / Import customers / Import orders | Impordi kataloog / Impordi kliendid / Impordi tellimused |
+| Catalog / Customers / Orders (import card titles; the button is Start import, PRO-3564) | Kataloog / Kliendid / Tellimused |
 
 The three "Sync catalog/customer/order changes to the engine" phrases (both
 packs) become dead i18n once decision 4 is implemented — drop them from
@@ -677,7 +677,7 @@ own i18n):
 
 | EN | ET |
 |---|---|
-| Importing… %1 / %2 | (shipped) |
+| Importing… (beside Cancel; "%1 of %2" under the bar, PRO-3564) | (shipped) |
 | Done, %1 of %2 synced. | (shipped) |
 | Done, %1 of %2 synced — %3 failed. | (shipped) |
 | Stopped before an error — %1 of %2 synced so far. Press the import button to run it again. | (shipped) |

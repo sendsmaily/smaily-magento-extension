@@ -11,6 +11,7 @@ namespace Smaily\Connect\Test\Unit\Model\Engine\Payload;
 use Magento\Catalog\Api\CategoryRepositoryInterface;
 use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Catalog\Helper\ImageFactory as ImageHelperFactory;
+use Magento\Catalog\Model\Category;
 use Magento\Catalog\Model\Product;
 use Magento\CatalogInventory\Api\Data\StockItemInterface;
 use Magento\CatalogInventory\Api\StockRegistryInterface;
@@ -342,6 +343,72 @@ class CatalogPayloadBuilderTest extends TestCase
     }
 
     /**
+     * PRO-1952 (contract v1.6.0 §3): a product with no category is sent with
+     * the placeholder `category_path` and `tags.category_defaulted: "true"`,
+     * so the engine derives nothing from the placeholder slug. The delete
+     * tombstone carries the same flag.
+     */
+    public function testProductWithoutACategoryIsMarkedCategoryDefaulted(): void
+    {
+        $builder = $this->createBuilder('42');
+
+        $item = $builder->build($this->product(42, 'SHIRT'));
+        $tombstone = $builder->buildTombstone($this->product(42, 'SHIRT'));
+
+        self::assertSame('uncategorized', $item['category_path']);
+        self::assertSame('true', $item['tags']['category_defaulted']);
+        self::assertSame('true', $tombstone['tags']['category_defaulted']);
+    }
+
+    /**
+     * PRO-1952: a product in a real category sends its path and no flag;
+     * the contract's flag is omit-on-false.
+     */
+    public function testProductInARealCategorySendsNoCategoryDefaultedFlag(): void
+    {
+        $categories = [
+            2 => $this->category(1, '1/2', 'default-category'),
+            5 => $this->category(2, '1/2/5', 'shirts'),
+        ];
+        $categoryRepository = $this->createMock(CategoryRepositoryInterface::class);
+        $categoryRepository->method('get')->willReturnCallback(static fn (int $id) => $categories[$id]);
+
+        $item = $this->createBuilder('42', null, null, null, null, $categoryRepository)
+            ->build($this->product(42, 'SHIRT', 19.99, [], 'https://shop.example/shirt', [5]));
+
+        self::assertSame('shirts', $item['category_path']);
+        self::assertArrayNotHasKey('category_defaulted', $item['tags']);
+    }
+
+    /**
+     * PRO-1952: a product assigned only to the store's root category has no
+     * real category either, so its placeholder is flagged too.
+     */
+    public function testProductOnlyInTheRootCategoryIsMarkedCategoryDefaulted(): void
+    {
+        $categoryRepository = $this->createMock(CategoryRepositoryInterface::class);
+        $categoryRepository->method('get')->willReturn($this->category(1, '1/2', 'default-category'));
+
+        $item = $this->createBuilder('42', null, null, null, null, $categoryRepository)
+            ->build($this->product(42, 'SHIRT', 19.99, [], 'https://shop.example/shirt', [2]));
+
+        self::assertSame('uncategorized', $item['category_path']);
+        self::assertSame('true', $item['tags']['category_defaulted']);
+    }
+
+    private function category(int $level, string $path, string $urlKey): Category&MockObject
+    {
+        $category = $this->createMock(Category::class);
+        $category->method('getLevel')->willReturn($level);
+        $category->method('getPath')->willReturn($path);
+        $category->method('getData')->willReturnCallback(
+            static fn (string $key = '', $index = null) => $key === 'url_key' ? $urlKey : null
+        );
+
+        return $category;
+    }
+
+    /**
      * A store manager whose default store view is store 1 on website 1.
      */
     private function canonicalStoreManager(): StoreManagerInterface&MockObject
@@ -362,7 +429,8 @@ class CatalogPayloadBuilderTest extends TestCase
         ?Emulation $emulation = null,
         ?StoreManagerInterface $storeManager = null,
         ?StockRegistryStorage $stockRegistryStorage = null,
-        ?ProductRepositoryInterface $productRepository = null
+        ?ProductRepositoryInterface $productRepository = null,
+        ?CategoryRepositoryInterface $categoryRepository = null
     ): CatalogPayloadBuilder {
         $parentResolver = $this->createMock(ParentProductResolver::class);
         $parentResolver->method('productIdOf')->with(42)->willReturn($resolvedProductId);
@@ -380,7 +448,7 @@ class CatalogPayloadBuilderTest extends TestCase
         return new CatalogPayloadBuilder(
             $storeManager,
             $productRepository ?? $this->createMock(ProductRepositoryInterface::class),
-            $this->createMock(CategoryRepositoryInterface::class),
+            $categoryRepository ?? $this->createMock(CategoryRepositoryInterface::class),
             $stockRegistry,
             $stockRegistryStorage ?? $this->createMock(StockRegistryStorage::class),
             new ImageHelperFactory(),
@@ -392,13 +460,15 @@ class CatalogPayloadBuilderTest extends TestCase
 
     /**
      * @param int[] $websiteIds
+     * @param int[] $categoryIds
      */
     private function product(
         int $id,
         string $sku,
         float $price = 19.99,
         array $websiteIds = [],
-        string $productUrl = 'https://shop.example/shirt'
+        string $productUrl = 'https://shop.example/shirt',
+        array $categoryIds = []
     ): Product&MockObject {
         $amount = $this->createMock(AmountInterface::class);
         $amount->method('getValue')->willReturn($price);
@@ -415,7 +485,7 @@ class CatalogPayloadBuilderTest extends TestCase
         $product->method('getPriceInfo')->willReturn($priceInfo);
         $product->method('getTypeId')->willReturn('simple');
         $product->method('getAttributeSetId')->willReturn(4);
-        $product->method('getCategoryIds')->willReturn([]);
+        $product->method('getCategoryIds')->willReturn($categoryIds);
         $product->method('getWebsiteIds')->willReturn($websiteIds);
         $product->method('getAttributeText')->willReturn(false);
         $product->method('getData')->willReturnCallback(

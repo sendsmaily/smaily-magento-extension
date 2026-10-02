@@ -44,6 +44,9 @@ class CatalogPayloadBuilder
      */
     public const DEFAULT_CURRENCY = 'EUR';
 
+    /** The `category_path` of a product with no real category (§3 requires one). */
+    private const PLACEHOLDER_CATEGORY = 'uncategorized';
+
     /** Memoized: process-invariant, but read for every product in a backfill. */
     private ?StoreInterface $canonicalStore = null;
 
@@ -86,11 +89,12 @@ class CatalogPayloadBuilder
         $scopeStoreId = $this->storeIdForProduct($product);
         $priceProduct = $this->scopedTo($product, $scopeStoreId);
         $languageValues = $this->languageValues($product, $priceProduct, $scopeStoreId);
+        $categoryPath = $this->categoryPath($product);
 
         $item = [
             'sku' => $this->sku($product),
             'name' => $languageValues['name'],
-            'category_path' => $this->categoryPath($product),
+            'category_path' => $categoryPath ?? self::PLACEHOLDER_CATEGORY,
             'price' => round(
                 (float)$priceProduct->getPriceInfo()->getPrice('final_price')->getAmount()->getValue(),
                 4
@@ -127,7 +131,7 @@ class CatalogPayloadBuilder
             $item['image_url'] = $imageUrl;
         }
 
-        $tags = $this->tags($product, (string)$item['category_path']);
+        $tags = $this->tags($product, (string)$item['category_path'], $categoryPath === null);
         if ($tags) {
             $item['tags'] = $tags;
         }
@@ -407,7 +411,16 @@ class CatalogPayloadBuilder
         return mb_substr($text, 0, 500);
     }
 
-    private function categoryPath(Product $product): string
+    /**
+     * The slug path of the product's deepest category.
+     *
+     * Null when the product has no real category: none assigned, none
+     * loadable, or only the root.
+     *
+     * @param Product $product
+     * @return string|null
+     */
+    private function categoryPath(Product $product): ?string
     {
         $deepest = null;
         $deepestLevel = -1;
@@ -423,7 +436,7 @@ class CatalogPayloadBuilder
             }
         }
         if ($deepest === null) {
-            return 'uncategorized';
+            return null;
         }
 
         $segments = [];
@@ -443,7 +456,7 @@ class CatalogPayloadBuilder
             }
         }
 
-        return $segments ? implode('/', $segments) : 'uncategorized';
+        return $segments ? implode('/', $segments) : null;
     }
 
     private function isInStock(Product $product): bool
@@ -481,7 +494,7 @@ class CatalogPayloadBuilder
     /**
      * @return array<string, string>
      */
-    private function tags(Product $product, string $categoryPath): array
+    private function tags(Product $product, string $categoryPath, bool $categoryDefaulted): array
     {
         $tags = [
             'category_path' => $categoryPath,
@@ -496,6 +509,12 @@ class CatalogPayloadBuilder
         $brand = $product->getAttributeText('manufacturer');
         if (is_string($brand) && trim($brand) !== '') {
             $tags['brand'] = trim($brand);
+        }
+
+        // §3 (v1.6.0): the category_path is a placeholder, so the engine
+        // derives nothing from its slug. Omit-on-false: never "false".
+        if ($categoryDefaulted) {
+            $tags['category_defaulted'] = 'true';
         }
 
         return $tags;

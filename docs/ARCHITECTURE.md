@@ -98,6 +98,11 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   id (`Engine\Payload\ParentProductResolver`: a configurable child resolves
   to its parent's entity id, everything else to its own). It keys the
   engine's product-level removal; the `sku` keying is untouched.
+- `category_path` is the slug path of the product's deepest category. A
+  product with no real category (none assigned, or only the root) is sent
+  with the placeholder `uncategorized` and `tags.category_defaulted:
+  "true"` (contract §3, v1.6.0; omitted otherwise), so the engine derives
+  nothing from the placeholder slug.
 - **Product delete** (`Observer/Engine/ProductDeleteBefore`): a
   parent/standalone hard-delete enqueues one `catalog_remove` row; the
   flusher drains those through its own non-D6 path to

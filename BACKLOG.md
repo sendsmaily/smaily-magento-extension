@@ -62,11 +62,6 @@ executed verification matrix (Luma / Hyvä / strict CSP — all pass) in
   (`GET contact.php?list=1`) is needed at scale.
 - Browse relay rate limiting (the engine rate-limits; a local limiter would
   cut noise from abusive clients).
-- `tags.category_defaulted` on catalog rows (contract §3, v1.6.0): a product
-  with no categories is sent with the literal `category_path:
-  "uncategorized"` — exactly the placeholder case the flag exists for, so
-  the engine currently derives species/`category_canonical`/replenishable
-  from a slug that carries no product meaning.
 
 ## Quality
 

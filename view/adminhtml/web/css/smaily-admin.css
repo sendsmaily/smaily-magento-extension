@@ -1028,6 +1028,10 @@
  * the name only. */
 .smaily-wizard .smaily-steps .smaily-step-sub { display: none; }
 @media (min-width: 1024px) {
+    /* A step shorter than the rail keeps its footer 26px under the content:
+     * the spare height goes below the footer, not between them. */
+    .smaily-wizard #smaily-wizard-main { grid-template-rows: auto 1fr; }
+    .smaily-wizard #smaily-wizard-main > .smaily-footer { align-self: start; }
     .smaily-wizard .smaily-steps li,
     .smaily-wizard .smaily-steps li.active,
     .smaily-wizard .smaily-steps li.done { align-items: flex-start; }

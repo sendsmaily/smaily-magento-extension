@@ -71,7 +71,9 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   import card and the finished-setup summary stay cards, as in the pack.
   The title is 6px above the intro, the intro reads 14px / 1.5 in the
   secondary text colour with 22px below it, and each section ends 26px
-  above the next one and above the footer divider. Settings tabs keep
+  above the next one and above the footer divider — also on a step
+  shorter than the rail (the finished-setup summary), where the rail's
+  spare height used to land between the content and the footer (36px). Settings tabs keep
   their cards (same partials, CSS scoped to `.smaily-wizard`). No
   behaviour change.
   The step rail shows the pack's 11px muted line under each step name

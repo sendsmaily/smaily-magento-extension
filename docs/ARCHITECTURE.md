@@ -481,6 +481,35 @@ the moment the reminder was created, inside the signature; the link expires
 nothing. A link without `ts` (issued before links carried it) is accepted for
 30 days after the tracker row's `mail_sent_at`, and is expired without one.
 
+**Where a guest's email comes from (PRO-3693).** Magento's checkout keeps a
+guest's email in the browser (`quote.guestEmail`) and sends it only with
+set-payment-information / place-order; `isEmailAvailable` saves nothing and
+shipping-information carries no email. So the module captures it, as the
+WooCommerce plugin captures the billing email before submit:
+`view/frontend/web/js/view/form/element/email-mixin.js` (a mixin on
+`Magento_Checkout/js/view/form/element/email`, declared in
+`view/frontend/requirejs-config.js`) posts the address when Magento runs its
+own `checkEmailAvailability()` — only for a value the component validated,
+after its `checkDelay` typing pause — and once at `initialize()` when the
+field opens with an address Magento validated earlier. One request per
+change of the value (shared by every email field on the page), none for a
+signed-in customer, fire-and-forget. The endpoint is the anonymous REST
+route `POST /V1/smaily-connect/guest-carts/:cartId/email` (`etc/webapi.xml`
+→ `Api\GuestCartEmailInterface` → `AbandonedCart\GuestCartEmail`), keyed on
+the masked cart id as Magento's own guest-carts routes are. It writes
+`quote.customer_email` and nothing else, with one UPDATE on the checkout
+connection — the quote model or repository would collect totals and fire the
+quote save events — and only on an active guest cart (`customer_id` null,
+repeated in the UPDATE's WHERE) with items, of a website with the
+abandoned-cart automation on, after `Magento\Framework\Validator\EmailAddress`.
+Every refusal answers `false` without saying why. Abuse guard, in the
+application cache like the browse relay's limiter: 10 requests per
+`RemoteAddress` per 10-minute window, and 5 writes per cart (24 h, the scan's
+age limit). Hyvä's Luma-based checkout runs the same checkout JS, so the mixin
+applies there; Hyvä Checkout and other third-party checkouts are not covered.
+Who is reminded does not change: the automation still goes with
+`force_opt_in=false` (`AutomationHandler`).
+
 **The exit signal (PRO-2453, Woo PRO-1723 parity).** A follow-up series has
 to stop when the shopper buys, and a Smaily-only "has ordered since" rule
 cannot see a repeat buyer's history the way the store can — so the store

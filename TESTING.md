@@ -45,6 +45,22 @@ only because their vendor tree predated 2.2.6. Lift the cap once
 bitexpert/phpstan-magento releases the fix it carries on its unreleased
 `bugfix/autoloader-requires-generated-file-not-source` branch.
 
+## Storefront JS harness
+
+```bash
+bin/test-js.sh              # headless Chrome; CHROME=/path/to/chrome to pick one
+```
+
+Each page under `Test/Js/` loads Magento's own checkout JS from `vendor/`
+(so `composer install` first), applies the module's mixin as
+`view/frontend/requirejs-config.js` declares it, stubs the rest of the
+checkout, and ends with `RESULT: PASS` or `RESULT: FAIL`; the script exits
+non-zero on a failure. `Test/Js/email-mixin.html` drives Magento's checkout
+email component through typing, validation and its typing pause and checks
+when the guest's email goes to the cart (one request per change of a valid
+address, none for an invalid value or a signed-in customer). Chrome's virtual
+time runs the pauses without waiting for them. CI does not run it yet.
+
 ## Integration tests (real MySQL)
 
 The integration suite exercises the module against a real MySQL database:

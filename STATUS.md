@@ -27,6 +27,34 @@ OK). Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3693 — a guest's email reaches the cart as soon as it is typed on
+  Magento's own checkout (2026-10-02, owner-approved design, Woo parity).**
+  Verified in the sandbox before the change: core checkout keeps the guest
+  email in the browser until set-payment-information / place-order, so the
+  scan never saw a guest who left at shipping, although the USER_GUIDE said
+  it did. New: a mixin on `Magento_Checkout/js/view/form/element/email`
+  posts the address when Magento runs `checkEmailAvailability()` (valid
+  value, after the 2 s typing pause) and at `initialize()` for a field that
+  opens with a validated address; one request per change, none when signed
+  in, fire-and-forget. Anonymous REST `POST
+  /V1/smaily-connect/guest-carts/:cartId/email` (`AbandonedCart\GuestCartEmail`)
+  writes `quote.customer_email` only (one UPDATE — no totals collection, no
+  quote save events), on an active guest cart with items whose website has
+  the abandoned-cart automation on (data minimisation — an assumption beyond
+  the approved design, see the report), after Magento's EmailAddress
+  validator; 10 requests / 10 min per `RemoteAddress`, 5 writes per cart
+  (application cache, as the relay's limiter). Who is reminded is
+  unchanged: `force_opt_in=false`, so in every contact-sync mode a guest
+  who leaves at shipping is reminded exactly when Smaily already has the
+  address as a contact that has not unsubscribed. Tests: integration
+  `AbandonedCart\GuestCartEmailTest` (real `quote` + `quote_id_mask` mirrors:
+  set, change, customer / inactive / empty / unknown cart, invalid emails,
+  feature off, rate limit, per-cart cap); JS harness `Test/Js/email-mixin.html`
+  (`bin/test-js.sh`, headless Chrome, Magento's own email component and
+  url-builder from vendor; not in CI). Docs: USER_GUIDE (Abandoned cart,
+  FAQ, Privacy), ARCHITECTURE, HYVA_SUPPORT, TESTING, CHANGELOG. Not yet
+  run in the sandbox (orchestrator's human-acceptance check).
+
 - **PRO-3692 — the catalog import sends the price and sale end date a
   product save sends (2026-10-02).** `EngineCatalogProcessor::loadPage()`
   now also selects `special_from_date`, `special_to_date` and `price_type`.

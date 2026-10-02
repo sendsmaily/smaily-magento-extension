@@ -440,11 +440,32 @@ unsubscribed with this field.
 
 A cart counts as abandoned when it has items and an email address and has
 been idle past the **cutoff** (default 30 minutes, minimum 10). The email can
-come from a signed-in customer, an order in progress, or simply the address a
-guest typed at checkout — so a guest who enters their email and abandons at the
-shipping step is still reminded, without ever reaching the payment step. Carts
-older than 24 hours are never mailed — a recovering cron never blasts stale
-reminders. Each cart is mailed **once**.
+come from a signed-in customer, an order in progress, or the address a guest
+types at checkout. Carts older than 24 hours are never mailed — a recovering
+cron never blasts stale reminders. Each cart is mailed **once**.
+
+**When a guest's cart gets its email.** Magento's own checkout keeps a
+guest's email in the browser until the payment step. While the abandoned-cart
+automation is on, Smaily Connect saves it to the cart earlier: as soon as the
+email field holds a valid address and the guest stops typing for two seconds
+(the moment Magento checks whether the address has an account). A guest who
+types their email and leaves on the shipping step, before clicking **Next**,
+therefore has a cart that can be reminded. This applies to Magento's own
+checkout on Luma-based themes and to Hyvä's Luma-based checkout. On Mageplaza
+One Step Checkout the address reaches the cart as that checkout saves it (see
+[Third-party one-step checkouts](#third-party-one-step-checkouts)). On other
+checkouts, Hyvä Checkout included, a guest's cart gets its email when that
+checkout saves it to the cart — on Magento's flow, at the payment step.
+
+A guest who changes the address changes the cart's address too. To keep the
+checkout from being used to put other people's addresses on carts, one IP
+address can save an email at most 10 times in 10 minutes, and one cart
+takes at most five different addresses; past that, the cart keeps the address
+it has until the guest submits the payment step.
+
+Whether the reminder reaches the guest does not depend on when the email was
+saved: as for every automation, it reaches only a contact Smaily already has
+and never re-subscribes one who unsubscribed (see [Automations](#automations)).
 
 That covers only the reminders Smaily Connect sends. Before you switch the
 abandoned-cart automation on, list which modules in your store send
@@ -947,6 +968,17 @@ card — you do not have to keep the page open:
   through the same queued delivery. It stays off when the shopper also
   opted out of personalized recommendations on their own, under
   **My Account > Personalization** or in Smaily.
+- **A guest's email is stored on the cart before the guest submits it.**
+  While the abandoned-cart automation is on, the email a guest types on
+  Magento's own checkout is saved to the cart (Magento's own customer email
+  field of the cart) once it is a valid address — before the guest clicks
+  **Next** on the shipping step or places the order (see
+  [Abandoned cart](#abandoned-cart)). Nothing is sent to Smaily then: the
+  cart's address reaches Smaily only with a reminder, once the cart is idle
+  past the cutoff. The address stays on the cart until Magento deletes the cart (its
+  **Quote Lifetime** setting under **Stores > Configuration > Sales >
+  Checkout > Shopping Cart**). Mention this in your privacy notice where it
+  describes abandoned-cart reminders.
 - **Data subject requests**:
   `bin/magento smaily:gdpr export <email>` (Art. 15) and
   `bin/magento smaily:gdpr erase <email> --force` (Art. 17, idempotent).
@@ -1009,9 +1041,12 @@ Reconciliation runs every 15 minutes and only in *Subscribers only
 (consent)* mode.
 
 **The abandoned cart email never arrives.** The automation must be enabled
-with a workflow selected; the cart needs an email address (guest carts get
-one at checkout's email step); the cart must be idle past the cutoff but
-younger than 24 h; and each cart is only ever mailed once.
+with a workflow selected; the cart needs an email address (a guest's cart on
+Magento's own checkout gets one two seconds after the guest types a valid
+address in the email field — see [Abandoned cart](#abandoned-cart)); the
+cart must be idle past the cutoff but younger than 24 h; each cart is only
+ever mailed once; and Smaily must already have the address as a contact
+that has not unsubscribed.
 
 **The checkout checkbox doesn't show.** It renders on the Luma/Knockout
 checkout payment step — including Hyvä's default Luma-fallback checkout.

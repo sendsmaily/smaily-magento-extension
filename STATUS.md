@@ -16,6 +16,8 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3666 — the 3.0.0 changelog's admin-home entry once (2026-10-02).** Three merged copies on
+  one line became one entry with every detail any copy carried; no other CHANGELOG bullet repeats.
 - **PRO-3664 — the browse tracker's consent, as in the WooCommerce plugin
   (2026-10-02, owner design "exactly like Woo").** Consent category
   marketing; order: (1) the store's `window.smailyConnect.consentOverride()`

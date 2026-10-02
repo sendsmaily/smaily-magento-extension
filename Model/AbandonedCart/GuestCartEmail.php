@@ -34,17 +34,24 @@ use Smaily\Connect\Model\Config;
  * changed between the read and the write is left alone.
  *
  * The endpoint is anonymous, so it is an obvious way to put someone else's
- * address on carts. Two limits bound it, both in the application cache like
- * the browse relay's: requests per connection address (Magento's
- * RemoteAddress — a forwarding header counts only where the store's own
- * configuration names it), and writes per cart. A reminder still reaches only
- * a contact Smaily already has (force_opt_in=false, AutomationHandler).
+ * address on carts. Three limits bound it, all in the application cache like
+ * the browse relay's (a cache flush resets them): requests per connection
+ * address (Magento's RemoteAddress — a forwarding header counts only where
+ * the store's own configuration names it; an IPv6 address counts by its /64,
+ * the block one subscriber is usually given), writes per cart, and accepted
+ * writes per hour for the whole installation, which bounds a caller spread
+ * over many addresses. Behind a proxy Magento is not told about, every
+ * shopper has the proxy's address, so the per-address limit is then one
+ * limit for the whole store. A reminder still reaches only a contact Smaily
+ * already has (force_opt_in=false, AutomationHandler).
  */
 class GuestCartEmail implements GuestCartEmailInterface
 {
-    public const RATE_LIMIT_PER_WINDOW = 10;
+    public const RATE_LIMIT_PER_WINDOW = 30;
     public const RATE_WINDOW_SECONDS = 600;
     public const MAX_WRITES_PER_CART = 5;
+    public const MAX_WRITES_PER_HOUR = 2000;
+    public const STORE_WINDOW_SECONDS = 3600;
 
     /**
      * The cron reminds only carts younger than 24 h, so a cart's write count
@@ -97,6 +104,12 @@ class GuestCartEmail implements GuestCartEmailInterface
         if ($writes >= self::MAX_WRITES_PER_CART) {
             return false;
         }
+        $storeKey = 'smaily_cart_email_store_'
+            . intdiv($this->dateTime->gmtTimestamp(), self::STORE_WINDOW_SECONDS);
+        $storeWrites = (int)$this->cache->load($storeKey);
+        if ($storeWrites >= self::MAX_WRITES_PER_HOUR) {
+            return false;
+        }
 
         $connection = $this->resourceConnection->getConnection('checkout');
         $updated = $connection->update(
@@ -108,6 +121,7 @@ class GuestCartEmail implements GuestCartEmailInterface
             return false;
         }
         $this->cache->save((string)($writes + 1), $writesKey, [], self::WRITES_TTL_SECONDS);
+        $this->cache->save((string)($storeWrites + 1), $storeKey, [], 2 * self::STORE_WINDOW_SECONDS);
 
         return true;
     }
@@ -161,9 +175,9 @@ class GuestCartEmail implements GuestCartEmailInterface
      */
     private function allowRequest(): bool
     {
-        $ip = (string)$this->remoteAddress->getRemoteAddress();
+        $caller = $this->callerKey((string)$this->remoteAddress->getRemoteAddress());
         $window = intdiv($this->dateTime->gmtTimestamp(), self::RATE_WINDOW_SECONDS);
-        $key = 'smaily_cart_email_' . sha1($ip) . '_' . $window;
+        $key = 'smaily_cart_email_' . sha1($caller) . '_' . $window;
 
         $count = (int)$this->cache->load($key);
         if ($count >= self::RATE_LIMIT_PER_WINDOW) {
@@ -172,5 +186,25 @@ class GuestCartEmail implements GuestCartEmailInterface
         $this->cache->save((string)($count + 1), $key, [], 2 * self::RATE_WINDOW_SECONDS);
 
         return true;
+    }
+
+    /**
+     * What the per-address limit counts by: an IPv4 address as it is, an
+     * IPv6 address by its /64 — one subscriber holds a whole /64 and can
+     * pick a fresh address in it for every request. An IPv4-mapped IPv6
+     * address (::ffff:a.b.c.d) is its IPv4 address: its /64 is the same for
+     * every IPv4 caller.
+     */
+    private function callerKey(string $ip): string
+    {
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false) {
+            return $ip;
+        }
+        $packed = (string)inet_pton($ip);
+        if (str_starts_with($packed, str_repeat("\0", 10) . "\xff\xff")) {
+            return (string)inet_ntop(substr($packed, 12));
+        }
+
+        return bin2hex(substr($packed, 0, 8)) . '/64';
     }
 }

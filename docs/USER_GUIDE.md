@@ -458,10 +458,24 @@ checkouts, Hyvä Checkout included, a guest's cart gets its email when that
 checkout saves it to the cart — on Magento's flow, at the payment step.
 
 A guest who changes the address changes the cart's address too. To keep the
-checkout from being used to put other people's addresses on carts, one IP
-address can save an email at most 10 times in 10 minutes, and one cart
-takes at most five different addresses; past that, the cart keeps the address
-it has until the guest submits the payment step.
+checkout from being used to put other people's addresses on carts, three
+limits apply: one IP address can save an email at most 30 times in 10
+minutes (an IPv6 address counts together with the rest of its /64 block), one
+cart takes at most five different addresses, and the whole installation saves
+at most 2,000 addresses an hour. Past a limit, the cart keeps the address it
+has until the guest submits the payment step.
+
+**Behind a reverse proxy, Varnish or a load balancer**, set Magento up to see
+each shopper's own IP address. Either the web server puts the shopper's
+address in place of the proxy's before Magento runs (nginx `real_ip`, Apache
+`mod_remoteip`), or a `di.xml` tells Magento which forwarding header to read:
+the `alternativeHeaders` argument of
+`Magento\Framework\HTTP\PhpEnvironment\RemoteAddress` (for example
+`HTTP_X_FORWARDED_FOR`), with `trustedProxies` listing the proxy's own
+addresses. Otherwise every shopper reaches Magento from the proxy's address:
+the limit of 30 in 10 minutes is then one limit for the whole store, and once
+it is used up no guest's email is saved to a cart until the next 10 minutes
+begin. Smaily Connect's browse tracking limit counts by the same address.
 
 Whether the reminder reaches the guest does not depend on when the email was
 saved: as for every automation, it reaches only a contact Smaily already has

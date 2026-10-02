@@ -27,6 +27,18 @@ OK). Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3693 follow-through — the security review's findings
+  (2026-10-02, the owner's decisions).** (1) The guest-email endpoint's
+  limits: 30 requests / 10 min per caller (IPv4 as is, IPv6 by its /64, an
+  IPv4-mapped address as its IPv4), 5 writes per cart, and a new ceiling of
+  2000 accepted writes per hour for the whole installation — all in the
+  application cache (a flush resets them). Behind a proxy Magento does not
+  read the forwarding header of, the per-caller limit is one limit for the
+  whole store: the USER_GUIDE now says how to configure the real IP
+  (INSTALLING has no proxy note, so nothing there). Integration
+  `GuestCartEmailTest`: IPv4 limit, IPv6 /64 grouping, IPv4-mapped,
+  store-wide ceiling (2000 real writes on 401 carts), per-cart cap.
+
 - **PRO-3693 — a guest's email reaches the cart as soon as it is typed on
   Magento's own checkout (2026-10-02, owner-approved design, Woo parity).**
   Verified in the sandbox before the change: core checkout keeps the guest
@@ -42,11 +54,11 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   quote save events), on an active guest cart with items whose website has
   the abandoned-cart automation on (data minimisation — an assumption beyond
   the approved design, see the report), after Magento's EmailAddress
-  validator; 10 requests / 10 min per `RemoteAddress`, 5 writes per cart
-  (application cache, as the relay's limiter). Who is reminded is
-  unchanged: `force_opt_in=false`, so in every contact-sync mode a guest
-  who leaves at shipping is reminded exactly when Smaily already has the
-  address as a contact that has not unsubscribed. Tests: integration
+  validator; a per-caller and a per-cart limit (application cache, as the
+  relay's limiter; since retuned, see the follow-through entry above).
+  Who is reminded is unchanged: `force_opt_in=false`, so in every
+  contact-sync mode a guest who leaves at shipping is reminded exactly when
+  Smaily already has the address as a contact that has not unsubscribed. Tests: integration
   `AbandonedCart\GuestCartEmailTest` (real `quote` + `quote_id_mask` mirrors:
   set, change, customer / inactive / empty / unknown cart, invalid emails,
   feature off, rate limit, per-cart cap); JS harness `Test/Js/email-mixin.html`

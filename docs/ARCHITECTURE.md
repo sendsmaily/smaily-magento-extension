@@ -503,9 +503,15 @@ quote save events — and only on an active guest cart (`customer_id` null,
 repeated in the UPDATE's WHERE) with items, of a website with the
 abandoned-cart automation on, after `Magento\Framework\Validator\EmailAddress`.
 Every refusal answers `false` without saying why. Abuse guard, in the
-application cache like the browse relay's limiter: 10 requests per
-`RemoteAddress` per 10-minute window, and 5 writes per cart (24 h, the scan's
-age limit). Hyvä's Luma-based checkout runs the same checkout JS, so the mixin
+application cache like the browse relay's limiter (fixed windows; a cache
+flush resets every counter): 30 requests per caller per 10-minute window —
+the `RemoteAddress` as it is for IPv4, its /64 for IPv6, the IPv4 address for
+an IPv4-mapped one — 5 writes per cart (24 h, the scan's age limit), and 2000
+accepted writes per hour for the whole installation, which bounds a caller
+spread over many addresses. Behind a proxy whose forwarding header Magento is
+not configured to read, every shopper shares the proxy's address, so the
+per-caller limit becomes one limit for the whole store (USER_GUIDE, Abandoned
+cart, says how to configure it). Hyvä's Luma-based checkout runs the same checkout JS, so the mixin
 applies there; Hyvä Checkout and other third-party checkouts are not covered.
 Who is reminded does not change: the automation still goes with
 `force_opt_in=false` (`AutomationHandler`).

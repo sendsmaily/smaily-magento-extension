@@ -184,7 +184,7 @@ class GuestCartEmailTest extends IntegrationTestCase
         self::assertNull($this->emailOf(1));
     }
 
-    public function testOneAddressIsLimitedToTenRequestsInTenMinutes(): void
+    public function testOneAddressIsLimitedToThirtyRequestsInTenMinutes(): void
     {
         $this->seedCart(1, self::MASK);
         $service = $this->service();
@@ -205,6 +205,76 @@ class GuestCartEmailTest extends IntegrationTestCase
         $this->clock->travel(GuestCartEmail::RATE_WINDOW_SECONDS);
         self::assertTrue($service->set(self::MASK, 'again@example.com'));
         self::assertSame('again@example.com', $this->emailOf(1));
+    }
+
+    public function testAnIpv6CallerIsLimitedByItsSlash64(): void
+    {
+        $this->seedCart(1, self::MASK);
+        $service = $this->service();
+
+        // A fresh address in the same /64 for every request is one caller.
+        for ($i = 1; $i <= GuestCartEmail::RATE_LIMIT_PER_WINDOW; $i++) {
+            $this->ip = sprintf('2001:db8:aa:bb:%x::1', $i);
+            $service->set('unknownMask', 'guest@example.com');
+        }
+        $this->ip = '2001:db8:aa:bb:ffff:ffff:ffff:ffff';
+        self::assertFalse($service->set(self::MASK, 'guest@example.com'));
+        self::assertNull($this->emailOf(1));
+
+        // The next /64 is another caller.
+        $this->ip = '2001:db8:aa:bc::1';
+        self::assertTrue($service->set(self::MASK, 'guest@example.com'));
+    }
+
+    public function testAnIpv4MappedAddressCountsAsItsIpv4Address(): void
+    {
+        $this->seedCart(1, self::MASK);
+        $service = $this->service();
+
+        for ($i = 0; $i < GuestCartEmail::RATE_LIMIT_PER_WINDOW; $i++) {
+            $service->set('unknownMask', 'guest@example.com');
+        }
+        $this->ip = '::ffff:203.0.113.7';
+        self::assertFalse($service->set(self::MASK, 'guest@example.com'), 'The same caller as 203.0.113.7');
+
+        // Another IPv4 caller in mapped form is not limited by the first.
+        $this->ip = '::ffff:198.51.100.9';
+        self::assertTrue($service->set(self::MASK, 'guest@example.com'));
+    }
+
+    public function testTheStoreTakesAtMostTwoThousandAddressesAnHour(): void
+    {
+        $carts = intdiv(GuestCartEmail::MAX_WRITES_PER_HOUR, GuestCartEmail::MAX_WRITES_PER_CART) + 1;
+        $rows = [];
+        $masks = [];
+        for ($quoteId = 1; $quoteId <= $carts; $quoteId++) {
+            $rows[] = ['entity_id' => $quoteId, 'store_id' => 1, 'is_active' => 1, 'items_count' => 1];
+            $masks[] = ['quote_id' => $quoteId, 'masked_id' => 'mask' . $quoteId];
+        }
+        $this->connection->insertMultiple('quote', $rows);
+        $this->connection->insertMultiple('quote_id_mask', $masks);
+        $service = $this->service();
+
+        // Every request from its own caller, each cart up to its own cap:
+        // only the store-wide ceiling is left to stop them.
+        $accepted = 0;
+        for ($write = 0; $write < GuestCartEmail::MAX_WRITES_PER_HOUR; $write++) {
+            $this->ip = sprintf('10.%d.%d.1', intdiv($write, 256), $write % 256);
+            $quoteId = intdiv($write, GuestCartEmail::MAX_WRITES_PER_CART) + 1;
+            $accepted += (int)$service->set('mask' . $quoteId, sprintf('guest%d@example.com', $write));
+        }
+        self::assertSame(GuestCartEmail::MAX_WRITES_PER_HOUR, $accepted);
+
+        $this->ip = '192.0.2.1';
+        self::assertFalse($service->set('mask' . $carts, 'one-more@example.com'));
+        self::assertNull($this->emailOf($carts));
+        // The address a cart already has is still answered as set: it writes nothing.
+        self::assertTrue($service->set('mask1', 'guest4@example.com'));
+
+        // The next hour starts a fresh count.
+        $this->clock->travel(GuestCartEmail::STORE_WINDOW_SECONDS);
+        self::assertTrue($service->set('mask' . $carts, 'one-more@example.com'));
+        self::assertSame('one-more@example.com', $this->emailOf($carts));
     }
 
     public function testOneCartTakesAtMostFiveAddresses(): void

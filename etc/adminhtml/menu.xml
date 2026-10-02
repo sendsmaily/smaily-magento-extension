@@ -11,7 +11,11 @@
         <add id="Smaily_Connect::connect" title="Smaily Connect" module="Smaily_Connect"
              sortOrder="70" parent="Magento_Backend::marketing"
              resource="Smaily_Connect::connect"/>
-        <add id="Smaily_Connect::dashboard" title="Dashboard" module="Smaily_Connect"
+        <!-- Not "::dashboard": the menu renders the id's tail as the CSS class
+             (item-dashboard), and Magento's own menu stylesheet puts its
+             Dashboard icon glyph before any .item-dashboard link, which shows
+             as a missing-glyph box in a sub-menu. -->
+        <add id="Smaily_Connect::connect_dashboard" title="Dashboard" module="Smaily_Connect"
              sortOrder="10" parent="Smaily_Connect::connect"
              action="smaily_connect/dashboard" resource="Smaily_Connect::connect"/>
         <add id="Smaily_Connect::wizard" title="Initial setup" module="Smaily_Connect"

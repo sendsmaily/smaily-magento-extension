@@ -46,7 +46,7 @@ class Index extends Action implements HttpGetActionInterface
 
         /** @var Page $page */
         $page = $this->resultFactory->create(ResultFactory::TYPE_PAGE);
-        $page->setActiveMenu('Smaily_Connect::dashboard');
+        $page->setActiveMenu('Smaily_Connect::connect_dashboard');
         $page->getConfig()->getTitle()->prepend((string)__('Smaily Connect — Dashboard'));
 
         return $page;

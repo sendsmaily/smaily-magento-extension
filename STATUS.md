@@ -44,6 +44,12 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   live 2026-10-09. PRO-2460 decided A — contract §3 SKU key stands, PRO-1484
   closed. After the pilot: PRO-2506, PRO-1967, PRO-1198 (Smaily hand-over).
 
+- **PRO-2456 follow-up — the owner's live-sandbox review (2026-10-02).**
+  Marketing > Smaily Connect > Dashboard shows no missing-glyph box: the
+  menu id is now `Smaily_Connect::connect_dashboard`, because Magento turns
+  the id's tail into the menu class and its own `.item-dashboard` rule puts
+  the Dashboard icon glyph before such a link.
+
 - **PRO-3560 done — "Connected" means Smaily accepted the credentials
   (2026-10-02).** Before, the Dashboard and Settings > Connection said
   "Connected" whenever subdomain, username and password were filled in, and

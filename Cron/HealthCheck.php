@@ -12,6 +12,7 @@ use Magento\Framework\FlagManager;
 use Magento\Framework\Notification\NotifierInterface;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\ConsentSource;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Health\QueueHealth;
@@ -23,6 +24,10 @@ use Smaily\Connect\Model\Logger\Logger;
  *   per incident.
  * - Failed queue rows exceed a threshold in 24h -> minor notice at most once
  *   a day.
+ * - Browse tracking on without Magento cookie restriction mode -> minor
+ *   notice once, again after the condition has cleared and come back: the
+ *   tracker then has no consent source the server can see and sends
+ *   nothing unless the store added the consent override (PRO-3664).
  *
  * The flags and the failed-row query are shared with the admin dashboard
  * (ViewModel\Adminhtml\DashboardData) so both surfaces tell the same story.
@@ -31,6 +36,7 @@ class HealthCheck
 {
     public const FLAG_ENGINE_DOWN_SINCE = 'smaily_connect_engine_down_since';
     public const FLAG_ENGINE_NOTIFIED = 'smaily_connect_engine_down_notified';
+    public const FLAG_CONSENT_SOURCE_NOTIFIED = 'smaily_connect_consent_source_notified';
     private const FLAG_TENANT_INACTIVE_NOTIFIED = 'smaily_connect_engine_tenant_inactive_notified';
     private const FLAG_FAILURES_NOTIFIED_AT = 'smaily_connect_failures_notified_at';
 
@@ -44,7 +50,8 @@ class HealthCheck
         private readonly NotifierInterface $notifier,
         private readonly QueueHealth $queueHealth,
         private readonly DateTime $dateTime,
-        private readonly Logger $logger
+        private readonly Logger $logger,
+        private readonly ConsentSource $consentSource
     ) {
     }
 
@@ -52,6 +59,7 @@ class HealthCheck
     {
         $this->checkEngine();
         $this->checkFailureVolume();
+        $this->checkConsentSource();
     }
 
     private function checkEngine(): void
@@ -142,5 +150,28 @@ class HealthCheck
             );
             $this->flagManager->saveFlag(self::FLAG_FAILURES_NOTIFIED_AT, $now);
         }
+    }
+
+    private function checkConsentSource(): void
+    {
+        if (!$this->settings->isBrowseTrackingEnabled()
+            || $this->consentSource->isCookieRestrictionOnEverywhere()
+        ) {
+            $this->flagManager->deleteFlag(self::FLAG_CONSENT_SOURCE_NOTIFIED);
+
+            return;
+        }
+        if ((bool)$this->flagManager->getFlagData(self::FLAG_CONSENT_SOURCE_NOTIFIED)) {
+            return;
+        }
+
+        $this->notifier->addMinor(
+            (string)__('Smaily Connect: browse tracking collects nothing until a consent source is connected'),
+            (string)__(
+                'Browse tracking is on, but Magento’s cookie restriction mode is off, so the tracker sends no browse events — it has no visitor consent to go by. Connect a consent source in one of two ways: switch on Cookie Restriction Mode under Stores > Configuration > General > Web > Default Cookie Settings, or connect your own cookie consent tool with the consent override described in the User Guide (Connecting your cookie consent tool). If your store already has the override, mark this message as read.'
+            ),
+            ConsentSource::GUIDE_URL
+        );
+        $this->flagManager->saveFlag(self::FLAG_CONSENT_SOURCE_NOTIFIED, 1);
     }
 }

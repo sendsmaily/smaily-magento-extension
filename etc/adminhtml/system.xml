@@ -200,7 +200,7 @@
                 <field id="browse_tracking" translate="label comment" type="select" sortOrder="50"
                        showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
                     <label>Storefront Browse Tracking</label>
-                    <comment>Sends anonymized browsing events (product views, searches, cart activity) to the engine. Respects Magento cookie restriction mode. Off by default.</comment>
+                    <comment>Sends anonymized browsing events (product views, searches, cart activity) to the engine, only for visitors who gave marketing consent. Off by default.</comment>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
             </group>

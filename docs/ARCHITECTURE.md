@@ -399,7 +399,7 @@ invoke `bin/magento cron:run` every minute.
 | `smaily_backfill_tick` | every minute | Advance the oldest active import one time-budgeted chunk |
 | `smaily_abandoned_cart` | every 5 min | Scan idle quotes, enqueue automations |
 | `smaily_contact_reconcile` | every 15 min | Smaily→Magento consent mirror |
-| `smaily_health_check` | every 15 min | Engine-down / failure-volume notices |
+| `smaily_health_check` | every 15 min | Engine-down / failure-volume / missing-consent-source notices |
 | `smaily_queue_janitor` | daily 02:20 | Retention pruning (both queues + the abandoned-cart tracker) |
 | `smaily_catalog_resync` | daily 03:40 | Full catalog re-sync — the reconciler for stock/price changes no event can see (CSV import) |
 
@@ -520,7 +520,11 @@ Magento's `user:allowed:save:cookie` (jQuery, Luma), Hyvä's
 `user-allowed-save-cookie` (window) or the documented
 `smaily:consent-changed` (document) — starts it; each flush asks again and
 drops the queue when consent is gone. Campaign-click capture stays
-ungated.
+ungated. Only restriction mode is visible server-side
+(`Model\Engine\ConsentSource`: on in every store view): without it,
+`Cron\HealthCheck` posts a minor admin notice once (again after the
+condition clears and returns), and the browse toggle's note in
+`panel/intelligence.phtml` recommends the two consent sources.
 
 ### Profiling consent
 

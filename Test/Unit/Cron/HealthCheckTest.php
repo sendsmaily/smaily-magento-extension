@@ -15,6 +15,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Cron\HealthCheck;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\ConsentSource;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Health\QueueHealth;
@@ -101,7 +102,104 @@ class HealthCheckTest extends TestCase
             $notifier,
             $queueHealth,
             $dateTime,
-            $this->createMock(Logger::class)
+            $this->createMock(Logger::class),
+            $this->createMock(ConsentSource::class)
+        );
+    }
+
+    /**
+     * Browse tracking on without Magento's cookie restriction mode collects
+     * nothing unless the store added the consent override, so the admin
+     * says so and names both ways to connect a consent source (PRO-3664,
+     * the WooCommerce plugin's needs_consent_api_notice).
+     */
+    public function testBrowseTrackingWithoutCookieRestrictionNamesBothConsentSources(): void
+    {
+        $flags = $this->createMock(FlagManager::class);
+        $flags->method('getFlagData')->willReturn(null);
+        $flags->expects(self::once())->method('saveFlag')
+            ->with(HealthCheck::FLAG_CONSENT_SOURCE_NOTIFIED, 1);
+
+        $notifier = $this->createMock(NotifierInterface::class);
+        $notifier->expects(self::once())->method('addMinor')->with(
+            self::stringContains('until a consent source is connected'),
+            self::logicalAnd(
+                self::stringContains('Cookie Restriction Mode'),
+                self::stringContains('Stores > Configuration > General > Web > Default Cookie Settings'),
+                self::stringContains('consent override')
+            ),
+            ConsentSource::GUIDE_URL
+        );
+
+        $this->createConsentCron(true, false, $flags, $notifier)->execute();
+    }
+
+    public function testTheConsentSourceNoticeIsPostedOnce(): void
+    {
+        $flags = $this->createMock(FlagManager::class);
+        $flags->method('getFlagData')->willReturnCallback(
+            static fn (string $flag) => $flag === HealthCheck::FLAG_CONSENT_SOURCE_NOTIFIED ? 1 : null
+        );
+        $notifier = $this->createMock(NotifierInterface::class);
+        $notifier->expects(self::never())->method('addMinor');
+
+        $this->createConsentCron(true, false, $flags, $notifier)->execute();
+    }
+
+    /**
+     * @dataProvider consentSourcePresentProvider
+     */
+    public function testNoConsentSourceNoticeWhenNothingIsMissing(bool $browseTracking, bool $restrictionOn): void
+    {
+        $flags = $this->createMock(FlagManager::class);
+        $flags->expects(self::once())->method('deleteFlag')
+            ->with(HealthCheck::FLAG_CONSENT_SOURCE_NOTIFIED);
+        $notifier = $this->createMock(NotifierInterface::class);
+        $notifier->expects(self::never())->method('addMinor');
+
+        $this->createConsentCron($browseTracking, $restrictionOn, $flags, $notifier)->execute();
+    }
+
+    /**
+     * @return array<string, array{bool, bool}>
+     */
+    public static function consentSourcePresentProvider(): array
+    {
+        return [
+            'browse tracking off' => [false, false],
+            'cookie restriction mode on' => [true, true],
+        ];
+    }
+
+    private function createConsentCron(
+        bool $browseTracking,
+        bool $restrictionOn,
+        FlagManager&MockObject $flags,
+        NotifierInterface&MockObject $notifier
+    ): HealthCheck {
+        // Not connected: the engine check stays out of the way.
+        $settings = $this->createMock(Settings::class);
+        $settings->method('isConnected')->willReturn(false);
+        $settings->method('isBrowseTrackingEnabled')->willReturn($browseTracking);
+
+        $dateTime = $this->createMock(DateTime::class);
+        $dateTime->method('gmtTimestamp')->willReturn(1_757_000_000);
+
+        $queueHealth = $this->createMock(QueueHealth::class);
+        $queueHealth->method('failedSince')->willReturn(0);
+
+        $consentSource = $this->createMock(ConsentSource::class);
+        $consentSource->method('isCookieRestrictionOnEverywhere')->willReturn($restrictionOn);
+
+        return new HealthCheck(
+            $settings,
+            $this->createMock(Client::class),
+            $flags,
+            $notifier,
+            $queueHealth,
+            $dateTime,
+            $this->createMock(Logger::class),
+            $consentSource
         );
     }
 }

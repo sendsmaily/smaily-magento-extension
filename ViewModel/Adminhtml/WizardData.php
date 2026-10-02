@@ -25,6 +25,7 @@ use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Source\MultilingualMode;
 use Smaily\Connect\Model\Config\Source\SyncMode;
 use Smaily\Connect\Model\ContactSync\Mode;
+use Smaily\Connect\Model\Engine\ConsentSource;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory as MappingCollectionFactory;
@@ -53,7 +54,8 @@ class WizardData implements ArgumentInterface
         private readonly MappingCollectionFactory $mappingCollectionFactory,
         private readonly WebsiteContext $websiteContext,
         private readonly VerifiedCredentials $verifiedCredentials,
-        private readonly ResolverInterface $localeResolver
+        private readonly ResolverInterface $localeResolver,
+        private readonly ConsentSource $consentSource
     ) {
     }
 
@@ -231,6 +233,24 @@ class WizardData implements ArgumentInterface
     public function isEngineRefused(): bool
     {
         return $this->engineSettings->isRefused();
+    }
+
+    /**
+     * Whether the browse tracker's consent comes from Magento's cookie
+     * notice in every store view; otherwise the panel recommends connecting
+     * a consent source (PRO-3664).
+     */
+    public function isCookieRestrictionOnEverywhere(): bool
+    {
+        return $this->consentSource->isCookieRestrictionOnEverywhere();
+    }
+
+    /**
+     * The User Guide section on connecting a cookie consent tool.
+     */
+    public function getConsentGuideUrl(): string
+    {
+        return ConsentSource::GUIDE_URL;
     }
 
     /**

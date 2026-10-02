@@ -506,7 +506,12 @@ without consent, as in the WooCommerce plugin, so a purchase is still
 credited to the email.
 
 So a store with browse tracking on and neither of the first two collects
-no browse events. Connect one of the two:
+no browse events. The admin says so: the note under the browse-tracking
+toggle (Settings > Intelligence and Initial setup step 4) links to both
+ways below, and an admin notification says the same when browse tracking
+is on and cookie restriction mode is off in any store view. A store that
+already uses its own consent function can mark that notification read.
+Connect one of the two:
 
 - **Magento's cookie notice** — switch on Cookie Restriction Mode. Nothing
   else is needed.

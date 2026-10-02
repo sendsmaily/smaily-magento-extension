@@ -34,6 +34,21 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   Amasty and Cookiebot examples, documentation only). Checked with the
   real scripts in a browser harness with stubbed globals (7 scenarios ×
   Luma/Hyvä).
+  Admin (owner addition): the note under the browse-tracking toggle
+  (`panel/intelligence.phtml`, so Settings > Intelligence and the setup's
+  step 4) reads, when cookie restriction mode is off in any store view
+  (`Model\Engine\ConsentSource`), "Browse tracking sends nothing until a
+  consent source is connected: switch on Magento's cookie restriction mode
+  [Stores > Configuration > General > Web], or connect your own cookie
+  consent tool [User Guide]"; when it is on everywhere, "Consent comes from
+  Magento's cookie notice …". `Cron\HealthCheck` posts a minor notice
+  (Read Details → the guide section) under the same condition while browse
+  tracking is on, once per occurrence (flag
+  `smaily_connect_consent_source_notified`, cleared when the condition
+  clears). The server cannot see an override, so a store with one also
+  gets the notice and the "sends nothing" note — the notice says to mark
+  it read; the note stays. EN + ET. Rendered with the real template and
+  stub data, both states × both contexts × EN/ET.
 
 - **PRO-3614 researched — the first pilot store runs a headless storefront
   (2026-10-02).** Magento is its back end only; shoppers buy on a separate

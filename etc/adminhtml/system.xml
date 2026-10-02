@@ -84,7 +84,7 @@
                 <field id="sync_mode" translate="label comment" type="select" sortOrder="20"
                        showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
                     <label>Contact Sync Mode</label>
-                    <comment>Lawful-basis preset. Subscribers only (default): sync only opted-in newsletter subscribers and mirror Smaily unsubscribes back. All customers (legitimate interest): sync every registered customer; Smaily manages suppression. Checkout opt-in only: no account sync, only customers who tick the checkout checkbox.</comment>
+                    <comment>Lawful-basis preset. Subscribers only (default): sync only opted-in newsletter subscribers and mirror Smaily unsubscribes back. All customers (legitimate interest): every registered customer is synced; anyone who has not unsubscribed can receive your emails (soft opt-in). Soft opt-in allows marketing emails only about products similar to those the customer bought, and the customer must have had a clear way to refuse at purchase. Every email needs an unsubscribe link. You are responsible for the legal basis. Checkout opt-in only: no account sync, only customers who tick the checkout checkbox.</comment>
                     <source_model>Smaily\Connect\Model\Config\Source\SyncMode</source_model>
                     <depends><field id="sync_enabled">1</field></depends>
                 </field>

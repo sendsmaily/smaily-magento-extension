@@ -141,6 +141,23 @@ class SyncDispatcherTest extends TestCase
         self::assertLessThanOrEqual($after, $stamp);
     }
 
+    /**
+     * PRO-3616: when the withdrawn reminder never reached Smaily, the marker
+     * creates the contact — and Smaily creates a contact sent without a
+     * status as subscribed. A store unsubscribe therefore travels with it.
+     */
+    public function testTheCartPurchaseMarkerOfAStoreUnsubscribeCarriesTheUnsubscribe(): void
+    {
+        $this->dispatcher->dispatchCartPurchase('shopper@example.com', 1, true);
+
+        $contact = $this->enqueued[0]['payload']['contact'];
+        self::assertSame(
+            ['email', Trigger::ABANDONED_CART_PURCHASED_FIELD, 'is_unsubscribed'],
+            array_keys($contact)
+        );
+        self::assertSame(1, $contact['is_unsubscribed']);
+    }
+
     public function testContactSyncCarriesNoMarker(): void
     {
         $this->payloadBuilder->method('build')->willReturn(['email' => 'shopper@example.com']);

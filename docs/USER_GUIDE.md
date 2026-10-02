@@ -222,7 +222,7 @@ if Smaily is briefly unreachable — deliveries retry with backoff).
 | Mode | Who is synced | Smaily unsubscribes mirror back? |
 |---|---|---|
 | **Subscribers only (consent)** — default | Only opted-in newsletter subscribers | **Yes** — a contact who unsubscribes in Smaily is unsubscribed in Magento too (and vice versa) |
-| All customers (legitimate interest) | Every registered customer, as a soft opt-in: `is_unsubscribed` is omitted, so a customer new to Smaily becomes a subscriber and a contact Smaily already has keeps its status. A customer who unsubscribes in the store is sent as unsubscribed | No |
+| All customers (legitimate interest) | Every registered customer, as a soft opt-in: `is_unsubscribed` is omitted, so a customer new to Smaily becomes a subscriber and a contact Smaily already has keeps its status. A customer who unsubscribes in the store is sent as unsubscribed, and so is every later send for them (a profile save, a guest order from that email) | No |
 | Checkout opt-in only | Nobody automatically — only shoppers who tick the checkout newsletter checkbox. A signup through the newsletter form, the admin or the API alone is not synced; an unsubscribe in the store is | No |
 
 With Magento's **Need to Confirm** newsletter option on, a checkout opt-in
@@ -332,7 +332,8 @@ abandoned a cart — an ordinary purchase writes nothing and creates no contact.
 The reminder's cart and product fields are left exactly as the reminder wrote
 them. If the shopper buys before the reminder has gone out, the reminder is
 dropped instead: the Log row is closed without being sent, its response reading
-`cancelled`.
+`cancelled`. A shopper who unsubscribed in the store is sent as unsubscribed
+with this field, so a contact it creates in Smaily is never a subscriber.
 
 ## Abandoned cart
 

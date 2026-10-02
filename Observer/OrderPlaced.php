@@ -11,6 +11,8 @@ namespace Smaily\Connect\Observer;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Newsletter\Model\Subscriber;
+use Magento\Newsletter\Model\SubscriberFactory;
 use Magento\Newsletter\Model\SubscriptionManagerInterface;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
@@ -40,7 +42,8 @@ class OrderPlaced implements ObserverInterface
         private readonly OrderCollectionFactory $orderCollectionFactory,
         private readonly StoreManagerInterface $storeManager,
         private readonly SubscriptionManagerInterface $subscriptionManager,
-        private readonly StorefrontSubscription $storefrontSubscription
+        private readonly StorefrontSubscription $storefrontSubscription,
+        private readonly SubscriberFactory $subscriberFactory
     ) {
     }
 
@@ -98,7 +101,11 @@ class OrderPlaced implements ObserverInterface
             return;
         }
 
-        $this->dispatcher->dispatchCartPurchase($email, $storeId);
+        $this->dispatcher->dispatchCartPurchase(
+            $email,
+            $storeId,
+            $this->isUnsubscribedInStore($email, $websiteId)
+        );
     }
 
     private function syncContact(
@@ -132,14 +139,29 @@ class OrderPlaced implements ObserverInterface
         }
 
         // Guest-email inclusion without explicit opt-in (mode-driven toggle):
-        // is_unsubscribed is omitted so Smaily's own suppression state rules.
-        // Only a mode that needs no opt-in (legitimate interest) sends it; in
-        // the consent and checkout-only modes a guest reaches Smaily only
-        // through the opt-in above (PRO-3606).
+        // is_unsubscribed is omitted (soft opt-in) unless the store knows the
+        // email unsubscribed — Smaily would create it as a subscriber
+        // (PRO-3616). Only a mode that needs no opt-in (legitimate interest)
+        // sends it; in the consent and checkout-only modes a guest reaches
+        // Smaily only through the opt-in above (PRO-3606).
         $isGuest = (bool)$order->getCustomerIsGuest();
         if ($isGuest && $this->mode->includeGuests($websiteId) && !$this->mode->requiresOptin($websiteId)) {
-            $this->dispatcher->dispatchContactSync($email, $storeId, null, null);
+            $isUnsubscribed = $this->isUnsubscribedInStore($email, $websiteId) ? true : null;
+            $this->dispatcher->dispatchContactSync($email, $storeId, $isUnsubscribed, null);
         }
+    }
+
+    /**
+     * Whether the email's newsletter record on this website — a guest's or a
+     * customer's — says it unsubscribed.
+     */
+    private function isUnsubscribedInStore(string $email, int $websiteId): bool
+    {
+        $status = (int)$this->subscriberFactory->create()
+            ->loadBySubscriberEmail($email, $websiteId)
+            ->getStatus();
+
+        return $status === Subscriber::STATUS_UNSUBSCRIBED;
     }
 
     private function triggerFirstOrder(OrderInterface $order, string $email, int $storeId, int $websiteId): void

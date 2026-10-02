@@ -11,6 +11,7 @@ namespace Smaily\Connect\Test\Unit\Observer;
 use Magento\Framework\Event;
 use Magento\Framework\Event\Observer;
 use Magento\Newsletter\Model\Subscriber;
+use Magento\Newsletter\Model\SubscriberFactory;
 use Magento\Newsletter\Model\SubscriptionManagerInterface;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
@@ -31,9 +32,17 @@ use Smaily\Connect\Observer\OrderPlaced;
  *
  * PRO-3606: a guest order's email reaches Smaily without the opt-in only in
  * the all-customers mode.
+ *
+ * PRO-3616: an email the store knows as unsubscribed is never sent without
+ * a status — Smaily would create it as a subscriber.
  */
 class OrderPlacedTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        require_once __DIR__ . '/../Support/Stub/SubscriberFactory.php';
+    }
+
     /**
      * @dataProvider customerIdProvider
      */
@@ -100,21 +109,103 @@ class OrderPlacedTest extends TestCase
         ];
     }
 
+    /**
+     * PRO-3616: under all customers, a guest order from an email that
+     * unsubscribed in the store is sent as unsubscribed; one the store knows
+     * of no unsubscribe for is still sent without a status (soft opt-in).
+     *
+     * @dataProvider guestStatusProvider
+     */
+    public function testAGuestOrderUnderAllCustomersCarriesAStoreUnsubscribe(int $status, ?bool $expected): void
+    {
+        $dispatcher = $this->createMock(SyncDispatcher::class);
+        $dispatcher->method('websiteId')->willReturn(1);
+        $dispatcher->expects(self::once())->method('dispatchContactSync')
+            ->with('person@example.com', 1, $expected, null);
+
+        $this->observer(
+            $this->createMock(SubscriptionManagerInterface::class),
+            new StorefrontSubscription(),
+            SyncMode::MODE_LEGITIMATE_INTEREST,
+            false,
+            $dispatcher,
+            $status
+        )->execute($this->eventFor(0));
+    }
+
+    /**
+     * @return array<string, array{0: int, 1: ?bool}>
+     */
+    public static function guestStatusProvider(): array
+    {
+        return [
+            'unsubscribed in the store' => [Subscriber::STATUS_UNSUBSCRIBED, true],
+            'no newsletter record' => [0, null],
+            'waiting for confirmation' => [Subscriber::STATUS_NOT_ACTIVE, null],
+        ];
+    }
+
+    /**
+     * PRO-3616: the abandoned-cart purchase marker can create the contact
+     * when the withdrawn reminder never reached Smaily, so an email that
+     * unsubscribed in the store carries its unsubscribe.
+     *
+     * @dataProvider cartPurchaseProvider
+     */
+    public function testTheCartPurchaseMarkerCarriesAStoreUnsubscribe(int $status, bool $expected): void
+    {
+        $dispatcher = $this->createMock(SyncDispatcher::class);
+        $dispatcher->method('websiteId')->willReturn(1);
+        $dispatcher->expects(self::once())->method('dispatchCartPurchase')
+            ->with('person@example.com', 1, $expected);
+
+        $this->observer(
+            $this->createMock(SubscriptionManagerInterface::class),
+            new StorefrontSubscription(),
+            SyncMode::MODE_CONSENT,
+            false,
+            $dispatcher,
+            $status,
+            StateManager::STATUS_MAILED
+        )->execute($this->eventFor(42));
+    }
+
+    /**
+     * @return array<string, array{0: int, 1: bool}>
+     */
+    public static function cartPurchaseProvider(): array
+    {
+        return [
+            'unsubscribed in the store' => [Subscriber::STATUS_UNSUBSCRIBED, true],
+            'subscribed' => [Subscriber::STATUS_SUBSCRIBED, false],
+            'no newsletter record' => [0, false],
+        ];
+    }
+
     private function observer(
         SubscriptionManagerInterface $subscriptionManager,
         StorefrontSubscription $storefrontSubscription,
         string $mode = SyncMode::MODE_CONSENT,
         bool $optedIn = true,
-        ?SyncDispatcher $dispatcher = null
+        ?SyncDispatcher $dispatcher = null,
+        int $subscriberStatus = 0,
+        string $cartStatus = ''
     ): OrderPlaced {
         $config = $this->createMock(Config::class);
         $config->method('isConnected')->willReturn(true);
         $config->method('isSyncEnabled')->willReturn(true);
         $config->method('getSyncMode')->willReturn($mode);
         $config->method('includeGuests')->willReturn(true);
+        $config->method('isAbandonedCartEnabled')->willReturn(true);
 
         $stateManager = $this->createMock(StateManager::class);
-        $stateManager->method('rowForQuote')->willReturn(['status' => '', 'newsletter_optin' => $optedIn]);
+        $stateManager->method('rowForQuote')->willReturn(['status' => $cartStatus, 'newsletter_optin' => $optedIn]);
+
+        $subscriber = $this->createMock(Subscriber::class);
+        $subscriber->method('loadBySubscriberEmail')->with('person@example.com', 1)->willReturnSelf();
+        $subscriber->method('getStatus')->willReturn($subscriberStatus);
+        $subscriberFactory = $this->createMock(SubscriberFactory::class);
+        $subscriberFactory->method('create')->willReturn($subscriber);
 
         if ($dispatcher === null) {
             $dispatcher = $this->createMock(SyncDispatcher::class);
@@ -129,7 +220,8 @@ class OrderPlacedTest extends TestCase
             $this->createMock(OrderCollectionFactory::class),
             $this->createMock(StoreManagerInterface::class),
             $subscriptionManager,
-            $storefrontSubscription
+            $storefrontSubscription,
+            $subscriberFactory
         );
     }
 

@@ -22,8 +22,9 @@ use Smaily\Connect\Model\Multilingual\LanguageResolver;
  *
  * Always sent: email, store, store_group, store_website (human-readable
  * names, legacy-compatible), language. is_unsubscribed is included only when
- * explicitly known ($isUnsubscribed null = omitted — in legitimate-interest
- * mode Smaily owns suppression). Optional fields follow the merchant's
+ * explicitly known ($isUnsubscribed null = omitted: Smaily keeps an existing
+ * contact's status and creates a new contact as subscribed — the soft opt-in
+ * of the all-customers mode). Optional fields follow the merchant's
  * sync_fields selection; empty source values are OMITTED because Smaily
  * treats absent (keep) and empty (wipe) differently.
  */

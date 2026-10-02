@@ -80,18 +80,25 @@ class SyncDispatcher
      * own cart and product fields are left exactly as the reminder wrote
      * them. Stamped here, at the order-placed moment, for the same reason
      * dispatchAutomation() stamps its marker at the trigger.
+     *
+     * A withdrawn reminder never reached Smaily, so this send can create the
+     * contact, and Smaily creates a contact sent without a status as
+     * subscribed: an email the store knows as unsubscribed carries
+     * is_unsubscribed=1 (PRO-3616). Otherwise the status is omitted and the
+     * contact keeps the one it has.
      */
-    public function dispatchCartPurchase(string $email, int $storeId): void
+    public function dispatchCartPurchase(string $email, int $storeId, bool $unsubscribedInStore = false): void
     {
         $this->eventQueue->cancelPendingAutomation(Trigger::ABANDONED_CART, $email);
 
-        $this->enqueueContactSync(
-            [
-                'email' => $email,
-                Trigger::ABANDONED_CART_PURCHASED_FIELD => gmdate(Trigger::MARKER_STAMP_FORMAT),
-            ],
-            $storeId
-        );
+        $contact = [
+            'email' => $email,
+            Trigger::ABANDONED_CART_PURCHASED_FIELD => gmdate(Trigger::MARKER_STAMP_FORMAT),
+        ];
+        if ($unsubscribedInStore) {
+            $contact['is_unsubscribed'] = 1;
+        }
+        $this->enqueueContactSync($contact, $storeId);
     }
 
     /**

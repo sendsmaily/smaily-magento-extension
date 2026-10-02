@@ -134,8 +134,12 @@ the store uses cookie restriction mode, accept the cookie notice first).
    **Settings > Intelligence** say plainly when the Campaign Intelligence
    account is not active (fixed on the Smaily side, then **Check again**).
 5. Rollback if the pilot must stop: `docs/INSTALLING.md` § Disabling or
-   removing the module — note it drops the `smaily_*` tables unless
-   `--safe-mode=1` is used.
+   removing the module — note it drops the six `smaily_*` tables (queues,
+   Log, abandoned-cart tracker, automation mapping, import progress, order
+   attribution). With `--safe-mode=1` it still drops them but keeps a CSV
+   copy of every table with rows, which `setup:upgrade --data-restore=1`
+   loads back after re-enabling (verified on a clean sandbox, 2026-10-02).
+   Settings in `core_config_data` are kept either way.
 
 Record the outcome (ticked items, anything red, the row's **Last Error**
 without personal data) in the PRO-2474 report to the orchestrator.

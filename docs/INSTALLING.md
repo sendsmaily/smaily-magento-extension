@@ -58,6 +58,11 @@ Check the result: `app/code/Smaily/Connect/registration.php` and
 `app/code/Smaily/Connect/<something>/registration.php` instead, the files
 landed one folder too deep — move them up.
 
+`app/code` must be a real directory inside the Magento root. If it is a
+symlink to a folder outside the root, production-mode
+`setup:static-content:deploy` cannot read the module's files and stops
+with "The contents from the … file can't be read".
+
 ## 3. Enable and set up
 
 **Production mode** (check with `bin/magento deploy:mode:show`):
@@ -152,9 +157,12 @@ mapping, historical-import progress and order attribution. Your settings
 (connection, contact sync, automations) live in Magento's configuration
 and are kept.
 
-To keep a copy of the table contents, add `--safe-mode=1`: Magento writes
-each dropped table to CSV under `var/declarative_dumps_csv/`, and
-`--data-restore=1` on the `setup:upgrade` after re-enabling loads it back.
+To keep a copy of the table contents, add `--safe-mode=1`: Magento still
+drops the tables, but first writes every table that has rows to CSV under
+`var/declarative_dumps_csv/` (empty tables get no file — they come back
+empty). `--data-restore=1` on the `setup:upgrade` after re-enabling loads
+the rows back and empties that folder, so copy it elsewhere first if you
+also want a backup that outlives the restore.
 
 ```bash
 bin/magento maintenance:enable                 # production mode

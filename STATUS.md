@@ -5,7 +5,11 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-3560 — "Connected" on the Dashboard and in
+_Last updated: 2026-10-02 (PRO-2474 — the release ZIP installs on a clean
+Magento 2.4.8-p4 in production mode exactly as `docs/INSTALLING.md` says;
+the update and disable/restore paths work, and the runbook now says what
+`--safe-mode=1` really keeps; only the rc1 tag on Erkki's go remains.
+Earlier the same day: PRO-3560 — "Connected" on the Dashboard and in
 the Connection status now means Smaily accepted the saved credentials at the
 last real check, and the Dashboard has a "Not connected" verdict. Earlier the
 same day: PRO-2456 — the admin was checked against the
@@ -35,8 +39,8 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
 
 - **Next session opens here (2026-10-02).** Queue: ~~PRO-2456~~ (design-pack
   fidelity, done before rc1 — Erkki 2026-10-02) → **PRO-2474** (pilot readiness:
-  ZIP install on a clean sandbox, runbook, pilot-day checklist, rc1 tag on
-  Erkki's go). Milestones: rc1 tagged + pilot runbook 2026-10-03, pilot store
+  ZIP install on a clean sandbox, runbook and pilot-day checklist done; rc1
+  tag on Erkki's go remains). Milestones: rc1 tagged + pilot runbook 2026-10-03, pilot store
   live 2026-10-09. PRO-2460 decided A — contract §3 SKU key stands, PRO-1484
   closed. After the pilot: PRO-2506, PRO-1967, PRO-1198 (Smaily hand-over).
 
@@ -67,12 +71,35 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   connection." / "Smaily kasutajaandmed puuduvad või Smaily pole neid vastu
   võtnud — kontrolli neid jaotises Seaded > Ühendus ja testi ühendust."
   Gates: 318 unit, phpcs 0 errors, phpstan `[OK]`, integration 87.
-  **Not yet run:** the sandbox walk (no credentials / placeholder
-  credentials) and sandbox `setup:upgrade` + `setup:di:compile` +
-  static-content deploy — starting the sandbox from the worker was not
-  permitted; the orchestrator runs them before merge.
+  Sandbox walk done on the ZIP-installed store (PRO-2474 run below), en_US
+  + et_EE: missing credentials → "Not connected" verdict and card;
+  placeholder credentials Smaily refuses (404, unknown subdomain) → neither
+  the Dashboard nor Settings > Connection says Connected; an accepted check
+  simulated with `VerifiedCredentials::accept()` on the saved values → both
+  say Connected. Observation: Settings > Connection renders "Not connected"
+  until the panel script fills in the real status, so a verified store
+  shows it for a moment on load.
 
-- **PRO-2474 progress (2026-10-02): runbook + pilot-day checklist written.**
+- **PRO-2474 progress (2026-10-02): the release ZIP installs on a clean
+  Magento — only the rc1 tag on Erkki's go remains.** The 3.0.0-rc1 ZIP
+  (VERIFY OK, 338 entries, `sha256sum -c` OK) was installed on fresh
+  sandbox volumes with the module mount removed (scratch compose override,
+  not committed), in production mode, running `docs/INSTALLING.md`
+  verbatim: maintenance:enable → module:enable → setup:upgrade →
+  setup:di:compile → setup:static-content:deploy en_US et_EE →
+  maintenance:disable → cache:flush, all exit 0. Module enabled, six
+  `smaily_*` tables, `cron:run --group smaily_connect` leaves `success`
+  rows, the four admin entries open (Initial setup first), the "ready to
+  set up" system message shows. Update path (fresh extraction + the same
+  commands, production and default mode): settings byte-identical
+  afterwards. Disable with `--safe-mode=1`: tables 6 → 0, settings kept,
+  CSV only for tables with rows; re-enable with `--data-restore=1`: 6
+  tables, the seeded row back. Runbook corrections: `app/code` must be a
+  real directory (the sandbox's sample-data symlink made production static
+  deploy fail — TESTING.md now has the clean-install procedure), and what
+  `--safe-mode=1` / `--data-restore=1` really keep. Sandbox returned to the
+  normal mounted dev setup, default mode, test data removed.
+- **PRO-2474 earlier (2026-10-02): runbook + pilot-day checklist written.**
   `docs/INSTALLING.md` (public, linked from README and the User Guide's
   manual-install section) is the ZIP install runbook: verify with the
   `.sha256`, extract flat into `app/code/Smaily/Connect`, production vs
@@ -84,8 +111,9 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   and offers `--safe-mode=1` / `--data-restore=1`. `PILOT_CHECKLIST.md`
   (repo root, internal) is Erkki's pilot-day smoke list; it is excluded from
   the release ZIP and `bin/verify-release-zip.sh` now forbids it (local run:
-  VERIFY OK, 338 entries, `absent: pilot checklist`). Remaining for PRO-2474:
-  run the runbook on a clean sandbox, then the rc1 tag on Erkki's go.
+  VERIFY OK, 338 entries, `absent: pilot checklist`). Remaining for PRO-2474
+  then: run the runbook on a clean sandbox (done, above), then the rc1 tag
+  on Erkki's go.
   Pre-tag packaging fixes: `TESTING.md` and a worktree's `.git` pointer file
   no longer ship (both forbidden by the verifier; worktree run: VERIFY OK,
   336 entries); the User Guide names the browse-tracking toggle by its admin label.

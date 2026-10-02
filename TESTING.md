@@ -223,3 +223,71 @@ accepted item, not a defect: the Marketplace's packaging guide requires
 `version` and `Model\ModuleVersion` reads it for the admin's post-upgrade
 notice. CI therefore runs plain `composer validate`; do not "fix" the warning
 by dropping the field.
+
+### Clean install from the ZIP
+
+The install runbook, [docs/INSTALLING.md](docs/INSTALLING.md), is checked
+against the built ZIP on a fresh sandbox — not against the bind-mounted
+working tree, which is not what a merchant installs.
+
+1. **Start the sandbox without the module mount.** Keep a compose override
+   outside the repository (it is not committed) that replaces the
+   `magento2` volume list without the working-tree mount:
+
+   ```yaml
+   # e.g. /tmp/compose.zip-install.yaml
+   services:
+     magento2:
+       volumes: !override
+         - data:/var/www/html
+         - ./.sandbox/entrypoint.sh:/entrypoint.sh:ro
+   ```
+
+   ```bash
+   docker compose -f docker-compose.yaml -f /tmp/compose.zip-install.yaml up -d
+   docker exec magento2 bash -c 'cd /var/www/html && bin/magento module:status Smaily_Connect'
+   # Smaily_Connect : Module does not exist
+   ```
+
+   On fresh volumes this installs Magento without the module. On a used
+   data volume, remove the module from it first.
+
+2. **Give `app/code` a real directory.** The sample-data step links the
+   sandbox's `app/code` to `/sample-data/app/code`, outside the Magento
+   root, and production-mode static deployment cannot read a module there.
+   A real store keeps `app/code` inside the root, so do the same:
+
+   ```bash
+   docker exec magento2 bash -c 'cd /var/www/html && rm app/code && cp -a /sample-data/app/code app/code'
+   ```
+
+3. **Production mode**, as a live store runs:
+   `bin/magento deploy:mode:set production --skip-compilation`.
+
+4. **Run the runbook as written:** copy the ZIP and its `.sha256` into the
+   container (`docker cp`), then follow steps 1–5 of
+   [docs/INSTALLING.md](docs/INSTALLING.md) as `www-data` from
+   `/var/www/html` — `sha256sum -c`, extract, the production command
+   sequence with `setup:static-content:deploy en_US et_EE`,
+   `cron:run --group smaily_connect`, the admin checks. Then the update
+   section (a fresh extraction of the ZIP and the step 3 commands again)
+   and the disable section with `--safe-mode=1`, followed by re-enabling
+   with `--data-restore=1`.
+
+What a passing run shows: `module:status` answers `Module is enabled`;
+six `smaily_*` tables exist; `cron_schedule` has `success` rows for the
+`smaily_*` jobs; **Marketing > Smaily Connect** lists Dashboard, Initial
+setup, Settings and Log, and each opens Initial setup until the setup is
+completed; after an update the settings are unchanged; disabling drops the
+six tables, and re-enabling with `--data-restore=1` brings them back with
+their rows.
+
+Afterwards return to the normal sandbox: remove `app/code/Smaily` from the
+container, then `docker compose up -d` without the override recreates the
+container with the working-tree mount (the real `app/code` directory works
+with it). Run `bin/magento deploy:mode:set default` first if the sandbox
+should not stay in production mode.
+
+Last full run: 3.0.0-rc1 on Magento 2.4.8-p4, 2026-10-02 — every step
+passed in production mode; the developer/default-mode update sequence
+was run as well.

@@ -5,61 +5,31 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-3575 (setup address and subdomain) — the engine setup URL must be an https address on intelligence.smaily.com and the exchange reply is stored only when every address in it is too; the Smaily subdomain must be a plain subdomain, refused on save and on Test Connection with no request sent. Earlier the same day: PRO-3575 (opt-out record) — the profiling opt-out record is keyed by an HMAC of the address with the store's crypt key; entries under the earlier plain hash or a rotated key stay readable and move to the current key on their next change. Earlier the same day: PRO-3575 (cart restore link) — an abandoned-cart restore link expires 30 days after the reminder is created and then opens the cart page with a notice, restoring nothing. Earlier the same day: PRO-3575 (2.8.x settings) — once the 2.8.x settings are migrated, the upgrade deletes every `smaily/*` config row at every scope, the plain-text password among them; going back to 2.8.x starts with empty settings. Earlier the same day: PRO-3619 — recording a profiling choice writes it only to a contact Smaily already has, so it never creates or subscribes a Smaily contact; the abandoned-cart purchase marker goes only to a shopper whose reminder went out to Smaily. Earlier the same day: PRO-3575 (browse relay) — the storefront browse relay rate-limits by the connection's own address, forwards each batch in one short attempt with no retry or wait, and forwards no customer identifier from the browser; every engine call has a connect timeout and a requested back-off is honoured up to 60 s. Earlier the same day: PRO-3583 follow-up — Settings > Intelligence shows the Campaign Intelligence introduction only until the engine is connected; the setup step always shows it. Earlier the same day: PRO-3616 — under "All customers" a customer or guest who unsubscribed in the store is sent as unsubscribed on a profile save, a guest order and the abandoned-cart purchase marker, so Smaily never creates them as a subscriber. Earlier the same day: PRO-3610 — "All customers" is the soft opt-in: the contact import sends a customer who is not a newsletter subscriber without a subscription status, and the mode card says what soft opt-in requires, in EN + ET. Earlier the same day: PRO-3606 — under checkout opt-in only, a newsletter-form signup alone no longer reaches Smaily; under subscribers only, a guest order's email reaches Smaily only with the checkout opt-in, whatever "Include guest order emails" says. Earlier the same day: PRO-1965 + PRO-1963 — the Log's Details show the payload each attempt really sent and the server's real reply, on both queues, and a retry no longer erases the evidence of the attempt before it. Earlier the same day: PRO-3594 — subscribing again switches profiling back on when the opt-out came only from unsubscribing; a profiling opt-out of the shopper's own stays. PRO-3578 simplification pass — the profiling-consent code is tighter, behaviour unchanged. Earlier the same day: PRO-3602 — the update deletes the retired force opt-in setting's stored value at every scope. Earlier the same day: PRO-3583 — Initial setup step 4 and Settings > Intelligence introduce Campaign Intelligence with the siblings' agreed text, the paid add-on note and the €250/month price, in EN + ET. Earlier the same day: PRO-3582 — the contact import sends the audience of the website's contact-sync mode, each contact with its real subscription status, and the import estimate counts that audience. Earlier the same day: PRO-3591 — My Account > Personalization shows a preference only when the store knows it, otherwise an opt-out button. PRO-3579 — My Account > Personalization appears only where Campaign Intelligence is live, and a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-3579 — My Account > Personalization appears only where Campaign Intelligence is live, and a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-3579 — a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-1952 — a product with no real category is synced with `tags.category_defaulted: "true"`. Earlier the same day: PRO-3581 — uninstalling the module removes its settings, the Smaily password and the engine key included, and its flag rows, the profiling opt-out record included; disabling keeps everything. Earlier the same day: PRO-3584 — an over-long or malformed visitor token, context or session id is dropped on its own; the order keeps every other attribution signal. Earlier the same day: PRO-3580 — the welcome automation fires only for a subscription the shopper makes on the storefront, a resubscription included; not for one made in the admin, through the API or by an import. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out, and an opt-out made in Smaily reaches the engine. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
-and the Dashboard fill the content area on the pack's grey pane under a
-full-width white tab strip, in Magento's Open Sans, with 33 px buttons and
-our own text, link and status colours. Earlier the same day: PRO-3572 — a
-network failure on a Smaily or
-engine call no longer carries a contact's email into the log, a queue row's
-last error or the admin: the request URL in Guzzle's message is masked.
-Earlier the same day: PRO-3571 — the Log page has no logging-level
-control any more; the log stays at errors only unless a developer runs
-`bin/magento config:set smaily_connect/logging/verbosity debug|info|error`.
-Earlier the same day: PRO-2456 follow-up — five defects from Erkki's
-live-sandbox review fixed: the Dashboard menu glyph, the contact import
-block, checkbox alignment, the Intelligence connected state and the
-Overview step, which now leads on to the Dashboard or Settings. Earlier
-the same day: PRO-2474 — the release ZIP installs on a clean
-Magento 2.4.8-p4 in production mode exactly as `docs/INSTALLING.md` says;
-the update and disable/restore paths work, and the runbook now says what
-`--safe-mode=1` really keeps; only the rc1 tag on Erkki's go remains.
-Earlier the same day: PRO-3560 — "Connected" on the Dashboard and in
-the Connection status now means Smaily accepted the saved credentials at the
-last real check, and the Dashboard has a "Not connected" verdict. Earlier the
-same day: PRO-2456 — the admin was checked against the
-design pack in en_US + et_EE; twelve visual deviations are fixed, the
-larger ones are listed for Stories, and the pack is no longer tracked in the
-repository. Earlier the same day: PRO-2474 — the ZIP install runbook and the
-pilot-day checklist are written; CLAUDE.md anchors on the two Magento Epics — v3
-rewrite and UI/UX parity — and names their outcome gauges; queue set for
-the pilot; `composer.lock` refreshed, gates unchanged. Previous session, 2026-09-11: PRO-2472 — the release train's packaging
-leftovers are closed: the checksum ships with the release, the module
-manifest and the composer manifest agree, and MSI is documented as optional.
-Earlier the same day: PRO-2476 — the sandbox admin logs in without a
-second factor again, on the running sandbox and on every boot. Earlier the
-same day: PRO-2454 — the Log says what the server said,
-offers "Send again" only where it is safe, and labels a withdrawn reminder
-as withdrawn. Earlier the same day: PRO-1458 — a product outside the default
-website is now priced and linked at a website it actually belongs to;
-verified on a two-website sandbox. Previous session, 2026-09-10: parity sweep vs
-Woo/Shopify, doc reconcile; release gates PRO-1400 + PRO-1484 verified on a
-clean sandbox install; PRO-2451, PRO-2452, PRO-2453, PRO-2467 landed; the
-3.0.0-rc1 release train ran and closed out — the package ships no `docs/`,
-the `composer validate --strict` version warning is accepted; PRO-2473
-committed `composer.lock`; PRO-1748 adopted the shared Connect terminology
-canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
+_Last updated: 2026-10-02 — the pre-rc1 work list is closed except the final
+clean-install pass. PRO-3575 security review landed in full (browse relay,
+2.8.x settings deleted after migration, 30-day cart restore link, keyed-hash
+profiling opt-out record and consent cache, https-only engine setup address,
+plain Smaily subdomain); PRO-3619 (no profiling choice or purchase marker
+creates a Smaily contact); PRO-3606/3610/3616 (contact-sync modes); PRO-1965
+(Log evidence); PRO-2456, PRO-2474, PRO-3560, PRO-3571/3572, PRO-3576–3584,
+PRO-3591/3594/3602, PRO-1952. Earlier sessions: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
 - **Next session opens here (2026-10-02).** Done today: PRO-2456 (+ page
   frame), PRO-2474 runbook, pilot-day checklist and clean ZIP install,
   PRO-3560, PRO-3571, PRO-3572, the PRO-3574 parity spike and its Stories
-  PRO-3576/3577/3578/3579/3580/3581/3584/3591, PRO-1952, PRO-3594. In
-  progress elsewhere: PRO-3582, PRO-3583, PRO-3602. Remaining before rc1:
-  PRO-1965, PRO-3575 (security review), PRO-3603 (final clean-install pass),
-  then the rc1 tag on Erkki's go. Milestones: rc1 2026-10-03 (may move —
-  Erkki 2026-10-02: rc1 waits for the whole list), pilot store live
-  2026-10-09. After the pilot: PRO-2506, PRO-1967, PRO-1198 (hand-over).
+  PRO-3576/3577/3578/3579/3580/3581/3584/3591, PRO-3582, PRO-3583 (+
+  follow-up), PRO-3594, PRO-3602, PRO-3606, PRO-3610, PRO-3616, PRO-3619
+  (+ remainder: the purchase marker goes only to a contact Smaily has),
+  PRO-1952, PRO-1965 (+ PRO-1963), and the PRO-3575 security fixes (browse
+  relay, 2.8.x settings, cart restore link, opt-out record and consent
+  cache keys, setup address and subdomain). Remaining before rc1: PRO-3603
+  (final clean-install pass, in the sandbox), then the rc1 tag on Erkki's
+  go. Milestones: rc1 2026-10-03 (may move — Erkki 2026-10-02: rc1 waits
+  for the whole list), pilot store live 2026-10-09. After the pilot:
+  PRO-2506, PRO-1967, PRO-1198 (hand-over), and the UI/UX parity Stories
+  (PRO-1357, PRO-1398, PRO-1385).
 
 - **Automation docs corrected — a trigger for an unknown contact creates
   nothing (2026-10-02).** The `AutomationHandler` docblock, the user
@@ -3895,31 +3865,30 @@ PRO-1267 (engine: Magento product-identity contract note).
    suppression), as WooCommerce's import does. Confirm the import should
    send unsubscribed, or say to omit the status for non-subscribers (then
    a brand-new contact may be created subscribed — unverified, WooCommerce
-   PRO-3407).
-10. PRO-3606 — checkout opt-in only (Low urgency; reversible). Two
-   choices made on the safe side, confirm or reverse: (a) an unsubscribe
-   made in the store still reaches Smaily as `is_unsubscribed=1`, so a
-   shopper who opted in at checkout and later unsubscribes in My Account
-   does not stay subscribed in Smaily (this mode has no reconcile).
-   WooCommerce sends no opt-out in this mode. The cost: an unsubscribe of
-   a newsletter-form subscriber who never reached Smaily creates an
-   unsubscribed contact there. (b) With "Need to Confirm" on, every
-   confirmed signup syncs, a confirmed newsletter-form signup included,
-   because Magento does not record where a pending signup came from;
-   otherwise a checkout opt-in on such a store would never reach Smaily.
-
    PRO-3407).~~ **Resolved (Erkki, 2026-10-02, PRO-3610):** the mode is the
    soft opt-in; omit the status for non-subscribers. Smaily creates a new
    contact without the field as subscribed (confirmed by Erkki).
+10. PRO-3606 — checkout opt-in only (Low urgency; reversible). Two
+    choices made on the safe side, confirm or reverse: (a) an unsubscribe
+    made in the store still reaches Smaily as `is_unsubscribed=1`, so a
+    shopper who opted in at checkout and later unsubscribes in My Account
+    does not stay subscribed in Smaily (this mode has no reconcile).
+    WooCommerce sends no opt-out in this mode. The cost: an unsubscribe of
+    a newsletter-form subscriber who never reached Smaily creates an
+    unsubscribed contact there. (b) With "Need to Confirm" on, every
+    confirmed signup syncs, a confirmed newsletter-form signup included,
+    because Magento does not record where a pending signup came from;
+    otherwise a checkout opt-in on such a store would never reach Smaily.
 11. ~~PRO-3619 — the abandoned-cart purchase marker for an address Smaily
-   does not have (Medium urgency; reversible). The marker now goes only
-   after a reminder went out to Smaily. But a reminder to an address
-   Smaily does not have creates nothing (your fact, 2026-10-02), so a
-   guest who was never a Smaily contact and buys after the reminder still
-   gets created by the marker — as a subscriber, unless the store holds
-   them as unsubscribed. Closing it needs one Smaily read of the contact
-   before the marker is sent (in the queue, not at checkout), and the
-   marker skipped when Smaily does not have the contact. WooCommerce has
-   the same gap. Say whether to add that read.~~ **Resolved (Erkki,
-   2026-10-02): yes** — the queue reads the contact and skips the marker
-   for an address Smaily does not have (PRO-3619 remainder above).
+    does not have (Medium urgency; reversible). The marker now goes only
+    after a reminder went out to Smaily. But a reminder to an address
+    Smaily does not have creates nothing (your fact, 2026-10-02), so a
+    guest who was never a Smaily contact and buys after the reminder still
+    gets created by the marker — as a subscriber, unless the store holds
+    them as unsubscribed. Closing it needs one Smaily read of the contact
+    before the marker is sent (in the queue, not at checkout), and the
+    marker skipped when Smaily does not have the contact. WooCommerce has
+    the same gap. Say whether to add that read.~~ **Resolved (Erkki,
+    2026-10-02): yes** — the queue reads the contact and skips the marker
+    for an address Smaily does not have (PRO-3619 remainder in "Where we
+    are").

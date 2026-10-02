@@ -64,7 +64,8 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   parity): multilingual modes `single`/`c` use the config-default workflow;
   modes `a`/`b` resolve `smaily_automation_mapping` rows — the exact
   (trigger, language) row first, then the trigger's `is_default_fallback`
-  row, then the config default; no match anywhere is a terminal skip. Rows
+  row, then the config default; no match anywhere is a terminal skip
+  (`Queue\Skipped`: closed with the reason, read as Skipped in the Log). Rows
   are looked up for the event's website with legacy global rows
   (`website_id 0` — the 2.8.x migration's default-scope seeding, or a
   pre-Phase-3 save) as the fallback; a website-specific row wins. A matched
@@ -582,14 +583,15 @@ or a subscription Smaily's consent mirror writes counts too.
 - **Delivery** is `Queue\Handler\ProfilingConsentHandler`, on the normal
   retry ladder, behind the same sending gate as the identity merge. A row is
   sent only while it still matches the record: a retry or a Send again of a
-  choice the shopper has since replaced closes as sent without a call, so an
-  older answer never undoes a newer one at the engine. A §10 404 (the engine
+  choice the shopper has since replaced is closed without a call as
+  `Queue\Skipped` (read as Skipped in the Log), so an older answer never
+  undoes a newer one at the engine. A §10 404 (the engine
   holds nothing for that address) also closes the row — there is nothing to
   exclude.
 - **Identity merge.** `Queue\Handler\IdentityMergeHandler` asks
   `isAllowed()` (at the customer's store view, whose Smaily account holds
-  the contact) before each merge; an opted-out shopper's row closes as sent
-  without a call, so their browsing stays anonymous. Asked on the cron, not
+  the contact) before each merge; an opted-out shopper's row is closed
+  without a call as `Queue\Skipped`, so their browsing stays anonymous. Asked on the cron, not
   in the login observer, so a login never waits on a Smaily read.
 
 ## Admin UI

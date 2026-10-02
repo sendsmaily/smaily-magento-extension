@@ -19,6 +19,7 @@ use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
+use Smaily\Connect\Model\Queue\Skipped;
 
 class AutomationHandlerTest extends TestCase
 {
@@ -67,6 +68,44 @@ class AutomationHandlerTest extends TestCase
         self::assertSame([1 => true], $handler->handle([$event]));
         self::assertCount(1, $posted);
         self::assertFalse($posted[0]['force_opt_in']);
+    }
+
+    /**
+     * PRO-3634: with no Smaily workflow mapped to the trigger nothing is
+     * posted, and the row is closed as Skipped with the reason — not as
+     * delivered.
+     */
+    public function testATriggerWithNoWorkflowMappedIsSkippedWithTheReason(): void
+    {
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->expects(self::never())->method('forStore');
+
+        $router = $this->createMock(Router::class);
+        $router->method('resolve')->willReturn(null);
+
+        $event = $this->createMock(Event::class);
+        $event->method('getId')->willReturn(1);
+        $eventQueue = $this->createMock(EventQueue::class);
+        $eventQueue->method('decodePayload')->willReturn([
+            'trigger_type' => 'welcome',
+            'website_id' => 1,
+            'language' => 'en',
+            'address' => ['email' => 'person@example.com'],
+        ]);
+        $eventQueue->expects(self::never())->method('recordExchange');
+
+        $handler = new AutomationHandler(
+            $clientProvider,
+            $router,
+            $eventQueue,
+            $this->createMock(Logger::class),
+            $this->createMock(AccountResolver::class)
+        );
+
+        self::assertEquals(
+            [1 => new Skipped(AutomationHandler::SKIPPED_NO_WORKFLOW)],
+            $handler->handle([$event])
+        );
     }
 
     /**

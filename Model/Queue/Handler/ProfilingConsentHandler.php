@@ -16,6 +16,7 @@ use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\Skipped;
 
 /**
  * Delivers a shopper's queued profiling choice to the engine
@@ -26,10 +27,14 @@ use Smaily\Connect\Model\Queue\EventQueue;
  * (ProfilingOptOuts): a retry, or a Send again from the Log, of a choice the
  * shopper has since replaced closes without a call, so an older answer can
  * never undo a newer one at the engine. The newer choice has a row of its
- * own.
+ * own. Such a row is closed as Skipped with the reason, never as delivered
+ * (PRO-3634).
  */
 class ProfilingConsentHandler implements EventHandlerInterface
 {
+    public const SKIPPED_REPLACED = 'Skipped: the shopper has since changed their personalization preference,'
+        . ' and the newer preference is sent in its own row. Nothing was sent.';
+
     private const REASON = 'user_preference';
 
     public function __construct(
@@ -66,7 +71,7 @@ class ProfilingConsentHandler implements EventHandlerInterface
             $optOut = (bool)($payload['opt_out'] ?? false);
             if ($optOut !== ($this->optOuts->moment($email) !== null)) {
                 $this->logger->debug('Profiling choice not sent, a newer one replaced it', ['id' => $id]);
-                $results[$id] = true;
+                $results[$id] = new Skipped(self::SKIPPED_REPLACED);
                 continue;
             }
 

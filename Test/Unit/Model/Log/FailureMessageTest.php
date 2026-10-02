@@ -99,6 +99,24 @@ class FailureMessageTest extends TestCase
                 'Vahele jäetud: Smailys ei ole seda kontakti ja ostu märge looks selle'
                     . ' tellijana. Midagi ei saadetud.',
             ],
+            // PRO-3634: the other rows the queue closes without sending.
+            'skipped, no workflow mapped' => [
+                'Skipped: no Smaily workflow is mapped to this automation trigger. Nothing was sent.',
+                'Vahele jäetud: selle automaatika päästikuga pole seotud ühtegi Smaily töövoogu.'
+                    . ' Midagi ei saadetud.',
+            ],
+            'skipped, newer personalization preference' => [
+                'Skipped: the shopper has since changed their personalization preference, and the newer'
+                    . ' preference is sent in its own row. Nothing was sent.',
+                'Vahele jäetud: ostja on vahepeal oma personaliseerimise eelistust muutnud ja uuem eelistus'
+                    . ' saadetakse eraldi real. Midagi ei saadetud.',
+            ],
+            'skipped, opted out of personalization' => [
+                'Skipped: the shopper opted out of personalized recommendations, so their browsing is not'
+                    . ' linked to their address. Nothing was sent.',
+                'Vahele jäetud: ostja loobus personaalsetest soovitustest, seega tema sirvimist ei seota'
+                    . ' tema e-posti aadressiga. Midagi ei saadetud.',
+            ],
         ];
     }
 

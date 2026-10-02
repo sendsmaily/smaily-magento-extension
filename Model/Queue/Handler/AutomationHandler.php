@@ -16,6 +16,7 @@ use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\Skipped;
 
 /**
  * Delivers queued automation.trigger events via POST /api/autoresponder.php.
@@ -27,6 +28,8 @@ use Smaily\Connect\Model\Queue\EventQueue;
  * cannot re-trigger an automation for an address that already received it.
  * A missing workflow mapping is a terminal skip, not a failure — retrying
  * cannot make a mapping appear (matches the Woo AutomationRouter contract).
+ * The row is closed as Skipped with the reason, never as delivered
+ * (PRO-3634).
  *
  * Credentials follow the resolved match (Woo parity): when a mapping row
  * matched, the row's account_key names the Smaily account that must deliver
@@ -43,6 +46,9 @@ use Smaily\Connect\Model\Queue\EventQueue;
  */
 class AutomationHandler implements EventHandlerInterface
 {
+    public const SKIPPED_NO_WORKFLOW = 'Skipped: no Smaily workflow is mapped to this automation trigger.'
+        . ' Nothing was sent.';
+
     public function __construct(
         private readonly SmailyClientProvider $clientProvider,
         private readonly Router $router,
@@ -81,7 +87,7 @@ class AutomationHandler implements EventHandlerInterface
                     'trigger' => $trigger,
                     'website_id' => $websiteId,
                 ]);
-                $results[$id] = true;
+                $results[$id] = new Skipped(self::SKIPPED_NO_WORKFLOW);
                 continue;
             }
 

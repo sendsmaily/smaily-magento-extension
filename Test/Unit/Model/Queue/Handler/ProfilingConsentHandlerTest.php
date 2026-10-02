@@ -19,6 +19,7 @@ use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\Handler\ProfilingConsentHandler;
+use Smaily\Connect\Model\Queue\Skipped;
 
 class ProfilingConsentHandlerTest extends TestCase
 {
@@ -74,7 +75,11 @@ class ProfilingConsentHandlerTest extends TestCase
         $results = $this->handle(1, ['email' => 'person@example.com', 'opt_out' => true,
             'opted_out_at' => '2026-09-21T14:13:20Z']);
 
-        self::assertSame([1 => true], $results, 'Closed for good: retrying it would undo the newer choice');
+        self::assertEquals(
+            [1 => new Skipped(ProfilingConsentHandler::SKIPPED_REPLACED)],
+            $results,
+            'PRO-3634: closed for good without a call, and it reads Skipped, not delivered'
+        );
     }
 
     public function testAnEngineOutageLeavesTheRowToTheRetryLadder(): void

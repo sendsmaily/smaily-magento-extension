@@ -16,6 +16,41 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3634 done — rows closed without sending read Skipped and are not
+  counted as delivered (2026-10-02).** Three handler paths answered `true`
+  (stored as a plain `sent`) without a request; they now answer
+  `Queue\Skipped` with a reason, so `markSkipped()` keeps it in
+  `last_error` and the Log reads the row as Skipped:
+  `AutomationHandler` (no Smaily workflow mapped),
+  `ProfilingConsentHandler` (a choice the shopper has since replaced) and
+  `IdentityMergeHandler` (shopper opted out of profiling). Kept as
+  delivered: `ProfilingConsentHandler`'s §10 404 (the engine answered).
+  The reasons are in `FailureMessage::TRANSLATED`, so they read in the
+  admin's language. `DashboardStats::contactSyncsDelivered()` counts a
+  `sent` row only with an empty `last_error` and no
+  `CANCELLED_RESPONSE` (the Log's own skip/withdraw rule);
+  `catalogItemsDelivered()` is unchanged — the ingest queue marks `sent`
+  only on the engine's answer and never skips or withdraws. New phrases
+  (EN → ET, own): "Skipped: no Smaily workflow is mapped to this
+  automation trigger. Nothing was sent." → "Vahele jäetud: selle
+  automaatika päästikuga pole seotud ühtegi Smaily töövoogu. Midagi ei
+  saadetud."; "Skipped: the shopper has since changed their
+  personalization preference, and the newer preference is sent in its own
+  row. Nothing was sent." → "Vahele jäetud: ostja on vahepeal oma
+  personaliseerimise eelistust muutnud ja uuem eelistus saadetakse eraldi
+  real. Midagi ei saadetud."; "Skipped: the shopper opted out of
+  personalized recommendations, so their browsing is not linked to their
+  address. Nothing was sent." → "Vahele jäetud: ostja loobus
+  personaalsetest soovitustest, seega tema sirvimist ei seota tema e-posti
+  aadressiga. Midagi ei saadetud.". Tests RED first: unit handler tests
+  (+1, 3 changed from `true` to `Skipped` — the behaviour changed),
+  `FailureMessageTest` (+3); integration `DashboardStatsTest` (+2; the
+  ingest-queue case passed before the change, as expected) and
+  `FlushEventQueueTest` (+1, real AutomationHandler through the flusher,
+  read back as Skipped). Gates: unit 637, phpcs 0 errors in the changed
+  files (7 pre-existing errors in `panel/connection.phtml` from PRO-3566),
+  phpstan `[OK]`, integration 132.
+
 - **PRO-3566 done — per-language account blocks as the pack draws them
   (2026-10-02).** In "Per-language Smaily accounts" mode
   (`panel/connection.phtml`, initial setup step 1 and Settings >

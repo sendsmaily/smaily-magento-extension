@@ -64,7 +64,7 @@ Everything lives under **Marketing > Smaily Connect**, four pages:
 
 | Page | What it is |
 |---|---|
-| **Dashboard** | The landing page: a one-sentence health verdict, connection status for Smaily / Campaign Intelligence / browse tracking, operational counters (deliveries, the events queued today that are still waiting to send, failures) and the latest queue activity. Every number is a real local queue query. When deliveries failed in the last 24 hours, a warning banner above the verdict counts them and the verdict carries a red **Review failures** button — both open the Log filtered to failed rows; when everything runs, the verdict offers **View full log**. |
+| **Dashboard** | The landing page: a one-sentence health verdict, connection status for Smaily / Campaign Intelligence / browse tracking, operational counters (deliveries in the last 30 days — only events that reached Smaily or Campaign Intelligence, never a skipped or withdrawn row — the events queued today that are still waiting to send, failures) and the latest queue activity. Every number is a real local queue query. When deliveries failed in the last 24 hours, a warning banner above the verdict counts them and the verdict carries a red **Review failures** button — both open the Log filtered to failed rows; when everything runs, the verdict offers **View full log**. |
 | **Initial setup** | The guided five-step onboarding. On a fresh install every Smaily Connect page brings you here until setup is completed; you can re-run it any time — your settings are kept. |
 | **Settings** | The initial setup's content as always-available tabs — Connection, Contacts, Automations, Intelligence, RSS. Each tab saves instantly via AJAX. Tabs are deep-linkable (`?tab=rss`). |
 | **Log** | One unified delivery log for both Smaily and Campaign Intelligence, with mass retry for failed rows. |
@@ -620,9 +620,14 @@ card — you do not have to keep the page open:
   meantime. Nothing was delivered and nothing failed, so it is labelled as
   neither.
 - **Skipped** is its own status too: a row the store closed without
-  sending anything, because sending could not have done what it was for —
-  for example the abandoned-cart purchase marker for an address Smaily does
-  not have. Details shows the reason, and the row does not retry.
+  sending anything, because sending could not have done what it was for:
+  the abandoned-cart purchase marker for an address Smaily does not have,
+  an automation trigger with no Smaily workflow mapped to it, a
+  personalization choice the shopper has changed since (the newer choice
+  is sent on its own row), or linking the browsing of a shopper who opted
+  out of personalized recommendations to their address. Details shows the
+  reason in your admin language, and the row does not retry. A skipped row
+  is not counted as delivered on the Dashboard.
 - **Details** on any row opens a narrow panel on the right with the full
   picture. Its header names the event (its id and type) and shows its
   status. The attempt history lists what happened in order: when the row

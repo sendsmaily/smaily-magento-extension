@@ -17,17 +17,23 @@ use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Smaily\Connect\Api\Queue\EventHandlerInterface;
 use Smaily\Connect\Cron\FlushEventQueue;
+use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
+use Smaily\Connect\Model\Log\QueueRowLoader;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\EventType;
+use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
 use Smaily\Connect\Model\Queue\Handler\ContactSyncHandler;
 use Smaily\Connect\Model\Queue\HandlerPool;
+use Smaily\Connect\Model\ResourceModel\Log\Collection;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\RecordingHandler;
@@ -294,6 +300,45 @@ class FlushEventQueueTest extends IntegrationTestCase
         self::assertNull($row['sent_payload'], 'Nothing was sent for this row');
         self::assertStringContainsString('Skipped', (string)$row['last_error']);
         self::assertStringContainsString('Smaily does not have this contact', (string)$row['last_error']);
+    }
+
+    /**
+     * PRO-3634: an automation trigger with no Smaily workflow mapped is
+     * closed without a request, and the Log reads it as Skipped with the
+     * reason — not as delivered.
+     */
+    public function testAnAutomationWithNoWorkflowMappedIsClosedAsSkipped(): void
+    {
+        $this->queue->enqueue(
+            EventType::AUTOMATION_TRIGGER,
+            ['trigger_type' => 'welcome', 'store_id' => 1, 'website_id' => 1, 'language' => 'en',
+                'address' => ['email' => 'a@example.com']],
+            'a@example.com',
+            1,
+            'f-automation-unmapped'
+        );
+        $router = $this->createMock(Router::class);
+        $router->method('resolve')->willReturn(null);
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->expects(self::never())->method('forStore');
+
+        $this->runCron([EventType::AUTOMATION_TRIGGER => $this->objectManager->create(AutomationHandler::class, [
+            'router' => $router,
+            'clientProvider' => $clientProvider,
+            'accountResolver' => $this->createMock(AccountResolver::class),
+        ])]);
+
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_SENT, $row['status'], 'Closed: retrying cannot make a mapping appear');
+        self::assertNull($row['next_retry_at']);
+        self::assertNull($row['sent_payload'], 'Nothing was sent for this row');
+        self::assertSame(AutomationHandler::SKIPPED_NO_WORKFLOW, $row['last_error']);
+        /** @var QueueRowLoader $rowLoader */
+        $rowLoader = $this->objectManager->create(QueueRowLoader::class);
+        self::assertSame(
+            Collection::STATUS_SKIPPED,
+            $rowLoader->load(Collection::SOURCE_SMAILY . '-' . $row['id'])['status'] ?? null
+        );
     }
 
     public function testAPurchaseMarkerForAContactSmailyHasIsPosted(): void

@@ -18,6 +18,7 @@ use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\Skipped;
 
 /**
  * Delivers queued identity-merge events (POST identity/merge, contract §7).
@@ -25,10 +26,14 @@ use Smaily\Connect\Model\Queue\EventQueue;
  * A shopper who opted out of profiling is not merged (PRO-3578, Woo
  * IdentityHookHandler parity): binding their anonymous browsing to their
  * address is the profiling they said no to. Asked here, on the cron, rather
- * than at login, so the login never waits on a Smaily read.
+ * than at login, so the login never waits on a Smaily read. Such a row is
+ * closed as Skipped with the reason, never as delivered (PRO-3634).
  */
 class IdentityMergeHandler implements EventHandlerInterface
 {
+    public const SKIPPED_OPTED_OUT = 'Skipped: the shopper opted out of personalized recommendations,'
+        . ' so their browsing is not linked to their address. Nothing was sent.';
+
     public function __construct(
         private readonly Settings $settings,
         private readonly Client $client,
@@ -63,7 +68,7 @@ class IdentityMergeHandler implements EventHandlerInterface
             $email = (string)$payload['customer_email'];
             if (!$this->profilingConsent->isAllowed($email, $this->storeIdOf($payload))) {
                 $this->logger->debug('Identity merge not sent, the shopper opted out of profiling', ['id' => $id]);
-                $results[$id] = true;
+                $results[$id] = new Skipped(self::SKIPPED_OPTED_OUT);
                 continue;
             }
 

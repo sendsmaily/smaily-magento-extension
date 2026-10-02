@@ -20,6 +20,7 @@ use Smaily\Connect\Model\Privacy\ProfilingConsent;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
+use Smaily\Connect\Model\Queue\Skipped;
 
 class IdentityMergeHandlerTest extends TestCase
 {
@@ -74,7 +75,11 @@ class IdentityMergeHandlerTest extends TestCase
         $this->profilingConsent->method('isAllowed')->with('person@example.com', 3)->willReturn(false);
         $this->client->expects(self::never())->method('identityMerge');
 
-        self::assertSame([1 => true], $this->handle(self::PAYLOAD), 'Closed for good: browsing stays anonymous');
+        self::assertEquals(
+            [1 => new Skipped(IdentityMergeHandler::SKIPPED_OPTED_OUT)],
+            $this->handle(self::PAYLOAD),
+            'PRO-3634: closed for good without a call, and it reads Skipped, not delivered'
+        );
         self::assertSame([], $this->recorded, 'Nothing went on the wire');
     }
 
@@ -86,7 +91,7 @@ class IdentityMergeHandlerTest extends TestCase
             ->with('person@example.com', null)->willReturn(false);
         $this->client->expects(self::never())->method('identityMerge');
 
-        self::assertSame([1 => true], $this->handle(self::PAYLOAD));
+        self::assertEquals([1 => new Skipped(IdentityMergeHandler::SKIPPED_OPTED_OUT)], $this->handle(self::PAYLOAD));
     }
 
     public function testTheStoreViewQueuedWithTheRowIsUsedAndNotSentToTheEngine(): void

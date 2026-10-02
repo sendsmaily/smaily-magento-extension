@@ -10,6 +10,8 @@ namespace Smaily\Connect\Model\Adminhtml;
 
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Stdlib\DateTime\DateTime;
+use Smaily\Connect\Model\Queue\Event;
+use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
@@ -30,18 +32,26 @@ class DashboardStats
     }
 
     /**
-     * Delivered contact syncs still in the 30-day retention window.
+     * Delivered contact syncs still in the 30-day retention window: rows
+     * that reached Smaily (PRO-3634). The queue also closes a row as `sent`
+     * when it skips it (reason in `last_error`) or withdraws it
+     * (`last_response` = CANCELLED_RESPONSE); the Log reads those as
+     * Skipped and Withdrawn, and they are not counted here.
      */
     public function contactSyncsDelivered(): int
     {
         return $this->count(EventResource::TABLE_NAME, [
-            'status = ?' => 'sent',
+            'status = ?' => Event::STATUS_SENT,
             'event_type = ?' => EventType::CONTACT_SYNC,
+            "COALESCE(last_error, '') = ?" => '',
+            "COALESCE(last_response, '') <> ?" => EventQueue::CANCELLED_RESPONSE,
         ]);
     }
 
     /**
-     * Delivered catalog items still in the 30-day retention window.
+     * Delivered catalog items still in the 30-day retention window. The
+     * ingest queue marks a row `sent` only on the engine's answer — it
+     * never skips or withdraws one.
      */
     public function catalogItemsDelivered(): int
     {

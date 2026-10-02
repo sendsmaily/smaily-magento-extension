@@ -251,6 +251,44 @@ class EventQueueTest extends IntegrationTestCase
         );
     }
 
+    /**
+     * PRO-3619: only a reminder that went out to Smaily counts as delivered —
+     * not one withdrawn, waiting, given up, or a skip that POSTed nothing.
+     */
+    public function testHasDeliveredAutomationCountsOnlyAReminderThatWentOut(): void
+    {
+        $this->seedAutomation('abandoned_cart', 'shopper@example.com', 'u-pending');
+        $this->seedAutomation('abandoned_cart', 'shopper@example.com', 'u-failed');
+        $this->seedAutomation('abandoned_cart', 'shopper@example.com', 'u-skipped');
+        $this->seedAutomation('abandoned_cart', 'shopper@example.com', 'u-withdrawn');
+        $this->seedAutomation('welcome', 'shopper@example.com', 'u-welcome');
+        $this->seedAutomation('abandoned_cart', 'someone-else@example.com', 'u-other');
+        $sent = ['status' => Event::STATUS_SENT, 'sent_payload' => '[{"email":"shopper@example.com"}]'];
+        $this->connection->update(
+            EventResource::TABLE_NAME,
+            ['status' => Event::STATUS_FAILED, 'sent_payload' => $sent['sent_payload']],
+            ['event_uuid = ?' => 'u-failed']
+        );
+        $this->connection->update(EventResource::TABLE_NAME, ['status' => Event::STATUS_SENT], [
+            'event_uuid = ?' => 'u-skipped',
+        ]);
+        // A withdrawn row may keep the request of an earlier failed attempt.
+        $this->connection->update(
+            EventResource::TABLE_NAME,
+            ['sent_payload' => $sent['sent_payload'], 'last_response' => '{"http_status":503}'],
+            ['event_uuid = ?' => 'u-withdrawn']
+        );
+        $this->queue->cancelPendingAutomation('abandoned_cart', 'shopper@example.com');
+        $this->connection->update(EventResource::TABLE_NAME, $sent, ['event_uuid IN (?)' => ['u-welcome', 'u-other']]);
+
+        self::assertFalse($this->queue->hasDeliveredAutomation('abandoned_cart', 'shopper@example.com'));
+
+        $this->seedAutomation('abandoned_cart', 'shopper@example.com', 'u-delivered');
+        $this->connection->update(EventResource::TABLE_NAME, $sent, ['event_uuid = ?' => 'u-delivered']);
+
+        self::assertTrue($this->queue->hasDeliveredAutomation('abandoned_cart', 'shopper@example.com'));
+    }
+
     private function seedAutomation(string $trigger, string $email, string $uuid): void
     {
         $this->queue->enqueue(

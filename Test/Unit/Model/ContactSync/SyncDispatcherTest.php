@@ -27,6 +27,9 @@ class SyncDispatcherTest extends TestCase
     /** @var array<int, array{0: string, 1: string}> */
     private array $cancelled = [];
 
+    /** Whether the contact's abandoned-cart reminder went out to Smaily. */
+    private bool $reminderDelivered = true;
+
     private SubscriberPayloadBuilder&MockObject $payloadBuilder;
     private SyncDispatcher $dispatcher;
 
@@ -51,6 +54,10 @@ class SyncDispatcherTest extends TestCase
 
                 return 0;
             }
+        );
+        $eventQueue->method('hasDeliveredAutomation')->willReturnCallback(
+            fn (string $trigger, string $entityId): bool => $this->reminderDelivered
+                && [$trigger, $entityId] === [Trigger::ABANDONED_CART, 'shopper@example.com']
         );
         $eventQueue->method('enqueue')->willReturnCallback(
             function (string $eventType, array $payload): bool {
@@ -142,9 +149,24 @@ class SyncDispatcherTest extends TestCase
     }
 
     /**
-     * PRO-3616: when the withdrawn reminder never reached Smaily, the marker
-     * creates the contact — and Smaily creates a contact sent without a
-     * status as subscribed. A store unsubscribe therefore travels with it.
+     * PRO-3619: a reminder that never went out reached no contact, and
+     * Smaily creates a contact sent without a status as subscribed — so
+     * there is no marker to send, only the reminder to withdraw.
+     */
+    public function testNoCartPurchaseMarkerWhenTheReminderNeverWentOut(): void
+    {
+        $this->reminderDelivered = false;
+
+        $this->dispatcher->dispatchCartPurchase('shopper@example.com', 1);
+
+        self::assertSame([[Trigger::ABANDONED_CART, 'shopper@example.com']], $this->cancelled);
+        self::assertSame([], $this->enqueued);
+    }
+
+    /**
+     * PRO-3616: Smaily creates a contact sent without a status as subscribed,
+     * and a reminder sent to an address Smaily does not have creates nothing.
+     * A store unsubscribe therefore travels with the marker.
      */
     public function testTheCartPurchaseMarkerOfAStoreUnsubscribeCarriesTheUnsubscribe(): void
     {

@@ -318,6 +318,34 @@ class EventQueue
     }
 
     /**
+     * Whether an automation of one trigger went out to Smaily for a contact
+     * (PRO-3619): a row closed as sent with a request on record and not
+     * withdrawn — a skip that POSTed nothing, a row still waiting and one
+     * given up do not count. Bounded by the janitor's retention of sent rows.
+     */
+    public function hasDeliveredAutomation(string $trigger, string $entityId): bool
+    {
+        $connection = $this->resourceConnection->getConnection();
+        $payloads = $connection->fetchCol(
+            $connection->select()
+                ->from($this->resourceConnection->getTableName(EventResource::TABLE_NAME), ['payload'])
+                ->where('event_type = ?', EventType::AUTOMATION_TRIGGER)
+                ->where('entity_id = ?', $entityId)
+                ->where('status = ?', Event::STATUS_SENT)
+                ->where('sent_payload IS NOT NULL')
+                ->where('last_response IS NULL OR last_response != ?', self::CANCELLED_RESPONSE)
+        );
+
+        foreach ($payloads as $payload) {
+            if ($this->triggerOf((string)$payload) === $trigger) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Which of these automation rows a later delivery already superseded:
      * one of the same trigger, to the same contact, that was sent after it
      * and not itself withdrawn (PRO-2454). A trigger lives in the payload —

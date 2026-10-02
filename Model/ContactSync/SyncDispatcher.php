@@ -81,15 +81,20 @@ class SyncDispatcher
      * them. Stamped here, at the order-placed moment, for the same reason
      * dispatchAutomation() stamps its marker at the trigger.
      *
-     * A withdrawn reminder never reached Smaily, so this send can create the
-     * contact, and Smaily creates a contact sent without a status as
-     * subscribed: an email the store knows as unsubscribed carries
-     * is_unsubscribed=1 (PRO-3616). Otherwise the status is omitted and the
-     * contact keeps the one it has.
+     * Smaily creates a contact sent without a status as subscribed, so the
+     * marker goes only when a reminder went out to Smaily (PRO-3619): one
+     * withdrawn, still waiting or given up reached no contact, and the marker
+     * would create one. An email the store knows as unsubscribed carries
+     * is_unsubscribed=1 (PRO-3616) — a reminder to an address Smaily does
+     * not have creates nothing, so the marker can still create it. Otherwise
+     * the status is omitted and the contact keeps the one it has.
      */
     public function dispatchCartPurchase(string $email, int $storeId, bool $unsubscribedInStore = false): void
     {
         $this->eventQueue->cancelPendingAutomation(Trigger::ABANDONED_CART, $email);
+        if (!$this->eventQueue->hasDeliveredAutomation(Trigger::ABANDONED_CART, $email)) {
+            return;
+        }
 
         $contact = [
             'email' => $email,

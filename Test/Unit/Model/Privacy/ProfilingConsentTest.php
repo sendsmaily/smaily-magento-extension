@@ -40,6 +40,8 @@ class ProfilingConsentTest extends TestCase
     /** @var array<int, array<int, array<string, mixed>>> */
     private array $smailyWrites = [];
 
+    private int $smailyReads = 0;
+
     /** @var array<string, string> */
     private array $cache = [];
 
@@ -53,6 +55,7 @@ class ProfilingConsentTest extends TestCase
     {
         $this->smailyClient = $this->createMock(SmailyClient::class);
         $this->smailyClient->method('get')->willReturnCallback(function (): array {
+            $this->smailyReads++;
             if ($this->contact instanceof \Throwable) {
                 throw $this->contact;
             }
@@ -110,6 +113,71 @@ class ProfilingConsentTest extends TestCase
             'smaily_rec_profiling' => 0,
             'smaily_rec_profiling_ts' => self::NOW_Z,
         ]]], $this->smailyWrites);
+    }
+
+    /**
+     * PRO-3619: Smaily creates a contact sent without a status as
+     * subscribed, so a choice is written only to a contact Smaily has.
+     *
+     * @return array<string, array{0: bool}>
+     */
+    public static function choices(): array
+    {
+        return ['opt-out' => [false], 'opt-in' => [true]];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('choices')]
+    public function testAChoiceIsNotWrittenToAContactSmailyDoesNotHave(bool $allowed): void
+    {
+        $this->contact = new ApiException('Contact not found', ApiException::CODE_EMAIL_NOT_FOUND);
+
+        $this->consent()->setAllowed('person@example.com', $allowed, 1);
+
+        self::assertSame([], $this->smailyWrites, 'A write would create the contact as a subscriber');
+        self::assertCount(1, $this->enqueued, 'The engine still hears the choice');
+        self::assertSame($allowed ? [] : ['person@example.com' => self::NOW], $this->records);
+    }
+
+    public function testAChoiceIsNotWrittenWhenSmailyCannotSayWhetherItHasTheContact(): void
+    {
+        $this->contact = new SmailyClientException('Smaily is down');
+
+        $this->consent()->setAllowed('person@example.com', false, 1);
+
+        self::assertSame([], $this->smailyWrites);
+        self::assertCount(1, $this->enqueued);
+        self::assertSame(['person@example.com' => self::NOW], $this->records);
+    }
+
+    /**
+     * @return array<string, array{0: array<string, string>|\Throwable, 1: int}>
+     */
+    public static function pageViewReads(): array
+    {
+        return [
+            'a Smaily contact' => [['email' => 'person@example.com', 'is_unsubscribed' => '0'], 1],
+            'not a Smaily contact' => [
+                new ApiException('Contact not found', ApiException::CODE_EMAIL_NOT_FOUND),
+                0,
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, string>|\Throwable $contact
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('pageViewReads')]
+    public function testRecordingAChoiceReusesTheReadOfThePageView(array|\Throwable $contact, int $writes): void
+    {
+        $this->contact = $contact;
+        $consent = $this->consent();
+        $consent->knownPreference('person@example.com', 1);
+
+        $consent->setAllowed('person@example.com', false, 1);
+        $consent->setAllowed('person@example.com', true, 1);
+
+        self::assertSame(1, $this->smailyReads, 'Smaily is read once, by the page view');
+        self::assertCount(2 * $writes, $this->smailyWrites);
     }
 
     public function testAFailedSmailyWriteStillQueuesTheEngineAndKeepsTheChoice(): void

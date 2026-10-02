@@ -27,10 +27,11 @@ use Smaily\Connect\Model\Queue\EventType;
  * of profiling on its own (PRO-3594, Erkki 2026-10-02).
  *
  * A choice goes to the Smaily contact (smaily_rec_profiling 0/1 +
- * smaily_rec_profiling_ts), into the store's own durable record
- * (ProfilingOptOuts) and onto the marketing event queue for the engine's
- * opt-out endpoint (contract §10), where it gets the normal retry ladder
- * (PRO-3578).
+ * smaily_rec_profiling_ts) when Smaily has one — Smaily creates a contact
+ * sent without a status as subscribed (PRO-3619) — into the store's own
+ * durable record (ProfilingOptOuts) and onto the marketing event queue for
+ * the engine's opt-out endpoint (contract §10), where it gets the normal
+ * retry ladder (PRO-3578).
  *
  * A read resolves the Smaily contact against the store's record, and the
  * newest choice wins (Woo PRO-3191/3192/3434): only an opt-in on the contact
@@ -41,6 +42,7 @@ use Smaily\Connect\Model\Queue\EventType;
 class ProfilingConsent
 {
     private const CACHE_PREFIX = 'smaily_profiling_';
+    private const CONTACT_CACHE_PREFIX = 'smaily_profiling_contact_';
     private const CACHE_TTL_SECONDS = 86400;
     private const TIMESTAMP_FORMAT = 'Y-m-d\TH:i:s\Z';
 
@@ -85,21 +87,14 @@ class ProfilingConsent
         }
 
         $optOutMoment = $this->optOuts->moment($email);
-        $found = true;
         try {
-            $contact = $this->smailyClientProvider->forStore($storeId)
-                ->get(SmailyClient::ENDPOINT_CONTACT, ['email' => $email]);
-            $fields = isset($contact[0]) && is_array($contact[0]) ? $contact[0] : $contact;
-        } catch (ApiException $exception) {
-            if ($exception->getSmailyCode() !== ApiException::CODE_EMAIL_NOT_FOUND) {
-                return $this->fallback($email, $optOutMoment, $exception);
-            }
-            // Unknown contact: no answer on Smaily's side, not an error.
-            $found = false;
-            $fields = [];
+            $fields = $this->readContact($email, $storeId);
         } catch (SmailyClientException $exception) {
             return $this->fallback($email, $optOutMoment, $exception);
         }
+        // Unknown contact: no answer on Smaily's side, not an error.
+        $found = $fields !== null;
+        $fields ??= [];
 
         $allowed = (string)($fields['is_unsubscribed'] ?? '') !== '1'
             && (string)($fields['smaily_rec_profiling'] ?? '') !== '0';
@@ -202,8 +197,9 @@ class ProfilingConsent
     }
 
     /**
-     * Record the shopper's choice: Smaily contact fields, the store's own
-     * record and the engine, through the queue.
+     * Record the shopper's choice: Smaily contact fields — only on a contact
+     * Smaily has, since the write would create one as a subscriber
+     * (PRO-3619) — the store's own record and the engine, through the queue.
      */
     public function setAllowed(string $email, bool $allowed, int|string|null $storeId = null): void
     {
@@ -215,7 +211,9 @@ class ProfilingConsent
         $moment = $this->dateTime->gmtTimestamp();
         $timestamp = gmdate(self::TIMESTAMP_FORMAT, $moment);
 
-        $this->writeToContact($email, $allowed, $storeId, $timestamp);
+        if ($this->hasContact($email, $storeId)) {
+            $this->writeToContact($email, $allowed, $storeId, $timestamp);
+        }
         if ($allowed) {
             $this->optOuts->forget($email);
         } else {
@@ -273,6 +271,58 @@ class ProfilingConsent
     private function cacheKey(string $email): string
     {
         return self::CACHE_PREFIX . sha1($email);
+    }
+
+    /**
+     * The Smaily contact's fields, or null when Smaily does not have the
+     * contact. Whether it has one is kept for a day, so recording a choice
+     * reuses the read the page view made (PRO-3619).
+     *
+     * @return array<int|string, mixed>|null
+     * @throws SmailyClientException when Smaily cannot be read
+     */
+    private function readContact(string $email, int|string|null $storeId): ?array
+    {
+        try {
+            $contact = $this->smailyClientProvider->forStore($storeId)
+                ->get(SmailyClient::ENDPOINT_CONTACT, ['email' => $email]);
+            $fields = isset($contact[0]) && is_array($contact[0]) ? $contact[0] : $contact;
+        } catch (ApiException $exception) {
+            if ($exception->getSmailyCode() !== ApiException::CODE_EMAIL_NOT_FOUND) {
+                throw $exception;
+            }
+            $fields = null;
+        }
+        $this->cache->save(
+            $fields === null ? '0' : '1',
+            self::CONTACT_CACHE_PREFIX . sha1($email),
+            [],
+            self::CACHE_TTL_SECONDS
+        );
+
+        return $fields;
+    }
+
+    /**
+     * Whether Smaily has the contact: the answer of the last read, else a
+     * read now. Not when Smaily cannot be read — a write could create it.
+     */
+    private function hasContact(string $email, int|string|null $storeId): bool
+    {
+        $known = $this->cache->load(self::CONTACT_CACHE_PREFIX . sha1($email));
+        if ($known !== false) {
+            return $known === '1';
+        }
+
+        try {
+            return $this->readContact($email, $storeId) !== null;
+        } catch (SmailyClientException $exception) {
+            $this->logger->error('Profiling consent write to Smaily skipped: the contact could not be read', [
+                'error' => $exception->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     /**

@@ -328,12 +328,14 @@ shoppers alike are covered, and the purchase counts as soon as the order is
 placed, without waiting for payment status.
 
 It is written **only** for a shopper the extension actually tracked as having
-abandoned a cart — an ordinary purchase writes nothing and creates no contact.
-The reminder's cart and product fields are left exactly as the reminder wrote
-them. If the shopper buys before the reminder has gone out, the reminder is
-dropped instead: the Log row is closed without being sent, its response reading
-`cancelled`. A shopper who unsubscribed in the store is sent as unsubscribed
-with this field, so a contact it creates in Smaily is never a subscriber.
+abandoned a cart and whose reminder went out to Smaily — an ordinary purchase
+writes nothing and creates no contact. The reminder's cart and product fields
+are left exactly as the reminder wrote them. If the shopper buys before the
+reminder has gone out, the reminder is dropped instead and nothing is written:
+the Log row is closed without being sent, its response reading `cancelled`. A
+reminder that failed for good means nothing is written either. A shopper who
+unsubscribed in the store is sent as unsubscribed with this field, so a
+contact it creates in Smaily is never a subscriber.
 
 ## Abandoned cart
 
@@ -625,8 +627,9 @@ panel — you do not have to keep the page open:
   contact. When Smaily cannot be read and the store holds no opt-out, the
   page says the preference could not be loaded and offers a single **Opt
   out of personalized recommendations** button instead of a tick box, so
-  the shopper can still opt out. The choice is stored on the Smaily contact, kept by the
-  store itself, and enforced by the engine. It reaches Campaign Intelligence
+  the shopper can still opt out. The choice is stored on the Smaily contact
+  when Smaily already has one — recording it never creates a contact or
+  subscribes anyone — kept by the store itself, and enforced by the engine. It reaches Campaign Intelligence
   as a queued delivery (type `engine.profiling_consent` in the **Log**), so
   an engine outage only delays it: it is retried like every other delivery.
   A delivery that waits while the shopper changes their mind is not sent —

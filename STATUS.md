@@ -5,7 +5,10 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-2456 — the admin was checked against the
+_Last updated: 2026-10-02 (PRO-3560 — "Connected" on the Dashboard and in
+the Connection status now means Smaily accepted the saved credentials at the
+last real check, and the Dashboard has a "Not connected" verdict. Earlier the
+same day: PRO-2456 — the admin was checked against the
 design pack in en_US + et_EE; twelve visual deviations are fixed, the
 larger ones are listed for Stories, and the pack is no longer tracked in the
 repository. Earlier the same day: PRO-2474 — the ZIP install runbook and the
@@ -36,6 +39,38 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   Erkki's go). Milestones: rc1 tagged + pilot runbook 2026-10-03, pilot store
   live 2026-10-09. PRO-2460 decided A — contract §3 SKU key stands, PRO-1484
   closed. After the pilot: PRO-2506, PRO-1967, PRO-1198 (Smaily hand-over).
+
+- **PRO-3560 done — "Connected" means Smaily accepted the credentials
+  (2026-10-02).** Before, the Dashboard and Settings > Connection said
+  "Connected" whenever subdomain, username and password were filled in, and
+  the Dashboard verdict ignored the Smaily connection — so placeholder
+  credentials read "Connected with the saved credentials" and missing ones
+  read "All systems normal" beside a "Not connected" Smaily card (fidelity
+  audit row 13). Now `Model\Client\VerifiedCredentials` remembers which
+  credentials Smaily accepted, as keyed hashes (`EncryptorInterface::hash`,
+  never the password) in one flag row (`smaily_connect_verified_credentials`,
+  last 20) — no schema change. `SmailyClient` records the answers at its one
+  chokepoint: a passed `validateCredentials()` (Test connection, and now
+  every connection save — `WizardStepSaver::saveConnect()` checks what it
+  saved, never blocking the save) accepts; any 401/403, the queue's
+  included, refuses. Changed credentials are not verified until checked.
+  The Dashboard's Smaily card and the Connection status (`boot.verified`)
+  read it at the same scope — the target website's default store view
+  (the Dashboard used to read the admin's default scope); a new
+  `disconnected` verdict ("Not connected", danger, "Open Connection
+  settings") ranks right after "Setup incomplete". No Smaily call happens on
+  a page load. `Config::isConnected()` keeps its meaning (fields filled in)
+  as the gate for queueing and sending. New phrases (EN + ET, for Erkki's
+  proofread): "Open Connection settings" / "Ava ühenduse seaded"; the
+  verdict sentence "The Smaily credentials are missing or Smaily has not
+  accepted them — check them in Settings > Connection and test the
+  connection." / "Smaily kasutajaandmed puuduvad või Smaily pole neid vastu
+  võtnud — kontrolli neid jaotises Seaded > Ühendus ja testi ühendust."
+  Gates: 318 unit, phpcs 0 errors, phpstan `[OK]`, integration 87.
+  **Not yet run:** the sandbox walk (no credentials / placeholder
+  credentials) and sandbox `setup:upgrade` + `setup:di:compile` +
+  static-content deploy — starting the sandbox from the worker was not
+  permitted; the orchestrator runs them before merge.
 
 - **PRO-2474 progress (2026-10-02): runbook + pilot-day checklist written.**
   `docs/INSTALLING.md` (public, linked from README and the User Guide's

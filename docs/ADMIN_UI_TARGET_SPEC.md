@@ -100,7 +100,7 @@ form fields — source: A2 §F, `ViewModel\Adminhtml\DashboardData`):
 
 | Element | Real functionality |
 |---|---|
-| Verdict hero | priority-ordered from setup completeness, `getFailedLast24h()`, `isEngineDown()` |
+| Verdict hero | priority-ordered from setup completeness, `isSmailyConnected()` (Smaily accepted the saved credentials, PRO-3560), `getFailedLast24h()`, `isEngineDown()` |
 | Connection strip | live pills from `isSmailyConnected`, `isEngineConnected`/`isEngineDown`, `isBrowseTrackingEnabled` |
 | Metric tiles | Contact syncs delivered 30d, Catalog items delivered 30d (only if engine connected), Queued today, Failed 24h — real local queue queries |
 | Recent activity | last 10 queue rows: Source/Type/Entity/Status/Updated |

@@ -19,6 +19,7 @@ use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Automation\Mapping;
 use Smaily\Connect\Model\Automation\Trigger;
+use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Source\MultilingualMode;
 use Smaily\Connect\Model\ContactSync\Mode;
@@ -48,7 +49,8 @@ class WizardData implements ArgumentInterface
         private readonly ProductCollectionFactory $productCollectionFactory,
         private readonly Json $serializer,
         private readonly MappingCollectionFactory $mappingCollectionFactory,
-        private readonly WebsiteContext $websiteContext
+        private readonly WebsiteContext $websiteContext,
+        private readonly VerifiedCredentials $verifiedCredentials
     ) {
     }
 
@@ -118,6 +120,10 @@ class WizardData implements ArgumentInterface
 
         return $this->serializer->serialize([
             'connected' => $this->config->isConnected($storeId),
+            // What the Connection status shows: Smaily accepted these saved
+            // credentials at the last real check (PRO-3560). `connected`
+            // above only says they are filled in.
+            'verified' => $this->verifiedCredentials->isVerified($storeId),
             'setupCompleted' => $this->isSetupCompleted(),
             'storeId' => $storeId,
             'connection' => [

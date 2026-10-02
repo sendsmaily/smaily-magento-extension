@@ -128,6 +128,15 @@ lands in the regular configuration, so you can fine-tune it later on the
 footer and connection-status line (Connected / Not connected, with the
 account name once connected).
 
+**Connected** means that Smaily accepted the saved credentials the last
+time they were checked: when you pressed Test Connection, or when you saved
+the connection (each save asks Smaily once). Filled-in fields alone are not
+enough. Changed credentials show *Not connected* until they are checked, and
+if Smaily later refuses them — for example because the API user was
+removed — the status turns to *Not connected* too. The Dashboard then shows
+a **Not connected** verdict with an **Open Connection settings** button;
+press Test Connection there to check the credentials again.
+
 | Field | Notes |
 |---|---|
 | Subdomain | Your Smaily subdomain. Pasting the full URL (`https://demo.sendsmaily.net`) also works — it is normalized on save. |
@@ -570,9 +579,10 @@ panel — you do not have to keep the page open:
 ## FAQ
 
 **Nothing is syncing.** Check that Magento cron runs (`bin/magento
-cron:run --group smaily_connect` manually to test), the connection is
-saved, and look at the Log for errors — the Dashboard verdict points
-there when deliveries fail.
+cron:run --group smaily_connect` manually to test), the Smaily connection
+shows *Connected* (the Dashboard says *Not connected* when Smaily has not
+accepted the saved credentials), and look at the Log for errors — the
+Dashboard verdict points there when deliveries fail.
 
 **A contact unsubscribed in Smaily but is still subscribed in Magento.**
 Reconciliation runs every 15 minutes and only in *Subscribers only

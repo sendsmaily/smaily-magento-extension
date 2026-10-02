@@ -17,6 +17,7 @@ use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollection
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
+use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
@@ -65,7 +66,8 @@ class WizardDataTest extends IntegrationTestCase
             $this->createMock(ProductCollectionFactory::class),
             $this->objectManager->get(Json::class),
             $this->objectManager->get(MappingCollectionFactory::class),
-            new WebsiteContext($storeManager, $request)
+            new WebsiteContext($storeManager, $request),
+            $this->createMock(VerifiedCredentials::class)
         );
     }
 

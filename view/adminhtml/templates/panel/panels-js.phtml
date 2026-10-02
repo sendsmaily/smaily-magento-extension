@@ -452,16 +452,18 @@ window.smailyPanelsInit = function ($) {
         if (boot.connection.hasPassword) {
             $('#smaily-w-password-note').show();
         }
-        if (connected) {
+        // "Connected" only when Smaily accepted the saved credentials at the
+        // last real check (PRO-3560) — filled-in fields alone are not enough.
+        if (boot.verified) {
             result('#smaily-w-test-result', '<?= $escaper->escapeJs(__('Connected with the saved credentials.')) ?>', true);
         }
         if ($('#smaily-w-connection-status').length) {
-            $('#smaily-w-connection-pill').toggleClass('smaily-pill--active', connected)
-                .toggleClass('smaily-pill--off', !connected);
-            $('#smaily-w-connection-pill-text').text(connected
+            $('#smaily-w-connection-pill').toggleClass('smaily-pill--active', boot.verified)
+                .toggleClass('smaily-pill--off', !boot.verified);
+            $('#smaily-w-connection-pill-text').text(boot.verified
                 ? '<?= $escaper->escapeJs(__('Connected')) ?>'
                 : '<?= $escaper->escapeJs(__('Not connected')) ?>');
-            $('#smaily-w-connection-account').text(connected
+            $('#smaily-w-connection-account').text(boot.verified
                 ? '<?= $escaper->escapeJs(__('as "%1"')) ?>'.replace('%1', boot.connection.subdomain)
                 : '');
         }

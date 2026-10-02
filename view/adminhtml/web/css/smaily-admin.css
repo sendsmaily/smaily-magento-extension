@@ -541,6 +541,9 @@
 .smaily-dashboard .smaily-verdict-incomplete { background: var(--s-info-soft); border-color: var(--s-info-border); border-left-color: var(--s-bar-info); }
 .smaily-dashboard .smaily-verdict-incomplete .smaily-verdict-dot { background: var(--s-bar-info); }
 .smaily-dashboard .smaily-verdict-incomplete .smaily-verdict-kicker { color: var(--s-info); }
+.smaily-dashboard .smaily-verdict-disconnected { background: var(--s-danger-soft); border-color: var(--s-danger-border); border-left-color: var(--s-bar-error); }
+.smaily-dashboard .smaily-verdict-disconnected .smaily-verdict-dot { background: var(--s-bar-error); }
+.smaily-dashboard .smaily-verdict-disconnected .smaily-verdict-kicker { color: var(--s-danger); }
 .smaily-dashboard .smaily-verdict-action { align-self: center; }
 
 .smaily-dashboard .smaily-connections { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }

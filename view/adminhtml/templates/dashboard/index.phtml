@@ -38,13 +38,17 @@ $sourceLabels = [
     'intelligence' => __('Campaign Intelligence'),
 ];
 
-// One-sentence health verdict, by priority: incomplete > account not active
-// > failures > engine unreachable > all good. A deactivated Campaign
-// Intelligence account outranks the rest because it explains them (PRO-2451).
-// Kicker is the short role label above it.
+// One-sentence health verdict, by priority: incomplete > Smaily not
+// connected > account not active > failures > engine unreachable > all good.
+// Smaily credentials that Smaily has not accepted (PRO-3560) and a
+// deactivated Campaign Intelligence account (PRO-2451) outrank the rest
+// because they explain them. Kicker is the short role label above it.
 if ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_INCOMPLETE) {
     $verdictKicker = __('Setup incomplete');
     $verdictText = __('Setup is not finished yet — complete the initial setup to start syncing.');
+} elseif ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_DISCONNECTED) {
+    $verdictKicker = __('Not connected');
+    $verdictText = __('The Smaily credentials are missing or Smaily has not accepted them — check them in Settings > Connection and test the connection.');
 } elseif ($engineRefused) {
     $verdictKicker = __('Needs attention');
     $verdictText = __('Campaign Intelligence has stopped accepting data from this store, so product, customer and order data is no longer being sent and recommendations will go stale. Waiting will not fix it — the account has to be made active again on the Smaily side. Your Smaily email sending is unaffected; everything queued here waits and is sent once the account is active.');
@@ -96,6 +100,9 @@ $connections = [
         <?php if ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_INCOMPLETE): ?>
             <a class="action-primary smaily-verdict-action" href="<?= $escaper->escapeUrl($urls['wizard']) ?>">
                 <span><?= $escaper->escapeHtml(__('Resume setup')) ?></span></a>
+        <?php elseif ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_DISCONNECTED): ?>
+            <a class="action-primary smaily-verdict-action" href="<?= $escaper->escapeUrl($urls['settings']) ?>">
+                <span><?= $escaper->escapeHtml(__('Open Connection settings')) ?></span></a>
         <?php elseif ($failed > 0): ?>
             <a class="action-primary smaily-verdict-action" href="<?= $escaper->escapeUrl($urls['logFailed']) ?>">
                 <span><?= $escaper->escapeHtml(__('Review failures')) ?></span></a>

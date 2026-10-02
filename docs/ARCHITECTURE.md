@@ -502,6 +502,24 @@ Initial setup, Settings, Log. Design rules:
   HealthCheck cron's failed-rows query (`Model\Health\QueueHealth`) and
   engine-down flag, so the dashboard can never disagree with the admin
   notifications. Unknowable numbers are omitted, not estimated.
+- **"Connected" means Smaily accepted the credentials (PRO-3560).**
+  `Config::isConnected()` only says that subdomain, username and password
+  are filled in; it stays the gate for queueing and sending.
+  `Model\Client\VerifiedCredentials` remembers which credentials Smaily
+  accepted, as keyed hashes (`EncryptorInterface::hash`, the last 20) in
+  one flag row, `smaily_connect_verified_credentials`. `SmailyClient`
+  records the answers at its one chokepoint: a passed
+  `validateCredentials()` accepts (Test Connection, and the connection save
+  — `WizardStepSaver::saveConnect()` checks what it just saved and never
+  fails the save on the answer); any 401/403 refuses, wherever it came
+  from, the queue's deliveries included. Changed credentials hash
+  differently, so they are not connected until checked. The Dashboard's
+  Smaily card and verdict and the Connection status (`boot.verified` from
+  `WizardData`) all ask `isVerified()` for the target website's default
+  store view, so they cannot disagree; no page load calls Smaily. The
+  verdict order is: setup incomplete > Smaily not connected > Campaign
+  Intelligence account not active > failures > engine unreachable > all
+  good.
 - **Unified log.** One grid (`smaily_log_grid`) over BOTH queues:
   `Model\ResourceModel\Log\Collection` builds a `UNION ALL` of the two
   queue tables as a derived table, keyed by the synthetic

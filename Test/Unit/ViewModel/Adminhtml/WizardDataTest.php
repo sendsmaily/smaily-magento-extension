@@ -20,6 +20,7 @@ use Magento\Store\Model\ScopeInterface;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
+use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
@@ -51,6 +52,9 @@ class WizardDataTest extends TestCase
     /** @var WebsiteContext&\PHPUnit\Framework\MockObject\MockObject */
     private $websiteContext;
 
+    /** @var VerifiedCredentials&\PHPUnit\Framework\MockObject\MockObject */
+    private $verifiedCredentials;
+
     private WizardData $viewModel;
 
     protected function setUp(): void
@@ -66,6 +70,7 @@ class WizardDataTest extends TestCase
         $this->websiteContext = $this->createMock(WebsiteContext::class);
         $this->websiteContext->method('getWebsiteId')->willReturn(2);
         $this->websiteContext->method('getStoreId')->willReturn(5);
+        $this->verifiedCredentials = $this->createMock(VerifiedCredentials::class);
 
         $customerCollection = $this->createMock(CustomerCollection::class);
         $customerCollection->method('getSize')->willReturn(0);
@@ -93,7 +98,8 @@ class WizardDataTest extends TestCase
             $productCollectionFactory,
             new Json(),
             $this->createMock(MappingCollectionFactory::class),
-            $this->websiteContext
+            $this->websiteContext,
+            $this->verifiedCredentials
         );
     }
 
@@ -111,6 +117,32 @@ class WizardDataTest extends TestCase
         self::assertSame('demo', $decoded['connection']['subdomain']);
         self::assertSame('user', $decoded['connection']['username']);
         self::assertTrue($decoded['connection']['hasPassword']);
+    }
+
+    /**
+     * PRO-3560: filled-in credentials are not "Connected" — the Connection
+     * status follows whether Smaily accepted them at the last real check.
+     */
+    public function testSavedCredentialsSmailyHasNotAcceptedAreNotShownAsConnected(): void
+    {
+        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->config->method('isConnected')->willReturn(true);
+        $this->verifiedCredentials->expects(self::once())->method('isVerified')->with(5)->willReturn(false);
+
+        $decoded = json_decode($this->viewModel->getBootJson(), true);
+
+        self::assertTrue($decoded['connected']);
+        self::assertFalse($decoded['verified']);
+    }
+
+    public function testSavedCredentialsSmailyAcceptedAreShownAsConnected(): void
+    {
+        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->verifiedCredentials->method('isVerified')->with(5)->willReturn(true);
+
+        $decoded = json_decode($this->viewModel->getBootJson(), true);
+
+        self::assertTrue($decoded['verified']);
     }
 
     public function testGetBootJsonReadsSubscriberAndAutomationFieldsAtTheSelectedWebsiteScope(): void

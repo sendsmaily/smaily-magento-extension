@@ -13,6 +13,8 @@ use Magento\Framework\View\Element\Block\ArgumentInterface;
 use Smaily\Connect\Cron\HealthCheck;
 use Smaily\Connect\Model\Adminhtml\DashboardStats;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
+use Smaily\Connect\Model\Adminhtml\WebsiteContext;
+use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Health\QueueHealth;
@@ -25,10 +27,12 @@ use Smaily\Connect\Model\Health\QueueHealth;
 class DashboardData implements ArgumentInterface
 {
     public const VERDICT_INCOMPLETE = 'incomplete';
+    public const VERDICT_DISCONNECTED = 'disconnected';
     public const VERDICT_DEGRADED = 'degraded';
     public const VERDICT_OK = 'ok';
 
     private ?int $failed24h = null;
+    private ?bool $smailyConnected = null;
     private ?bool $engineRefused = null;
     private ?bool $engineDown = null;
 
@@ -38,7 +42,9 @@ class DashboardData implements ArgumentInterface
         private readonly SetupGuard $setupGuard,
         private readonly QueueHealth $queueHealth,
         private readonly DashboardStats $stats,
-        private readonly FlagManager $flagManager
+        private readonly FlagManager $flagManager,
+        private readonly VerifiedCredentials $verifiedCredentials,
+        private readonly WebsiteContext $websiteContext
     ) {
     }
 
@@ -47,14 +53,21 @@ class DashboardData implements ArgumentInterface
         return $this->setupGuard->isSetupCompleted();
     }
 
+    /**
+     * Whether Smaily accepted the saved credentials at the last real check
+     * (PRO-3560) — read at the same scope as the Connection status, the
+     * target website's default store view, so the two cannot disagree.
+     */
     public function isSmailyConnected(): bool
     {
-        return $this->config->isConnected();
+        return $this->smailyConnected ??= $this->verifiedCredentials->isVerified(
+            $this->websiteContext->getStoreId()
+        );
     }
 
     public function getSmailySubdomain(): string
     {
-        return $this->config->getSubdomain();
+        return $this->config->getSubdomain($this->websiteContext->getStoreId());
     }
 
     public function isEngineConnected(): bool
@@ -139,12 +152,17 @@ class DashboardData implements ArgumentInterface
     }
 
     /**
-     * One-word health state: incomplete | degraded | ok.
+     * One-word health state: incomplete | disconnected | degraded | ok.
+     * A Smaily connection that Smaily has not accepted outranks failures,
+     * because it explains them (PRO-3560).
      */
     public function getVerdict(): string
     {
         if (!$this->isSetupCompleted()) {
             return self::VERDICT_INCOMPLETE;
+        }
+        if (!$this->isSmailyConnected()) {
+            return self::VERDICT_DISCONNECTED;
         }
         if ($this->isEngineRefused() || $this->getFailedLast24h() > 0 || $this->isEngineDown()) {
             return self::VERDICT_DEGRADED;

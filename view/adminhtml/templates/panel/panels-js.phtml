@@ -247,6 +247,12 @@ window.smailyPanelsInit = function ($) {
                 if (data.fallback_language) {
                     mlFallbackSaved = data.fallback_language;
                 }
+                if (!data.accounts) {
+                    // The single account just saved is the one an empty
+                    // password now keeps (PRO-3690).
+                    boot.connection.subdomain = data.subdomain;
+                    boot.connection.username = data.username;
+                }
                 (data.accounts || []).forEach(function (account) {
                     var $block = $('.smaily-ml-account[data-language=' + account.language + ']');
                     $block.data('saved-subdomain', account.subdomain)
@@ -335,6 +341,15 @@ window.smailyPanelsInit = function ($) {
             username: $block.find('.smaily-ml-username').val(),
             password: $block.find('.smaily-ml-password').val()
         };
+    }
+
+    // Whether typed credentials name another account than the one the form
+    // was drawn with (PRO-3690): an empty password keeps the saved one only
+    // for that account. The subdomain is compared in any case.
+    function accountChanged(fields, savedSubdomain, savedUsername) {
+        return String(fields.subdomain || '').trim().toLowerCase()
+                !== String(savedSubdomain || '').trim().toLowerCase()
+            || String(fields.username || '').trim() !== String(savedUsername || '').trim();
     }
 
     /**
@@ -866,6 +881,17 @@ window.smailyPanelsInit = function ($) {
                             [prefix + 'password']
                         );
                     }
+                    if (!fields.password && accountChanged(
+                        fields,
+                        $(this).data('saved-subdomain'),
+                        $(this).data('saved-username')
+                    )) {
+                        throw formError(
+                            '<?= $escaper->escapeJs(__('The subdomain or username of the %1 account changed — enter its password.')) ?>'
+                                .replace('%1', fields.language.toUpperCase()),
+                            [prefix + 'password']
+                        );
+                    }
                     accounts.push(fields);
                 });
                 var fallback = $('input[name=smaily-w-fallback]:checked').val();
@@ -904,6 +930,12 @@ window.smailyPanelsInit = function ($) {
                     ['subdomain', 'username', 'password'].filter(function (key) {
                         return !creds[key];
                     })
+                );
+            }
+            if (!creds.password && accountChanged(creds, boot.connection.subdomain, boot.connection.username)) {
+                throw formError(
+                    '<?= $escaper->escapeJs(__('The subdomain or username changed — enter the password of this account.')) ?>',
+                    ['password']
                 );
             }
             return withStorefrontUrl({

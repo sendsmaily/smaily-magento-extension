@@ -59,6 +59,39 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   Smaily→Magento consent reconcile" (EN + ET; the old rows are replaced).
   `MigrateLegacyConfigTest` pins the full EN and ET texts.
 
+- **PRO-3690 — a changed account needs its password (2026-10-02).** An
+  empty (or masked) password keeps the saved one only for the account the
+  form was drawn with. `WizardStepSaver::saveConnect` refuses, before
+  anything is saved or checked: in mode A, a per-language block with a
+  subdomain and username that differ from those of the store view it was
+  drawn from (`AccountResolver::storeIdForAccountKey`, as
+  `WizardData::getMultilingualAccounts`) — field
+  `accounts.<language>.password`, "The subdomain or username of the %1
+  account changed — enter its password."; in the other modes, the single
+  account against the website's store view (`WebsiteContext::getStoreId`,
+  as the boot JSON) — field `password`, "The subdomain or username changed
+  — enter the password of this account." (EN + ET). The subdomain is
+  compared in any case, the username exactly; a block without both values
+  saves no account and is not checked. The single account did not require
+  a password on change before, so it gets the rule too. `collect.connect`
+  in panels-js checks the same against `data-saved-subdomain` /
+  `data-saved-username` and `boot.connection` (updated after a successful
+  single-account save, as the blocks already were). Consequence for
+  PRO-3683: a block drawn with another account than the one typed now
+  needs the password even when another store view holds that account; the
+  borrow path still serves a store view that moves to a language whose
+  block shows that language's account (integration test re-cut to it).
+  Unit `WizardStepSaverTest` (+4, 6 data sets), integration
+  `PerLanguageAccountsSaveTest` (+1: the reported case — a store view et→fi,
+  the fi block drawn with the et account, fi account typed without a
+  password → refused, nothing saved). Verified with the real Settings
+  templates and stub data in headless Chrome, en_US and et_EE, mode A and
+  single: unchanged / subdomain in capitals save; a changed subdomain or
+  username without a password shows the banner and the message under the
+  password field; with a password it saves, and the next empty-password
+  save passes. USER_GUIDE (Connection, "When a store view's language
+  changes"), CHANGELOG.
+
 - **PRO-3683 — per-language accounts follow a store view's language change
   (2026-10-02).** A mode-A Connection save (`WizardStepSaver::saveConnect`,
   posted mode `a` with `accounts`) walks every store view of the website

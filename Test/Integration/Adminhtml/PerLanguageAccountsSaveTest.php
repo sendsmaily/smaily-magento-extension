@@ -121,21 +121,57 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
         $this->assertOtherWebsiteUntouched();
     }
 
+    /**
+     * The fi block is drawn from store view 3, the first fi store view, which
+     * already holds the fi account; store view 5 moves to fi.
+     */
     public function testAnEmptyPasswordTakesThePasswordOfAStoreViewThatUsesTheAccount(): void
     {
-        $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'et_EE', 5 => 'fi_FI']);
+        $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'fi_FI', 5 => 'et_EE']);
         $this->saveAccounts([
             $this->account('en', 'en-secret'),
             $this->account('et', 'et-secret'),
             $this->account('fi', 'fi-secret'),
         ]);
 
-        $this->setStoreLocale(3, 'fi_FI');
+        $this->setStoreLocale(5, 'fi_FI');
         $this->saveAccounts([$this->account('en'), $this->account('et'), $this->account('fi')]);
 
-        $this->assertAccount(3, 'fi');
         $this->assertAccount(5, 'fi');
+        $this->assertAccount(3, 'fi');
         $this->assertAccount(2, 'et');
+    }
+
+    /**
+     * PRO-3690: the fi block is drawn from store view 3, which still holds
+     * the et account after moving to fi. A new account typed into it with
+     * an empty password is refused on the block's password field, and
+     * nothing is saved — store view 3 is not left with the fi account and
+     * the et password.
+     */
+    public function testANewAccountInABlockDrawnWithAnotherAccountNeedsItsPassword(): void
+    {
+        $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'et_EE', 5 => 'en_GB']);
+        $this->saveAccounts([$this->account('en', 'en-secret'), $this->account('et', 'et-secret')]);
+
+        $this->setStoreLocale(3, 'fi_FI');
+        $accounts = [$this->account('en'), $this->account('et'), $this->account('fi')];
+        $errors = $this->saver->save('connect', [
+            'subdomain' => 'en-shop',
+            'username' => 'en-user',
+            'password' => '',
+            'multilingual_mode' => 'a',
+            'fallback_language' => 'en',
+            'accounts' => $accounts,
+        ]);
+
+        self::assertSame([[
+            'field' => 'accounts.fi.password',
+            'message' => 'The subdomain or username of the FI account changed — enter its password.',
+        ]], $errors);
+        $this->assertAccount(3, 'et');
+        $this->assertAccount(2, 'et');
+        $this->assertAccount(1, 'en');
     }
 
     /**

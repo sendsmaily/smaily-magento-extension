@@ -180,6 +180,15 @@ class WizardStepSaver
             }
         }
 
+        $previousMode = $this->config->getMultilingualMode($websiteId) ?: MultilingualMode::MODE_SINGLE;
+        $postedMode = strtolower((string)($data['multilingual_mode'] ?? 'single'));
+        $mode = in_array($postedMode, ['single', 'a', 'b', 'c'], true) ? $postedMode : $previousMode;
+
+        $errors = $this->changedAccountPasswordErrors($data, $mode, $subdomain, $username, $password, $websiteId);
+        if ($errors !== []) {
+            return $errors;
+        }
+
         // The accounts the store views hold before anything below is saved.
         $heldAccounts = is_array($data['accounts'] ?? null) ? $this->heldAccounts($websiteId) : [];
 
@@ -194,17 +203,13 @@ class WizardStepSaver
             );
         }
 
-        $previousMode = $this->config->getMultilingualMode($websiteId) ?: MultilingualMode::MODE_SINGLE;
-        $mode = strtolower((string)($data['multilingual_mode'] ?? 'single'));
-        if (in_array($mode, ['single', 'a', 'b', 'c'], true)) {
+        if ($mode === $postedMode) {
             $this->configWriter->save(
                 Config::XML_PATH_MULTILINGUAL_MODE,
                 $mode,
                 ScopeInterface::SCOPE_WEBSITES,
                 $websiteId
             );
-        } else {
-            $mode = $previousMode;
         }
 
         if ($mode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS && is_array($data['accounts'] ?? null)) {
@@ -256,6 +261,88 @@ class WizardStepSaver
         $this->checkCredentials($subdomain, $username, $password);
 
         return [];
+    }
+
+    /**
+     * A changed account needs its own password (PRO-3690). An empty or
+     * masked password keeps the saved one only for the account the form
+     * was drawn with: the subdomain (in any case) and username that the
+     * store view behind it holds before the save. In mode A each
+     * per-language block is compared with the store view it was drawn
+     * from (`WizardData::getMultilingualAccounts`); a block without both
+     * a subdomain and a username saves no account and needs none. In the
+     * other modes the single account is compared with the website's store
+     * view, as the Connection panel draws it.
+     *
+     * @param array<string, mixed> $data
+     * @return array<int, array{field: string, message: string}>
+     */
+    private function changedAccountPasswordErrors(
+        array $data,
+        string $mode,
+        string $subdomain,
+        string $username,
+        string $password,
+        int $websiteId
+    ): array {
+        if ($mode !== MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS) {
+            $storeId = $this->websiteContext->getStoreId();
+
+            return $this->isChangedWithoutPassword($subdomain, $username, $password, $storeId)
+                ? [[
+                    'field' => 'password',
+                    'message' => (string)__('The subdomain or username changed — enter the password of this account.'),
+                ]]
+                : [];
+        }
+
+        $errors = [];
+        foreach ((array)($data['accounts'] ?? []) as $account) {
+            if (!is_array($account)) {
+                continue;
+            }
+            $language = (string)($account['language'] ?? '');
+            $storeId = $language === '' ? null : $this->accountResolver->storeIdForAccountKey($language, $websiteId);
+            $accountSubdomain = $this->normalizer->normalize((string)($account['subdomain'] ?? ''));
+            $accountUsername = trim((string)($account['username'] ?? ''));
+            if ($storeId === null || $accountSubdomain === '' || $accountUsername === '') {
+                continue;
+            }
+            if ($this->isChangedWithoutPassword(
+                $accountSubdomain,
+                $accountUsername,
+                (string)($account['password'] ?? ''),
+                $storeId
+            )) {
+                $errors[] = [
+                    'field' => 'accounts.' . $language . '.password',
+                    'message' => (string)__(
+                        'The subdomain or username of the %1 account changed — enter its password.',
+                        strtoupper($language)
+                    ),
+                ];
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Whether a post keeps the saved password for an account other than
+     * the one the store view holds.
+     */
+    private function isChangedWithoutPassword(
+        string $subdomain,
+        string $username,
+        string $password,
+        int $storeId
+    ): bool {
+        if ($password !== '' && !$this->credentialCheck->isKeptPassword($password)) {
+            return false;
+        }
+
+        return strcasecmp($subdomain, $this->config->getSubdomain($storeId)) !== 0
+            || $username !== $this->config->getUsername($storeId);
     }
 
     /**

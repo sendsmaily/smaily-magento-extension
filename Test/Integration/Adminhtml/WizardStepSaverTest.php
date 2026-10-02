@@ -116,7 +116,7 @@ class WizardStepSaverTest extends IntegrationTestCase
             'value' => 'legacy-default',
         ]);
 
-        $this->saver->save('connect', ['subdomain' => 'new-demo', 'username' => 'api-user']);
+        $this->saver->save('connect', ['subdomain' => 'new-demo', 'username' => 'api-user', 'password' => 'secret']);
 
         $rows = $this->configRows(Config::XML_PATH_SUBDOMAIN);
         self::assertCount(2, $rows, 'The default-scope row must survive alongside the new website row');
@@ -152,8 +152,8 @@ class WizardStepSaverTest extends IntegrationTestCase
 
     public function testSavingTwiceUpdatesTheSameWebsiteRowInsteadOfDuplicating(): void
     {
-        $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user']);
-        $this->saver->save('connect', ['subdomain' => 'demo-two', 'username' => 'api-user']);
+        $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'password' => 'secret']);
+        $this->saver->save('connect', ['subdomain' => 'demo-two', 'username' => 'api-user', 'password' => 'secret']);
 
         $rows = $this->configRows(Config::XML_PATH_SUBDOMAIN);
         self::assertCount(1, $rows);

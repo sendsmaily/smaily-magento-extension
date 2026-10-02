@@ -180,7 +180,11 @@ blank, Test connection uses the saved password, as long as the subdomain and
 username are filled in. With empty fields and nothing saved to fall back on,
 it asks you to fill in the subdomain, username and password. Saving succeeds whenever the
 subdomain and username are filled in and the subdomain is a plain one — wrong
-credentials do not block it. On **Settings > Connection** a save with
+credentials do not block it. A password field left empty keeps the saved
+password only while the subdomain and username are the saved ones: after you
+change either one (the subdomain in another case does not count), enter the
+account's password too — until then the save is refused on the password
+field, also in a per-language account block. On **Settings > Connection** a save with
 credentials Smaily does not accept shows *Saved.* beside the button and
 turns the status line to *Not connected*; press Test connection to see
 Smaily's reason. In the initial setup the Connect step is saved and the
@@ -284,10 +288,13 @@ current language. After you change a store view's locale, open
 Settings > Connection, check the block of its new language and save:
 until then the store view keeps using the account of its old language.
 The block of a language with no saved account of its own shows the
-account its store views use now. A password left empty is kept: a store
-view that moves to a language takes the password saved for that
-language's account. When you enter a new account for the language, enter
-its password too.
+account its store views use now. A password left empty is kept while the
+block's subdomain and username are the ones it showed: a store view that
+moves to a language takes the password saved for that language's account.
+When you enter another subdomain or username in the block — for example
+the new language's account in a block that still shows the old language's
+— enter its password too; until then the save is refused on the block's
+password field.
 
 ---
 

@@ -73,6 +73,10 @@ class WizardStepSaverTest extends TestCase
     {
         $this->configWriter = $this->createMock(WriterInterface::class);
         $this->config = $this->createMock(Config::class);
+        // The account the connection tests post is the one already saved,
+        // so an empty password keeps it (PRO-3690).
+        $this->config->method('getSubdomain')->willReturn('demo');
+        $this->config->method('getUsername')->willReturn('api-user');
         $this->clientProvider = $this->createMock(SmailyClientProvider::class);
         $this->clientFactory = $this->createMock(SmailyClientFactory::class);
 
@@ -348,6 +352,121 @@ class WizardStepSaverTest extends TestCase
         $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'password' => '']);
 
         self::assertFalse($this->saver->isConnectionAccepted());
+    }
+
+    /**
+     * PRO-3690: an empty or masked password keeps the saved one only for the
+     * saved account — a changed subdomain or username needs the password,
+     * refused on its field before anything is saved or checked.
+     *
+     * @dataProvider changedAccountProvider
+     */
+    public function testAChangedAccountWithoutAPasswordIsRefusedAndNothingIsSaved(
+        string $subdomain,
+        string $username,
+        string $password
+    ): void {
+        $this->clientFactory->expects(self::never())->method('create');
+
+        $errors = $this->saver->save('connect', [
+            'subdomain' => $subdomain,
+            'username' => $username,
+            'password' => $password,
+            'multilingual_mode' => 'single',
+        ]);
+
+        self::assertSame([[
+            'field' => 'password',
+            'message' => 'The subdomain or username changed — enter the password of this account.',
+        ]], $errors);
+        self::assertSame([], $this->saved);
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string, 2: string}>
+     */
+    public static function changedAccountProvider(): array
+    {
+        return [
+            'another subdomain' => ['other', 'api-user', ''],
+            'another username' => ['demo', 'other-user', ''],
+            'masked password' => ['other', 'api-user', '******'],
+        ];
+    }
+
+    /**
+     * @dataProvider keptAccountProvider
+     */
+    public function testAnAccountThatKeepsItsPasswordIsSaved(
+        string $subdomain,
+        string $username,
+        string $password
+    ): void {
+        $errors = $this->saver->save('connect', [
+            'subdomain' => $subdomain,
+            'username' => $username,
+            'password' => $password,
+        ]);
+
+        self::assertSame([], $errors);
+        self::assertSame($subdomain, $this->savedValue(Config::XML_PATH_SUBDOMAIN));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string, 2: string}>
+     */
+    public static function keptAccountProvider(): array
+    {
+        return [
+            'the saved account' => ['demo', 'api-user', ''],
+            'the saved subdomain in capitals' => ['DEMO', 'api-user', ''],
+            'another account with its password' => ['other', 'other-user', 'secret'],
+        ];
+    }
+
+    /**
+     * PRO-3690: a per-language block drawn with one account (its store
+     * view's) that names another needs that account's password; the field
+     * error names the block's password field.
+     */
+    public function testAPerLanguageBlockWithAnotherAccountAndNoPasswordIsRefused(): void
+    {
+        $this->accountResolver->method('storeIdForAccountKey')->with('fi', 0)->willReturn(3);
+        $this->clientFactory->expects(self::never())->method('create');
+
+        $errors = $this->saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'multilingual_mode' => 'a',
+            'accounts' => [
+                ['language' => 'fi', 'subdomain' => 'fi-shop', 'username' => 'fi-user', 'password' => ''],
+            ],
+        ]);
+
+        self::assertSame([[
+            'field' => 'accounts.fi.password',
+            'message' => 'The subdomain or username of the FI account changed — enter its password.',
+        ]], $errors);
+        self::assertSame([], $this->saved);
+    }
+
+    public function testAPerLanguageBlockWithItsOwnAccountKeepsItsPassword(): void
+    {
+        $this->accountResolver->method('storeIdForAccountKey')->willReturn(3);
+        $this->accountResolver->method('storeLanguages')->willReturn([3 => 'fi']);
+
+        $errors = $this->saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'multilingual_mode' => 'a',
+            'accounts' => [
+                ['language' => 'fi', 'subdomain' => 'Demo', 'username' => 'api-user', 'password' => ''],
+            ],
+        ]);
+
+        self::assertSame([], $errors);
+        self::assertTrue($this->wasSavedAtScope(Config::XML_PATH_USERNAME, ScopeInterface::SCOPE_STORES, 3));
+        self::assertFalse($this->wasSavedAtScope(Config::XML_PATH_PASSWORD, ScopeInterface::SCOPE_STORES, 3));
     }
 
     /**

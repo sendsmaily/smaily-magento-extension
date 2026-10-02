@@ -4,7 +4,8 @@
     "linear@internal": true,
     "outline@internal": true,
     "engineering@internal": true,
-    "github@internal": true
+    "github@internal": true,
+    "product@internal": true
   },
   "extraKnownMarketplaces": {
     "internal": {

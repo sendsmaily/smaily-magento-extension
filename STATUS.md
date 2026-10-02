@@ -16,6 +16,14 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-2456 evening walk-through — admin pages checked in en_US and
+  et_EE at 1440, 1100 and 400 px (2026-10-02).** Every Smaily page and
+  state, the states the store is not in drawn in the browser from the real
+  templates with stub data (no request reached the store). Fixed: the
+  initial setup draws step 1 open server-side, so the page no longer jumps
+  by the step's height when the script runs (layout shift 0.12 → 0).
+  No behaviour change.
+
 - **PRO-3642 done — skipped and withdrawn rows are not deliveries for Send
   again, and the Dashboard reads them as the Log does (2026-10-02).**
   `EventQueue` has one private delivered rule, `deliveredCondition()`

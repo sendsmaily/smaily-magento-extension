@@ -95,13 +95,16 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
             4 => __('Intelligence'),
             5 => __('Overview'),
         ] as $stepNo => $stepLabel): ?>
-        <li data-step="<?= (int)$stepNo ?>">
+        <li data-step="<?= (int)$stepNo ?>"<?= $stepNo === 1 ? ' class="active"' : '' ?>>
             <span class="smaily-step-index"><span class="smaily-step-num"><?= (int)$stepNo ?></span></span><?= $escaper->escapeHtml($stepLabel) ?>
         </li>
         <?php endforeach; ?>
     </ul>
 
-    <div class="smaily-step-panel" data-step="1">
+    <?php // Step 1 is drawn open, as the script opens it on a fresh install
+    // and on a finished setup, so the page does not jump when the script
+    // runs. ?>
+    <div class="smaily-step-panel active" data-step="1">
         <?= /* @noEscape */ $stepHead(1, $setupCompleted ? $completedPill : '') ?>
         <?php if ($setupCompleted): ?>
         <?php

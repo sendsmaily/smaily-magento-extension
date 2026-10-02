@@ -16,6 +16,23 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-1398 — no merchant page shows the config-scope banner (2026-10-02,
+  presentation only).** Re-checked against today's code: the "Overridden for
+  X" banner, its `ConfigOverrides` field anchors (the Contacts tab's
+  `include_guests`/`automation_force_opt_in` additions included) and the
+  detector/clearer behind it were already removed with the website selector
+  (PRO-1461, item 7 below); nothing references them. This pass removes the
+  four phrases that outlived them (EN + ET: "Invalid override scope.",
+  "Only website or store-view overrides can be cleared.", "Override cleared
+  — the default now applies here.", "That setting is not managed by Smaily
+  Connect, so it was not touched.") and corrects ADMIN_UI_TARGET_SPEC §2.3
+  and finding #3, which still called the banner live. No stored config
+  touched; save-time clearing stays PRO-1385. Verified with the real
+  Settings and initial-setup templates and stub data in headless Chrome,
+  en_US and et_EE: two websites, website 2 selected, per-language accounts
+  with store-view credentials (the rows the old detector flagged) — all
+  five tabs and the setup steps show no scope banner; the website selector
+  beside the tab strip names the website being edited.
 - **Storefront URL and consent slice tightened after a simplification review (2026-10-02, behaviour-neutral).** `StorefrontUrl::apply()` reads and normalizes each store's value once per request; `ensureSession()` returns nothing; `WizardData::isStorefrontDisclosureOpen()`; `normalize()` drops the redundant `pass` check (`parse_url` sets `user`, `''` included, whenever a password is given).
 - **PRO-3666 — the 3.0.0 changelog's admin-home entry once (2026-10-02).** Three merged copies on
   one line became one entry with every detail any copy carried; no other CHANGELOG bullet repeats.
@@ -655,7 +672,7 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   last item and PRO-3660's human acceptance; (2) next client HC Pro (legacy
   2.x upgrade, 4 websites): PRO-3661, PRO-3662 (spike — questions for the
   client), PRO-3663, PRO-3665; (3) PRO-3675 (Hyvä consent event on a real
-  Hyvä store); (4) UI/UX parity PRO-1398, PRO-1385, PRO-1357; then PRO-2506,
+  Hyvä store); (4) UI/UX parity PRO-1385, PRO-1357; then PRO-2506,
   PRO-1967, PRO-1198. Engine ask PRO-3649, Woo ask PRO-3673 are with their
   teams. Erkki still proofreads today's Estonian strings. Sandbox: remove
   finished agent worktrees under `.claude/worktrees` before any sandbox

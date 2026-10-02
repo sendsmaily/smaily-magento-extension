@@ -251,14 +251,15 @@ for these.
   button(s) + one InlineStatus per tab. **No global save bar — every tab
   owns its own save + status**, already the shipped idiom (per-tab AJAX
   save, STATUS.md "UI/UX parity phase 2a").
-- **Target change (§4, decision 2, not yet implemented):** the PRO-1274
-  "Overridden for X" banner + manual "Use Default" button, currently shown
-  next to shadowed fields, is removed from this common shell. Save
-  auto-clears any shadowing website/store-view override instead of
-  surfacing it — scope becomes invisible on these pages by design ("what you
-  see is what runs"). The `OverrideDetector`/`OverrideClearer` machinery is
-  reused, just triggered automatically rather than manually. See §4.2 for
-  which fields (if any) keep a scope switcher elsewhere.
+- **Scope (§4, decision 2, shipped):** no tab of this shell, and no step of
+  the initial setup, shows a config-scope banner. The PRO-1274
+  "Overridden for X" banner + manual "Use Default" button and their
+  `OverrideDetector`/`OverrideClearer` machinery were removed with the
+  website selector (PRO-1461): on a 2+-website install the selector beside
+  the tab strip is what says which website the page edits. Clearing a
+  leftover website/store-view row on save is not part of this shell and is
+  tracked separately. See §4.2 for which fields (if any) keep a scope
+  switcher elsewhere.
 
 #### 2.3.A Connection tab
 
@@ -714,7 +715,7 @@ canonical per (c).
 |---|---|---|---|
 | 1 | Stray glyph before Dashboard nav label | Admin menu (not a screen covered by A1/A2 — menu chrome is out of scope for both analyses) | Not covered by this spec — trivial standalone bug fix, listed in §5 Follow-ups. |
 | 2 | Two config surfaces, partial/duplicated | Settings (all tabs) vs native `Stores > Configuration` | **RESOLVED** (§4, decisions 1+3, plus the four field-level resolutions in §4.2, Erkki 2026-07-14): one source of truth = our own pages; **native `Stores > Configuration > Smaily` disappears entirely** — every field, including the four that were native-only orphans, now has a target home on the module's own pages. The RSS tab's own duplication (finding #10) is folded into the same fix. |
-| 3 | Opaque "overridden" scope banner | Settings (all tabs) | **RESOLVED** (§4, decision 2): scope is handled by us, never shown to the merchant. The PRO-1274 detection/clear machinery (`OverrideDetector`/`OverrideClearer`) is reused, but triggered automatically on save instead of surfaced as a visible banner + manual "Use Default" — that banner disappears from the merchant's normal view. Scope stays visible only on the advanced native page, for whatever fields survive there. Implementation (auto-clear-on-save) is a follow-up, not shipped by this doc pass. |
+| 3 | Opaque "overridden" scope banner | Settings (all tabs) | **RESOLVED** (§4, decision 2): scope is handled by us, never shown to the merchant. Shipped: the banner + manual "Use Default" and the PRO-1274 detection/clear machinery (`OverrideDetector`/`OverrideClearer`) are gone from every Settings tab and initial-setup step (PRO-1461; the leftover phrases went with PRO-1398); the native page is hidden, so no merchant surface shows scope. The website selector says which website a page edits. Clearing a leftover override on save is a separate follow-up. |
 | 4 | Settings page diverges from design layout + wrong wording | Settings (all 5 tabs) | §2.3 (a) layout target + (c) EST+ENG text tables, per tab. |
 | 5 | Setup Wizard choice-cards broken | Setup Wizard | §2.2 (a) Radio Choice-Card layout target (anatomy, states, reactive region) + §2.3.A (a)/(b) for the underlying 4-mode data it must render. |
 | 6 | Single/double opt-in is a design-pack leak | Settings > Subscribers | §2.3.B (d) REMOVE — confirmed leak, delete rather than build. |

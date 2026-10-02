@@ -46,6 +46,18 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   block → website account, rows gone), half-blank block, other website
   untouched. USER_GUIDE: "When a store view's language changes".
 
+- **PRO-3654 — engine contract synced v1.8.1 → v1.8.2 (2026-10-02, doc
+  only, no sender change).** Byte-identical with engine main 333b05e
+  (`bin/check-contract-staleness.sh` against the local engine checkout: OK,
+  md5 `d91c1aa4…`). Two changes since 1.8.1, both engine-side: §6/§7 one
+  customer per visitor token (PRO-3649 — a token bound to a customer never
+  moves to another; the merge and browse responses keep their shape, a
+  refused token binding counts 0); §5 customer `language` — when absent the
+  engine leaves the Smaily contact's `language` field as it is (PRO-3640).
+  `CustomerPayloadBuilder` already leaves `language` out when the store has
+  none, so nothing changes in code or fixtures. ARCHITECTURE and
+  UPSTREAM_PROPOSAL cite v1.8.2.
+
 - **PRO-3681 — the owner's four upgrade-day decisions for 2.x → 3.0
   (2026-10-02, Questions item 14 decided; changes what the upgrade
   writes).** `LegacyConfigMapper`: a scope's `smaily/general/enable` = 0
@@ -769,8 +781,8 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   2.x upgrade, 4 websites): PRO-3661, PRO-3662 (spike — questions for the
   client), PRO-3663, PRO-3665; (3) PRO-3675 (Hyvä consent event on a real
   Hyvä store); (4) UI/UX parity PRO-1385, PRO-1357; then PRO-2506,
-  PRO-1967, PRO-1198. Engine ask PRO-3649, Woo ask PRO-3673 are with their
-  teams. Erkki still proofreads today's Estonian strings. Sandbox: remove
+  PRO-1967, PRO-1198. Engine ask PRO-3649 is answered (contract 1.8.2, PRO-3654); Woo ask PRO-3673 is with its
+  team. Erkki still proofreads today's Estonian strings. Sandbox: remove
   finished agent worktrees under `.claude/worktrees` before any sandbox
   `setup:di:compile` (they are inside the bind-mounted module).
 

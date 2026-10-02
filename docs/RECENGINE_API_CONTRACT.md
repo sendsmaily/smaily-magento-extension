@@ -1,8 +1,8 @@
 # Smaily Recommendation Engine — API Contract v1.8
 
-**Version**: 1.8.1
+**Version**: 1.8.2
 **Published**: 2026-05-19
-**Last updated**: 2026-08-06 (v1.8.1 — §2's `403 tenant_inactive` now also covers purged/offboarded tenants. PATCH bump: no new endpoint, field or wire shape; a fix to which engine states emit an already-documented response — PRO-1820)
+**Last updated**: 2026-10-02 (v1.8.2 — §6/§7: one customer per visitor token; a token already bound to a customer never binds to another. PATCH bump: no new endpoint, field or wire shape; nothing to change sender-side — PRO-3649)
 **Status**: Stable — basis for plugin implementation
 
 ---
@@ -800,7 +800,7 @@ Batch upload of customers. **Identity is `email`** (W4 / D1): UPSERT by `(tenant
 | `first_name` | string | NO | |
 | `last_name` | string | NO | |
 | `country` | string (ISO 3166-1 alpha-2) | NO | E.g. "EE", "FI", "US". Stored **as sent** — not strictly ISO-validated (N-8). |
-| `language` | string (ISO 639-1) | NO | E.g. "et", "en", "ru". Drives **per-customer localization** of the recommendation fields pushed to Smaily — `rec_N_name` / `rec_N_description` / `rec_N_link_url` are resolved from the catalog `*_i18n` columns in this language (fallback: `tenant_settings.default_language` → `en` → `default` → first). Also pushed to the Smaily contact's native `language` field for segmentation. Falls back to the tenant default when absent. Stored **as sent** — not strictly ISO-validated (N-8). See `MULTILINGUAL_DESIGN.md`. |
+| `language` | string (ISO 639-1) | NO | E.g. "et", "en", "ru". Drives **per-customer localization** of the recommendation fields pushed to Smaily — `rec_N_name` / `rec_N_description` / `rec_N_link_url` are resolved from the catalog `*_i18n` columns in this language (fallback: `tenant_settings.default_language` → `en` → `default` → first). Also pushed to the Smaily contact's native `language` field for segmentation — only when sent. When absent, localization and copy use the tenant default, and the Smaily `language` field is left as it is (never overwritten with the default). Stored **as sent** — not strictly ISO-validated (N-8). See `MULTILINGUAL_DESIGN.md`. |
 | `phone` | string | NO | |
 | `first_seen_at` | ISO 8601 | NO | Registration timestamp (if different from row creation). Not overwritten on update (earliest wins). |
 | `external_id` | string | NO | Platform-internal user_id |
@@ -1052,7 +1052,10 @@ For each event, the engine resolves `customer_id` as follows:
 3. Else if `external_id` is present → look up `customers` by external_id → resolve customer_id
 4. Otherwise → INSERT browse_event with `customer_id = NULL` (anonymous)
 
-**Retroactive binding**: when `customer_id` is resolved (steps 1–3), the engine UPDATEs all earlier `browse_events` with the same `session_id` where `customer_id IS NULL`. The customer gets full session history even if their first click was anonymous.
+**Retroactive binding**: when `customer_id` is resolved (steps 1–3), the engine UPDATEs all earlier `browse_events` with the same `session_id` where `customer_id IS NULL`. The customer gets full session history even if their first click was anonymous. When the event also carries `smaily_visitor_token`, the engine does the same for earlier anonymous events with the same token (cross-session).
+
+<a name="one-customer-per-visitor-token"></a>
+**One customer per visitor token** (v1.8.2, PRO-3649): a link can set the `smaily_vt` cookie, so the token on a device says nothing about who uses that device next. Once a visitor token is bound to a customer, the engine never binds that token's browsing — earlier or later — to a different customer; the first binding wins, with no age limit. A token is bound when the engine issued it for a customer (`visitor_tokens`) or when earlier browse events carrying it already belong to a customer. A token that is not bound yet binds exactly as described above. When the token belongs to someone else, the event itself still resolves by `customer_email` / `external_id` (steps 2–3) and its session still binds; only the token-based retroactive binding is skipped. The response shape does not change (`retroactive_bound` simply excludes the skipped rows). Senders change nothing.
 
 **Profiling opt-out (Art 21) — engine-side enforcement at ingest:** if the resolved customer has opted out ([§10](#10-post-apiv1customeremailopt-out)), the engine does **not** bind the event on any resolution path (visitor token, email, external_id); the event is stored **anonymous** (`customer_id = NULL`) and excluded from retroactive binding. Enforcement is engine-side because the visitor token is engine-issued — a sender cannot know which customer it maps to, so the token path cannot be filtered client-side.
 
@@ -1184,6 +1187,8 @@ At least **one** of `anon_session_id` or `smaily_visitor_token` must be present 
 ```
 
 **Idempotency**: same merge twice = no-op (events already bound; the second call's `browse_events_updated` reports 0).
+
+**One customer per visitor token** (v1.8.2, PRO-3649 — same rule as [§6](#one-customer-per-visitor-token)): if `smaily_visitor_token` is already bound to a different customer, the merge binds nothing by the token — no browse events move and the `visitor_tokens` row keeps its customer. The `anon_session_id` part of the same call binds as before. The response is still `200` with the same shape; the token part simply contributes `0` to `browse_events_updated` and `visitor_tokens_bound`. The same customer merging their own token, or a token that is not bound yet, behaves as before. Senders change nothing and should not retry.
 
 ---
 
@@ -2045,6 +2050,12 @@ curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
 - **The gate read only one of the two deactivation stamps.** A GDPR-purged (offboarded) tenant's API key kept authenticating, so a plugin that outlived its purge re-created customer and order rows inside a tombstoned tenant — observed in production on 2026-08-04 for two tenants purged on 2026-07-30. Both key-resolution paths (per-connection keys and the legacy single-key fallback) now carry the tombstone, and the shared authentication step refuses it.
 - **Deliberately the SAME response, not a new one.** A purged tenant answers byte-identically to a suspended one, `"tenant_status": "suspended"` literal included. That field is a fixed string, never a state discriminator — senders must not branch on it. The plugin contract gains no state: a sender's correct reaction (stop sending, surface an admin notice, do not retry) is already the documented one.
 - **Nothing to implement plugin-side.** A plugin that already handles `403 tenant_inactive` per the §2 sender rule is correct as-is. The semantics are informational: unlike suspension, a purge is permanent — the credentials cannot be revived by any key, setup token or regenerate flow (PRO-1820 closed those mints on 2026-08-05), and data sent after the purge is rejected at the gate and never stored.
+
+**v1.8.2** (2026-10-02) — **§6/§7: one customer per visitor token**. PATCH bump per the [Versioning](#versioning) rule (no new endpoint, no new field, no shape change — a fix to *which rows* the engine binds). PRO-3649, Erkki's decision 2026-10-02:
+- **The gap.** A campaign or other link can set the visitor-token cookie. The identity merge bound the token's browsing history — retroactively too — to whoever logged in next on that device, and the browse ingest did the same whenever an event carrying the token resolved a customer. One person's browsing could land on another customer's profile, and a shared link could push invented browsing onto someone else.
+- **The rule.** Once a visitor token is bound to a customer, the engine never binds that token's browsing (past or future) to a different customer. The first binding wins; no age limit. An unbound token binds as before; the same customer with their own token behaves as before.
+- **What still binds.** The merge's `anon_session_id` and the browse event's own `customer_email` / `external_id` resolution are unchanged — only the token-based binding is refused.
+- **Nothing to implement sender-side.** Request and response shapes are unchanged; a refused token binding reports `0` in the existing counts, not an error.
 
 ### Appendix F: Migration notes
 

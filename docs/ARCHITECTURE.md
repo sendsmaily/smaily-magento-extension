@@ -736,7 +736,7 @@ Initial setup, Settings, Log. Design rules:
 ## Wire contracts
 
 The authoritative engine contract is
-[RECENGINE_API_CONTRACT.md](RECENGINE_API_CONTRACT.md) (v1.8.1, byte-synced
+[RECENGINE_API_CONTRACT.md](RECENGINE_API_CONTRACT.md) (v1.8.2, byte-synced
 across the Smaily connect repositories). Load-bearing invariants
 implemented here:
 

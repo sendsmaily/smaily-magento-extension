@@ -87,6 +87,18 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   URL sits under the pack's small "Feed URL" label (ET "Voo-URL", the
   WooCommerce plugin's wording) as a 12.5px monospace chip with the pack's
   #d6d6d6 border and 9px 11px padding.
+  No load jump left in the initial setup: `WizardData::getStartStep()`
+  (Connect on a fresh install and on a finished setup, Contacts once the
+  credentials are filled in) and `getReachedStep()` (5 after a finished
+  setup) are read by the template, which draws that step open, the rail's
+  active/done marks and the Back button before the script runs; the script
+  starts from the same two values instead of deciding on its own. Before,
+  a store with credentials but an unfinished setup was drawn on Connect and
+  switched to Contacts when the script ran (content 532 → 1093 px tall at
+  1440 px; 1248 → 1093 px in a two-language store); a finished setup's
+  rail gained its done marks and Back disappeared only then. Now first
+  paint and scripted state are the same in all four states (fresh,
+  credentials only, two-language, finished). Unit: `WizardDataTest` (+3).
 
 - **PRO-2456 evening walk-through — admin pages checked in en_US and
   et_EE at 1440, 1100 and 400 px (2026-10-02).** Every Smaily page and

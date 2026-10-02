@@ -67,6 +67,31 @@ class WizardData implements ArgumentInterface
     }
 
     /**
+     * The initial setup step the page opens on, drawn server-side so the
+     * page does not jump when the script runs (PRO-2456): Connect on a fresh
+     * install and on a finished setup (its summary), Contacts once the
+     * Smaily credentials are filled in but the setup is not finished.
+     */
+    public function getStartStep(): int
+    {
+        if ($this->isSetupCompleted()) {
+            return 1;
+        }
+
+        return $this->config->isConnected($this->websiteContext->getStoreId()) ? 2 : 1;
+    }
+
+    /**
+     * The furthest initial setup step reached on load: every step after a
+     * finished setup, else the step it opens on. Steps up to it stay
+     * unlocked in the step rail.
+     */
+    public function getReachedStep(): int
+    {
+        return $this->isSetupCompleted() ? 5 : $this->getStartStep();
+    }
+
+    /**
      * The website the page/wizard currently targets — feeds the Settings
      * selector's/wizard chooser's own chrome (RFC_MULTI_WEBSITE.md §2).
      */

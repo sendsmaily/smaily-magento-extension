@@ -209,6 +209,37 @@ class WizardDataTest extends TestCase
         self::assertTrue($this->viewModel->isSetupCompleted());
     }
 
+    /**
+     * PRO-2456: the initial setup draws the step it opens on server-side, so
+     * the page does not jump when the script runs.
+     */
+    public function testAFreshSetupOpensOnConnectWithOnlyThatStepReached(): void
+    {
+        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->config->method('isConnected')->willReturn(false);
+
+        self::assertSame(1, $this->viewModel->getStartStep());
+        self::assertSame(1, $this->viewModel->getReachedStep());
+    }
+
+    public function testFilledInCredentialsOpenAnUnfinishedSetupOnContacts(): void
+    {
+        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->config->expects(self::atLeastOnce())->method('isConnected')->with(5)->willReturn(true);
+
+        self::assertSame(2, $this->viewModel->getStartStep());
+        self::assertSame(2, $this->viewModel->getReachedStep());
+    }
+
+    public function testAFinishedSetupOpensOnConnectWithEveryStepReached(): void
+    {
+        $this->scopeConfig->method('isSetFlag')->willReturn(true);
+        $this->config->method('isConnected')->willReturn(true);
+
+        self::assertSame(1, $this->viewModel->getStartStep());
+        self::assertSame(5, $this->viewModel->getReachedStep());
+    }
+
     public function testSelectorHelpersDelegateToWebsiteContext(): void
     {
         $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);

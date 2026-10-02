@@ -52,6 +52,14 @@ $stepTitles = [
 // Completed marker and "Edit credentials" (PRO-3563, the pack's
 // completed-revisit frame); rendered server-side so the form never flashes.
 $setupCompleted = $viewModel->isSetupCompleted();
+// The step the page opens on and the furthest step reached, from the server,
+// so the right step, rail and footer are drawn before the script runs and
+// the page does not jump (PRO-2456). The script starts from the same two.
+$startStep = $viewModel->getStartStep();
+$reachedStep = $viewModel->getReachedStep();
+$panelClass = static function (int $stepNo) use ($startStep): string {
+    return 'smaily-step-panel' . ($stepNo === $startStep ? ' active' : '');
+};
 $completedPill = '<span class="smaily-pill smaily-pill--active" id="smaily-w-completed-pill">'
     . '<span class="smaily-pill__dot"></span>' . $escaper->escapeHtml(__('Completed')) . '</span>';
 $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $stepTitles): string {
@@ -98,16 +106,14 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
             4 => [__('Intelligence'), __('Create a connection with Campaign Intelligence (optional)')],
             5 => [__('Overview'), __('Summary and last check')],
         ] as $stepNo => [$stepLabel, $stepSub]): ?>
-        <li data-step="<?= (int)$stepNo ?>"<?= $stepNo === 1 ? ' class="active"' : '' ?>>
+        <?php $stepState = $stepNo === $startStep ? 'active' : ($stepNo <= $reachedStep ? 'done' : ''); ?>
+        <li data-step="<?= (int)$stepNo ?>"<?= $stepState !== '' ? ' class="' . $escaper->escapeHtmlAttr($stepState) . '"' : '' ?>>
             <span class="smaily-step-index"><span class="smaily-step-num"><?= (int)$stepNo ?></span></span><span class="smaily-step-text"><span class="smaily-step-name"><?= $escaper->escapeHtml($stepLabel) ?></span><span class="smaily-step-sub"><?= $escaper->escapeHtml($stepSub) ?></span></span>
         </li>
         <?php endforeach; ?>
     </ul>
 
-    <?php // Step 1 is drawn open, as the script opens it on a fresh install
-    // and on a finished setup, so the page does not jump when the script
-    // runs. ?>
-    <div class="smaily-step-panel active" data-step="1">
+    <div class="<?= /* @noEscape */ $panelClass(1) ?>" data-step="1">
         <?= /* @noEscape */ $stepHead(1, $setupCompleted ? $completedPill : '') ?>
         <?php if ($setupCompleted): ?>
         <?php
@@ -134,12 +140,12 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
         <?php endif; ?>
         <div id="smaily-w-connect-form"<?= $setupCompleted ? ' style="display:none"' : '' ?>><?= $block->getChildHtml('panel.connection') ?></div>
     </div>
-    <div class="smaily-step-panel" data-step="2"><?= /* @noEscape */ $stepHead(2) ?><?= $block->getChildHtml('panel.subscribers') ?></div>
-    <div class="smaily-step-panel" data-step="3"><?= /* @noEscape */ $stepHead(3) ?><?= $block->getChildHtml('panel.automations') ?></div>
-    <div class="smaily-step-panel" data-step="4"><?= /* @noEscape */ $stepHead(4) ?><?= $block->getChildHtml('panel.intelligence') ?></div>
+    <div class="<?= /* @noEscape */ $panelClass(2) ?>" data-step="2"><?= /* @noEscape */ $stepHead(2) ?><?= $block->getChildHtml('panel.subscribers') ?></div>
+    <div class="<?= /* @noEscape */ $panelClass(3) ?>" data-step="3"><?= /* @noEscape */ $stepHead(3) ?><?= $block->getChildHtml('panel.automations') ?></div>
+    <div class="<?= /* @noEscape */ $panelClass(4) ?>" data-step="4"><?= /* @noEscape */ $stepHead(4) ?><?= $block->getChildHtml('panel.intelligence') ?></div>
 
     <!-- Step 5: Overview (wizard-only) -->
-    <div class="smaily-step-panel" data-step="5">
+    <div class="<?= /* @noEscape */ $panelClass(5) ?>" data-step="5">
         <?= /* @noEscape */ $stepHead(5) ?>
         <div class="smaily-card">
             <?php // One of the two shows: Smaily accepted the saved credentials (PRO-3560) or not. ?>
@@ -170,7 +176,7 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
     </div>
 
     <div class="smaily-footer">
-        <button type="button" class="action-secondary" id="smaily-w-back"><span><?= $escaper->escapeHtml(__('Back')) ?></span></button>
+        <button type="button" class="action-secondary" id="smaily-w-back"<?= $startStep === 1 ? ' style="display:none"' : '' ?>><span><?= $escaper->escapeHtml(__('Back')) ?></span></button>
         <div>
             <?php if ($setupCompleted): ?>
             <button type="button" class="action-secondary" id="smaily-w-edit-credentials"><span><?= $escaper->escapeHtml(__('Edit credentials')) ?></span></button>
@@ -202,7 +208,7 @@ require(['jquery'], function ($) {
     // reached (from the saved config on load, then per-step saves). The
     // stepper derives "done" (unlocked, clickable) from maxStep, so going
     // Back never re-locks steps that were already completed.
-    var step = 1, maxStep = 1;
+    var step = <?= (int)$startStep ?>, maxStep = <?= (int)$reachedStep ?>;
     // Whether Smaily accepted the saved credentials (PRO-3560): from the page
     // load, then from the finish step's answer.
     var verified = !!panels.boot.verified;
@@ -294,15 +300,10 @@ require(['jquery'], function ($) {
         render();
     });
 
-    if (panels.boot.setupCompleted) {
-        // Setup finished earlier: open on the connection summary (step 1)
-        // and keep every step unlocked for revisits.
-        step = 1;
-        maxStep = 5;
-    } else {
-        step = panels.isConnected() ? 2 : 1;
-        maxStep = step;
-    }
+    // The start step and the furthest step reached come from the server
+    // (WizardData::getStartStep() / getReachedStep()), which drew them: a
+    // finished setup opens on the connection summary with every step
+    // unlocked, filled-in credentials open an unfinished setup on Contacts.
     if (step === 3) {
         panels.loadWorkflows('#smaily-w-save-result');
     }

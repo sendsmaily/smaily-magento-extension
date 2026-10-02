@@ -198,24 +198,27 @@ class StateManager
     }
 
     /**
-     * Quote IDs in a terminal status, which must not be (re)mailed.
+     * Restrict a quote select to the quotes not in a terminal status — the
+     * ones that may still be mailed (the cron's gate). $quoteIdColumn is the
+     * select's quote id column, e.g. `main_table.entity_id`.
      *
-     * @param int[] $quoteIds
-     * @return int[]
+     * A LEFT JOIN on the unique quote_id: at most one row per quote, so the
+     * select's page still counts quotes. Done in SQL, not on a loaded page:
+     * handled carts stay active and idle, and would otherwise fill the page
+     * and keep newer carts out of it (PRO-3711).
      */
-    public function filterAlreadyHandled(array $quoteIds): array
+    public function excludeHandled(Select $select, string $quoteIdColumn): void
     {
-        if (!$quoteIds) {
-            return [];
-        }
-
         $connection = $this->resourceConnection->getConnection(self::CONNECTION);
-        $select = $connection->select()
-            ->from($this->table(), ['quote_id'])
-            ->where('quote_id IN (?)', array_map('intval', $quoteIds))
-            ->where('status IN (?)', self::TERMINAL_STATUSES);
-
-        return array_map('intval', $connection->fetchCol($select));
+        $select->joinLeft(
+            ['smaily_cart_state' => $this->table()],
+            $connection->quoteInto(
+                'smaily_cart_state.quote_id = ' . $quoteIdColumn . ' AND smaily_cart_state.status IN (?)',
+                self::TERMINAL_STATUSES
+            ),
+            []
+        );
+        $select->where('smaily_cart_state.quote_id IS NULL');
     }
 
     /**
@@ -226,7 +229,7 @@ class StateManager
      * "already handled" marker, and the module must not touch the core
      * `quote` table, so deleting it would let a still-active idle quote be
      * picked up again and mailed to the erased address. `erased` is a
-     * terminal status like `completed` — filterAlreadyHandled() covers it,
+     * terminal status like `completed` — excludeHandled() covers it,
      * so the cron neither mails the quote nor tracks it afresh.
      */
     public function anonymizeForEmail(string $email): int
@@ -250,7 +253,7 @@ class StateManager
      * than the cutoff, or a guest's typed email the scan has not seen) has no
      * row, or one without this address, and would be mailed to the erased
      * address on the next sweep. The core quote rows are only read: the
-     * tombstone is what makes filterAlreadyHandled() skip them.
+     * tombstone is what makes excludeHandled() skip them.
      *
      * @return int the carts newly marked
      */

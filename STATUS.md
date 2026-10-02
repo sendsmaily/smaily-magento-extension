@@ -27,6 +27,30 @@ OK). Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3711 — a busy store keeps sending abandoned-cart reminders
+  (2026-10-02; found by reading the code).** `Cron\AbandonedCart` loaded the
+  first 100 idle carts of the 24-hour window (by quote id) and only then
+  dropped the handled ones in PHP (`filterAlreadyHandled()`). Handled carts
+  stay active and idle, so with more than 100 of them in the window a newer
+  cart was never loaded. Now `StateManager::excludeHandled()` adds a LEFT
+  JOIN on `smaily_abandoned_cart` (unique `quote_id`, terminal statuses —
+  `skipped` included — in the ON clause) and `quote_id IS NULL` to the
+  collection's select, before the LIMIT; page size, order and the other
+  filters are unchanged. `filterAlreadyHandled()` is removed: after the SQL
+  exclusion it only re-read rows the same SELECT had just checked (no guard
+  against a concurrent run either), and the tests that used it as the
+  cron's gate (`StateManagerTest`, `GdprEraseTest`) now run
+  `excludeHandled()` on a select over the quote mirror. EXPLAIN on the
+  throwaway integration DB (quote / quote_address with Magento's own
+  indexes, 50,000 quotes): the side table is an `eq_ref` on
+  `SMAILY_ABANDONED_CART_QUOTE_ID`, "Not exists" (antijoin); the quote
+  access is the same as before (index scan on PRIMARY in id order, as the
+  ORDER BY + LIMIT asks). Integration `Cron\AbandonedCartTest` now runs
+  Magento's own quote collection on the quote + quote_address mirrors (the
+  mirror gains `updated_at`); new case: 150 handled carts (each terminal
+  status) + a new cart + an `open` opt-in cart → both reminded, no handled
+  cart weighed again — red on the old code. Not run in the sandbox.
+
 - **PRO-3693 follow-through — the security review's findings
   (2026-10-02, the owner's decisions).** (1) The guest-email endpoint's
   limits: 30 requests / 10 min per caller (IPv4 as is, IPv6 by its /64, an
@@ -47,8 +71,8 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   the erased address on the next sweep. Integration `GdprEraseTest`
   (quote + new quote_address mirrors): cart email in another case, billing
   address only, an opt-in row under another address, inactive and
-  bystander carts left alone, quotes unchanged, `filterAlreadyHandled()`
-  (the cron's gate) skips the three, a second run is a no-op. The quote
+  bystander carts left alone, quotes unchanged, the cron's gate (now
+  `excludeHandled()`, PRO-3711) skips the three, a second run is a no-op. The quote
   scan uses `LOWER()` on unindexed columns — a full scan of `quote`, as the
   queue scan already is; an admin one-off.
   (3) One abandoned-cart reminder per address per 24 h, across carts:

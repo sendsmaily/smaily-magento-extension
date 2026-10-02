@@ -8,8 +8,10 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Cron;
 
-use Magento\Framework\DB\Select;
+use Magento\Framework\Data\Collection\EntityFactoryInterface;
+use Magento\Framework\Model\ResourceModel\Db\VersionControl\Snapshot;
 use Magento\Quote\Model\Quote;
+use Magento\Quote\Model\ResourceModel\Quote as QuoteResource;
 use Magento\Quote\Model\ResourceModel\Quote\Collection as QuoteCollection;
 use Magento\Quote\Model\ResourceModel\Quote\CollectionFactory as QuoteCollectionFactory;
 use Magento\Store\Api\Data\StoreInterface;
@@ -31,12 +33,15 @@ use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\ResourceModel\Log\Collection;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
 
 /**
- * PRO-3693: one address gets at most one abandoned-cart reminder in 24
- * hours, whatever number of carts carry it — against the real cart tracker
- * and the real queue. Magento's quote collection and the payload builder are
- * stubbed: each test hands the cron the idle carts and their addresses.
+ * The abandoned-cart scan against the real cart tracker, the real queue and
+ * Magento's own quote collection on the quote and quote_address mirrors.
+ * PRO-3693: one address gets at most one reminder in 24 hours, whatever
+ * number of carts carry it. PRO-3711: handled carts never keep a new one
+ * out of the scan's page. The payload builder is stubbed: it reads the
+ * cart's own email.
  */
 class AbandonedCartTest extends IntegrationTestCase
 {
@@ -44,16 +49,21 @@ class AbandonedCartTest extends IntegrationTestCase
 
     private StateManager $stateManager;
 
-    /**
-     * @var array<int, string> the address each idle cart resolves to
-     */
-    private array $idleCarts = [];
-
     protected function setUp(): void
     {
         parent::setUp();
         require_once __DIR__ . '/../Support/Stub/QuoteCollectionFactory.php';
         $this->stateManager = $this->objectManager->create(StateManager::class);
+        $schema = new SchemaInstaller($this->connection);
+        $schema->createQuote();
+        $schema->createQuoteAddress();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->connection->query('DROP TABLE IF EXISTS `quote_address`');
+        $this->connection->query('DROP TABLE IF EXISTS `quote`');
+        parent::tearDown();
     }
 
     public function testASecondCartOfARemindedAddressIsSkippedAndTheLogSaysWhy(): void
@@ -61,7 +71,7 @@ class AbandonedCartTest extends IntegrationTestCase
         $this->stateManager->markMailed(1, 1, 'shopper@example.com');
         $this->clock->travel(3 * 3600);
 
-        $this->idleCarts = [2 => 'Shopper@Example.com', 3 => 'other@example.com'];
+        $this->idleCarts([2 => 'Shopper@Example.com', 3 => 'other@example.com']);
         $this->cron()->execute();
 
         self::assertSame(StateManager::STATUS_SKIPPED, $this->statusOf(2), 'Compared in any case');
@@ -89,7 +99,7 @@ class AbandonedCartTest extends IntegrationTestCase
 
     public function testTwoCartsOfOneAddressInOneRunGetOneReminder(): void
     {
-        $this->idleCarts = [5 => 'twice@example.com', 6 => 'TWICE@example.com'];
+        $this->idleCarts([5 => 'twice@example.com', 6 => 'TWICE@example.com']);
         $this->cron()->execute();
 
         self::assertSame(StateManager::STATUS_MAILED, $this->statusOf(5));
@@ -101,7 +111,7 @@ class AbandonedCartTest extends IntegrationTestCase
         $this->stateManager->markMailed(1, 1, 'shopper@example.com');
         $this->clock->travel(86400 + 60);
 
-        $this->idleCarts = [2 => 'shopper@example.com'];
+        $this->idleCarts([2 => 'shopper@example.com']);
         $this->cron()->execute();
 
         self::assertSame(StateManager::STATUS_MAILED, $this->statusOf(2));
@@ -111,7 +121,7 @@ class AbandonedCartTest extends IntegrationTestCase
     {
         $this->stateManager->markMailed(1, 1, 'shopper@example.com');
         $this->clock->travel(3600);
-        $this->idleCarts = [2 => 'shopper@example.com'];
+        $this->idleCarts([2 => 'shopper@example.com']);
         $this->cron()->execute();
         $this->cron()->execute();
 
@@ -119,11 +129,53 @@ class AbandonedCartTest extends IntegrationTestCase
 
         // The first reminder ages out; the skip did not start a new 24 hours.
         $this->clock->travel(86400);
-        $this->idleCarts = [2 => 'shopper@example.com', 3 => 'shopper@example.com'];
+        $this->idleCarts([2 => 'shopper@example.com', 3 => 'shopper@example.com']);
         $this->cron()->execute();
 
         self::assertSame(StateManager::STATUS_SKIPPED, $this->statusOf(2), 'A skipped cart stays skipped');
         self::assertSame(StateManager::STATUS_MAILED, $this->statusOf(3));
+    }
+
+    /**
+     * PRO-3711: the scan reads one page of 100 carts. Handled carts stay
+     * active and idle, so with more of them than a page holds a new cart was
+     * never loaded. Each terminal status counts as handled; an open row (the
+     * checkout opt-in) does not.
+     */
+    public function testANewCartIsRemindedWhenMoreHandledCartsThanOnePageHoldsAreIdle(): void
+    {
+        $statuses = [
+            StateManager::STATUS_MAILED,
+            StateManager::STATUS_SKIPPED,
+            StateManager::STATUS_COMPLETED,
+            StateManager::STATUS_ERASED,
+            StateManager::STATUS_EXPIRED,
+        ];
+        $handled = [];
+        $tracked = [];
+        for ($quoteId = 1; $quoteId <= 150; $quoteId++) {
+            $handled[$quoteId] = 'handled-' . $quoteId . '@example.com';
+            $tracked[] = [
+                'quote_id' => $quoteId,
+                'store_id' => 1,
+                'email' => $handled[$quoteId],
+                'status' => $statuses[$quoteId % count($statuses)],
+            ];
+        }
+        $this->idleCarts($handled);
+        $this->connection->insertMultiple(self::CART_TABLE, $tracked);
+        $this->idleCarts([151 => 'new@example.com', 152 => 'opted-in@example.com']);
+        $this->stateManager->setNewsletterOptin(152, 1, 'opted-in@example.com', true);
+
+        $this->cron()->execute();
+
+        self::assertSame(StateManager::STATUS_MAILED, $this->statusOf(151), 'The new cart is reminded');
+        self::assertSame(StateManager::STATUS_MAILED, $this->statusOf(152), 'An open row is not handled');
+        self::assertSame(
+            ['new@example.com', 'opted-in@example.com'],
+            array_keys($this->queueRowsByEntity()),
+            'No handled cart is weighed again'
+        );
     }
 
     private function cron(): AbandonedCart
@@ -156,7 +208,7 @@ class AbandonedCartTest extends IntegrationTestCase
 
         $payloadBuilder = $this->createMock(PayloadBuilder::class);
         $payloadBuilder->method('build')->willReturnCallback(
-            fn (Quote $quote): array => ['email' => $this->idleCarts[(int)$quote->getId()]]
+            fn (Quote $quote): array => ['email' => (string)$quote->getData('customer_email')]
         );
 
         return new AbandonedCart(
@@ -173,35 +225,57 @@ class AbandonedCartTest extends IntegrationTestCase
     }
 
     /**
-     * A quote collection that holds the idle carts of the current test.
+     * Seed active carts with items, idle for an hour, each with its email on
+     * the cart. A cart seeded again is idle for an hour again.
+     *
+     * @param array<int, string> $emailsByQuote
+     */
+    private function idleCarts(array $emailsByQuote): void
+    {
+        $rows = [];
+        foreach ($emailsByQuote as $quoteId => $email) {
+            $rows[] = [
+                'entity_id' => $quoteId,
+                'store_id' => 1,
+                'is_active' => 1,
+                'items_count' => 1,
+                'customer_email' => $email,
+                'updated_at' => $this->clockDate(-3600),
+            ];
+        }
+        $this->connection->insertOnDuplicate('quote', $rows, ['customer_email', 'updated_at']);
+    }
+
+    /**
+     * Magento's own quote collection on the mirrors — the scan's SQL runs as
+     * in production. Only what needs the full application is stubbed: the
+     * resource model (it names the table) and the quote objects (built
+     * without their constructor, holding only the row).
      */
     private function quoteCollectionFactory(): QuoteCollectionFactory
     {
-        $select = $this->createMock(Select::class);
-        $select->method('joinLeft')->willReturnSelf();
-        $select->method('where')->willReturnSelf();
+        $resource = $this->createMock(QuoteResource::class);
+        $resource->method('getConnection')->willReturn($this->connection);
+        $resource->method('getMainTable')->willReturn('quote');
+        $resource->method('getTable')->willReturnArgument(0);
+        $resource->method('getIdFieldName')->willReturn('entity_id');
 
-        $collection = $this->createMock(QuoteCollection::class);
-        $collection->method('addFieldToFilter')->willReturnSelf();
-        $collection->method('setOrder')->willReturnSelf();
-        $collection->method('setPageSize')->willReturnSelf();
-        $collection->method('getSelect')->willReturn($select);
-        $collection->method('getConnection')->willReturn($this->connection);
-        $collection->method('getTable')->willReturnArgument(0);
-        $collection->method('getItems')->willReturnCallback(function (): array {
-            $quotes = [];
-            foreach (array_keys($this->idleCarts) as $quoteId) {
-                $quote = $this->createMock(Quote::class);
-                $quote->method('getId')->willReturn($quoteId);
-                $quote->method('getStoreId')->willReturn(1);
-                $quotes[$quoteId] = $quote;
-            }
+        $entityFactory = $this->createMock(EntityFactoryInterface::class);
+        $entityFactory->method('create')->willReturnCallback(function (): Quote {
+            $quote = (new \ReflectionClass(Quote::class))->newInstanceWithoutConstructor();
+            $quote->setIdFieldName('entity_id');
 
-            return $quotes;
+            return $quote;
         });
 
         $factory = $this->createMock(QuoteCollectionFactory::class);
-        $factory->method('create')->willReturn($collection);
+        $factory->method('create')->willReturnCallback(
+            fn (): QuoteCollection => $this->objectManager->create(QuoteCollection::class, [
+                'entityFactory' => $entityFactory,
+                'entitySnapshot' => $this->createMock(Snapshot::class),
+                'resource' => $resource,
+            ])
+        );
 
         return $factory;
     }

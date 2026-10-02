@@ -112,19 +112,21 @@ class AbandonedCart
         // EITHER place (PayloadBuilder resolves the recipient with the same
         // fallback order). PRO-1275.
         $this->requireAnyEmail($collection);
+        // A handled cart (terminal tracker row: mailed, skipped, erased, ...)
+        // can stay active and idle; left out in SQL, so handled carts never
+        // take the page's places from newer carts (PRO-3711).
+        $this->stateManager->excludeHandled($collection->getSelect(), 'main_table.entity_id');
 
-        $quotes = [];
+        $candidates = [];
         foreach ($collection->getItems() as $quote) {
             if ($quote instanceof Quote) {
-                $quotes[(int)$quote->getId()] = $quote;
+                $candidates[] = $quote;
             }
         }
-        if (!$quotes) {
+        if (!$candidates) {
             return;
         }
 
-        $handled = $this->stateManager->filterAlreadyHandled(array_keys($quotes));
-        $candidates = array_diff_key($quotes, array_flip($handled));
         $remindedSince = $this->dateTime->gmtDate('Y-m-d H:i:s', $now - self::REMINDER_INTERVAL_SECONDS);
 
         $mailed = 0;

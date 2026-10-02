@@ -379,7 +379,7 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   ran only `smaily:gdpr erase`, not Magento's own customer deletion) looks
   untracked to the next sweep and is mailed to the address just erased. What
   stays is an email-less tombstone — `email` NULL, status
-  `StateManager::STATUS_ERASED` — which `filterAlreadyHandled()` covers like
+  `StateManager::STATUS_ERASED` — which `excludeHandled()` covers like
   any other terminal status, so `Cron\AbandonedCart` neither mails that
   quote nor tracks it afresh, and the status no longer reads `mailed`, so the
   PRO-2453 purchase marker never fires for an erased contact either. The
@@ -479,8 +479,12 @@ import mode — no Magento emails.
 ### Abandoned cart
 
 `Cron/AbandonedCart` scans the native `quote` table (active, has items +
-email, idle past cutoff, younger than 24 h), diffs against the
-`smaily_abandoned_cart` side table, marks `mailed` **before** dispatching
+email, idle past cutoff, younger than 24 h; 100 per run per website, oldest
+quote id first), leaves out in the same SQL every quote whose
+`smaily_abandoned_cart` row is terminal (`StateManager::excludeHandled()`: a
+LEFT JOIN on the unique `quote_id` with the terminal statuses in the ON
+clause, `WHERE ... quote_id IS NULL` — one lookup per quote on that unique
+index, an antijoin in MySQL's plan), marks `mailed` **before** dispatching
 (a crash costs one reminder, never a duplicate), and enqueues the
 automation. The payload's `abandoned_cart_url` is an HMAC-signed
 `smaily/cart/restore?id=&ts=&token=` link (`AbandonedCart\RestoreTokenManager`,
@@ -489,6 +493,15 @@ the moment the reminder was created, inside the signature; the link expires
 30 days later and then lands on the cart page with a notice, restoring
 nothing. A link without `ts` (issued before links carried it) is accepted for
 30 days after the tracker row's `mail_sent_at`, and is expired without one.
+
+**Handled carts never fill the page (PRO-3711).** A handled cart (a
+terminal row: `mailed`, `skipped`, `completed`, `erased`, `expired`) that is
+still active keeps matching the scan's `quote` filters for the rest of its
+24 hours. The terminal rows were once dropped in PHP after the page of 100
+was loaded, so on a store with more than 100 such carts in the window the
+page held only handled carts and a newer cart was never loaded. The
+exclusion is in the SQL, before the LIMIT, so the page holds only
+candidates.
 
 **One reminder per address per 24 hours (PRO-3693).** Before it marks a
 candidate `mailed`, the cron asks `StateManager::hasReminderSince()` whether

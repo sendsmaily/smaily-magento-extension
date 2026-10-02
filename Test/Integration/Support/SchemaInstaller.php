@@ -72,7 +72,8 @@ class SchemaInstaller
      * patch it. The legacy reminder_date/is_sent columns are part of the
      * stub because the 2.8.x schema patch exists to drop them, and that
      * patch reads store_id too. customer_id, is_active and items_count are
-     * what the guest-cart email capture checks.
+     * what the guest-cart email capture checks; updated_at is the
+     * abandoned-cart scan's idle window.
      */
     public function createQuote(): void
     {
@@ -85,6 +86,7 @@ class SchemaInstaller
             . ' `is_active` SMALLINT UNSIGNED NULL DEFAULT 1,'
             . ' `items_count` INT UNSIGNED NULL DEFAULT 0,'
             . ' `customer_email` VARCHAR(255) NULL,'
+            . ' `updated_at` TIMESTAMP NULL,'
             . ' `reminder_date` TIMESTAMP NULL,'
             . ' `is_sent` SMALLINT NULL,'
             . ' PRIMARY KEY (`entity_id`)'

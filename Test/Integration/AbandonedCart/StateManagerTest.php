@@ -10,6 +10,7 @@ namespace Smaily\Connect\Test\Integration\AbandonedCart;
 
 use Smaily\Connect\Model\AbandonedCart\StateManager;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
 
 /**
  * The tracker's own gate against the real table. Contacts are synthetic.
@@ -20,10 +21,20 @@ class StateManagerTest extends IntegrationTestCase
 
     private StateManager $stateManager;
 
+    private SchemaInstaller $schema;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->stateManager = $this->objectManager->create(StateManager::class);
+        $this->schema = new SchemaInstaller($this->connection);
+        $this->schema->createQuote();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->connection->query('DROP TABLE IF EXISTS `quote`');
+        parent::tearDown();
     }
 
     /**
@@ -35,12 +46,13 @@ class StateManagerTest extends IntegrationTestCase
      */
     public function testATombstonedQuoteStaysOutOfTheCronsCandidateSet(): void
     {
+        $this->schema->seedQuote(11, ['is_active' => 1, 'items_count' => 1]);
         $this->stateManager->markMailed(11, 1, self::SUBJECT);
         self::assertSame(1, $this->stateManager->anonymizeForEmail(self::SUBJECT));
 
         self::assertSame(
-            [11],
-            $this->stateManager->filterAlreadyHandled([11]),
+            [],
+            $this->passTheCronsGate([11]),
             'The tombstoned quote never reaches markMailed()/dispatchAutomation() again'
         );
     }
@@ -71,6 +83,7 @@ class StateManagerTest extends IntegrationTestCase
      */
     public function testAFreshCheckoutOptinRepopulatesTheTombstoneWithoutRevivingIt(): void
     {
+        $this->schema->seedQuote(22, ['is_active' => 1, 'items_count' => 1]);
         $this->stateManager->markMailed(22, 1, self::SUBJECT);
         $this->stateManager->anonymizeForEmail(self::SUBJECT);
 
@@ -81,8 +94,8 @@ class StateManagerTest extends IntegrationTestCase
         self::assertSame(StateManager::STATUS_ERASED, $row['status']);
         self::assertSame('1', (string)$row['newsletter_optin']);
         self::assertSame(
-            [22],
-            $this->stateManager->filterAlreadyHandled([22]),
+            [],
+            $this->passTheCronsGate([22]),
             'A repopulated tombstone is still terminal, so no reminder is scheduled'
         );
     }
@@ -102,5 +115,22 @@ class StateManagerTest extends IntegrationTestCase
         self::assertEqualsWithDelta(time(), strtotime($sentAt . ' UTC'), 60);
         self::assertNull($this->stateManager->mailSentAt(32), 'A tracked quote that was never mailed');
         self::assertNull($this->stateManager->mailSentAt(33), 'An untracked quote');
+    }
+
+    /**
+     * The quotes among $quoteIds that the cron's gate lets through.
+     *
+     * @param int[] $quoteIds
+     * @return int[]
+     */
+    private function passTheCronsGate(array $quoteIds): array
+    {
+        $select = $this->connection->select()
+            ->from(['main_table' => 'quote'], ['entity_id'])
+            ->where('main_table.entity_id IN (?)', $quoteIds)
+            ->order('main_table.entity_id ASC');
+        $this->stateManager->excludeHandled($select, 'main_table.entity_id');
+
+        return array_map('intval', $this->connection->fetchCol($select));
     }
 }

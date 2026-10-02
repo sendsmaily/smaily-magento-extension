@@ -178,16 +178,18 @@ class GdprEraseTest extends IntegrationTestCase
         $schema->seedQuote(25, ['is_active' => 1, 'items_count' => 1, 'customer_email' => self::BYSTANDER]);
         $quotesBefore = $this->fetchAll('quote', 'entity_id');
 
-        self::assertSame([], $this->stateManager->filterAlreadyHandled([21, 22, 23, 24, 25]));
+        self::assertSame([21, 22, 23, 24, 25], $this->passTheCronsGate([21, 22, 23, 24, 25]));
 
         self::assertSame(
             ['removed' => 0, 'anonymised' => 3],
             $this->eraser->erase(self::SUBJECT)[self::CART_LABEL]
         );
 
-        $handled = $this->stateManager->filterAlreadyHandled([21, 22, 23, 24, 25]);
-        sort($handled);
-        self::assertSame([21, 22, 23], $handled, 'The scan skips every active cart that holds the erased address');
+        self::assertSame(
+            [24, 25],
+            $this->passTheCronsGate([21, 22, 23, 24, 25]),
+            'The scan skips every active cart that holds the erased address'
+        );
         $rows = array_column($this->fetchAll(self::CART_TABLE, 'quote_id'), null, 'quote_id');
         self::assertSame(['21', '22', '23'], array_map('strval', array_keys($rows)));
         foreach ($rows as $row) {
@@ -355,5 +357,22 @@ class GdprEraseTest extends IntegrationTestCase
         $tester->execute($arguments);
 
         return $tester;
+    }
+
+    /**
+     * The quotes among $quoteIds that the cron's gate lets through.
+     *
+     * @param int[] $quoteIds
+     * @return int[]
+     */
+    private function passTheCronsGate(array $quoteIds): array
+    {
+        $select = $this->connection->select()
+            ->from(['main_table' => 'quote'], ['entity_id'])
+            ->where('main_table.entity_id IN (?)', $quoteIds)
+            ->order('main_table.entity_id ASC');
+        $this->stateManager->excludeHandled($select, 'main_table.entity_id');
+
+        return array_map('intval', $this->connection->fetchCol($select));
     }
 }

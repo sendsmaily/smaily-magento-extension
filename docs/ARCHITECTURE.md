@@ -216,7 +216,7 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   base-URL fallback and `Multilingual\AccountResolver`'s default account),
   never Magento's implicit current-store resolver: the backfill collection
   (`EngineCatalogProcessor::loadPage()`) calls `setStoreId()` with it
-  explicitly before `addUrlRewrite()`/`addPriceData()`, and the live path
+  explicitly before `addUrlRewrite()`, and the live path
   (`ProductSaveAfter`/`ProductDeleteBefore`) re-scopes the product to it via
   `ProductRepository::getById($id, false, $canonicalStoreId)` before reading
   price whenever the admin save/delete didn't already resolve that same
@@ -226,6 +226,19 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   per product. Each `smaily_ingest_queue` catalog row's `store_id` column
   records that canonical ingest scope for audit — not necessarily the store
   the price was read at, see the exception below.
+- **The backfill page holds every product (PRO-2506):** `loadPage()` calls
+  neither `addPriceData()` nor any store/website filter, so it pages exactly
+  what `countProducts()` counts. `addPriceData()` INNER JOINs
+  `catalog_product_index_price` on the scope's website (Magento's
+  `Product\Collection::_productLimitationPrice()`), which kept every product
+  outside the default website out of the catalog import and the nightly
+  re-sync — and every product the price index leaves out (disabled, and out
+  of stock while the store hides out-of-stock products), so the re-sync
+  never corrected those either. Prices are read through the product's price
+  info at the store `storeIdForProduct()` picks, as on the live path; the
+  page selects `tax_class_id`, which the price index used to supply and the
+  tax adjustment reads. A disabled or hidden product is sent as its
+  tombstone (`in_stock: false`).
 - **The one exception — a product outside the default website
   (PRO-1458):** such a product has no price of its own at the canonical
   scope, so reading it there reports a scope it never sells in. It is priced

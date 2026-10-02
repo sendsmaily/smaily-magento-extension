@@ -109,6 +109,80 @@ class EngineCatalogProcessorTest extends TestCase
         $processor->process($job);
     }
 
+    /**
+     * PRO-2506: the page and the count apply no product limitation. Each of
+     * the methods below joins `catalog_product_website` or the price index
+     * on one website (Magento's Product\Collection::_applyProductLimitations()
+     * — addPriceData() as an INNER JOIN on price_index.website_id), which
+     * drops a product that sells only on another website. Such a product
+     * reaches CatalogIngest like any other, and the page selects the tax
+     * class the price index used to supply.
+     */
+    public function testBackfillPagesEveryWebsitesProductsWithoutAWebsiteRestriction(): void
+    {
+        $canonicalWebsiteProduct = $this->createMock(Product::class);
+        $canonicalWebsiteProduct->method('getId')->willReturn(10);
+        $canonicalWebsiteProduct->method('getWebsiteIds')->willReturn([1]);
+        $otherWebsiteProduct = $this->createMock(Product::class);
+        $otherWebsiteProduct->method('getId')->willReturn(11);
+        $otherWebsiteProduct->method('getWebsiteIds')->willReturn([2]);
+
+        $collection = $this->createMock(Collection::class);
+        foreach ([
+            'addPriceData', 'addWebsiteFilter', 'addStoreFilter', 'addCategoryFilter',
+            'setVisibility', 'applyFrontendPriceLimitations',
+        ] as $limitation) {
+            $collection->expects(self::never())->method($limitation);
+        }
+        $collection->expects(self::exactly(2))->method('setStoreId')->with(7);
+        $collection->expects(self::once())->method('addAttributeToSelect')->with(
+            self::logicalAnd(self::containsIdentical('price'), self::containsIdentical('tax_class_id'))
+        );
+        $collection->method('getSize')->willReturn(2);
+        $collection->method('getItems')->willReturn([$canonicalWebsiteProduct, $otherWebsiteProduct]);
+
+        $collectionFactory = $this->createMock(ProductCollectionFactory::class);
+        $collectionFactory->method('create')->willReturn($collection);
+
+        $jobManager = $this->createMock(JobManager::class);
+        $jobManager->method('isCancelled')->willReturn(true);
+        $jobManager->expects(self::once())->method('recordProgress')
+            ->with(self::anything(), 2, 0, '11');
+
+        $payloadBuilder = $this->createMock(CatalogPayloadBuilder::class);
+        $payloadBuilder->method('canonicalStoreId')->willReturn(7);
+
+        $ingestQueue = $this->createMock(IngestQueue::class);
+        $ingestQueue->method('countPending')->willReturn(0);
+
+        $enqueued = [];
+        $catalogIngest = $this->createMock(CatalogIngest::class);
+        $catalogIngest->method('enqueueProduct')->willReturnCallback(
+            static function (Product $product) use (&$enqueued): bool {
+                $enqueued[] = $product->getId();
+
+                return true;
+            }
+        );
+
+        $job = $this->createMock(Job::class);
+        $job->method('getData')->willReturn(null);
+        $job->method('getCursorValue')->willReturn('0');
+        $job->expects(self::once())->method('setData')->with('total_count', 2);
+
+        $processor = new EngineCatalogProcessor(
+            $jobManager,
+            $collectionFactory,
+            $payloadBuilder,
+            $ingestQueue,
+            $catalogIngest
+        );
+
+        $processor->process($job);
+
+        self::assertSame([10, 11], $enqueued);
+    }
+
     private function createJob(): Job&MockObject
     {
         $job = $this->createMock(Job::class);

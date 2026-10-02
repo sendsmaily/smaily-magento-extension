@@ -97,17 +97,25 @@ class EngineCatalogProcessor implements ProcessorInterface
         // collection falls back to Magento's implicit current-store
         // resolver, an undocumented scope that depends on the invoking
         // CLI/cron context and can disagree with the live save path. Must
-        // be set before addUrlRewrite()/addPriceData(), which both read the
-        // collection's store id at call time.
+        // be set before addUrlRewrite(), which reads the collection's store
+        // id at call time.
+        //
+        // No addPriceData() and no store/website filter (PRO-2506): Magento
+        // INNER JOINs the price index on the scope's website, which drops
+        // every product outside the default website (and every product the
+        // price index leaves out). The page holds every product, as
+        // countProducts() counts them; CatalogPayloadBuilder reads each
+        // price at the store it belongs to (PRO-1458), as on the live path.
+        // `tax_class_id` came from the price index before: the tax
+        // adjustment of a price amount reads it.
         $collection->setStoreId($this->payloadBuilder->canonicalStoreId());
         $collection->addAttributeToSelect([
-            'name', 'status', 'visibility', 'price', 'special_price',
+            'name', 'status', 'visibility', 'price', 'special_price', 'tax_class_id',
             'short_description', 'description', 'url_key', 'image',
             'small_image', 'thumbnail', 'manufacturer',
         ]);
         $collection->addFieldToFilter('entity_id', ['gt' => $cursor]);
         $collection->addUrlRewrite();
-        $collection->addPriceData();
         $collection->setOrder('entity_id', 'ASC');
         $collection->setPageSize(self::PAGE_SIZE);
 

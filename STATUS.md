@@ -46,6 +46,27 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   block → website account, rows gone), half-blank block, other website
   untouched. USER_GUIDE: "When a store view's language changes".
 
+- **PRO-2506 — the catalog import and the nightly re-sync reach every
+  website's products (2026-10-02).** `EngineCatalogProcessor::loadPage()`
+  no longer calls `addPriceData()`, whose INNER JOIN on the price index at
+  the default website kept out every product outside it — and every product
+  the price index leaves out (disabled; out of stock while the store hides
+  out-of-stock products; on no website). The page now holds what
+  `countProducts()` counts (so "X of Y" reaches Y); each product is priced
+  by `CatalogPayloadBuilder` at the store `storeIdForProduct()` picks
+  (PRO-1458), as on the live path; `tax_class_id` is selected because the
+  index used to supply it and the tax adjustment reads it. Side effect, on
+  purpose: disabled/hidden products go as tombstones and out-of-stock ones
+  as `in_stock: false` every night, so the re-sync now corrects them too.
+  Queue `store_id` unchanged — ARCHITECTURE already says it names the
+  canonical ingest scope, not the price scope. Pinned by
+  `EngineCatalogProcessorTest::testBackfillPagesEveryWebsitesProductsWithoutAWebsiteRestriction`
+  (no product-limitation method on page or count — the six that join one
+  website, read from Magento's `Product\Collection`; a website-2 product is
+  enqueued; `tax_class_id` selected); re-adding `addPriceData()` or dropping
+  `tax_class_id` turns it red. Not run against a real catalog (the
+  integration harness has no catalog/EAV schema; sandbox not touched).
+
 - **PRO-3654 — engine contract synced v1.8.1 → v1.8.2 (2026-10-02, doc
   only, no sender change).** Byte-identical with engine main 333b05e
   (`bin/check-contract-staleness.sh` against the local engine checkout: OK,
@@ -780,7 +801,7 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   last item and PRO-3660's human acceptance; (2) next client HC Pro (legacy
   2.x upgrade, 4 websites): PRO-3661, PRO-3662 (spike — questions for the
   client), PRO-3663, PRO-3665; (3) PRO-3675 (Hyvä consent event on a real
-  Hyvä store); (4) UI/UX parity PRO-1385, PRO-1357; then PRO-2506,
+  Hyvä store); (4) UI/UX parity PRO-1385, PRO-1357; then
   PRO-1967, PRO-1198. Engine ask PRO-3649 is answered (contract 1.8.2, PRO-3654); Woo ask PRO-3673 is with its
   team. Erkki still proofreads today's Estonian strings. Sandbox: remove
   finished agent worktrees under `.claude/worktrees` before any sandbox

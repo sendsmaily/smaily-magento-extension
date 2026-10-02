@@ -397,7 +397,12 @@
             }
         };
 
-        window.checkoutConfig = {storeCode: 'default', forgotPasswordUrl: '', validatedEmailValue: ''};
+        window.checkoutConfig = {
+            storeCode: 'default',
+            forgotPasswordUrl: '',
+            validatedEmailValue: '',
+            smailyGuestCartEmail: !options.abandonedCartOff
+        };
         Email = instantiate(registry, 'Magento_Checkout/js/view/form/element/email');
         state.Email = Email;
         state.component = new Email();
@@ -476,6 +481,14 @@
         check('a second email field on the page does not send it again', page.posts.length === 1 && !!second);
         page = checkoutPage({storedValidatedEmail: 'returning@example.com', loggedIn: true});
         check('nor for a signed-in customer', page.posts.length === 0);
+
+        log('# the abandoned-cart automation is off for the website');
+        page = checkoutPage({abandonedCartOff: true, storedValidatedEmail: 'returning@example.com'});
+        check('the stored address is not sent', page.posts.length === 0);
+        await type(page.component, 'guest@example.com');
+        await settle(page.component);
+        check('a typed address is not sent', page.posts.length === 0);
+        check('Magento\'s own check still runs', page.availabilityChecks.join() === 'guest@example.com');
 
         log('# the address has an account and the request fails');
         page = checkoutPage({emailHasAccount: true, postFails: true});

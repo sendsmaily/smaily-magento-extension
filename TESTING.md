@@ -58,7 +58,8 @@ checkout, and ends with `RESULT: PASS` or `RESULT: FAIL`; the script exits
 non-zero on a failure. `Test/Js/email-mixin.html` drives Magento's checkout
 email component through typing, validation and its typing pause and checks
 when the guest's email goes to the cart (one request per change of a valid
-address, none for an invalid value or a signed-in customer). Chrome's virtual
+address, none for an invalid value, a signed-in customer or a website with the
+abandoned-cart automation off). Chrome's virtual
 time runs the pauses without waiting for them. CI does not run it yet.
 
 ## Integration tests (real MySQL)

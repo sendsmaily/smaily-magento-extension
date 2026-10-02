@@ -12,8 +12,10 @@
  * It rides on Magento's own email check: checkEmailAvailability() runs only
  * once the field validates and the shopper has stopped typing for the
  * component's checkDelay. One request goes per change of the address, none
- * for a signed-in customer. Fire-and-forget: the answer is not read and a
- * failure changes nothing in the checkout.
+ * for a signed-in customer, and none while the abandoned-cart automation is
+ * off for the website (window.checkoutConfig.smailyGuestCartEmail, from
+ * GuestCartEmailConfigProvider). Fire-and-forget: the answer is not read and
+ * a failure changes nothing in the checkout.
  */
 define([
     'mage/storage',
@@ -31,7 +33,9 @@ define([
      * @param {String} email
      */
     function capture(email) {
-        if (customer.isLoggedIn() || !email || email === lastSent) {
+        if (!(window.checkoutConfig || {}).smailyGuestCartEmail
+            || customer.isLoggedIn() || !email || email === lastSent
+        ) {
             return;
         }
         lastSent = email;

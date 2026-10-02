@@ -10,4 +10,12 @@
     <type name="Magento\Checkout\Block\Checkout\LayoutProcessor">
         <plugin name="smaily_connect_checkout_newsletter_optin" type="Smaily\Connect\Plugin\Checkout\AddNewsletterOptinToLayout"/>
     </type>
+    <!-- Whether the checkout email field sends a guest's email to the cart (PRO-3693). -->
+    <type name="Magento\Checkout\Model\CompositeConfigProvider">
+        <arguments>
+            <argument name="configProviders" xsi:type="array">
+                <item name="smaily_connect_guest_cart_email" xsi:type="object">Smaily\Connect\Model\AbandonedCart\GuestCartEmailConfigProvider</item>
+            </argument>
+        </arguments>
+    </type>
 </config>

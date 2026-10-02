@@ -67,6 +67,13 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   with the Log reading Skipped and the flusher claiming only the other
   row; two carts in one run; a reminder older than 24 h; a skipped cart is
   not weighed again and does not start a new 24 h.
+  (4) The checkout sends nothing while the automation is off:
+  `AbandonedCart\GuestCartEmailConfigProvider` (frontend
+  `CompositeConfigProvider`) puts `smailyGuestCartEmail` (the website's
+  abandoned-cart switch) in `window.checkoutConfig`; the mixin posts only
+  when it is true. Unit test for the provider; JS harness case (stored and
+  typed address, off → no request, Magento's own check still runs; red
+  without the guard). Not run in the sandbox (not touched).
 
 - **PRO-3693 — a guest's email reaches the cart as soon as it is typed on
   Magento's own checkout (2026-10-02, owner-approved design, Woo parity).**

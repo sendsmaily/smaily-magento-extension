@@ -516,7 +516,11 @@ own `checkEmailAvailability()` — only for a value the component validated,
 after its `checkDelay` typing pause — and once at `initialize()` when the
 field opens with an address Magento validated earlier. One request per
 change of the value (shared by every email field on the page), none for a
-signed-in customer, fire-and-forget. The endpoint is the anonymous REST
+signed-in customer, none while the website's abandoned-cart automation is
+off (`window.checkoutConfig.smailyGuestCartEmail`, from
+`AbandonedCart\GuestCartEmailConfigProvider`, added to Magento's
+`CompositeConfigProvider` in `etc/frontend/di.xml`; the endpoint still checks
+the switch itself), fire-and-forget. The endpoint is the anonymous REST
 route `POST /V1/smaily-connect/guest-carts/:cartId/email` (`etc/webapi.xml`
 → `Api\GuestCartEmailInterface` → `AbandonedCart\GuestCartEmail`), keyed on
 the masked cart id as Magento's own guest-carts routes are. It writes

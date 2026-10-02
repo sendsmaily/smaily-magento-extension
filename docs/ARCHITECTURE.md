@@ -543,10 +543,14 @@ or a subscription Smaily's consent mirror writes counts too.
   an `engine.profiling_consent` row for the engine's §10 opt-out endpoint.
   A failed Smaily write does not stop the other two.
 - **The store's record** is one flag row, `smaily_connect_profiling_optouts`:
-  a map of `sha1(address)` to the opt-out's moment (Unix time), held under
-  a named lock for every change. Only opt-outs are kept — an opt-in removes
-  the entry — so it grows with the number of people who said no, never with
-  the contact base, and it holds no address. No table, no column.
+  a map of a keyed hash of the address (HMAC-SHA256 with the installation
+  crypt key) to the opt-out's moment (Unix time), held under a named lock
+  for every change. Only opt-outs are kept — an opt-in removes the entry —
+  so it grows with the number of people who said no, never with the
+  contact base, and it holds no address. No table, no column. A read also
+  finds an entry under an earlier crypt key (after a key rotation) or under
+  the plain `sha1(address)` the record used before; any change to that
+  address's entry rewrites it under the newest key.
 - **A read** (`isAllowed()`, cached a day) resolves the Smaily contact
   against the record, and the newest choice wins (Woo PRO-3191/3192/3434
   parity). Only an opt-in on the contact (`smaily_rec_profiling = 1`) whose

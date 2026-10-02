@@ -160,10 +160,16 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   undo a newer one).
   Slice 2: the login identity merge skips an opted-out shopper.
   `IdentityMergeHandler` asks `ProfilingConsent::isAllowed()` at the
-  customer's store view (looked up by `customer_external_id`; default scope
-  when the account is gone) and closes the row as sent without a call. On
-  the cron, not in `Observer/Engine/CustomerLogin`, so login never waits on
-  a Smaily read.
+  customer's store view (queued with the row as `store_id`, which the
+  handler strips before the §7 call; a row queued before that looks the
+  customer up by `customer_external_id`; default scope when the account is
+  gone) and closes the row as sent without a call. On the cron, not in
+  `Observer/Engine/CustomerLogin`, so login never waits on a Smaily read.
+  Simplification pass (behaviour-neutral): both engine queue handlers share
+  `Engine\Settings::sendingBlockedReason()`; `ProfilingConsent` builds its
+  cache key and saves its cache entry in one place each; addresses are
+  normalised once, in `ProfilingConsent` (`ProfilingOptOuts` takes them
+  normalised).
   Slice 3: unsubscribing from marketing also stops profiling (Erkki
   2026-10-02, Woo F3-31). `isAllowed()` reads `is_unsubscribed = 1` as "do
   not profile"; new `Observer\Engine\SubscriberUnsubscribed`

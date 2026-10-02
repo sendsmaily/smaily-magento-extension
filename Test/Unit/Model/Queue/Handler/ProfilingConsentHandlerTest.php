@@ -111,7 +111,7 @@ class ProfilingConsentHandlerTest extends TestCase
 
     public function testNothingIsSentWhileTheAccountIsRefused(): void
     {
-        $this->settings->method('isRefused')->willReturn(true);
+        $this->settings->method('sendingBlockedReason')->willReturn('Campaign Intelligence account is not active');
         $this->client->expects(self::never())->method('customerOptOut');
 
         $results = $this->handle(1, ['email' => 'person@example.com', 'opt_out' => true]);

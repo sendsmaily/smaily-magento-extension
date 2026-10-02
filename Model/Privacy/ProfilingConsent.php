@@ -77,8 +77,7 @@ class ProfilingConsent
             return true;
         }
 
-        $cacheKey = self::CACHE_PREFIX . sha1($email);
-        $cached = $this->cache->load($cacheKey);
+        $cached = $this->cache->load($this->cacheKey($email));
         if ($cached !== false) {
             return $cached === '1' || $cached === self::CACHED_GUESS;
         }
@@ -91,13 +90,13 @@ class ProfilingConsent
             $fields = isset($contact[0]) && is_array($contact[0]) ? $contact[0] : $contact;
         } catch (ApiException $exception) {
             if ($exception->getSmailyCode() !== ApiException::CODE_EMAIL_NOT_FOUND) {
-                return $this->fallback($email, $cacheKey, $optOutMoment, $exception);
+                return $this->fallback($email, $optOutMoment, $exception);
             }
             // Unknown contact: no answer on Smaily's side, not an error.
             $found = false;
             $fields = [];
         } catch (SmailyClientException $exception) {
-            return $this->fallback($email, $cacheKey, $optOutMoment, $exception);
+            return $this->fallback($email, $optOutMoment, $exception);
         }
 
         $allowed = (string)($fields['is_unsubscribed'] ?? '') !== '1'
@@ -129,7 +128,7 @@ class ProfilingConsent
             }
         }
 
-        $this->cache->save($allowed ? '1' : '0', $cacheKey, [], self::CACHE_TTL_SECONDS);
+        $this->remember($email, $allowed ? '1' : '0');
 
         return $allowed;
     }
@@ -149,7 +148,7 @@ class ProfilingConsent
             return null;
         }
 
-        $cacheKey = self::CACHE_PREFIX . sha1($email);
+        $cacheKey = $this->cacheKey($email);
         if ($this->cache->load($cacheKey) === self::CACHED_GUESS) {
             $this->cache->remove($cacheKey);
         }
@@ -163,11 +162,11 @@ class ProfilingConsent
      * shopper the store holds no opt-out for is profiled (fail open, the
      * model's accepted residual risk — Woo F3-31) — cached as a guess.
      */
-    private function fallback(string $email, string $cacheKey, ?int $optOutMoment, \Throwable $exception): bool
+    private function fallback(string $email, ?int $optOutMoment, \Throwable $exception): bool
     {
         $this->logger->debug('Profiling consent read failed', ['error' => $exception->getMessage()]);
         $allowed = $optOutMoment === null;
-        $this->cache->save($allowed ? self::CACHED_GUESS : '0', $cacheKey, [], self::CACHE_TTL_SECONDS);
+        $this->remember($email, $allowed ? self::CACHED_GUESS : '0');
 
         return $allowed;
     }
@@ -218,7 +217,7 @@ class ProfilingConsent
         }
         $this->queueForEngine($email, !$allowed, $timestamp);
 
-        $this->cache->save($allowed ? '1' : '0', self::CACHE_PREFIX . sha1($email), [], self::CACHE_TTL_SECONDS);
+        $this->remember($email, $allowed ? '1' : '0');
     }
 
     /**
@@ -237,7 +236,20 @@ class ProfilingConsent
         $moment = $this->dateTime->gmtTimestamp();
         $this->optOuts->record($email, $moment);
         $this->queueForEngine($email, true, gmdate(self::TIMESTAMP_FORMAT, $moment));
-        $this->cache->save('0', self::CACHE_PREFIX . sha1($email), [], self::CACHE_TTL_SECONDS);
+        $this->remember($email, '0');
+    }
+
+    private function cacheKey(string $email): string
+    {
+        return self::CACHE_PREFIX . sha1($email);
+    }
+
+    /**
+     * Cache the answer for a day: '1', '0' or the fail-open guess.
+     */
+    private function remember(string $email, string $answer): void
+    {
+        $this->cache->save($answer, $this->cacheKey($email), [], self::CACHE_TTL_SECONDS);
     }
 
     /**

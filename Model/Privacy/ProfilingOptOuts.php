@@ -17,7 +17,8 @@ use Magento\Framework\Lock\LockManagerInterface;
  * sha1(address) to the opt-out's moment. Only opt-outs are kept — the model
  * is opt-out, default-on, so an opt-in is the absence of an entry, and the
  * map stays as large as the number of people who said no, not the contact
- * base. The address itself is never stored.
+ * base. The address itself is never stored. Addresses arrive normalised
+ * (lower case, trimmed): ProfilingConsent is the one place that does it.
  *
  * The moment is the Unix time the store made the opt-out (My Account, an
  * unsubscribe, or the store writing the opt-out to the Smaily contact), or
@@ -97,6 +98,6 @@ class ProfilingOptOuts
 
     private static function key(string $email): string
     {
-        return sha1(strtolower(trim($email)));
+        return sha1($email);
     }
 }

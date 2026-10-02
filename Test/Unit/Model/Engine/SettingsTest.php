@@ -58,6 +58,16 @@ class SettingsTest extends TestCase
         self::assertTrue($settings->isSendingAllowed());
     }
 
+    public function testAQueueHandlerIsToldWhySendingIsBlocked(): void
+    {
+        $settings = $this->createSettings();
+        self::assertNull($settings->sendingBlockedReason());
+
+        $settings->recordRefusal();
+
+        self::assertSame('Campaign Intelligence account is not active', $settings->sendingBlockedReason());
+    }
+
     private function createSettings(): Settings
     {
         $store = new class {

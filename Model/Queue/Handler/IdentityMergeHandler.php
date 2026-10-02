@@ -45,16 +45,12 @@ class IdentityMergeHandler implements EventHandlerInterface
     public function handle(array $events): array
     {
         $results = [];
-        // Connectedness cannot change under us mid-batch; a refusal can (a
-        // 403 on one row stops the rest), so only that half is re-asked.
-        $connected = $this->settings->isConnected();
         foreach ($events as $event) {
             $id = (int)$event->getId();
-            $refused = $this->settings->isRefused();
-            if (!$connected || $refused) {
-                $results[$id] = $refused
-                    ? 'Campaign Intelligence account is not active'
-                    : 'Campaign Intelligence is not connected';
+            // Asked per row: a refusal (a 403 on one row) stops the rest.
+            $blocked = $this->settings->sendingBlockedReason();
+            if ($blocked !== null) {
+                $results[$id] = $blocked;
                 continue;
             }
 
@@ -71,6 +67,8 @@ class IdentityMergeHandler implements EventHandlerInterface
                 continue;
             }
 
+            // store_id is the store's own routing, not part of §7.
+            unset($payload['store_id']);
             try {
                 $this->client->identityMerge($payload);
                 $results[$id] = true;
@@ -87,13 +85,19 @@ class IdentityMergeHandler implements EventHandlerInterface
     }
 
     /**
-     * The customer's store view, whose Smaily account holds their consent;
-     * null (the default scope) when the account is gone.
+     * The customer's store view, whose Smaily account holds their consent:
+     * queued with the row at login. A row queued before the store view was
+     * part of the payload looks the customer up; null (the default scope)
+     * when the account is gone.
      *
      * @param array<int|string, mixed> $payload
      */
     private function storeIdOf(array $payload): ?int
     {
+        if (isset($payload['store_id'])) {
+            return (int)$payload['store_id'];
+        }
+
         try {
             return (int)$this->customerRepository->getById((int)($payload['customer_external_id'] ?? 0))
                 ->getStoreId();

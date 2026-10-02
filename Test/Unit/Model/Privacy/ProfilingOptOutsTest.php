@@ -63,7 +63,6 @@ class ProfilingOptOutsTest extends TestCase
         $this->optOuts->record('person@example.com', 1790000000);
 
         self::assertSame(1790000000, $this->optOuts->moment('person@example.com'));
-        self::assertSame(1790000000, $this->optOuts->moment('  Person@Example.com '), 'Address is normalised');
     }
 
     public function testAMirroredOptOutHasMomentZero(): void

@@ -72,8 +72,18 @@ class IdentityMergeHandlerTest extends TestCase
         self::assertSame([1 => true], $this->handle(self::PAYLOAD));
     }
 
+    public function testTheStoreViewQueuedWithTheRowIsUsedAndNotSentToTheEngine(): void
+    {
+        $this->customerRepository = $this->createMock(CustomerRepositoryInterface::class);
+        $this->customerRepository->expects(self::never())->method('getById');
+        $this->profilingConsent->method('isAllowed')->with('person@example.com', 5)->willReturn(true);
+        $this->client->expects(self::once())->method('identityMerge')->with(self::PAYLOAD)->willReturn(['ok' => true]);
+
+        self::assertSame([1 => true], $this->handle(self::PAYLOAD + ['store_id' => 5]));
+    }
+
     /**
-     * @param array<string, string> $payload
+     * @param array<string, string|int> $payload
      * @return array<int, true|string|\Smaily\Connect\Model\Client\Exception\SmailyClientException>
      */
     private function handle(array $payload): array

@@ -54,6 +54,9 @@ class CustomerLogin implements ObserverInterface
             'customer_external_id' => (string)$customer->getId(),
             'merge_ts' => gmdate('Y-m-d\TH:i:s\Z'),
             'merge_reason' => 'login',
+            // The handler's consent check reads at this store view; stripped
+            // before the call to the engine.
+            'store_id' => (int)$customer->getStoreId(),
         ];
         if ($cookies['anon_session_id'] !== null) {
             $payload['anon_session_id'] = $cookies['anon_session_id'];

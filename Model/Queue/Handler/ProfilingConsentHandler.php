@@ -47,16 +47,12 @@ class ProfilingConsentHandler implements EventHandlerInterface
     public function handle(array $events): array
     {
         $results = [];
-        // Same gate as the identity merge: connectedness cannot change
-        // mid-batch, a refusal can, so only that half is re-asked per row.
-        $connected = $this->settings->isConnected();
         foreach ($events as $event) {
             $id = (int)$event->getId();
-            $refused = $this->settings->isRefused();
-            if (!$connected || $refused) {
-                $results[$id] = $refused
-                    ? 'Campaign Intelligence account is not active'
-                    : 'Campaign Intelligence is not connected';
+            // Asked per row: a refusal (a 403 on one row) stops the rest.
+            $blocked = $this->settings->sendingBlockedReason();
+            if ($blocked !== null) {
+                $results[$id] = $blocked;
                 continue;
             }
 

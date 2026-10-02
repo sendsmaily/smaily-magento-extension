@@ -92,6 +92,19 @@ class Settings
     }
 
     /**
+     * Why a queued engine row may not be sent now, or null when it may: the
+     * sending gate with the reason a queue handler reports on the row.
+     */
+    public function sendingBlockedReason(): ?string
+    {
+        if ($this->isRefused()) {
+            return 'Campaign Intelligence account is not active';
+        }
+
+        return $this->isConnected() ? null : 'Campaign Intelligence is not connected';
+    }
+
+    /**
      * Remember the refusal. Keeps the first timestamp: the merchant wants to
      * know when sending stopped, not when it was last attempted.
      */

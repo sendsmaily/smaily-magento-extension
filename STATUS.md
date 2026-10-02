@@ -51,12 +51,15 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
 
 ## Where we are
 
-- **Next session opens here (2026-10-02).** Queue: ~~PRO-2456~~ (design-pack
-  fidelity, done before rc1 — Erkki 2026-10-02) → **PRO-2474** (pilot readiness:
-  ZIP install on a clean sandbox, runbook and pilot-day checklist done; rc1
-  tag on Erkki's go remains). Milestones: rc1 tagged + pilot runbook 2026-10-03, pilot store
-  live 2026-10-09. PRO-2460 decided A — contract §3 SKU key stands, PRO-1484
-  closed. After the pilot: PRO-2506, PRO-1967, PRO-1198 (Smaily hand-over).
+- **Next session opens here (2026-10-02).** Done today: PRO-2456 (+ page
+  frame), PRO-2474 runbook, pilot-day checklist and clean ZIP install,
+  PRO-3560, PRO-3571, PRO-3572, the PRO-3574 parity spike and its Stories
+  PRO-3576/3577/3578/3579/3580/3581/3584/3591, PRO-1952, PRO-3594. In
+  progress elsewhere: PRO-3582, PRO-3583, PRO-3602. Remaining before rc1:
+  PRO-1965, PRO-3575 (security review), PRO-3603 (final clean-install pass),
+  then the rc1 tag on Erkki's go. Milestones: rc1 2026-10-03 (may move —
+  Erkki 2026-10-02: rc1 waits for the whole list), pilot store live
+  2026-10-09. After the pilot: PRO-2506, PRO-1967, PRO-1198 (hand-over).
 
 - **PRO-3594 done — subscribing again switches profiling back on
   (2026-10-02).** Owner decision (Erkki 2026-10-02): when the shopper

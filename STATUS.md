@@ -214,6 +214,8 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   lock, identical to the old: 299 unit, phpcs 0 errors / 997 warnings,
   phpstan `[OK]`, integration 87 tests.
 
+- **PRO-2456 — style coverage (2026-10-02):** the admin's computed styles against the design pack, 77.9 % of compared properties match; the page frame (width caps, background, mixed fonts) is the largest gap — `docs/audits/2026-10-02-ADMIN_STYLE_COVERAGE.md`.
+
 - **PRO-2456 done — fidelity check of the admin against the design pack
   (2026-10-02).** Every artboard was rendered and compared with the sandbox
   admin in en_US and et_EE; the deviation list (24 rows, ordered by

@@ -109,8 +109,9 @@ regardless of which website is selected. Each product is sent to it once,
 with the price and link of your default website; a product that does not
 sell on the default website is sent with the price and link of the first
 website it is assigned to. The catalog import and the nightly catalog
-re-sync send every product of every website the same way; a disabled,
-hidden or out-of-stock product goes as out of stock.
+re-sync send every product of every website the same way, with the same
+price and sale end date as a product save; a disabled, hidden or
+out-of-stock product goes as out of stock.
 
 After installation the admin notifications show "Smaily Connect is ready to
 set up", with a link to this guide; after an upgrade from 2.8.x it also says

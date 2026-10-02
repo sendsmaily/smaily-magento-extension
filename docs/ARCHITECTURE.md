@@ -239,6 +239,18 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   page selects `tax_class_id`, which the price index used to supply and the
   tax adjustment reads. A disabled or hidden product is sent as its
   tombstone (`in_stock: false`).
+- **The backfill page selects what a product save holds (PRO-3692):** a
+  collection item carries only the static columns and the attributes
+  `loadPage()` selects, while a saved product carries all of them. The list
+  holds every attribute the payload and Magento's price classes read:
+  `special_from_date`/`special_to_date` (`SpecialPrice` checks the sale
+  window; `on_sale_until` is `special_to_date`) and `price_type` (the bundle
+  price classes price a bundle as fixed or dynamic by it).
+  `EngineCatalogImportParityTest` sends one product through both paths
+  and compares `price`, `compare_price` and `on_sale_until`. The flat
+  product catalog does not apply: `Product\Collection::isEnabledFlat()` asks
+  `Flat\State::isAvailable()`, which is true only in the frontend area
+  (Magento_Catalog `etc/frontend/di.xml`), and the import runs in cron.
 - **The one exception — a product outside the default website
   (PRO-1458):** such a product has no price of its own at the canonical
   scope, so reading it there reports a scope it never sells in. It is priced

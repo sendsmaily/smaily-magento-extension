@@ -108,9 +108,21 @@ class EngineCatalogProcessor implements ProcessorInterface
         // price at the store it belongs to (PRO-1458), as on the live path.
         // `tax_class_id` came from the price index before: the tax
         // adjustment of a price amount reads it.
+        //
+        // The list holds every attribute the payload and Magento's price
+        // classes read off the product (PRO-3692), so an imported row is the
+        // row a product save sends: SpecialPrice checks the sale window and
+        // the payload's `on_sale_until` is `special_to_date`; the bundle
+        // price classes price a bundle as fixed or dynamic by `price_type`.
+        //
+        // No flat-catalog switch is needed: Magento reads the flat product
+        // tables only in the frontend area (Flat\State's `isAvailable` is
+        // true only in Magento_Catalog's etc/frontend/di.xml), and the import
+        // runs in cron.
         $collection->setStoreId($this->payloadBuilder->canonicalStoreId());
         $collection->addAttributeToSelect([
-            'name', 'status', 'visibility', 'price', 'special_price', 'tax_class_id',
+            'name', 'status', 'visibility', 'price', 'special_price', 'special_from_date',
+            'special_to_date', 'price_type', 'tax_class_id',
             'short_description', 'description', 'url_key', 'image',
             'small_image', 'thumbnail', 'manufacturer',
         ]);

@@ -27,6 +27,31 @@ OK). Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3692 — the catalog import sends the price and sale end date a
+  product save sends (2026-10-02).** `EngineCatalogProcessor::loadPage()`
+  now also selects `special_from_date`, `special_to_date` and `price_type`.
+  Compared against what `CatalogPayloadBuilder` and Magento's price classes
+  read off the product (vendor source: catalog `RegularPrice`,
+  `SpecialPrice`, `BasePrice`, `FinalPrice`, `TierPrice`, CatalogRule
+  `CatalogRulePrice`, the bundle price classes, the tax adjustment): before,
+  an imported product on sale had no `on_sale_until`, a sale outside its
+  from/to window went as on sale (SpecialPrice read empty dates as "always"),
+  and a fixed-price bundle was priced as dynamic. Tier prices load
+  themselves (backend `afterLoad`), catalog-rule prices are a DB lookup, the
+  rest was already selected. New `EngineCatalogImportParityTest`: one
+  product row through the save path and through one import page (the item
+  holds only the static columns + the selected attributes), real
+  `CatalogIngest` + `CatalogPayloadBuilder` + Magento's catalog price
+  classes and Timezone; four cases (running / ended / not-started sale,
+  fixed bundle) — all four red without the three attributes. Flat catalog:
+  no code change — `Collection::isEnabledFlat()` asks
+  `Flat\State::isAvailable()`, true only in the frontend area
+  (Magento_Catalog `etc/frontend/di.xml`); the import runs only from cron
+  (`BackfillTick`), so it reads EAV with the flat catalog on. Configurable
+  and grouped price classes (not in the dev vendor) read their children
+  through their own collections — not checked against source here. Not run
+  on a real catalog (sandbox not touched).
+
 - **PRO-3694 — the 2.x sync-frequency upgrade notice says what 3.0 does
   (2026-10-02).** `LegacyConfigMapper`'s notice no longer promises "a daily
   full sync" (3.0 has none); it now reads, in UPGRADING's words, "v3 syncs

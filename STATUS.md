@@ -61,6 +61,20 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   Verified with the real templates and stub data in headless Chrome, both
   languages. No behaviour change.
 
+- **PRO-2456 — initial setup and RSS builder follow the design pack
+  (2026-10-02, owner decision: follow the pack).** The initial setup's
+  step content sits directly on the grey pane as the pack's Setup Wizard
+  frames draw it: the step's sections (the connection fields, the
+  lawful-basis choice, the store-event triggers, the Campaign Intelligence
+  connect, the overview links, the language routing and fallback account
+  sections) have no card — no background, border, padding or corners; the
+  import card and the finished-setup summary stay cards, as in the pack.
+  The title is 6px above the intro, the intro reads 14px / 1.5 in the
+  secondary text colour with 22px below it, and each section ends 26px
+  above the next one and above the footer divider. Settings tabs keep
+  their cards (same partials, CSS scoped to `.smaily-wizard`). No
+  behaviour change.
+
 - **PRO-2456 evening walk-through — admin pages checked in en_US and
   et_EE at 1440, 1100 and 400 px (2026-10-02).** Every Smaily page and
   state, the states the store is not in drawn in the browser from the real

@@ -986,6 +986,31 @@
 .smaily-wizard #smaily-wizard-main > .smaily-footer,
 .smaily-wizard .smaily-overview-footer { max-width: 680px; }
 
+/* Initial setup steps on the pane (PRO-2456, owner decision 2026-10-02: follow
+ * the pack's "Setup Wizard" frames). The step's own sections are not cards
+ * here: no background, border, padding or corners, so the fields sit
+ * directly on the grey pane; Settings keeps its cards (same partials). The
+ * import card and the finished-setup summary stay cards, as in the pack. Each
+ * section ends 26px above the next one and above the footer divider (the
+ * pack's footer gap). The title is 6px above the intro, which reads at 14px
+ * / 1.5 with 22px below it; what opens a step without an intro (the summary,
+ * an error banner, the language routing choice) keeps 18px under the title. */
+.smaily-wizard .smaily-step-panel .smaily-card:not(.smaily-backfill-card) {
+    margin: 0 0 26px; padding: 0; background: none; border: 0; border-radius: 0;
+}
+.smaily-wizard .smaily-setup-summary { margin-bottom: 26px; }
+.smaily-wizard .smaily-step-head { margin-bottom: 0; }
+.smaily-wizard .smaily-step-title { margin-bottom: 6px; }
+.smaily-wizard .smaily-step-head + .smaily-setup-summary,
+.smaily-wizard .smaily-step-head + .smaily-form-banner,
+.smaily-wizard #smaily-w-connect-form > #smaily-ml-modes:first-child { margin-top: var(--sp-3); }
+.smaily-wizard .smaily-step-panel .smaily-card:not(.smaily-backfill-card) > p:not(.note):not(.message),
+.smaily-wizard .smaily-step-panel .smaily-card > div:not([id]):not([class]) > p,
+.smaily-wizard [data-step="2"] #smaily-w-subscribers-body > p {
+    max-width: 60ch; margin: 0 0 22px; font-size: var(--fs-14); line-height: 1.5; color: var(--s-text-2);
+}
+.smaily-wizard .smaily-step-panel .smaily-card > div:not([id]):not([class]) > p:not(:last-child) { margin-bottom: var(--sp-2); }
+
 /* Dashboard lower panels: the header and every row carry the padding, with
  * dividers between them (pack Dashboard). The Quick links heading outranks
  * the generic card heading above (.smaily-ui .smaily-card > h2). */

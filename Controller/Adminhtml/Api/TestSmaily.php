@@ -27,9 +27,11 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * -> {connected: bool, accountName?: string, error?: string}
  *
  * With credentials posted, those are tested as typed. Without a password, a
- * store_id falls back to the credentials SAVED for that store view — this is
- * what lets a per-language account block (multilingual mode A) re-test a
- * saved account without retyping its password.
+ * store_id falls back to the credentials SAVED for that store view when the
+ * subdomain and username are filled in, or when only the store_id is posted —
+ * this is what lets a per-language account block (multilingual mode A)
+ * re-test a saved account without retyping its password. Empty fields, or no
+ * saved credentials to fall back to, ask the merchant to fill them in.
  */
 class TestSmaily extends AbstractJsonAction implements HttpPostActionInterface
 {
@@ -59,18 +61,22 @@ class TestSmaily extends AbstractJsonAction implements HttpPostActionInterface
             return $this->jsonResponse(['connected' => false, 'error' => (new InvalidSubdomainException())->getMessage()]);
         }
 
-        if ($password === '' && $storeId !== null) {
+        // A per-language account block re-tests its saved account by
+        // store_id alone; the forms post every field.
+        $fieldsPosted = array_key_exists('subdomain', $body) || array_key_exists('username', $body);
+        $keepsSavedPassword = $password === '' && $storeId !== null
+            && (!$fieldsPosted || ($subdomain !== '' && $username !== ''));
+
+        if ($keepsSavedPassword) {
             try {
                 $client = $this->clientProvider->forStore($storeId);
                 $subdomain = $subdomain !== '' ? $subdomain : 'saved';
-            } catch (SmailyClientException $exception) {
-                return $this->jsonResponse(['connected' => false, 'error' => $exception->getMessage()]);
+            } catch (SmailyClientException) {
+                // Nothing saved to test with (a fresh install).
+                return $this->fillInCredentials();
             }
         } elseif ($subdomain === '' || $username === '' || $password === '') {
-            return $this->jsonResponse([
-                'connected' => false,
-                'error' => (string)__('Please fill in the subdomain, username and password.'),
-            ]);
+            return $this->fillInCredentials();
         } else {
             $client = $this->clientFactory->create([
                 'subdomain' => $subdomain,
@@ -97,5 +103,16 @@ class TestSmaily extends AbstractJsonAction implements HttpPostActionInterface
                 'error' => (string)__('Could not reach Smaily: %1', $exception->getMessage()),
             ]);
         }
+    }
+
+    /**
+     * The plain answer when there is nothing to test with.
+     */
+    private function fillInCredentials(): Json
+    {
+        return $this->jsonResponse([
+            'connected' => false,
+            'error' => (string)__('Please fill in the subdomain, username and password.'),
+        ]);
     }
 }

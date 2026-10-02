@@ -16,6 +16,13 @@ PRO-3591/3594/3602, PRO-1952. Earlier sessions: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3628 — PRO-3603 findings fixed (2026-10-02).** Test connection
+  with empty fields asks "Please fill in the subdomain, username and
+  password." (EN + ET) instead of "Smaily API credentials are not
+  configured (store scope: 1)": `TestSmaily` keeps the saved password only
+  when the subdomain and username are filled in (or when a per-language
+  account block posts its store view alone) and saved credentials exist.
+
 - **Next session opens here (2026-10-02).** Done today: PRO-2456 (+ page
   frame), PRO-2474 runbook, pilot-day checklist and clean ZIP install,
   PRO-3560, PRO-3571, PRO-3572, the PRO-3574 parity spike and its Stories

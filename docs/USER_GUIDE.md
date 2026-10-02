@@ -155,7 +155,10 @@ includes the API; press Test Connection again after the package is changed.
 
 Use the **Test Connection** button next to the fields for instant feedback
 on the credentials as typed — no save needed; a successful test also
-refreshes the automation workflow dropdowns. Saving succeeds whenever the
+refreshes the automation workflow dropdowns. With the password field left
+blank, Test Connection uses the saved password, as long as the subdomain and
+username are filled in. With empty fields and nothing saved to fall back on,
+it asks you to fill in the subdomain, username and password. Saving succeeds whenever the
 subdomain is a plain one; if the saved credentials are wrong you get a clear
 warning instead of a blocked save.
 

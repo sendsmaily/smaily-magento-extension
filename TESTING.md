@@ -181,6 +181,7 @@ Assert afterwards:
   welcome/abandoned workflow IDs.
 - `quote.reminder_date` / `quote.is_sent` and `smaily_customer_sync` are gone.
 - The orphaned `crontab/default/jobs/smaily_subscriber_sync/...` row is gone.
+- No `smaily/*` row is left at any scope; `smaily_connect/*` rows stay.
 
 ## Release package
 

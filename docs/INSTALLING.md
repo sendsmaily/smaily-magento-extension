@@ -187,8 +187,9 @@ data from the store database:
 - every setting at every scope (`core_config_data` paths starting with
   `smaily_connect/`), including the encrypted Smaily API password and the
   Campaign Intelligence API key;
-- the settings an upgrade from Smaily for Magento 2.8.x kept (paths
-  starting with `smaily/`, including the old plain-text password);
+- any settings of Smaily for Magento 2.8.x still in the database (paths
+  starting with `smaily/`; the upgrade already deletes them once it has
+  migrated them);
 - the module's flag rows (`flag` codes starting with `smaily_connect_`):
   the record of shoppers who opted out of personalization, the record of
   checked credentials, and the health-check and consent-sync state.

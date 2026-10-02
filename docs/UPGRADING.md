@@ -25,10 +25,16 @@ package; `setup:upgrade` runs the migration.
 | Subscriber cron sync toggle + field selection | Subscriber Synchronization (every tick carries over) |
 | Abandoned cart toggle / autoresponder / interval | Automations group (`2:hour` → 120 minutes) + a mapping fallback row |
 
-Legacy `smaily/*` config rows are left in place, so downgrading back to
-2.8.x (composer version constraint) restores the old behavior. Uninstalling
-Smaily Connect removes them along with its own settings (see
-[INSTALLING.md](INSTALLING.md#disabling-or-removing-the-module)).
+Once the settings are migrated, the upgrade deletes the old 2.8.x settings
+(every `smaily/*` config row, at every scope — the plain-text password
+among them). The migrated settings live under `smaily_connect/*` and are not
+touched. A store that has no 2.8.x settings is not affected.
+
+**Going back to 2.8.x starts with empty settings.** The upgrade cannot be
+undone by changing the composer version constraint alone: after a downgrade,
+enter the Smaily subdomain, username and password and the 2.8.x options
+again. If you may need to go back, note the 2.8.x settings (Stores >
+Configuration > Smaily) or take a database backup before you upgrade.
 
 ## What is cleaned up
 
@@ -36,6 +42,8 @@ Smaily Connect removes them along with its own settings (see
   and the unused `smaily_customer_sync` table are dropped. Already-mailed
   abandoned carts are carried over first — nobody gets a duplicate
   reminder because of the upgrade.
+- The old 2.8.x settings (`smaily/*`, every scope) are deleted once they are
+  migrated; see above.
 - The orphaned dynamic cron-expression config row is removed.
 - The stored value of the retired *Automations May Re-Subscribe (Advanced)*
   setting (`smaily_connect/subscribers/automation_force_opt_in`, a 3.0.0

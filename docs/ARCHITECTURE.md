@@ -373,6 +373,10 @@ indexed for the reads their cron drains do (`status`/`domain` + `next_retry_at`,
 `Setup/Patch/Schema/MigrateLegacyQuoteColumns` drops the legacy 2.8.x
 artifacts (`quote.reminder_date`, `quote.is_sent`, `smaily_customer_sync`)
 because a renamed module's declarative schema cannot.
+`Setup/Patch/Data/MigrateLegacyConfig` maps the 2.8.x `smaily/*` config rows
+onto the v3 paths and, once every scope is written, deletes them at every
+scope (the plaintext password among them); a downgrade to 2.8.x starts with
+empty settings.
 
 Uninstalling removes what declarative schema does not: `Setup\Uninstall`
 deletes the `smaily_connect/*` and legacy `smaily/*` config rows at every

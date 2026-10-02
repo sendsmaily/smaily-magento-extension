@@ -109,18 +109,58 @@ class MigrateLegacyConfigTest extends IntegrationTestCase
         }
     }
 
-    public function testLegacyRowsAreKeptButOrphanedCronExpressionIsDeleted(): void
+    public function testLegacyRowsAtEveryScopeAndTheOrphanedCronExpressionAreDeletedAfterTheMigration(): void
     {
         $this->seedLegacyRows('default', 0, [
             'smaily/general/subdomain' => 'demo',
+            'smaily/general/password' => 'plain-secret',
             self::LEGACY_CRON_PATH => '0 4 * * *',
         ]);
+        $this->seedLegacyRows('websites', 2, ['smaily/general/username' => 'second-user']);
+        $this->seedLegacyRows('stores', 3, ['smaily/sync/fields' => 'first_name']);
 
         $this->applyPatch();
 
         $paths = array_column($this->fetchAll('core_config_data', 'config_id'), 'path');
-        self::assertContains('smaily/general/subdomain', $paths, 'Legacy rows stay for 2.8.x downgrades');
+        self::assertSame([], preg_grep('#^smaily/#', $paths), 'No 2.8.x row is left at any scope');
         self::assertNotContains(self::LEGACY_CRON_PATH, $paths, 'Orphaned dynamic cron row is removed');
+        self::assertSame('demo', $this->configValues('default', 0)[Config::XML_PATH_SUBDOMAIN]);
+        self::assertSame('second-user', $this->configValues('websites', 2)[Config::XML_PATH_USERNAME]);
+        self::assertNotEmpty($this->configValues('default', 0)[Config::XML_PATH_PASSWORD]);
+    }
+
+    public function testDeletingTheLegacyRowsLeavesNeighbouringPathsAlone(): void
+    {
+        $this->seedLegacyRows('default', 0, [
+            'smaily/general/subdomain' => 'demo',
+            Config::XML_PATH_USERNAME => 'v3-user',
+            'smailyX/general/subdomain' => 'other-module',
+            'smaily_other/general/subdomain' => 'another-module',
+        ]);
+
+        $this->applyPatch();
+
+        $config = $this->configValues('default', 0);
+        self::assertArrayNotHasKey('smaily/general/subdomain', $config);
+        self::assertSame('v3-user', $config[Config::XML_PATH_USERNAME]);
+        self::assertSame('other-module', $config['smailyX/general/subdomain']);
+        self::assertSame('another-module', $config['smaily_other/general/subdomain']);
+    }
+
+    public function testAFailedMigrationKeepsTheLegacyRows(): void
+    {
+        $this->seedLegacyRows('default', 0, ['smaily/general/password' => 'plain-secret']);
+
+        $encryptor = $this->createMock(EncryptorInterface::class);
+        $encryptor->method('encrypt')->willThrowException(new \RuntimeException('no key'));
+        try {
+            $this->applyPatch(['encryptor' => $encryptor]);
+            self::fail('The migration error must surface');
+        } catch (\RuntimeException) {
+            // Expected: setup:upgrade stops on the error.
+        }
+
+        self::assertSame('plain-secret', $this->configValues('default', 0)['smaily/general/password']);
     }
 
     public function testDeliberateDropsSurfaceAdminNotices(): void
@@ -166,12 +206,15 @@ class MigrateLegacyConfigTest extends IntegrationTestCase
         self::assertSame([], $this->env->getNotifier()->getNotifications());
     }
 
-    private function applyPatch(): void
+    /**
+     * @param array<string, mixed> $arguments constructor overrides
+     */
+    private function applyPatch(array $arguments = []): void
     {
         /** @var ResourceConnection $resourceConnection */
         $resourceConnection = $this->objectManager->get(ResourceConnection::class);
         /** @var MigrateLegacyConfig $patch */
-        $patch = $this->objectManager->create(MigrateLegacyConfig::class, [
+        $patch = $this->objectManager->create(MigrateLegacyConfig::class, $arguments + [
             'moduleDataSetup' => new DataSetup($resourceConnection),
         ]);
         $patch->apply();

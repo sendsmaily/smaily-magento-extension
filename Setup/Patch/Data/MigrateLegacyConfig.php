@@ -24,8 +24,10 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
  * scopes) onto the v3 paths so an upgrade keeps working without any manual
  * reconfiguration. The plaintext legacy API password is encrypted; the
  * configured autoresponder IDs are also seeded into the automation mapping
- * table as per-website fallback rows. Legacy rows are left in place so a
- * downgrade to 2.8.x stays possible.
+ * table as per-website fallback rows. Once every scope is migrated, the
+ * legacy `smaily/*` rows are deleted at every scope (the plaintext password
+ * among them): a downgrade to 2.8.x then starts with empty settings. A
+ * failure before that point leaves them in place.
  */
 class MigrateLegacyConfig implements DataPatchInterface
 {
@@ -94,6 +96,10 @@ class MigrateLegacyConfig implements DataPatchInterface
             $this->seedAutomationMappings($legacy, $scope, (int)$scopeId);
             $allNotices = array_merge($allNotices, $result['notices']);
         }
+
+        // Every scope is migrated: the 2.8.x rows go, the plaintext password
+        // among them. Only "smaily/" itself matches, not smaily_connect/*.
+        $connection->delete($configTable, ['path LIKE ?' => 'smaily/%']);
 
         // The legacy dynamic cron expression row is orphaned in v3.
         $connection->delete($configTable, [

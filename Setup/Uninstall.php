@@ -17,8 +17,8 @@ use Magento\Framework\Setup\UninstallInterface;
  * Removes the module's settings and flag rows when the module is
  * uninstalled, as the WooCommerce plugin does: every `smaily_connect/*`
  * configuration row at every scope (the encrypted Smaily password and the
- * Campaign Intelligence key included), the 2.8.x `smaily/*` rows the
- * upgrade kept for a downgrade (a plaintext password among them), and every
+ * Campaign Intelligence key included), any 2.8.x `smaily/*` row still
+ * present (the upgrade deletes them once migrated), and every
  * `smaily_connect_*` flag row (the profiling opt-out record, the verified
  * credentials, the health and reconcile cursors). No engine call is made:
  * the engine key stays valid on the engine until it is revoked there.

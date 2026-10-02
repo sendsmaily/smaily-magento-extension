@@ -46,9 +46,9 @@ For a store on 2.8.x the upgrade is a normal `composer update` +
 
 - **All settings migrate automatically** during `setup:upgrade`: API credentials
   (the previously plaintext password lands encrypted), subscriber sync settings,
-  abandoned cart configuration, autoresponder mappings. Legacy `smaily/*` config
-  rows are left in place, so a composer-constraint downgrade back to 2.8.x restores
-  the old behavior.
+  abandoned cart configuration, autoresponder mappings. Once migrated, the legacy
+  `smaily/*` config rows (the plaintext password among them) are deleted, so a
+  downgrade back to 2.8.x starts with empty settings.
 - **Legacy schema is cleaned up safely**: the `reminder_date`/`is_sent` columns on
   the core `quote` table and the unused `smaily_customer_sync` table are dropped,
   with already-mailed abandoned-cart state carried over first — the upgrade can

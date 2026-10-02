@@ -205,7 +205,7 @@ $modeCards = [
 // through the API. ?>
 <?php $storefrontUrl = $viewModel->getSavedStorefrontUrl(); ?>
 <?php $apiOnly = $viewModel->isApiOnlyStore(); ?>
-<details class="smaily-disclosure" id="smaily-w-storefront"<?= $storefrontUrl !== '' || $apiOnly ? ' open' : '' ?>>
+<details class="smaily-disclosure" id="smaily-w-storefront"<?= $viewModel->isStorefrontDisclosureOpen() ? ' open' : '' ?>>
     <summary class="smaily-disclosure__toggle"><?= $escaper->escapeHtml(__('Using a separate storefront?')) ?></summary>
     <div class="smaily-card">
         <?php if ($apiOnly): ?>

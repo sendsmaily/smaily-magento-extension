@@ -100,14 +100,9 @@
         // browse tracker writes it once the visitor has consented
         // (ensureSession), as the WooCommerce plugin does.
         function ensureSession() {
-            var sessionId = getCookie(config.cookieSession);
-
-            if (!sessionId) {
-                sessionId = uuidv4();
-                setCookie(config.cookieSession, sessionId, config.ttlSessionDays);
+            if (!getCookie(config.cookieSession)) {
+                setCookie(config.cookieSession, uuidv4(), config.ttlSessionDays);
             }
-
-            return sessionId;
         }
 
         return {

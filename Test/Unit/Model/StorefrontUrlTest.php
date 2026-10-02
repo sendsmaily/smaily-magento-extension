@@ -67,6 +67,7 @@ class StorefrontUrlTest extends TestCase
             'fragment' => ['https://shop.example.com/#top'],
             'empty fragment' => ['https://shop.example.com#'],
             'user' => ['https://user:secret@shop.example.com'],
+            'password without user' => ['https://:secret@shop.example.com'],
             'no host' => ['https://'],
             'space in host' => ['https://shop example.com'],
         ];
@@ -141,6 +142,21 @@ class StorefrontUrlTest extends TestCase
             'https://shop.example.com/oak.html',
             (new StorefrontUrl($config))->apply('https://backend.example.com/oak.html', 7)
         );
+    }
+
+    public function testEachStoresValueIsReadOncePerRequest(): void
+    {
+        $config = $this->createMock(Config::class);
+        $config->expects(self::exactly(2))->method('getStorefrontUrl')->willReturnMap([
+            [1, 'https://one.example.com'],
+            [2, ''],
+        ]);
+        $storefrontUrl = new StorefrontUrl($config);
+
+        self::assertSame('https://one.example.com/a.html', $storefrontUrl->apply('https://b.example.com/a.html', 1));
+        self::assertSame('https://one.example.com/b.html', $storefrontUrl->apply('https://b.example.com/b.html', 1));
+        self::assertSame('https://b.example.com/c.html', $storefrontUrl->apply('https://b.example.com/c.html', 2));
+        self::assertSame('https://b.example.com/d.html', $storefrontUrl->apply('https://b.example.com/d.html', 2));
     }
 
     private function storefrontUrl(string $saved): StorefrontUrl

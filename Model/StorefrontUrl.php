@@ -17,6 +17,13 @@ namespace Smaily\Connect\Model;
  */
 class StorefrontUrl
 {
+    /**
+     * The normalized storefront address per store, read once per request.
+     *
+     * @var array<string, ?string>
+     */
+    private array $storefronts = [];
+
     public function __construct(
         private readonly Config $config
     ) {
@@ -45,7 +52,6 @@ class StorefrontUrl
             || isset($parts['query'])
             || isset($parts['fragment'])
             || isset($parts['user'])
-            || isset($parts['pass'])
             || str_ends_with($value, '?')
             || str_ends_with($value, '#')
         ) {
@@ -62,7 +68,11 @@ class StorefrontUrl
      */
     public function apply(string $url, int|string|null $storeId): string
     {
-        $storefront = self::normalize($this->config->getStorefrontUrl($storeId));
+        $key = $storeId === null ? '' : 'store:' . $storeId;
+        if (!array_key_exists($key, $this->storefronts)) {
+            $this->storefronts[$key] = self::normalize($this->config->getStorefrontUrl($storeId));
+        }
+        $storefront = $this->storefronts[$key];
         if ($storefront === null || $storefront === '') {
             return $url;
         }

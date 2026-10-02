@@ -189,6 +189,15 @@ class WizardData implements ArgumentInterface
         return $this->orderOrigin->isApiOnly();
     }
 
+    /**
+     * Whether the "Using a separate storefront?" disclosure is drawn open: a
+     * storefront address is saved, or the store is API-only (PRO-3660).
+     */
+    public function isStorefrontDisclosureOpen(): bool
+    {
+        return $this->getSavedStorefrontUrl() !== '' || $this->isApiOnlyStore();
+    }
+
     public function getBootJson(): string
     {
         $websiteId = $this->websiteContext->getWebsiteId();

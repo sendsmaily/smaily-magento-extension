@@ -192,6 +192,33 @@ class WizardDataTest extends TestCase
     }
 
     /**
+     * @dataProvider storefrontDisclosureProvider
+     */
+    public function testTheStorefrontDisclosureOpensWithASavedAddressOrOnAnApiOnlyStore(
+        string $saved,
+        bool $apiOnly,
+        bool $expected
+    ): void {
+        $this->config->method('getStorefrontUrl')->with(5)->willReturn($saved);
+        $this->orderOrigin->method('isApiOnly')->willReturn($apiOnly);
+
+        self::assertSame($expected, $this->viewModel->isStorefrontDisclosureOpen());
+    }
+
+    /**
+     * @return array<string, array{string, bool, bool}>
+     */
+    public static function storefrontDisclosureProvider(): array
+    {
+        return [
+            'nothing saved, checkout orders' => ['', false, false],
+            'address saved' => ['https://shop.example.com', false, true],
+            'API-only store' => ['', true, true],
+            'both' => ['https://shop.example.com', true, true],
+        ];
+    }
+
+    /**
      * PRO-3579: when Smaily's last answer was that the package has no API
      * access, the Connection status says so instead of blaming the
      * credentials.

@@ -16,6 +16,7 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **Storefront URL and consent slice tightened after a simplification review (2026-10-02, behaviour-neutral).** `StorefrontUrl::apply()` reads and normalizes each store's value once per request; `ensureSession()` returns nothing; `WizardData::isStorefrontDisclosureOpen()`; `normalize()` drops the redundant `pass` check (`parse_url` sets `user`, `''` included, whenever a password is given).
 - **PRO-3666 — the 3.0.0 changelog's admin-home entry once (2026-10-02).** Three merged copies on
   one line became one entry with every detail any copy carried; no other CHANGELOG bullet repeats.
 - **PRO-3664 — the browse tracker's consent, as in the WooCommerce plugin

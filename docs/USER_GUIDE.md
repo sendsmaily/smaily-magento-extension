@@ -224,7 +224,10 @@ outside the per-language modes.
 **Settings > Contacts** (or Initial setup step 2)
 
 Contacts sync in near-real-time through a durable queue (no lost events
-if Smaily is briefly unreachable — deliveries retry with backoff).
+if Smaily is briefly unreachable — deliveries retry with backoff). When one
+store action saves the same contact more than once, a save that changes
+nothing about the contact queues no second sync: a registration with the
+newsletter box ticked queues one contact sync under **Subscribers only**.
 
 ### Contact sync mode (lawful basis)
 

@@ -111,7 +111,21 @@ PRO-3591/3594/3602, PRO-1952. Earlier sessions: 2026-09-11, 2026-09-10._
   so it matches its caption "events waiting to send". The target spec
   names the tile "Queued today" without defining it as "created today",
   and the pilot checklist reads the caption as the cron-health signal, so
-  the count changed, not the caption.
+  the count changed, not the caption. (4) Cause of the two `contact.sync`
+  rows per registration: Magento's `createAccount()` saves the customer
+  twice — the account, then `changeResetPasswordLinkToken()` saves the
+  reset token through the repository — and the newsletter plugin
+  subscribes between the two saves. `SubscriberSaveAfter` queues the
+  subscription; the token save fires `customer_save_after_data_object`
+  again with the subscriber now subscribed, and `CustomerSaveAfter`
+  queued the same contact. `SyncDispatcher::dispatchContactSync()` now
+  skips a sync that adds nothing (every field already in the last sync
+  it queued for that store and address, same value; memory of the last
+  100 addresses per process). Consent: one row. All customers: two (the
+  account before the subscription, then the subscription with
+  `is_unsubscribed=0`) — was three. The event_uuid idempotency was not
+  used: it would also drop a subscribe → unsubscribe → subscribe
+  sequence. The purchase marker path does not take part.
 
 - **Automation docs corrected — a trigger for an unknown contact creates
   nothing (2026-10-02).** The `AutomationHandler` docblock, the user

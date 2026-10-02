@@ -22,6 +22,16 @@ use Smaily\Connect\Model\Queue\EventType;
  */
 class SyncDispatcher
 {
+    /** How many addresses the last-queued memory below holds at most. */
+    private const QUEUED_MEMORY = 100;
+
+    /**
+     * The last contact sync this process queued per store and address.
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    private array $lastQueued = [];
+
     public function __construct(
         private readonly SubscriberPayloadBuilder $payloadBuilder,
         private readonly LanguageResolver $languageResolver,
@@ -30,16 +40,36 @@ class SyncDispatcher
     ) {
     }
 
+    /**
+     * Queue one contact sync, unless it adds nothing to the one this request
+     * already queued for the address (PRO-3628). A storefront registration
+     * with the newsletter box saves the customer twice — the account, then
+     * the password-reset token — and subscribes between the two saves, so
+     * the second save would queue the subscription's contact again. A sync
+     * whose every field is already in the last one, with the same value,
+     * changes nothing in Smaily. One that changes or adds a field is queued.
+     * The queue's event_uuid idempotency is not used here: it would also
+     * drop a sync that returns to an earlier state (subscribe, unsubscribe,
+     * subscribe again).
+     */
     public function dispatchContactSync(
         string $email,
         int $storeId,
         ?bool $isUnsubscribed,
         ?CustomerInterface $customer = null
     ): void {
-        $this->enqueueContactSync(
-            $this->payloadBuilder->build($email, $storeId, $isUnsubscribed, $customer),
-            $storeId
-        );
+        $contact = $this->payloadBuilder->build($email, $storeId, $isUnsubscribed, $customer);
+        $key = $storeId . '|' . ($contact['email'] ?? '');
+        if (isset($this->lastQueued[$key]) && $this->addsNothing($contact, $this->lastQueued[$key])) {
+            return;
+        }
+
+        $this->enqueueContactSync($contact, $storeId);
+        unset($this->lastQueued[$key]);
+        $this->lastQueued[$key] = $contact;
+        if (count($this->lastQueued) > self::QUEUED_MEMORY) {
+            unset($this->lastQueued[array_key_first($this->lastQueued)]);
+        }
     }
 
     /**
@@ -121,6 +151,23 @@ class SyncDispatcher
             (string)($contact['email'] ?? ''),
             $this->websiteId($storeId)
         );
+    }
+
+    /**
+     * Whether every field of $contact is already in $queued, with the same value.
+     *
+     * @param array<string, mixed> $contact
+     * @param array<string, mixed> $queued
+     */
+    private function addsNothing(array $contact, array $queued): bool
+    {
+        foreach ($contact as $field => $value) {
+            if (!array_key_exists($field, $queued) || $queued[$field] !== $value) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function websiteId(int $storeId): int

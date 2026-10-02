@@ -180,6 +180,70 @@ class SyncDispatcherTest extends TestCase
         self::assertSame(1, $contact['is_unsubscribed']);
     }
 
+    /**
+     * PRO-3628: a contact sync that adds nothing to the one this request
+     * already queued for the address — the same fields with the same
+     * values, or fewer of them — is not queued again.
+     *
+     * @return array<string, array{0: list<array<string, string|int>>, 1: int}>
+     */
+    public static function repeatProvider(): array
+    {
+        $subscribed = ['email' => 'shopper@example.com', 'is_unsubscribed' => 0, 'first_name' => 'Test'];
+        $noStatus = ['email' => 'shopper@example.com', 'first_name' => 'Test'];
+        $unsubscribed = ['is_unsubscribed' => 1] + $subscribed;
+
+        return [
+            'the same contact twice' => [[$subscribed, $subscribed], 1],
+            'no status after the status' => [[$subscribed, $noStatus], 1],
+            'the status after no status' => [[$noStatus, $subscribed], 2],
+            'a changed field' => [[$subscribed, ['first_name' => 'Changed'] + $subscribed], 2],
+            'a field added' => [[$subscribed, $subscribed + ['last_name' => 'Person']], 2],
+            'subscribed, unsubscribed, subscribed' => [[$subscribed, $unsubscribed, $subscribed], 3],
+        ];
+    }
+
+    /**
+     * @dataProvider repeatProvider
+     * @param list<array<string, string|int>> $contacts
+     */
+    public function testAContactSyncThatAddsNothingIsNotQueuedAgain(array $contacts, int $queued): void
+    {
+        $this->payloadBuilder->method('build')->willReturnOnConsecutiveCalls(...$contacts);
+
+        foreach ($contacts as $ignored) {
+            $this->dispatcher->dispatchContactSync('shopper@example.com', 1, null);
+        }
+
+        self::assertCount($queued, $this->enqueued);
+    }
+
+    public function testTheSameContactForAnotherStoreIsQueued(): void
+    {
+        $this->payloadBuilder->method('build')->willReturn(['email' => 'shopper@example.com']);
+
+        $this->dispatcher->dispatchContactSync('shopper@example.com', 1, null);
+        $this->dispatcher->dispatchContactSync('shopper@example.com', 2, null);
+
+        self::assertCount(2, $this->enqueued);
+    }
+
+    /**
+     * The purchase marker row can be closed unsent (PRO-3619), so a contact
+     * sync is never held back because of it, and it is never held back
+     * either.
+     */
+    public function testTheCartPurchaseMarkerNeitherHoldsBackNorIsHeldBack(): void
+    {
+        $this->payloadBuilder->method('build')->willReturn(['email' => 'shopper@example.com']);
+
+        $this->dispatcher->dispatchCartPurchase('shopper@example.com', 1);
+        $this->dispatcher->dispatchContactSync('shopper@example.com', 1, null);
+        $this->dispatcher->dispatchCartPurchase('shopper@example.com', 1);
+
+        self::assertCount(3, $this->enqueued);
+    }
+
     public function testContactSyncCarriesNoMarker(): void
     {
         $this->payloadBuilder->method('build')->willReturn(['email' => 'shopper@example.com']);

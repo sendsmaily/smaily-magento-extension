@@ -11,6 +11,7 @@ namespace Smaily\Connect\Test\Integration\Adminhtml;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\RequestInterface;
+use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Magento\Store\Api\Data\StoreInterface;
@@ -66,7 +67,8 @@ class WizardDataTest extends IntegrationTestCase
             $this->objectManager->get(Json::class),
             $this->objectManager->get(MappingCollectionFactory::class),
             new WebsiteContext($storeManager, $request),
-            $this->createMock(VerifiedCredentials::class)
+            $this->createMock(VerifiedCredentials::class),
+            $this->createMock(ResolverInterface::class)
         );
     }
 

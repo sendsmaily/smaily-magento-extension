@@ -98,6 +98,39 @@
 .smaily-ui .smaily-ml-table td:last-child { text-align: center; }
 .smaily-ui .smaily-ml-table select { max-width: 34rem; }
 .smaily-ui .smaily-ml-none { color: #666; }
+/* Per-language Smaily accounts (PRO-3566, pack "Setup Wizard" frame 4): a
+ * dashed accent-tinted region (the pack's #d6c3cb, no token) that appears with
+ * the mode; the account blocks in a two-column grid that stacks when narrow;
+ * each block with a language chip, compact fields and its own status. */
+.smaily-ui .smaily-ml-region {
+    max-width: 680px; margin-bottom: 2rem; padding: 16px 18px;
+    background: var(--s-surface-2); border: 1px dashed #d6c3cb; border-radius: 6px;
+}
+.smaily-ui .smaily-ml-region__kicker {
+    margin-bottom: var(--sp-3); font: 700 var(--fs-11)/1 var(--font); letter-spacing: .5px;
+    text-transform: uppercase; color: var(--s-accent);
+}
+/* Settings: the mode cards and the fallback card share the region's measure
+ * (the initial setup already caps its cards at it). */
+.smaily-settings #smaily-ml-modes,
+.smaily-settings #smaily-w-accounts > .smaily-card { max-width: 680px; }
+.smaily-ui .smaily-ml-accounts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--sp-4); }
+.smaily-ui .smaily-ml-account {
+    min-width: 0; padding: 14px 16px; background: var(--s-surface);
+    border: 1px solid var(--s-border); border-radius: var(--r-3); color: var(--s-text);
+}
+.smaily-ui .smaily-ml-account__head { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.smaily-ui .smaily-ml-account__chip {
+    flex: 0 0 auto; width: 26px; height: 18px; border-radius: var(--r-2); background: var(--s-text-2);
+    color: #fff; font: 700 10px/18px var(--font); letter-spacing: .3px; text-align: center;
+}
+.smaily-ui .smaily-ml-account .smaily-ml-account__name { margin: 0; min-width: 0; font-size: var(--fs-14); font-weight: 700; color: var(--s-text); }
+.smaily-ui .smaily-ml-account > p.note { margin: 0 0 var(--sp-3); font-size: var(--fs-12); color: var(--s-text-3); }
+.smaily-ui .smaily-ml-account .smaily-field { max-width: none; margin-bottom: 11px; }
+.smaily-ui .smaily-ml-account .smaily-field label { font-size: var(--fs-12); color: var(--s-text-2); }
+.smaily-ui .smaily-ml-account .smaily-field input { max-width: none; padding: 6px 9px; font-size: var(--fs-13); }
+.smaily-ui .smaily-ml-account__foot { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: var(--sp-3); }
+.smaily-ui .smaily-ml-account__foot .smaily-result.smaily-inline-status { margin-left: 0; white-space: normal; line-height: 1.4; }
 
 /* --- Wizard stepper ------------------------------------------------------- */
 .smaily-wizard .smaily-steps { display: flex; gap: 0; margin: 0 0 3rem; padding: 0; list-style: none; }

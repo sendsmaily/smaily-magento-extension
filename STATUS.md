@@ -16,6 +16,33 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3566 done — per-language account blocks as the pack draws them
+  (2026-10-02).** In "Per-language Smaily accounts" mode
+  (`panel/connection.phtml`, initial setup step 1 and Settings >
+  Connection) the account blocks sit in the pack's dashed reactive region
+  (`.smaily-ml-region`: `--s-surface-2`, 1 px dashed #d6c3cb — the pack's
+  value, no token — 6 px radius, headed by the mode name as an accent
+  kicker), in a two-column grid that stacks below ~540 px. Each block is a
+  white 5 px card with a language chip (code), the heading "Smaily account
+  for <language name>", compact fields (12 px labels, 13 px inputs), and a
+  footer with Test connection and its own status, rendered server-side:
+  *Connected* when Smaily accepted the credentials saved for that
+  language's store view at the last check, otherwise *Not connected*; Test
+  connection replaces it with the answer for what is typed.
+  `WizardData::getMultilingualAccounts()` now adds `languageName`
+  (`\Locale::getDisplayLanguage` in the admin's interface locale via the
+  new `Magento\Framework\Locale\ResolverInterface` dependency; the code in
+  capitals when ICU has no name) and `verified`
+  (`VerifiedCredentials::isVerified($storeId)`). On Settings the mode cards
+  and the fallback card share the region's 680 px measure, as in the initial
+  setup. No new phrases ("Per-language Smaily accounts", "Smaily account for
+  %1", "Connected", "Not connected" are shipped). Unit-tested (name per admin
+  locale, fallback to the code, status per store view); verified by
+  rendering the real templates with stub data for two languages in headless
+  Chrome (Settings en_US / et_EE, initial setup at 1400 / 700 / 560 px; Test
+  connection, the field error on a block, switching mode hides the region).
+  Fidelity audit row 20 marked fixed.
+
 - **PRO-3568 done — the Dashboard's degraded and healthy states carry the
   pack's banner and buttons (2026-10-02).** With failed deliveries in the
   last 24 hours (and setup complete, Smaily connected) `dashboard/index.phtml`

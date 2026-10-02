@@ -11,6 +11,7 @@ namespace Smaily\Connect\Test\Unit\ViewModel\Adminhtml;
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Sales\Model\ResourceModel\Order\Collection as OrderCollection;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
@@ -58,6 +59,9 @@ class WizardDataTest extends TestCase
     /** @var ContactAudience&\PHPUnit\Framework\MockObject\MockObject */
     private $contactAudience;
 
+    /** @var ResolverInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private $localeResolver;
+
     private WizardData $viewModel;
 
     protected function setUp(): void
@@ -73,6 +77,7 @@ class WizardDataTest extends TestCase
         $this->websiteContext->method('getWebsiteId')->willReturn(2);
         $this->websiteContext->method('getStoreId')->willReturn(5);
         $this->verifiedCredentials = $this->createMock(VerifiedCredentials::class);
+        $this->localeResolver = $this->createMock(ResolverInterface::class);
 
         $this->contactAudience = $this->createMock(ContactAudience::class);
 
@@ -98,7 +103,8 @@ class WizardDataTest extends TestCase
             new Json(),
             $this->createMock(MappingCollectionFactory::class),
             $this->websiteContext,
-            $this->verifiedCredentials
+            $this->verifiedCredentials,
+            $this->localeResolver
         );
     }
 
@@ -260,5 +266,39 @@ class WizardDataTest extends TestCase
         $this->mode->expects(self::once())->method('mode')->with(2)->willReturn(SyncMode::MODE_LEGITIMATE_INTEREST);
 
         self::assertSame(SyncMode::MODE_LEGITIMATE_INTEREST, $this->viewModel->getSyncMode());
+    }
+
+    /**
+     * PRO-3566: each per-language account block shows its language by name
+     * and its own connection status — whether Smaily accepted the
+     * credentials saved for that language's store view at the last check.
+     */
+    public function testEachPerLanguageAccountCarriesItsLanguageNameAndItsOwnConnectionStatus(): void
+    {
+        $this->accountResolver->method('languageStoreIds')->with(2)->willReturn(['en' => 5, 'et' => 7]);
+        $this->verifiedCredentials->method('isVerified')->willReturnMap([[5, true], [7, false]]);
+        $this->localeResolver->method('getLocale')->willReturn('en_US');
+
+        $accounts = $this->viewModel->getMultilingualAccounts();
+
+        self::assertSame(['English', 'Estonian'], array_column($accounts, 'languageName'));
+        self::assertSame([true, false], array_column($accounts, 'verified'));
+        self::assertSame([5, 7], array_column($accounts, 'storeId'));
+    }
+
+    public function testTheLanguageNameFollowsTheAdminsInterfaceLocale(): void
+    {
+        $this->accountResolver->method('languageStoreIds')->willReturn(['en' => 5]);
+        $this->localeResolver->method('getLocale')->willReturn('et_EE');
+
+        self::assertSame('inglise', $this->viewModel->getMultilingualAccounts()[0]['languageName']);
+    }
+
+    public function testALanguageWithoutAKnownNameFallsBackToItsCode(): void
+    {
+        $this->accountResolver->method('languageStoreIds')->willReturn(['zz' => 5]);
+        $this->localeResolver->method('getLocale')->willReturn('en_US');
+
+        self::assertSame('ZZ', $this->viewModel->getMultilingualAccounts()[0]['languageName']);
     }
 }

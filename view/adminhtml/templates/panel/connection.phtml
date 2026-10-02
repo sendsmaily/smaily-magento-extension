@@ -123,41 +123,61 @@ $modeCards = [
 
 <?php if ($isMultilingual): ?>
 <div id="smaily-w-accounts" <?= $isModeA ? '' : 'style="display:none;"' ?>>
-    <?php foreach ($accounts as $account): ?>
-    <div class="smaily-card smaily-ml-account"
-         data-language="<?= $escaper->escapeHtmlAttr($account['language']) ?>"
-         data-store-id="<?= $escaper->escapeHtmlAttr((string)($account['storeId'] ?? '')) ?>"
-         data-has-password="<?= $account['hasPassword'] ? '1' : '0' ?>"
-         data-saved-subdomain="<?= $escaper->escapeHtmlAttr($account['subdomain']) ?>"
-         data-saved-username="<?= $escaper->escapeHtmlAttr($account['username']) ?>">
-        <h2><?= $escaper->escapeHtml(__('Smaily account for %1', strtoupper($account['language']))) ?></h2>
-        <p class="note"><?= $escaper->escapeHtml(__('Store views with the %1 language sync their contacts and automations to this account.', strtoupper($account['language']))) ?></p>
-        <div class="smaily-field">
-            <label for="smaily-ml-subdomain-<?= $escaper->escapeHtmlAttr($account['language']) ?>"><?= $escaper->escapeHtml(__('Subdomain')) ?></label>
-            <input type="text" class="smaily-ml-subdomain"
-                   id="smaily-ml-subdomain-<?= $escaper->escapeHtmlAttr($account['language']) ?>"
-                   value="<?= $escaper->escapeHtmlAttr($account['subdomain']) ?>"/>
+    <?php // Pack "Setup Wizard" frame 4 (PRO-3566): a dashed region that appears with
+    // this mode, the accounts in a two-column grid (one column when narrow), each
+    // block with its language chip, its fields and its own connection status —
+    // Smaily's answer at the last check of the credentials saved for that
+    // language; Test connection replaces it with the answer for what is typed. ?>
+    <div class="smaily-ml-region">
+        <div class="smaily-ml-region__kicker"><?= $escaper->escapeHtml(__('Per-language Smaily accounts')) ?></div>
+        <div class="smaily-ml-accounts">
+            <?php foreach ($accounts as $account): ?>
+            <?php $code = $escaper->escapeHtmlAttr($account['language']); ?>
+            <div class="smaily-ml-account"
+                 data-language="<?= $code ?>"
+                 data-store-id="<?= $escaper->escapeHtmlAttr((string)($account['storeId'] ?? '')) ?>"
+                 data-has-password="<?= $account['hasPassword'] ? '1' : '0' ?>"
+                 data-saved-subdomain="<?= $escaper->escapeHtmlAttr($account['subdomain']) ?>"
+                 data-saved-username="<?= $escaper->escapeHtmlAttr($account['username']) ?>">
+                <div class="smaily-ml-account__head">
+                    <span class="smaily-ml-account__chip"><?= $escaper->escapeHtml(strtoupper($account['language'])) ?></span>
+                    <h2 class="smaily-ml-account__name"><?= $escaper->escapeHtml(__('Smaily account for %1', $account['languageName'])) ?></h2>
+                </div>
+                <p class="note"><?= $escaper->escapeHtml(__('Store views with the %1 language sync their contacts and automations to this account.', strtoupper($account['language']))) ?></p>
+                <div class="smaily-field">
+                    <label for="smaily-ml-subdomain-<?= $code ?>"><?= $escaper->escapeHtml(__('Subdomain')) ?></label>
+                    <input type="text" class="smaily-ml-subdomain"
+                           id="smaily-ml-subdomain-<?= $code ?>"
+                           value="<?= $escaper->escapeHtmlAttr($account['subdomain']) ?>"/>
+                </div>
+                <div class="smaily-field">
+                    <label for="smaily-ml-username-<?= $code ?>"><?= $escaper->escapeHtml(__('API username')) ?></label>
+                    <input type="text" class="smaily-ml-username"
+                           id="smaily-ml-username-<?= $code ?>"
+                           value="<?= $escaper->escapeHtmlAttr($account['username']) ?>"/>
+                </div>
+                <div class="smaily-field">
+                    <label for="smaily-ml-password-<?= $code ?>"><?= $escaper->escapeHtml(__('API password')) ?></label>
+                    <input type="password" class="smaily-ml-password" autocomplete="new-password"
+                           id="smaily-ml-password-<?= $code ?>"/>
+                    <?php if ($account['hasPassword']): ?>
+                    <p class="note"><?= $escaper->escapeHtml(__('A password is already saved — leave this empty to keep it.')) ?></p>
+                    <?php endif; ?>
+                </div>
+                <div class="smaily-ml-account__foot">
+                    <button type="button" class="action-secondary smaily-ml-test">
+                        <span><?= $escaper->escapeHtml(__('Test connection')) ?></span>
+                    </button>
+                    <?php if ($account['verified']): ?>
+                    <span class="smaily-result smaily-inline-status ok is-saved"><span class="smaily-inline-status__check"></span><span><?= $escaper->escapeHtml(__('Connected')) ?></span></span>
+                    <?php else: ?>
+                    <span class="smaily-result smaily-inline-status is-idle"><span><?= $escaper->escapeHtml(__('Not connected')) ?></span></span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endforeach; ?>
         </div>
-        <div class="smaily-field">
-            <label for="smaily-ml-username-<?= $escaper->escapeHtmlAttr($account['language']) ?>"><?= $escaper->escapeHtml(__('API username')) ?></label>
-            <input type="text" class="smaily-ml-username"
-                   id="smaily-ml-username-<?= $escaper->escapeHtmlAttr($account['language']) ?>"
-                   value="<?= $escaper->escapeHtmlAttr($account['username']) ?>"/>
-        </div>
-        <div class="smaily-field">
-            <label for="smaily-ml-password-<?= $escaper->escapeHtmlAttr($account['language']) ?>"><?= $escaper->escapeHtml(__('API password')) ?></label>
-            <input type="password" class="smaily-ml-password" autocomplete="new-password"
-                   id="smaily-ml-password-<?= $escaper->escapeHtmlAttr($account['language']) ?>"/>
-            <?php if ($account['hasPassword']): ?>
-            <p class="note"><?= $escaper->escapeHtml(__('A password is already saved — leave this empty to keep it.')) ?></p>
-            <?php endif; ?>
-        </div>
-        <button type="button" class="action-secondary smaily-ml-test">
-            <span><?= $escaper->escapeHtml(__('Test connection')) ?></span>
-        </button>
-        <span class="smaily-result"></span>
     </div>
-    <?php endforeach; ?>
 
     <div class="smaily-card">
         <h2><?= $escaper->escapeHtml(__('Default fallback account')) ?></h2>

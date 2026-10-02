@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\ViewModel\Adminhtml;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
@@ -51,7 +52,8 @@ class WizardData implements ArgumentInterface
         private readonly Json $serializer,
         private readonly MappingCollectionFactory $mappingCollectionFactory,
         private readonly WebsiteContext $websiteContext,
-        private readonly VerifiedCredentials $verifiedCredentials
+        private readonly VerifiedCredentials $verifiedCredentials,
+        private readonly ResolverInterface $localeResolver
     ) {
     }
 
@@ -328,7 +330,7 @@ class WizardData implements ArgumentInterface
      * detected language.
      *
      * @return array<int, array{language: string, storeId: int|null, subdomain: string,
-     *     username: string, hasPassword: bool}>
+     *     username: string, hasPassword: bool, languageName: string, verified: bool}>
      */
     public function getMultilingualAccounts(): array
     {
@@ -341,10 +343,29 @@ class WizardData implements ArgumentInterface
                 'subdomain' => $this->config->getSubdomain($storeId),
                 'username' => $this->config->getUsername($storeId),
                 'hasPassword' => $this->config->getPassword($storeId) !== '',
+                // The block's heading and status (PRO-3566): the language
+                // by name in the admin's own language, and whether Smaily
+                // accepted this store view's saved credentials (PRO-3560).
+                'languageName' => $this->languageName($language),
+                'verified' => $this->verifiedCredentials->isVerified($storeId),
             ];
         }
 
         return $accounts;
+    }
+
+    /**
+     * A language code ("et") as its name in the admin's interface locale
+     * ("Estonian", or "eesti" for an Estonian admin); the code in capitals
+     * when the locale data has no name for it.
+     */
+    private function languageName(string $language): string
+    {
+        $name = \Locale::getDisplayLanguage($language, $this->localeResolver->getLocale());
+
+        return is_string($name) && $name !== '' && strcasecmp($name, $language) !== 0
+            ? $name
+            : strtoupper($language);
     }
 
     /**

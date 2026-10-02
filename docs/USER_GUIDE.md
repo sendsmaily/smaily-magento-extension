@@ -208,7 +208,7 @@ selected card, nothing is saved until you press Save/Continue:
 | Mode | Meaning |
 |---|---|
 | Single language | One account, one workflow per trigger (default). |
-| Per-language Smaily accounts | Each language has its own Smaily account. The Connection panel shows one credential block per detected language, each with its own Test Connection button, plus a **default fallback account** picker. |
+| Per-language Smaily accounts | Each language has its own Smaily account. The Connection panel shows one credential block per detected language — side by side, each headed by its language — with its own Test Connection button and its own status (*Connected* when Smaily accepted that language's saved credentials at the last check, otherwise *Not connected*), plus a **default fallback account** picker. |
 | One account, per-language workflows | One Smaily account; each language fires its own workflow. The most common multilingual setup. |
 | One workflow branching by language | One workflow; the language split happens inside Smaily. The `language` field is sent with every contact. |
 

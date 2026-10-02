@@ -370,7 +370,7 @@ toggle; catalog, customer and order sync run automatically once connected.
 | Catalog | On product save/delete (deletes become out-of-stock) and on every stock change — a shipment that sells the last unit, a credit memo that puts it back, an Advanced Inventory or Sources edit, an API stock update. A nightly re-sync (03:40 store time) catches what no event can see, such as a CSV/`bin/magento import` run that writes the tables directly |
 | Customers | On profile create/update (no consent fields — the engine is a separate lawful surface) |
 | Orders | On order placement, status changes, and refunds — a credit memo re-syncs the order, so a fully credited line is reported as returned and stops being recommended back to that customer (a partly credited line still counts as kept) |
-| Browse events | Product views, searches, cart adds, checkout — batched from the storefront (**Storefront Browse Tracking**, off by default — a separate, consent-gated toggle, not part of the always-on sync above) |
+| Browse events | Product views, searches, cart adds, checkout — batched from the storefront (**Enable storefront browse tracking (product views, searches, cart activity)**, off by default — a separate, consent-gated toggle, not part of the always-on sync above) |
 
 Browse tracking respects Magento's cookie restriction mode and sends events
 through your own server (`smaily/relay`) so the API key never reaches the

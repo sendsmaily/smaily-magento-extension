@@ -196,8 +196,10 @@ It asserts that the archive carries what a Magento module needs to install
 (`registration.php`, `composer.json`, `etc/module.xml`, `etc/db_schema.xml`,
 the `i18n` catalogs, `view/`) plus `README.md`, `CHANGELOG.md` and
 `LICENSE.txt`, that it carries none of the development apparatus (tests, CI
-config, sandbox, tooling, static-analysis and phpunit config, `vendor/`, the
-internal working documents), none of the Hyvä companion (`compat/` — a
+config, sandbox, tooling, static-analysis and phpunit config, `vendor/`, git
+metadata — the `.git` directory, or the `.git` file a git worktree has in its
+place — and the developer and working documents, this `TESTING.md` and
+`CONTRIBUTING.md` among them), none of the Hyvä companion (`compat/` — a
 separately published package) and no `docs/` at all, that the version in the
 archived `composer.json` is the repo's, and that every shipped PHP file parses
 under `php -l`. It ends by printing a SHA-256 build hash and writing it to

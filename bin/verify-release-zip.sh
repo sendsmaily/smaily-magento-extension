@@ -75,8 +75,10 @@ require CHANGELOG.md
 require LICENSE.txt
 
 # --- 2. What must never ship ------------------------------------------------
-# The development apparatus, the separately published Hyvä companion, the
-# internal working documents and the whole docs/ folder — it vendors the engine
+# The development apparatus (git metadata included — a git worktree has a
+# `.git` pointer file instead of a directory), the separately published Hyvä
+# companion, the developer and internal working documents (TESTING.md among
+# them) and the whole docs/ folder — it vendors the engine
 # contract from a private repository and carries internal audits, so the
 # documentation set is linked on GitHub instead of copied into the package.
 forbid() {
@@ -95,6 +97,7 @@ forbid "sandbox"          '\.sandbox/'
 forbid "composer vendor"  'vendor/'
 forbid "CI config"        '\.github/'
 forbid "git metadata"     '\.git/'
+forbid "git pointer file" '\.git$'
 forbid "tooling scripts"  'bin/'
 forbid "phpunit config"   'phpunit.*\.xml.*'
 forbid "phpcs config"     'phpcs\.xml.*'
@@ -104,6 +107,7 @@ forbid "docker files"     '(docker-compose.*|Dockerfile)$'
 forbid "working status"   'STATUS\.md$'
 forbid "backlog"          'BACKLOG\.md$'
 forbid "agent guide"      'CLAUDE\.md$'
+forbid "testing guide"    'TESTING\.md$'
 forbid "pilot checklist"  'PILOT_CHECKLIST\.md$'
 forbid "documentation"    'docs/'
 

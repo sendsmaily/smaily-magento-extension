@@ -11,9 +11,11 @@
 #   bin/build-release-zip.sh [output.zip]      (default: ./smaily-connect-magento2.zip)
 #
 # What stays out: the development apparatus (tests, CI, sandbox, tooling,
-# static-analysis config), the Hyvä companion (compat/, published as the
-# separate package smaily/module-connect-hyva), the internal working documents
-# and the whole docs/ folder — it carries the engine contract vendored from a
+# static-analysis config, git metadata — including the `.git` pointer file a
+# git worktree has instead of a directory), the Hyvä companion (compat/,
+# published as the separate package smaily/module-connect-hyva), the developer
+# and internal working documents (TESTING.md, CONTRIBUTING.md, CLAUDE.md,
+# STATUS.md, BACKLOG.md, PILOT_CHECKLIST.md) and the whole docs/ folder — it carries the engine contract vendored from a
 # private repository and internal audits, so the documentation set lives on
 # GitHub and the package links to it there (Erkki's decision, 2026-09-10).
 # What ships alongside the code: README.md, CHANGELOG.md, LICENSE.txt.
@@ -31,14 +33,14 @@ rm -f "$OUT"
 cd "$ROOT"
 
 zip -q -r -X "$OUT" . \
-    -x '.git/*' '.github/*' '.sandbox/*' '.vscode/*' '.claude/*' \
+    -x '.git' '.git/*' '.github/*' '.sandbox/*' '.vscode/*' '.claude/*' \
        'Test/*' 'compat/*' 'vendor/*' 'var/*' 'bin/*' \
        'docker-compose.yaml' 'Dockerfile' \
        'phpcs.xml.dist' 'phpstan.neon.dist' \
        'phpunit.xml.dist' 'phpunit.integration.xml.dist' \
        'composer.lock' '.gitignore' \
        'CONTRIBUTING.md' 'CLAUDE.md' 'STATUS.md' 'BACKLOG.md' \
-       'PILOT_CHECKLIST.md' \
+       'TESTING.md' 'PILOT_CHECKLIST.md' \
        'docs/*' \
        '*.zip' '*.zip.sha256'
 

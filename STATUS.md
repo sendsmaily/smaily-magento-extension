@@ -51,6 +51,9 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   the release ZIP and `bin/verify-release-zip.sh` now forbids it (local run:
   VERIFY OK, 338 entries, `absent: pilot checklist`). Remaining for PRO-2474:
   run the runbook on a clean sandbox, then the rc1 tag on Erkki's go.
+  Pre-tag packaging fixes: `TESTING.md` and a worktree's `.git` pointer file
+  no longer ship (both forbidden by the verifier; worktree run: VERIFY OK,
+  336 entries); the User Guide names the browse-tracking toggle by its admin label.
 
 - **`composer.lock` refreshed (2026-10-02, GitHub issue #2).** `composer
   update --ignore-platform-req='ext-*'`, PHP 8.1 pin kept; `composer update

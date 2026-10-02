@@ -3,10 +3,10 @@
 **Audience:** the Smaily team that owns `sendsmaily/smaily-magento-extension`, the
 `smaily/smailyformagento` composer package and the Magento Marketplace listing.
 **From:** the fork (`erkkimarkus/magento-connect`), branch `v3`, at **3.0.0-rc3**
-(unreleased).
+(a GitHub pre-release on the fork).
 **Status:** proposal / decision request. Nothing irreversible has been done — no
-composer release published, no Marketplace submission. 3.0.0-rc1 and 3.0.0-rc2
-are GitHub pre-releases on the fork, with a ZIP for manual installs; the
+composer release published, no Marketplace submission. 3.0.0-rc1, 3.0.0-rc2 and
+3.0.0-rc3 are GitHub pre-releases on the fork, with a ZIP for manual installs; the
 upstream repository has no release of the rewrite.
 This document makes the case, lays out a staged review and hand-over plan, and ends
 with the concrete go/no-go decisions.

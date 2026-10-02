@@ -5,7 +5,12 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 — 3.0.0-rc3 is prepared, not published: the
+_Last updated: 2026-10-02 — 3.0.0-rc3 is released as a GitHub pre-release on
+the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc3),
+built by the release workflow from commit a1ff618; the ZIP and its .sha256
+were checked after publishing (375 entries, checksum OK, sha256
+0c500698…ab8b6; file contents byte-identical to a local build — the ZIP
+bytes differ only by the zip tool, Linux in CI vs macOS locally). The
 version is `3.0.0-rc3` (composer.json, `ModuleInfo::VERSION`, the upstream
 proposal; composer.lock content-hash refreshed), and CHANGELOG has a
 "Changes since 3.0.0-rc2" list (the bullets added since the rc2 cut moved
@@ -1002,8 +1007,8 @@ Earlier: 2026-09-11, 2026-09-10._
   consent as in Woo: override → cookie restriction mode → none), PRO-3666,
   and since then PRO-1398, PRO-3665, PRO-3661, PRO-3681. All of it is in
   3.0.0-rc2, released on the fork as a pre-release (header); everything
-  since then is in 3.0.0-rc3, which is prepared (header) and awaits the
-  owner's go to publish.
+  since then is in 3.0.0-rc3, released on the fork as a pre-release
+  (header) — the pilot installs rc3.
   Next, in order: (1) pilot day
   09.10 — Erkki passes the storefront hand-off in HEADLESS_STOREFRONTS.md to
   the storefront team (incl. keeping the query string on the `/<url_key>.html`
@@ -3914,8 +3919,7 @@ Earlier: 2026-09-11, 2026-09-10._
   merchant recovery).
 
 **All 6 v3 phases implemented** (~110 files) on branch `v3`, version
-**3.0.0-rc3 — unreleased** (3.0.0-rc2 is the newest GitHub pre-release
-on the fork). Current truth:
+**3.0.0-rc3 — GitHub pre-release on the fork**. Current truth:
 
 - **PRO-1391 final-polish done — four refinements on Settings > Connection
   after Erkki's side-by-side review of the PRO-1391 visual-fidelity pass.**

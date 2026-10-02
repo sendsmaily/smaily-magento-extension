@@ -56,6 +56,10 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   sentence picks singular or plural per count ("1 customer" / "1 klient");
   new phrases "%1 customer(s)", "%1 order(s)", "%1 product(s)" and "Your
   store has %1, %2 and %3. …" replace the old sentence in EN + ET.
+  Automations: the Enabled (and Test mode) checkbox sits on one line with
+  its label. Intelligence: "Connected: … (engine …)" is the pack's success
+  Banner instead of Magento's message box, and the body copy, the browse
+  tracking checkbox and its muted, indented note keep the card's spacing.
 
 - **PRO-3560 done — "Connected" means Smaily accepted the credentials
   (2026-10-02).** Before, the Dashboard and Settings > Connection said

@@ -55,7 +55,17 @@ $isRefused = $viewModel->isEngineRefused();
             <a class="smaily-banner__action" href="<?= $escaper->escapeUrl($viewModel->getSmailyAccountUrl()) ?>" target="_blank"><?= $escaper->escapeHtml(__('Open your Smaily account')) ?></a>
         </div>
         <?php else: ?>
-        <p class="message message-success" id="smaily-w-engine-status"></p>
+        <?php // Pack Banner component, success level (not Magento's message box). ?>
+        <div class="smaily-banner smaily-banner--success" role="status">
+            <span class="smaily-banner__icon"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="8" cy="8" r="7.2" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".9"/>
+                <path d="M5 8.5l2 2 4-4.5" stroke="currentColor" stroke-width="1.8" fill="none"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+            </svg></span>
+            <div class="smaily-banner__body">
+                <div class="smaily-banner__message" id="smaily-w-engine-status"></div>
+            </div>
+        </div>
         <?php endif; ?>
         <?php if (!$isSettings): ?>
         <p><?= $escaper->escapeHtml(__('Catalog, customer and order sync started automatically. Historical data can be imported any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?></p>

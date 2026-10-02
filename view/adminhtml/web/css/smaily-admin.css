@@ -600,7 +600,7 @@
 .smaily-engine-trigger__controls { display: flex; gap: var(--sp-3); flex-wrap: wrap; align-items: flex-end; }
 .smaily-engine-trigger__ctrl { display: flex; flex-direction: column; gap: var(--sp-1); }
 .smaily-engine-trigger__ctrl > span { font-size: var(--fs-11); font-weight: 700; color: var(--s-text-3); text-transform: uppercase; letter-spacing: .4px; }
-.smaily-engine-trigger__ctrl label { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--s-text-2); font-size: var(--fs-13); }
+.smaily-engine-trigger__ctrl label { display: inline-flex; align-items: center; gap: 6px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--s-text-2); font-size: var(--fs-13); line-height: 1.3; }
 .smaily-engine-empty { text-align: center; background: var(--s-surface); border: 1px solid var(--s-border); border-radius: var(--r-3); padding: 32px 24px; }
 .smaily-engine-empty__icon { width: 44px; height: 44px; border-radius: 50%; background: var(--s-info-soft); border: 1px solid var(--s-info-border); color: var(--s-info); font: 700 22px/44px var(--font); margin: 0 auto var(--sp-3); }
 .smaily-engine-empty__title { font-size: var(--fs-16); font-weight: 700; margin-bottom: 5px; }
@@ -747,6 +747,22 @@
 .smaily-wizard [data-step="2"] .smaily-inline-toggle .note {
     margin: 3px 0 0 23px; font-size: var(--fs-12); color: var(--s-text-3);
 }
+/* PRO-2456: the same checkbox row everywhere else (Intelligence's browse
+ * tracking among them) — box and label on one centred line, the note
+ * indented under the label text. */
+.smaily-ui .smaily-inline-toggle label {
+    display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); font-weight: 600; color: var(--s-text);
+}
+.smaily-ui .smaily-inline-toggle .note { margin: 3px 0 0 23px; font-size: var(--fs-12); color: var(--s-text-3); }
+.smaily-ui .smaily-inline-toggle input[type=checkbox],
+.smaily-engine-trigger__ctrl label input[type=checkbox] { flex: 0 0 auto; margin: 0; }
+
+/* --- Intelligence (wizard step 4 + Settings > Intelligence, PRO-2456) ------ *
+ * The connected state: the success Banner, then the body copy and the browse
+ * tracking row on the card's 16px rhythm. */
+#smaily-w-engine-connected > .smaily-banner { margin-bottom: var(--sp-4); }
+.smaily-ui #smaily-w-engine-connected > p { margin: 0 0 var(--sp-4); font-size: var(--fs-13); line-height: 1.45; color: var(--s-text-2); }
+.smaily-ui #smaily-w-engine-connected > .smaily-inline-toggle { margin-bottom: var(--sp-4); }
 
 /* --- Settings > RSS tab (PRO-2456, pack Settings "RSS tab" frame) --------- *
  * Same shell as the other tabs (H3 + description + tab footer, in

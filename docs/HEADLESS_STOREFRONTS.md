@@ -125,8 +125,8 @@ value only when it has the shape shown; ignore it otherwise.
 | `smaily_vt` | `vt_` + 1–61 letters or digits | `smaily_rec_uid` | 365 days |
 | `smaily_ctx` | 1–64 of `A-Z a-z 0-9 . _ -` | `smaily_rec_ctx` | 30 days |
 
-Also, when the cookie `smaily_anon_sid` is missing, set it to a new random
-UUID v4 for 30 days. It is the anonymous session id of browse events.
+The anonymous session id of browse events, the cookie `smaily_anon_sid`,
+is not part of this capture: set it in step 4, with consent only.
 
 These are the default names and lifetimes. A Campaign Intelligence account
 can override them; ask Smaily support if the account was set up with other
@@ -156,7 +156,12 @@ recommendation emails show no conversions.
 
 Only when **Enable storefront browse tracking (product views, searches,
 cart activity)** is on in the module's settings; the relay answers 404
-otherwise.
+otherwise. And only for a shopper who allowed **marketing** cookies in the
+storefront's consent banner — without that consent send no event and set
+no `smaily_anon_sid`, as Magento's own tracker does (see the User Guide,
+[Connecting your cookie consent tool](USER_GUIDE.md#connecting-your-cookie-consent-tool)).
+With consent, when the cookie `smaily_anon_sid` is missing, set it to a new
+random UUID v4 for 30 days.
 
 Send events from the shopper's browser to
 `https://backend.example.com/smaily/relay` as a JSON body:
@@ -169,7 +174,7 @@ Send events from the shopper's browser to
     "event_type": "product_view",
     "sku": "OAK-TABLE-120",
     "category_path": "dining/tables",
-    "smaily_visitor_token": "<value of the smaily_rec_uid cookie, with consent only>"
+    "smaily_visitor_token": "<value of the smaily_rec_uid cookie, when set>"
   }
 ]}
 ```
@@ -186,9 +191,7 @@ Send events from the shopper's browser to
   source.
 - Up to 100 events per request; batch for a few seconds. Magento's own
   tracker batches for 5 seconds and sends on `pagehide`.
-- Send `smaily_visitor_token` only after the shopper has accepted
-  analytics or marketing cookies in the storefront's consent banner.
-  Without consent, send the events without it.
+- Send `smaily_visitor_token` when the `smaily_rec_uid` cookie is set.
 - Send with `navigator.sendBeacon()` and a `text/plain` body (for example
   `new Blob([json], {type: 'text/plain'})`). The relay reads the raw body
   and needs no cookie, session or form key, so this cross-origin request

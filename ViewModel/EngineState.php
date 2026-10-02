@@ -51,9 +51,8 @@ class EngineState implements ArgumentInterface
             // Cast deliberately: the helper is annotated @return bool but
             // actually returns the raw config value — the string "0" when
             // restriction mode is off, which is truthy in JS and would make
-            // the tracker demand consent (and drop the identity hint) on
-            // every store.
-            'consentRequired' => (bool)$this->cookieHelper->isCookieRestrictionModeEnabled(),
+            // the tracker wait for a cookie notice the store never shows.
+            'cookieRestriction' => (bool)$this->cookieHelper->isCookieRestrictionModeEnabled(),
             'attribution' => $this->attributionManager->getClientConfig(),
         ]);
     }

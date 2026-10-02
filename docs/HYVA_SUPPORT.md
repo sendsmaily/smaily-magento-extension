@@ -77,6 +77,13 @@ path repository until the separate package exists (see
   programmatically (fires no `submit` event) or replace the form bypass
   this capture; if a store reports missing `cart_add` events, add a
   `private-content-loaded` cart-diff listener as the success-side signal.
+  The consent gate is the base tracker's (override, then Magento's cookie
+  notice, otherwise none; no event and no session cookie without consent);
+  consent given later on the page is picked up from Hyvä's cookie notice
+  event `user-allowed-save-cookie` (window) instead of Luma's jQuery
+  `user:allowed:save:cookie`, and from `smaily:consent-changed`. Checked
+  with the real script in a browser harness with stubbed globals, not yet
+  on a Hyvä store.
 - `view/frontend/layout/hyva_smaily_privacy_index.xml` +
   `templates/privacy/form.phtml` — Tailwind-styled personalization form
   (same behaviour and translated phrases; classes only).
@@ -148,7 +155,7 @@ were confirmed received by the engine (`ingest/browse`), not just relayed.
 | Attribution: campaign-click landing sets cookies (FPC page) | pass | pass | pass |
 | Tracker: product_view / search / checkout_start / checkout_complete reach the relay | pass | pass | pass (product_view, search) |
 | Tracker: cart_add (Luma `ajax:addToCart`; Hyvä PDP form-submit capture) | pass | pass (sku from page context) | pass |
-| Tracker: consent (cookie restriction on/off; identity hint dropped without consent, restored with it) | pass (earlier pass) | pass (off / on-without / on-with) | not re-run (same code path as the Hyvä column) |
+| Tracker: consent (cookie restriction on/off; identity hint dropped without consent, restored with it) — the behaviour of that date, since replaced by the consent gate (see `smaily-tracker.js` above) | pass (earlier pass) | pass (off / on-without / on-with) | not re-run (same code path as the Hyvä column) |
 | Page-context blocks render + execute (SecureHtmlRenderer) | pass | pass | pass (hash-whitelisted, zero CSP violations) |
 | Checkout opt-in checkbox (Luma-fallback checkout; toggle persists, order placed) | pass | pass (checkout + success render `Magento/luma` via theme fallback) | n/a (the fallback checkout renders Luma; a no-inline CSP across Luma is a store-wide theme decision, not a module surface — Magento's default enforced checkout CSP was verified in the Luma pass) |
 | Personalization page: nav link, Tailwind styling, save + persist | pass (after the FPC fix below) | pass (computed styles confirm the Tailwind classes resolved) | pass by construction (plain HTML form, zero scripts) |

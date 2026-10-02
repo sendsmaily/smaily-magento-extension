@@ -16,6 +16,25 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3664 — the browse tracker's consent, as in the WooCommerce plugin
+  (2026-10-02, owner design "exactly like Woo").** Consent category
+  marketing; order: (1) the store's `window.smailyConnect.consentOverride()`
+  when it is a function (`=== true` is consent), (2) under Magento cookie
+  restriction mode `user_allowed_save_cookie`, (3) otherwise none. Without
+  consent the tracker (Luma `tracker.js` and Hyvä `smaily-tracker.js`)
+  sends no event and writes no `smaily_anon_sid` — the attribution scripts
+  no longer write it; they expose `ensureSession()`, which the tracker
+  calls on consent. Campaign-click cookies stay ungated. Later consent
+  starts tracking: Luma's jQuery `user:allowed:save:cookie`, Hyvä's window
+  `user-allowed-save-cookie` (from memory of Hyvä's cookie notice, not
+  checked on a Hyvä store), and the documented `smaily:consent-changed` on
+  `document`; each flush asks again and drops the queue without consent.
+  The tracker config key `consentRequired` is now `cookieRestriction`.
+  User Guide section "Connecting your cookie consent tool" (contract,
+  Amasty and Cookiebot examples, documentation only). Checked with the
+  real scripts in a browser harness with stubbed globals (7 scenarios ×
+  Luma/Hyvä).
+
 - **PRO-3614 researched — the first pilot store runs a headless storefront
   (2026-10-02).** Magento is its back end only; shoppers buy on a separate
   storefront application, and the back-end host answers only `/graphql`,

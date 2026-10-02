@@ -6,30 +6,41 @@
  * relay (smaily/relay), which forwards them to the Campaign Intelligence
  * engine — the API key never reaches the browser. Loss-tolerant by design.
  *
- * Consent (contract §6 sender-side anonymous mode): when Magento cookie
- * restriction mode is on and the visitor has not allowed cookies
- * (user_allowed_save_cookie), events still flow but omit the identity hint
- * (smaily_visitor_token) — session_id + event_id only, so anonymous events
- * keep feeding popularity/co-view signals. The engine-side profiling
- * opt-out gate is the guarantee; this is the data-minimization layer.
+ * Consent (marketing), as in the WooCommerce plugin: (1) the store's own
+ * window.smailyConnect.consentOverride() when it is a function — its
+ * answer, true or false, decides; (2) otherwise, under Magento cookie
+ * restriction mode, the user_allowed_save_cookie cookie; (3) otherwise no
+ * consent. Without consent the tracker sends nothing and writes no session
+ * cookie; consent that arrives later on the page (Magento's
+ * user:allowed:save:cookie, or smaily:consent-changed fired by the store's
+ * consent adapter) starts it. Every flush asks again and drops the queue
+ * when consent is gone. Campaign-click capture (attribution.js) is not
+ * gated.
  */
 define(['jquery', 'Smaily_Connect/js/attribution'], function ($, attribution) {
     'use strict';
 
     var BATCH_WINDOW_MS = 5000,
-        MAX_BATCH = 100;
+        MAX_BATCH = 100,
+        CONSENT_CHANGED_EVENT = 'smaily:consent-changed';
 
     return function (config) {
         var helper = attribution(config.attribution),
             queue = [],
-            flushTimer = null;
+            flushTimer = null,
+            started = false;
 
         function consentGiven() {
-            if (!config.consentRequired) {
-                return true;
+            var site = window.smailyConnect;
+
+            if (site && typeof site.consentOverride === 'function') {
+                return site.consentOverride() === true;
+            }
+            if (config.cookieRestriction) {
+                return helper.getCookie('user_allowed_save_cookie') !== null;
             }
 
-            return helper.getCookie('user_allowed_save_cookie') !== null;
+            return false;
         }
 
         function sessionId() {
@@ -44,10 +55,9 @@ define(['jquery', 'Smaily_Connect/js/attribution'], function ($, attribution) {
             };
             var visitorToken = helper.getCookie(config.attribution.cookieVisitor);
 
-            // Identity hint only with consent (sender-side anonymous mode).
             // The rec id/ctx cookies are deliberately NOT echoed here — see
             // Model/Engine/BrowseEventValidator for why.
-            if (visitorToken && consentGiven()) {
+            if (visitorToken) {
                 event.smaily_visitor_token = visitorToken;
             }
 
@@ -55,7 +65,7 @@ define(['jquery', 'Smaily_Connect/js/attribution'], function ($, attribution) {
         }
 
         function push(event) {
-            if (!event.session_id) {
+            if (!started || !event.session_id) {
                 return;
             }
             queue.push(event);
@@ -72,6 +82,11 @@ define(['jquery', 'Smaily_Connect/js/attribution'], function ($, attribution) {
                 flushTimer = null;
             }
             if (!queue.length) {
+                return;
+            }
+            if (!consentGiven()) {
+                queue.length = 0;
+
                 return;
             }
             var payload = JSON.stringify({events: queue.splice(0, MAX_BATCH)});
@@ -146,8 +161,18 @@ define(['jquery', 'Smaily_Connect/js/attribution'], function ($, attribution) {
             push(event);
         });
 
+        function start() {
+            if (started || !consentGiven()) {
+                return;
+            }
+            started = true;
+            helper.ensureSession();
+            trackPageContext();
+        }
+
         window.addEventListener('pagehide', flush);
 
-        trackPageContext();
+        start();
+        $(document).on('user:allowed:save:cookie ' + CONSENT_CHANGED_EVENT, start);
     };
 });

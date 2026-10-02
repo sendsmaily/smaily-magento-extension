@@ -477,11 +477,95 @@ toggle; catalog, customer and order sync run automatically once connected.
 | Orders | On order placement, status changes, and refunds — a credit memo re-syncs the order, so a fully credited line is reported as returned and stops being recommended back to that customer (a partly credited line still counts as kept) |
 | Browse events | Product views, searches, cart adds, checkout — batched from the storefront (**Enable storefront browse tracking (product views, searches, cart activity)**, off by default — a separate, consent-gated toggle, not part of the always-on sync above) |
 
-Browse tracking respects Magento's cookie restriction mode and sends events
-through your own server (`smaily/relay`) so the API key never reaches the
-browser. On **Settings > Intelligence** the toggle is saved with the tab's
+Browse tracking sends events only for a visitor who gave marketing consent
+(see [Connecting your cookie consent tool](#connecting-your-cookie-consent-tool))
+and sends them through your own server (`smaily/relay`) so the API key never
+reaches the browser. On **Settings > Intelligence** the toggle is saved with the tab's
 **Save** button, which appears once Campaign Intelligence is connected —
 before that the tab has nothing to save, and **Connect** is its only action.
+
+### Connecting your cookie consent tool
+
+The browse tracker needs to know whether the visitor allowed **marketing**
+cookies. It asks, in this order, as the WooCommerce plugin does:
+
+1. **Your own consent function**, when the page defines
+   `window.smailyConnect.consentOverride`. Its answer decides: `true` means
+   consent, any other answer means no consent.
+2. **Magento's cookie notice**, when Magento's cookie restriction mode is on
+   (**Stores > Configuration > General > Web > Default Cookie Settings >
+   Cookie Restriction Mode**): consent once the visitor allows cookies
+   there.
+3. **Otherwise there is no consent.**
+
+Without consent the tracker sends no browse event and sets no session
+cookie (`smaily_anon_sid`). Campaign-click capture is not affected: the
+cookies from a Smaily email link (see
+[Recommendation attribution](#recommendation-attribution)) are written
+without consent, as in the WooCommerce plugin, so a purchase is still
+credited to the email.
+
+So a store with browse tracking on and neither of the first two collects
+no browse events. Connect one of the two:
+
+- **Magento's cookie notice** — switch on Cookie Restriction Mode. Nothing
+  else is needed.
+- **Your own consent tool** (Amasty, Cookiebot and others leave Magento's
+  mode off) — add a small script that answers for the tool, below.
+
+**The contract.** Define the function before the page finishes loading —
+for example in **Content > Design > Configuration > (store view) > HTML
+Head > Scripts and Style Sheets**:
+
+- `window.smailyConnect.consentOverride()` returns `true` only when the
+  visitor allowed marketing cookies in your tool. The tracker calls it when
+  the page loads, again before each send, and on each event below.
+- When the visitor changes their choice on the page, fire
+  `document.dispatchEvent(new CustomEvent('smaily:consent-changed'))`. The
+  tracker asks again: with consent it starts tracking at once (the page's
+  own view included); without it, nothing more is sent from that page.
+  Without the event, tracking starts on the visitor's next page view.
+- Magento's own cookie notice needs no event: the tracker already listens
+  to it (`user:allowed:save:cookie`; on Hyvä, `user-allowed-save-cookie`).
+
+The module contains no code for any consent tool. The two examples below
+are for your own theme or the HTML Head field; check them against the tool
+version you run.
+
+**Example: Amasty Cookie Consent.** Amasty keeps the visitor's choice in the
+cookie `amcookie_allowed`, a comma-separated list of the cookie group ids
+the visitor allowed. Group ids differ per store: look up the id of your
+marketing group in Amasty's cookie group settings and put it in the script.
+
+```html
+<script>
+window.smailyConnect = window.smailyConnect || {};
+window.smailyConnect.consentOverride = function () {
+    var MARKETING_GROUP_ID = '3'; // your marketing group's id in Amasty
+    var match = document.cookie.match(/(?:^|; )amcookie_allowed=([^;]*)/);
+
+    return !!match && decodeURIComponent(match[1]).split(',').indexOf(MARKETING_GROUP_ID) !== -1;
+};
+</script>
+```
+
+**Example: Cookiebot.** Cookiebot exposes the choice as
+`Cookiebot.consent.marketing` and fires `CookiebotOnConsentReady` and
+`CookiebotOnAccept` on `window`.
+
+```html
+<script>
+window.smailyConnect = window.smailyConnect || {};
+window.smailyConnect.consentOverride = function () {
+    return !!(window.Cookiebot && window.Cookiebot.consent && window.Cookiebot.consent.marketing);
+};
+['CookiebotOnConsentReady', 'CookiebotOnAccept'].forEach(function (name) {
+    window.addEventListener(name, function () {
+        document.dispatchEvent(new CustomEvent('smaily:consent-changed'));
+    });
+});
+</script>
+```
 
 ### Recommendation attribution
 

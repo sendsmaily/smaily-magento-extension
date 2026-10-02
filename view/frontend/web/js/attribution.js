@@ -86,14 +86,24 @@ define([], function () {
             setCookie(config.cookieContext, context, config.ttlContextDays);
         }
 
-        // Persistent anonymous session id for browse events + identity merge.
-        if (!getCookie(config.cookieSession)) {
-            setCookie(config.cookieSession, uuidv4(), config.ttlSessionDays);
+        // The anonymous session id of browse events is not written here: the
+        // browse tracker writes it once the visitor has consented
+        // (ensureSession), as the WooCommerce plugin does.
+        function ensureSession() {
+            var sessionId = getCookie(config.cookieSession);
+
+            if (!sessionId) {
+                sessionId = uuidv4();
+                setCookie(config.cookieSession, sessionId, config.ttlSessionDays);
+            }
+
+            return sessionId;
         }
 
         return {
             getCookie: getCookie,
-            uuidv4: uuidv4
+            uuidv4: uuidv4,
+            ensureSession: ensureSession
         };
     };
 });

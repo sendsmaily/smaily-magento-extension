@@ -508,10 +508,19 @@ since v1.7.0), rate-limited per connection address (Magento's
 `RemoteAddress`: a forwarding header counts only where the store's own
 configuration names it, with its trusted proxies), stamps
 `source: plugin_magento` server-side, and forwards so the API key never
-reaches the browser. Under Magento cookie restriction mode without cookie
-consent the tracker runs in sender-side anonymous mode (contract §6):
-events still flow with `session_id` + `event_id` but the
-`smaily_visitor_token` identity hint is omitted.
+reaches the browser. Consent (marketing) is resolved as in the WooCommerce
+plugin (F3-50, one standard signal, no per-vendor code): the store's own
+`window.smailyConnect.consentOverride()` when defined, else
+`user_allowed_save_cookie` under Magento cookie restriction mode
+(`cookieRestriction` in the tracker config, from `ViewModel\EngineState`),
+else no consent. Without consent the tracker sends nothing and writes no
+`smaily_anon_sid` (the attribution scripts only expose `ensureSession()`;
+the tracker calls it on consent). Consent that arrives later on the page —
+Magento's `user:allowed:save:cookie` (jQuery, Luma), Hyvä's
+`user-allowed-save-cookie` (window) or the documented
+`smaily:consent-changed` (document) — starts it; each flush asks again and
+drops the queue when consent is gone. Campaign-click capture stays
+ungated.
 
 ### Profiling consent
 

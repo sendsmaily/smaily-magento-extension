@@ -92,8 +92,10 @@ Browse events are not queued, so they **never appear in the Log** — they go
 from the storefront through the store's own `smaily/relay` endpoint straight
 to the engine. "Identified" means the browser carries the engine's visitor
 token: it is set from the `smaily_vt` link parameter when someone arrives
-from a Smaily email link, and it is only sent when cookies are allowed (if
-the store uses cookie restriction mode, accept the cookie notice first).
+from a Smaily email link. Browse events are sent only with marketing
+consent: accept the store's cookie notice (cookie restriction mode) or its
+own consent tool's banner first — with neither connected, no browse event
+is sent at all (User Guide, *Connecting your cookie consent tool*).
 
 | What to do | Where to look / what good looks like |
 |---|---|

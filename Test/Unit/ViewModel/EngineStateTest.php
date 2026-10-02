@@ -21,12 +21,12 @@ class EngineStateTest extends TestCase
     /**
      * Magento's cookie helper is annotated @return bool but actually returns
      * the raw config value — "0" (truthy in JS) when restriction mode is
-     * off. The tracker config must carry a real boolean or every store
-     * would demand consent and drop the identity hint.
+     * off. The tracker config must carry a real boolean or the tracker
+     * would wait for a cookie notice the store never shows.
      *
-     * @dataProvider consentRequiredProvider
+     * @dataProvider cookieRestrictionProvider
      */
-    public function testConsentRequiredIsRealBoolean(mixed $helperValue, bool $expected): void
+    public function testCookieRestrictionIsRealBoolean(mixed $helperValue, bool $expected): void
     {
         $cookieHelper = $this->createMock(CookieHelper::class);
         $cookieHelper->method('isCookieRestrictionModeEnabled')->willReturn($helperValue);
@@ -47,13 +47,13 @@ class EngineStateTest extends TestCase
 
         $config = json_decode($viewModel->getTrackerConfigJson(), true);
 
-        self::assertSame($expected, $config['consentRequired']);
+        self::assertSame($expected, $config['cookieRestriction']);
     }
 
     /**
      * @return array<string, array{mixed, bool}>
      */
-    public static function consentRequiredProvider(): array
+    public static function cookieRestrictionProvider(): array
     {
         return [
             'restriction off (string zero)' => ['0', false],

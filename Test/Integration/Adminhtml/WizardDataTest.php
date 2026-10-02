@@ -24,6 +24,7 @@ use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\Engine\ConsentSource;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
+use Smaily\Connect\Model\OrderOrigin;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory as MappingCollectionFactory;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
@@ -70,7 +71,8 @@ class WizardDataTest extends IntegrationTestCase
             new WebsiteContext($storeManager, $request),
             $this->createMock(VerifiedCredentials::class),
             $this->createMock(ResolverInterface::class),
-            $this->createMock(ConsentSource::class)
+            $this->createMock(ConsentSource::class),
+            $this->createMock(OrderOrigin::class)
         );
     }
 

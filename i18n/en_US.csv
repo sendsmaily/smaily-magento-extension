@@ -207,6 +207,7 @@
 "Importing…","Importing…"
 "Imports are unavailable while the account is not active — there is nowhere to send the data. They come back as soon as the account does.","Imports are unavailable while the account is not active — there is nowhere to send the data. They come back as soon as the account does."
 "In progress","In progress"
+"In the last 30 days your orders came only through Magento's API, as they do from a separate storefront.","In the last 30 days your orders came only through Magento's API, as they do from a separate storefront."
 "Include guest order emails","Include guest order emails"
 "Info","Info"
 "Initial contact import","Initial contact import"

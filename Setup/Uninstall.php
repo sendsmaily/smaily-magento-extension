@@ -21,7 +21,7 @@ use Smaily\Connect\Model\Adminhtml\SetupNotice;
  * Campaign Intelligence key included), any 2.8.x `smaily/*` row still
  * present (the upgrade deletes them once migrated), and every
  * `smaily_connect_*` flag row (the profiling opt-out record, the verified
- * credentials, the health and reconcile cursors), and the install's "ready
+ * credentials, the health and reconcile cursors, the order-origin stamps), and the install's "ready
  * to set up" admin notice. No engine call is made: the engine key stays
  * valid on the engine until it is revoked there.
  *

@@ -248,7 +248,14 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   frontend emulation, `Rss\FeedBuilder` for each item's `<link>` / `<guid>`.
   Image links never pass through it. The stored value is normalized again on
   read, so a value set past the admin's check (`config:set`) that is not an
-  https host alone rewrites nothing.
+  https host alone rewrites nothing. The field opens by itself from
+  `Model\OrderOrigin`: `Observer\RecordOrderOrigin`
+  (`sales_order_place_after`) stamps each order's time into one of two
+  `smaily_connect_*` flags — an API order is placed in the `graphql` area, or
+  in `webapi_rest` without the `form_key` cookie of Magento's storefront
+  session; every other order (Luma's checkout REST call carries the cookie)
+  is a storefront order. `isApiOnly()`: an API order and no storefront
+  order in the last 30 days. Installation-wide; no table or column.
 
 ### Queue semantics (both queues)
 

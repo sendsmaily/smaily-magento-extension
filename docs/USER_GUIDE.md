@@ -213,6 +213,13 @@ empty to send Magento's own product links. The value is kept per website and
 saved with **Save Connection**; the field is drawn open while a value is
 saved.
 
+The field also opens by itself, with a sentence saying why, when the store's
+orders of the last 30 days all came through Magento's API: placed through
+GraphQL, or through REST without Magento's own storefront session (as a
+separate storefront places them). One order through Magento's own checkout
+in that time — Luma's checkout included — keeps it collapsed, and so does a
+store that has not taken an order since the module was installed.
+
 The address must be https and the host alone: a path other than `/`, a
 query or a fragment is refused on save, with the message under the field
 (a trailing `/` is dropped). After a save that changes the address, the

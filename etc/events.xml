@@ -15,6 +15,7 @@
     </event>
     <event name="sales_order_place_after">
         <observer name="smaily_connect_order_placed" instance="Smaily\Connect\Observer\OrderPlaced"/>
+        <observer name="smaily_connect_order_origin" instance="Smaily\Connect\Observer\RecordOrderOrigin"/>
     </event>
     <!-- Campaign Intelligence ingest hooks. -->
     <event name="catalog_product_save_after">

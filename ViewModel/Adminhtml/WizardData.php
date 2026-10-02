@@ -28,6 +28,7 @@ use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\Engine\ConsentSource;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
+use Smaily\Connect\Model\OrderOrigin;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory as MappingCollectionFactory;
 use Smaily\Connect\Model\SmailyUrl;
 
@@ -55,7 +56,8 @@ class WizardData implements ArgumentInterface
         private readonly WebsiteContext $websiteContext,
         private readonly VerifiedCredentials $verifiedCredentials,
         private readonly ResolverInterface $localeResolver,
-        private readonly ConsentSource $consentSource
+        private readonly ConsentSource $consentSource,
+        private readonly OrderOrigin $orderOrigin
     ) {
     }
 
@@ -176,6 +178,15 @@ class WizardData implements ArgumentInterface
     public function getSavedStorefrontUrl(): string
     {
         return $this->config->getStorefrontUrl($this->websiteContext->getStoreId());
+    }
+
+    /**
+     * Whether the orders of the last 30 days came only through the API, so
+     * the Storefront URL field opens by itself (PRO-3660).
+     */
+    public function isApiOnlyStore(): bool
+    {
+        return $this->orderOrigin->isApiOnly();
     }
 
     public function getBootJson(): string

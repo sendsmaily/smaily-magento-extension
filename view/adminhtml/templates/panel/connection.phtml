@@ -200,11 +200,17 @@ $modeCards = [
 <?php if ($isSettings): ?>
 <?php // A store that sells on a separate (headless) storefront: product links
 // in the catalog sync and the RSS feed go to the storefront's address
-// (PRO-3660). Collapsed behind a link; drawn open when an address is saved. ?>
+// (PRO-3660). Collapsed behind a link; drawn open when an address is saved,
+// or, with one sentence saying why, when the last 30 days' orders all came
+// through the API. ?>
 <?php $storefrontUrl = $viewModel->getSavedStorefrontUrl(); ?>
-<details class="smaily-disclosure" id="smaily-w-storefront"<?= $storefrontUrl !== '' ? ' open' : '' ?>>
+<?php $apiOnly = $viewModel->isApiOnlyStore(); ?>
+<details class="smaily-disclosure" id="smaily-w-storefront"<?= $storefrontUrl !== '' || $apiOnly ? ' open' : '' ?>>
     <summary class="smaily-disclosure__toggle"><?= $escaper->escapeHtml(__('Using a separate storefront?')) ?></summary>
     <div class="smaily-card">
+        <?php if ($apiOnly): ?>
+        <p class="smaily-disclosure__why"><?= $escaper->escapeHtml(__('In the last 30 days your orders came only through Magento\'s API, as they do from a separate storefront.')) ?></p>
+        <?php endif; ?>
         <div class="smaily-field">
             <label for="smaily-w-storefront-url"><?= $escaper->escapeHtml(__('Storefront URL')) ?></label>
             <input type="text" inputmode="url" id="smaily-w-storefront-url" placeholder="https://shop.example.com"

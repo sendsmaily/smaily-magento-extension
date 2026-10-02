@@ -27,6 +27,7 @@ use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\Engine\ConsentSource;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
+use Smaily\Connect\Model\OrderOrigin;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory as MappingCollectionFactory;
 use Smaily\Connect\ViewModel\Adminhtml\WizardData;
 
@@ -63,6 +64,9 @@ class WizardDataTest extends TestCase
     /** @var ResolverInterface&\PHPUnit\Framework\MockObject\MockObject */
     private $localeResolver;
 
+    /** @var OrderOrigin&\PHPUnit\Framework\MockObject\MockObject */
+    private $orderOrigin;
+
     private WizardData $viewModel;
 
     protected function setUp(): void
@@ -92,6 +96,7 @@ class WizardDataTest extends TestCase
         $productCollectionFactory = $this->createMock(ProductCollectionFactory::class);
         $productCollectionFactory->method('create')->willReturn($productCollection);
 
+        $this->orderOrigin = $this->createMock(OrderOrigin::class);
         $this->viewModel = new WizardData(
             $this->config,
             $this->mode,
@@ -106,7 +111,8 @@ class WizardDataTest extends TestCase
             $this->websiteContext,
             $this->verifiedCredentials,
             $this->localeResolver,
-            $this->createMock(ConsentSource::class)
+            $this->createMock(ConsentSource::class),
+            $this->orderOrigin
         );
     }
 
@@ -176,6 +182,13 @@ class WizardDataTest extends TestCase
         $this->config->method('getStorefrontUrl')->with(5)->willReturn('https://shop.example.com');
 
         self::assertSame('https://shop.example.com', $this->viewModel->getSavedStorefrontUrl());
+    }
+
+    public function testTheStorefrontUrlFieldOpensOnAnApiOnlyStore(): void
+    {
+        $this->orderOrigin->method('isApiOnly')->willReturn(true);
+
+        self::assertTrue($this->viewModel->isApiOnlyStore());
     }
 
     /**

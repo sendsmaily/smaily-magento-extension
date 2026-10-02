@@ -207,6 +207,7 @@
 "Importing…","Impordin…"
 "Imports are unavailable while the account is not active — there is nowhere to send the data. They come back as soon as the account does.","Kuni konto ei ole aktiivne, ei saa importe käivitada — andmeid pole kuhugi saata. Need tulevad tagasi kohe, kui konto on taas aktiivne."
 "In progress","Pooleli"
+"In the last 30 days your orders came only through Magento's API, as they do from a separate storefront.","Viimase 30 päeva jooksul tulid sinu tellimused ainult Magento API kaudu, nagu eraldi poe veebilehelt."
 "Include guest order emails","Kaasa külalistellimuste e-posti aadressid"
 "Info","Info"
 "Initial contact import","Esmane kontaktide import"

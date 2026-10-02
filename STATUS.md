@@ -50,8 +50,26 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   it read; the note stays. EN + ET. Rendered with the real template and
   stub data, both states × both contexts × EN/ET.
 
+- **PRO-3660 — the Storefront URL field opens by itself on an API-only
+  store (2026-10-02, owner decision: Questions item 13 option b).** New
+  `Model\OrderOrigin` + `Observer\RecordOrderOrigin` on
+  `sales_order_place_after` (failures logged, never stop the order): an
+  order placed in the `graphql` area, or in `webapi_rest` without the
+  `form_key` cookie, stamps `smaily_connect_last_api_order_at`; every other
+  order (Luma's checkout REST call carries the cookie, admin and area-less
+  orders too) stamps `smaily_connect_last_storefront_order_at` — FlagManager
+  rows, no schema change; the uninstall's `smaily_connect\_%` flag delete
+  removes them (`UninstallTest` now seeds both). `WizardData::isApiOnlyStore()`
+  — an API order and no storefront order in the last 30 days — draws the
+  disclosure open with "In the last 30 days your orders came only through
+  Magento's API, as they do from a separate storefront." (EN + ET);
+  collapsed otherwise and before any order. Unit: new `OrderOriginTest`
+  (8 origins, 7 window cases), `RecordOrderOriginTest`, `WizardDataTest`
+  (+1). Headless Chrome render with stub data, both languages: opened with
+  the sentence. USER_GUIDE, HEADLESS_STOREFRONTS, ARCHITECTURE, CHANGELOG.
+
 - **PRO-3660 — Storefront URL for a separate (headless) storefront
-  (2026-10-02; the auto-open is not built, see Questions item 13).** Owner
+  (2026-10-02; the auto-open followed, see the entry above).** Owner
   design: one setting, `smaily_connect/connection/storefront_url`, website
   scope like the other connection settings (`system.xml` declares it for
   `config:set`). New `Model\StorefrontUrl`: `normalize()` accepts an https
@@ -74,11 +92,11 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   catalog import again under Intelligence > Historical imports, so that
   Campaign Intelligence gets the new product links." Five new phrases
   (EN + ET). The nightly catalog re-sync also carries the new links; the
-  RSS feed shows them within its 15-minute cache. Not built: the field
-  opening by itself on an API-only store — the approved rule (frontend-area
-  orders vs. API orders) would open it on every Luma store, because Luma's
-  checkout places orders through REST (`webapi_rest`, as PRO-3580 found);
-  question 13 below. Unit: new `StorefrontUrlTest`, `Rss\FeedBuilderTest`;
+  RSS feed shows them within its 15-minute cache. The field opening by
+  itself waited for question 13 below: the first rule (frontend-area
+  orders vs. API orders) would have opened it on every Luma store, because
+  Luma's checkout places orders through REST (`webapi_rest`, as PRO-3580
+  found). Unit: new `StorefrontUrlTest`, `Rss\FeedBuilderTest`;
   `CatalogPayloadBuilderTest` (+2, image links checked), `WizardStepSaverTest`
   (+5 incl. data sets), `SaveStepTest` (+1), `WizardDataTest` (+1).
   Verified with the real Settings templates and stub data in headless
@@ -4593,7 +4611,7 @@ PRO-1267 (engine: Magento product-identity contract note).
     URL" that replaces the host of every product link (path and query
     string kept); built, see "Where we are". The storefront still has to
     route `/<url_key>.html`, or redirect it keeping the query string.
-13. PRO-3660 — when the Storefront URL field opens by itself (Medium
+13. ~~PRO-3660 — when the Storefront URL field opens by itself (Medium
     urgency; reversible, no schema). The approved rule — open it when the
     last 30 days' orders came only through the API and none through
     Magento's own checkout (frontend area) — does not hold: Luma's
@@ -4607,4 +4625,6 @@ PRO-1267 (engine: Magento product-identity contract note).
     closer, but a heuristic; (c) drop the auto-open. Recording stays as
     designed either way: two timestamps in Magento's flag table,
     `smaily_connect_*` (removed by the uninstall). Recommended: (a). Say
-    a, b or c.
+    a, b or c.~~ **Resolved (Erkki, 2026-10-02): option (b)** — GraphQL,
+    or REST without the `form_key` cookie, is an API order; every other
+    order is a storefront order. Built, see "Where we are".

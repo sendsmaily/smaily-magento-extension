@@ -15,6 +15,7 @@ use Smaily\Connect\Model\Adminhtml\SetupNotice;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
+use Smaily\Connect\Model\OrderOrigin;
 use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
 use Smaily\Connect\Setup\Patch\Data\RemoveSettingsOnUninstall;
 use Smaily\Connect\Setup\Uninstall;
@@ -136,6 +137,8 @@ class UninstallTest extends IntegrationTestCase
         $flags = [
             ProfilingOptOuts::FLAG_CODE,
             VerifiedCredentials::FLAG_CODE,
+            OrderOrigin::FLAG_LAST_STOREFRONT_ORDER,
+            OrderOrigin::FLAG_LAST_API_ORDER,
             'smaily_connect_engine_down_since',
             'smaily_connect_reconcile_seq_w1',
             'smailyXconnect_foo',

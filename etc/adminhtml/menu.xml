@@ -20,7 +20,7 @@
              action="smaily_connect/dashboard" resource="Smaily_Connect::connect"/>
         <add id="Smaily_Connect::wizard" title="Initial setup" module="Smaily_Connect"
              sortOrder="20" parent="Smaily_Connect::connect"
-             action="smaily_connect/wizard" resource="Smaily_Connect::connect"/>
+             action="smaily_connect/wizard" resource="Smaily_Connect::config"/>
         <add id="Smaily_Connect::settings" title="Settings" module="Smaily_Connect"
              sortOrder="30" parent="Smaily_Connect::connect"
              action="smaily_connect/settings" resource="Smaily_Connect::config"/>

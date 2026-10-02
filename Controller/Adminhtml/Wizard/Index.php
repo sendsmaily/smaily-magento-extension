@@ -21,7 +21,7 @@ use Smaily\Connect\Model\Adminhtml\SetupGuard;
  */
 class Index extends Action implements HttpGetActionInterface
 {
-    public const ADMIN_RESOURCE = 'Smaily_Connect::connect';
+    public const ADMIN_RESOURCE = 'Smaily_Connect::config';
 
     public function __construct(
         Context $context,

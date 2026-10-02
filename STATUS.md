@@ -67,7 +67,17 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   7.15.5). (6) Every workflow `uses:` is pinned to the full commit SHA its
   major tag pointed to on 2026-10-02 (checkout v4.4.0, upload-artifact
   v4.6.2, setup-php 2.37.2 — dereferenced from the annotated tag), with the
-  version as a comment. No Dependabot config exists, so a bump is manual.
+  version as a comment. No Dependabot config exists, so a bump is manual. (7) Owner decision, WooCommerce
+  parity: the admin Log shows contact data in full for debugging —
+  `PayloadRedactor` hides only values under secret-looking keys, the
+  "redacted" / "PII redacted" tags are gone and the Details footer reads
+  "Passwords and API keys are never shown." (EN + ET). The server log file
+  keeps masking addresses (item 4). PRO-3573 is resolved that way. (8)
+  Owner decision, WooCommerce parity: the initial setup (page and menu
+  entry) needs `Smaily_Connect::config`, as Settings does; the Dashboard
+  stays on `::connect`. A role with only `::connect` on a store whose setup
+  is unfinished is sent to the setup by the setup-first redirect and gets
+  Magento's access-denied page there.
 
 - **PRO-3644 done — copy consistency leftovers (2026-10-02).** (1) The
   failed-events banner on the Dashboard and the Log has a singular: "1

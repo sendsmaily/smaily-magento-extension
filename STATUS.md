@@ -16,6 +16,26 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3563 done — a finished initial setup reopens on a connection
+  summary (2026-10-02).** The pack's completed-revisit frame: with
+  `setupCompleted`, `wizard/index.phtml` renders step 1 as a read-only
+  summary card (`.smaily-setup-summary`: Subdomain as
+  `<sub>.sendsmaily.net`, API username, Status pill from
+  `isSmailyVerified()`), a Completed pill beside the "Step 1 of 5" kicker
+  and **Edit credentials** in the footer — server-side, so the form never
+  flashes. Edit credentials hides the summary and shows the connection form
+  (it stays for the rest of the visit); Continue from the summary moves to
+  step 2 without saving (no needless credential check); the rail keeps all
+  five steps clickable, the Overview included. Before, a revisit opened on
+  the Overview step. Not taken from the pack: the resting "Saved" status
+  beside Edit credentials (the Completed pill already says it). New
+  phrases: "Completed" → "Lõpetatud" (own; Woo uses "lõpetatud" for
+  "complete", e.g. "Initial import complete"), "Edit credentials" →
+  "Muuda kasutajaandmeid" (Woo `smaily-connect-et.po`, verbatim). Verified
+  by rendering the real templates with stubs in headless Chrome (en_US and
+  et_EE; completed connected / not connected, an unfinished setup
+  unchanged). Fidelity audit row 16 marked fixed.
+
 - **PRO-3562 done — a failed save shows a banner and marks the field that
   caused it (2026-10-02).** The pack's two-layer error model on the initial
   setup and every Settings tab: `panels-js.phtml` `showFormErrors()` puts an
@@ -100,7 +120,7 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   walks `PILOT_CHECKLIST.md` with real credentials (human acceptance of
   everything that needs a real Smaily account and engine) — PRO-2474's last
   item. After the pilot (open backlog): PRO-3625 (remaining low hardening),
-  PRO-3573, the UI/UX parity Stories (PRO-3561–3569), PRO-2506,
+  PRO-3573, the UI/UX parity Stories (PRO-3564–3569), PRO-2506,
   PRO-1967, PRO-1198 (Smaily hand-over). Sandbox: run `git worktree list`
   and remove finished agent worktrees under `.claude/worktrees` before any
   sandbox `setup:di:compile` (they are inside the bind-mounted module).

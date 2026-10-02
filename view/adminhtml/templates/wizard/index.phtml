@@ -48,11 +48,17 @@ $stepTitles = [
     4 => __('Campaign Intelligence (optional)'),
     5 => __('You are all set!'),
 ];
-$stepHead = static function (int $stepNo) use ($escaper, $stepTitles): string {
+// A finished setup reopens on a read-only summary of the connection, with a
+// Completed marker and "Edit credentials" (PRO-3563, the pack's
+// completed-revisit frame); rendered server-side so the form never flashes.
+$setupCompleted = $viewModel->isSetupCompleted();
+$completedPill = '<span class="smaily-pill smaily-pill--active" id="smaily-w-completed-pill">'
+    . '<span class="smaily-pill__dot"></span>' . $escaper->escapeHtml(__('Completed')) . '</span>';
+$stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $stepTitles): string {
     return '<div class="smaily-step-head">'
         . '<div class="smaily-step-kicker-row"><span class="smaily-step-kicker">'
         . $escaper->escapeHtml(__('Step %1 of %2', $stepNo, count($stepTitles)))
-        . '</span></div>'
+        . '</span>' . $marker . '</div>'
         . '<h3 class="smaily-step-title">' . $escaper->escapeHtml($stepTitles[$stepNo]) . '</h3>'
         . '</div>';
 };
@@ -95,7 +101,33 @@ $stepHead = static function (int $stepNo) use ($escaper, $stepTitles): string {
         <?php endforeach; ?>
     </ul>
 
-    <div class="smaily-step-panel" data-step="1"><?= /* @noEscape */ $stepHead(1) ?><?= $block->getChildHtml('panel.connection') ?></div>
+    <div class="smaily-step-panel" data-step="1">
+        <?= /* @noEscape */ $stepHead(1, $setupCompleted ? $completedPill : '') ?>
+        <?php if ($setupCompleted): ?>
+        <?php
+        $verified = $viewModel->isSmailyVerified();
+        $savedSubdomain = $viewModel->getSavedSubdomain();
+        $savedUsername = $viewModel->getSavedUsername();
+        ?>
+        <div class="smaily-setup-summary" id="smaily-w-summary">
+            <div class="smaily-setup-summary__row">
+                <span class="smaily-setup-summary__label"><?= $escaper->escapeHtml(__('Subdomain')) ?></span>
+                <code class="smaily-setup-summary__value"><?= $escaper->escapeHtml($savedSubdomain !== '' ? $savedSubdomain . '.sendsmaily.net' : '—') ?></code>
+            </div>
+            <div class="smaily-setup-summary__row">
+                <span class="smaily-setup-summary__label"><?= $escaper->escapeHtml(__('API username')) ?></span>
+                <span class="smaily-setup-summary__value"><?= $escaper->escapeHtml($savedUsername !== '' ? $savedUsername : '—') ?></span>
+            </div>
+            <div class="smaily-setup-summary__row">
+                <span class="smaily-setup-summary__label"><?= $escaper->escapeHtml(__('Status')) ?></span>
+                <span class="smaily-pill smaily-pill--<?= $verified ? 'active' : 'off' ?>">
+                    <span class="smaily-pill__dot"></span><?= $escaper->escapeHtml($verified ? __('Connected') : __('Not connected')) ?>
+                </span>
+            </div>
+        </div>
+        <?php endif; ?>
+        <div id="smaily-w-connect-form"<?= $setupCompleted ? ' style="display:none"' : '' ?>><?= $block->getChildHtml('panel.connection') ?></div>
+    </div>
     <div class="smaily-step-panel" data-step="2"><?= /* @noEscape */ $stepHead(2) ?><?= $block->getChildHtml('panel.subscribers') ?></div>
     <div class="smaily-step-panel" data-step="3"><?= /* @noEscape */ $stepHead(3) ?><?= $block->getChildHtml('panel.automations') ?></div>
     <div class="smaily-step-panel" data-step="4"><?= /* @noEscape */ $stepHead(4) ?><?= $block->getChildHtml('panel.intelligence') ?></div>
@@ -134,6 +166,9 @@ $stepHead = static function (int $stepNo) use ($escaper, $stepTitles): string {
     <div class="smaily-footer">
         <button type="button" class="action-secondary" id="smaily-w-back"><span><?= $escaper->escapeHtml(__('Back')) ?></span></button>
         <div>
+            <?php if ($setupCompleted): ?>
+            <button type="button" class="action-secondary" id="smaily-w-edit-credentials"><span><?= $escaper->escapeHtml(__('Edit credentials')) ?></span></button>
+            <?php endif; ?>
             <span class="smaily-result" id="smaily-w-save-result"></span>
             <button type="button" class="action-primary" id="smaily-w-next"><span><?= $escaper->escapeHtml(__('Continue')) ?></span></button>
         </div>
@@ -165,6 +200,9 @@ require(['jquery'], function ($) {
     // Whether Smaily accepted the saved credentials (PRO-3560): from the page
     // load, then from the finish step's answer.
     var verified = !!panels.boot.verified;
+    // A finished setup opens on the connection summary (PRO-3563) until
+    // "Edit credentials" returns the form.
+    var summary = $('#smaily-w-summary').length > 0;
 
     function render() {
         $('.smaily-steps li').each(function () {
@@ -182,6 +220,9 @@ require(['jquery'], function ($) {
         $('#smaily-w-next span').text(step === 4
             ? '<?= $escaper->escapeJs(__('Finish')) ?>'
             : '<?= $escaper->escapeJs(__('Continue')) ?>');
+        $('#smaily-w-summary').toggle(summary);
+        $('#smaily-w-connect-form').toggle(!summary);
+        $('#smaily-w-edit-credentials').toggle(summary && step === 1);
         $('#smaily-w-save-result').text('');
         panels.clearFormErrors($('#smaily-wizard-main'));
         window.scrollTo(0, 0);
@@ -194,7 +235,8 @@ require(['jquery'], function ($) {
     }
 
     var stepSavers = {
-        1: function () { return save('connect', panels.collect.connect); },
+        // The summary saves nothing: Continue only moves on.
+        1: function () { return summary ? Promise.resolve() : save('connect', panels.collect.connect); },
         2: function () { return save('subscribers', panels.collect.subscribers); },
         3: function () { return save('automations', panels.collect.automations); },
         4: function () {
@@ -229,6 +271,11 @@ require(['jquery'], function ($) {
             $button.prop('disabled', false);
         });
     });
+    $('#smaily-w-edit-credentials').on('click', function () {
+        summary = false;
+        render();
+        $('#smaily-w-subdomain').trigger('focus');
+    });
     $('#smaily-w-back').on('click', function () {
         step = Math.max(1, step - 1);
         render();
@@ -242,13 +289,14 @@ require(['jquery'], function ($) {
     });
 
     if (panels.boot.setupCompleted) {
-        // Setup finished earlier: every step was completed, keep them all
-        // unlocked for revisits.
-        step = 5;
-    } else if (panels.isConnected()) {
-        step = 2;
+        // Setup finished earlier: open on the connection summary (step 1)
+        // and keep every step unlocked for revisits.
+        step = 1;
+        maxStep = 5;
+    } else {
+        step = panels.isConnected() ? 2 : 1;
+        maxStep = step;
     }
-    maxStep = step;
     if (step === 3) {
         panels.loadWorkflows('#smaily-w-save-result');
     }

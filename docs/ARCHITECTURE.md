@@ -348,7 +348,7 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   same job sweeps `smaily_abandoned_cart` (PRO-2469) — it owns the schedule
   and the window, while the SQL stays with the table's owner
   (`StateManager::pruneTerminal()` / `pruneOrphans()`): a terminal row
-  (`mailed`, `completed`, `expired`, `erased`) older than the 30-day window
+  (`mailed`, `skipped`, `completed`, `expired`, `erased`) older than the 30-day window
   goes, and so does any row whose `quote_id` is no longer in `quote`,
   whatever its status; Magento's own quote cleanup does not cascade onto the
   side table, and a marker with nothing left to mark is dead weight. A live
@@ -412,7 +412,7 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
 |---|---|
 | `smaily_event_queue` | Marketing event queue |
 | `smaily_ingest_queue` | Engine ingest queue |
-| `smaily_abandoned_cart` | Per-quote send state (`open`/`mailed`/`completed`/`expired`/`erased`) + checkout opt-in flag (the core `quote` table is never altered) |
+| `smaily_abandoned_cart` | Per-quote send state (`open`/`mailed`/`skipped`/`completed`/`expired`/`erased`) + checkout opt-in flag (the core `quote` table is never altered) |
 | `smaily_automation_mapping` | (website, trigger, language, account) → workflow |
 | `smaily_backfill_job` | Chunked import jobs (cursor-resumable) |
 | `smaily_order_attribution` | Recommendation attribution per order (sales connection) |

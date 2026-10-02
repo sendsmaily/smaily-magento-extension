@@ -5,25 +5,24 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 — 3.0.0-rc2 is released as a GitHub pre-release on
-the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc2),
-built by the release workflow from commit 32059a2; the ZIP and its .sha256
-were checked after publishing (367 entries, checksum OK, byte-identical to
-the local build, sha256 7322b213…3419). The
-version is `3.0.0-rc2` (composer.json, `ModuleInfo::VERSION`, the upstream
-proposal; composer.lock content-hash refreshed), CHANGELOG has a "Changes
-since 3.0.0-rc1" list, and UPGRADING's "What changes on upgrade day" adds
-three payload differences checked against `SubscriberPayloadBuilder` and
-2.8.1's `Cron/SubscribersSync` (names no longer upper-cased; an unknown
-gender left out instead of `Male`; `store`, `store_group` and
-`store_website` left out when the store view cannot be found, where 2.8.x
-sent `store` and `store_group` empty). The
-ZIP builds and verifies locally from the prepared commit. It awaits the
-owner's go to tag and publish (a GitHub pre-release on the fork, as rc1).
-3.0.0-rc1 is released as a GitHub pre-release on the fork
-(https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc1),
-built by the release workflow from commit 9af1d9e (354 files, checksum
-OK). Earlier: 2026-09-11, 2026-09-10._
+_Last updated: 2026-10-02 — 3.0.0-rc3 is prepared, not published: the
+version is `3.0.0-rc3` (composer.json, `ModuleInfo::VERSION`, the upstream
+proposal; composer.lock content-hash refreshed), and CHANGELOG has a
+"Changes since 3.0.0-rc2" list (the bullets added since the rc2 cut moved
+there from the rc1 list, plus PRO-3683, the engine contract 1.8.2, the
+translated and corrected upgrade notices and the Mageplaza One Step
+Checkout guide). Everything since rc2 is in it: PRO-3693 (guest email on
+the standard checkout, its limits, one reminder per address per 24 h,
+erasure stops pending reminders), PRO-3711, PRO-3690, PRO-3683, PRO-2506,
+PRO-3692, PRO-3654, PRO-3694, PRO-3663, PRO-3680. The ZIP builds and
+verifies locally from the prepared commit. It awaits the owner's go to tag
+and publish (a GitHub pre-release on the fork, as rc1 and rc2).
+3.0.0-rc2 is released as a GitHub pre-release on the fork
+(https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc2),
+built by the release workflow from commit 32059a2 (367 entries, checksum
+OK, byte-identical to the local build, sha256 7322b213…3419). 3.0.0-rc1 is
+released the same way from commit 9af1d9e (354 files, checksum OK).
+Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
@@ -1002,8 +1001,10 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   PRO-3660 (Storefront URL, auto-open on API-only orders), PRO-3664 (browse
   consent as in Woo: override → cookie restriction mode → none), PRO-3666,
   and since then PRO-1398, PRO-3665, PRO-3661, PRO-3681. All of it is in
-  3.0.0-rc2, released on the fork as a pre-release (header) — the pilot
-  installs rc2, not rc1. Next, in order: (1) pilot day
+  3.0.0-rc2, released on the fork as a pre-release (header); everything
+  since then is in 3.0.0-rc3, which is prepared (header) and awaits the
+  owner's go to publish.
+  Next, in order: (1) pilot day
   09.10 — Erkki passes the storefront hand-off in HEADLESS_STOREFRONTS.md to
   the storefront team (incl. keeping the query string on the `/<url_key>.html`
   redirect), sets the Storefront URL, walks `PILOT_CHECKLIST.md`; PRO-2474's
@@ -3913,7 +3914,8 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   merchant recovery).
 
 **All 6 v3 phases implemented** (~110 files) on branch `v3`, version
-**3.0.0-rc2 — GitHub pre-release on the fork**. Current truth:
+**3.0.0-rc3 — unreleased** (3.0.0-rc2 is the newest GitHub pre-release
+on the fork). Current truth:
 
 - **PRO-1391 final-polish done — four refinements on Settings > Connection
   after Erkki's side-by-side review of the PRO-1391 visual-fidelity pass.**

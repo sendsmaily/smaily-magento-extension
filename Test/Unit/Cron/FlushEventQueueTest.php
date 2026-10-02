@@ -18,6 +18,7 @@ use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\HandlerPool;
 use Smaily\Connect\Model\Queue\RetryPolicy;
+use Smaily\Connect\Model\Queue\Skipped;
 
 class FlushEventQueueTest extends TestCase
 {
@@ -127,6 +128,26 @@ class FlushEventQueueTest extends TestCase
         self::assertStringContainsString('permanent_http_422', $calls[1][0]);
         self::assertTrue($calls[1][2], 'A 422 is parked on the spot');
         self::assertSame(['Slow down', 90, false], $calls[2]);
+    }
+
+    /**
+     * PRO-3619: a row the handler skipped is closed for good with its
+     * reason — not delivered, not failed, nothing left to retry.
+     */
+    public function testASkippedRowIsClosedWithItsReason(): void
+    {
+        $event = $this->createEvent(3, 'contact.sync');
+        $this->eventQueue->method('claimBatch')->willReturn([$event]);
+
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willReturn([3 => new Skipped('Smaily does not have this contact')]);
+
+        $this->eventQueue->expects(self::once())->method('markSkipped')
+            ->with($event, 'Smaily does not have this contact');
+        $this->eventQueue->expects(self::never())->method('markSent');
+        $this->eventQueue->expects(self::never())->method('markFailed');
+
+        $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
     }
 
     public function testMissingResultIsAFailure(): void

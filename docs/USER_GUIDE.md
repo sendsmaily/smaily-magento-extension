@@ -333,9 +333,13 @@ writes nothing and creates no contact. The reminder's cart and product fields
 are left exactly as the reminder wrote them. If the shopper buys before the
 reminder has gone out, the reminder is dropped instead and nothing is written:
 the Log row is closed without being sent, its response reading `cancelled`. A
-reminder that failed for good means nothing is written either. A shopper who
-unsubscribed in the store is sent as unsubscribed with this field, so a
-contact it creates in Smaily is never a subscriber.
+reminder that failed for good means nothing is written either.
+
+The field is written only to a contact Smaily already has, so it never
+creates a contact. Before sending it, the extension looks the address up in
+Smaily; when Smaily does not have it, the Log row is closed without being
+sent and says why. A shopper who unsubscribed in the store is sent as
+unsubscribed with this field.
 
 ## Abandoned cart
 

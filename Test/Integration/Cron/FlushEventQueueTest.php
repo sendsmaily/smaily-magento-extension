@@ -12,10 +12,12 @@ use GuzzleHttp\Client as HttpClient;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Smaily\Connect\Api\Queue\EventHandlerInterface;
 use Smaily\Connect\Cron\FlushEventQueue;
+use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Client\SmailyClient;
@@ -40,6 +42,9 @@ use Smaily\Connect\Test\Integration\Support\RecordingHandler;
 class FlushEventQueueTest extends IntegrationTestCase
 {
     private EventQueue $queue;
+
+    /** @var array<int, array{request: Request}> what the fake transport received */
+    private array $requests = [];
 
     protected function setUp(): void
     {
@@ -268,6 +273,96 @@ class FlushEventQueueTest extends IntegrationTestCase
         );
     }
 
+    /**
+     * PRO-3619: Smaily creates a contact sent without a status as
+     * subscribed, so the purchase marker goes only to a contact Smaily has.
+     * The queue reads the contact first; for an address Smaily does not have
+     * nothing is posted, and the row is closed with the reason.
+     */
+    public function testAPurchaseMarkerForAnAddressSmailyDoesNotHaveIsSkippedWithTheReason(): void
+    {
+        $this->enqueueMarker('f-marker-unknown');
+
+        $this->runCron(['contact.sync' => $this->realContactSync([
+            new Response(200, [], '{"code":206,"message":"Could not find requested email address"}'),
+        ])]);
+
+        self::assertSame(['GET'], $this->requestMethods(), 'One read, and nothing posted');
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_SENT, $row['status'], 'Closed: retrying cannot change the answer');
+        self::assertNull($row['next_retry_at']);
+        self::assertNull($row['sent_payload'], 'Nothing was sent for this row');
+        self::assertStringContainsString('Skipped', (string)$row['last_error']);
+        self::assertStringContainsString('Smaily does not have this contact', (string)$row['last_error']);
+    }
+
+    public function testAPurchaseMarkerForAContactSmailyHasIsPosted(): void
+    {
+        $this->enqueueMarker('f-marker-known');
+
+        $this->runCron(['contact.sync' => $this->realContactSync([
+            new Response(200, [], '{"email":"a@example.com","is_unsubscribed":"0"}'),
+            new Response(200, [], '{"code":101,"message":"OK"}'),
+        ])]);
+
+        self::assertSame(['GET', 'POST'], $this->requestMethods());
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_SENT, $row['status']);
+        self::assertNull($row['last_error']);
+        self::assertSame(
+            [['email' => 'a@example.com', Trigger::ABANDONED_CART_PURCHASED_FIELD => '2026-10-02 10:00:00']],
+            json_decode((string)$row['sent_payload'], true)
+        );
+    }
+
+    public function testAPurchaseMarkerWaitsWhenSmailyCannotBeRead(): void
+    {
+        $this->enqueueMarker('f-marker-unread');
+
+        $this->runCron(['contact.sync' => $this->realContactSync([
+            new Response(503, [], 'Service unavailable'),
+        ])]);
+
+        self::assertSame(['GET'], $this->requestMethods(), 'Nothing is posted while the answer is not known');
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_PENDING, $row['status'], 'Retried on the ladder');
+        self::assertSame('1', (string)$row['attempts']);
+        self::assertSame($this->clockDate(EventQueue::BACKOFF_SECONDS[0]), $row['next_retry_at']);
+    }
+
+    public function testAContactSyncIsPostedWithoutAContactRead(): void
+    {
+        $this->enqueueContact('f-plain');
+
+        $this->runCron(['contact.sync' => $this->realContactSync([
+            new Response(200, [], '{"code":101,"message":"OK"}'),
+        ])]);
+
+        self::assertSame(['POST'], $this->requestMethods());
+    }
+
+    private function enqueueMarker(string $uuid): void
+    {
+        $this->queue->enqueue(
+            'contact.sync',
+            ['store_id' => 0, 'contact' => [
+                'email' => 'a@example.com',
+                Trigger::ABANDONED_CART_PURCHASED_FIELD => '2026-10-02 10:00:00',
+            ]],
+            'a@example.com',
+            0,
+            $uuid
+        );
+    }
+
+    /**
+     * @return string[]
+     */
+    private function requestMethods(): array
+    {
+        return array_map(static fn (array $entry): string => $entry['request']->getMethod(), $this->requests);
+    }
+
     private function enqueueContact(string $uuid): void
     {
         $this->queue->enqueue(
@@ -289,6 +384,7 @@ class FlushEventQueueTest extends IntegrationTestCase
     private function realContactSync(array $responses): ContactSyncHandler
     {
         $handlerStack = HandlerStack::create(new MockHandler($responses));
+        $handlerStack->push(Middleware::history($this->requests));
         $httpClientFactory = $this->createMock(HttpClientFactory::class);
         $httpClientFactory->method('create')->willReturnCallback(
             static function (array $config) use ($handlerStack): HttpClient {

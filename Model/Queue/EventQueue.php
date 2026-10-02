@@ -209,6 +209,20 @@ class EventQueue
     }
 
     /**
+     * Close an event for good without sending it (PRO-3619): nothing left to
+     * retry, and the reason kept where the Log shows an error.
+     */
+    public function markSkipped(Event $event, string $reason): void
+    {
+        $event->addData(array_merge(
+            $this->terminalFields(null),
+            ['last_error' => mb_substr($reason, 0, self::MAX_ERROR_LENGTH)],
+            $this->exchangeFields($event, null, null)
+        ));
+        $this->eventResource->save($event);
+    }
+
+    /**
      * Record a failed delivery attempt; reschedules with backoff (or with the
      * delay Smaily itself asked for) or parks the event as failed once
      * attempts are exhausted.

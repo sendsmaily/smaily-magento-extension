@@ -14,6 +14,7 @@ use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\HandlerPool;
 use Smaily\Connect\Model\Queue\RetryPolicy;
+use Smaily\Connect\Model\Queue\Skipped;
 
 /**
  * Drains the marketing event queue: claims due events, dispatches them to
@@ -85,6 +86,8 @@ class FlushEventQueue
             $result = $results[(int)$event->getId()] ?? 'Handler returned no result for event';
             if ($result === true) {
                 $this->eventQueue->markSent($event);
+            } elseif ($result instanceof Skipped) {
+                $this->eventQueue->markSkipped($event, $result->reason);
             } elseif ($result instanceof SmailyClientException) {
                 // A refused send: the policy decides retry vs. stop for good.
                 $this->retryPolicy->apply($event, $result);

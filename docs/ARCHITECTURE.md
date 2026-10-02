@@ -457,6 +457,16 @@ never tracked as abandoned (no row, a checkout-optin-only `open` row, or an
 erased tombstone) sends nothing, so an ordinary purchase never creates a
 contact.
 
+Smaily creates a contact sent without a status as subscribed, so the marker
+never creates one. It is queued only when `EventQueue::hasDeliveredAutomation()`
+finds an abandoned-cart reminder to that address that went out (sent, with a
+`sent_payload`, not withdrawn), and `Queue\Handler\ContactSyncHandler` reads
+the contact (`GET contact.php`, in the cron, never at checkout) before it
+posts the marker. For an address Smaily does not have (code 206) the handler
+answers `Queue\Skipped` and `EventQueue::markSkipped()` closes the row —
+`sent`, no `sent_payload`, the reason in `last_error` for the Log; a read
+that fails leaves the row on the retry ladder with nothing posted.
+
 ### Attribution (FPC-safe by construction)
 
 Landing capture is client-side (`view/frontend/web/js/attribution.js` —

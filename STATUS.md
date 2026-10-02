@@ -61,6 +61,24 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   Erkki 2026-10-02: rc1 waits for the whole list), pilot store live
   2026-10-09. After the pilot: PRO-2506, PRO-1967, PRO-1198 (hand-over).
 
+- **PRO-3619 remainder done — the purchase marker goes only to a contact
+  Smaily has (2026-10-02).** Owner decision (Erkki 2026-10-02, question
+  11): yes. `ContactSyncHandler` reads the contact (`GET contact.php`)
+  before it posts a row that carries `abandoned_cart_purchased_at` — once
+  per marker row, in the cron, never at checkout; other contact syncs are
+  posted without a read. Smaily code 206 (no such contact): the handler
+  answers the new `Queue\Skipped` and the flusher calls
+  `EventQueue::markSkipped()`, which closes the row (`sent`, no
+  `sent_payload`, nothing to retry) with the reason in `last_error`, so the
+  Log row reads "Skipped: Smaily does not have this contact, …". A failed
+  read is returned as the exception: the RetryPolicy classifies it and
+  nothing is posted. `EventHandlerInterface` documents the new result. No
+  schema change. Woo has the same gap (not changed here). Tests RED first:
+  unit `FlushEventQueueTest` (+1), integration `FlushEventQueueTest` (+4:
+  unknown address skipped with one GET and no POST, known contact GET then
+  POST, failed read retried, a plain contact sync posts with no read).
+  Gates: unit 553, phpcs 0 errors, phpstan `[OK]`, integration 120.
+
 - **PRO-3619 done — a profiling choice or a purchase marker never creates
   a Smaily contact (2026-10-02).** Smaily creates a new contact sent
   without `is_unsubscribed` as subscribed, keeps an existing contact's
@@ -85,11 +103,10 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   (`sent_payload`), not withdrawn — a skip that POSTed nothing, a failed
   row and a waiting row do not count (WooCommerce parity, Woo PRO-1723).
   The tracker's `mailed` status means only "queued", so the queue decides.
-  Bounded by the janitor's 30-day retention of sent rows. Not closed: a
-  reminder delivered to an address Smaily does not have creates nothing,
-  so the marker can still create that contact (as subscribed, unless the
-  store holds it as unsubscribed — PRO-3616); closing it needs a contact
-  read before the marker is sent — question for Erkki. Tests RED first:
+  Bounded by the janitor's 30-day retention of sent rows. A reminder
+  delivered to an address Smaily does not have creates nothing, so the
+  marker could still create that contact — closed by the remainder above
+  (a contact read in the queue). Tests RED first:
   `ProfilingConsentTest` (+5), `SyncDispatcherTest` (+1), integration
   `EventQueueTest` (+1). Gates: unit 496, phpcs 0 errors, phpstan `[OK]`,
   integration 113.
@@ -3874,7 +3891,7 @@ PRO-1267 (engine: Magento product-identity contract note).
    PRO-3407).~~ **Resolved (Erkki, 2026-10-02, PRO-3610):** the mode is the
    soft opt-in; omit the status for non-subscribers. Smaily creates a new
    contact without the field as subscribed (confirmed by Erkki).
-11. PRO-3619 — the abandoned-cart purchase marker for an address Smaily
+11. ~~PRO-3619 — the abandoned-cart purchase marker for an address Smaily
    does not have (Medium urgency; reversible). The marker now goes only
    after a reminder went out to Smaily. But a reminder to an address
    Smaily does not have creates nothing (your fact, 2026-10-02), so a
@@ -3883,4 +3900,6 @@ PRO-1267 (engine: Magento product-identity contract note).
    them as unsubscribed. Closing it needs one Smaily read of the contact
    before the marker is sent (in the queue, not at checkout), and the
    marker skipped when Smaily does not have the contact. WooCommerce has
-   the same gap. Say whether to add that read.
+   the same gap. Say whether to add that read.~~ **Resolved (Erkki,
+   2026-10-02): yes** — the queue reads the contact and skips the marker
+   for an address Smaily does not have (PRO-3619 remainder above).

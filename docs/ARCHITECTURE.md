@@ -606,7 +606,10 @@ Initial setup, Settings, Log. Design rules:
   it never renders under Stores > Configuration for any admin; the
   declarations stay only for encrypted backend models and CLI
   `config:set`/`config:show`. There is no parallel settings store, and no
-  second editing surface.
+  second editing surface. The two secrets — the Smaily API password and the
+  Campaign Intelligence API key — are declared sensitive in `etc/di.xml`
+  (`Magento\Config\Model\Config\TypePool`), so `app:config:dump` never
+  writes them to `app/etc/config.php`.
 - **Multi-website (RFC_MULTI_WEBSITE.md).** `Model\Adminhtml\WebsiteContext`
   is the single seam every admin save/prefill path reads to know its target
   website: it resolves a `website` request param (validated against real

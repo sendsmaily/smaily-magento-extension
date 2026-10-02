@@ -88,4 +88,17 @@
             </argument>
         </arguments>
     </type>
+
+    <!-- The Smaily API password and the Campaign Intelligence API key are
+         secrets: app:config:dump leaves them out of app/etc/config.php (they
+         stay in the database), so their ciphertext never lands in a file that
+         is committed with the code. -->
+    <type name="Magento\Config\Model\Config\TypePool">
+        <arguments>
+            <argument name="sensitive" xsi:type="array">
+                <item name="smaily_connect/connection/password" xsi:type="string">1</item>
+                <item name="smaily_connect/intelligence/api_key" xsi:type="string">1</item>
+            </argument>
+        </arguments>
+    </type>
 </config>

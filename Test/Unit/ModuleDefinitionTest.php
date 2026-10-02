@@ -121,4 +121,22 @@ class ModuleDefinitionTest extends TestCase
             }
         }
     }
+
+    /**
+     * Secrets are declared sensitive, so `app:config:dump` never writes them
+     * to app/etc/config.php.
+     */
+    public function testSecretConfigPathsAreDeclaredSensitive(): void
+    {
+        $xml = simplexml_load_file(self::PACKAGE_ROOT . '/etc/di.xml');
+        self::assertNotFalse($xml);
+        $items = $xml->xpath(
+            "//type[@name='Magento\\Config\\Model\\Config\\TypePool']/arguments"
+            . "/argument[@name='sensitive']/item[.='1']/@name"
+        );
+        $sensitive = array_map('strval', $items ?: []);
+
+        self::assertContains(\Smaily\Connect\Model\Config::XML_PATH_PASSWORD, $sensitive);
+        self::assertContains(\Smaily\Connect\Model\Engine\Settings::XML_PATH_API_KEY, $sensitive);
+    }
 }

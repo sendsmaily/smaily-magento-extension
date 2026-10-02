@@ -47,7 +47,12 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   restore link (`id`, `ts`, `token`), the browse relay's event fields
   (`BrowseEventValidator`) and the checkout opt-in's `form_key` read a
   non-string as absent/invalid — Magento's error handler turned the
-  "Array to string conversion" warning into a 500.
+  "Array to string conversion" warning into a 500. (3) The Smaily
+  password and the engine API key paths are declared sensitive
+  (`etc/di.xml`, `TypePool`), so `app:config:dump` keeps their ciphertext
+  out of `config.php`. The consent cache was already keyed by the opt-out
+  record's HMAC (`ProfilingOptOuts::addressKey()`, PRO-3575) — confirmed,
+  no change.
 
 - **PRO-3644 done — copy consistency leftovers (2026-10-02).** (1) The
   failed-events banner on the Dashboard and the Log has a singular: "1

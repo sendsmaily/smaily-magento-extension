@@ -5,7 +5,9 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-09-11 (PRO-2472 — the release train's packaging
+_Last updated: 2026-10-02 (CLAUDE.md anchors on the two Magento Epics — v3
+rewrite and UI/UX parity — and names their outcome gauges; queue set for
+the pilot. Previous session, 2026-09-11: PRO-2472 — the release train's packaging
 leftovers are closed: the checksum ships with the release, the module
 manifest and the composer manifest agree, and MSI is documented as optional.
 Earlier the same day: PRO-2476 — the sandbox admin logs in without a
@@ -24,16 +26,12 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
 
 ## Where we are
 
-- **Next session opens here (2026-09-11).** Queue: ~~PRO-2454 (Send again,
-  server-worded refusals, Withdrawn)~~ → ~~PRO-2476 (sandbox 2FA off, before
-  PRO-2456)~~ → ~~PRO-2472 (release packaging leftovers)~~ → **PRO-2456
-  next** → PRO-2506 → PRO-2474 (pilot
-  readiness — the first pilot client exists and installs manually from the
-  release ZIP into `app/code`, clean install, live engine tenant) → rc1 tag
-  on Erkki's go; the Smaily repo hand-over (PRO-1198) comes AFTER the pilot,
-  on Erkki's date. PRO-1748 is closed — Erkki proofread the Estonian diff on
-  2026-09-10. PRO-2460 waits on the engine's answer (current SKU behaviour
-  stays meanwhile). PRO-1971 reaffirmed A.
+- **Next session opens here (2026-10-02).** Queue: **PRO-2456** (design-pack
+  fidelity, before rc1 — Erkki 2026-10-02) → **PRO-2474** (pilot readiness:
+  ZIP install on a clean sandbox, runbook, pilot-day checklist, rc1 tag on
+  Erkki's go). Milestones: rc1 tagged + pilot runbook 2026-10-03, pilot store
+  live 2026-10-09. PRO-2460 decided A — contract §3 SKU key stands, PRO-1484
+  closed. After the pilot: PRO-2506, PRO-1967, PRO-1198 (Smaily hand-over).
 
 - **PRO-2472 done — the 3.0.0-rc1 release train's packaging leftovers are
   closed (2026-09-11).** Four small things, no behaviour change in the

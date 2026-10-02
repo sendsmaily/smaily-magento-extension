@@ -104,14 +104,23 @@ is the coordination and visibility layer. Full process: Outline → Processes �
 guide for AI agents" (attached to MGMT-5). Three rules for every agent working
 here:
 
-1. **Anchor before work.** A Linear project must exist before substantive work
-   starts. This repo's project: [Smaily Connect for Magento 2 — v3
-   rewrite](https://linear.app/smaily/project/smaily-connect-for-magento-2-v3-rewrite-34e9fd6ca889),
-   team "Product Development", initiatives *Smaily E-Commerce native
-   integrations* + *Campaign Intelligence*. Cross-repo asks are filed as issues in the
-   sibling projects (Woo: "Smaily Connect for WooCommerce — v3 rewrite",
-   Shopify: "Smaily Connect for Shopify — hosted app", engine: "Campaign
-   Intelligence — recommendation engine").
+1. **Anchor before work.** Work anchors on the initiative *Smaily E-Commerce
+   native integrations* (v3 also serves *Campaign Intelligence*) and on two
+   Epics (Linear projects, team "Product Development"):
+   - [Smaily Connect for Magento 2 — v3
+     rewrite](https://linear.app/smaily/project/smaily-connect-for-magento-2-v3-rewrite-34e9fd6ca889)
+     — outcome: 3.0.0 reaches real stores (pilot first, then the Smaily
+     upstream hand-over PRO-1198).
+   - [Magento Connect UI/UX
+     parity](https://linear.app/smaily/project/magento-connect-uiux-parity-2121de63e959)
+     — outcome: the admin matches its Woo/Shopify siblings and the design pack.
+
+   Work found in a session is filed as a Story (job story, problem Story or
+   spike) in the Epic whose outcome it serves (Story-first intake, PRO-3118).
+   Cross-repo asks are filed as issues in the sibling projects (Woo: "Smaily
+   Connect for WooCommerce — v3 rewrite", Shopify: "Smaily Connect for
+   Shopify — hosted app", engine: "Campaign Intelligence — recommendation
+   engine").
 
 2. **One-way doors interrupt.** Before any irreversible or expensive-to-undo
    commitment — persistent data schema, public/integration API contracts (e.g.
@@ -129,3 +138,14 @@ here:
 
 Never duplicate repo documents into Linear — summarize and link. Linear content
 is written in English.
+
+## Outcome gauges
+
+- **v3 rewrite** — shape: deadline. Gauge: PRO-2474 pilot-readiness
+  checklist, items ticked out of 5 (read from the Linear issue). Milestones
+  (set 2026-10-02): "rc1 tagged + pilot runbook" 2026-10-03, "Pilot store
+  live" 2026-10-09. Value 2026-10-02: 0/5.
+- **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
+  Stories in the Epic (state not Done/Canceled). Value 2026-10-02: 4 open
+  (PRO-2456, PRO-1357, PRO-1398, PRO-1385). Dates: none yet (2026-10-02 —
+  not asked; PRO-2456 is placed before the rc1 tag).

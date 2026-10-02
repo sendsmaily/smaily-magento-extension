@@ -106,6 +106,12 @@ PRO-3591/3594/3602, PRO-1952. Earlier sessions: 2026-09-11, 2026-09-10._
   `FailureMessage::TRANSLATED`). A row stored in Estonian before the fix
   is shown as stored. Not covered: Campaign Intelligence errors
   (`Model/Engine/Client.php` translates at throw time the same way).
+  (3) The Dashboard "Queued today" tile counts the rows queued today
+  (UTC) on both queues that are still `pending` (first attempt or retry),
+  so it matches its caption "events waiting to send". The target spec
+  names the tile "Queued today" without defining it as "created today",
+  and the pilot checklist reads the caption as the cron-health signal, so
+  the count changed, not the caption.
 
 - **Automation docs corrected — a trigger for an unknown contact creates
   nothing (2026-10-02).** The `AutomationHandler` docblock, the user

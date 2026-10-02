@@ -52,14 +52,19 @@ class DashboardStats
     }
 
     /**
-     * Rows queued today (UTC) across both delivery queues.
+     * Rows queued today (UTC) across both delivery queues that are still
+     * waiting to be sent — the first attempt or a retry (PRO-3628). A row
+     * sent, failed or being sent right now is not counted.
      */
     public function queuedToday(): int
     {
         $midnight = $this->dateTime->gmtDate('Y-m-d 00:00:00');
         $total = 0;
         foreach ([EventResource::TABLE_NAME, IngestEventResource::TABLE_NAME] as $table) {
-            $total += $this->count($table, ['created_at >= ?' => $midnight]);
+            $total += $this->count($table, [
+                'created_at >= ?' => $midnight,
+                'status = ?' => 'pending',
+            ]);
         }
 
         return $total;

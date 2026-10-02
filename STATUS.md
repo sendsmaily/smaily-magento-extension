@@ -5,19 +5,26 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-03 — after the rc3 cut: PRO-3714 (a variant
-without a category of its own takes its parent's), PRO-3715 (an empty-SKU
-configurable order line names the variant bought), PRO-3699 (leaving
-per-language accounts needs the password of an account other than the
-website's), PRO-3717 (the post-save connection check pairs the website
-account with the website password) and PRO-3718 (a new default fallback
-account needs its password on the server; the form asks exactly when the
-server would refuse) and PRO-3719 (the connection status after a reload
-describes the website account the save checked; the fallback language is
-saved per website), listed in CHANGELOG under "Changes since
-3.0.0-rc3"; PRO-3675 (the Hyvä tracker's consent event checked against
-Hyvä's sources; documentation only); PRO-3724 (browse tracking counts a
-cookie-notice acceptance only for the current website).
+_Last updated: 2026-10-03 — 3.0.0-rc4 is prepared, not published: the
+version is `3.0.0-rc4` (composer.json, `ModuleInfo::VERSION`, the upstream
+proposal; composer.lock content-hash refreshed), and CHANGELOG has a
+"Changes since 3.0.0-rc3" list. Everything since rc3 is in it: PRO-3714
+(a variant without a category of its own takes its parent's), PRO-3715
+(an empty-SKU configurable order line names the variant bought),
+PRO-3699 (leaving per-language accounts needs the password of an account
+other than the website's), PRO-3717 + PRO-3719 (the connection status
+after a save and after a reload describes the website account, merged
+into one bullet; the fallback language is saved per website, its own
+bullet), PRO-3718 (a new default fallback account needs its password on
+the server; the form asks exactly when the server would refuse) and
+PRO-3724 (browse tracking counts a cookie-notice acceptance only for the
+current website; the bullet and the user guide's consent section now say
+that on Luma Magento's notice is not shown again on a second website that
+shares the cookie domain, on Hyvä it shows per website). PRO-3675 and the
+simplification pass change no behaviour, so they have no bullet. The ZIP
+builds and verifies locally from the prepared commit. It awaits the
+owner's go to tag and publish (a GitHub pre-release on the fork, as rc1,
+rc2 and rc3).
 2026-10-02: 3.0.0-rc3 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc3),
 built by the release workflow from commit a1ff618; the ZIP and its .sha256
@@ -32,9 +39,7 @@ translated and corrected upgrade notices and the Mageplaza One Step
 Checkout guide). Everything since rc2 is in it: PRO-3693 (guest email on
 the standard checkout, its limits, one reminder per address per 24 h,
 erasure stops pending reminders), PRO-3711, PRO-3690, PRO-3683, PRO-2506,
-PRO-3692, PRO-3654, PRO-3694, PRO-3663, PRO-3680. The ZIP builds and
-verifies locally from the prepared commit. It awaits the owner's go to tag
-and publish (a GitHub pre-release on the fork, as rc1 and rc2).
+PRO-3692, PRO-3654, PRO-3694, PRO-3663, PRO-3680.
 3.0.0-rc2 is released as a GitHub pre-release on the fork
 (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc2),
 built by the release workflow from commit 32059a2 (367 entries, checksum
@@ -1247,7 +1252,9 @@ Earlier: 2026-09-11, 2026-09-10._
   and since then PRO-1398, PRO-3665, PRO-3661, PRO-3681. All of it is in
   3.0.0-rc2, released on the fork as a pre-release (header); everything
   since then is in 3.0.0-rc3, released on the fork as a pre-release
-  (header) — the pilot installs rc3.
+  (header); everything since rc3 is in 3.0.0-rc4, which is prepared
+  (header) and awaits the owner's go to publish — the pilot installs rc4
+  once it is published, rc3 until then.
   Next, in order: (1) pilot day
   09.10 — Erkki passes the storefront hand-off in HEADLESS_STOREFRONTS.md to
   the storefront team (incl. keeping the query string on the `/<url_key>.html`
@@ -4158,7 +4165,8 @@ Earlier: 2026-09-11, 2026-09-10._
   merchant recovery).
 
 **All 6 v3 phases implemented** (~110 files) on branch `v3`, version
-**3.0.0-rc3 — GitHub pre-release on the fork**. Current truth:
+**3.0.0-rc4 — unreleased** (3.0.0-rc3 is the newest GitHub pre-release
+on the fork). Current truth:
 
 - **PRO-1391 final-polish done — four refinements on Settings > Connection
   after Erkki's side-by-side review of the PRO-1391 visual-fidelity pass.**

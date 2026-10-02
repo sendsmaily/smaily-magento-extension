@@ -14,6 +14,6 @@ namespace Smaily\Connect\Model;
  */
 class ModuleInfo
 {
-    public const VERSION = '3.0.0-rc3';
+    public const VERSION = '3.0.0-rc4';
     public const USER_AGENT = 'SmailyConnect-MagentoPlugin/' . self::VERSION;
 }

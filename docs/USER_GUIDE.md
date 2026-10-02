@@ -671,7 +671,12 @@ cookies. It asks, in this order, as the WooCommerce plugin does:
 2. **Magento's cookie notice**, when Magento's cookie restriction mode is on
    (**Stores > Configuration > General > Web > Default Cookie Settings >
    Cookie Restriction Mode**): consent once the visitor allows cookies
-   there.
+   there. This consent counts only on the website where the visitor gave
+   it, and on Magento's standard theme the notice is not shown again on a
+   second website that shares the cookie domain, so a visitor who allowed
+   cookies on another website is not tracked there until they consent
+   through your own consent tool (1.); on Hyvä the notice shows on each
+   website.
 3. **Otherwise there is no consent.**
 
 Without consent the tracker sends no browse event and sets no session

@@ -485,6 +485,12 @@ observer is deliberately outside the `ReconcileGuard`, so an unsubscribe
 Smaily's consent mirror writes counts too. A resubscribe does not turn
 profiling back on.
 
+- **The page** (My Account > Personalization: `Controller\Privacy\Index`
+  and `Save`, the nav link `Block\Account\PersonalizationLink`) exists
+  only while `Engine\Settings::isSendingAllowed()` — connected and not
+  refused, Woo PRO-2513/PRO-3189 parity (PRO-3579). Elsewhere both actions
+  forward to `noroute` and the link renders nothing; stored choices are
+  untouched.
 - **A choice** (My Account > Personalization, `setAllowed()`) goes three
   ways: to the Smaily contact (`smaily_rec_profiling` 0/1 +
   `smaily_rec_profiling_ts`, Z-suffixed), into the store's own record

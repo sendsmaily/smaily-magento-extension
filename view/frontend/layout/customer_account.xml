@@ -9,7 +9,7 @@
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <body>
         <referenceBlock name="customer_account_navigation">
-            <block class="Magento\Customer\Block\Account\SortLink"
+            <block class="Smaily\Connect\Block\Account\PersonalizationLink"
                    name="smaily-privacy-link">
                 <arguments>
                     <argument name="path" xsi:type="string">smaily/privacy</argument>

@@ -565,7 +565,10 @@ panel — you do not have to keep the page open:
   the Smaily contact (`is_unsubscribed`) — bidirectional in consent mode.
 - **Personalization (profiling) consent** is a separate axis: customers can
   opt out of personalized recommendations under **My Account >
-  Personalization**. The choice is stored on the Smaily contact, kept by the
+  Personalization**. The page and its menu link exist only while Campaign
+  Intelligence is connected and the account is active; on a store without
+  it the page is not found, because nothing personalizes recommendations
+  there. The choice is stored on the Smaily contact, kept by the
   store itself, and enforced by the engine. It reaches Campaign Intelligence
   as a queued delivery (type `engine.profiling_consent` in the **Log**), so
   an engine outage only delays it: it is retried like every other delivery.

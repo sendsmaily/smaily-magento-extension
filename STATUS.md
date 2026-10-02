@@ -15,7 +15,8 @@ account needs its password on the server; the form asks exactly when the
 server would refuse) and PRO-3719 (the connection status after a reload
 describes the website account the save checked; the fallback language is
 saved per website), listed in CHANGELOG under "Changes since
-3.0.0-rc3".
+3.0.0-rc3"; PRO-3675 (the Hyvä tracker's consent event checked against
+Hyvä's sources; documentation only).
 2026-10-02: 3.0.0-rc3 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc3),
 built by the release workflow from commit a1ff618; the ZIP and its .sha256
@@ -41,6 +42,23 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3675 — the Hyvä tracker starts on the event Hyvä's cookie notice
+  really dispatches (2026-10-03; documentation only).** PRO-3664 took the
+  window event `user-allowed-save-cookie` from memory. Checked against the
+  public Hyvä sources: `Magento_Cookie/templates/notices.phtml`,
+  `setAcceptCookies()`, sets `user_allowed_save_cookie` and then calls
+  `window.dispatchEvent(new CustomEvent('user-allowed-save-cookie'))` in
+  `hyva-themes/magento2-default-theme` 1.4.0 and 1.5.2 (the supported
+  range is 1.4+) and in `magento2-default-theme-csp` 1.5.2 — the name
+  `smaily-tracker.js` listens to on `window`, so the listener is unchanged
+  (no other name exists in those versions). `docs/HYVA_SUPPORT.md`: the
+  tracker bullet cites the source; the consent row of the verification
+  matrix describes today's behaviour (no browse event, so no visitor
+  token, and no session cookie without consent; accepting the notice
+  starts tracking on the same page) and says it is not re-run on a store
+  since the consent gate. The live Hyvä store check stays human
+  acceptance. No CHANGELOG bullet (no behaviour change).
 
 - **PRO-3719 — the connection status after a reload describes the account
   the save checked; each website keeps its own fallback language
@@ -567,8 +585,8 @@ Earlier: 2026-09-11, 2026-09-10._
   no longer write it; they expose `ensureSession()`, which the tracker
   calls on consent. Campaign-click cookies stay ungated. Later consent
   starts tracking: Luma's jQuery `user:allowed:save:cookie`, Hyvä's window
-  `user-allowed-save-cookie` (from memory of Hyvä's cookie notice, not
-  checked on a Hyvä store), and the documented `smaily:consent-changed` on
+  `user-allowed-save-cookie` (checked against Hyvä's cookie-notice source by
+  PRO-3675, not yet on a Hyvä store), and the documented `smaily:consent-changed` on
   `document`; each flush asks again and drops the queue without consent.
   The tracker config key `consentRequired` is now `cookieRestriction`.
   User Guide section "Connecting your cookie consent tool" (contract,
@@ -1196,8 +1214,8 @@ Earlier: 2026-09-11, 2026-09-10._
   redirect), sets the Storefront URL, walks `PILOT_CHECKLIST.md`; PRO-2474's
   last item and PRO-3660's human acceptance; (2) next client HC Pro (legacy
   2.x upgrade, 4 websites): PRO-3661, PRO-3662 (spike — questions for the
-  client), PRO-3663, PRO-3665; (3) PRO-3675 (Hyvä consent event on a real
-  Hyvä store); (4) UI/UX parity PRO-1385, PRO-1357; then
+  client), PRO-3663, PRO-3665; (3) PRO-3675 (Hyvä consent event: the name is
+  checked against Hyvä's sources; the check on a real Hyvä store remains); (4) UI/UX parity PRO-1385, PRO-1357; then
   PRO-1967, PRO-1198. Engine ask PRO-3649 is answered (contract 1.8.2, PRO-3654); Woo ask PRO-3673 is with its
   team. Erkki still proofreads today's Estonian strings. Sandbox: remove
   finished agent worktrees under `.claude/worktrees` before any sandbox

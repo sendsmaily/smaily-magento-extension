@@ -82,9 +82,15 @@ path repository until the separate package exists (see
   notice, otherwise none; no event and no session cookie without consent);
   consent given later on the page is picked up from Hyvä's cookie notice
   event `user-allowed-save-cookie` (window) instead of Luma's jQuery
-  `user:allowed:save:cookie`, and from `smaily:consent-changed`. Checked
-  with the real script in a browser harness with stubbed globals, not yet
-  on a Hyvä store.
+  `user:allowed:save:cookie`, and from `smaily:consent-changed`. The event
+  name is the one Hyvä's cookie notice dispatches when the shopper accepts:
+  `Magento_Cookie/templates/notices.phtml`, `setAcceptCookies()`, sets
+  the `user_allowed_save_cookie` cookie and then calls
+  `window.dispatchEvent(new CustomEvent('user-allowed-save-cookie'))` —
+  the same in `hyva-themes/magento2-default-theme` 1.4.0 and 1.5.2 and in
+  `magento2-default-theme-csp` 1.5.2 (public sources, read 2026-10-03).
+  Checked with the real script in a browser harness with stubbed globals;
+  not yet re-run on a Hyvä store.
 - `view/frontend/layout/hyva_smaily_privacy_index.xml` +
   `templates/privacy/form.phtml` — Tailwind-styled personalization form
   (same behaviour and translated phrases; classes only).
@@ -156,7 +162,7 @@ were confirmed received by the engine (`ingest/browse`), not just relayed.
 | Attribution: campaign-click landing sets cookies (FPC page) | pass | pass | pass |
 | Tracker: product_view / search / checkout_start / checkout_complete reach the relay | pass | pass | pass (product_view, search) |
 | Tracker: cart_add (Luma `ajax:addToCart`; Hyvä PDP form-submit capture) | pass | pass (sku from page context) | pass |
-| Tracker: consent (cookie restriction on/off; identity hint dropped without consent, restored with it) — the behaviour of that date, since replaced by the consent gate (see `smaily-tracker.js` above) | pass (earlier pass) | pass (off / on-without / on-with) | not re-run (same code path as the Hyvä column) |
+| Tracker: consent — without consent (cookie restriction mode on and the cookie notice not accepted; or cookie restriction mode off and no consent override) no browse event is sent, so no visitor token reaches the engine, and no session cookie is written; accepting the cookie notice starts tracking on the same page (Luma: jQuery `user:allowed:save:cookie`; Hyvä: window `user-allowed-save-cookie`, see `smaily-tracker.js` above) | not re-run on a real store since the consent gate (browser harness with the real script: pass); the earlier pass covered the behaviour it replaced | not re-run on a Hyvä store since the consent gate (browser harness with the real script: pass; event name checked against the Hyvä sources); the earlier pass (off / on-without / on-with) covered the behaviour it replaced | not re-run (same code path as the Hyvä column) |
 | Page-context blocks render + execute (SecureHtmlRenderer) | pass | pass | pass (hash-whitelisted, zero CSP violations) |
 | Checkout opt-in checkbox (Luma-fallback checkout; toggle persists, order placed) | pass | pass (checkout + success render `Magento/luma` via theme fallback) | n/a (the fallback checkout renders Luma; a no-inline CSP across Luma is a store-wide theme decision, not a module surface — Magento's default enforced checkout CSP was verified in the Luma pass) |
 | Personalization page: nav link, Tailwind styling, save + persist | pass (after the FPC fix below) | pass (computed styles confirm the Tailwind classes resolved) | pass by construction (plain HTML form, zero scripts) |

@@ -17,7 +17,7 @@ example a `+pilot` alias of your own mailbox), your own name, your own test
 customer account on the pilot store. **Never** use a real customer's email,
 name, account or order — not to look something up, not to "just check one".
 Do not copy addresses or order details from the Log into notes, Linear or
-chat; the Log's Details panel masks addresses on purpose. No credentials or
+chat; the Log shows addresses in full, for debugging. No credentials or
 setup tokens in this file, in Linear or in chat either.
 
 Agree with the merchant beforehand: which payment method the test order
@@ -120,7 +120,7 @@ the store uses cookie restriction mode, accept the cookie notice first).
 
 1. **Log** → filter **Status** **Failed** (or the failed banner / the
    Dashboard's failed tile, which open the same view) → **Details** on the
-   row. The slide-out shows the payload as sent (addresses masked), attempt
+   row. The slide-out shows the payload as sent, attempt
    count, next automatic retry or "will not retry on its own", the
    **Last Error** as the other side said it, our failure class beside it,
    and the last API response.

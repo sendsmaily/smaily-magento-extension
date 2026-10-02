@@ -653,11 +653,13 @@ card — you do not have to keep the page open:
   failure), the last response that did arrive stays. A row that never
   reached the server — skipped because no workflow is mapped, withdrawn,
   or stopped before any request — says that nothing was sent for it.
-  Sensitive values (passwords, API keys) are never shown, and email
-  addresses are masked. At the bottom, **Send again** appears on exactly the
-  rows where the grid offers it (it asks first, like the grid's button), and
-  **Copy payload** copies the payload as the panel shows it — masked, never
-  the stored original. Escape or the close button closes the panel.
+  Passwords and API keys are never shown; contact data — email addresses
+  included — is shown in full, as in the WooCommerce plugin's log, so you
+  can debug a delivery. Treat what you read and copy here as personal
+  data. At the bottom, **Send again** appears on exactly the rows where the
+  grid offers it (it asks first, like the grid's button), and **Copy
+  payload** copies the payload as the panel shows it, with its secrets
+  hidden. Escape or the close button closes the panel.
 - When deliveries failed in the last 24 hours, a banner above the grid
   says so and links straight to the grid pre-filtered to failed rows; the
   dashboard's failed-deliveries tile links to the same view.

@@ -27,17 +27,19 @@ class PayloadRedactorTest extends TestCase
         self::assertSame('', $this->redactor->redact('   '));
     }
 
-    public function testMasksEmailsInJsonValues(): void
+    /**
+     * The admin Log shows contact data in full, as the WooCommerce plugin's
+     * log does; only secrets are hidden.
+     */
+    public function testShowsContactDataInJsonValuesInFull(): void
     {
         $result = $this->redactor->redact(json_encode([
-            'email' => 'erkki.markus@gmail.com',
-            'nested' => ['contact' => 'jane.doe@example.co.uk'],
+            'email' => 'jane.doe@example.com',
+            'nested' => ['contact' => 'john%40example.co.uk'],
         ]));
 
-        self::assertStringContainsString('e***@g***.com', $result);
-        self::assertStringContainsString('j***@e***.uk', $result);
-        self::assertStringNotContainsString('erkki.markus@gmail.com', $result);
-        self::assertStringNotContainsString('jane.doe@example.co.uk', $result);
+        self::assertStringContainsString('jane.doe@example.com', $result);
+        self::assertStringContainsString('john%40example.co.uk', $result);
     }
 
     public function testRedactsSecretLookingKeysRecursively(): void
@@ -58,11 +60,11 @@ class PayloadRedactorTest extends TestCase
         self::assertStringContainsString('kept', $result);
     }
 
-    public function testNonJsonInputGetsPlainTextEmailMasking(): void
+    public function testNonJsonInputIsShownAsItIs(): void
     {
         $result = $this->redactor->redact('HTTP 500 while syncing customer john@shop.example.org to Smaily');
 
-        self::assertSame('HTTP 500 while syncing customer j***@s***.org to Smaily', $result);
+        self::assertSame('HTTP 500 while syncing customer john@shop.example.org to Smaily', $result);
     }
 
     public function testNonSecretScalarsSurviveUntouched(): void

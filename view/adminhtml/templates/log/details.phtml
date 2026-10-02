@@ -6,7 +6,7 @@
  * Delivery detail panel for one unified-log row, loaded into a slide-out
  * modal by the grid's Details action (Controller\Adminhtml\Log\Details).
  * Payloads and responses are passed through the PayloadRedactor: secrets
- * are never shown, email addresses are masked.
+ * are never shown; contact data is shown in full.
  *
  * The design pack's Details panel (PRO-3565): the [data-smaily-details-head]
  * header (event id, type, status pill) and the [data-smaily-details-foot]
@@ -31,7 +31,7 @@ $statusLabels = (array)$block->getData('status_labels');
 $refusal = $block->getData('refusal');
 /** @var array{of: int, by: string, at: string}|null $resendRecord */
 $resendRecord = $block->getData('resend_record');
-// The server's own words, masked like everything else here; our internal
+// The server's own words, secrets hidden like everything else here; our internal
 // classification is shown beside them, not in place of them.
 $lastError = (string)$block->getData('last_error');
 $failureClass = (string)$block->getData('failure_class');
@@ -200,28 +200,28 @@ $formatDate = static fn (string $date): string => (string)$block->formatDate($da
     </div>
 
     <?php if ($lastError !== ''): ?>
-    <h3><?= $escaper->escapeHtml($skipped ? __('Reason') : __('Last error')) ?><span class="smaily-log-redact-tag"><?= $escaper->escapeHtml(__('redacted')) ?></span></h3>
+    <h3><?= $escaper->escapeHtml($skipped ? __('Reason') : __('Last error')) ?></h3>
     <pre class="smaily-log-details-pre<?= $skipped ? '' : ' smaily-log-details-error' ?>"><?= $escaper->escapeHtml($lastError) ?></pre>
         <?php if ($failureClass !== '' && !$skipped): ?>
         <p class="note"><?= $escaper->escapeHtml(__('Failure class: %1', $failureClass)) ?></p>
         <?php endif; ?>
     <?php endif; ?>
 
-    <h3><?= $escaper->escapeHtml($payloadTitle) ?><span class="smaily-log-redact-tag"><?= $escaper->escapeHtml(__('PII redacted')) ?></span></h3>
+    <h3><?= $escaper->escapeHtml($payloadTitle) ?></h3>
     <?php if ($payload !== ''): ?>
         <pre class="smaily-log-details-pre" data-smaily-payload><?= $escaper->escapeHtml($payload) ?></pre>
     <?php else: ?>
         <p class="note"><?= $escaper->escapeHtml(__('No payload stored for this row.')) ?></p>
     <?php endif; ?>
 
-    <h3><?= $escaper->escapeHtml(__('Last response')) ?><span class="smaily-log-redact-tag"><?= $escaper->escapeHtml(__('PII redacted')) ?></span></h3>
+    <h3><?= $escaper->escapeHtml(__('Last response')) ?></h3>
     <?php if ($response !== ''): ?>
         <pre class="smaily-log-details-pre<?= $responseIsError ? ' smaily-log-details-error' : '' ?>"><?= $escaper->escapeHtml($response) ?></pre>
     <?php else: ?>
         <p class="note"><?= $escaper->escapeHtml($noResponseText) ?></p>
     <?php endif; ?>
 
-    <p class="note"><?= $escaper->escapeHtml(__('Sensitive values (passwords, API keys) are never shown here, and email addresses are masked.')) ?></p>
+    <p class="note"><?= $escaper->escapeHtml(__('Passwords and API keys are never shown.')) ?></p>
 
     <?php if ($resendUrl !== null || $payload !== ''): ?>
     <div class="smaily-log-details__foot" data-smaily-details-foot>

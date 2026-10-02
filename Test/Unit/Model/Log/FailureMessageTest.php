@@ -49,10 +49,10 @@ class FailureMessageTest extends TestCase
         self::assertSame('', $this->failureMessage->failureClass('Connection timed out after 30s'));
     }
 
-    public function testMasksContactsQuotedByTheServer(): void
+    public function testShowsContactsQuotedByTheServerInFull(): void
     {
         self::assertSame(
-            'Address j***@e***.com is not valid',
+            'Address jane.doe@example.com is not valid',
             $this->failureMessage->forDisplay(
                 'permanent_http_400: Address jane.doe@example.com is not valid'
             )
@@ -140,12 +140,12 @@ class FailureMessageTest extends TestCase
         );
     }
 
-    public function testATranslatedPartIsMaskedLikeTheRest(): void
+    public function testATranslatedMessageKeepsTheServersPartAsItIs(): void
     {
         StoreLocale::use('et_EE');
 
         self::assertSame(
-            'Smaily API tagastas koodi 203: Address j***@e***.com is not valid',
+            'Smaily API tagastas koodi 203: Address jane.doe@example.com is not valid',
             $this->failureMessage->forDisplay('Smaily API returned code 203: Address jane.doe@example.com is not valid')
         );
     }

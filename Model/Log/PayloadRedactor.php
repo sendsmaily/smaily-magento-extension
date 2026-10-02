@@ -8,20 +8,14 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Log;
 
-use Smaily\Connect\Model\Logger\EmailMask;
-
 /**
  * Prepares stored queue payloads/responses for display in the admin log
- * drill-down. Two rules, applied recursively:
+ * drill-down: values under secret-looking keys (password, token, api key,
+ * ...) are never shown — replaced with "[redacted]", at any depth.
  *
- * - values under secret-looking keys (password, token, api key, ...) are
- *   never shown — replaced with "[redacted]";
- * - email addresses anywhere in string values are masked to their first
- *   characters ("e***@g***.com"), enough to recognize a contact without
- *   exposing the address.
- *
- * Non-JSON input (a raw error body, an HTML response) gets the same email
- * masking as plain text.
+ * Contact data is shown in full, as the WooCommerce plugin's log does: the
+ * Log is an admin debugging tool behind its own ACL resource. Non-JSON input
+ * (a raw error body, an HTML response) is shown as it is.
  */
 class PayloadRedactor
 {
@@ -43,7 +37,7 @@ class PayloadRedactor
 
         $decoded = json_decode($raw, true);
 
-        return is_array($decoded) ? $this->redactDecoded($decoded) : EmailMask::apply($raw);
+        return is_array($decoded) ? $this->redactDecoded($decoded) : $raw;
     }
 
     /**
@@ -78,7 +72,7 @@ class PayloadRedactor
                 $result[$key] = $this->redactArray($value);
                 continue;
             }
-            $result[$key] = is_string($value) ? EmailMask::apply($value) : $value;
+            $result[$key] = $value;
         }
 
         return $result;

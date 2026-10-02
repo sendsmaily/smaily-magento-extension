@@ -593,8 +593,7 @@ stays untouched. Three additions:
    `Controller\Adminhtml\Log\*`).
 2. A **Details slide-out panel** (right-docked, scrim behind it): header
    (event id + type + status Pill + close), scrollable body (summary
-   grid, attempt-history timeline, redacted request payload, redacted
-   response), footer (Retry now, Copy payload, InlineStatus).
+   grid, attempt-history timeline, request payload, response), footer (Retry now, Copy payload, InlineStatus).
 3. A **Log verbosity** control (error/info/debug, `logging/verbosity`) —
    resolved (Erkki, 2026-07-14, §4.2): this field is native-only today and
    gets a home on this page instead, replacing native config entirely. No
@@ -615,8 +614,8 @@ stays untouched. Three additions:
 | Grid columns | Source, Type, Entity, Status, Attempts, Last Error, Created, Updated, Actions |
 | Mass action: Retry | re-queues selected failed rows |
 | Failed-24h banner | zero-state hidden; links to grid pre-filtered on status |
-| Details slide-out | status pill, attempts (N of MAX), honest retry line (5 states: sent/sending/failed-terminal/scheduled-retry/waiting-for-flush), last error (redacted), payload as-sent/queued (redacted), last response (redacted) |
-| PII redaction | `Model\Log\PayloadRedactor` — secrets never shown, emails masked |
+| Details slide-out | status pill, attempts (N of MAX), honest retry line (5 states: sent/sending/failed-terminal/scheduled-retry/waiting-for-flush), last error, payload as-sent/queued, last response — secrets hidden in each |
+| Secret redaction | `Model\Log\PayloadRedactor` — secrets never shown; contact data shown in full, as in the WooCommerce plugin (owner decision, 2026-10-02) |
 | Log verbosity (error/info/debug) | Removed (Erkki, 2026-10-02) — developer-only via `bin/magento config:set`, see item 3 above |
 
 **Built (PRO-3565, 2026-10-02).** The grid's Status column is a Pill per
@@ -633,7 +632,9 @@ pack's two actions and an InlineStatus. The pack's "Retry now" is labelled
 **Send again**: it is the same guarded action as the grid's per-row Send
 again (PRO-2454 — offered only where `ResendGuard` clears the row), and the
 shared terminology wins over the pack's copy. "Copy payload" copies the
-redacted payload the panel shows.
+payload the panel shows, secrets hidden. The pack's "PII redacted" /
+"redacted" tags are not drawn: the panel hides only secrets, so the tags
+would not be true.
 
 **(c) EST+ENG text** (source: our own i18n):
 
@@ -643,7 +644,7 @@ redacted payload the panel shows.
 | Retry (mass action) | Proovi uuesti |
 | "All %1 automatic attempts are used up — this row will NOT retry on its own. Select it in the log and press Retry to queue it again." | (shipped) |
 | "%1 events failed in the last 24 hours" / "%1 event failed in the last 24 hours" (one phrase per number) | (shipped) |
-| "Sensitive values (passwords, API keys) are never shown here, and email addresses are masked." | (shipped) |
+| "Passwords and API keys are never shown." | "Paroole ja API võtmeid ei näidata kunagi." |
 
 **(d) REMOVE:** none.
 

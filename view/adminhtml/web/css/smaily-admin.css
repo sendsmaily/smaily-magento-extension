@@ -774,7 +774,6 @@
 /* --- Log details slide-out: attempt timeline ------------------------------ */
 .smaily-log-details-retry { display: flex; gap: var(--sp-2); align-items: center; background: var(--s-info-soft); border: 1px solid var(--s-info-border); color: var(--s-info); border-radius: var(--r-3); padding: 11px 14px; font-size: var(--fs-13); line-height: 1.45; }
 .smaily-log-details-retry.is-terminal { background: var(--s-neutral-soft); border-color: var(--s-neutral-border); color: var(--s-text-2); }
-.smaily-log-redact-tag { display: inline-block; font-size: 10px; font-weight: 700; color: var(--s-parked); background: var(--s-parked-soft); border: 1px solid var(--s-parked-border); border-radius: var(--r-2); padding: 0 6px; text-transform: uppercase; letter-spacing: .3px; margin-left: 6px; vertical-align: middle; }
 
 /* --- Settings website selector (RFC_MULTI_WEBSITE.md §2, PRO-1461) --------- *
  * Own chrome next to the tab strip, shown only on 2+-website installs. */

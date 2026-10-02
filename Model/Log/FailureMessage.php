@@ -66,7 +66,7 @@ class FailureMessage
     /**
      * The merchant-facing wording of a stored `last_error`: the server's own
      * message where there is one, in the admin's language where it is one of
-     * ours, with PII masked.
+     * ours, with secrets hidden.
      */
     public function forDisplay(?string $lastError): string
     {

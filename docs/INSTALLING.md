@@ -20,7 +20,10 @@ module out again. For a composer install, see the
   [UPGRADING.md](UPGRADING.md) instead.
 - Storefront theme: Luma-based themes work as they are; a Hyvä storefront
   also needs the separate compatibility module — see
-  [HYVA_SUPPORT.md](HYVA_SUPPORT.md).
+  [HYVA_SUPPORT.md](HYVA_SUPPORT.md). A headless storefront (a separate
+  storefront application on top of Magento) needs work from its own team
+  before the storefront features work — see
+  [HEADLESS_STOREFRONTS.md](HEADLESS_STOREFRONTS.md).
 
 Run every `bin/magento` command below from the Magento root, as the user
 that owns the Magento files.

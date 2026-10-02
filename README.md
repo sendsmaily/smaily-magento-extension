@@ -63,6 +63,7 @@ See [UPGRADING.md](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/U
 | [Upgrading](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/UPGRADING.md) | Migrating from Smaily for Magento 2.8.x |
 | [Architecture](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/ARCHITECTURE.md) | How the module works inside (for developers) |
 | [Hyvä Support](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/HYVA_SUPPORT.md) | Hyvä theme compatibility: audit, compat module, verification results |
+| [Headless Storefronts](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/HEADLESS_STOREFRONTS.md) | What works with a separate storefront application, and what its team must add |
 | [Testing](https://github.com/erkkimarkus/magento-connect/blob/v3/TESTING.md) | Test suites, sandbox, upgrade verification |
 | [Contributing](https://github.com/erkkimarkus/magento-connect/blob/v3/CONTRIBUTING.md) | Development environment and quality gates |
 | [Backlog](https://github.com/erkkimarkus/magento-connect/blob/v3/BACKLOG.md) | Known deferred work |

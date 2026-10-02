@@ -16,6 +16,29 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3614 researched — the first pilot store runs a headless storefront
+  (2026-10-02).** Magento is its back end only; shoppers buy on a separate
+  storefront application, and the back-end host answers only `/graphql`,
+  `/rest` and `/media` to the public (other paths 403). Findings in the new
+  public `docs/HEADLESS_STOREFRONTS.md` (linked from README, INSTALLING,
+  the USER_GUIDE FAQ; a pre-flight row in `PILOT_CHECKLIST.md`). Works
+  as is: everything server-side (contact sync, import, reconcile,
+  abandoned-cart detection, purchase marker, first order, catalog /
+  customer / order sync, GDPR erase, admin). Needs storefront work:
+  campaign-click capture, browse beacon to `smaily/relay`, attribution
+  cookies carried to the place-order request, its own checkout newsletter
+  checkbox, reachable `smaily/relay` and `smaily/rss/feed`. Not available
+  headless: `{{abandoned_cart_url}}` restore, the welcome for API signups
+  (Q8), **Checkout opt-in only** mode, My Account > Personalization,
+  identity merge on login. **Product links:** `product_url` (catalog and
+  RSS) is Magento's `getProductUrl()` — the store view's Base Link URL +
+  URL key + suffix; images are the back end's public media URLs and work.
+  The storefront's product page is `/p/<sku>/<url_key>.html`; it 301s
+  Magento-style `/<url_key>.html` there but drops the query string (the
+  engine's `smaily_rec` / `smaily_vt` / UTM params). No module setting
+  produces the storefront pattern — design options are in "Questions /
+  tasks for Erkki" item 12. Docs only, no code changed.
+
 - **PRO-3644 done — copy consistency leftovers (2026-10-02).** (1) The
   failed-events banner on the Dashboard and the Log has a singular: "1
   event failed in the last 24 hours" / "Viimase 24 tunni jooksul
@@ -488,6 +511,11 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   **Evening 2026-10-02 handoff:** UI/UX parity done today (design-pack match
   78.0 → 94.9 %, PRO-3561–3570, 3634, 3641, 3642, 3569, 3644, setup steps on the
   grey pane). All worker branches are merged; no worktrees left. Then: Erkki proofreads today's Estonian strings; pilot day 09.10.
+  **PRO-3614 (late 2026-10-02):** the pilot store is headless — before
+  pilot day, Erkki decides the product-link design (Questions item 12)
+  and passes the hand-off in `docs/HEADLESS_STOREFRONTS.md` "What the
+  storefront team must add" to the storefront team; contact sync and
+  automations stay off until its "Before switching anything on" passes.
   Next: pilot day — milestone "Pilot store live", 2026-10-09. The pilot's
   developer installs from the release ZIP per `docs/INSTALLING.md`; Erkki
   walks `PILOT_CHECKLIST.md` with real credentials (human acceptance of
@@ -4432,3 +4460,19 @@ PRO-1267 (engine: Magento product-identity contract note).
     2026-10-02): yes** — the queue reads the contact and skips the marker
     for an address Smaily does not have (PRO-3619 remainder in "Where we
     are").
+12. PRO-3614 — product links for a headless storefront (High urgency for
+    the pilot: recommendation emails stay off until decided; reversible).
+    The storefront's product page is `/p/<sku>/<url_key>.html`; the module
+    sends Magento's own product URL. Options: (A) no code — set the store
+    view's Base Link URL to the storefront and have the storefront team
+    keep the query string on its `/<url_key>.html` redirect; side effect:
+    every Magento-built link of that store view moves (Magento's emails,
+    `smaily/relay`, `smaily/rss/feed`, `smaily/cart/restore`), so the
+    storefront host must pass `/smaily/` to the back end. (B) code — a
+    store-view setting "Storefront product URL" with `{sku}` and
+    `{url_key}` placeholders (str_replace, values URL-encoded; empty =
+    today's behaviour), used for the catalog `product_url` and the RSS
+    item links; no side effects, but the template must follow the
+    storefront's routing, and existing engine rows change on the nightly
+    re-sync. Recommended: B, plus the storefront team's hand-off. Say A or
+    B.

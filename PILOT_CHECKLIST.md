@@ -29,6 +29,7 @@ uses, and that you cancel or refund it afterwards.
 |---|---|
 | Confirm the store has one website. | Stores > All Stores lists one website. More than one: Initial setup opens with "Which website are you setting up?" and Settings shows a **Website** selector — onboard each website, and note it in PRO-2474. |
 | Confirm the storefront theme is Luma-based, not Hyvä. | Content > Design > Configuration. A Hyvä theme needs the separate compat module (`compat/hyva`), which the ZIP does not carry — stop and raise it. |
+| Confirm shoppers buy on Magento's own theme, not on a separate (headless) storefront application. | Open a product page on the public shop: Magento's own theme loads `requirejs` (Luma) or Alpine.js (Hyvä). A headless storefront (PRO-3614): walk `docs/HEADLESS_STOREFRONTS.md` "Before switching anything on" first — keep contact sync and automations off until its product-link check passes; §5's `{{abandoned_cart_url}}`, the checkout checkbox and §6 do not apply until the storefront team's hand-off items are in place. |
 | Confirm the ZIP the developer installed is the release build. | Developer ran `sha256sum -c smaily-connect-magento2.zip.sha256` → `OK`. `bin/magento module:status Smaily_Connect` → `Module is enabled`. |
 | Confirm the store's Magento cron is installed. | `crontab -l` on the server shows the `#~ MAGENTO START` block running `bin/magento cron:run` every minute. |
 

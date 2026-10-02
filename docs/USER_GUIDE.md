@@ -805,6 +805,13 @@ checkout payment step — including Hyvä's default Luma-fallback checkout.
 The commercial Hyvä Checkout product is a different integration surface and
 is not supported (see [HYVA_SUPPORT.md](HYVA_SUPPORT.md)).
 
+**My store runs a headless storefront.** The server-side features work as
+they are; the browse tracker, campaign-click capture, checkout checkbox and
+personalization page are Magento theme parts a separate storefront does not
+draw, and product links need a check before recommendation emails go out.
+See [HEADLESS_STOREFRONTS.md](HEADLESS_STOREFRONTS.md) for the full list
+and the hand-off for the storefront team.
+
 **Where did the sync frequency setting go?** v3 syncs in near-real-time via
 observers plus a 15-minute consent reconcile; the old 4h/12h/daily presets
 are obsolete.

@@ -132,9 +132,10 @@ $modeCards = [
         <div class="smaily-ml-region__kicker"><?= $escaper->escapeHtml(__('Per-language Smaily accounts')) ?></div>
         <div class="smaily-ml-accounts">
             <?php foreach ($accounts as $account): ?>
+            <?php // Escaped once here; the attributes below print it as is. ?>
             <?php $code = $escaper->escapeHtmlAttr($account['language']); ?>
             <div class="smaily-ml-account"
-                 data-language="<?= $code ?>"
+                 data-language="<?= /* @noEscape */ $code ?>"
                  data-store-id="<?= $escaper->escapeHtmlAttr((string)($account['storeId'] ?? '')) ?>"
                  data-has-password="<?= $account['hasPassword'] ? '1' : '0' ?>"
                  data-saved-subdomain="<?= $escaper->escapeHtmlAttr($account['subdomain']) ?>"
@@ -145,21 +146,21 @@ $modeCards = [
                 </div>
                 <p class="note"><?= $escaper->escapeHtml(__('Store views with the %1 language sync their contacts and automations to this account.', strtoupper($account['language']))) ?></p>
                 <div class="smaily-field">
-                    <label for="smaily-ml-subdomain-<?= $code ?>"><?= $escaper->escapeHtml(__('Subdomain')) ?></label>
+                    <label for="smaily-ml-subdomain-<?= /* @noEscape */ $code ?>"><?= $escaper->escapeHtml(__('Subdomain')) ?></label>
                     <input type="text" class="smaily-ml-subdomain"
-                           id="smaily-ml-subdomain-<?= $code ?>"
+                           id="smaily-ml-subdomain-<?= /* @noEscape */ $code ?>"
                            value="<?= $escaper->escapeHtmlAttr($account['subdomain']) ?>"/>
                 </div>
                 <div class="smaily-field">
-                    <label for="smaily-ml-username-<?= $code ?>"><?= $escaper->escapeHtml(__('API username')) ?></label>
+                    <label for="smaily-ml-username-<?= /* @noEscape */ $code ?>"><?= $escaper->escapeHtml(__('API username')) ?></label>
                     <input type="text" class="smaily-ml-username"
-                           id="smaily-ml-username-<?= $code ?>"
+                           id="smaily-ml-username-<?= /* @noEscape */ $code ?>"
                            value="<?= $escaper->escapeHtmlAttr($account['username']) ?>"/>
                 </div>
                 <div class="smaily-field">
-                    <label for="smaily-ml-password-<?= $code ?>"><?= $escaper->escapeHtml(__('API password')) ?></label>
+                    <label for="smaily-ml-password-<?= /* @noEscape */ $code ?>"><?= $escaper->escapeHtml(__('API password')) ?></label>
                     <input type="password" class="smaily-ml-password" autocomplete="new-password"
-                           id="smaily-ml-password-<?= $code ?>"/>
+                           id="smaily-ml-password-<?= /* @noEscape */ $code ?>"/>
                     <?php if ($account['hasPassword']): ?>
                     <p class="note"><?= $escaper->escapeHtml(__('A password is already saved — leave this empty to keep it.')) ?></p>
                     <?php endif; ?>

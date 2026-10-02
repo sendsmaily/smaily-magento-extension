@@ -99,7 +99,9 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   rendering the real templates with stub data for two languages in headless
   Chrome (Settings en_US / et_EE, initial setup at 1400 / 700 / 560 px; Test
   connection, the field error on a block, switching mode hides the region).
-  Fidelity audit row 20 marked fixed.
+  Fidelity audit row 20 marked fixed. The block attributes print the
+  language code escaped once (`$code`) under `/* @noEscape */`, as
+  `panel/automations.phtml` does, so phpcs ends with 0 errors again.
 
 - **PRO-3568 done — the Dashboard's degraded and healthy states carry the
   pack's banner and buttons (2026-10-02).** With failed deliveries in the

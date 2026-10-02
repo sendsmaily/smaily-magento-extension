@@ -79,6 +79,31 @@ OK). Earlier: 2026-09-11, 2026-09-10._
   none, so nothing changes in code or fixtures. ARCHITECTURE and
   UPSTREAM_PROPOSAL cite v1.8.2.
 
+- **PRO-3663 — Mageplaza One Step Checkout, read from source (2026-10-02,
+  docs only, no code change).** Read from public mirrors of the extension's
+  source (2.8.2 and 4.0.10; the current release is 4.4.x) and its public
+  guide; not run on a store. (a) Its page updates the `checkout_index_index`
+  handle and adds its own processor to `Onepage`'s `layoutProcessors`, so the
+  core `LayoutProcessor` (and `AddNewsletterOptinToLayout`) still runs; its
+  payment template draws `afterMethods`, and its processor removes only
+  `billing-address-form` there — the checkbox shows and the
+  `smaily/checkout/optin` → `sales_order_place_after` path is unchanged.
+  (b) Its email field calls its own `guest-carts/:cartId/isEmailAvailable`,
+  which saves `quote.customer_email` at once, so `Cron\AbandonedCart` sees
+  the guest's email. (c) Its own newsletter checkbox (on by default, can be
+  pre-ticked) calls `Subscriber::subscribe($email)` on
+  `sales_model_service_quote_submit_success`, inside the REST place-order
+  request: synced under Subscribers only / All customers without Welcome;
+  not synced under Checkout opt-in only; with Need to Confirm both
+  checkboxes ticked send the confirmation request twice. New USER_GUIDE
+  section "Third-party one-step checkouts" (recommend the module's checkbox,
+  switch OSC's off; three live-store checks); FAQ links it. Found while
+  reading Magento 2.4.7's checkout JS: the core Luma checkout keeps a
+  guest's email in the browser (`quote.guestEmail`) until payment
+  information is sent, so the guide's "a guest who abandons at the shipping
+  step is still reminded" (PRO-1275) is unconfirmed for the core checkout —
+  raised for a follow-up, guide text unchanged.
+
 - **PRO-3681 — the owner's four upgrade-day decisions for 2.x → 3.0
   (2026-10-02, Questions item 14 decided; changes what the upgrade
   writes).** `LegacyConfigMapper`: a scope's `smaily/general/enable` = 0

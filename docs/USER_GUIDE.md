@@ -9,6 +9,7 @@ Smaily Connect keeps your newsletter audience, marketing automations and
 - [Contact synchronization](#contact-synchronization)
 - [Automations](#automations)
 - [Abandoned cart](#abandoned-cart)
+- [Third-party one-step checkouts](#third-party-one-step-checkouts)
 - [Product RSS feed](#product-rss-feed)
 - [Campaign Intelligence](#campaign-intelligence)
 - [Historical import (backfill)](#historical-import-backfill)
@@ -459,6 +460,64 @@ cart when clicked (a signed link; carts belonging to a registered customer
 ask them to sign in first). The link expires 30 days after the reminder is
 created: an expired link opens the cart page with the notice "This cart link
 has expired." and restores nothing.
+
+## Third-party one-step checkouts
+
+Some stores replace Magento's checkout with a one-step checkout extension.
+This section covers **Mageplaza One Step Checkout** on a Luma-based theme.
+What it says was read from the extension's source code (versions 2.8.2 and
+4.0.10) and its public documentation; it was not tested on a running store.
+Newer versions can differ, so do the checks below on your store after you
+install or update either extension. Other one-step checkouts and Mageplaza's
+Hyvä edition are not covered.
+
+| What | Result | How sure |
+|---|---|---|
+| Smaily Connect's newsletter checkbox shows | Yes, below the payment methods. One Step Checkout builds its page from Magento's checkout layout and keeps the area below the payment methods where Smaily Connect adds the checkbox. | Read from source — check on your store |
+| Ticking it subscribes the shopper | Yes. The checkbox saves the choice for the cart when it is ticked, and placing the order reads it, as in Magento's checkout. | Read from source — check on your store |
+| A guest's email reaches abandoned-cart reminders | Yes. When a guest types a valid email address, One Step Checkout saves it to the cart at once (while it checks whether the address has an account). The abandoned-cart scan reads it from the cart. | Read from source — check on your store |
+| One Step Checkout's own newsletter checkbox | It subscribes the shopper to Magento's newsletter when the order is placed. What Smaily Connect then does depends on the contact sync mode — see below. | Read from source |
+
+**Show one newsletter checkbox, not two.** Both checkboxes are on after
+install: Smaily Connect's **Show Newsletter Checkbox At Checkout** and One
+Step Checkout's **Show Newsletter Checkbox** both default to *Yes*. A
+shopper who ticks both is subscribed once, but with Magento's **Need to
+Confirm** option on, Magento sends the confirmation request twice.
+
+We recommend Smaily Connect's checkbox. In One Step Checkout's
+configuration, set **Show Newsletter Checkbox** to *No*. Smaily Connect's
+checkbox works in every contact sync mode, starts the Welcome automation
+and is never ticked in advance.
+
+If you keep One Step Checkout's checkbox instead, set Smaily Connect's
+**Show Newsletter Checkbox At Checkout** to *No*, and set One Step
+Checkout's **Checked Newsletter by default** to *No* — a box that is ticked
+in advance is not consent. Then:
+
+- Under **Subscribers only** and **All customers**, the new subscriber
+  syncs to Smaily. No Welcome automation starts: One Step Checkout
+  subscribes the shopper while the order is placed through Magento's API,
+  and Welcome fires only for subscriptions made on the storefront (see
+  [Automations](#automations)).
+- Under **Checkout opt-in only**, the subscriber does not sync, because
+  only Smaily Connect's checkbox counts as the checkout opt-in.
+- With **Need to Confirm** on, the subscriber syncs in every mode when the
+  shopper clicks the confirmation link, and Welcome starts then.
+
+**Check on your store after install:**
+
+1. Open the checkout as a guest. The page shows one newsletter checkbox,
+   below the payment methods if it is Smaily Connect's.
+2. With the abandoned-cart automation on, add a product to the cart, open
+   the checkout as a guest, type an email address and leave the page.
+   After the cutoff, the reminder appears in **Marketing > Smaily Connect >
+   Log**.
+3. Place a guest order with the checkbox ticked. The shopper appears in
+   **Marketing > Communications > Newsletter Subscribers** and, in the Log,
+   as a contact sync to Smaily.
+
+If Smaily Connect's checkbox does not show, keep One Step Checkout's
+checkbox as described above.
 
 ## Product RSS feed
 
@@ -950,6 +1009,8 @@ younger than 24 h; and each cart is only ever mailed once.
 checkout payment step — including Hyvä's default Luma-fallback checkout.
 The commercial Hyvä Checkout product is a different integration surface and
 is not supported (see [HYVA_SUPPORT.md](HYVA_SUPPORT.md)).
+For Mageplaza One Step Checkout, see
+[Third-party one-step checkouts](#third-party-one-step-checkouts).
 
 **My store runs a headless storefront.** The server-side features work as
 they are; the browse tracker, campaign-click capture, checkout checkbox and

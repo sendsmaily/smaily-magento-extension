@@ -48,7 +48,14 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   Marketing > Smaily Connect > Dashboard shows no missing-glyph box: the
   menu id is now `Smaily_Connect::connect_dashboard`, because Magento turns
   the id's tail into the menu class and its own `.item-dashboard` rule puts
-  the Dashboard icon glyph before such a link.
+  the Dashboard icon glyph before such a link. The "Initial contact
+  import" block follows the pack's Backfill frames: Start import is the
+  primary button (no text shadow on our buttons), and the buttons and the
+  status ("Queued — …", in neutral grey while working) share one row under
+  a divider instead of the status dropping below with an indent. The count
+  sentence picks singular or plural per count ("1 customer" / "1 klient");
+  new phrases "%1 customer(s)", "%1 order(s)", "%1 product(s)" and "Your
+  store has %1, %2 and %3. …" replace the old sentence in EN + ET.
 
 - **PRO-3560 done — "Connected" means Smaily accepted the credentials
   (2026-10-02).** Before, the Dashboard and Settings > Connection said

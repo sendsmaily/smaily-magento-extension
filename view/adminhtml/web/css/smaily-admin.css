@@ -437,9 +437,20 @@
  * PRO-1397 polish #3 (finding #7's tail): the description, the import
  * button and the progress bar had no vertical gap between them at all.
  * Unscoped (not tab-scoped) because the card is one shared partial rendered
- * on both the wizard step-2 and the Settings > Subscribers panel. */
-.smaily-backfill-card > .note { margin: var(--sp-2) 0 var(--sp-4); }
+ * on both the wizard step-2 and the Settings > Subscribers panel.
+ * PRO-2456 (pack "Backfill" frames): title, 13px body copy, progress, then
+ * one controls row under a divider — Start import, Cancel and the status
+ * sit on one line, and a long status wraps beside the buttons instead of
+ * dropping below them with an indent. */
+.smaily-ui .smaily-backfill-card { background: var(--s-surface-2); margin-bottom: 0; }
+.smaily-backfill-card__title { display: block; font-size: var(--fs-14); font-weight: 700; color: var(--s-text); }
+.smaily-ui .smaily-backfill-card > p.note { margin: var(--sp-1) 0 0; font-size: var(--fs-13); line-height: 1.45; color: var(--s-text-2); }
 .smaily-backfill-card .smaily-progress { margin-top: var(--sp-4); }
+.smaily-backfill-card__controls {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+    margin-top: var(--sp-4); padding-top: 14px; border-top: 1px solid var(--s-border);
+}
+.smaily-backfill-card__controls .smaily-result.smaily-inline-status { flex: 1 1 16rem; min-width: 0; margin-left: var(--sp-1); white-space: normal; line-height: 1.4; }
 
 /* ========================================================================= *
  * PRO-1281 Stage B — the visual system applied to the screens.
@@ -462,6 +473,9 @@
  * builds a glyph + text; these map the legacy .ok/.err channel onto the
  * inline-status roles so wizard, settings and backfill share one treatment. -- */
 .smaily-result.smaily-inline-status { margin-left: var(--sp-3); }
+/* In-progress copy is neutral grey (pack InlineStatus "working"), not the
+ * legacy .ok green that result() also sets on it. */
+.smaily-ui .smaily-result.smaily-inline-status.is-working { color: var(--s-text-2); }
 .smaily-inline-status:empty { display: none; }
 .smaily-inline-status a { color: inherit; text-decoration: underline; font-weight: 600; }
 
@@ -677,10 +691,12 @@
 .smaily-ui select { padding: 7px 10px; cursor: pointer; }
 .smaily-ui .action-primary {
     padding: 9px 18px; border-radius: var(--r-2); border-color: #d44f00; font-weight: 700; font-size: var(--fs-13);
+    text-shadow: none;
 }
 .smaily-ui .action-secondary {
     padding: 9px 16px; background: var(--s-surface); border: 1px solid var(--s-border-strong);
     border-radius: var(--r-2); color: var(--s-text); font-weight: 700; font-size: var(--fs-13);
+    text-shadow: none;
 }
 .smaily-ui .action-secondary:hover { background: var(--s-surface-3); border-color: var(--s-border-strong); color: var(--s-text); }
 

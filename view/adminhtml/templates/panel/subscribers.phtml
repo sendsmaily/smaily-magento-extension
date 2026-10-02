@@ -134,19 +134,36 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
         </div>
     </div>
 
-    <div class="smaily-card smaily-backfill-card" style="background:#f8f8f8;">
-        <strong><?= $escaper->escapeHtml(__('Initial contact import')) ?></strong>
-        <p class="note" id="smaily-w-backfill-estimate"<?= $syncEnabled ? '' : ' style="display:none;"' ?>><?= $escaper->escapeHtml(__('Your store has %1 customers, %2 orders and %3 products. The import runs in the background, a chunk per minute, and never slows the storefront down.', $totals['customers'], $totals['orders'], $totals['products'])) ?></p>
+    <?php
+    // Magento's __() has no plural forms, so each count picks its own
+    // singular or plural phrase ("1 customer", not "1 customers").
+    $storeCounts = [];
+    foreach ([
+        'customers' => [__('%1 customer', $totals['customers']), __('%1 customers', $totals['customers'])],
+        'orders' => [__('%1 order', $totals['orders']), __('%1 orders', $totals['orders'])],
+        'products' => [__('%1 product', $totals['products']), __('%1 products', $totals['products'])],
+    ] as $countKey => $countPhrases) {
+        $storeCounts[] = (string)$countPhrases[(int)$totals[$countKey] === 1 ? 0 : 1];
+    }
+    ?>
+    <?php // Pack "Backfill" frames: title, body copy, progress, then the
+    // controls (Start import as the primary action, Cancel, the status) in one
+    // row under a divider. ?>
+    <div class="smaily-card smaily-backfill-card">
+        <strong class="smaily-backfill-card__title"><?= $escaper->escapeHtml(__('Initial contact import')) ?></strong>
+        <p class="note" id="smaily-w-backfill-estimate"<?= $syncEnabled ? '' : ' style="display:none;"' ?>><?= $escaper->escapeHtml(__('Your store has %1, %2 and %3. The import runs in the background, a chunk per minute, and never slows the storefront down.', ...$storeCounts)) ?></p>
         <p class="note" id="smaily-w-backfill-off"<?= $syncEnabled ? ' style="display:none;"' : '' ?>><?= $escaper->escapeHtml(__('Contact synchronisation is off for this website, so an import would send nothing. Turn it on and save to import.')) ?></p>
-        <button type="button" class="action-secondary" id="smaily-w-backfill"<?= $syncEnabled ? '' : ' disabled' ?>>
-            <span><?= $escaper->escapeHtml(__('Start import')) ?></span>
-        </button>
-        <button type="button" class="action-tertiary" id="smaily-w-backfill-cancel" style="display:none;">
-            <span><?= $escaper->escapeHtml(__('Cancel import')) ?></span>
-        </button>
-        <span class="smaily-result" id="smaily-w-backfill-result"></span>
         <div class="smaily-progress" id="smaily-w-backfill-bar" style="display:none;">
             <div class="smaily-progress__track"><div class="smaily-progress__fill"></div></div>
+        </div>
+        <div class="smaily-backfill-card__controls">
+            <button type="button" class="action-primary" id="smaily-w-backfill"<?= $syncEnabled ? '' : ' disabled' ?>>
+                <span><?= $escaper->escapeHtml(__('Start import')) ?></span>
+            </button>
+            <button type="button" class="action-secondary" id="smaily-w-backfill-cancel" style="display:none;">
+                <span><?= $escaper->escapeHtml(__('Cancel import')) ?></span>
+            </button>
+            <span class="smaily-result" id="smaily-w-backfill-result"></span>
         </div>
     </div>
 </div>

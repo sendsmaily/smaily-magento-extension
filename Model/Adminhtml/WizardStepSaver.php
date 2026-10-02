@@ -118,21 +118,35 @@ class WizardStepSaver
         $username = trim((string)($data['username'] ?? ''));
         $password = (string)($data['password'] ?? '');
 
-        if ($subdomain === '' || $username === '') {
-            return [['field' => 'subdomain', 'message' => (string)__('Subdomain and username are required.')]];
+        // Each error names the field that caused it, so the form can mark
+        // that field (PRO-3562); a per-language account's fields are
+        // "accounts.<language>.<field>".
+        $required = [];
+        foreach (['subdomain' => $subdomain, 'username' => $username] as $field => $value) {
+            if ($value === '') {
+                $required[] = ['field' => $field, 'message' => (string)__('Subdomain and username are required.')];
+            }
+        }
+        if ($required !== []) {
+            return $required;
         }
 
         // Every subdomain in the post must be a plain one before anything is
         // saved or checked: a refused value never meets the stored password.
-        $subdomains = [$subdomain];
+        // The per-language accounts come first: in mode A the top-level
+        // credentials repeat the fallback account's, whose field is the one
+        // the merchant sees.
+        $subdomains = [];
         foreach ((array)($data['accounts'] ?? []) as $account) {
             if (is_array($account)) {
-                $subdomains[] = $this->normalizer->normalize((string)($account['subdomain'] ?? ''));
+                $field = 'accounts.' . (string)($account['language'] ?? '') . '.subdomain';
+                $subdomains[$field] = $this->normalizer->normalize((string)($account['subdomain'] ?? ''));
             }
         }
-        foreach ($subdomains as $candidate) {
+        $subdomains['subdomain'] = $subdomain;
+        foreach ($subdomains as $field => $candidate) {
             if ($candidate !== '' && !SmailyUrl::isPlainSubdomain($candidate)) {
-                return [['field' => 'subdomain', 'message' => (new InvalidSubdomainException())->getMessage()]];
+                return [['field' => $field, 'message' => (new InvalidSubdomainException())->getMessage()]];
             }
         }
 

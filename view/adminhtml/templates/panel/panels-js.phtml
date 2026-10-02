@@ -110,6 +110,96 @@ window.smailyPanelsInit = function ($) {
             : '');
     }
 
+    // --- Form errors (PRO-3562, the pack's two-layer error model) -----------
+    // A failed save shows an error banner above the form and marks the field
+    // that caused it (danger styling + the message under it). An error
+    // carries {field, message} entries — from the save endpoint or from the
+    // checks before it; "accounts.<language>.<field>" names a per-language
+    // account's field. Editing a marked field removes its mark.
+    function formError(message, fields) {
+        var error = new Error(message);
+        error.errors = (fields || []).map(function (field) {
+            return {field: field, message: message};
+        });
+        return error;
+    }
+
+    function fieldInput(key) {
+        var plain = {
+            subdomain: '#smaily-w-subdomain',
+            username: '#smaily-w-username',
+            password: '#smaily-w-password'
+        };
+        var account = /^accounts\.([a-z]{2,3})\.(subdomain|username|password)$/.exec(String(key || ''));
+        if (plain[key]) {
+            return $(plain[key]);
+        }
+        if (account) {
+            return $('.smaily-ml-account[data-language=' + account[1] + '] .smaily-ml-' + account[2]);
+        }
+        return $();
+    }
+
+    function clearFieldError($input) {
+        var $scope = $input.closest('.smaily-step-panel, .smaily-tab-panel');
+        $input.removeClass('is-invalid').removeAttr('aria-invalid');
+        $input.closest('.smaily-field').find('.smaily-field-error').remove();
+        // A banner that only summarised field errors goes with the last mark.
+        if (!$scope.find('.is-invalid').length) {
+            $scope.find('.smaily-form-banner[data-fields-only=1]').remove();
+        }
+    }
+
+    function clearFormErrors($scope) {
+        $scope.find('.smaily-form-banner').remove();
+        $scope.find('.smaily-field-error').remove();
+        $scope.find('.is-invalid').removeClass('is-invalid').removeAttr('aria-invalid');
+    }
+
+    function showFormErrors($scope, error) {
+        var errors = (error && error.errors && error.errors.length)
+            ? error.errors
+            : [{field: '', message: (error && error.message) || '<?= $escaper->escapeJs(__('Saving failed.')) ?>'}];
+        var messages = [];
+        var placed = [];
+        var fieldsOnly = true;
+        clearFormErrors($scope);
+        errors.forEach(function (entry) {
+            var $input = fieldInput(entry.field).filter(':visible').first();
+            if (messages.indexOf(entry.message) === -1) {
+                messages.push(entry.message);
+            }
+            // The message goes under the first field it names.
+            if ($input.length && placed.indexOf(entry.message) === -1) {
+                placed.push(entry.message);
+                var $anchor = $input.closest('.smaily-subdomain-row');
+                ($anchor.length ? $anchor : $input).after(
+                    $('<p class="smaily-field-error"></p>').text(entry.message)
+                );
+            }
+            if (!$input.length) {
+                fieldsOnly = false;
+                return;
+            }
+            $input.addClass('is-invalid').attr('aria-invalid', 'true')
+                .one('input change', function () {
+                    clearFieldError($(this));
+                });
+        });
+        var $banner = $('<div class="smaily-banner smaily-banner--error smaily-form-banner" role="alert"></div>')
+            .attr('data-fields-only', fieldsOnly ? '1' : '0')
+            .append($('<span class="smaily-banner__icon">&#9888;</span>'))
+            .append($('<div class="smaily-banner__body"></div>').append(
+                $('<div class="smaily-banner__message"></div>').text(messages.join(' '))
+            ));
+        var $after = $scope.children('.smaily-step-head, .smaily-tab-desc').first();
+        if ($after.length) {
+            $after.after($banner);
+        } else {
+            $scope.prepend($banner);
+        }
+    }
+
     function credentials() {
         return {
             subdomain: $('#smaily-w-subdomain').val(),
@@ -128,7 +218,9 @@ window.smailyPanelsInit = function ($) {
         return post(urls.saveStep, {step: name, data: data}).then(function (response) {
             if (!response.saved) {
                 var message = (response.errors || []).map(function (e) { return e.message; }).join(' ');
-                throw new Error(message || '<?= $escaper->escapeJs(__('Saving failed.')) ?>');
+                var error = new Error(message || '<?= $escaper->escapeJs(__('Saving failed.')) ?>');
+                error.errors = response.errors || [];
+                throw error;
             }
             if (name === 'connect' && typeof response.verified === 'boolean') {
                 setConnectionStatus(response.verified, response.accountName);
@@ -663,16 +755,23 @@ window.smailyPanelsInit = function ($) {
                 var accounts = [];
                 $('.smaily-ml-account').each(function () {
                     var fields = mlAccountFields($(this));
+                    var prefix = 'accounts.' + fields.language + '.';
                     if (!fields.subdomain || !fields.username) {
-                        throw new Error(
+                        throw formError(
                             '<?= $escaper->escapeJs(__('Fill in the subdomain and username of the %1 account.')) ?>'
-                                .replace('%1', fields.language.toUpperCase())
+                                .replace('%1', fields.language.toUpperCase()),
+                            ['subdomain', 'username'].filter(function (key) {
+                                return !fields[key];
+                            }).map(function (key) {
+                                return prefix + key;
+                            })
                         );
                     }
                     if (!fields.password && !$(this).data('has-password')) {
-                        throw new Error(
+                        throw formError(
                             '<?= $escaper->escapeJs(__('Enter the password of the %1 account.')) ?>'
-                                .replace('%1', fields.language.toUpperCase())
+                                .replace('%1', fields.language.toUpperCase()),
+                            [prefix + 'password']
                         );
                     }
                     accounts.push(fields);
@@ -688,9 +787,10 @@ window.smailyPanelsInit = function ($) {
                     throw new Error('<?= $escaper->escapeJs(__('Pick the default fallback account.')) ?>');
                 }
                 if (fallback !== mlFallbackSaved && !fallbackAccount.password) {
-                    throw new Error(
+                    throw formError(
                         '<?= $escaper->escapeJs(__('Enter the password of the %1 account so it can take over as the default fallback.')) ?>'
-                            .replace('%1', fallback.toUpperCase())
+                            .replace('%1', fallback.toUpperCase()),
+                        ['accounts.' + fallback + '.password']
                     );
                 }
                 return {
@@ -707,8 +807,11 @@ window.smailyPanelsInit = function ($) {
             }
             var creds = credentials();
             if (!connected && (!creds.subdomain || !creds.username || !creds.password)) {
-                throw new Error(
-                    '<?= $escaper->escapeJs(__('Fill in the credentials and press Test connection first.')) ?>'
+                throw formError(
+                    '<?= $escaper->escapeJs(__('Fill in the credentials and press Test connection first.')) ?>',
+                    ['subdomain', 'username', 'password'].filter(function (key) {
+                        return !creds[key];
+                    })
                 );
             }
             return {
@@ -785,6 +888,8 @@ window.smailyPanelsInit = function ($) {
         result: result,
         credentials: credentials,
         saveStep: saveStep,
+        showFormErrors: showFormErrors,
+        clearFormErrors: clearFormErrors,
         loadWorkflows: loadWorkflows,
         initAll: initAll,
         collect: collect,

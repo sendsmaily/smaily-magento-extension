@@ -16,6 +16,28 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3562 done — a failed save shows a banner and marks the field that
+  caused it (2026-10-02).** The pack's two-layer error model on the initial
+  setup and every Settings tab: `panels-js.phtml` `showFormErrors()` puts an
+  error banner (`.smaily-form-banner`, the shared `.smaily-banner--error`)
+  under the step heading / tab description, marks each field the error
+  names (`.is-invalid`: `--s-bar-error` border, #fef8f7 fill, 2 px ring —
+  the pack's `inputError`; the message under the first field it names,
+  `.smaily-field-error`) and the status beside the button says "Saving
+  failed."; editing a marked field removes its mark, and a banner that only
+  summarised field errors goes with the last mark; the next save, a
+  successful one or a step change clears the rest. Field keys: the save
+  endpoint already answered `{field, message}`; `WizardStepSaver` now names
+  the empty field (`subdomain` and/or `username`, one entry each) and a
+  per-language account's refused subdomain as `accounts.<language>.subdomain`
+  (checked before the top-level one, which repeats the fallback account's in
+  mode A); the checks before the save (empty credentials, a per-language
+  account's empty fields or password) name their fields the same way. An
+  error without a field (e.g. `mappings`) shows the banner only. No new
+  phrases. Verified by rendering the real templates with stubs in headless
+  Chrome (Settings > Connection, Automations, mode-A account blocks; the
+  initial setup in et_EE). Fidelity audit row 15 marked fixed.
+
 - **PRO-3561 done — every initial-setup step shows its position and title
   as the pack draws them (2026-10-02).** `wizard/index.phtml` renders a
   "Step N of 5" kicker (11 px / 700 / uppercase, `--s-text-3`) and the step

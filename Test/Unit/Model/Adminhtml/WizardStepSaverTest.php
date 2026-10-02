@@ -355,10 +355,13 @@ class WizardStepSaverTest extends TestCase
      * with a message; nothing is saved and Smaily is not asked, so the stored
      * password is never sent with it.
      *
+     * PRO-3562: the error names the field that caused it, so the form marks
+     * that field — a per-language account's own subdomain field included.
+     *
      * @dataProvider refusedConnectionProvider
      * @param array<string, mixed> $data
      */
-    public function testASubdomainThatIsNotPlainIsRefusedAndNothingIsSaved(array $data): void
+    public function testASubdomainThatIsNotPlainIsRefusedAndNothingIsSaved(array $data, string $field): void
     {
         $this->accountResolver->method('storeIdsForAccountKey')->willReturn([5]);
         $this->clientFactory->expects(self::never())->method('create');
@@ -366,25 +369,67 @@ class WizardStepSaverTest extends TestCase
         $errors = $this->saver->save('connect', $data);
 
         self::assertSame([[
-            'field' => 'subdomain',
+            'field' => $field,
             'message' => 'The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.',
         ]], $errors);
         self::assertSame([], $this->saved);
     }
 
     /**
-     * @return array<string, array{array<string, mixed>}>
+     * @return array<string, array{array<string, mixed>, string}>
      */
     public static function refusedConnectionProvider(): array
     {
         return [
-            'the account' => [['subdomain' => 'engine.example#', 'username' => 'api-user', 'password' => '']],
+            'the account' => [
+                ['subdomain' => 'engine.example#', 'username' => 'api-user', 'password' => ''],
+                'subdomain',
+            ],
             'a per-language account' => [[
                 'subdomain' => 'demo',
                 'username' => 'api-user',
                 'multilingual_mode' => 'a',
                 'accounts' => [['language' => 'et', 'subdomain' => 'engine.example?', 'username' => 'et-user']],
-            ]],
+            ], 'accounts.et.subdomain'],
+            'the fallback account, posted twice' => [[
+                'subdomain' => 'engine.example?',
+                'username' => 'et-user',
+                'multilingual_mode' => 'a',
+                'accounts' => [['language' => 'et', 'subdomain' => 'engine.example?', 'username' => 'et-user']],
+            ], 'accounts.et.subdomain'],
+        ];
+    }
+
+    /**
+     * PRO-3562: an empty required field is named, each one on its own.
+     *
+     * @dataProvider emptyFieldProvider
+     * @param array<string, string> $data
+     * @param string[] $fields
+     */
+    public function testAnEmptyRequiredFieldIsNamedAndNothingIsSaved(array $data, array $fields): void
+    {
+        $this->clientFactory->expects(self::never())->method('create');
+
+        $errors = $this->saver->save('connect', $data);
+
+        self::assertSame($fields, array_column($errors, 'field'));
+        self::assertSame(
+            array_fill(0, count($fields), 'Subdomain and username are required.'),
+            array_column($errors, 'message')
+        );
+        self::assertSame([], $this->saved);
+    }
+
+    /**
+     * @return array<string, array{array<string, string>, string[]}>
+     */
+    public static function emptyFieldProvider(): array
+    {
+        return [
+            'subdomain' => [['subdomain' => '', 'username' => 'api-user'], ['subdomain']],
+            'username' => [['subdomain' => 'demo', 'username' => ' '], ['username']],
+            'both' => [['subdomain' => '', 'username' => ''], ['subdomain', 'username']],
         ];
     }
 

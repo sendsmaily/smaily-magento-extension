@@ -709,6 +709,18 @@
 }
 .smaily-ui .action-secondary:hover { background: var(--s-surface-3); border-color: var(--s-border-strong); color: var(--s-text); }
 
+/* --- Form errors (PRO-3562, pack "Setup Wizard" error frame): an error banner
+ * above the form, and the field that caused it with a danger border and its
+ * message under it. After the base input rules, which it outranks. ---------- */
+.smaily-ui .smaily-form-banner { max-width: 680px; margin: 0 0 var(--sp-4); }
+.smaily-settings [data-tab="connection"] .smaily-form-banner { max-width: 620px; }
+.smaily-ui input.is-invalid,
+.smaily-ui input.is-invalid:focus {
+    border-color: var(--s-bar-error); background: #fef8f7; box-shadow: 0 0 0 2px rgba(215, 44, 13, .13);
+}
+.smaily-ui .smaily-subdomain-row input.is-invalid + .smaily-subdomain-suffix { border-color: var(--s-bar-error); }
+.smaily-ui .smaily-field-error { margin: 5px 0 0; font-size: var(--fs-12); font-weight: 600; color: var(--s-danger); }
+
 /* --- Settings > Subscribers tab (PRO-1397) --------------------------------- *
  * Same shell as Connection: H3 title + description above a white card. The
  * card itself reuses the shared .smaily-choice component (lawful-basis radio

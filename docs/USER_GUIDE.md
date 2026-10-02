@@ -178,6 +178,14 @@ Smaily's reason. In the initial setup the Connect step is saved and the
 setup moves on; the Overview step then says that syncing starts once Smaily
 accepts the credentials.
 
+When a save fails — in the initial setup or on a Settings tab — an error
+banner above the form says why, the status beside the button says *Saving
+failed.*, and the field that caused it is marked in red with the message
+under it (for example an empty subdomain or username, or a subdomain that is
+not a plain one, also in a per-language account block). Editing the marked
+field removes the mark; the banner goes with the last mark, or with the next
+save.
+
 Credentials can be set per **website**, or per **store view** when each
 language uses its own Smaily account (multilingual mode "Per-language
 Smaily accounts" — the Connection panel manages those store-view

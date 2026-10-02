@@ -181,8 +181,13 @@ require(['jquery'], function ($) {
 
     // Shared by the generic Save button (other tabs) and Connection's own
     // Save Connection button — same per-tab AJAX save, different button/status.
+    // A failed save shows the error banner above the tab's form and marks the
+    // field that caused it; the status beside the button says the save
+    // failed (PRO-3562).
     function saveTab($button, step, resultSelector) {
+        var $panel = $('.smaily-tab-panel.active');
         $button.prop('disabled', true);
+        panels.clearFormErrors($panel);
         panels.result(resultSelector, '<?= $escaper->escapeJs(__('Saving…')) ?>', true);
         new Promise(function (resolve) { resolve(panels.collect[step]()); })
             .then(function (data) { return panels.saveStep(step, data); })
@@ -190,7 +195,8 @@ require(['jquery'], function ($) {
                 panels.result(resultSelector, '<?= $escaper->escapeJs(__('Saved.')) ?>', true);
             })
             .catch(function (error) {
-                panels.result(resultSelector, error.message, false);
+                panels.showFormErrors($panel, error);
+                panels.result(resultSelector, '<?= $escaper->escapeJs(__('Saving failed.')) ?>', false);
             })
             .finally(function () {
                 $button.prop('disabled', false);

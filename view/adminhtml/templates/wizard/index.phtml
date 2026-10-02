@@ -183,6 +183,7 @@ require(['jquery'], function ($) {
             ? '<?= $escaper->escapeJs(__('Finish')) ?>'
             : '<?= $escaper->escapeJs(__('Continue')) ?>');
         $('#smaily-w-save-result').text('');
+        panels.clearFormErrors($('#smaily-wizard-main'));
         window.scrollTo(0, 0);
     }
 
@@ -209,6 +210,8 @@ require(['jquery'], function ($) {
 
     $('#smaily-w-next').on('click', function () {
         var $button = $(this).prop('disabled', true);
+        var $panel = $('.smaily-step-panel[data-step=' + step + ']');
+        panels.clearFormErrors($panel);
         panels.result('#smaily-w-save-result', '<?= $escaper->escapeJs(__('Saving…')) ?>', true);
         stepSavers[step]().then(function () {
             panels.result('#smaily-w-save-result', '', true);
@@ -219,7 +222,9 @@ require(['jquery'], function ($) {
             }
             render();
         }).catch(function (error) {
-            panels.result('#smaily-w-save-result', error.message, false);
+            // Banner above the step's form + the field that caused it (PRO-3562).
+            panels.showFormErrors($panel, error);
+            panels.result('#smaily-w-save-result', '<?= $escaper->escapeJs(__('Saving failed.')) ?>', false);
         }).finally(function () {
             $button.prop('disabled', false);
         });

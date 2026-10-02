@@ -486,12 +486,8 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 - **Next session opens here (2026-10-02).** 3.0.0-rc1 is out (header).
   **Evening 2026-10-02 handoff:** UI/UX parity done today (design-pack match
-  78.0 → 90.9 %, PRO-3561–3570, 3634, 3641, 3642, 3569). Two worker branches
-  were running at session end; PRO-3644 + the four copy fixes are merged. Merge
-  the other first (cherry-pick onto v3, run unit + phpcs + phpstan, push, then
-  remove the worktree before any sandbox di:compile):
-  `worktree-agent-aa98586342e34c62c` (setup steps on the grey pane, rail
-  sub-labels, RSS "Feed URL" label, first-paint step from the server). Then: Erkki proofreads today's Estonian strings; pilot day 09.10.
+  78.0 → 94.9 %, PRO-3561–3570, 3634, 3641, 3642, 3569, 3644, setup steps on the
+  grey pane). All worker branches are merged; no worktrees left. Then: Erkki proofreads today's Estonian strings; pilot day 09.10.
   Next: pilot day — milestone "Pilot store live", 2026-10-09. The pilot's
   developer installs from the release ZIP per `docs/INSTALLING.md`; Erkki
   walks `PILOT_CHECKLIST.md` with real credentials (human acceptance of

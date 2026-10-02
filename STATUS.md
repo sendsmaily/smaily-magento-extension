@@ -5,7 +5,11 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-03 — 3.0.0-rc4 is prepared, not published: the
+_Last updated: 2026-10-03 — 3.0.0-rc4 is released as a GitHub pre-release on
+the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc4),
+built by the release workflow from commit 5684a1c; the ZIP and its .sha256
+were checked after publishing (377 entries, checksum OK, file contents
+identical to a local build). The
 version is `3.0.0-rc4` (composer.json, `ModuleInfo::VERSION`, the upstream
 proposal; composer.lock content-hash refreshed), and CHANGELOG has a
 "Changes since 3.0.0-rc3" list. Everything since rc3 is in it: PRO-3714
@@ -1243,30 +1247,30 @@ Earlier: 2026-09-11, 2026-09-10._
   in-process instance — nothing stored). Fixes PRO-3603 findings 1, 5
   and 6.
 
-- **Next session opens here (2026-10-02, late evening).** 3.0.0-rc1 is out
-  (header). Done this session: PRO-3614 (headless research, docs/HEADLESS_STOREFRONTS.md),
-  PRO-3625 + PRO-3573 (hardening; the admin Log shows contact data in full
-  and the initial setup needs `::config`, both Woo parity by owner decision),
-  PRO-3660 (Storefront URL, auto-open on API-only orders), PRO-3664 (browse
-  consent as in Woo: override → cookie restriction mode → none), PRO-3666,
-  and since then PRO-1398, PRO-3665, PRO-3661, PRO-3681. All of it is in
-  3.0.0-rc2, released on the fork as a pre-release (header); everything
-  since then is in 3.0.0-rc3, released on the fork as a pre-release
-  (header); everything since rc3 is in 3.0.0-rc4, which is prepared
-  (header) and awaits the owner's go to publish — the pilot installs rc4
-  once it is published, rc3 until then.
-  Next, in order: (1) pilot day
-  09.10 — Erkki passes the storefront hand-off in HEADLESS_STOREFRONTS.md to
-  the storefront team (incl. keeping the query string on the `/<url_key>.html`
-  redirect), sets the Storefront URL, walks `PILOT_CHECKLIST.md`; PRO-2474's
-  last item and PRO-3660's human acceptance; (2) next client HC Pro (legacy
-  2.x upgrade, 4 websites): PRO-3661, PRO-3662 (spike — questions for the
-  client), PRO-3663, PRO-3665; (3) PRO-3675 (Hyvä consent event: the name is
-  checked against Hyvä's sources; the check on a real Hyvä store remains); (4) UI/UX parity PRO-1385, PRO-1357; then
-  PRO-1967, PRO-1198. Engine ask PRO-3649 is answered (contract 1.8.2, PRO-3654); Woo ask PRO-3673 is with its
-  team. Erkki still proofreads today's Estonian strings. Sandbox: remove
-  finished agent worktrees under `.claude/worktrees` before any sandbox
-  `setup:di:compile` (they are inside the bind-mounted module).
+- **Next session opens here (2026-10-03).** 3.0.0-rc4 is out (header) —
+  the pilot installs rc4. Done 2026-10-02/03: headless storefronts + the
+  Storefront URL (PRO-3614/3660), browse consent as in Woo and per website
+  (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the standard
+  checkout + one reminder per address a day + erase stops reminders + busy
+  stores (PRO-3693/3711), the 2.x upgrade decisions (PRO-3661/3681), catalog
+  import per website with save-path prices (PRO-2506/3692), variants take the
+  parent's category (PRO-3714/3715), seven per-language account fixes
+  (PRO-3683/3690/3699/3717/3718/3719), contract 1.8.2 (PRO-3654); rc2, rc3,
+  rc4 released. Next, in order: (1) pilot day 09.10 — Erkki passes the
+  storefront hand-off in docs/HEADLESS_STOREFRONTS.md to the storefront team
+  (keep the query string on the `/<url_key>.html` redirect), sets the
+  Storefront URL, walks PILOT_CHECKLIST.md; human acceptance of PRO-2474 and
+  PRO-3660 (a recommendation and a back-in-stock link open on the
+  storefront), plus one look at a configurable product's category and
+  price in the engine; (2) HC Pro (legacy 2.x upgrade, 4 websites, one
+  Smaily account): Erkki reads their 2.x settings with the UPGRADING
+  checklist (PRO-3661), the Mageplaza live checks (PRO-3663), the
+  other-abandoned-cart-senders check (PRO-3665), the Campaign Intelligence
+  questions (spike PRO-3662); (3) open backlog: PRO-3713 (spike, cart scan on
+  millions of carts), PRO-3675 (live Hyvä check), PRO-1357, PRO-1967,
+  PRO-1198 (Smaily hand-over). Erkki still proofreads the Estonian strings
+  added 2026-10-02/03. Sandbox: remove finished agent worktrees under
+  `.claude/worktrees` before any sandbox `setup:di:compile`.
 
 - **PRO-3603 done — final clean-install pass of the release ZIP
   (2026-10-02).** On fresh sandbox volumes, without the working-tree
@@ -4165,8 +4169,7 @@ Earlier: 2026-09-11, 2026-09-10._
   merchant recovery).
 
 **All 6 v3 phases implemented** (~110 files) on branch `v3`, version
-**3.0.0-rc4 — unreleased** (3.0.0-rc3 is the newest GitHub pre-release
-on the fork). Current truth:
+**3.0.0-rc4 — GitHub pre-release on the fork**. Current truth:
 
 - **PRO-1391 final-polish done — four refinements on Settings > Connection
   after Erkki's side-by-side review of the PRO-1391 visual-fidelity pass.**

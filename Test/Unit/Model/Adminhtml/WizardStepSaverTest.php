@@ -434,6 +434,108 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
+     * PRO-3660: the storefront address is saved normalized at the website's
+     * scope, and the save tells that it changed.
+     */
+    public function testAStorefrontUrlIsSavedNormalizedAtWebsiteScope(): void
+    {
+        $this->websiteContext->method('getWebsiteId')->willReturn(2);
+        $this->config->method('getStorefrontUrl')->willReturn('');
+
+        $errors = $this->saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'storefront_url' => ' https://Shop.Example.com/ ',
+        ]);
+
+        self::assertSame([], $errors);
+        self::assertSame('https://shop.example.com', $this->savedValue(Config::XML_PATH_STOREFRONT_URL));
+        self::assertSame(
+            ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 2],
+            $this->savedScope(Config::XML_PATH_STOREFRONT_URL)
+        );
+        self::assertTrue($this->saver->isStorefrontUrlChanged());
+    }
+
+    /**
+     * @dataProvider unchangedStorefrontUrlProvider
+     */
+    public function testSavingTheSameStorefrontUrlIsNoChange(string $saved, string $posted): void
+    {
+        $this->config->method('getStorefrontUrl')->willReturn($saved);
+
+        $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'storefront_url' => $posted]);
+
+        self::assertFalse($this->saver->isStorefrontUrlChanged());
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function unchangedStorefrontUrlProvider(): array
+    {
+        return [
+            'same address' => ['https://shop.example.com', 'https://shop.example.com/'],
+            'still empty' => ['', ''],
+        ];
+    }
+
+    public function testClearingTheStorefrontUrlIsAChange(): void
+    {
+        $this->config->method('getStorefrontUrl')->willReturn('https://shop.example.com');
+
+        $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'storefront_url' => '']);
+
+        self::assertSame('', $this->savedValue(Config::XML_PATH_STOREFRONT_URL));
+        self::assertTrue($this->saver->isStorefrontUrlChanged());
+    }
+
+    public function testAConnectionSaveWithoutTheStorefrontUrlLeavesItAsIs(): void
+    {
+        $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user']);
+
+        self::assertFalse($this->wasSaved(Config::XML_PATH_STOREFRONT_URL));
+        self::assertFalse($this->saver->isStorefrontUrlChanged());
+    }
+
+    /**
+     * PRO-3660: an address that is not an https host alone is refused on its
+     * field (PRO-3562) before anything is saved or checked.
+     *
+     * @dataProvider refusedStorefrontUrlProvider
+     */
+    public function testAStorefrontUrlThatIsNotAnHttpsHostIsRefusedAndNothingIsSaved(mixed $value): void
+    {
+        $this->clientFactory->expects(self::never())->method('create');
+
+        $errors = $this->saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'storefront_url' => $value,
+        ]);
+
+        self::assertSame([[
+            'field' => 'storefront_url',
+            'message' => 'Enter the storefront\'s address only, starting with https:// — for example '
+                . 'https://shop.example.com — without a path or a query.',
+        ]], $errors);
+        self::assertSame([], $this->saved);
+    }
+
+    /**
+     * @return array<string, array{mixed}>
+     */
+    public static function refusedStorefrontUrlProvider(): array
+    {
+        return [
+            'not https' => ['http://shop.example.com'],
+            'a path' => ['https://shop.example.com/products'],
+            'a query' => ['https://shop.example.com/?ref=1'],
+            'not a string' => [['https://shop.example.com']],
+        ];
+    }
+
+    /**
      * The mode-A fallback language is informational only (its credentials,
      * not this hint, are the real per-website binding) and stays at default
      * scope, unchanged.

@@ -66,9 +66,28 @@ class SaveStepTest extends TestCase
         $this->controller($body, $verifiedCredentials, [], $accepted)->execute();
 
         self::assertSame(
-            ['saved' => true, 'errors' => [], 'verified' => $accepted, 'accountName' => 'demo'],
+            [
+                'saved' => true,
+                'errors' => [],
+                'verified' => $accepted,
+                'accountName' => 'demo',
+                'storefrontUrlChanged' => false,
+            ],
             $this->response
         );
+    }
+
+    /**
+     * PRO-3660: a connection save that changed the storefront address says
+     * so, for the result to ask for the catalog import again.
+     */
+    public function testAConnectionSaveAnswersWhetherTheStorefrontUrlChanged(): void
+    {
+        $body = ['step' => 'connect', 'data' => ['subdomain' => 'demo', 'username' => 'u']];
+
+        $this->controller($body, $this->createMock(VerifiedCredentials::class), [], true, true)->execute();
+
+        self::assertTrue($this->response['storefrontUrlChanged']);
     }
 
     public function testARefusedConnectionSaveAnswersOnlyTheErrors(): void
@@ -102,7 +121,8 @@ class SaveStepTest extends TestCase
         array $body,
         VerifiedCredentials $verifiedCredentials,
         array $errors = [],
-        bool $connectionAccepted = false
+        bool $connectionAccepted = false,
+        bool $storefrontUrlChanged = false
     ): SaveStep {
         $request = $this->createMock(HttpRequest::class);
         $request->method('getContent')->willReturn((string)json_encode($body));
@@ -121,6 +141,7 @@ class SaveStepTest extends TestCase
         $stepSaver = $this->createMock(WizardStepSaver::class);
         $stepSaver->method('save')->willReturn($errors);
         $stepSaver->method('isConnectionAccepted')->willReturn($connectionAccepted);
+        $stepSaver->method('isStorefrontUrlChanged')->willReturn($storefrontUrlChanged);
         $websiteContext = $this->createMock(WebsiteContext::class);
         $websiteContext->method('getStoreId')->willReturn(4);
 

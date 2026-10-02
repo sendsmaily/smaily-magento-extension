@@ -239,6 +239,16 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   store's display currency: an install whose second website has a different
   base currency is mislabeled there, and per-website tenants (the
   multi-website RFC's Phase 4, PRO-1762) are the fix for that, not this.
+- **Storefront URL (PRO-3660):** a store that sells on a separate
+  (headless) storefront saves its address at website scope
+  (`smaily_connect/connection/storefront_url`, Settings > Connection).
+  `Model\StorefrontUrl::apply()` replaces the scheme, host and port of the
+  product link with it — path and query string kept — read at the store the
+  link was built for: `CatalogPayloadBuilder::productUrl()` after the
+  frontend emulation, `Rss\FeedBuilder` for each item's `<link>` / `<guid>`.
+  Image links never pass through it. The stored value is normalized again on
+  read, so a value set past the admin's check (`config:set`) that is not an
+  https host alone rewrites nothing.
 
 ### Queue semantics (both queues)
 

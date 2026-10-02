@@ -169,6 +169,16 @@ class WizardDataTest extends TestCase
     }
 
     /**
+     * PRO-3660: the Storefront URL field shows the selected website's value.
+     */
+    public function testTheStorefrontUrlIsReadAtTheSelectedWebsitesStoreScope(): void
+    {
+        $this->config->method('getStorefrontUrl')->with(5)->willReturn('https://shop.example.com');
+
+        self::assertSame('https://shop.example.com', $this->viewModel->getSavedStorefrontUrl());
+    }
+
+    /**
      * PRO-3579: when Smaily's last answer was that the package has no API
      * access, the Connection status says so instead of blaming the
      * credentials.

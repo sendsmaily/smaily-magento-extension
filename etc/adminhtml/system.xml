@@ -71,6 +71,10 @@
                     <comment>How automation workflows are routed for multi-language stores. Single: one language. Per-language accounts: each store view has its own Smaily account (override credentials at store view scope). Per-language workflows: one account, a workflow per language. Single workflow: one workflow that branches by language inside Smaily.</comment>
                     <source_model>Smaily\Connect\Model\Config\Source\MultilingualMode</source_model>
                 </field>
+                <field id="storefront_url" translate="label" type="text" sortOrder="50"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Storefront URL</label>
+                </field>
             </group>
             <group id="subscribers" translate="label comment" type="text" sortOrder="20"
                    showInDefault="1" showInWebsite="1" showInStore="0">

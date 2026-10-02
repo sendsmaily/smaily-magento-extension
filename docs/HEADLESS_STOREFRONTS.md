@@ -34,7 +34,7 @@ available** — no headless path today.
 | Welcome automation | Server: newsletter subscription | **Not available** for storefront signups — a signup through GraphQL or REST counts as an API signup, and the welcome fires only for signups in Magento's own storefront or the checkbox below |
 | Checkout newsletter checkbox | Magento checkout (Luma/Knockout) | **Needs storefront work** — the storefront draws its own checkbox and subscribes the shopper; see [Newsletter consent](#newsletter-consent-at-checkout). The **Checkout opt-in only** sync mode does not work on a headless storefront |
 | Catalog, customer and order sync to Campaign Intelligence | Server: Magento events, queue, cron | **Works**; product links need a check — see [Product links and images](#product-links-and-images) |
-| RSS product feed `smaily/rss/feed` | Back-end page, read by Smaily | **Works** when Smaily can reach the back-end host; item links are the same Magento product links |
+| RSS product feed `smaily/rss/feed` | Back-end page, read by Smaily | **Works** when Smaily can reach the back-end host; item links are the same product links as in the catalog |
 | Campaign-click capture (`smaily_rec`, `smaily_vt`, `smaily_ctx`) | Storefront script | **Needs storefront work** |
 | Recommendation attribution on orders | Server, reads the shopper's cookies at order placement | **Needs storefront work** — the order request must carry the cookies |
 | Browse tracking (product views, searches, cart adds, checkout) | Storefront script posting to `smaily/relay` | **Needs storefront work** |
@@ -52,6 +52,8 @@ The module builds every product link from Magento itself:
   that is the store view's **Base Link URL** + the product's URL key + the
   URL suffix, for example `https://backend.example.com/oak-table.html`.
 - RSS feed items (`<link>`, `<guid>`): the same URL.
+- With a **Storefront URL** set (below), both start with the storefront's
+  address instead.
 - Images (catalog `image_url`, RSS `<enclosure>`, abandoned-cart
   `product_image_url_N`): Magento's resized product image under the store
   view's **Base URL for User Media Files**, for example
@@ -69,19 +71,38 @@ appended (`utm_source`, `utm_medium`, `smaily_rec`, `smaily_ctx`,
 back-end host, which shoppers cannot open, or at a path the storefront does
 not route.
 
-There is no Smaily Connect setting for the storefront's product URL
-pattern. What decides the link today is Magento's own configuration of the
-store view:
+### Storefront URL
 
-1. **Stores > Configuration > General > Web > Base URLs (Secure) > Secure
-   Base Link URL** (and the unsecure one) at the store view's scope. Set to
-   the storefront's address, the product link becomes
-   `https://shop.example.com/oak-table.html`.
-2. The storefront must open that path: either it routes
-   `/<url-key>.html` itself, or it redirects it to its own product page.
-   **A redirect must keep the query string**, or the tracking parameters
-   are lost and recommendation clicks are neither attributed nor tied to
-   the shopper.
+**Settings > Connection > Using a separate storefront? > Storefront URL**
+puts the product links on the storefront's address. Enter the storefront's
+address only — `https://shop.example.com`, https, no path, no query. Every
+product link in the catalog sync and in the RSS feed then starts with it:
+the scheme, host and port of Magento's link are replaced, the path and the
+query string stay. `https://backend.example.com/oak-table.html` becomes
+`https://shop.example.com/oak-table.html`. Image links do not change, and
+nothing else moves — Magento's own emails, the abandoned-cart link and the
+module's back-end addresses keep the back-end host. Empty, the links are
+Magento's own. The value is kept per website, like the other connection
+settings.
+
+After a change, run the catalog import again (**Settings > Intelligence >
+Historical imports > Catalog**) so Campaign Intelligence gets the new links
+at once; the nightly catalog re-sync brings them too. The RSS feed shows
+them within 15 minutes (its cache).
+
+The storefront must open the path: either it routes `/<url-key>.html`
+itself, or it redirects it to its own product page. **A redirect must keep
+the query string**, or the tracking parameters are lost and recommendation
+clicks are neither attributed nor tied to the shopper.
+
+### Base Link URL
+
+Without the module's setting, Magento's own configuration of the store view
+decides the link: **Stores > Configuration > General > Web > Base URLs
+(Secure) > Secure Base Link URL** (and the unsecure one) at the store
+view's scope. Set to the storefront's address, the product link becomes
+`https://shop.example.com/oak-table.html` as well, and the same routing
+rule applies.
 
 Changing the Base Link URL moves every link Magento builds for that store
 view, not only the module's: Magento's own emails, the module's
@@ -90,6 +111,8 @@ the storefront host those paths then have to reach the back end (for
 example a reverse proxy for `/smaily/`). Agree this with the storefront
 team before changing it; many headless setups already set the Base Link URL
 to the storefront for Magento's own emails.
+
+### Check before recommendation emails
 
 If the storefront's product pages use another pattern — for example a path
 built from the SKU — and it does not redirect Magento-style paths, the
@@ -239,7 +262,8 @@ only in the same browser, while the storefront still holds the cart.
 
 1. Install the module and connect it as usual; leave contact sync and
    automations off.
-2. Run one catalog sync and open a product's `product_url` and `image_url`
+2. Set the **Storefront URL** when shoppers cannot open the back-end host.
+   Run one catalog sync and open a product's `product_url` and `image_url`
    from **Log > Details**: the link opens the right product page on the
    storefront, with an added `?probe=1` still in the address bar after any
    redirect; the image loads.

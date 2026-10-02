@@ -50,6 +50,46 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   it read; the note stays. EN + ET. Rendered with the real template and
   stub data, both states × both contexts × EN/ET.
 
+- **PRO-3660 — Storefront URL for a separate (headless) storefront
+  (2026-10-02; the auto-open is not built, see Questions item 13).** Owner
+  design: one setting, `smaily_connect/connection/storefront_url`, website
+  scope like the other connection settings (`system.xml` declares it for
+  `config:set`). New `Model\StorefrontUrl`: `normalize()` accepts an https
+  address of a host alone (port allowed; a path other than `/`, a query, a
+  fragment or a user name refuses it; lowercased, trailing slash dropped),
+  `apply()` replaces the scheme, host and port of a product link with it —
+  path and query string kept — read at the store the link is built for, and
+  normalizes the stored value again, so a bad `config:set` value rewrites
+  nothing. Applied in `CatalogPayloadBuilder::productUrl()` (after the
+  frontend emulation, every language's link) and `Rss\FeedBuilder` (item
+  `<link>` / `<guid>`). Image links, the channel `<link>`, the abandoned-cart
+  restore link and everything else are unchanged. Settings > Connection
+  (not the initial setup): a "Using a separate storefront?" link under the
+  account card opens a Storefront URL card (native `<details>`, drawn open
+  when a value is saved). `WizardStepSaver::saveConnect()` checks the value
+  before anything is saved and refuses it on the field
+  (`field: storefront_url`, PRO-3562 banner + field mark); a post without
+  the key leaves the value as is. `SaveStep` answers
+  `storefrontUrlChanged`, and the tab's result then reads "Saved. Run the
+  catalog import again under Intelligence > Historical imports, so that
+  Campaign Intelligence gets the new product links." Five new phrases
+  (EN + ET). The nightly catalog re-sync also carries the new links; the
+  RSS feed shows them within its 15-minute cache. Not built: the field
+  opening by itself on an API-only store — the approved rule (frontend-area
+  orders vs. API orders) would open it on every Luma store, because Luma's
+  checkout places orders through REST (`webapi_rest`, as PRO-3580 found);
+  question 13 below. Unit: new `StorefrontUrlTest`, `Rss\FeedBuilderTest`;
+  `CatalogPayloadBuilderTest` (+2, image links checked), `WizardStepSaverTest`
+  (+5 incl. data sets), `SaveStepTest` (+1), `WizardDataTest` (+1).
+  Verified with the real Settings templates and stub data in headless
+  Chrome, en_US and et_EE: collapsed, saved value (open), an invalid value
+  refused on the field, a changed value with the import message. Docs:
+  USER_GUIDE "A separate storefront", HEADLESS_STOREFRONTS "Storefront URL",
+  ARCHITECTURE, ADMIN_UI_TARGET_SPEC, CHANGELOG. Human acceptance still
+  open: on the pilot store a recommendation and a back-in-stock link open
+  the product page on the storefront — the storefront's `/<url_key>.html`
+  redirect must keep the query string (PRO-3614 found it drops it).
+
 - **PRO-3614 researched — the first pilot store runs a headless storefront
   (2026-10-02).** Magento is its back end only; shoppers buy on a separate
   storefront application, and the back-end host answers only `/graphql`,
@@ -4549,4 +4589,22 @@ PRO-1267 (engine: Magento product-identity contract note).
     item links; no side effects, but the template must follow the
     storefront's routing, and existing engine rows change on the nightly
     re-sync. Recommended: B, plus the storefront team's hand-off. Say A or
-    B.
+    B. **Decided (Erkki, 2026-10-02, PRO-3660):** neither — a "Storefront
+    URL" that replaces the host of every product link (path and query
+    string kept); built, see "Where we are". The storefront still has to
+    route `/<url_key>.html`, or redirect it keeping the query string.
+13. PRO-3660 — when the Storefront URL field opens by itself (Medium
+    urgency; reversible, no schema). The approved rule — open it when the
+    last 30 days' orders came only through the API and none through
+    Magento's own checkout (frontend area) — does not hold: Luma's
+    checkout places the order through REST (`webapi_rest`, PRO-3580), so
+    every Luma store would look API-only and see the field open. Options:
+    (a) count only GraphQL (`graphql` area) as the API — PWA Studio, Vue
+    Storefront/Alokai and most headless storefronts place orders there; a
+    REST-only headless store then keeps the field collapsed (the link
+    stays); (b) also count a REST order as the API when the request carries
+    no Magento storefront cookie (`form_key`, set by Luma and Hyvä pages) —
+    closer, but a heuristic; (c) drop the auto-open. Recording stays as
+    designed either way: two timestamps in Magento's flag table,
+    `smaily_connect_*` (removed by the uninstall). Recommended: (a). Say
+    a, b or c.

@@ -196,3 +196,21 @@ $modeCards = [
     </div>
 </div>
 <?php endif; ?>
+
+<?php if ($isSettings): ?>
+<?php // A store that sells on a separate (headless) storefront: product links
+// in the catalog sync and the RSS feed go to the storefront's address
+// (PRO-3660). Collapsed behind a link; drawn open when an address is saved. ?>
+<?php $storefrontUrl = $viewModel->getSavedStorefrontUrl(); ?>
+<details class="smaily-disclosure" id="smaily-w-storefront"<?= $storefrontUrl !== '' ? ' open' : '' ?>>
+    <summary class="smaily-disclosure__toggle"><?= $escaper->escapeHtml(__('Using a separate storefront?')) ?></summary>
+    <div class="smaily-card">
+        <div class="smaily-field">
+            <label for="smaily-w-storefront-url"><?= $escaper->escapeHtml(__('Storefront URL')) ?></label>
+            <input type="text" inputmode="url" id="smaily-w-storefront-url" placeholder="https://shop.example.com"
+                   value="<?= $escaper->escapeHtmlAttr($storefrontUrl) ?>"/>
+            <p class="note"><?= $escaper->escapeHtml(__('If shoppers buy on a separate storefront, enter its address. The product links in the catalog sync to Campaign Intelligence and in the RSS feed then start with it; the rest of each link stays the same. Image links do not change. Leave empty to use Magento\'s own product links.')) ?></p>
+        </div>
+    </div>
+</details>
+<?php endif; ?>

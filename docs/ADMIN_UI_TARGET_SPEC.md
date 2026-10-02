@@ -811,6 +811,7 @@ on a wizard/Settings panel today; **both** = duplicated right now.
 | `connection/password` | Smaily API password (encrypted) | both, same shape as subdomain | **ours**, same reasoning. |
 | `connection/test_connection` | Test connection button (no stored value) | both (native `frontend_model` button; ours: AJAX Test connection) | **ours.** Pure UI duplication, not a config value. |
 | `connection/multilingual_mode` | Routing mode (single/a/b/c) | both (native: default+website scope; ours: Connection tab mode cards, default scope only) | **ours** — resolved (Erkki, 2026-07-14): native's per-website differentiation is dropped, one mode per Magento instance, owned entirely by the Connection tab. |
+| `connection/storefront_url` | Separate (headless) storefront address for product links (PRO-3660) | **ours** only (Settings > Connection, website scope; `system.xml` declares it for `config:set`) | **ours.** |
 | `subscribers/sync_enabled` | Master subscriber-sync toggle | both (native: website scope; ours: default scope) | **ours.** |
 | `subscribers/sync_mode` | Lawful-basis preset | both, same shape | **ours.** |
 | `subscribers/sync_fields` | Extra contact fields synced | both, same shape | **ours.** |

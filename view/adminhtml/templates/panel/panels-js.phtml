@@ -139,7 +139,8 @@ window.smailyPanelsInit = function ($) {
         var plain = {
             subdomain: '#smaily-w-subdomain',
             username: '#smaily-w-username',
-            password: '#smaily-w-password'
+            password: '#smaily-w-password',
+            storefront_url: '#smaily-w-storefront-url'
         };
         var account = /^accounts\.([a-z]{2,3})\.(subdomain|username|password)$/.exec(String(key || ''));
         if (plain[key]) {
@@ -828,6 +829,16 @@ window.smailyPanelsInit = function ($) {
         });
     }
 
+    // The Storefront URL field is drawn in Settings only (PRO-3660): the
+    // initial setup's save posts no key and leaves the saved value as is.
+    function withStorefrontUrl(data) {
+        var $field = $('#smaily-w-storefront-url');
+        if ($field.length) {
+            data.storefront_url = String($field.val() || '');
+        }
+        return data;
+    }
+
     // --- Per-panel save payloads (shared savestep endpoint) -----------------
     var collect = {
         connect: function () {
@@ -874,7 +885,7 @@ window.smailyPanelsInit = function ($) {
                         ['accounts.' + fallback + '.password']
                     );
                 }
-                return {
+                return withStorefrontUrl({
                     // The fallback account's credentials double as the
                     // default-scope credentials (any unmatched scope uses
                     // them), Woo mode-A parity.
@@ -884,7 +895,7 @@ window.smailyPanelsInit = function ($) {
                     multilingual_mode: mode,
                     fallback_language: fallback,
                     accounts: accounts
-                };
+                });
             }
             var creds = credentials();
             if (!connected && (!creds.subdomain || !creds.username || !creds.password)) {
@@ -895,12 +906,12 @@ window.smailyPanelsInit = function ($) {
                     })
                 );
             }
-            return {
+            return withStorefrontUrl({
                 subdomain: creds.subdomain,
                 username: creds.username,
                 password: creds.password,
                 multilingual_mode: mode
-            };
+            });
         },
         subscribers: function () {
             var data = {

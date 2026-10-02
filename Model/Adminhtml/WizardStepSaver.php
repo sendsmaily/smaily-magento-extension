@@ -29,6 +29,7 @@ use Smaily\Connect\Model\Config\Source\SyncMode;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\SmailyUrl;
+use Smaily\Connect\Model\StorefrontUrl;
 use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
@@ -55,6 +56,9 @@ class WizardStepSaver
 
     /** Whether Smaily accepted the credentials the last connection save checked (PRO-3570). */
     private bool $connectionAccepted = false;
+
+    /** Whether the last connection save changed the storefront address (PRO-3660). */
+    private bool $storefrontUrlChanged = false;
 
     public function __construct(
         private readonly WriterInterface $configWriter,
@@ -108,12 +112,23 @@ class WizardStepSaver
     }
 
     /**
+     * Whether the last connection save in this request stored a storefront
+     * address other than the one saved before — the product links Campaign
+     * Intelligence holds then need the catalog import again (PRO-3660).
+     */
+    public function isStorefrontUrlChanged(): bool
+    {
+        return $this->storefrontUrlChanged;
+    }
+
+    /**
      * @param array<string, mixed> $data
      * @return array<int, array{field: string, message: string}>
      */
     private function saveConnect(array $data, int $websiteId): array
     {
         $this->connectionAccepted = false;
+        $this->storefrontUrlChanged = false;
         $subdomain = $this->normalizer->normalize((string)($data['subdomain'] ?? ''));
         $username = trim((string)($data['username'] ?? ''));
         $password = (string)($data['password'] ?? '');
@@ -147,6 +162,21 @@ class WizardStepSaver
         foreach ($subdomains as $field => $candidate) {
             if ($candidate !== '' && !SmailyUrl::isPlainSubdomain($candidate)) {
                 return [['field' => $field, 'message' => (new InvalidSubdomainException())->getMessage()]];
+            }
+        }
+
+        // The storefront address (Settings only, PRO-3660) is checked before
+        // anything is saved as well; a post without the key leaves it as is.
+        $storefrontUrl = null;
+        if (array_key_exists('storefront_url', $data)) {
+            $storefrontUrl = is_string($data['storefront_url'])
+                ? StorefrontUrl::normalize($data['storefront_url'])
+                : null;
+            if ($storefrontUrl === null) {
+                return [[
+                    'field' => 'storefront_url',
+                    'message' => (string)__('Enter the storefront\'s address only, starting with https:// — for example https://shop.example.com — without a path or a query.'),
+                ]];
             }
         }
 
@@ -238,6 +268,19 @@ class WizardStepSaver
                     }
                 }
             }
+        }
+
+        if ($storefrontUrl !== null) {
+            $savedStorefrontUrl = StorefrontUrl::normalize(
+                $this->config->getStorefrontUrl($this->websiteContext->getStoreId())
+            );
+            $this->storefrontUrlChanged = $storefrontUrl !== $savedStorefrontUrl;
+            $this->configWriter->save(
+                Config::XML_PATH_STOREFRONT_URL,
+                $storefrontUrl,
+                ScopeInterface::SCOPE_WEBSITES,
+                $websiteId
+            );
         }
 
         $this->checkCredentials($subdomain, $username, $password);

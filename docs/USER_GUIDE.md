@@ -199,6 +199,30 @@ language uses its own Smaily account (multilingual mode "Per-language
 Smaily accounts" — the Connection panel manages those store-view
 credentials for you, see below).
 
+### A separate storefront
+
+When shoppers buy on a separate (headless) storefront and Magento is the
+back end only, open **Using a separate storefront?** under the account
+fields on **Settings > Connection** and enter the storefront's address as
+**Storefront URL**, for example `https://shop.example.com`. The product
+links in the catalog sync to Campaign Intelligence and in the RSS feed then
+start with that address: the scheme, host and port of Magento's link are
+replaced, and the path and the query string stay. Image links, the
+abandoned-cart link and Magento's own emails do not change. Leave the field
+empty to send Magento's own product links. The value is kept per website and
+saved with **Save Connection**; the field is drawn open while a value is
+saved.
+
+The address must be https and the host alone: a path other than `/`, a
+query or a fragment is refused on save, with the message under the field
+(a trailing `/` is dropped). After a save that changes the address, the
+result beside the button asks you to run the catalog import again under
+**Settings > Intelligence > Historical imports**, so that Campaign
+Intelligence gets the new links; the nightly catalog re-sync brings them
+too. The RSS feed shows them within 15 minutes. The storefront must open
+Magento's product paths, or redirect them keeping the query string — see
+[HEADLESS_STOREFRONTS.md](HEADLESS_STOREFRONTS.md#product-links-and-images).
+
 
 
 ### Multilingual stores
@@ -432,7 +456,9 @@ straight to it.
 
 Items include `smly:price` / `smly:old_price` / `smly:discount` (prices as
 shown in your storefront, tax included). Only catalog-visible, enabled
-products are listed; configurable variants resolve to their parent. The feed
+products are listed; configurable variants resolve to their parent. Item
+links start with the **Storefront URL** when one is set (see
+[A separate storefront](#a-separate-storefront)). The feed
 is a single store-wide on/off toggle on the **Settings > RSS** tab, saved with
 that tab's own **Save** button. Responses
 are cached for 15 minutes.
@@ -900,7 +926,9 @@ is not supported (see [HYVA_SUPPORT.md](HYVA_SUPPORT.md)).
 **My store runs a headless storefront.** The server-side features work as
 they are; the browse tracker, campaign-click capture, checkout checkbox and
 personalization page are Magento theme parts a separate storefront does not
-draw, and product links need a check before recommendation emails go out.
+draw, and product links need a check before recommendation emails go out —
+the **Storefront URL** setting puts them on the storefront's address (see
+[A separate storefront](#a-separate-storefront)).
 See [HEADLESS_STOREFRONTS.md](HEADLESS_STOREFRONTS.md) for the full list
 and the hand-off for the storefront team.
 

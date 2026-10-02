@@ -169,6 +169,15 @@ class WizardData implements ArgumentInterface
         return $this->config->getUsername($this->websiteContext->getStoreId());
     }
 
+    /**
+     * The saved storefront address of the selected website ('' when none,
+     * PRO-3660).
+     */
+    public function getSavedStorefrontUrl(): string
+    {
+        return $this->config->getStorefrontUrl($this->websiteContext->getStoreId());
+    }
+
     public function getBootJson(): string
     {
         $websiteId = $this->websiteContext->getWebsiteId();

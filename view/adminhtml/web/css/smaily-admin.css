@@ -807,6 +807,15 @@
     display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
     margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: 1px solid var(--s-border); max-width: 620px;
 }
+/* "Using a separate storefront?" (PRO-3660): a link under the account card
+ * that opens the Storefront URL card, the same measure as the account card. */
+.smaily-settings .smaily-disclosure__toggle {
+    display: inline-block; list-style: none; cursor: pointer; font-size: var(--fs-13); font-weight: 600; color: var(--s-link);
+}
+.smaily-settings .smaily-disclosure__toggle:hover { color: var(--s-link-hover); text-decoration: underline; }
+.smaily-settings .smaily-disclosure__toggle::-webkit-details-marker { display: none; }
+.smaily-settings .smaily-disclosure > .smaily-card { max-width: 620px; margin-top: var(--sp-3); padding: 20px 22px; border-radius: 6px; }
+.smaily-settings .smaily-disclosure .smaily-field { max-width: 440px; }
 
 /* --- PRO-1391: visual-fidelity pass — gray canvas + card polish, measured
  * from the design pack (Settings.dc.html "FRAME 1: CONNECTION TAB"). Card
@@ -990,8 +999,9 @@
 .smaily-settings .smaily-tab-footer + .smaily-card { margin-top: var(--sp-6); }
 .smaily-ui .smaily-engine-automations > h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-16); font-weight: 700; color: var(--s-text); }
 /* A multilingual store's Connection tab: the default account card, the
- * error banner and the footer share the 680px measure of the mode cards. */
-.smaily-settings [data-tab="connection"]:has(#smaily-ml-modes) :is(#smaily-w-default-account .smaily-card, .smaily-form-banner, .smaily-tab-footer) { max-width: 680px; }
+ * error banner, the storefront card and the footer share the 680px measure
+ * of the mode cards. */
+.smaily-settings [data-tab="connection"]:has(#smaily-ml-modes) :is(#smaily-w-default-account .smaily-card, .smaily-form-banner, .smaily-tab-footer, .smaily-disclosure > .smaily-card) { max-width: 680px; }
 /* Initial setup footer: the pack's 12px gap, and the step's measure, so the
  * buttons stay with the card above them (as the Settings tab footers do). */
 .smaily-wizard .smaily-footer { gap: var(--sp-3); }

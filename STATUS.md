@@ -64,6 +64,19 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   lock, identical to the old: 299 unit, phpcs 0 errors / 997 warnings,
   phpstan `[OK]`, integration 87 tests.
 
+- **PRO-2456 in progress — fidelity check of the admin against the design
+  pack (2026-10-02).** The pack (`Magento Connect admin visual system.zip`,
+  exported 2026-07-12) had been tracked in `docs/` since `db2fc53` — swept
+  in by an unrelated docs commit. It is now removed from the tree and
+  `/docs/*.zip` is ignored, so a re-dropped export stays local; history
+  keeps it (restore with
+  `git show db2fc53:"docs/Magento Connect admin visual system.zip" > pack.zip`).
+  The extracted source does NOT move into `docs/design/`: the pack invents
+  options and copy (target spec §1), `docs/` is public on GitHub, and what
+  binds is already written down (the A1 layout extract and the target
+  spec). It never shipped either way — `bin/build-release-zip.sh` excludes
+  `docs/*` and `*.zip`.
+
 - **PRO-2472 done — the 3.0.0-rc1 release train's packaging leftovers are
   closed (2026-09-11).** Four small things, no behaviour change in the
   module itself:

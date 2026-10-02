@@ -71,10 +71,26 @@ if ($refusal !== null) {
 }
 
 // Prefer the payload exactly as it went over the wire; fall back to the
-// queued payload for rows that have never been attempted — that one is
-// already decoded, so it is redacted from the array, not read twice.
+// queued payload for rows that never put it there — that one is already
+// decoded, so it is redacted from the array, not read twice. A row that is
+// over, or was tried, without a sent payload never reached the server: a
+// skip, a withdrawal, or a refusal before any request (PRO-1965).
 $sentPayload = (string)($row['sent_payload'] ?? '');
-$payloadTitle = $sentPayload !== '' ? __('Payload (as sent)') : __('Payload (queued, not sent yet)');
+$attempted = $attempts > 0 || !in_array($status, ['pending', 'sending'], true);
+if ($sentPayload !== '') {
+    $payloadTitle = __('Payload (as sent)');
+} elseif ($attempted) {
+    $payloadTitle = __('Payload (queued, nothing was sent for this row)');
+} else {
+    $payloadTitle = __('Payload (queued, not sent yet)');
+}
+if (!$attempted) {
+    $noResponseText = __('No response recorded — this row has not been attempted yet.');
+} elseif ($sentPayload !== '') {
+    $noResponseText = __('No response received — the server did not answer. The last error says why.');
+} else {
+    $noResponseText = __('No response — nothing was sent for this row.');
+}
 $payload = $sentPayload !== ''
     ? $redactor->redact($sentPayload)
     : ((string)($row['payload'] ?? '') === '' ? '' : $redactor->redactDecoded($decodedPayload));
@@ -148,7 +164,7 @@ $response = $redactor->redact(isset($row['last_response']) ? (string)$row['last_
     <?php if ($response !== ''): ?>
         <pre class="smaily-log-details-pre"><?= $escaper->escapeHtml($response) ?></pre>
     <?php else: ?>
-        <p class="note"><?= $escaper->escapeHtml(__('No response recorded — this row has not been attempted yet.')) ?></p>
+        <p class="note"><?= $escaper->escapeHtml($noResponseText) ?></p>
     <?php endif; ?>
 
     <p class="note"><?= $escaper->escapeHtml(__('Sensitive values (passwords, API keys) are never shown here, and email addresses are masked.')) ?></p>

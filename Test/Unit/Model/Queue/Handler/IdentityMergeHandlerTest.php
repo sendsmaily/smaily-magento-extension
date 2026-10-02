@@ -35,8 +35,12 @@ class IdentityMergeHandlerTest extends TestCase
     private ProfilingConsent&MockObject $profilingConsent;
     private CustomerRepositoryInterface&MockObject $customerRepository;
 
+    /** @var array<int, array{0: array<int|string, mixed>, 1: array<string, mixed>|null}> */
+    private array $recorded = [];
+
     protected function setUp(): void
     {
+        $this->recorded = [];
         $this->client = $this->createMock(Client::class);
         $this->profilingConsent = $this->createMock(ProfilingConsent::class);
         $this->customerRepository = $this->createMock(CustomerRepositoryInterface::class);
@@ -53,12 +57,25 @@ class IdentityMergeHandlerTest extends TestCase
         self::assertSame([1 => true], $this->handle(self::PAYLOAD));
     }
 
+    public function testTheMergeIsRecordedOnTheRow(): void
+    {
+        $exchange = ['request' => self::PAYLOAD, 'response' => ['http_status' => 200, 'body' => ['ok' => true]]];
+        $this->profilingConsent->method('isAllowed')->willReturn(true);
+        $this->client->method('identityMerge')->willReturn(['ok' => true]);
+        $this->client->method('lastExchange')->willReturn($exchange);
+
+        $this->handle(self::PAYLOAD);
+
+        self::assertSame([[self::PAYLOAD, $exchange['response']]], $this->recorded);
+    }
+
     public function testAnOptedOutShopperIsNotMerged(): void
     {
         $this->profilingConsent->method('isAllowed')->with('person@example.com', 3)->willReturn(false);
         $this->client->expects(self::never())->method('identityMerge');
 
         self::assertSame([1 => true], $this->handle(self::PAYLOAD), 'Closed for good: browsing stays anonymous');
+        self::assertSame([], $this->recorded, 'Nothing went on the wire');
     }
 
     public function testAShopperWhoseAccountIsGoneIsAskedAtTheDefaultScope(): void
@@ -95,6 +112,11 @@ class IdentityMergeHandlerTest extends TestCase
         $event->method('getId')->willReturn(1);
         $eventQueue = $this->createMock(EventQueue::class);
         $eventQueue->method('decodePayload')->willReturn($payload);
+        $eventQueue->method('recordExchange')->willReturnCallback(
+            function (Event $event, array $sent, ?array $response): void {
+                $this->recorded[] = [$sent, $response];
+            }
+        );
 
         $handler = new IdentityMergeHandler(
             $settings,

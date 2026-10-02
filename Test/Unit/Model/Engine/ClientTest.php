@@ -59,6 +59,40 @@ class ClientTest extends TestCase
         self::assertStringContainsString('"orders":[{"external_order_id":"100000001"}]', (string)$request->getBody());
     }
 
+    public function testTheLastExchangeHoldsTheBodyAsSentAndTheFinalReply(): void
+    {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/ingest/orders');
+        $client = $this->createClient([
+            new Response(503, [], '{"error":"unavailable"}'),
+            new Response(200, [], '{"ok":true,"processed":1}'),
+        ]);
+        self::assertNull($client->lastExchange(), 'Nothing was sent yet');
+
+        $client->ingest(Client::DOMAIN_ORDERS, [['external_order_id' => '100000001']]);
+
+        self::assertSame([
+            'request' => ['orders' => [['external_order_id' => '100000001']]],
+            'response' => ['http_status' => 200, 'body' => ['ok' => true, 'processed' => 1]],
+        ], $client->lastExchange());
+        self::assertStringNotContainsString('sk_test_key', (string)json_encode($client->lastExchange()));
+    }
+
+    public function testARefusalIsRecordedAsTheEngineAnsweredIt(): void
+    {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/ingest/catalog');
+        $client = $this->createClient([new Response(400, [], '{"error":"validation_failed"}')]);
+
+        try {
+            $client->ingest(Client::DOMAIN_CATALOG, []);
+        } catch (EngineRequestException) {
+        }
+
+        self::assertSame(
+            ['http_status' => 400, 'body' => ['error' => 'validation_failed']],
+            $client->lastExchange()['response'] ?? null
+        );
+    }
+
     public function testRateLimitRetriesWithRetryAfterFromBody(): void
     {
         $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/ingest/ping');

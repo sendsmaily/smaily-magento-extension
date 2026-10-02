@@ -29,9 +29,13 @@ class ProfilingConsentHandlerTest extends TestCase
     /** @var array<int, array<string, mixed>> */
     private array $payloads = [];
 
+    /** @var array<int, array{0: array<int|string, mixed>, 1: array<string, mixed>|null}> */
+    private array $recorded = [];
+
     protected function setUp(): void
     {
         $this->payloads = [];
+        $this->recorded = [];
         $this->settings = $this->createMock(Settings::class);
         $this->settings->method('isConnected')->willReturn(true);
         $this->client = $this->createMock(Client::class);
@@ -97,6 +101,23 @@ class ProfilingConsentHandlerTest extends TestCase
         self::assertSame([1 => true], $results);
     }
 
+    public function testTheChoiceIsRecordedOnTheRowAsTheEngineAnsweredIt(): void
+    {
+        $exchange = [
+            'request' => ['opt_out' => true, 'reason' => 'user_preference', 'opted_out_at' => '2026-09-21T14:13:20Z'],
+            'response' => ['http_status' => 404, 'body' => ['error' => 'not_found']],
+        ];
+        $this->optOuts->method('moment')->willReturn(1790000000);
+        $this->client->method('customerOptOut')
+            ->willThrowException(new EngineRequestException('Engine request failed with HTTP 404', 404));
+        $this->client->method('lastExchange')->willReturn($exchange);
+
+        $this->handle(1, ['email' => 'person@example.com', 'opt_out' => true,
+            'opted_out_at' => '2026-09-21T14:13:20Z']);
+
+        self::assertSame([[$exchange['request'], $exchange['response']]], $this->recorded);
+    }
+
     public function testOtherRefusalsAreReported(): void
     {
         $this->optOuts->method('moment')->willReturn(1790000000);
@@ -139,6 +160,11 @@ class ProfilingConsentHandlerTest extends TestCase
         $eventQueue = $this->createMock(EventQueue::class);
         $eventQueue->method('decodePayload')->willReturnCallback(
             fn (Event $event): array => $this->payloads[(int)$event->getId()]
+        );
+        $eventQueue->method('recordExchange')->willReturnCallback(
+            function (Event $event, array $sent, ?array $response): void {
+                $this->recorded[] = [$sent, $response];
+            }
         );
 
         $handler = new ProfilingConsentHandler(

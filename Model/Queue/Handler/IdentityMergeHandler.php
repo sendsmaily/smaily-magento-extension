@@ -79,6 +79,11 @@ class IdentityMergeHandler implements EventHandlerInterface
             } catch (EngineException $exception) {
                 $results[$id] = $exception->getMessage();
             }
+
+            $exchange = $this->client->lastExchange();
+            if ($exchange !== null) {
+                $this->eventQueue->recordExchange($event, $exchange['request'], $exchange['response']);
+            }
         }
 
         return $results;

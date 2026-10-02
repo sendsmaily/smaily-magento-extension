@@ -189,12 +189,33 @@ class IngestQueue
         }
     }
 
+    /**
+     * Remember on the row what this attempt put on the wire and what came
+     * back, for the Log's Details. Nothing is saved here: markSent() or
+     * markFailed() stores it with the attempt's outcome. A null $response
+     * (no answer arrived) keeps the last answer the row did get (PRO-1963).
+     *
+     * @param array<int|string, mixed> $sentPayload this row's part of the request body
+     * @param array<string, mixed>|null $response
+     */
+    public function recordExchange(IngestEvent $event, array $sentPayload, ?array $response): void
+    {
+        $event->setData('sent_payload', $this->serializer->serialize($sentPayload));
+        if ($response !== null) {
+            $event->setData('last_response', $this->serializer->serialize($response));
+        }
+    }
+
+    /**
+     * $response replaces the reply the row holds; without one, the reply
+     * recordExchange() kept stays.
+     */
     public function markSent(IngestEvent $event, ?string $response = null): void
     {
         $event->addData([
             'status' => IngestEvent::STATUS_SENT,
             'last_error' => null,
-            'last_response' => $response,
+            'last_response' => $response ?? $event->getData('last_response'),
         ]);
         $this->eventResource->save($event);
     }

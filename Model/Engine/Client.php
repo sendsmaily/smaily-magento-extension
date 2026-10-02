@@ -13,6 +13,7 @@ use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\RequestOptions;
 use Magento\Framework\App\ProductMetadataInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use Smaily\Connect\Model\Client\ExchangeResponse;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Client\TransportErrorMessage;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
@@ -70,6 +71,11 @@ class Client
 
     private const RETRY_DELAYS_SECONDS = [1, 2, 4, 8, 16];
     private const TIMEOUT_SECONDS = 30;
+
+    /**
+     * @var array{request: array<int|string, mixed>, response: array{http_status: int, body: mixed}|null}|null
+     */
+    private ?array $lastExchange = null;
 
     public function __construct(
         private readonly Settings $settings,
@@ -280,11 +286,25 @@ class Client
     }
 
     /**
+     * The last request's body and the final reply to it, after any retries —
+     * null until a request was made, and a null reply when none arrived. The
+     * queues store it on the row for the Log's Details (PRO-1965); the API
+     * key is never part of it.
+     *
+     * @return array{request: array<int|string, mixed>, response: array{http_status: int, body: mixed}|null}|null
+     */
+    public function lastExchange(): ?array
+    {
+        return $this->lastExchange;
+    }
+
+    /**
      * @param array<string, mixed>|null $body
      * @return array<string, mixed>
      */
     private function request(string $method, string $url, ?array $body, bool $authenticated = true): array
     {
+        $this->lastExchange = null;
         $options = [
             RequestOptions::TIMEOUT => self::TIMEOUT_SECONDS,
             RequestOptions::HEADERS => [
@@ -305,11 +325,17 @@ class Client
 
         $httpClient = $this->httpClientFactory->create();
         $attempt = 0;
+        $this->lastExchange = ['request' => $body ?? [], 'response' => null];
 
         // Retry loop per contract: backoff 1/2/4/8/16s on 429 and 5xx.
         while (true) {
             try {
+                $this->lastExchange['response'] = null;
                 $response = $httpClient->request($method, $url, $options);
+                $this->lastExchange['response'] = ExchangeResponse::of(
+                    $response->getStatusCode(),
+                    (string)$response->getBody()
+                );
                 $this->checkEngineVersion($response->getHeaderLine('X-Engine-Version'));
                 if ($authenticated) {
                     // The account answered, so a remembered refusal is over
@@ -322,7 +348,9 @@ class Client
                 return $this->decode((string)$response->getBody());
             } catch (BadResponseException $exception) {
                 $status = $exception->getResponse()->getStatusCode();
-                $errorBody = $this->decodeSafely((string)$exception->getResponse()->getBody());
+                $rawBody = (string)$exception->getResponse()->getBody();
+                $this->lastExchange['response'] = ExchangeResponse::of($status, $rawBody);
+                $errorBody = $this->decodeSafely($rawBody);
 
                 if ($status === 403 && ($errorBody['error'] ?? '') === 'tenant_inactive') {
                     // Contract §2: the key is valid, the account is not.

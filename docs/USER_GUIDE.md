@@ -539,8 +539,15 @@ panel — you do not have to keep the page open:
   payload exactly as it was (or will be) sent, the attempt count, when the
   next automatic retry happens (or an honest "this row will not retry on
   its own"), the last error — with our internal failure class beside it —
-  and the last API response. Sensitive values (passwords, API keys) are
-  never shown, and email addresses are masked.
+  and the last API response: the HTTP status and what Smaily or Campaign
+  Intelligence answered. A row that went out with others in one request
+  shows only its own part of it. A retry keeps the evidence of the attempt
+  before it: when a later attempt gets no answer at all (a network
+  failure), the last response that did arrive stays. A row that never
+  reached the server — skipped because no workflow is mapped, withdrawn,
+  or stopped before any request — says that nothing was sent for it.
+  Sensitive values (passwords, API keys) are never shown, and email
+  addresses are masked.
 - When deliveries failed in the last 24 hours, a banner above the grid
   says so and links straight to the grid pre-filtered to failed rows; the
   dashboard's failed-deliveries tile links to the same view.

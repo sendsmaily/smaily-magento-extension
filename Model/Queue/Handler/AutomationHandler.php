@@ -83,6 +83,7 @@ class AutomationHandler implements EventHandlerInterface
                 continue;
             }
 
+            $client = null;
             try {
                 $storeId = (int)($payload['store_id'] ?? 0);
                 $clientStoreId = $storeId ?: null;
@@ -92,7 +93,8 @@ class AutomationHandler implements EventHandlerInterface
                     // resolves to null = the default-scope credentials.
                     $clientStoreId = $this->accountResolver->storeIdForAccountKey($match->accountKey, $websiteId);
                 }
-                $this->clientProvider->forStore($clientStoreId)->post(SmailyClient::ENDPOINT_AUTORESPONDER, [
+                $client = $this->clientProvider->forStore($clientStoreId);
+                $client->post(SmailyClient::ENDPOINT_AUTORESPONDER, [
                     'autoresponder' => $match->workflowId,
                     'addresses' => [$address],
                     'force_opt_in' => false,
@@ -102,6 +104,11 @@ class AutomationHandler implements EventHandlerInterface
                 // Handed on whole: only the exception carries the HTTP status
                 // and Retry-After the RetryPolicy classifies on.
                 $results[$id] = $exception;
+            }
+
+            $exchange = $client?->lastExchange();
+            if ($exchange !== null) {
+                $this->eventQueue->recordExchange($event, $exchange['request'], $exchange['response']);
             }
         }
 

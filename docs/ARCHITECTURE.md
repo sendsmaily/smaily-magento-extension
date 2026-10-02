@@ -254,6 +254,22 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   worker) are requeued after 15 minutes.
 - **Idempotency:** `event_uuid` is unique; callers may pass a deterministic
   UUID to make an enqueue idempotent.
+- **Exchange evidence (PRO-1965, Woo F3-44 parity):** both clients keep
+  the last request body and the reply to it (`lastExchange()`: HTTP status
+  plus the decoded body, or the start of a non-JSON body via
+  `Model\Client\ExchangeResponse`; no reply on a network failure; never a
+  credential). The handlers and `Cron\FlushIngestQueue` hand it to
+  `recordExchange()` on the queue, which sets `sent_payload` and
+  `last_response` on the row model; `markSent()` / `markFailed()` store
+  them with the outcome. A batched row keeps only its own part of the body
+  in the wrapper's shape (`[contact]`, `{products: [item]}`,
+  `{product_ids: [id]}`), and a D6 row only its own `errors[]` entries.
+  An outcome that names no exchange keeps the one the row holds, so a retry
+  never erases the evidence of the attempt before it (PRO-1963). A row that
+  never reached the wire (a skip, a withdrawal, a refusal before any
+  request) has no `sent_payload`, and the Details drawer says so. Nothing
+  of it is logged; the drawer shows it through `PayloadRedactor`, and the
+  Art. 17 eraser already anonymises both columns.
 - **Sending again (PRO-2454):** the Log's per-row **Send again** and the
   mass **Retry** both ask `Model\Log\ResendGuard` first — one server-owned
   answer, shaped after Woo's `TransactionalRetryGuard`: a reason code

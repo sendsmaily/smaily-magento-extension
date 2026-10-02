@@ -48,6 +48,11 @@ class SmailyClient
 
     private ?HttpClient $httpClient = null;
 
+    /**
+     * @var array{request: array<int|string, mixed>, response: array{http_status: int, body: mixed}|null}|null
+     */
+    private ?array $lastExchange = null;
+
     public function __construct(
         private readonly HttpClientFactory $httpClientFactory,
         private readonly Logger $logger,
@@ -130,6 +135,19 @@ class SmailyClient
     }
 
     /**
+     * The last request's body and the reply to it — null until a request was
+     * made, and a null reply when none arrived (a network failure). The queue
+     * stores it on the row for the Log's Details (PRO-1965); credentials are
+     * never part of it.
+     *
+     * @return array{request: array<int|string, mixed>, response: array{http_status: int, body: mixed}|null}|null
+     */
+    public function lastExchange(): ?array
+    {
+        return $this->lastExchange;
+    }
+
+    /**
      * @param array<string, mixed> $options
      * @return array<int|string, mixed>
      */
@@ -141,11 +159,19 @@ class SmailyClient
             'endpoint' => $uri,
             'options' => $this->redact($options),
         ]);
+        $this->lastExchange = [
+            'request' => (array)($options[RequestOptions::JSON] ?? $options[RequestOptions::QUERY] ?? []),
+            'response' => null,
+        ];
 
         try {
             $response = $this->getHttpClient()->request($method, $uri, $options);
         } catch (BadResponseException $exception) {
             $status = $exception->getResponse()->getStatusCode();
+            $this->lastExchange['response'] = ExchangeResponse::of(
+                $status,
+                (string)$exception->getResponse()->getBody()
+            );
             $this->logger->error('Smaily API HTTP error', [
                 'method' => $method,
                 'endpoint' => $uri,
@@ -190,6 +216,7 @@ class SmailyClient
         }
 
         $body = (string)$response->getBody();
+        $this->lastExchange['response'] = ExchangeResponse::of($response->getStatusCode(), $body);
         $decoded = json_decode($body, true);
         if (!is_array($decoded)) {
             throw new TransportException((string)__('Smaily API returned a malformed response body'));

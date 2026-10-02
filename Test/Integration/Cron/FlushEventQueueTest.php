@@ -209,6 +209,65 @@ class FlushEventQueueTest extends IntegrationTestCase
         self::assertSame($this->clockDate(EventQueue::BACKOFF_SECONDS[0]), $row['next_retry_at']);
     }
 
+    public function testADeliveredRowRecordsThePayloadAsSentAndTheResponse(): void
+    {
+        $this->enqueueContact('f-evidence');
+
+        $this->runCron(['contact.sync' => $this->realContactSync([
+            new Response(200, [], '{"code":101,"message":"OK"}'),
+        ])]);
+
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_SENT, $row['status']);
+        self::assertSame(
+            [['email' => 'a@example.com']],
+            json_decode((string)$row['sent_payload'], true),
+            'This row\'s part of the request body, exactly as it was posted'
+        );
+        self::assertSame(
+            ['http_status' => 200, 'body' => ['code' => 101, 'message' => 'OK']],
+            json_decode((string)$row['last_response'], true)
+        );
+    }
+
+    public function testARefusedRowRecordsWhatTheServerAnswered(): void
+    {
+        $this->enqueueContact('f-refused-evidence');
+
+        $this->runCron(['contact.sync' => $this->realContactSync([new Response(404, [], 'Not found')])]);
+
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_FAILED, $row['status']);
+        self::assertSame([['email' => 'a@example.com']], json_decode((string)$row['sent_payload'], true));
+        self::assertSame(
+            ['http_status' => 404, 'body' => 'Not found'],
+            json_decode((string)$row['last_response'], true)
+        );
+    }
+
+    public function testARetryThatGetsNoAnswerKeepsTheLastResponseReceived(): void
+    {
+        $this->enqueueContact('f-retry-evidence');
+        $handler = $this->realContactSync([
+            new Response(503, [], 'Service unavailable'),
+            new ConnectException('cURL error 28: timed out', new Request('POST', 'api/contact.php')),
+        ]);
+
+        $this->runCron(['contact.sync' => $handler]);
+        $this->clock->travel(EventQueue::BACKOFF_SECONDS[0]);
+        $this->runCron(['contact.sync' => $handler]);
+
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame('2', (string)$row['attempts']);
+        self::assertStringContainsString('timed out', (string)$row['last_error']);
+        self::assertSame([['email' => 'a@example.com']], json_decode((string)$row['sent_payload'], true));
+        self::assertSame(
+            ['http_status' => 503, 'body' => 'Service unavailable'],
+            json_decode((string)$row['last_response'], true),
+            'PRO-1963: the attempt without an answer does not erase the answer before it'
+        );
+    }
+
     private function enqueueContact(string $uuid): void
     {
         $this->queue->enqueue(

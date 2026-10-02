@@ -58,6 +58,90 @@ class FlushIngestQueueTest extends IntegrationTestCase
         self::assertNull($rows['fi-2']['next_retry_at']);
     }
 
+    /**
+     * PRO-1965: each row keeps its own item as sent, in the wrapper's shape,
+     * and the engine's reply as it concerns that row — no other row's error.
+     */
+    public function testEachRowRecordsItsItemAsSentAndItsShareOfTheReply(): void
+    {
+        $this->queue->enqueue('catalog', ['sku' => 'OK-1'], null, null, 'fi-e1');
+        $this->queue->enqueue('catalog', ['sku' => 'BAD'], null, null, 'fi-e2');
+        $reply = [
+            'processed' => 1,
+            'deduplicated' => 0,
+            'errors' => [['index' => 1, 'field' => 'price', 'message' => 'must be a number']],
+        ];
+
+        $client = $this->createMock(Client::class);
+        $client->method('ingest')->willReturn($reply);
+        $client->method('lastExchange')->willReturn([
+            'request' => ['products' => [['sku' => 'OK-1'], ['sku' => 'BAD']]],
+            'response' => ['http_status' => 200, 'body' => $reply],
+        ]);
+        $this->runCron($client);
+
+        $rows = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(
+            ['products' => [['sku' => 'OK-1', 'event_id' => 'fi-e1']]],
+            json_decode((string)$rows['fi-e1']['sent_payload'], true)
+        );
+        self::assertSame(
+            ['http_status' => 200, 'body' => ['processed' => 1, 'deduplicated' => 0, 'errors' => []]],
+            json_decode((string)$rows['fi-e1']['last_response'], true)
+        );
+        self::assertSame(
+            ['products' => [['sku' => 'BAD', 'event_id' => 'fi-e2']]],
+            json_decode((string)$rows['fi-e2']['sent_payload'], true)
+        );
+        self::assertSame(
+            ['http_status' => 200, 'body' => $reply],
+            json_decode((string)$rows['fi-e2']['last_response'], true)
+        );
+    }
+
+    public function testARetryThatGetsNoAnswerKeepsTheLastReplyReceived(): void
+    {
+        $this->queue->enqueue('orders', ['order' => []], null, null, 'fi-keep');
+
+        $client = $this->createMock(Client::class);
+        $client->method('ingest')->willThrowException(new EngineTransportException('HTTP 503'));
+        $client->method('lastExchange')->willReturnOnConsecutiveCalls(
+            ['request' => [], 'response' => ['http_status' => 503, 'body' => ['error' => 'unavailable']]],
+            ['request' => [], 'response' => null]
+        );
+        $this->runCron($client);
+        $this->clock->travel(IngestQueue::BACKOFF_SECONDS[0]);
+        $this->runCron($client);
+
+        $row = $this->fetchAll(IngestEventResource::TABLE_NAME)[0];
+        self::assertSame('2', (string)$row['attempts']);
+        self::assertSame(
+            ['http_status' => 503, 'body' => ['error' => 'unavailable']],
+            json_decode((string)$row['last_response'], true),
+            'PRO-1963: the attempt without an answer does not erase the answer before it'
+        );
+    }
+
+    public function testADeliveredRowKeepsTheReplyItGot(): void
+    {
+        $this->queue->enqueue('orders', ['order' => []], null, null, 'fi-sent');
+
+        $client = $this->createMock(Client::class);
+        $client->method('ingest')->willReturn(['processed' => 1]);
+        $client->method('lastExchange')->willReturn(
+            ['request' => [], 'response' => ['http_status' => 200, 'body' => ['processed' => 1]]]
+        );
+        $this->runCron($client);
+
+        $row = $this->fetchAll(IngestEventResource::TABLE_NAME)[0];
+        self::assertSame(IngestEvent::STATUS_SENT, $row['status']);
+        self::assertSame(
+            ['http_status' => 200, 'body' => ['processed' => 1]],
+            json_decode((string)$row['last_response'], true),
+            'markSent() without a response of its own does not erase the recorded one'
+        );
+    }
+
     public function testTransportFailureReschedulesTheBatchWithBackoff(): void
     {
         $this->queue->enqueue('orders', ['order' => []], null, null, 'fi-t1');
@@ -111,6 +195,26 @@ class FlushIngestQueueTest extends IntegrationTestCase
         self::assertStringContainsString('"outcome":"not_found"', (string)$rows['fr-2']['last_response']);
         self::assertSame(IngestEvent::STATUS_FAILED, $rows['fr-3']['status'], 'Keyless rows park observably');
         self::assertSame('catalog/remove row has no product_id', $rows['fr-3']['last_error']);
+    }
+
+    public function testACatalogRemoveRowRecordsItsIdAsSentAndTheRefusal(): void
+    {
+        $this->queue->enqueue(Client::DOMAIN_CATALOG_REMOVE, ['product_id' => '7'], '7', null, 'fr-e1');
+
+        $client = $this->createMock(Client::class);
+        $client->method('catalogRemove')->willThrowException(new EngineRequestException('HTTP 422', 422));
+        $client->method('lastExchange')->willReturn([
+            'request' => ['product_ids' => ['7']],
+            'response' => ['http_status' => 422, 'body' => ['error' => 'validation_failed']],
+        ]);
+        $this->runCron($client);
+
+        $row = $this->fetchAll(IngestEventResource::TABLE_NAME)[0];
+        self::assertSame(['product_ids' => ['7']], json_decode((string)$row['sent_payload'], true));
+        self::assertSame(
+            ['http_status' => 422, 'body' => ['error' => 'validation_failed']],
+            json_decode((string)$row['last_response'], true)
+        );
     }
 
     public function testCatalogRemoveTransportFailureReschedulesWithBackoff(): void

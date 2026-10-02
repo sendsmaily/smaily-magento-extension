@@ -179,14 +179,32 @@ class EventQueue
     }
 
     /**
+     * Remember on the row what this attempt put on the wire and what came
+     * back, for the Log's Details. Nothing is saved here: markSent() or
+     * markFailed() stores it with the attempt's outcome. A null $response
+     * (no answer arrived) keeps the last answer the row did get.
+     *
+     * @param array<int|string, mixed> $sentPayload this row's part of the request body
+     * @param array<string, mixed>|null $response
+     */
+    public function recordExchange(Event $event, array $sentPayload, ?array $response): void
+    {
+        $event->setData('sent_payload', $this->serializer->serialize($sentPayload));
+        if ($response !== null) {
+            $event->setData('last_response', $this->serializer->serialize($response));
+        }
+    }
+
+    /**
      * Mark an event as delivered.
      */
     public function markSent(Event $event, ?string $sentPayload = null, ?string $response = null): void
     {
-        $event->addData($this->terminalFields($response) + [
-            'last_error' => null,
-            'sent_payload' => $sentPayload,
-        ]);
+        $event->addData(array_merge(
+            $this->terminalFields($response),
+            ['last_error' => null],
+            $this->exchangeFields($event, $sentPayload, $response)
+        ));
         $this->eventResource->save($event);
     }
 
@@ -215,9 +233,7 @@ class EventQueue
             'status' => $exhausted ? Event::STATUS_FAILED : Event::STATUS_PENDING,
             'next_retry_at' => $exhausted ? null : $this->nextRetryAt($attempts, $retryAfter),
             'last_error' => mb_substr($error, 0, self::MAX_ERROR_LENGTH),
-            'sent_payload' => $sentPayload,
-            'last_response' => $response,
-        ]);
+        ] + $this->exchangeFields($event, $sentPayload, $response));
         $this->eventResource->save($event);
 
         if ($exhausted) {
@@ -386,6 +402,21 @@ class EventQueue
             'status' => Event::STATUS_SENT,
             'next_retry_at' => null,
             'last_response' => $response,
+        ];
+    }
+
+    /**
+     * The exchange an outcome stores: the one the caller names, else the one
+     * the row already holds — recorded by this attempt, or left by an
+     * earlier one. An attempt never erases the evidence before it (PRO-1963).
+     *
+     * @return array{sent_payload: mixed, last_response: mixed}
+     */
+    private function exchangeFields(Event $event, ?string $sentPayload, ?string $response): array
+    {
+        return [
+            'sent_payload' => $sentPayload ?? $event->getData('sent_payload'),
+            'last_response' => $response ?? $event->getData('last_response'),
         ];
     }
 

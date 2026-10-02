@@ -78,6 +78,7 @@ class FlushIngestQueue
         try {
             $response = $this->client->ingest($domain, $items);
         } catch (EngineTransportException $exception) {
+            $this->recordBatchExchange($domain, $events, $items);
             foreach ($events as $event) {
                 $this->queue->markFailed($event, $exception->getMessage());
             }
@@ -95,6 +96,7 @@ class FlushIngestQueue
 
             // Whole-batch 4xx: the request shape is wrong; retrying the same
             // rows cannot succeed.
+            $this->recordBatchExchange($domain, $events, $items);
             foreach ($events as $event) {
                 $this->queue->markFailed($event, $exception->getMessage(), true);
             }
@@ -102,7 +104,37 @@ class FlushIngestQueue
             return;
         }
 
+        $this->recordBatchExchange($domain, $events, $items);
         $this->applyD6Response($domain, $events, $response);
+    }
+
+    /**
+     * Keep on each row, for the Log's Details (PRO-1965), its own item in
+     * the wrapper's shape and the engine's reply as it concerns that row:
+     * a D6 errors[] entry names its row by index, so no row carries another
+     * row's error. Stored with the outcome markSent()/markFailed() records.
+     *
+     * @param IngestEvent[] $events indexed 0..n-1 in send order
+     * @param array<int, array<string, mixed>> $items the same indexes
+     */
+    private function recordBatchExchange(string $domain, array $events, array $items): void
+    {
+        $exchange = $this->client->lastExchange();
+        if ($exchange === null) {
+            return;
+        }
+
+        $wrapper = Client::DOMAIN_WRAPPERS[$domain];
+        foreach ($events as $index => $event) {
+            $response = $exchange['response'];
+            if (is_array($response) && is_array($response['body']['errors'] ?? null)) {
+                $response['body']['errors'] = array_values(array_filter(
+                    $response['body']['errors'],
+                    static fn ($error): bool => is_array($error) && (int)($error['index'] ?? -1) === $index
+                ));
+            }
+            $this->queue->recordExchange($event, [$wrapper => [$items[$index]]], $response);
+        }
     }
 
     /**
@@ -142,6 +174,7 @@ class FlushIngestQueue
         try {
             $response = $this->client->catalogRemove($ids);
         } catch (EngineTransportException $exception) {
+            $this->recordRemoveExchange($keyed);
             foreach ($keyed as [$event]) {
                 $this->queue->markFailed($event, $exception->getMessage());
             }
@@ -159,6 +192,7 @@ class FlushIngestQueue
             // 4xx is terminal: a malformed wrapper cannot improve by
             // resending, and a 404 means the engine predates §3b — the
             // periodic full re-sync stays the reconciler either way.
+            $this->recordRemoveExchange($keyed);
             foreach ($keyed as [$event]) {
                 $this->queue->markFailed($event, $exception->getMessage(), true);
             }
@@ -166,6 +200,8 @@ class FlushIngestQueue
             return;
         }
 
+        // On success the row's own outcome below replaces the batch reply.
+        $this->recordRemoveExchange($keyed);
         $notFound = array_map('strval', (array)($response['not_found'] ?? []));
         foreach ($keyed as [$event, $productId]) {
             $this->queue->markSent($event, $this->serializer->serialize([
@@ -173,6 +209,24 @@ class FlushIngestQueue
                 'removed_products' => (int)($response['removed_products'] ?? 0),
                 'rows_tombstoned' => (int)($response['rows_tombstoned'] ?? 0),
             ]));
+        }
+    }
+
+    /**
+     * The §3b counterpart of recordBatchExchange(): each row keeps its own
+     * id in the wrapper's shape and the engine's reply.
+     *
+     * @param array<int, array{0: IngestEvent, 1: string}> $keyed
+     */
+    private function recordRemoveExchange(array $keyed): void
+    {
+        $exchange = $this->client->lastExchange();
+        if ($exchange === null) {
+            return;
+        }
+
+        foreach ($keyed as [$event, $productId]) {
+            $this->queue->recordExchange($event, ['product_ids' => [$productId]], $exchange['response']);
         }
     }
 

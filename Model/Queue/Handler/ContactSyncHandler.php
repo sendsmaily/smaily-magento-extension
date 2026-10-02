@@ -52,9 +52,10 @@ class ContactSyncHandler implements EventHandlerInterface
 
         foreach ($byStore as $storeId => $rows) {
             $contacts = array_column($rows, 'contact');
+            $client = null;
             try {
-                $this->clientProvider->forStore($storeId ?: null)
-                    ->post(SmailyClient::ENDPOINT_CONTACT, $contacts);
+                $client = $this->clientProvider->forStore($storeId ?: null);
+                $client->post(SmailyClient::ENDPOINT_CONTACT, $contacts);
                 $error = null;
             } catch (SmailyClientException $exception) {
                 // Handed on whole: only the exception carries the HTTP status
@@ -67,10 +68,16 @@ class ContactSyncHandler implements EventHandlerInterface
                 ]);
             }
 
+            $exchange = $client?->lastExchange();
             foreach ($rows as $row) {
                 /** @var Event $event */
                 $event = $row['event'];
                 $results[(int)$event->getId()] = $error ?? true;
+                if ($exchange !== null) {
+                    // The row's own part of the batch body — never the other
+                    // contacts posted with it — and the reply to the batch.
+                    $this->eventQueue->recordExchange($event, [$row['contact']], $exchange['response']);
+                }
             }
         }
 

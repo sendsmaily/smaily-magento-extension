@@ -145,6 +145,35 @@ class EventQueueTest extends IntegrationTestCase
         self::assertSame('HTTP 200', $row['last_response']);
     }
 
+    public function testAnAttemptThatRecordsNoExchangeKeepsThePreviousAttemptsEvidence(): void
+    {
+        $this->queue->enqueue('contact.sync', [], null, 0, 'u-evidence');
+        $claimed = $this->queue->claimBatch();
+        $this->queue->markFailed($claimed[0], 'HTTP 503', '[{"email":"a@example.com"}]', '{"http_status":503}');
+
+        $this->clock->travel(61);
+        $claimed = $this->queue->claimBatch();
+        $this->queue->markFailed($claimed[0], 'Smaily API request failed: timed out');
+
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame('2', (string)$row['attempts']);
+        self::assertSame('Smaily API request failed: timed out', $row['last_error']);
+        self::assertSame('[{"email":"a@example.com"}]', $row['sent_payload'], 'PRO-1963: a retry erases nothing');
+        self::assertSame('{"http_status":503}', $row['last_response'], 'PRO-1963: a retry erases nothing');
+    }
+
+    public function testAnExchangeRecordedOnTheRowIsStoredWithTheOutcome(): void
+    {
+        $this->queue->enqueue('contact.sync', [], null, 0, 'u-recorded');
+        $claimed = $this->queue->claimBatch();
+        $this->queue->recordExchange($claimed[0], [['email' => 'a@example.com']], ['http_status' => 200]);
+        $this->queue->markSent($claimed[0]);
+
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame([['email' => 'a@example.com']], json_decode((string)$row['sent_payload'], true));
+        self::assertSame(['http_status' => 200], json_decode((string)$row['last_response'], true));
+    }
+
     public function testRetryResetsOnlyFailedRows(): void
     {
         $this->queue->enqueue('contact.sync', [], null, 0, 'u-parked');

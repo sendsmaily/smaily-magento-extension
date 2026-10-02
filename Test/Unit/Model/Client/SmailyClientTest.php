@@ -252,6 +252,58 @@ class SmailyClientTest extends TestCase
         $this->assertCarriesNoContact((string)json_encode($this->logged, JSON_UNESCAPED_SLASHES));
     }
 
+    public function testTheLastExchangeHoldsTheBodyAsPostedAndTheReply(): void
+    {
+        $client = $this->createClient([new Response(200, [], '{"code": 101, "message": "OK"}')]);
+        self::assertNull($client->lastExchange(), 'Nothing was sent yet');
+
+        $client->post(SmailyClient::ENDPOINT_CONTACT, [['email' => 'test@example.com']]);
+
+        self::assertSame([
+            'request' => [['email' => 'test@example.com']],
+            'response' => ['http_status' => 200, 'body' => ['code' => 101, 'message' => 'OK']],
+        ], $client->lastExchange());
+    }
+
+    public function testARefusalIsRecordedAsTheServerAnsweredIt(): void
+    {
+        $client = $this->createClient([
+            new Response(200, [], '{"code": 203, "message": "Invalid data"}'),
+            new Response(502, [], '<html>Bad gateway</html>'),
+        ]);
+
+        try {
+            $client->post(SmailyClient::ENDPOINT_CONTACT, [['email' => 'test@example.com']]);
+        } catch (ApiException) {
+        }
+        self::assertSame(
+            ['http_status' => 200, 'body' => ['code' => 203, 'message' => 'Invalid data']],
+            $client->lastExchange()['response'] ?? null
+        );
+
+        try {
+            $client->post(SmailyClient::ENDPOINT_AUTORESPONDER, ['autoresponder' => 7]);
+        } catch (TransportException) {
+        }
+        self::assertSame([
+            'request' => ['autoresponder' => 7],
+            'response' => ['http_status' => 502, 'body' => '<html>Bad gateway</html>'],
+        ], $client->lastExchange());
+    }
+
+    public function testARequestThatGotNoAnswerRecordsNoReplyAndNoCredentials(): void
+    {
+        $client = $this->createClient([self::networkFailure()]);
+
+        try {
+            $client->post(SmailyClient::ENDPOINT_CONTACT, [['email' => 'test@example.com']]);
+        } catch (TransportException) {
+        }
+
+        self::assertSame(['request' => [['email' => 'test@example.com']], 'response' => null], $client->lastExchange());
+        self::assertStringNotContainsString('secret', (string)json_encode($client->lastExchange()));
+    }
+
     public function testMalformedBodyThrowsTransportException(): void
     {
         $client = $this->createClient([new Response(200, [], 'not json')]);

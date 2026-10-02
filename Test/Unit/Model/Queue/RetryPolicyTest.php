@@ -17,6 +17,7 @@ use Smaily\Connect\Model\Client\Exception\TransportException;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\RetryPolicy;
+use Smaily\Connect\Test\Unit\Support\StoreLocale;
 
 class RetryPolicyTest extends TestCase
 {
@@ -114,5 +115,36 @@ class RetryPolicyTest extends TestCase
         $this->eventQueue->expects(self::once())->method('markFailed');
 
         $this->policy->apply($this->event, new SmailyClientException('Credentials are not configured'));
+    }
+
+    /**
+     * PRO-3628: the row keeps the English source text even when the cron
+     * run translated the message for an Estonian store. The admin
+     * translates it when it shows the row.
+     */
+    public function testTheRowKeepsTheEnglishSourceTextOfATranslatedError(): void
+    {
+        StoreLocale::use('et_EE');
+        $refusal = new TransportException(__('Smaily API request failed with HTTP %1', 404), 404);
+        $outage = new TransportException(__('Smaily API request failed with HTTP %1', 503), 503);
+        $stored = [];
+        $this->eventQueue->method('markFailed')->willReturnCallback(
+            static function (Event $event, string $error) use (&$stored): void {
+                $stored[] = $error;
+            }
+        );
+
+        $this->policy->apply($this->event, $refusal);
+        $this->policy->apply($this->event, $outage);
+
+        self::assertSame([
+            'permanent_http_404: Smaily API request failed with HTTP 404',
+            'Smaily API request failed with HTTP 503',
+        ], $stored);
+    }
+
+    protected function tearDown(): void
+    {
+        StoreLocale::reset();
     }
 }

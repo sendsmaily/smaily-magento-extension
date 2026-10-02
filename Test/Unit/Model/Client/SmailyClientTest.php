@@ -20,11 +20,13 @@ use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
 use Smaily\Connect\Model\Client\Exception\InvalidSubdomainException;
 use Smaily\Connect\Model\Client\Exception\PlanBlockedException;
+use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\Exception\TransportException;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Test\Unit\Support\StoreLocale;
 
 class SmailyClientTest extends TestCase
 {
@@ -102,6 +104,79 @@ class SmailyClientTest extends TestCase
         } catch (ApiException $exception) {
             self::assertSame(ApiException::CODE_INVALID_DATA, $exception->getSmailyCode());
             self::assertSame(203, $exception->getResponse()['code']);
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        StoreLocale::reset();
+    }
+
+    /**
+     * @return array<string, array{0: Response, 1: string, 2: string}>
+     */
+    public static function deliveryErrors(): array
+    {
+        return [
+            'HTTP refusal' => [
+                new Response(404, [], 'Not found'),
+                'Smaily API request failed with HTTP 404',
+                'Smaily API päring ebaõnnestus (HTTP 404)',
+            ],
+            'credentials refused' => [
+                new Response(401, [], 'Unauthorized'),
+                'Smaily API credentials were rejected',
+                'Smaily lükkas API kasutajaandmed tagasi',
+            ],
+            'error envelope' => [
+                new Response(200, [], '{"code": 203, "message": "Invalid data"}'),
+                'Smaily API returned code 203: Invalid data',
+                'Smaily API tagastas koodi 203: Invalid data',
+            ],
+            'malformed body' => [
+                new Response(200, [], 'not json'),
+                'Smaily API returned a malformed response body',
+                'Smaily API tagastas vigase vastuse',
+            ],
+        ];
+    }
+
+    /**
+     * PRO-3628: a cron run translates in the store's locale. The exception
+     * keeps the English source text beside the translation, and the queue
+     * stores the source text, so the admin shows it in the admin's own
+     * language.
+     *
+     * @dataProvider deliveryErrors
+     */
+    public function testAnErrorKeepsItsEnglishSourceTextInAnEstonianStore(
+        Response $response,
+        string $source,
+        string $translated
+    ): void {
+        StoreLocale::use('et_EE');
+        $client = $this->createClient([$response]);
+
+        try {
+            $client->post(SmailyClient::ENDPOINT_CONTACT, [['email' => 'test@example.com']]);
+            self::fail('Expected a SmailyClientException');
+        } catch (SmailyClientException $exception) {
+            self::assertSame($translated, $exception->getMessage());
+            self::assertSame($source, $exception->getSourceMessage());
+        }
+    }
+
+    public function testANetworkFailureKeepsItsEnglishSourceTextInAnEstonianStore(): void
+    {
+        StoreLocale::use('et_EE');
+        $client = $this->createClient([self::networkFailure()]);
+
+        try {
+            $client->post(SmailyClient::ENDPOINT_CONTACT, [['email' => 'test@example.com']]);
+            self::fail('Expected a TransportException');
+        } catch (TransportException $exception) {
+            self::assertStringStartsWith('Smaily API päring ebaõnnestus: cURL error 28', $exception->getMessage());
+            self::assertStringStartsWith('Smaily API request failed: cURL error 28', $exception->getSourceMessage());
         }
     }
 

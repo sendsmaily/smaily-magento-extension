@@ -97,6 +97,16 @@ PRO-3591/3594/3602, PRO-1952. Earlier sessions: 2026-09-11, 2026-09-10._
   real credentials (pilot day): a Sent contact, workflow lists,
   automations, the engine exchange, catalog/customer/order ingest.
 
+- **PRO-3628 — PRO-3603 findings 2–4 (2026-10-02).** (2) A Smaily
+  delivery error is stored in English: `SmailyClientException` built from
+  a Phrase keeps the source text (`getSourceMessage()`) beside the
+  translated message; `RetryPolicy` stores that, the batch log lines
+  record it, and `FailureMessage` translates it in the admin's language
+  in the Log grid and Details (the messages it knows are listed in
+  `FailureMessage::TRANSLATED`). A row stored in Estonian before the fix
+  is shown as stored. Not covered: Campaign Intelligence errors
+  (`Model/Engine/Client.php` translates at throw time the same way).
+
 - **Automation docs corrected — a trigger for an unknown contact creates
   nothing (2026-10-02).** The `AutomationHandler` docblock, the user
   guide's automation section and the CHANGELOG's PRO-3577 bullet said a

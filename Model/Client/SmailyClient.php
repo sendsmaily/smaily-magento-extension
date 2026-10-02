@@ -35,7 +35,10 @@ use Smaily\Connect\Model\SmailyUrl;
  * SmailyClientProvider to obtain a client for a store view.
  *
  * Exception messages are translated with __(): they surface in the admin UI
- * (wizard step 1, config assist, workflow loading).
+ * (wizard step 1, config assist, workflow loading). The exception keeps the
+ * English source text too (getSourceMessage()): the queue stores that, and
+ * the Log translates it in the admin's language (Model\Log\FailureMessage,
+ * whose list names these messages).
  */
 class SmailyClient
 {
@@ -185,7 +188,7 @@ class SmailyClient
                 // are not refused, the package is (PRO-3579).
                 $this->verifiedCredentials->planBlocked($this->subdomain, $this->username, $this->password);
                 throw new PlanBlockedException(
-                    (string)__(
+                    __(
                         'Smaily refused the request because this account\'s package does not include API access.'
                         . ' Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all.'
                     ),
@@ -197,10 +200,10 @@ class SmailyClient
                 // Wherever the refusal came from (the queue included), these
                 // credentials are no longer "Connected" (PRO-3560).
                 $this->verifiedCredentials->refuse($this->subdomain, $this->username, $this->password);
-                throw new AuthenticationException((string)__('Smaily API credentials were rejected'), $status, $exception);
+                throw new AuthenticationException(__('Smaily API credentials were rejected'), $status, $exception);
             }
             throw new TransportException(
-                (string)__('Smaily API request failed with HTTP %1', $status),
+                __('Smaily API request failed with HTTP %1', $status),
                 $status,
                 $exception,
                 $this->retryAfterSeconds($exception->getResponse())
@@ -215,14 +218,14 @@ class SmailyClient
                 'endpoint' => $uri,
                 'error' => $error,
             ]);
-            throw new TransportException((string)__('Smaily API request failed: %1', $error));
+            throw new TransportException(__('Smaily API request failed: %1', $error));
         }
 
         $body = (string)$response->getBody();
         $this->lastExchange['response'] = ExchangeResponse::of($response->getStatusCode(), $body);
         $decoded = json_decode($body, true);
         if (!is_array($decoded)) {
-            throw new TransportException((string)__('Smaily API returned a malformed response body'));
+            throw new TransportException(__('Smaily API returned a malformed response body'));
         }
 
         // Summarized on purpose: full bodies would put contact PII in logs.
@@ -234,7 +237,7 @@ class SmailyClient
 
         if (isset($decoded['code']) && (int)$decoded['code'] !== ApiException::CODE_SUCCESS) {
             throw new ApiException(
-                (string)__(
+                __(
                     'Smaily API returned code %1: %2',
                     (int)$decoded['code'],
                     (string)($decoded['message'] ?? 'unknown error')

@@ -17,7 +17,7 @@ class InvalidSubdomainException extends SmailyClientException
     public function __construct()
     {
         parent::__construct(
-            (string)__('The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.')
+            __('The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.')
         );
     }
 }

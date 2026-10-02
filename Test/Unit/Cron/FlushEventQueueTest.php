@@ -19,6 +19,7 @@ use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\HandlerPool;
 use Smaily\Connect\Model\Queue\RetryPolicy;
 use Smaily\Connect\Model\Queue\Skipped;
+use Smaily\Connect\Test\Unit\Support\StoreLocale;
 
 class FlushEventQueueTest extends TestCase
 {
@@ -171,12 +172,38 @@ class FlushEventQueueTest extends TestCase
         new HandlerPool(['contact.sync' => new \stdClass()]); // @phpstan-ignore argument.type
     }
 
-    private function createCron(HandlerPool $pool): FlushEventQueue
+    /**
+     * PRO-3628: the log file records a batch failure in English, whatever
+     * the store's language.
+     */
+    public function testTheLogFileRecordsABatchFailureInEnglish(): void
+    {
+        StoreLocale::use('et_EE');
+        $this->eventQueue->method('claimBatch')->willReturn([$this->createEvent(1, 'contact.sync')]);
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willThrowException(
+            new TransportException(__('Smaily API request failed with HTTP %1', 503), 503)
+        );
+        $logger = $this->createMock(Logger::class);
+        $logger->expects(self::once())->method('info')
+            ->with('Queue batch failed', self::callback(
+                static fn (array $context): bool => $context['error'] === 'Smaily API request failed with HTTP 503'
+            ));
+
+        $this->createCron(new HandlerPool(['contact.sync' => $handler]), $logger)->execute();
+    }
+
+    protected function tearDown(): void
+    {
+        StoreLocale::reset();
+    }
+
+    private function createCron(HandlerPool $pool, ?Logger $logger = null): FlushEventQueue
     {
         return new FlushEventQueue(
             $this->eventQueue,
             $pool,
-            $this->createMock(Logger::class),
+            $logger ?? $this->createMock(Logger::class),
             new RetryPolicy($this->eventQueue)
         );
     }

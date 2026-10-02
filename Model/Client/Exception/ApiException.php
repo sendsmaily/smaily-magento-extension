@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Client\Exception;
 
+use Magento\Framework\Phrase;
+
 /**
  * Smaily API returned an error envelope (HTTP 200 with code other than 101).
  *
@@ -23,7 +25,7 @@ class ApiException extends SmailyClientException
      * @param array<string, mixed> $response
      */
     public function __construct(
-        string $message,
+        string|Phrase $message,
         private readonly int $smailyCode,
         private readonly array $response = []
     ) {

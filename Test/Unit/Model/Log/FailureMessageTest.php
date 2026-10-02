@@ -11,6 +11,7 @@ namespace Smaily\Connect\Test\Unit\Model\Log;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Log\FailureMessage;
 use Smaily\Connect\Model\Log\PayloadRedactor;
+use Smaily\Connect\Test\Unit\Support\StoreLocale;
 
 class FailureMessageTest extends TestCase
 {
@@ -56,6 +57,105 @@ class FailureMessageTest extends TestCase
                 'permanent_http_400: Address jane.doe@example.com is not valid'
             )
         );
+    }
+
+    /**
+     * PRO-3628: the row holds the English source text; the admin reads it
+     * in the admin's own language.
+     *
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function storedErrors(): array
+    {
+        return [
+            'refusal' => [
+                'permanent_http_404: Smaily API request failed with HTTP 404',
+                'Smaily API päring ebaõnnestus (HTTP 404)',
+            ],
+            'error envelope' => [
+                'Smaily API returned code 203: Invalid data',
+                'Smaily API tagastas koodi 203: Invalid data',
+            ],
+            'server message with a colon' => [
+                'Smaily API returned code 203: Field birthday: not a date',
+                'Smaily API tagastas koodi 203: Field birthday: not a date',
+            ],
+            'network failure' => [
+                'Smaily API request failed: cURL error 28: Connection timed out',
+                'Smaily API päring ebaõnnestus: cURL error 28: Connection timed out',
+            ],
+            'credentials refused' => [
+                'permanent_http_401: Smaily API credentials were rejected',
+                'Smaily lükkas API kasutajaandmed tagasi',
+            ],
+            'not configured' => [
+                'Smaily API credentials are not configured (store scope: 1)',
+                'Smaily API kasutajaandmed on seadistamata (poe skoop: 1)',
+            ],
+        ];
+    }
+
+    /**
+     * @dataProvider storedErrors
+     */
+    public function testAStoredErrorReadsInTheAdminsLanguage(string $stored, string $estonian): void
+    {
+        StoreLocale::use('et_EE');
+
+        self::assertSame($estonian, $this->failureMessage->forDisplay($stored));
+    }
+
+    public function testAnEnglishAdminReadsTheStoredEnglishText(): void
+    {
+        StoreLocale::use('en_US');
+
+        self::assertSame(
+            'Smaily API request failed with HTTP 404',
+            $this->failureMessage->forDisplay('permanent_http_404: Smaily API request failed with HTTP 404')
+        );
+    }
+
+    public function testATranslatedPartIsMaskedLikeTheRest(): void
+    {
+        StoreLocale::use('et_EE');
+
+        self::assertSame(
+            'Smaily API tagastas koodi 203: Address j***@e***.com is not valid',
+            $this->failureMessage->forDisplay('Smaily API returned code 203: Address jane.doe@example.com is not valid')
+        );
+    }
+
+    /**
+     * A row stored before PRO-3628 holds the text in the store's language;
+     * it is shown as it was stored.
+     */
+    public function testAnErrorStoredInAnotherLanguageIsShownAsStored(): void
+    {
+        StoreLocale::use('en_US');
+
+        self::assertSame(
+            'Smaily API päring ebaõnnestus (HTTP 404)',
+            $this->failureMessage->forDisplay('permanent_http_404: Smaily API päring ebaõnnestus (HTTP 404)')
+        );
+    }
+
+    public function testEveryTranslatedErrorIsInBothDictionaries(): void
+    {
+        foreach (['en_US', 'et_EE'] as $locale) {
+            $csv = (string)file_get_contents(dirname(__DIR__, 4) . '/i18n/' . $locale . '.csv');
+            foreach (FailureMessage::TRANSLATED as $source) {
+                self::assertStringContainsString(
+                    '"' . str_replace('"', '""', $source) . '","',
+                    $csv,
+                    sprintf('%s is missing from %s.csv', $source, $locale)
+                );
+            }
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        StoreLocale::reset();
     }
 
     public function testEmptyErrorStaysEmpty(): void

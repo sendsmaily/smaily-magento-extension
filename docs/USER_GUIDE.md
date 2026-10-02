@@ -567,7 +567,9 @@ panel — you do not have to keep the page open:
   (catalog, customers, orders, browse events), told apart by the
   **Source** column, with status, attempts and the last error. The error
   column shows what the other side actually said, not our internal name
-  for the failure. Select failed rows and **Retry** — each row is routed
+  for the failure. A Smaily delivery error reads in your admin language,
+  whatever the language of the store that sent the row; the log file
+  records it in English. Select failed rows and **Retry** — each row is routed
   back to its own queue; rows that cannot safely be sent again are left
   alone and counted ("2 event(s) queued for retry, 1 skipped because
   sending again would not be safe").

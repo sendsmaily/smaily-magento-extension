@@ -76,7 +76,7 @@ class FlushEventQueue
             $this->logger->info('Queue batch failed', [
                 'event_type' => $eventType,
                 'count' => count($events),
-                'error' => $exception->getMessage(),
+                'error' => $exception->getSourceMessage(),
             ]);
 
             return;

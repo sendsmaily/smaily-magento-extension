@@ -82,14 +82,14 @@ class RetryPolicy
                 'reason' => sprintf(
                     'permanent_http_%d: %s',
                     $exception->getHttpStatus(),
-                    $exception->getMessage()
+                    $exception->getSourceMessage()
                 ),
                 'retryAfter' => null,
                 'terminal' => true,
             ];
         } else {
             $verdict = [
-                'reason' => $exception->getMessage(),
+                'reason' => $exception->getSourceMessage(),
                 'retryAfter' => $exception instanceof TransportException ? $exception->getRetryAfter() : null,
                 'terminal' => false,
             ];

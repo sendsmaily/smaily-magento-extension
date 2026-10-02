@@ -79,7 +79,7 @@ class ContactSyncHandler implements EventHandlerInterface
                 $this->logger->info('Contact sync batch failed', [
                     'store_id' => $storeId,
                     'count' => count($rows),
-                    'error' => $exception->getMessage(),
+                    'error' => $exception->getSourceMessage(),
                 ]);
             }
 

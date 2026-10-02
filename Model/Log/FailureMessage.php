@@ -17,9 +17,32 @@ namespace Smaily\Connect\Model\Log;
  * exactly like the payload beside it; the classification stays for the
  * Details drawer, where the technical detail belongs. A retryable failure
  * carries no prefix and is shown as it is.
+ *
+ * The client's own messages are stored as English source text, whatever the
+ * store's language (PRO-3628), and are translated here, in the admin's
+ * language, when the row is shown. A row stored in another language before
+ * that, or a message that is not one of ours, is shown as stored.
  */
 class FailureMessage
 {
+    /**
+     * The client messages a queue row can store, as written in __() in
+     * Model\Client\SmailyClient, SmailyClientProvider and
+     * Exception\InvalidSubdomainException. A message added there that the
+     * queue can store is added here too, or it is shown in English.
+     */
+    public const TRANSLATED = [
+        'Smaily refused the request because this account\'s package does not include API access.'
+            . ' Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all.',
+        'Smaily API credentials were rejected',
+        'Smaily API request failed with HTTP %1',
+        'Smaily API request failed: %1',
+        'Smaily API returned a malformed response body',
+        'Smaily API returned code %1: %2',
+        'Smaily API credentials are not configured (store scope: %1)',
+        'The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.',
+    ];
+
     /** What RetryPolicy prepends to a refusal it parked on the spot. */
     private const CLASS_PATTERN = '/^(permanent_http_\d+):\s*/';
 
@@ -30,12 +53,13 @@ class FailureMessage
 
     /**
      * The merchant-facing wording of a stored `last_error`: the server's own
-     * message where there is one, with PII masked.
+     * message where there is one, in the admin's language where it is one of
+     * ours, with PII masked.
      */
     public function forDisplay(?string $lastError): string
     {
         return $this->redactor->redact(
-            (string)preg_replace(self::CLASS_PATTERN, '', trim((string)$lastError))
+            $this->translate((string)preg_replace(self::CLASS_PATTERN, '', trim((string)$lastError)))
         );
     }
 
@@ -48,5 +72,17 @@ class FailureMessage
         preg_match(self::CLASS_PATTERN, trim((string)$lastError), $matches);
 
         return $matches[1] ?? '';
+    }
+
+    private function translate(string $message): string
+    {
+        foreach (self::TRANSLATED as $source) {
+            $pattern = '/^' . preg_replace('/%\d+/', '(.*?)', preg_quote($source, '/')) . '$/su';
+            if (preg_match($pattern, $message, $matches)) {
+                return (string)__($source, ...array_slice($matches, 1));
+            }
+        }
+
+        return $message;
     }
 }

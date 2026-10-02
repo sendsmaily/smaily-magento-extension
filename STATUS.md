@@ -16,6 +16,28 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3642 done — skipped and withdrawn rows are not deliveries for Send
+  again, and the Dashboard reads them as the Log does (2026-10-02).**
+  `EventQueue` has one private delivered rule, `deliveredCondition()`
+  (sent, request on record, not `CANCELLED_RESPONSE`, empty `last_error`
+  — the Log's withdrawn/skipped markers), used by both
+  `hasDeliveredAutomation()` and `laterDeliveredOfSameTrigger()` (computed
+  in SQL as a `delivered` column). Before, a later skipped row (stored
+  `sent`) counted as "a later message already reached this contact" and
+  hid Send again; and a skip that kept an earlier attempt's request counted
+  as a delivered abandoned-cart reminder. The Log's status derivation is
+  now `Collection::smailyStatusExpression()`, read by the grid's UNION and
+  by `DashboardStats::recentActivity()`; `DashboardData::getRecentActivity()`
+  adds `status_label` (the Log's `QueueStatusOptions`) and `status_pill`
+  (`StatusPill`), and the template draws those — its own label map and
+  pill map are gone. No new phrases. Tests RED first: integration
+  `EventQueueTest` (+1), `ResendTest` (+1; the existing superseded fixture
+  now carries the request a real delivery stores), `DashboardStatsTest`
+  (+1); unit `DashboardDataTest` (+1). CHANGELOG near-duplicate bullets
+  (durable queues, Details, historical import) merged into one each.
+  Gates: unit 638, phpcs 0 errors in the changed files, phpstan `[OK]`,
+  integration 135.
+
 - **PRO-3634 done — rows closed without sending read Skipped and are not
   counted as delivered (2026-10-02).** Three handler paths answered `true`
   (stored as a plain `sent`) without a request; they now answer

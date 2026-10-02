@@ -18,6 +18,8 @@ use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Health\QueueHealth;
+use Smaily\Connect\Model\Log\StatusPill;
+use Smaily\Connect\Ui\Component\QueueStatusOptions;
 
 /**
  * Operational dashboard data. The verdict reuses the HealthCheck cron's
@@ -44,7 +46,9 @@ class DashboardData implements ArgumentInterface
         private readonly DashboardStats $stats,
         private readonly FlagManager $flagManager,
         private readonly VerifiedCredentials $verifiedCredentials,
-        private readonly WebsiteContext $websiteContext
+        private readonly WebsiteContext $websiteContext,
+        private readonly StatusPill $statusPill,
+        private readonly QueueStatusOptions $statusOptions
     ) {
     }
 
@@ -197,11 +201,24 @@ class DashboardData implements ArgumentInterface
     }
 
     /**
+     * The latest queue rows, each with the label and pill variant the Log
+     * gives its status (PRO-3642): the Log's status filter options name it,
+     * StatusPill colours it.
+     *
      * @return array<int, array{source: string, type: string, entity_id: string,
-     *     status: string, updated_at: string}>
+     *     status: string, updated_at: string, status_label: string|\Magento\Framework\Phrase,
+     *     status_pill: string}>
      */
     public function getRecentActivity(int $limit = 10): array
     {
-        return $this->stats->recentActivity($limit);
+        $labels = array_column($this->statusOptions->toOptionArray(), 'label', 'value');
+        $rows = [];
+        foreach ($this->stats->recentActivity($limit) as $row) {
+            $row['status_label'] = $labels[$row['status']] ?? $row['status'];
+            $row['status_pill'] = $this->statusPill->variant($row['status']);
+            $rows[] = $row;
+        }
+
+        return $rows;
     }
 }

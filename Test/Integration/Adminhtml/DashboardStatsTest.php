@@ -9,10 +9,12 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Integration\Adminhtml;
 
 use Smaily\Connect\Model\Adminhtml\DashboardStats;
+use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Model\Queue\Handler\ContactSyncHandler;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
+use Smaily\Connect\Model\ResourceModel\Log\Collection;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 
@@ -84,6 +86,44 @@ class DashboardStatsTest extends IntegrationTestCase
         $this->ingestRow('sent', $today, 'catalog_remove');
 
         self::assertSame(2, $this->objectManager->create(DashboardStats::class)->catalogItemsDelivered());
+    }
+
+    /**
+     * PRO-3642: recent activity reads each row's status as the Log does —
+     * a row closed without sending is Skipped, a withdrawn one Withdrawn
+     * (withdrawn wins over an earlier attempt's error), not Sent.
+     */
+    public function testRecentActivityReadsSkippedAndWithdrawnAsTheLogDoes(): void
+    {
+        $today = $this->clockDate();
+
+        $this->smailyRow('sent', $today);
+        $this->smailyRow('sent', $today, 0, ['last_error' => ContactSyncHandler::SKIPPED_NOT_A_CONTACT]);
+        $this->smailyRow('sent', $today, 1, [
+            'last_response' => EventQueue::CANCELLED_RESPONSE,
+            'last_error' => 'Connection timed out',
+        ]);
+        $this->smailyRow('failed', $today, 5, ['last_error' => 'boom']);
+        $this->ingestRow('sent', $today);
+
+        $statuses = [];
+        foreach ($this->objectManager->create(DashboardStats::class)->recentActivity() as $row) {
+            $statuses[$row['source']][] = $row['status'];
+        }
+        sort($statuses['smaily']);
+
+        self::assertSame(
+            [
+                'smaily' => [
+                    Event::STATUS_FAILED,
+                    Event::STATUS_SENT,
+                    Collection::STATUS_SKIPPED,
+                    Collection::STATUS_WITHDRAWN,
+                ],
+                'intelligence' => ['sent'],
+            ],
+            $statuses
+        );
     }
 
     /**

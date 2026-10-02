@@ -289,6 +289,24 @@ class EventQueueTest extends IntegrationTestCase
         self::assertTrue($this->queue->hasDeliveredAutomation('abandoned_cart', 'shopper@example.com'));
     }
 
+    /**
+     * PRO-3642: a row skipped after an earlier failed attempt keeps that
+     * attempt's request, but nothing reached the contact — the Log reads it
+     * as Skipped, and it does not count as delivered.
+     */
+    public function testASkipThatKeptAnEarlierRequestIsNotADelivery(): void
+    {
+        $this->seedAutomation('abandoned_cart', 'shopper@example.com', 'u-1');
+        $claimed = $this->queue->claimBatch();
+        $this->queue->recordExchange($claimed[0], [['email' => 'shopper@example.com']], null);
+        $this->queue->markFailed($claimed[0], 'Connection timed out');
+        $this->clock->travel(3600);
+        $claimed = $this->queue->claimBatch();
+        $this->queue->markSkipped($claimed[0], 'Skipped: no Smaily workflow is mapped to this automation trigger.');
+
+        self::assertFalse($this->queue->hasDeliveredAutomation('abandoned_cart', 'shopper@example.com'));
+    }
+
     private function seedAutomation(string $trigger, string $email, string $uuid): void
     {
         $this->queue->enqueue(

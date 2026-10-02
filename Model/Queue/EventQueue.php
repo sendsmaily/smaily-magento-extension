@@ -333,9 +333,9 @@ class EventQueue
 
     /**
      * Whether an automation of one trigger went out to Smaily for a contact
-     * (PRO-3619): a row closed as sent with a request on record and not
-     * withdrawn — a skip that POSTed nothing, a row still waiting and one
-     * given up do not count. Bounded by the janitor's retention of sent rows.
+     * (PRO-3619): a delivered row by deliveredCondition() — a skip, a
+     * withdrawal, a row still waiting and one given up do not count.
+     * Bounded by the janitor's retention of sent rows.
      */
     public function hasDeliveredAutomation(string $trigger, string $entityId): bool
     {
@@ -345,9 +345,7 @@ class EventQueue
                 ->from($this->resourceConnection->getTableName(EventResource::TABLE_NAME), ['payload'])
                 ->where('event_type = ?', EventType::AUTOMATION_TRIGGER)
                 ->where('entity_id = ?', $entityId)
-                ->where('status = ?', Event::STATUS_SENT)
-                ->where('sent_payload IS NOT NULL')
-                ->where('last_response IS NULL OR last_response != ?', self::CANCELLED_RESPONSE)
+                ->where($this->deliveredCondition())
         );
 
         foreach ($payloads as $payload) {
@@ -361,8 +359,10 @@ class EventQueue
 
     /**
      * Which of these automation rows a later delivery already superseded:
-     * one of the same trigger, to the same contact, that was sent after it
-     * and not itself withdrawn (PRO-2454). A trigger lives in the payload —
+     * one of the same trigger, to the same contact, that was delivered after
+     * it (PRO-2454) — by deliveredCondition(), so a later row that was
+     * skipped or withdrawn reached nobody and stands in no one's way
+     * (PRO-3642). A trigger lives in the payload —
      * the Log's grid never carries it — so one query brings this queue's
      * automation rows for those contacts and the triggers are read here.
      *
@@ -380,7 +380,14 @@ class EventQueue
             $connection->select()
                 ->from(
                     $this->resourceConnection->getTableName(EventResource::TABLE_NAME),
-                    ['id', 'entity_id', 'payload', 'status', 'last_response']
+                    [
+                        'id',
+                        'entity_id',
+                        'payload',
+                        'delivered' => new \Zend_Db_Expr(
+                            'CASE WHEN ' . $this->deliveredCondition() . ' THEN 1 ELSE 0 END'
+                        ),
+                    ]
                 )
                 ->where('event_type = ?', EventType::AUTOMATION_TRIGGER)
                 ->where('entity_id IN (?)', array_values(array_unique($entityIds)))
@@ -390,8 +397,7 @@ class EventQueue
         foreach ($rows as $row) {
             $byEntity[(string)$row['entity_id']][(int)$row['id']] = [
                 'trigger' => $this->triggerOf((string)$row['payload']),
-                'delivered' => (string)$row['status'] === Event::STATUS_SENT
-                    && (string)($row['last_response'] ?? '') !== self::CANCELLED_RESPONSE,
+                'delivered' => (int)$row['delivered'] === 1,
             ];
         }
 
@@ -420,6 +426,26 @@ class EventQueue
     public function decodePayload(Event $event): array
     {
         return Resend::stripRecord($this->payloadDecoder->decode($event->getPayload()));
+    }
+
+    /**
+     * The one rule for "this row reached the contact", as SQL over a queue
+     * row: closed as sent with a request on record, not withdrawn
+     * (CANCELLED_RESPONSE) and with no skip reason in `last_error` — the
+     * Log's own reading, where either marker makes the row Withdrawn or
+     * Skipped. A skipped or withdrawn row may keep an earlier attempt's
+     * request, so the request alone does not make a delivery.
+     */
+    private function deliveredCondition(): string
+    {
+        $connection = $this->resourceConnection->getConnection();
+
+        return sprintf(
+            "(status = %s AND sent_payload IS NOT NULL AND COALESCE(last_response, '') <> %s"
+            . " AND COALESCE(last_error, '') = '')",
+            $connection->quote(Event::STATUS_SENT),
+            $connection->quote(self::CANCELLED_RESPONSE)
+        );
     }
 
     /**

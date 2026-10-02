@@ -10,6 +10,7 @@ namespace Smaily\Connect\Model\ResourceModel\Log;
 
 use Magento\Framework\Data\Collection\Db\FetchStrategyInterface as FetchStrategy;
 use Magento\Framework\Data\Collection\EntityFactoryInterface as EntityFactory;
+use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\Framework\DB\Select;
 use Magento\Framework\Event\ManagerInterface as EventManager;
 use Magento\Framework\View\Element\UiComponent\DataProvider\SearchResult;
@@ -48,6 +49,27 @@ class Collection extends SearchResult
      * one (PRO-3565).
      */
     public const STATUS_SKIPPED = 'skipped';
+
+    /**
+     * The status the Log shows for a row of the marketing queue, as SQL over
+     * its columns (prefixed with $alias): a sent row with the withdrawal
+     * marker reads Withdrawn, one with a skip reason Skipped, any other row
+     * its stored status. Withdrawn wins: a withdrawn row may keep an earlier
+     * attempt's error. The grid and the Dashboard's recent activity both
+     * read it from here.
+     */
+    public static function smailyStatusExpression(AdapterInterface $connection, string $alias): \Zend_Db_Expr
+    {
+        return new \Zend_Db_Expr(sprintf(
+            'CASE WHEN %5$s.status = %1$s AND %5$s.last_response = %2$s THEN %3$s'
+            . ' WHEN %5$s.status = %1$s AND %5$s.last_error <> \'\' THEN %4$s ELSE %5$s.status END',
+            $connection->quote(Event::STATUS_SENT),
+            $connection->quote(EventQueue::CANCELLED_RESPONSE),
+            $connection->quote(self::STATUS_WITHDRAWN),
+            $connection->quote(self::STATUS_SKIPPED),
+            $alias
+        ));
+    }
 
     /**
      * Split a composite log id back into its queue and row id. Unknown
@@ -123,17 +145,9 @@ class Collection extends SearchResult
                 'entity_id' => 'q.entity_id',
                 // Only the marketing queue withdraws or skips rows, so only
                 // its half can carry either marker; the grid label and the
-                // status filter both read this one derived column. Withdrawn
-                // wins: a withdrawn row may keep an earlier attempt's error.
+                // status filter both read this one derived column.
                 'status' => $source === self::SOURCE_SMAILY
-                    ? new \Zend_Db_Expr(sprintf(
-                        'CASE WHEN q.status = %1$s AND q.last_response = %2$s THEN %3$s'
-                        . ' WHEN q.status = %1$s AND q.last_error <> \'\' THEN %4$s ELSE q.status END',
-                        $connection->quote(Event::STATUS_SENT),
-                        $connection->quote(EventQueue::CANCELLED_RESPONSE),
-                        $connection->quote(self::STATUS_WITHDRAWN),
-                        $connection->quote(self::STATUS_SKIPPED)
-                    ))
+                    ? self::smailyStatusExpression($connection, 'q')
                     : 'q.status',
                 'attempts' => 'q.attempts',
                 'last_error' => 'q.last_error',

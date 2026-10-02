@@ -14,6 +14,7 @@ use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
+use Smaily\Connect\Model\ResourceModel\Log\Collection as LogCollection;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 
 /**
@@ -81,7 +82,9 @@ class DashboardStats
     }
 
     /**
-     * The latest queue rows from both queues, newest first.
+     * The latest queue rows from both queues, newest first. A marketing-queue
+     * row's status is the one the Log shows (PRO-3642): Skipped and
+     * Withdrawn are read off the row the same way, never shown as Sent.
      *
      * @return array<int, array{source: string, type: string, entity_id: string,
      *     status: string, updated_at: string}>
@@ -92,14 +95,14 @@ class DashboardStats
         $rows = [];
 
         $eventSelect = $connection->select()
-            ->from($this->resourceConnection->getTableName(EventResource::TABLE_NAME), [
-                'type' => 'event_type',
-                'entity_id',
-                'status',
-                'updated_at',
+            ->from(['q' => $this->resourceConnection->getTableName(EventResource::TABLE_NAME)], [
+                'type' => 'q.event_type',
+                'entity_id' => 'q.entity_id',
+                'status' => LogCollection::smailyStatusExpression($connection, 'q'),
+                'updated_at' => 'q.updated_at',
             ])
-            ->order('updated_at DESC')
-            ->order('id DESC')
+            ->order('q.updated_at DESC')
+            ->order('q.id DESC')
             ->limit($limit);
         foreach ($connection->fetchAll($eventSelect) as $row) {
             $rows[] = ['source' => 'smaily'] + array_map('strval', $row);

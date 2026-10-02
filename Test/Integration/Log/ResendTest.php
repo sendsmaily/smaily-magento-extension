@@ -116,9 +116,10 @@ class ResendTest extends IntegrationTestCase
         $this->queue->enqueue(EventType::AUTOMATION_TRIGGER, ['trigger_type' => 'welcome'], 'jane@example.com', 0, 'u-1');
         $this->markFailed(1);
         $this->queue->enqueue(EventType::AUTOMATION_TRIGGER, ['trigger_type' => 'welcome'], 'jane@example.com', 0, 'u-2');
+        // A delivery keeps the request it sent (PRO-3642: the Log's delivered rule).
         $this->connection->update(
             EventResource::TABLE_NAME,
-            ['status' => Event::STATUS_SENT],
+            ['status' => Event::STATUS_SENT, 'sent_payload' => '[{"email":"jane@example.com"}]'],
             ['id = ?' => 2]
         );
 
@@ -150,6 +151,36 @@ class ResendTest extends IntegrationTestCase
             ['status' => Event::STATUS_SENT],
             ['id = ?' => 2]
         );
+
+        self::assertSame(
+            '',
+            $this->guard->refusalReason(
+                Collection::SOURCE_SMAILY,
+                1,
+                (array)$this->rowLoader->load('smaily-1')
+            )
+        );
+    }
+
+    /**
+     * PRO-3642: a later row of the same trigger that was skipped or
+     * withdrawn reached nobody, so it does not stand in the way of sending
+     * the failed one again — the same delivered rule as the Log.
+     */
+    public function testALaterSkippedOrWithdrawnRowDoesNotSupersede(): void
+    {
+        $this->queue->enqueue(EventType::AUTOMATION_TRIGGER, ['trigger_type' => 'abandoned_cart'], 'jane@example.com', 0, 'u-1');
+        $this->markFailed(1);
+        $this->queue->enqueue(EventType::AUTOMATION_TRIGGER, ['trigger_type' => 'abandoned_cart'], 'jane@example.com', 0, 'u-2');
+        $claimed = $this->queue->claimBatch();
+        $this->queue->markSkipped($claimed[0], 'Skipped: no Smaily workflow is mapped to this automation trigger.');
+        $this->queue->enqueue(EventType::AUTOMATION_TRIGGER, ['trigger_type' => 'abandoned_cart'], 'jane@example.com', 0, 'u-3');
+        $this->connection->update(
+            EventResource::TABLE_NAME,
+            ['sent_payload' => '[{"email":"jane@example.com"}]', 'last_response' => '{"http_status":503}'],
+            ['id = ?' => 3]
+        );
+        $this->queue->cancelPendingAutomation('abandoned_cart', 'jane@example.com');
 
         self::assertSame(
             '',

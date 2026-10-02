@@ -17,6 +17,8 @@ use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Health\QueueHealth;
+use Smaily\Connect\Model\Log\StatusPill;
+use Smaily\Connect\Ui\Component\QueueStatusOptions;
 use Smaily\Connect\ViewModel\Adminhtml\DashboardData;
 
 /**
@@ -87,12 +89,41 @@ class DashboardDataTest extends TestCase
         self::assertSame(DashboardData::VERDICT_INCOMPLETE, $viewModel->getVerdict());
     }
 
+    /**
+     * PRO-3642: recent activity names and colours each status as the Log
+     * does — a skipped or withdrawn row reads as such in a grey pill.
+     */
+    public function testRecentActivityCarriesTheLogsStatusLabelAndPill(): void
+    {
+        $stats = $this->createMock(DashboardStats::class);
+        $stats->method('recentActivity')->with(10)->willReturn([
+            ['source' => 'smaily', 'type' => 'contact.sync', 'entity_id' => 'a@example.com',
+                'status' => 'skipped', 'updated_at' => '2026-10-02 10:00:00'],
+            ['source' => 'smaily', 'type' => 'automation.trigger', 'entity_id' => 'b@example.com',
+                'status' => 'withdrawn', 'updated_at' => '2026-10-02 09:00:00'],
+            ['source' => 'intelligence', 'type' => 'catalog', 'entity_id' => '1',
+                'status' => 'sent', 'updated_at' => '2026-10-02 08:00:00'],
+        ]);
+
+        $rows = $this->createViewModel(false, stats: $stats)->getRecentActivity(10);
+
+        self::assertSame(
+            [['Skipped', 'neutral'], ['Withdrawn', 'neutral'], ['Sent', 'sent']],
+            array_map(
+                static fn (array $row): array => [(string)$row['status_label'], $row['status_pill']],
+                $rows
+            )
+        );
+        self::assertSame('skipped', $rows[0]['status']);
+    }
+
     private function createViewModel(
         bool $refused,
         bool $smailyVerified = true,
         int $failed = 0,
         bool $setupCompleted = true,
-        bool $planBlocked = false
+        bool $planBlocked = false,
+        ?DashboardStats $stats = null
     ): DashboardData {
         $engineSettings = $this->createMock(EngineSettings::class);
         $engineSettings->method('isConnected')->willReturn(true);
@@ -117,10 +148,12 @@ class DashboardDataTest extends TestCase
             $engineSettings,
             $setupGuard,
             $queueHealth,
-            $this->createMock(DashboardStats::class),
+            $stats ?? $this->createMock(DashboardStats::class),
             $this->createMock(FlagManager::class),
             $verifiedCredentials,
-            $websiteContext
+            $websiteContext,
+            new StatusPill(),
+            new QueueStatusOptions()
         );
     }
 }

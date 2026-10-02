@@ -64,7 +64,7 @@ Everything lives under **Marketing > Smaily Connect**, four pages:
 
 | Page | What it is |
 |---|---|
-| **Dashboard** | The landing page: a one-sentence health verdict, connection status for Smaily / Campaign Intelligence / browse tracking, operational counters (deliveries in the last 30 days — only events that reached Smaily or Campaign Intelligence, never a skipped or withdrawn row — the events queued today that are still waiting to send, failures) and the latest queue activity. Every number is a real local queue query. When deliveries failed in the last 24 hours, a warning banner above the verdict counts them and the verdict carries a red **Review failures** button — both open the Log filtered to failed rows; when everything runs, the verdict offers **View full log**. |
+| **Dashboard** | The landing page: a one-sentence health verdict, connection status for Smaily / Campaign Intelligence / browse tracking, operational counters (deliveries in the last 30 days — only events that reached Smaily or Campaign Intelligence, never a skipped or withdrawn row — the events queued today that are still waiting to send, failures) and the latest queue activity, each row's status labelled and coloured as in the Log (*Skipped* and *Withdrawn* included). Every number is a real local queue query. When deliveries failed in the last 24 hours, a warning banner above the verdict counts them and the verdict carries a red **Review failures** button — both open the Log filtered to failed rows; when everything runs, the verdict offers **View full log**. |
 | **Initial setup** | The guided five-step onboarding. On a fresh install every Smaily Connect page brings you here until setup is completed; you can re-run it any time — your settings are kept. |
 | **Settings** | The initial setup's content as always-available tabs — Connection, Contacts, Automations, Intelligence, RSS. Each tab saves instantly via AJAX. Tabs are deep-linkable (`?tab=rss`). |
 | **Log** | One unified delivery log for both Smaily and Campaign Intelligence, with mass retry for failed rows. |
@@ -619,7 +619,9 @@ card — you do not have to keep the page open:
   would reach the shopper twice or reach nobody. Details on such a row says
   which of the three it is: the reminder was withdrawn when the shopper
   completed the purchase, a later message of the same kind already reached
-  that contact, or the contact's data was erased under Art. 17.
+  that contact, or the contact's data was erased under Art. 17. A later
+  row that was skipped or withdrawn reached nobody, so it does not count as
+  "already reached".
 - **Withdrawn** is its own status in the grid and in the status filter: a
   reminder the store called back because the shopper bought in the
   meantime. Nothing was delivered and nothing failed, so it is labelled as

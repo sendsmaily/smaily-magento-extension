@@ -60,7 +60,7 @@ class DatabaseScopeConfig implements ScopeConfigInterface
         return (bool)$this->getValue($path, $scopeType, $scopeCode);
     }
 
-    private function row(string $scope, int $scopeId, string $path): ?string
+    protected function row(string $scope, int $scopeId, string $path): ?string
     {
         $values = $this->connection->fetchCol(
             $this->connection->select()->from('core_config_data', ['value'])

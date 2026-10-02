@@ -258,7 +258,7 @@ class WizardStepSaver
             );
         }
 
-        $this->checkCredentials($subdomain, $username, $password);
+        $this->checkCredentials($subdomain, $username, $password, $websiteId);
 
         return [];
     }
@@ -462,14 +462,20 @@ class WizardStepSaver
      * remembers the answer for the Dashboard and the Connection status. The
      * save never depends on it — a refusal or an unreachable Smaily is shown
      * as "Not connected", not as a failed save.
+     *
+     * The account checked is the one saved at website scope — the single
+     * account, or in mode A the default fallback account. An empty or masked
+     * password keeps that scope's password, which this request has not
+     * changed; not the website's default store view's, which in mode A can
+     * belong to another language's account, and which the configuration
+     * read in this request still shows after leaving mode A removed it
+     * (PRO-3717).
      */
-    private function checkCredentials(string $subdomain, string $username, string $password): void
+    private function checkCredentials(string $subdomain, string $username, string $password, int $websiteId): void
     {
-        // An empty or masked password keeps the stored one, still unchanged in this request.
-        $password = $this->credentialCheck->resolvePassword(
-            $password === '' ? null : $password,
-            $this->websiteContext->getStoreId()
-        );
+        if ($password === '' || $this->credentialCheck->isKeptPassword($password)) {
+            $password = $this->config->getWebsitePassword($websiteId);
+        }
 
         try {
             $this->connectionAccepted = $this->credentialCheck->check($subdomain, $username, $password);

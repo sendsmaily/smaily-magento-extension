@@ -298,10 +298,16 @@ class WizardStepSaverTest extends TestCase
         $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'password' => 'secret']);
     }
 
+    /**
+     * PRO-3717: the password saved for the website — the scope the
+     * subdomain and username are saved at — not its default store view's.
+     */
     public function testAKeptPasswordIsCheckedAsStored(): void
     {
+        $this->websiteContext->method('getWebsiteId')->willReturn(3);
         $this->websiteContext->method('getStoreId')->willReturn(1);
-        $this->config->method('getPassword')->with(1)->willReturn('stored-secret');
+        $this->config->method('getPassword')->willReturn('store-view-secret');
+        $this->config->method('getWebsitePassword')->with(3)->willReturn('stored-secret');
         $this->clientFactory->expects(self::once())->method('create')
             ->with(['subdomain' => 'demo', 'username' => 'api-user', 'password' => 'stored-secret'])
             ->willReturn($this->createMock(SmailyClient::class));
@@ -348,7 +354,7 @@ class WizardStepSaverTest extends TestCase
 
     public function testAConnectionSaveWithoutAPasswordToCheckIsNotAccepted(): void
     {
-        $this->config->method('getPassword')->willReturn('');
+        $this->config->method('getWebsitePassword')->willReturn('');
         $this->clientFactory->expects(self::never())->method('create');
 
         $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'password' => '']);

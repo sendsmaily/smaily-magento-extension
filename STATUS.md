@@ -7,9 +7,11 @@
 
 _Last updated: 2026-10-03 — after the rc3 cut: PRO-3714 (a variant
 without a category of its own takes its parent's), PRO-3715 (an empty-SKU
-configurable order line names the variant bought) and PRO-3699 (leaving
+configurable order line names the variant bought), PRO-3699 (leaving
 per-language accounts needs the password of an account other than the
-website's), listed in CHANGELOG under "Changes since 3.0.0-rc3".
+website's) and PRO-3717 (the post-save connection check pairs the website
+account with the website password), listed in CHANGELOG under "Changes
+since 3.0.0-rc3".
 2026-10-02: 3.0.0-rc3 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc3),
 built by the release workflow from commit a1ff618; the ZIP and its .sha256
@@ -35,6 +37,36 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3717 — with per-language accounts, the post-save connection status
+  checks the right password (2026-10-03; found by reading code during
+  PRO-3699, reproduced in the integration harness).**
+  `WizardStepSaver::checkCredentials()` checked the posted top-level
+  (website-scope) subdomain and username, but an empty password came from
+  the website's default store view (`resolvePassword(..., getStoreId())`).
+  In mode A with a default store view whose language is not the fallback
+  language, that paired the en fallback account with the et password
+  (measured on the old code), Smaily refused it, and the status said "Not
+  connected" although every saved account worked. Leaving mode A did the
+  same: the store-view rows were deleted, but the scope config read in the
+  request still held them. Now an empty or masked password is the
+  website-scope one (`Config::getWebsitePassword`, new) — the scope the
+  subdomain and username are written to; a kept password is not written in
+  the request, so the request's config is not stale for it. Meaning of the
+  status unchanged: after a save it describes the account saved for the
+  website (the single account; in mode A the default fallback account).
+  Integration `PerLanguageAccountsSaveTest`: the saver now reads through a
+  new fake `RequestCachedScopeConfig` (core_config_data loaded once per
+  request, as Magento does; cleared when the saver cleans the config cache
+  type), and Smaily accepts only each language's own account; a mode-A save
+  with an et default store view checks en-shop/en-user/en-secret and is
+  accepted; leaving mode A with the fallback account and an empty password
+  checks the en password — both red on the old code (they got et-secret).
+  Unit `testAKeptPasswordIsCheckedAsStored` now reads the website's
+  password. USER_GUIDE (Default fallback account), CHANGELOG. Not run in
+  the sandbox. Known, not changed: after a reload the status reads the
+  default store view's account (`WizardData::isSmailyVerified`), which in
+  mode A can be another language's account than the one a save checks.
 
 - **PRO-3715 — a purchase line without a SKU names the same product as the
   bought item's catalog row (2026-10-03; found by a read-only review).** An

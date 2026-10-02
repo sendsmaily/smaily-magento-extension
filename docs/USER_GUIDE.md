@@ -277,7 +277,10 @@ store view.
 **Default fallback account (per-language accounts mode).** The picked
 account handles contacts whose language cannot be matched to any account,
 and its credentials also serve every scope without a per-language
-override. Switching the multilingual mode away from per-language accounts
+override. After a save, the connection-status line beside the button says
+whether Smaily accepted the default fallback account — the account saved
+for the whole website — whatever language the default store view has; each
+language block's own status shows that language's account. Switching the multilingual mode away from per-language accounts
 removes the per-store-view credential overrides (the panel asks for
 confirmation first); workflow mappings are kept but stop being used
 outside the per-language modes. The single account is saved for the whole

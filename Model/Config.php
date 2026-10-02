@@ -114,6 +114,17 @@ class Config
     }
 
     /**
+     * The decrypted Smaily API password saved for a website (its own, else
+     * the default scope's).
+     */
+    public function getWebsitePassword(int $websiteId): string
+    {
+        $encrypted = (string)$this->websiteValue(self::XML_PATH_PASSWORD, $websiteId);
+
+        return $encrypted === '' ? '' : $this->encryptor->decrypt($encrypted);
+    }
+
+    /**
      * Whether a complete set of API credentials is configured for the scope.
      *
      * @param int|string|null $storeId

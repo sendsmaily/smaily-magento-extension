@@ -22,6 +22,8 @@ use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
 use Smaily\Connect\Model\Automation\MappingSaver;
 use Smaily\Connect\Model\Client\CredentialCheck;
+use Smaily\Connect\Model\Client\Exception\AuthenticationException;
+use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
@@ -30,6 +32,7 @@ use Smaily\Connect\Model\Multilingual\LanguageResolver;
 use Smaily\Connect\Model\SubdomainNormalizer;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
+use Smaily\Connect\Test\Integration\Support\Fake\RequestCachedScopeConfig;
 
 /**
  * PRO-3683: with per-language Smaily accounts, saving the accounts gives
@@ -60,12 +63,45 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
 
     private Config $config;
 
+    /**
+     * The credentials each connection save asked Smaily about.
+     *
+     * @var array<int, array<string, string>>
+     */
+    private array $checked = [];
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $scopeConfig = new DatabaseScopeConfig($this->connection, self::STORES);
         $this->config = $this->objectManager->create(Config::class, ['scopeConfig' => $scopeConfig]);
+        // The saver reads the configuration as Magento does in a request: as
+        // it was when the request first read it. Its end (the saver cleans
+        // the config cache type) starts the next request.
+        $requestScopeConfig = new RequestCachedScopeConfig($this->connection, self::STORES);
+        $requestConfig = $this->objectManager->create(Config::class, ['scopeConfig' => $requestScopeConfig]);
+        $cacheTypeList = $this->createMock(TypeListInterface::class);
+        $cacheTypeList->method('cleanType')->willReturnCallback(
+            static function () use ($requestScopeConfig): void {
+                $requestScopeConfig->clear();
+            }
+        );
+        // Smaily accepts each language's own account only: <language>-shop,
+        // <language>-user, <language>-secret.
+        $this->checked = [];
+        $clientFactory = $this->createMock(SmailyClientFactory::class);
+        $clientFactory->method('create')->willReturnCallback(function (array $credentials): SmailyClient {
+            $this->checked[] = $credentials;
+            $client = $this->createMock(SmailyClient::class);
+            if ($credentials !== $this->credentials(explode('-', $credentials['subdomain'])[0])) {
+                $client->method('validateCredentials')->willThrowException(
+                    new AuthenticationException('refused', 401)
+                );
+            }
+
+            return $client;
+        });
 
         $defaultStore = $this->createMock(StoreInterface::class);
         $defaultStore->method('getWebsiteId')->willReturn(self::WEBSITE_ID);
@@ -91,16 +127,16 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
         $this->saver = new WizardStepSaver(
             $this->objectManager->get(WriterInterface::class),
             $this->objectManager->get(EncryptorInterface::class),
-            $this->createMock(TypeListInterface::class),
+            $cacheTypeList,
             new SubdomainNormalizer(),
-            new AccountResolver($storeManager, new LanguageResolver($scopeConfig)),
-            $this->config,
+            new AccountResolver($storeManager, new LanguageResolver($requestScopeConfig)),
+            $requestConfig,
             new WebsiteContext($storeManager, $request),
             $storeManager,
             $this->objectManager->get(MappingSaver::class),
             $this->createMock(SmailyClientProvider::class),
             new ConfigRowNormalizer(),
-            new CredentialCheck($this->createMock(SmailyClientFactory::class), $this->config),
+            new CredentialCheck($clientFactory, $requestConfig),
             $this->createMock(SetupNotice::class)
         );
 
@@ -261,7 +297,9 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
      * PRO-3699: leaving per-language accounts keeps a working account — the
      * website's own (the en fallback) with an empty password, the default
      * store view's account with its password; every store view of the
-     * website then uses it.
+     * website then uses it. PRO-3717: the save checks that account with its
+     * own password, so the status says it is connected — not the en account
+     * with the et password store view 2 held when the request began.
      *
      * @param array<string, string> $single
      */
@@ -270,6 +308,7 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
     {
         $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'et_EE', 5 => 'en_GB']);
         $this->saveAccounts([$this->account('en', 'en-secret'), $this->account('et', 'et-secret')]);
+        $this->checked = [];
 
         self::assertSame([], $this->saveSingle($single));
 
@@ -277,6 +316,27 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
             $this->assertAccount($storeId, $language, 'Store view ' . $storeId);
         }
         $this->assertOtherWebsiteUntouched();
+        self::assertSame([$this->credentials($language)], $this->checked);
+        self::assertTrue($this->saver->isConnectionAccepted());
+    }
+
+    /**
+     * PRO-3717: a per-language accounts save checks the account saved for
+     * the website — the default fallback account, en — with its own
+     * password, whatever language the website's default store view has.
+     * Store view 2, the default one, is et: an empty password is not taken
+     * from it.
+     */
+    public function testAPerLanguageAccountsSaveChecksTheFallbackAccountWithItsOwnPassword(): void
+    {
+        $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'et_EE', 5 => 'en_GB']);
+        $this->saveAccounts([$this->account('en', 'en-secret'), $this->account('et', 'et-secret')]);
+        $this->checked = [];
+
+        $this->saveAccounts([$this->account('en'), $this->account('et')]);
+
+        self::assertSame([$this->credentials('en')], $this->checked);
+        self::assertTrue($this->saver->isConnectionAccepted());
     }
 
     /**
@@ -342,6 +402,20 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
             'subdomain' => $language . '-shop',
             'username' => $language . '-user',
             'password' => $password,
+        ];
+    }
+
+    /**
+     * The credentials of a language's account as Smaily is asked about them.
+     *
+     * @return array<string, string>
+     */
+    private function credentials(string $language): array
+    {
+        return [
+            'subdomain' => $language . '-shop',
+            'username' => $language . '-user',
+            'password' => $language . '-secret',
         ];
     }
 

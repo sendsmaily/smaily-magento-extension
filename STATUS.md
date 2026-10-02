@@ -101,6 +101,11 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   rail gained its done marks and Back disappeared only then. Now first
   paint and scripted state are the same in all four states (fresh,
   credentials only, two-language, finished). Unit: `WizardDataTest` (+3).
+  Style coverage re-measured (`docs/audits/2026-10-02-ADMIN_STYLE_COVERAGE.md`
+  "Re-measure (initial setup and RSS, 2026-10-02)"): 90.9 % → 94.9 %
+  overall (strict 88.4 → 92.4 %); initial setup steps 1–5 91 / 90 / 87 /
+  88 / 87 % → 99 / 96 / 92 / 98 / 98 %, Settings › RSS 82 → 99 %. Largest
+  remaining gap: the trigger cards (M5–M8).
 
 - **PRO-2456 evening walk-through — admin pages checked in en_US and
   et_EE at 1440, 1100 and 400 px (2026-10-02).** Every Smaily page and

@@ -14,7 +14,7 @@ element visuals) and §5 (accepted micro-value differences). Companion:
 
 ## Summary
 
-*Evening re-measure: 90.9 % (Open Sans accepted) — see [Re-measure (evening 2026-10-02)](#re-measure-evening-2026-10-02).*
+*Evening re-measure: 90.9 % (Open Sans accepted) — see [Re-measure (evening 2026-10-02)](#re-measure-evening-2026-10-02). After the initial setup and RSS follow-through: 94.9 % — see [Re-measure (initial setup and RSS, 2026-10-02)](#re-measure-initial-setup-and-rss-2026-10-02).*
 
 **Overall: 77.9 %** — 2,070 of 2,656 compared properties match.
 Strict reading (pack-internal conflicts resolved by a token counted as
@@ -495,3 +495,60 @@ recent-activity table no longer scrolls sideways at 1100 px and the Failed
 tile's badge stays in the tile; the Log Details header is no longer italic,
 14 px and indented by Magento's `.modal-title span` rule (this last fix is
 in the numbers above: the header pill's size and font style).
+
+## Re-measure (initial setup and RSS, 2026-10-02)
+
+**Overall: 94.9 %** — 2,520 of the same 2,656 properties match (strict
+92.4 %), up from the evening's 90.9 % (strict 88.4 %). The Dashboard and
+Log rows were not touched and keep their evening values.
+
+Owner decision 2026-10-02: follow the pack. Done (PRO-2456): gaps 1, 2 and
+4 of the evening's list — the initial setup's step content sits on the
+grey pane without a card, with the pack's intro and spacing; the step
+rail's sub-labels (EN + ET, the WooCommerce plugin's step descriptions);
+the RSS builder's labels, controls, URL chip and "Feed URL" label. The
+starting step of the initial setup is now drawn server-side in every state
+(no jump when the script runs).
+
+### Method
+
+The same rows, comparison rules and walkers as the evening, with two
+changes. (1) The screens were drawn without the sandbox store: the real
+templates of the branch, rendered with stub data mirroring the evening
+state, in a local headless Chrome with the module stylesheet and a minimal
+stand-in for the admin's base rules (border-box sizing, Open Sans, the
+88 px menu and 30 px page padding, Magento's button and link colours). On
+the unchanged code this reproduces the evening's per-screen figures within
+0.8 points (initial setup steps 1–5: 91.1 / 89.7 / 86.7 / 88.3 / 86.8 %;
+RSS 81.8 %), so the before and after below are both read this way.
+(2) The walkers measure the rail sub-labels and the "Feed URL" label when
+they exist (they only recorded them as missing before).
+
+| Screen | Before | After | Strict after | Adjusted after |
+|---|---|---|---|---|
+| Initial setup › 1 Connect | 91.1 % | **98.7 %** | 96.4 % | 99.6 % |
+| Initial setup › 2 Contacts | 89.7 % | **96.4 %** | 92.9 % | 98.0 % |
+| Initial setup › 3 Automations | 86.7 % | **91.9 %** | 91.6 % | 92.5 % |
+| Initial setup › 4 Intelligence | 88.3 % | **97.5 %** | 95.1 % | 99.4 % |
+| Initial setup › 5 Overview | 86.8 % | **98.0 %** | 97.4 % | 99.3 % |
+| Settings › RSS | 81.8 % | **98.5 %** | 97.0 % | 99.2 % |
+| Settings › Connection / Contacts / Automations / Intelligence | 98.2 / 96.1 / 90.6 / 95.0 % | unchanged | | |
+
+*Adjusted* counts 15 rows whose recorded value no longer describes the
+pack: the step intro's line height (21 px is the pack's 1.5 at its 14 px;
+the row's 19.5 px was taken at our old 13 px), the step footer's top margin
+(0 px, but the footer divider sits 26 px under the content, as in the pack,
+through the section's bottom margin), step 4's first intro paragraph (8 px
+to the second; the intro block ends 22 px above the field) and four Open
+Sans rows that were missing in the morning (owner decision).
+
+### Remaining gaps, by size
+
+1. **Trigger cards** (M5–M8): unchanged — 25 rows on step 3, the larger
+   part of Settings › Automations' 55.
+2. **Card measures and corners** (H32, M1, M2): unchanged; the RSS card is
+   620 px where the probe reads the pack's 706 px outer width (one row).
+3. **"Refresh workflows"** (M9): unchanged.
+4. Small ones: unchanged (spinner, progress track, verdict dot ring, the
+   Dashboard's title row, the wizard frame radius).
+

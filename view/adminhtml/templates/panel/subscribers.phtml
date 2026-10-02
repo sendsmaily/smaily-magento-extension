@@ -51,7 +51,7 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
     </div>
     <?php endif; ?>
     <div id="smaily-w-subscribers-body">
-        <p><?= $escaper->escapeHtml(__('This is a lawful-basis choice. Pick the preset that matches how you have asked your customers for permission — you can change it later under Configuration.')) ?></p>
+        <p><?= $escaper->escapeHtml(__('This is a lawful-basis choice. Pick the preset that matches how you have asked your customers for permission — you can change it later in Settings > Contacts.')) ?></p>
         <?php
         $subscriberModes = [
             'consent' => [
@@ -169,7 +169,7 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
         <div class="smaily-backfill-card__intro">
             <p class="note" id="smaily-w-backfill-estimate"<?php foreach ($importEstimates as $countMode => $estimate): ?> data-estimate-<?= $escaper->escapeHtmlAttr($countMode) ?>="<?= $escaper->escapeHtmlAttr($estimate) ?>"<?php endforeach; ?><?= $syncEnabled ? '' : ' style="display:none;"' ?>><?= $escaper->escapeHtml($importEstimates[$savedSyncMode] ?? '') ?></p>
         </div>
-        <p class="note" id="smaily-w-backfill-off"<?= $syncEnabled ? ' style="display:none;"' : '' ?>><?= $escaper->escapeHtml(__('Contact synchronisation is off for this website, so an import would send nothing. Turn it on and save to import.')) ?></p>
+        <p class="note" id="smaily-w-backfill-off"<?= $syncEnabled ? ' style="display:none;"' : '' ?>><?= $escaper->escapeHtml(__('Contact synchronization is off for this website, so an import would send nothing. Turn it on and save to import.')) ?></p>
         <div class="smaily-backfill-verdict" style="display:none;"><span class="smaily-backfill-verdict__icon"></span><span class="smaily-backfill-verdict__text"></span></div>
         <div class="smaily-backfill-card__link" style="display:none;"></div>
         <div class="smaily-backfill-card__controls">

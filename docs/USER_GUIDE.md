@@ -6,7 +6,7 @@ Smaily Connect keeps your newsletter audience, marketing automations and
 - [Installation](#installation)
 - [Finding your way around](#finding-your-way-around)
 - [Connecting your Smaily account](#connecting-your-smaily-account)
-- [Contact synchronisation](#contact-synchronisation)
+- [Contact synchronization](#contact-synchronization)
 - [Automations](#automations)
 - [Abandoned cart](#abandoned-cart)
 - [Product RSS feed](#product-rss-feed)
@@ -241,7 +241,7 @@ outside the per-language modes.
 
 ---
 
-## Contact synchronisation
+## Contact synchronization
 
 **Settings > Contacts** (or Initial setup step 2)
 

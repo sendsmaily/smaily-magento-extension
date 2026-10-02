@@ -51,6 +51,29 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   files (7 pre-existing errors in `panel/connection.phtml` from PRO-3566),
   phpstan `[OK]`, integration 132.
 
+- **PRO-3569 done — admin copy leftovers (2026-10-02).** The Contacts
+  lawful-basis paragraph points to where the choice is changed now
+  ("… you can change it later in Settings > Contacts." / "… hiljem saab
+  seda muuta jaotises Seaded > Kontaktid."), not to the hidden
+  Configuration section. One spelling of *synchronization*: the house
+  style is US English (Magento's `en_US`, and most of our strings), so the
+  two "Contact synchronisation …" phrases became "Contact synchronization
+  …" (step 2's title and the import note; ET unchanged; README and the
+  user guide's section heading follow). The Automations tab's button is
+  **Save Automations**, like **Save Connection** / **Save Contacts** (the
+  object is the tab's name; ET unchanged). The Dashboard verdict has a
+  real singular and plural ("%1 delivery failed …" / "%1 deliveries
+  failed …"; ET "… ebaõnnestus %1 saadetis." / "… %1 saadetist.")
+  instead of "delivery(ies)"; the unused "%1 failed delivery(ies) in the
+  last 24 hours." is gone from both packs. Estonian page titles are
+  capitalised like the menu ("Smaily Connect — Töölaud / Algseadistus /
+  Seaded / Logi"). The CHANGELOG names the Feed URL Builder's current
+  place (Settings > RSS) and the pilot checklist puts **Finish** on the
+  Intelligence step, **Go to Dashboard** on Overview. Verified by
+  rendering the real templates with stubs (Dashboard with 1 and 12
+  failures, Settings, initial setup; en_US and et_EE, no untranslated
+  phrase).
+
 - **PRO-3566 done — per-language account blocks as the pack draws them
   (2026-10-02).** In "Per-language Smaily accounts" mode
   (`panel/connection.phtml`, initial setup step 1 and Settings >

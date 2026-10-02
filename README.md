@@ -8,7 +8,7 @@ with the Smaily Connect plugins for WooCommerce and Shopify.
 
 ## Features
 
-- **Contact synchronisation** — near-real-time, two-way: new contacts
+- **Contact synchronization** — near-real-time, two-way: new contacts
   flow to Smaily instantly; unsubscribes in Smaily mirror back to Magento.
 - **Contact sync modes** — lawful-basis presets: subscribers only (consent,
   default), all customers (legitimate interest), or checkout opt-in only.

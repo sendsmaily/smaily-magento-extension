@@ -59,7 +59,9 @@ if ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_INCO
     $verdictText = __('Campaign Intelligence has stopped accepting data from this store, so product, customer and order data is no longer being sent and recommendations will go stale. Waiting will not fix it — the account has to be made active again on the Smaily side. Your Smaily email sending is unaffected; everything queued here waits and is sent once the account is active.');
 } elseif ($failed > 0) {
     $verdictKicker = __('Needs attention');
-    $verdictText = __('Smaily Connect is running, but %1 delivery(ies) failed in the last 24 hours.', $failed);
+    $verdictText = $failed === 1
+        ? __('Smaily Connect is running, but %1 delivery failed in the last 24 hours.', $failed)
+        : __('Smaily Connect is running, but %1 deliveries failed in the last 24 hours.', $failed);
 } elseif ($engineDown) {
     $verdictKicker = __('Needs attention');
     $verdictText = __('Smaily Connect is running, but Campaign Intelligence is currently unreachable — data is queued locally and will sync when it recovers.');

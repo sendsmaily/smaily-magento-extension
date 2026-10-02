@@ -142,7 +142,7 @@ bilingual):
 | Settings / Log / Setup Wizard | Seaded / Logi / Seadistusviisard |
 | Source / Type / Entity / Status | Allikas / Tüüp / Kirje / Olek |
 | "Setup is not finished yet — complete the setup wizard to start syncing." | (shipped) |
-| "Smaily Connect is running, but %1 delivery(ies) failed in the last 24 hours." | (shipped) |
+| "Smaily Connect is running, but %1 delivery failed in the last 24 hours." / "… %1 deliveries failed …" (singular / plural) | (shipped) |
 | "Everything is running — deliveries to Smaily are flowing normally." | (shipped) |
 
 **Wording-harmonization candidates (non-blocking, sibling wins per binding
@@ -388,7 +388,7 @@ follows the same section-header + card-list idiom):
   controls."
 - Catalog-load-failed fallback: warning Banner + saved cards rendered
   dimmed/non-interactive, "existing config is never wiped."
-- Footer: one "Save automations" button (whole block, not per-row) +
+- Footer: one "Save Automations" button (whole block, not per-row) +
   InlineStatus.
 
 This card-list-with-pills shape (vs. the cramped checkbox+dropdown list

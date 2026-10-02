@@ -46,8 +46,8 @@ uses, and that you cancel or refund it afterwards.
 | What to do | Where to look / what good looks like |
 |---|---|
 | Get a one-time setup URL/token for the store's existing Campaign Intelligence tenant from the engine side. Paste it into **Setup URL or token from Smaily** and press **Connect**. | "Connected: <tenant> (engine <version>)" — the tenant must be the pilot store's tenant, not a test tenant. The token is one-time and never stored — if the exchange fails, ask for a new token rather than retrying the old one. |
-| Tick **Enable storefront browse tracking (product views, searches, cart activity)** (needed for §6). | Saved with the step. |
-| **Overview** step: **Finish**. | "You are all set!"; after that, Smaily Connect pages open the **Dashboard** instead of Initial setup. |
+| Tick **Enable storefront browse tracking (product views, searches, cart activity)** (needed for §6), then press **Finish** — the Intelligence step's button. | Saved with the step; the **Overview** step opens with "You are all set!". From now on, Smaily Connect pages open the **Dashboard** instead of Initial setup. |
+| **Overview** step: **Go to Dashboard**. | The Dashboard opens. |
 | On the server: `bin/magento smaily:engine:ping`. | `Connected. Tenant: …, engine version: …, ping: {…}`. "Ping failed: …" is red — see §9. |
 | Dashboard. | Connection strip: **Smaily** and **Campaign Intelligence** both **Connected**; **Browse tracking** shows **Script live on storefront**. |
 | Decide with the engine side whether the existing tenant needs the store's history. If it does: **Settings > Intelligence** → **Historical imports to Campaign Intelligence** → **Start import** on the Catalog, Customers and Orders cards. | Live sync covers changes from now on only. Each card shows *Running* with "n of total" under its progress bar and ends *Done* — "Done, n of total synced." — one chunk per cron minute. |

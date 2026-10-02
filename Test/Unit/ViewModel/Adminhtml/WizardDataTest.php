@@ -133,6 +133,25 @@ class WizardDataTest extends TestCase
     }
 
     /**
+     * PRO-3718: the form compares a password-less account with the account
+     * saved for the website, as the save does — not with the store view's
+     * account the fields show.
+     */
+    public function testGetBootJsonCarriesTheAccountSavedForTheWebsite(): void
+    {
+        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->config->method('getSubdomain')->willReturn('et-shop');
+        $this->config->method('getUsername')->willReturn('et-user');
+        $this->config->method('getWebsiteSubdomain')->with(2)->willReturn('en-shop');
+        $this->config->method('getWebsiteUsername')->with(2)->willReturn('en-user');
+
+        $decoded = json_decode($this->viewModel->getBootJson(), true);
+
+        self::assertSame(['subdomain' => 'en-shop', 'username' => 'en-user'], $decoded['websiteAccount']);
+        self::assertSame('et-shop', $decoded['connection']['subdomain']);
+    }
+
+    /**
      * PRO-3560: filled-in credentials are not "Connected" — the Connection
      * status follows whether Smaily accepted them at the last real check.
      */

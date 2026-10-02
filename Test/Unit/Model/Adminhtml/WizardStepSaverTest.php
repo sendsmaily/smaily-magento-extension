@@ -458,6 +458,34 @@ class WizardStepSaverTest extends TestCase
         self::assertSame([], $this->saved);
     }
 
+    /**
+     * PRO-3718: a new default fallback account without its password is also
+     * a website account without its password — its block shows one error,
+     * the block's own.
+     */
+    public function testANewFallbackBlockWithoutAPasswordShowsOneError(): void
+    {
+        $this->accountResolver->method('storeIdForAccountKey')->with('fi', 0)->willReturn(3);
+        $this->clientFactory->expects(self::never())->method('create');
+
+        $errors = $this->saver->save('connect', [
+            'subdomain' => 'fi-shop',
+            'username' => 'fi-user',
+            'password' => '',
+            'multilingual_mode' => 'a',
+            'fallback_language' => 'fi',
+            'accounts' => [
+                ['language' => 'fi', 'subdomain' => 'fi-shop', 'username' => 'fi-user', 'password' => ''],
+            ],
+        ]);
+
+        self::assertSame([[
+            'field' => 'accounts.fi.password',
+            'message' => 'The subdomain or username of the FI account changed — enter its password.',
+        ]], $errors);
+        self::assertSame([], $this->saved);
+    }
+
     public function testAPerLanguageBlockWithItsOwnAccountKeepsItsPassword(): void
     {
         $this->accountResolver->method('storeIdForAccountKey')->willReturn(3);

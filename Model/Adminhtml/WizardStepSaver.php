@@ -275,7 +275,10 @@ class WizardStepSaver
      * website scope, the scope it is written to and whose password an empty
      * one keeps — not with the website's store view the panel draws it
      * from, which after mode A can still hold a per-language account
-     * (PRO-3699).
+     * (PRO-3699). In mode A the top-level credentials are the default
+     * fallback account's, saved at website scope too: a fallback account
+     * other than the one saved there needs its password as well, asked for
+     * on the fallback block's password field (PRO-3718).
      *
      * @param array<string, mixed> $data
      * @return array<int, array{field: string, message: string}>
@@ -288,19 +291,19 @@ class WizardStepSaver
         string $password,
         int $websiteId
     ): array {
+        $websiteAccountChanged = $this->isChangedWithoutPassword(
+            $subdomain,
+            $username,
+            $password,
+            $this->config->getWebsiteSubdomain($websiteId),
+            $this->config->getWebsiteUsername($websiteId)
+        );
+        $websiteAccountError = [
+            'field' => 'password',
+            'message' => (string)__('The subdomain or username changed — enter the password of this account.'),
+        ];
         if ($mode !== MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS) {
-            return $this->isChangedWithoutPassword(
-                $subdomain,
-                $username,
-                $password,
-                $this->config->getWebsiteSubdomain($websiteId),
-                $this->config->getWebsiteUsername($websiteId)
-            )
-                ? [[
-                    'field' => 'password',
-                    'message' => (string)__('The subdomain or username changed — enter the password of this account.'),
-                ]]
-                : [];
+            return $websiteAccountChanged ? [$websiteAccountError] : [];
         }
 
         $errors = [];
@@ -330,6 +333,22 @@ class WizardStepSaver
                     ),
                 ];
             }
+        }
+
+        // The top-level credentials: the default fallback account, asked for
+        // on its block unless that block already has its own error.
+        $fallbackLanguage = strtolower(trim((string)($data['fallback_language'] ?? '')));
+        if ($websiteAccountChanged && $fallbackLanguage !== '') {
+            $websiteAccountError = [
+                'field' => 'accounts.' . $fallbackLanguage . '.password',
+                'message' => (string)__(
+                    'Enter the password of the %1 account so it can take over as the default fallback.',
+                    strtoupper($fallbackLanguage)
+                ),
+            ];
+        }
+        if ($websiteAccountChanged && !in_array($websiteAccountError['field'], array_column($errors, 'field'), true)) {
+            $errors[] = $websiteAccountError;
         }
 
         return $errors;

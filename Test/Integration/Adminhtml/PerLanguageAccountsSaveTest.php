@@ -357,6 +357,46 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
     }
 
     /**
+     * PRO-3718: the default fallback account is saved for the whole
+     * website, and an empty password keeps the website's password. A new
+     * fallback account without its password is refused on its block's
+     * password field, and nothing is saved: the website keeps the en account
+     * with the en password, not the et account with it.
+     */
+    public function testANewFallbackAccountWithoutItsPasswordIsRefused(): void
+    {
+        $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'et_EE', 5 => 'en_GB']);
+        $this->saveAccounts([$this->account('en', 'en-secret'), $this->account('et', 'et-secret')]);
+
+        $errors = $this->postAccounts([$this->account('en'), $this->account('et')], 'et');
+
+        self::assertSame([[
+            'field' => 'accounts.et.password',
+            'message' => 'Enter the password of the ET account so it can take over as the default fallback.',
+        ]], $errors);
+        $this->assertWebsiteAccount('en');
+        self::assertSame('en', $this->config->getFallbackLanguage());
+        $this->assertAccount(2, 'et');
+    }
+
+    /**
+     * PRO-3718: with its password, the new fallback account is saved for
+     * the website; each store view keeps its own language's account.
+     */
+    public function testANewFallbackAccountWithItsPasswordIsSaved(): void
+    {
+        $this->setLocales([1 => 'en_US', 2 => 'et_EE', 3 => 'et_EE', 5 => 'en_GB']);
+        $this->saveAccounts([$this->account('en', 'en-secret'), $this->account('et', 'et-secret')]);
+
+        self::assertSame([], $this->postAccounts([$this->account('en'), $this->account('et', 'et-secret')], 'et'));
+
+        $this->assertWebsiteAccount('et');
+        self::assertSame('et', $this->config->getFallbackLanguage());
+        $this->assertAccount(1, 'en');
+        $this->assertAccount(2, 'et');
+    }
+
+    /**
      * A single-account save as the Connection panel posts it after the mode
      * is switched away from per-language accounts.
      *
@@ -374,22 +414,37 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
     }
 
     /**
-     * A mode-A save as the Connection panel posts it: the en account is the
-     * fallback, so its credentials are also the top-level ones.
+     * A mode-A save with the en account as the fallback.
      *
      * @param array<int, array<string, string>> $accounts
      */
     private function saveAccounts(array $accounts): void
     {
-        $errors = $this->saver->save('connect', [
-            'subdomain' => $accounts[0]['subdomain'],
-            'username' => $accounts[0]['username'],
-            'password' => $accounts[0]['password'],
+        self::assertSame([], $this->postAccounts($accounts, 'en'));
+    }
+
+    /**
+     * A mode-A save as the Connection panel posts it: the fallback account's
+     * credentials are also the top-level ones.
+     *
+     * @param array<int, array<string, string>> $accounts
+     * @return array<int, array{field: string, message: string}>
+     */
+    private function postAccounts(array $accounts, string $fallback): array
+    {
+        $fallbackAccount = array_values(array_filter(
+            $accounts,
+            static fn (array $account): bool => $account['language'] === $fallback
+        ))[0];
+
+        return $this->saver->save('connect', [
+            'subdomain' => $fallbackAccount['subdomain'],
+            'username' => $fallbackAccount['username'],
+            'password' => $fallbackAccount['password'],
             'multilingual_mode' => 'a',
-            'fallback_language' => 'en',
+            'fallback_language' => $fallback,
             'accounts' => $accounts,
         ]);
-        self::assertSame([], $errors);
     }
 
     /**
@@ -429,6 +484,18 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
                 $this->config->getPassword($storeId),
             ],
             $message
+        );
+    }
+
+    private function assertWebsiteAccount(string $language): void
+    {
+        self::assertSame(
+            [$language . '-shop', $language . '-user', $language . '-secret'],
+            [
+                $this->config->getWebsiteSubdomain(self::WEBSITE_ID),
+                $this->config->getWebsiteUsername(self::WEBSITE_ID),
+                $this->config->getWebsitePassword(self::WEBSITE_ID),
+            ]
         );
     }
 

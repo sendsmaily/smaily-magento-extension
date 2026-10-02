@@ -9,9 +9,11 @@ _Last updated: 2026-10-03 — after the rc3 cut: PRO-3714 (a variant
 without a category of its own takes its parent's), PRO-3715 (an empty-SKU
 configurable order line names the variant bought), PRO-3699 (leaving
 per-language accounts needs the password of an account other than the
-website's) and PRO-3717 (the post-save connection check pairs the website
-account with the website password), listed in CHANGELOG under "Changes
-since 3.0.0-rc3".
+website's), PRO-3717 (the post-save connection check pairs the website
+account with the website password) and PRO-3718 (a new default fallback
+account needs its password on the server; the form asks exactly when the
+server would refuse), listed in CHANGELOG under "Changes since
+3.0.0-rc3".
 2026-10-02: 3.0.0-rc3 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc3),
 built by the release workflow from commit a1ff618; the ZIP and its .sha256
@@ -37,6 +39,47 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3718 — a new default fallback account needs its password on the
+  server too (2026-10-03; found by reading code during PRO-3699,
+  reproduced in the integration harness).** In mode A the form asked for
+  the new fallback account's password when the fallback language changed,
+  but the server did not: a post that skipped the form check saved the new
+  fallback account at website scope with the old website password (the
+  integration test's refused case returned no error on the old code).
+  Now `changedAccountPasswordErrors` compares the top-level credentials
+  (the fallback account's) with the account saved at website scope in
+  mode A as well — the PRO-3699 comparison, before any write — and refuses
+  a mismatch without a password on `accounts.<fallback>.password` with the
+  existing "Enter the password of the %1 account so it can take over as
+  the default fallback." (EN + ET); when the fallback block already has
+  its own PRO-3690 error, that one error stays. A mode-A post without a
+  fallback language gets the single-account error on `password`. An
+  unchanged fallback with an empty password keeps the saved password.
+  Client side: the boot JSON gains `websiteAccount` (subdomain and username
+  saved for the website, `WizardData::getBootJson`; `connection`, which the
+  fields and the status use, is unchanged), and panels-js compares with it
+  — the single account (instead of `boot.connection`, the PRO-3699 side
+  effect) and the mode-A fallback account (instead of "the fallback
+  language changed", whose baseline was the default-scope fallback
+  language); a successful connect save makes the posted top-level account
+  the new baseline. `mlFallbackSaved` is gone (no other reader). Unit
+  `WizardStepSaverTest` (+1: a new fallback block without a password shows
+  one error), `WizardDataTest` (+1: `websiteAccount` is the website
+  account, not the store view's). Integration `PerLanguageAccountsSaveTest`
+  (+2: fallback en→et without the et password → refused, website keeps en
+  and the en password, fallback stays en — red on the old code; with the
+  password → the website gets the et account, store views keep theirs).
+  Verified with the real Settings templates and stub data in headless
+  Chrome, en_US and et_EE, old and new JS (website account nordic-en, the
+  store view and the drawn fallback nordic-et): mode A — the drawn et
+  fallback without a password is now refused (old: posted, the server
+  refuses it), en (the website account) without a password now posts (old:
+  refused), et with its password posts and is the next baseline; single —
+  the drawn store-view account without a password is now refused (old:
+  posted), the website account (also in capitals) now posts (old:
+  refused), another account with its password posts. USER_GUIDE (Default
+  fallback account), CHANGELOG. Not run in the sandbox.
 
 - **PRO-3717 — with per-language accounts, the post-save connection status
   checks the right password (2026-10-03; found by reading code during
@@ -121,7 +164,8 @@ Earlier: 2026-09-11, 2026-09-10._
   side effect: panels-js still compares with `boot.connection` (the store
   view's account), so after leaving mode A it lets the shown account through
   to the server refusal and asks for a password for the fallback account the
-  server would accept. Integration `PerLanguageAccountsSaveTest` (+3; the
+  server would accept (fixed by PRO-3718: the form compares with the
+  website account). Integration `PerLanguageAccountsSaveTest` (+3; the
   harness's website mock gains `getStores` / `getDefaultStore`, store view 2
   et is website 7's default): unchanged et account without a password →
   refused, nothing saved, mode A stays; en fallback without a password and
@@ -278,8 +322,9 @@ Earlier: 2026-09-11, 2026-09-10._
   saves no account and is not checked. The single account did not require
   a password on change before, so it gets the rule too. `collect.connect`
   in panels-js checks the same against `data-saved-subdomain` /
-  `data-saved-username` and `boot.connection` (updated after a successful
-  single-account save, as the blocks already were). Consequence for
+  `data-saved-username` and the single account against the website account
+  (`boot.websiteAccount` since PRO-3718, updated after a successful connect
+  save, as the blocks already were). Consequence for
   PRO-3683: a block drawn with another account than the one typed now
   needs the password even when another store view holds that account; the
   borrow path still serves a store view that moves to a language whose

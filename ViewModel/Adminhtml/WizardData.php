@@ -219,6 +219,14 @@ class WizardData implements ArgumentInterface
                 'hasPassword' => $this->config->getPassword($storeId) !== '',
                 'multilingualMode' => $this->getMultilingualMode(),
             ],
+            // The account saved for the website — the single account, or the
+            // default fallback account in per-language accounts mode. An
+            // empty password keeps its password only for this account
+            // (PRO-3699, PRO-3718).
+            'websiteAccount' => [
+                'subdomain' => $this->config->getWebsiteSubdomain($websiteId),
+                'username' => $this->config->getWebsiteUsername($websiteId),
+            ],
             'multilingual' => [
                 'languages' => $this->accountResolver->detectedLanguages($websiteId),
                 'fallbackLanguage' => $this->config->getFallbackLanguage(),

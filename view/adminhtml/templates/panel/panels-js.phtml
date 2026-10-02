@@ -47,7 +47,6 @@ window.smailyPanelsInit = function ($) {
     var urls = <?= /* @noEscape */ json_encode(array_map('strval', $urls)) ?>;
     var connected = boot.connected;
     var mlLanguages = (boot.multilingual || {}).languages || [];
-    var mlFallbackSaved = (boot.multilingual || {}).fallbackLanguage || '';
     var isMultilingual = mlLanguages.length > 1;
     var mlModeCurrent = isMultilingual ? (boot.connection.multilingualMode || 'single') : 'single';
     var mlModeSaved = mlModeCurrent;
@@ -244,15 +243,10 @@ window.smailyPanelsInit = function ($) {
                 mlModeCurrent = data.multilingual_mode || mlModeCurrent;
                 mlModeSaved = mlModeCurrent;
                 mlSwitchConfirmed = false;
-                if (data.fallback_language) {
-                    mlFallbackSaved = data.fallback_language;
-                }
-                if (!data.accounts) {
-                    // The single account just saved is the one an empty
-                    // password now keeps (PRO-3690).
-                    boot.connection.subdomain = data.subdomain;
-                    boot.connection.username = data.username;
-                }
+                // The top-level account just saved — the single account or
+                // the default fallback account — is the website's, the one
+                // an empty password now keeps (PRO-3690, PRO-3718).
+                boot.websiteAccount = {subdomain: data.subdomain, username: data.username};
                 (data.accounts || []).forEach(function (account) {
                     var $block = $('.smaily-ml-account[data-language=' + account.language + ']');
                     $block.data('saved-subdomain', account.subdomain)
@@ -904,7 +898,14 @@ window.smailyPanelsInit = function ($) {
                 if (!fallback || !fallbackAccount) {
                     throw new Error('<?= $escaper->escapeJs(__('Pick the default fallback account.')) ?>');
                 }
-                if (fallback !== mlFallbackSaved && !fallbackAccount.password) {
+                // The fallback account is saved for the website: another
+                // account than the website's needs its password, as on the
+                // server (PRO-3718).
+                if (!fallbackAccount.password && accountChanged(
+                    fallbackAccount,
+                    boot.websiteAccount.subdomain,
+                    boot.websiteAccount.username
+                )) {
                     throw formError(
                         '<?= $escaper->escapeJs(__('Enter the password of the %1 account so it can take over as the default fallback.')) ?>'
                             .replace('%1', fallback.toUpperCase()),
@@ -932,7 +933,7 @@ window.smailyPanelsInit = function ($) {
                     })
                 );
             }
-            if (!creds.password && accountChanged(creds, boot.connection.subdomain, boot.connection.username)) {
+            if (!creds.password && accountChanged(creds, boot.websiteAccount.subdomain, boot.websiteAccount.username)) {
                 throw formError(
                     '<?= $escaper->escapeJs(__('The subdomain or username changed — enter the password of this account.')) ?>',
                     ['password']

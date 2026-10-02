@@ -280,7 +280,11 @@ and its credentials also serve every scope without a per-language
 override. After a save, the connection-status line beside the button says
 whether Smaily accepted the default fallback account — the account saved
 for the whole website — whatever language the default store view has; each
-language block's own status shows that language's account. Switching the multilingual mode away from per-language accounts
+language block's own status shows that language's account. The default
+fallback account is saved for the whole website too: when you pick another
+one, enter its password in its block — until then the save is refused on
+that block's password field. A fallback account left as it is keeps its
+saved password. Switching the multilingual mode away from per-language accounts
 removes the per-store-view credential overrides (the panel asks for
 confirmation first); workflow mappings are kept but stop being used
 outside the per-language modes. The single account is saved for the whole

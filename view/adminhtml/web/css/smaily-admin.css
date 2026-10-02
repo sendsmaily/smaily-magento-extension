@@ -860,6 +860,7 @@
  * the wizard's Contacts step renders the same partial, so every rule below
  * also covers it ([data-step="2"]). */
 .smaily-ui input[type=checkbox] { accent-color: var(--s-accent); width: 15px; height: 15px; cursor: pointer; }
+.smaily-ui input[type=radio] { accent-color: var(--s-accent); }
 .smaily-settings [data-tab="subscribers"] .smaily-card,
 .smaily-wizard [data-step="2"] .smaily-card { max-width: 680px; padding: 20px 22px; border-radius: 6px; color: var(--s-text); }
 .smaily-settings [data-tab="subscribers"] .smaily-card .smaily-card,
@@ -962,6 +963,14 @@
 .smaily-settings [data-tab="subscribers"] .smaily-tab-footer { max-width: 680px; }
 .smaily-settings [data-tab="automations"] .smaily-tab-footer,
 .smaily-settings [data-tab="intelligence"] .smaily-tab-footer { max-width: 666px; }
+/* Automations: the Campaign Intelligence card below the tab footer keeps
+ * the pane's gap from Save Automations, and its heading reads like the
+ * store-events card heading above it. */
+.smaily-settings .smaily-tab-footer + .smaily-card { margin-top: var(--sp-6); }
+.smaily-ui .smaily-engine-automations > h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-16); font-weight: 700; color: var(--s-text); }
+/* A multilingual store's Connection tab: the default account card, the
+ * error banner and the footer share the 680px measure of the mode cards. */
+.smaily-settings [data-tab="connection"]:has(#smaily-ml-modes) :is(#smaily-w-default-account .smaily-card, .smaily-form-banner, .smaily-tab-footer) { max-width: 680px; }
 /* Initial setup footer: the pack's 12px gap, and the step's measure, so the
  * buttons stay with the card above them (as the Settings tab footers do). */
 .smaily-wizard .smaily-footer { gap: var(--sp-3); }

@@ -22,7 +22,15 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   templates with stub data (no request reached the store). Fixed: the
   initial setup draws step 1 open server-side, so the page no longer jumps
   by the step's height when the script runs (layout shift 0.12 → 0).
-  No behaviour change.
+  Settings: the Campaign Intelligence automations' Daily cap and Test
+  emails fields are wide enough for their placeholders (the inline widths
+  were written for a 16 px rem; the admin's rem is 10 px), that card keeps
+  a 24 px gap below Save Automations and its heading matches the
+  store-events card heading (16 px / 700); in a multilingual store the
+  Connection tab's default-account card, error banner and footer share the
+  mode cards' 680 px measure (were 620 px under 680 px cards); radio
+  buttons (the fallback account) use the accent colour like the
+  checkboxes. No behaviour change.
 
 - **PRO-3642 done — skipped and withdrawn rows are not deliveries for Send
   again, and the Dashboard reads them as the Log does (2026-10-02).**

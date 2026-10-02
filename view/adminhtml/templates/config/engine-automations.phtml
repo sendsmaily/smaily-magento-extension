@@ -102,14 +102,14 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
                         </label>
                         <label class="smaily-engine-trigger__ctrl">
                             <span><?= $escaper->escapeHtml(__('Daily Cap')) ?></span>
-                            <input type="number" min="1" max="100000" style="width: 7rem;"
+                            <input type="number" min="1" max="100000" style="width: 12rem;"
                                    data-field="daily_cap"
                                    value="<?= $row['daily_cap'] === null ? '' : (int)$row['daily_cap'] ?>"
                                    placeholder="<?= $escaper->escapeHtmlAttr(__('No cap')) ?>"/>
                         </label>
                         <label class="smaily-engine-trigger__ctrl">
                             <span><?= $escaper->escapeHtml(__('Test Emails')) ?></span>
-                            <input type="text" style="width: 14rem;" data-field="test_emails"
+                            <input type="text" style="width: 26rem;" data-field="test_emails"
                                    value="<?= $escaper->escapeHtmlAttr($row['test_emails']) ?>"
                                    placeholder="a@example.com, b@example.com"/>
                         </label>

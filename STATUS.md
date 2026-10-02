@@ -43,6 +43,32 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   before switching on; PILOT_CHECKLIST §0 has the matching line. `docs/UPGRADING.md` has no
   before-you-upgrade checklist, so it has no line. No detection of other modules. Rendered with the
   real template and stub data in headless Chrome, Settings EN and setup ET.
+
+- **PRO-3661 — a multi-website 2.8.x store's upgrade, scope by scope
+  (2026-10-02; test + docs, no behaviour change).** 2.8.x (every 2.x tag,
+  2.0.0–2.8.1) shows each setting at Default Config and website only
+  (`showInStore="0"`; Frequency default only, Last synchronized at website
+  only) and reads each one at website scope, so a store-view `smaily/*` row
+  exists only through `config:set` and 2.8.x never reads it. New
+  integration test `Migration\LegacyScopeUpgradeTest` (4 websites, 11 store
+  views et/en/ru/lv/lt/fi, rows at default, website and store-view scope)
+  runs the migration and reads every scope through the real `Config`,
+  `LanguageResolver` and `Router` over a new test-only
+  `Support\Fake\DatabaseScopeConfig` (core_config_data with Magento's
+  store → website → default → config.xml fallback). Confirmed: the
+  default-scope account serves every store view of every website; website
+  overrides win; every language resolves and, in the migrated single
+  mode, routes to its website's workflow through that one account;
+  store-view rows of non-account settings stay unread, as in 2.8.x. Two
+  gaps, both pinned by the test: (1) **Enable Module** (`smaily/general/enable`,
+  default + website) is not migrated — a website with *No* starts sync,
+  welcome and abandoned cart in v3; (2) v3 reads the account per store
+  view, so a store-view `smaily/general/*` row 2.8.x ignored replaces that
+  store view's account. Documented in `docs/UPGRADING.md` (new "Before you
+  upgrade: what to note down" checklist with the 2.8.x labels and scopes,
+  "Set again after the upgrade", store-view query); the migration change is
+  Questions item 14.
+
 - **Storefront URL and consent slice tightened after a simplification review (2026-10-02, behaviour-neutral).** `StorefrontUrl::apply()` reads and normalizes each store's value once per request; `ensureSession()` returns nothing; `WizardData::isStorefrontDisclosureOpen()`; `normalize()` drops the redundant `pass` check (`parse_url` sets `user`, `''` included, whenever a password is given).
 - **PRO-3666 — the 3.0.0 changelog's admin-home entry once (2026-10-02).** Three merged copies on
   one line became one entry with every detail any copy carried; no other CHANGELOG bullet repeats.
@@ -4658,3 +4684,17 @@ PRO-1267 (engine: Magento product-identity contract note).
     a, b or c.~~ **Resolved (Erkki, 2026-10-02): option (b)** — GraphQL,
     or REST without the `form_key` cookie, is an API order; every other
     order is a storefront order. Built, see "Where we are".
+
+14. PRO-3661 — the 2.8.x *Enable Module* switch and store-view account rows
+    in the upgrade (Medium urgency: the next client upgrades a
+    multi-website store; one-way door, store data). Today the guide tells
+    the merchant to act (switch off sync, welcome and abandoned cart for a
+    website where 2.8.x had *Enable Module = No*; delete store-view
+    `smaily/general/*` rows before the upgrade). Proposed migration
+    change, for your decision: (a) where `smaily/general/enable` resolves
+    to 0 for a website (its own row, else the default), write
+    `sync_enabled`, `welcome_enabled` and `abandoned_enabled` = 0 at that
+    website (at the default scope when the default is 0); (b) do not carry
+    store-view `smaily/general/*` rows over (2.8.x never read them) and
+    post an admin notice naming the store views. Say yes, (a) only, or
+    keep the documentation.

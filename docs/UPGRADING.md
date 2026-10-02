@@ -4,6 +4,54 @@ Version 3 is a ground-up rewrite (module `Smaily_Connect`, replacing
 `Smaily_SmailyForMagento`), but upgrading is a normal composer update — the
 package name is unchanged and your settings migrate automatically.
 
+## Before you upgrade: what to note down
+
+Write down your 2.8.x settings first, so that you can compare them with
+v3 after the upgrade (the upgrade deletes the 2.8.x values, see below).
+Open **Stores > Configuration > Smaily Email Marketing and Automation >
+Module Configuration** and read the fields below at **Default Config**,
+then at **each website** in the scope switcher. The 2.8.x admin has no
+store-view settings. In v3, compare them under **Smaily Connect >
+Settings** with the same website selected.
+
+| 2.8.x group > field | Read at | In v3 |
+|---|---|---|
+| General Settings > Enable Module | default, each website | **Not carried over** — see *Set again after the upgrade* |
+| General Settings > Subdomain, API Username | default, each website | Settings > Connection, same scope. The API Password carries over too (encrypted); you do not need to note it |
+| Newsletter Subscription Form > Enable Subscribers Collection, Autoresponder ID | default, each website | Welcome automation, same scope: on when both are set |
+| Newsletter Subscription Form > Enable CAPTCHA, CAPTCHA Type | default, each website | Not carried over — see *Captcha* below |
+| Subscribers Syncronization > Enable Syncronization, Syncronize Additional Fields | default, each website | Subscriber Synchronization, same scope (Gender is sent as `user_gender`) |
+| Subscribers Syncronization > Frequency | default | Not carried over — v3 syncs as changes happen |
+| Abandoned Cart > Enable Abandoned Cart, Autoresponder ID, Trigger Abandoned Cart Automation | default, each website | Automations, same scope |
+| Abandoned Cart > Add Template Parameters | default, each website | Not carried over — every product field is sent |
+
+Also note what in Smaily depends on the store's data, because some of it
+changes (see *Behavior changes to review after upgrading*): segments or
+templates that use the `gender` field, and RSS feed URLs in your templates
+that use the `category` parameter. Check that `bin/magento cron:run` runs
+every minute on the server. Note which installed modules send
+abandoned-cart emails today (for example Mageplaza SMTP, Avada Email
+Marketing, or Adobe Commerce's own email reminder rules), and switch those
+emails off before you switch the Smaily abandoned-cart automation on, so a
+shopper does not get two reminders for one cart.
+
+**Values saved at store-view scope.** 2.8.x reads every setting per
+website, so a `smaily/*` value at store-view scope (possible only through
+`bin/magento config:set --scope=stores`) has no effect there. List them
+before you upgrade:
+
+```sql
+SELECT scope_id, path FROM core_config_data
+WHERE path LIKE 'smaily/%' AND scope = 'stores';
+```
+
+The upgrade carries such a value over at its store view. v3 reads the Smaily
+account (subdomain, username, password) per store view, so a store-view
+`smaily/general/*` value **replaces the website's account for that store
+view** after the upgrade. Delete those rows before you upgrade. v3 reads
+every other setting per website, as 2.8.x does: those store-view values
+stay without effect.
+
 ## Steps
 
 ```bash
@@ -25,6 +73,10 @@ package; `setup:upgrade` runs the migration.
 | Subscriber cron sync toggle + field selection | Subscriber Synchronization (every tick carries over) |
 | Abandoned cart toggle / autoresponder / interval | Automations group (`2:hour` → 120 minutes) + a mapping fallback row |
 
+Each value keeps the scope it was saved at: a website's own value stays
+that website's, and a website without one keeps using the default. One
+Smaily account saved at Default Config serves every website and store view.
+
 Once the settings are migrated, the upgrade deletes the old 2.8.x settings
 (every `smaily/*` config row, at every scope — the plain-text password
 among them). The migrated settings live under `smaily_connect/*` and are not
@@ -33,8 +85,17 @@ touched. A store that has no 2.8.x settings is not affected.
 **Going back to 2.8.x starts with empty settings.** The upgrade cannot be
 undone by changing the composer version constraint alone: after a downgrade,
 enter the Smaily subdomain, username and password and the 2.8.x options
-again. If you may need to go back, note the 2.8.x settings (Stores >
-Configuration > Smaily) or take a database backup before you upgrade.
+again. If you may need to go back, note the 2.8.x settings (see *Before
+you upgrade*) or take a database backup before you upgrade.
+
+## Set again after the upgrade
+
+- **Enable Module.** v3 has no module switch, and the upgrade does not read
+  it. A website (or Default Config) where 2.8.x had *Enable Module = No*
+  starts its subscriber sync, welcome and abandoned-cart automation in v3
+  if those settings are on at that scope or inherited from Default Config.
+  Right after `setup:upgrade`, switch them off for that website in
+  **Smaily Connect > Settings**.
 
 ## What is cleaned up
 

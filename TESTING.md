@@ -188,8 +188,12 @@ Assert afterwards:
 
 The ZIP a GitHub release publishes is assembled by one script,
 `bin/build-release-zip.sh` — the release workflow calls it, so what CI ships
-and what you build locally are the same artifact. `bin/verify-release-zip.sh`
-builds it and then checks it:
+and what you build locally are the same artifact. It is `git archive` of the
+committed tree (`HEAD`), so a file that is not committed (a local `.env`, an
+IDE folder, a tool's local configuration) never ships, and neither does an
+uncommitted change — commit before you build. What stays out is listed once,
+as `export-ignore` in `.gitattributes`, which a composer dist install from
+GitHub honours too. `bin/verify-release-zip.sh` builds it and then checks it:
 
 ```bash
 bin/verify-release-zip.sh            # writes ./smaily-connect-magento2.zip
@@ -199,9 +203,10 @@ It asserts that the archive carries what a Magento module needs to install
 (`registration.php`, `composer.json`, `etc/module.xml`, `etc/db_schema.xml`,
 the `i18n` catalogs, `view/`) plus `README.md`, `CHANGELOG.md` and
 `LICENSE.txt`, that it carries none of the development apparatus (tests, CI
-config, sandbox, tooling, static-analysis and phpunit config, `vendor/`, git
-metadata — the `.git` directory, or the `.git` file a git worktree has in its
-place — and the developer and working documents, this `TESTING.md` and
+config, sandbox, tooling, static-analysis and phpunit config, `vendor/`,
+`composer.lock`, archives, git metadata — the `.git` directory, or the `.git`
+file a git worktree has in its place — any dot-file or dot-folder such as
+`.env` or `.idea/`, and the developer and working documents, this `TESTING.md` and
 `CONTRIBUTING.md` among them), none of the Hyvä companion (`compat/` — a
 separately published package) and no `docs/` at all, that the version in the
 archived `composer.json` is the repo's, and that every shipped PHP file parses

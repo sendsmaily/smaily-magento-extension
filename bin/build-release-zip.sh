@@ -2,23 +2,28 @@
 #
 # bin/build-release-zip.sh — assemble the release ZIP (PRO-2470 release train).
 #
-# This is the ONE owner of what a shipped package contains: the release
-# workflow (.github/workflows/release.yaml) and the packaging check
+# This is the ONE build of a shipped package: the release workflow
+# (.github/workflows/release.yaml) and the packaging check
 # (bin/verify-release-zip.sh) both call it, so the artifact CI publishes and
 # the artifact the check inspects can never drift apart.
 #
 # Usage:
 #   bin/build-release-zip.sh [output.zip]      (default: ./smaily-connect-magento2.zip)
 #
-# What stays out: the development apparatus (tests, CI, sandbox, tooling,
-# static-analysis config, git metadata — including the `.git` pointer file a
-# git worktree has instead of a directory), the Hyvä companion (compat/,
-# published as the separate package smaily/module-connect-hyva), the developer
-# and internal working documents (TESTING.md, CONTRIBUTING.md, CLAUDE.md,
-# STATUS.md, BACKLOG.md, PILOT_CHECKLIST.md) and the whole docs/ folder — it carries the engine contract vendored from a
-# private repository and internal audits, so the documentation set lives on
-# GitHub and the package links to it there (Erkki's decision, 2026-09-10).
-# What ships alongside the code: README.md, CHANGELOG.md, LICENSE.txt.
+# The archive is `git archive` of the committed tree (HEAD): a file that is
+# not committed — a local .env, an IDE folder, a tool's local configuration,
+# a stray build — can never ship, and an uncommitted change is not in it
+# either. What stays out of the committed tree is listed once, as
+# export-ignore in .gitattributes, which composer's dist installs from GitHub
+# honour too: the development apparatus (tests, CI, sandbox, tooling,
+# static-analysis config), the Hyvä companion (compat/, published as the
+# separate package smaily/module-connect-hyva), the developer and internal
+# working documents (TESTING.md, CONTRIBUTING.md, CLAUDE.md, STATUS.md,
+# BACKLOG.md, PILOT_CHECKLIST.md) and the whole docs/ folder — it carries the
+# engine contract vendored from a private repository and internal audits, so
+# the documentation set lives on GitHub and the package links to it there
+# (Erkki's decision, 2026-09-10). What ships alongside the code: README.md,
+# CHANGELOG.md, LICENSE.txt.
 
 set -euo pipefail
 
@@ -30,18 +35,6 @@ case "$OUT" in
 esac
 
 rm -f "$OUT"
-cd "$ROOT"
-
-zip -q -r -X "$OUT" . \
-    -x '.git' '.git/*' '.github/*' '.sandbox/*' '.vscode/*' '.claude/*' \
-       'Test/*' 'compat/*' 'vendor/*' 'var/*' 'bin/*' \
-       'docker-compose.yaml' 'Dockerfile' \
-       'phpcs.xml.dist' 'phpstan.neon.dist' \
-       'phpunit.xml.dist' 'phpunit.integration.xml.dist' \
-       'composer.lock' '.gitignore' \
-       'CONTRIBUTING.md' 'CLAUDE.md' 'STATUS.md' 'BACKLOG.md' \
-       'TESTING.md' 'PILOT_CHECKLIST.md' \
-       'docs/*' \
-       '*.zip' '*.zip.sha256'
+git -C "$ROOT" archive --format=zip -o "$OUT" HEAD
 
 echo "$OUT"

@@ -57,7 +57,14 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   the new `Model\Logger\EmailMask`, which also finds URL-encoded (`%40`,
   `%2540`) and JSON-escaped (`\u0040`) addresses; an error text Smaily or
   the engine sends back reaches the file masked. The queue rows keep the
-  text as received.
+  text as received. (5) Packaging: `bin/build-release-zip.sh` is `git
+  archive HEAD`, the exclusions live once as `export-ignore` in the new
+  `.gitattributes` (composer dist installs honour them too), and
+  `bin/verify-release-zip.sh` also refuses dot-files at any depth,
+  `composer.lock` and archives. A local build therefore needs the change
+  committed. composer.json requires `guzzlehttp/guzzle ^7.4`; the lock
+  changed only its content-hash (`composer update --lock`, Guzzle stays
+  7.15.5).
 
 - **PRO-3644 done — copy consistency leftovers (2026-10-02).** (1) The
   failed-events banner on the Dashboard and the Log has a singular: "1

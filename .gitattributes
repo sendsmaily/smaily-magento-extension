@@ -1,0 +1,35 @@
+# What a package leaves out. `git archive` honours export-ignore, and so do
+# the GitHub zipballs composer downloads for a dist install — and the release
+# ZIP (bin/build-release-zip.sh) is built with `git archive` from this same
+# list, so every way the module ships contains exactly the same files.
+# bin/verify-release-zip.sh checks the result.
+
+# Development apparatus: tests, CI, sandbox, tooling and their configuration.
+/.github export-ignore
+/.sandbox export-ignore
+/.claude export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/Test export-ignore
+/bin export-ignore
+/docker-compose.yaml export-ignore
+/Dockerfile export-ignore
+/phpcs.xml.dist export-ignore
+/phpstan.neon.dist export-ignore
+/phpunit.xml.dist export-ignore
+/phpunit.integration.xml.dist export-ignore
+/composer.lock export-ignore
+
+# The Hyvä companion, published as the separate package smaily/module-connect-hyva.
+/compat export-ignore
+
+# Developer and internal working documents, and the documentation set (it
+# carries the engine contract vendored from a private repository; the
+# package links to the documentation on GitHub instead).
+/CONTRIBUTING.md export-ignore
+/CLAUDE.md export-ignore
+/STATUS.md export-ignore
+/BACKLOG.md export-ignore
+/TESTING.md export-ignore
+/PILOT_CHECKLIST.md export-ignore
+/docs export-ignore

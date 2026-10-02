@@ -2,11 +2,11 @@
 #
 # bin/verify-release-zip.sh — build the release ZIP and prove it is shippable.
 #
-# The package is assembled by one exclusion list (bin/build-release-zip.sh,
-# which the release workflow calls too), and an exclusion list is exactly the
-# kind of thing that rots silently: a new development directory ships, or a
-# rename drops a required file, and nobody notices until a merchant unpacks
-# it. This script is the gate — it builds the artifact the same way CI does,
+# The package is assembled by one exclusion list (export-ignore in
+# .gitattributes, applied by bin/build-release-zip.sh, which the release
+# workflow calls too), and an exclusion list is exactly the kind of thing
+# that rots silently: a new development directory ships, or a rename drops a
+# required file, and nobody notices until a merchant unpacks it. This script is the gate — it builds the artifact the same way CI does,
 # then asserts what must be inside, what must not, that the version in the
 # archive is the repo's, and that every shipped PHP file parses.
 #
@@ -102,7 +102,11 @@ forbid "tooling scripts"  'bin/'
 forbid "phpunit config"   'phpunit.*\.xml.*'
 forbid "phpcs config"     'phpcs\.xml.*'
 forbid "phpstan config"   'phpstan\.neon.*'
-forbid ".gitignore"       '\.gitignore$'
+# Any dot-file or dot-folder, at any depth: .env, .gitignore, .gitattributes,
+# IDE folders (.idea/, .vscode/), .DS_Store, tool caches.
+forbid "dot-files"        '(.*/)?\.'
+forbid "composer lock"    'composer\.lock$'
+forbid "archives"         '.*\.zip(\.sha256)?$'
 forbid "docker files"     '(docker-compose.*|Dockerfile)$'
 forbid "working status"   'STATUS\.md$'
 forbid "backlog"          'BACKLOG\.md$'

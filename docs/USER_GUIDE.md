@@ -284,7 +284,7 @@ Additional options:
   `user_gender` — the names Smaily's WooCommerce plugin uses, so a shopper
   syncing from two stores lands in one field. Empty values are omitted so
   existing Smaily values are never wiped.
-- **Include Guest Order Emails** — also sync the emails of guest orders
+- **Include guest order emails** — also sync the emails of guest orders
   placed without the checkout newsletter opt-in. It applies only under
   **All customers**. Under **Subscribers only** and **Checkout opt-in only**
   a guest's email reaches Smaily only when the guest ticks the checkout

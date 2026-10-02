@@ -351,7 +351,7 @@ path's reader are gone; the update deletes a stored row at every scope.
 | Recommended (badge) | Soovitatud |
 | Extra fields to sync with each contact | Lisaväljad, mis sünkroonitakse iga kontaktiga |
 | Show a newsletter checkbox at checkout | Näita kassas uudiskirja märkeruutu |
-| Let Smaily send the opt-in confirmation emails (suppresses Magento's own) | Lase Smailyl saata tellimuse kinnituskirjad (Magento enda kirjad jäetakse ära) |
+| Let Smaily send the opt-in confirmation emails (suppresses Magento's own) | Lase Smailyl saata uudiskirjaga liitumise ja sellest loobumise kirjad (Magento enda kirjad jäetakse ära) |
 
 The three lawful-basis labels are **verbatim-identical across Woo, Shopify
 and us already** — strongest positive confirmation in the whole audit, no
@@ -437,7 +437,7 @@ the pack's sample set.
 | First order — fires on a customer's first purchase | Esimene tellimus — käivitub kliendi esimesel ostul |
 | Abandoned cart — fires when a cart is left behind | Hüljatud ostukorv — käivitub, kui ostukorv jäetakse maha |
 | Campaign Intelligence Automations | Campaign Intelligence'i automaatikad |
-| Connect Smaily to set up automations | Automaatikate seadistamiseks ühenda Smaily |
+| Connect Campaign Intelligence to set up these automations | Nende automaatikate seadistamiseks ühenda Campaign Intelligence |
 | Smaily Workflow | Smaily töövoog |
 | Cooldown (days) | Puhkeaeg (päevades) |
 | Daily Cap | Päevalimiit |

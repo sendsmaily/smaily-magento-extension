@@ -16,6 +16,22 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-2456 — four copy fixes the owner approved (2026-10-02).**
+  Settings > Automations, Campaign Intelligence not connected: the empty
+  state reads "Connect Campaign Intelligence to set up these automations"
+  (ET "Nende automaatikate seadistamiseks ühenda Campaign Intelligence"),
+  not "Connect Smaily …". Settings > Contacts drops "— you can change it
+  later in Settings > Contacts" from the lawful-basis note (new phrase
+  without it; the initial setup keeps the long one). "Include Guest Order
+  Emails" → "Include guest order emails" (checkbox and `system.xml`).
+  Estonian: the stopped-import line names the button ("vajuta „Käivita
+  uuesti“"), and the suppress-emails checkbox says what it does — Magento's
+  newsletter subscription-confirmed and unsubscribed emails — "Lase
+  Smailyl saata uudiskirjaga liitumise ja sellest loobumise kirjad"
+  (was "tellimuse kinnituskirjad", which reads as order confirmations).
+  Verified with the real templates and stub data in headless Chrome, both
+  languages. No behaviour change.
+
 - **PRO-2456 evening walk-through — admin pages checked in en_US and
   et_EE at 1440, 1100 and 400 px (2026-10-02).** Every Smaily page and
   state, the states the store is not in drawn in the browser from the real

@@ -98,7 +98,7 @@
                 </field>
                 <field id="include_guests" translate="label comment" type="select" sortOrder="40"
                        showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
-                    <label>Include Guest Order Emails</label>
+                    <label>Include guest order emails</label>
                     <comment>Also sync emails from guest orders without the checkout newsletter opt-in. Applies only in the All customers (legitimate interest) mode; in the other modes a guest is synced only after ticking the checkout newsletter checkbox.</comment>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <depends><field id="sync_enabled">1</field></depends>

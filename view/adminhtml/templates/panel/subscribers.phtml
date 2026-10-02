@@ -51,7 +51,10 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
     </div>
     <?php endif; ?>
     <div id="smaily-w-subscribers-body">
-        <p><?= $escaper->escapeHtml(__('This is a lawful-basis choice. Pick the preset that matches how you have asked your customers for permission — you can change it later in Settings > Contacts.')) ?></p>
+        <?php // "Change it later in Settings > Contacts" only helps in the setup. ?>
+        <p><?= $escaper->escapeHtml($isSettings
+            ? __('This is a lawful-basis choice. Pick the preset that matches how you have asked your customers for permission.')
+            : __('This is a lawful-basis choice. Pick the preset that matches how you have asked your customers for permission — you can change it later in Settings > Contacts.')) ?></p>
         <?php
         $subscriberModes = [
             'consent' => [
@@ -111,7 +114,7 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
         <?php if ($isSettings): ?>
         <div class="smaily-inline-toggle">
             <label><input type="checkbox" id="smaily-w-include-guests"/>
-                <?= $escaper->escapeHtml(__('Include Guest Order Emails')) ?></label>
+                <?= $escaper->escapeHtml(__('Include guest order emails')) ?></label>
             <p class="note"><?= $escaper->escapeHtml(__('Also sync emails from guest orders without the checkout newsletter opt-in. Applies only in the All customers (legitimate interest) mode; in the other modes a guest is synced only after ticking the checkout newsletter checkbox.')) ?></p>
         </div>
         <?php endif; ?>

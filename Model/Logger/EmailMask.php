@@ -13,7 +13,7 @@ namespace Smaily\Connect\Model\Logger;
  * ("e***@g***.com"): enough to recognize a contact, without the address.
  *
  * An address is found written plainly, URL-encoded (`%40`, also
- * double-encoded `%2540`) and JSON-escaped (`@`, also escaped twice),
+ * double-encoded `%2540`) and JSON-escaped (`\u0040`, also escaped twice),
  * which is how an address reaches an error message that quotes a URL or a
  * JSON body. The separator is kept as it was written, so the surrounding URL
  * or JSON stays readable as such.

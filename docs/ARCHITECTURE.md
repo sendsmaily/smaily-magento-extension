@@ -474,6 +474,18 @@ profiling back on.
   a named lock for every change. Only opt-outs are kept — an opt-in removes
   the entry — so it grows with the number of people who said no, never with
   the contact base, and it holds no address. No table, no column.
+- **A read** (`isAllowed()`, cached a day) resolves the Smaily contact
+  against the record, and the newest choice wins (Woo PRO-3191/3192/3434
+  parity). Only an opt-in on the contact (`smaily_rec_profiling = 1`) whose
+  `smaily_rec_profiling_ts` is later than the store's opt-out lifts it — and
+  then the record is cleared and the opt-in is queued for the engine. A `1`
+  with no timestamp, an older one, or one not in exactly the
+  `Y-m-d\TH:i:s\Z` form this module writes (strict parse with round-trip),
+  or more than 5 minutes in the future, counts as older: the opt-out holds
+  and is written to the contact again (its new moment recorded), but never
+  to a contact Smaily does not have — the upsert would create one. When
+  Smaily cannot be read, the record decides; a shopper without an entry is
+  profiled (fail open, as before).
 - **Delivery** is `Queue\Handler\ProfilingConsentHandler`, on the normal
   retry ladder, behind the same sending gate as the identity merge. A row is
   sent only while it still matches the record: a retry or a Send again of a

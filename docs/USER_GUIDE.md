@@ -551,7 +551,10 @@ panel — you do not have to keep the page open:
   as a queued delivery (type `engine.profiling_consent` in the **Log**), so
   an engine outage only delays it: it is retried like every other delivery.
   A delivery that waits while the shopper changes their mind is not sent —
-  only the newest choice reaches the engine. When a shopper who opted out
+  only the newest choice reaches the engine. The store's own record of an
+  opt-out holds even when Smaily cannot be reached or a write to Smaily
+  failed; an older "yes" on the Smaily contact never overrides a newer "no"
+  made in the store (the store writes its "no" back to the contact instead). When a shopper who opted out
   logs in, their earlier anonymous browsing is not linked to their account.
 - **Unsubscribing from marketing also stops profiling.** When Campaign
   Intelligence is connected, a newsletter unsubscribe — in the store, or in

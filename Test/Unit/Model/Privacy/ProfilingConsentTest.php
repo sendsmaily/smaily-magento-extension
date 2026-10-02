@@ -12,6 +12,7 @@ use Magento\Framework\App\CacheInterface;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
@@ -39,8 +40,8 @@ class ProfilingConsentTest extends TestCase
     /** @var array<string, string> */
     private array $cache = [];
 
-    /** @var array<string, string> what Smaily answers for the contact */
-    private array $contact = [];
+    /** @var array<string, string>|\Throwable what Smaily answers for the contact */
+    private array|\Throwable $contact = [];
 
     private SmailyClient&MockObject $smailyClient;
     private Settings&MockObject $engineSettings;
@@ -48,7 +49,13 @@ class ProfilingConsentTest extends TestCase
     protected function setUp(): void
     {
         $this->smailyClient = $this->createMock(SmailyClient::class);
-        $this->smailyClient->method('get')->willReturnCallback(fn (): array => $this->contact);
+        $this->smailyClient->method('get')->willReturnCallback(function (): array {
+            if ($this->contact instanceof \Throwable) {
+                throw $this->contact;
+            }
+
+            return $this->contact;
+        });
         $this->smailyClient->method('post')->willReturnCallback(
             function (string $endpoint, array $body): array {
                 $this->smailyWrites[] = $body;
@@ -151,6 +158,98 @@ class ProfilingConsentTest extends TestCase
         );
         self::assertFalse($consent->isAllowed('person@example.com', 1));
         self::assertSame([], $this->smailyWrites, 'The unsubscribe itself tells Smaily; no profiling field is written');
+    }
+
+    public function testAnOlderOptInOnTheContactDoesNotLiftANewerStoreOptOut(): void
+    {
+        $this->records['person@example.com'] = self::NOW - 3600;
+        $this->contact = ['email' => 'person@example.com', 'is_unsubscribed' => '0',
+            'smaily_rec_profiling' => '1', 'smaily_rec_profiling_ts' => gmdate('Y-m-d\TH:i:s\Z', self::NOW - 7200)];
+
+        self::assertFalse($this->consent()->isAllowed('person@example.com', 1));
+        self::assertSame([[[
+            'email' => 'person@example.com',
+            'smaily_rec_profiling' => 0,
+            'smaily_rec_profiling_ts' => self::NOW_Z,
+        ]]], $this->smailyWrites, 'The newest choice is written back to the contact');
+        self::assertSame(['person@example.com' => self::NOW], $this->records, 'Its moment is the one Smaily now holds');
+    }
+
+    /**
+     * @return array<string, array{0: ?string}>
+     */
+    public static function untrustworthyTimestamps(): array
+    {
+        return [
+            'none' => [null],
+            'not the Z form' => ['2026-09-21 15:13:20'],
+            'an offset' => ['2026-09-21T15:13:20+00:00'],
+            'a relative word' => ['tomorrow'],
+            'rolled over' => ['2026-02-30T10:00:00Z'],
+            'in the future' => [gmdate('Y-m-d\TH:i:s\Z', self::NOW + 301)],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('untrustworthyTimestamps')]
+    public function testAnOptInWithoutATrustworthyTimestampCountsAsOlder(?string $timestamp): void
+    {
+        $this->records['person@example.com'] = self::NOW - 3600;
+        $this->contact = ['email' => 'person@example.com', 'is_unsubscribed' => '0', 'smaily_rec_profiling' => '1'];
+        if ($timestamp !== null) {
+            $this->contact['smaily_rec_profiling_ts'] = $timestamp;
+        }
+
+        self::assertFalse($this->consent()->isAllowed('person@example.com', 1));
+    }
+
+    public function testANewerOptInOnTheContactLiftsTheStoreOptOut(): void
+    {
+        $this->records['person@example.com'] = self::NOW - 3600;
+        $this->contact = ['email' => 'person@example.com', 'is_unsubscribed' => '0',
+            'smaily_rec_profiling' => '1', 'smaily_rec_profiling_ts' => gmdate('Y-m-d\TH:i:s\Z', self::NOW - 60)];
+
+        self::assertTrue($this->consent()->isAllowed('person@example.com', 1));
+        self::assertSame([], $this->records);
+        self::assertSame(
+            ['email' => 'person@example.com', 'opt_out' => false],
+            $this->enqueued[0]['payload'],
+            'The engine hears the newest choice too'
+        );
+        self::assertSame([], $this->smailyWrites);
+    }
+
+    public function testAContactThatNeverHeardTheOptOutKeepsTheShopperOptedOut(): void
+    {
+        $this->records['person@example.com'] = self::NOW - 3600;
+        $this->contact = ['email' => 'person@example.com', 'is_unsubscribed' => '0'];
+
+        self::assertFalse($this->consent()->isAllowed('person@example.com', 1));
+        self::assertCount(1, $this->smailyWrites, 'The opt-out is carried to the contact');
+    }
+
+    public function testAnUnknownContactIsNotCreatedToHoldTheOptOut(): void
+    {
+        $this->records['person@example.com'] = self::NOW - 3600;
+        $this->contact = new ApiException('Contact not found', ApiException::CODE_EMAIL_NOT_FOUND);
+
+        self::assertFalse($this->consent()->isAllowed('person@example.com', 1));
+        self::assertSame([], $this->smailyWrites);
+        self::assertSame(['person@example.com' => self::NOW - 3600], $this->records);
+    }
+
+    public function testWhenSmailyCannotBeReadTheStoreRecordDecides(): void
+    {
+        $this->contact = new SmailyClientException('Smaily is down');
+        $this->records['person@example.com'] = self::NOW - 3600;
+
+        self::assertFalse($this->consent()->isAllowed('person@example.com', 1));
+    }
+
+    public function testWhenSmailyCannotBeReadAShopperWithoutAnOptOutIsProfiled(): void
+    {
+        $this->contact = new SmailyClientException('Smaily is down');
+
+        self::assertTrue($this->consent()->isAllowed('person@example.com', 1));
     }
 
     private function consent(): ProfilingConsent

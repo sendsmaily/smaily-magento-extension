@@ -57,7 +57,8 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
 - Event types (`Model/Queue/EventType`): `contact.sync` (batched per store
   view — per-language accounts hit the right credentials),
   `automation.trigger` (delivered one-by-one so a partial failure can never
-  re-trigger an automation), `engine.identity_merge`.
+  re-trigger an automation), `engine.identity_merge`,
+  `engine.profiling_consent` (see Profiling consent below).
 - Automation routing (`Model/Automation/Router`, Woo `Multilingual\Router`
   parity): multilingual modes `single`/`c` use the config-default workflow;
   modes `a`/`b` resolve `smaily_automation_mapping` rows — the exact
@@ -182,10 +183,11 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   is the one gate every SENDING path consults: `Cron/FlushIngestQueue`,
   the engine-bound backfills at `Cron/BackfillTick`'s router,
   `Controller/Relay/Index`, `Queue\Handler\IdentityMergeHandler`,
-  `Privacy\ProfilingConsent` and `Cron/CatalogResync`. The two paths that
-  loop re-ask only its refusal half once connectedness is proved — per domain
-  in the flusher (so one refusal ends the run) and per row in the merge
-  handler — because that is the half a mid-run 403 can change.
+  `Queue\Handler\ProfilingConsentHandler` and `Cron/CatalogResync`. The
+  paths that loop re-ask only its refusal half once connectedness is proved —
+  per domain in the flusher (so one refusal ends the run) and per row in the
+  merge and profiling-consent handlers — because that is the half a mid-run
+  403 can change.
   `isConnected()` stays the gate for everything that only enqueues, reads or
   displays, so live observers keep queueing and the store's history is intact
   when the account comes back. Rows a refusal met
@@ -447,6 +449,30 @@ reaches the browser. Under Magento cookie restriction mode without cookie
 consent the tracker runs in sender-side anonymous mode (contract §6):
 events still flow with `session_id` + `event_id` but the
 `smaily_visitor_token` identity hint is omitted.
+
+### Profiling consent
+
+Opt-out model, default on: a shopper is profiled unless they said no.
+`Model\Privacy\ProfilingConsent` owns the answer.
+
+- **A choice** (My Account > Personalization, `setAllowed()`) goes three
+  ways: to the Smaily contact (`smaily_rec_profiling` 0/1 +
+  `smaily_rec_profiling_ts`, Z-suffixed), into the store's own record
+  (`Model\Privacy\ProfilingOptOuts`) and onto the marketing event queue as
+  an `engine.profiling_consent` row for the engine's §10 opt-out endpoint.
+  A failed Smaily write does not stop the other two.
+- **The store's record** is one flag row, `smaily_connect_profiling_optouts`:
+  a map of `sha1(address)` to the opt-out's moment (Unix time), held under
+  a named lock for every change. Only opt-outs are kept — an opt-in removes
+  the entry — so it grows with the number of people who said no, never with
+  the contact base, and it holds no address. No table, no column.
+- **Delivery** is `Queue\Handler\ProfilingConsentHandler`, on the normal
+  retry ladder, behind the same sending gate as the identity merge. A row is
+  sent only while it still matches the record: a retry or a Send again of a
+  choice the shopper has since replaced closes as sent without a call, so an
+  older answer never undoes a newer one at the engine. A §10 404 (the engine
+  holds nothing for that address) also closes the row — there is nothing to
+  exclude.
 
 ## Admin UI
 

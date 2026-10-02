@@ -546,8 +546,12 @@ panel — you do not have to keep the page open:
   the Smaily contact (`is_unsubscribed`) — bidirectional in consent mode.
 - **Personalization (profiling) consent** is a separate axis: customers can
   opt out of personalized recommendations under **My Account >
-  Personalization**. The choice is stored on the Smaily contact and
-  enforced by the engine.
+  Personalization**. The choice is stored on the Smaily contact, kept by the
+  store itself, and enforced by the engine. It reaches Campaign Intelligence
+  as a queued delivery (type `engine.profiling_consent` in the **Log**), so
+  an engine outage only delays it: it is retried like every other delivery.
+  A delivery that waits while the shopper changes their mind is not sent —
+  only the newest choice reaches the engine.
 - **Data subject requests**:
   `bin/magento smaily:gdpr export <email>` (Art. 15) and
   `bin/magento smaily:gdpr erase <email> --force` (Art. 17, idempotent).

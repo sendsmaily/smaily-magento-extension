@@ -5,7 +5,7 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
+_Last updated: 2026-10-02 (PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
 and the Dashboard fill the content area on the pack's grey pane under a
 full-width white tab strip, in Magento's Open Sans, with 33 px buttons and
 our own text, link and status colours. Earlier the same day: PRO-3572 — a
@@ -72,6 +72,25 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   (#1f7a34 / #bb2b0e) use our tokens; buttons are 33 px. CSS only. Overall
   style coverage 78.0 → 85.0 % (font difference counted as accepted). The
   Log page is a native grid and has no Smaily frame.
+
+- **PRO-3578 in progress — profiling consent hardening (2026-10-02,
+  parity audit P3 + R1 + R2, Woo PRO-3189/3191/3192/3434).** Slice 1: the
+  engine opt-out (and opt-in) is no longer one direct, never-retried call.
+  `ProfilingConsent::setAllowed()` writes the Smaily contact as before,
+  keeps the choice in `Model\Privacy\ProfilingOptOuts` — one flag row,
+  `smaily_connect_profiling_optouts`, a map of `sha1(address)` to the
+  opt-out's Unix moment, opt-outs only, changed under a named lock; no table,
+  no column — and queues an `engine.profiling_consent` row
+  (`{email, opt_out, opted_out_at}`, entity = address) when the engine is
+  connected. `Queue\Handler\ProfilingConsentHandler` sends §10 with reason
+  `user_preference` behind the merge handler's gate; a row whose choice no
+  longer matches the record (the shopper changed their mind while it waited,
+  or a Send again of an old row) closes as sent without a call; a §10 404
+  (the engine does not know the address) closes as sent. A failed Smaily
+  write no longer loses the engine call. Gates: unit, phpcs 0 errors,
+  phpstan `[OK]`, integration 89 (`ProfilingConsentDeliveryTest`: an
+  opt-out survives an engine outage; an older choice on the ladder cannot
+  undo a newer one).
 
 - **PRO-2456 follow-up — the owner's live-sandbox review (2026-10-02).**
   Marketing > Smaily Connect > Dashboard shows no missing-glyph box: the

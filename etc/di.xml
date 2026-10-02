@@ -38,6 +38,7 @@
                 <item name="contact.sync" xsi:type="object">Smaily\Connect\Model\Queue\Handler\ContactSyncHandler</item>
                 <item name="automation.trigger" xsi:type="object">Smaily\Connect\Model\Queue\Handler\AutomationHandler</item>
                 <item name="engine.identity_merge" xsi:type="object">Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler</item>
+                <item name="engine.profiling_consent" xsi:type="object">Smaily\Connect\Model\Queue\Handler\ProfilingConsentHandler</item>
             </argument>
         </arguments>
     </type>

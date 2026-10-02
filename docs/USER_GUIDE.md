@@ -64,7 +64,7 @@ Everything lives under **Marketing > Smaily Connect**, four pages:
 
 | Page | What it is |
 |---|---|
-| **Dashboard** | The landing page: a one-sentence health verdict, connection status for Smaily / Campaign Intelligence / browse tracking, operational counters (deliveries, the events queued today that are still waiting to send, failures) and the latest queue activity. Every number is a real local queue query. |
+| **Dashboard** | The landing page: a one-sentence health verdict, connection status for Smaily / Campaign Intelligence / browse tracking, operational counters (deliveries, the events queued today that are still waiting to send, failures) and the latest queue activity. Every number is a real local queue query. When deliveries failed in the last 24 hours, a warning banner above the verdict counts them and the verdict carries a red **Review failures** button — both open the Log filtered to failed rows; when everything runs, the verdict offers **View full log**. |
 | **Initial setup** | The guided five-step onboarding. On a fresh install every Smaily Connect page brings you here until setup is completed; you can re-run it any time — your settings are kept. |
 | **Settings** | The initial setup's content as always-available tabs — Connection, Contacts, Automations, Intelligence, RSS. Each tab saves instantly via AJAX. Tabs are deep-linkable (`?tab=rss`). |
 | **Log** | One unified delivery log for both Smaily and Campaign Intelligence, with mass retry for failed rows. |

@@ -97,7 +97,24 @@ $connections = [
     ],
 ];
 ?>
+<?php
+// Failed deliveries are the verdict's subject unless setup or the Smaily
+// connection outranks them: then the pack's degraded state — a warning
+// banner above the verdict and a danger "Review failures" button (PRO-3568).
+$showFailures = $failed > 0
+    && $verdict !== \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_INCOMPLETE
+    && $verdict !== \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_DISCONNECTED;
+?>
 <div id="smaily-dashboard" class="smaily-ui smaily-dashboard">
+    <?php if ($showFailures): ?>
+    <div class="smaily-banner smaily-banner--warning smaily-dashboard-banner" role="status">
+        <span class="smaily-banner__icon">&#9888;</span>
+        <div class="smaily-banner__body">
+            <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('%1 events failed in the last 24 hours', $failed)) ?></div>
+        </div>
+        <a class="smaily-banner__action" href="<?= $escaper->escapeUrl($urls['logFailed']) ?>"><?= $escaper->escapeHtml(__('Review failures')) ?></a>
+    </div>
+    <?php endif; ?>
     <div class="smaily-verdict smaily-verdict-<?= $escaper->escapeHtmlAttr($verdict) ?>">
         <span class="smaily-verdict-dot"></span>
         <div class="smaily-verdict-body">
@@ -110,23 +127,28 @@ $connections = [
         <?php elseif ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_DISCONNECTED): ?>
             <a class="action-primary smaily-verdict-action" href="<?= $escaper->escapeUrl($urls['settings']) ?>">
                 <span><?= $escaper->escapeHtml(__('Open Connection settings')) ?></span></a>
-        <?php elseif ($failed > 0): ?>
-            <a class="action-primary smaily-verdict-action" href="<?= $escaper->escapeUrl($urls['logFailed']) ?>">
+        <?php elseif ($showFailures): ?>
+            <a class="action-primary smaily-verdict-action smaily-verdict-action--danger" href="<?= $escaper->escapeUrl($urls['logFailed']) ?>">
                 <span><?= $escaper->escapeHtml(__('Review failures')) ?></span></a>
+        <?php elseif ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_OK): ?>
+            <?php // Healthy: nothing needs action, so the way to the Log is secondary (pack). ?>
+            <a class="action-secondary smaily-verdict-action" href="<?= $escaper->escapeUrl($urls['log']) ?>">
+                <span><?= $escaper->escapeHtml(__('View full log')) ?></span></a>
         <?php endif; ?>
     </div>
 
     <div class="smaily-connections">
         <?php foreach ($connections as [$label, $sub, $isOn, $pillVariant, $pillLabel]): ?>
+        <?php // Pack connection card: the dot in its own column beside label, sub-line and pill (PRO-3568). ?>
         <div class="smaily-connection <?= $isOn ? 'is-on' : 'is-off' ?>">
-            <div class="smaily-connection-head">
-                <span class="smaily-dot"></span>
-                <strong><?= $escaper->escapeHtml($label) ?></strong>
+            <span class="smaily-dot"></span>
+            <div class="smaily-connection-body">
+                <div class="smaily-connection-label"><?= $escaper->escapeHtml($label) ?></div>
+                <div class="smaily-connection-sub"><?= $escaper->escapeHtml($sub) ?></div>
+                <span class="smaily-pill smaily-pill--<?= $escaper->escapeHtmlAttr($pillVariant) ?>">
+                    <span class="smaily-pill__dot"></span><?= $escaper->escapeHtml($pillLabel) ?>
+                </span>
             </div>
-            <span class="smaily-connection-sub"><?= $escaper->escapeHtml($sub) ?></span>
-            <span class="smaily-pill smaily-pill--<?= $escaper->escapeHtmlAttr($pillVariant) ?>">
-                <span class="smaily-pill__dot"></span><?= $escaper->escapeHtml($pillLabel) ?>
-            </span>
         </div>
         <?php endforeach; ?>
     </div>

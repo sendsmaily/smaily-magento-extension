@@ -16,6 +16,27 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3568 done — the Dashboard's degraded and healthy states carry the
+  pack's banner and buttons (2026-10-02).** With failed deliveries in the
+  last 24 hours (and setup complete, Smaily connected) `dashboard/index.phtml`
+  puts a warning banner above the verdict — "%1 events failed in the last 24
+  hours" with a **Review failures** action, both phrases the Log's banner
+  already ships — and the verdict's **Review failures** button is danger red
+  (`.smaily-verdict-action--danger`: `--s-bar-error` fill, `--s-danger`
+  border). The healthy verdict gets a secondary **View full log** (our term
+  for the pack's "Open event log"; existing phrase). From the style coverage
+  audit (H16, H17, H20–H22, H29): the verdict at 6 px radius, 18/20 padding,
+  no shadow, its dot ringed in the level colour at 13 % (`color-mix`); the
+  connection cards flat at 13/15 padding and 5 px radius with the 14 px
+  ringed dot in its own column beside a 13 px / 600 label, the sub-line and
+  the pill; the quick-link arrow grey (`--s-border-2`) and right-aligned in
+  its row. No new phrases. Verified by rendering the real template with stubs
+  in headless Chrome (ok, degraded with failures, engine unreachable, not
+  connected, setup incomplete; en_US and et_EE). Fidelity audit row 22 marked
+  fixed. Not taken: the pack's banners in the disconnected and incomplete
+  states and the danger "Open Connection settings" button (not in this
+  Story).
+
 - **PRO-3567 done — Settings > Intelligence has the tab title, the
   description and a Save only when there is something to save
   (2026-10-02).** `settings/index.phtml` heads the tab like its siblings:

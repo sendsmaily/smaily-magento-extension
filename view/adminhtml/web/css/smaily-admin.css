@@ -132,7 +132,6 @@
 .smaily-dashboard .smaily-dot { width: 1rem; height: 1rem; border-radius: 50%; background: #d0d0d0; flex-shrink: 0; }
 .smaily-dashboard .smaily-connection.is-on .smaily-dot { background: #79a22e; }
 .smaily-dashboard .smaily-connection.is-off .smaily-dot { background: #d0d0d0; }
-.smaily-dashboard .smaily-connection-state { color: #666; margin-left: auto; text-align: right; }
 .smaily-dashboard .smaily-tiles { display: flex; gap: var(--sp-3); margin-bottom: 18px; flex-wrap: wrap; }
 /* Tiles use the Stage A .smaily-tile component (BEM); layout only lives here. */
 .smaily-dashboard .smaily-columns { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
@@ -635,31 +634,41 @@
 .smaily-settings .smaily-tabs li.active { border-bottom-color: var(--s-accent); color: var(--s-text); }
 
 /* --- Dashboard ------------------------------------------------------------- */
-.smaily-dashboard .smaily-verdict { align-items: center; gap: var(--sp-4); border-left-width: 5px; box-shadow: var(--shadow-1); }
+/* PRO-3568 (pack Dashboard): the verdict at 6 px radius and 18/20 padding,
+ * flat, its dot ringed in the level colour; the warning banner above it in
+ * the degraded state; the danger "Review failures" button. */
+.smaily-dashboard .smaily-verdict { align-items: center; gap: var(--sp-4); padding: 18px 20px; border-left-width: 5px; border-radius: 6px; box-shadow: none; }
+.smaily-dashboard .smaily-dashboard-banner { margin-bottom: var(--sp-4); }
 .smaily-dashboard .smaily-verdict-dot { flex: 0 0 auto; width: 14px; height: 14px; border-radius: 50%; background: var(--s-neutral); }
 .smaily-dashboard .smaily-verdict-body { flex: 1; min-width: 0; }
 .smaily-dashboard .smaily-verdict-kicker { font: 700 var(--fs-11)/1 var(--font); letter-spacing: .6px; text-transform: uppercase; margin-bottom: 5px; }
 .smaily-dashboard .smaily-verdict-text { font-size: var(--fs-18); font-weight: 700; color: var(--s-text); line-height: 1.35; }
 .smaily-dashboard .smaily-verdict-ok { background: var(--s-success-soft); border-color: var(--s-success-border); border-left-color: var(--s-bar-success); }
-.smaily-dashboard .smaily-verdict-ok .smaily-verdict-dot { background: var(--s-bar-success); }
+.smaily-dashboard .smaily-verdict-ok .smaily-verdict-dot { background: var(--s-bar-success); box-shadow: 0 0 0 4px color-mix(in srgb, var(--s-bar-success) 13%, transparent); }
 .smaily-dashboard .smaily-verdict-ok .smaily-verdict-kicker { color: var(--s-success); }
 .smaily-dashboard .smaily-verdict-degraded { background: var(--s-warning-soft); border-color: var(--s-warning-border); border-left-color: var(--s-bar-warning); }
-.smaily-dashboard .smaily-verdict-degraded .smaily-verdict-dot { background: var(--s-bar-warning); }
+.smaily-dashboard .smaily-verdict-degraded .smaily-verdict-dot { background: var(--s-bar-warning); box-shadow: 0 0 0 4px color-mix(in srgb, var(--s-bar-warning) 13%, transparent); }
 .smaily-dashboard .smaily-verdict-degraded .smaily-verdict-kicker { color: var(--s-warning); }
 .smaily-dashboard .smaily-verdict-incomplete { background: var(--s-info-soft); border-color: var(--s-info-border); border-left-color: var(--s-bar-info); }
-.smaily-dashboard .smaily-verdict-incomplete .smaily-verdict-dot { background: var(--s-bar-info); }
+.smaily-dashboard .smaily-verdict-incomplete .smaily-verdict-dot { background: var(--s-bar-info); box-shadow: 0 0 0 4px color-mix(in srgb, var(--s-bar-info) 13%, transparent); }
 .smaily-dashboard .smaily-verdict-incomplete .smaily-verdict-kicker { color: var(--s-info); }
 .smaily-dashboard .smaily-verdict-disconnected { background: var(--s-danger-soft); border-color: var(--s-danger-border); border-left-color: var(--s-bar-error); }
-.smaily-dashboard .smaily-verdict-disconnected .smaily-verdict-dot { background: var(--s-bar-error); }
+.smaily-dashboard .smaily-verdict-disconnected .smaily-verdict-dot { background: var(--s-bar-error); box-shadow: 0 0 0 4px color-mix(in srgb, var(--s-bar-error) 13%, transparent); }
 .smaily-dashboard .smaily-verdict-disconnected .smaily-verdict-kicker { color: var(--s-danger); }
 .smaily-dashboard .smaily-verdict-action { align-self: center; }
+.smaily-ui .action-primary.smaily-verdict-action--danger,
+.smaily-ui .action-primary.smaily-verdict-action--danger:focus { background: var(--s-bar-error); border-color: var(--s-danger); color: #fff; }
+.smaily-ui .action-primary.smaily-verdict-action--danger:hover { background: var(--s-danger); border-color: var(--s-danger); color: #fff; }
 
 .smaily-dashboard .smaily-connections { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-.smaily-dashboard .smaily-connection { align-items: flex-start; flex-direction: column; gap: var(--sp-1); box-shadow: var(--shadow-1); }
-.smaily-dashboard .smaily-connection-head { display: flex; align-items: center; gap: var(--sp-2); width: 100%; }
-.smaily-dashboard .smaily-connection-sub { font-size: var(--fs-12); color: var(--s-text-3); }
-.smaily-dashboard .smaily-connection .smaily-dot { width: 12px; height: 12px; }
-.smaily-dashboard .smaily-connection.is-on .smaily-dot { background: var(--s-bar-success); box-shadow: 0 0 0 3px var(--s-success-soft); }
+/* Connection cards (PRO-3568, pack Dashboard): flat, 13/15 padding, 5 px
+ * radius; the 14 px dot in its own column beside label, sub-line and pill. */
+.smaily-dashboard .smaily-connection { align-items: flex-start; flex-direction: row; gap: 11px; padding: 13px 15px; border-radius: var(--r-3); box-shadow: none; min-width: 0; }
+.smaily-dashboard .smaily-connection-body { flex: 1; min-width: 0; }
+.smaily-dashboard .smaily-connection-label { font-size: var(--fs-13); font-weight: 600; color: var(--s-text); }
+.smaily-dashboard .smaily-connection-sub { margin-bottom: 6px; font-size: var(--fs-12); color: var(--s-text-3); }
+.smaily-dashboard .smaily-connection .smaily-dot { width: 14px; height: 14px; }
+.smaily-dashboard .smaily-connection.is-on .smaily-dot { background: var(--s-bar-success); box-shadow: 0 0 0 4px color-mix(in srgb, var(--s-bar-success) 13%, transparent); }
 .smaily-dashboard .smaily-connection.is-off .smaily-dot { background: var(--s-border-2); }
 
 /* auto-fit, not auto-fill: with the engine disconnected there are three
@@ -672,8 +681,11 @@
 /* Panel headers + quick-link rows (PRO-2456, pack Dashboard lower area). */
 .smaily-dashboard .smaily-activity-head h2,
 .smaily-dashboard .smaily-quick-links > h2 { font-size: var(--fs-14); font-weight: 700; color: var(--s-text); }
-.smaily-dashboard .smaily-activity-head a::after,
-.smaily-dashboard .smaily-quick-links a::after { content: " \2192"; }
+.smaily-dashboard .smaily-activity-head a::after { content: " \2192"; }
+/* Quick links (PRO-3568): the arrow is grey and right-aligned in its row. */
+.smaily-dashboard .smaily-quick-links li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--sp-3); align-items: center; }
+.smaily-dashboard .smaily-quick-links li > * { grid-column: 1; }
+.smaily-dashboard .smaily-quick-links li::after { content: "\2192"; grid-column: 2; grid-row: 1 / span 2; color: var(--s-border-2); }
 .smaily-dashboard .smaily-quick-links ul { list-style: none; padding: 0; line-height: 1.45; }
 .smaily-dashboard .smaily-quick-links li { padding: var(--sp-3) 0; border-top: 1px solid var(--s-border); font-size: var(--fs-13); }
 .smaily-dashboard .smaily-quick-links__desc { display: block; margin-top: 2px; font-size: var(--fs-12); color: var(--s-text-3); }

@@ -1010,6 +1010,21 @@
     max-width: 60ch; margin: 0 0 22px; font-size: var(--fs-14); line-height: 1.5; color: var(--s-text-2);
 }
 .smaily-wizard .smaily-step-panel .smaily-card > div:not([id]):not([class]) > p:not(:last-child) { margin-bottom: var(--sp-2); }
+/* The rail's sub-labels (pack: an 11px muted line under each step name, the
+ * circle top-aligned with the name). The narrow strip across the top keeps
+ * the name only. */
+.smaily-wizard .smaily-steps .smaily-step-sub { display: none; }
+@media (min-width: 1024px) {
+    .smaily-wizard .smaily-steps li,
+    .smaily-wizard .smaily-steps li.active,
+    .smaily-wizard .smaily-steps li.done { align-items: flex-start; }
+    .smaily-wizard .smaily-steps li .smaily-step-index { margin-top: 1px; }
+    .smaily-wizard .smaily-steps .smaily-step-text { min-width: 0; }
+    .smaily-wizard .smaily-steps .smaily-step-name { display: block; }
+    .smaily-wizard .smaily-steps .smaily-step-sub {
+        display: block; margin-top: 1px; font-size: var(--fs-11); font-weight: 400; line-height: 1.35; color: var(--s-text-3);
+    }
+}
 
 /* Dashboard lower panels: the header and every row carry the padding, with
  * dividers between them (pack Dashboard). The Quick links heading outranks

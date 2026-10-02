@@ -87,16 +87,19 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
     </div>
     <?php endif; ?>
     <div id="smaily-wizard-main"<?= $showChooser ? ' style="display:none"' : '' ?>>
+    <?php // Each rail step carries the pack's short line under its name (the
+    // WooCommerce plugin's step descriptions); the rail shows it, the narrow
+    // strip across the top does not. ?>
     <ul class="smaily-steps">
         <?php foreach ([
-            1 => __('Connect'),
-            2 => __('Contacts'),
-            3 => __('Automations'),
-            4 => __('Intelligence'),
-            5 => __('Overview'),
-        ] as $stepNo => $stepLabel): ?>
+            1 => [__('Connect'), __('Set up Smaily account connections')],
+            2 => [__('Contacts'), __('Synchronization settings')],
+            3 => [__('Automations'), __('Setting up triggers for automations')],
+            4 => [__('Intelligence'), __('Create a connection with Campaign Intelligence (optional)')],
+            5 => [__('Overview'), __('Summary and last check')],
+        ] as $stepNo => [$stepLabel, $stepSub]): ?>
         <li data-step="<?= (int)$stepNo ?>"<?= $stepNo === 1 ? ' class="active"' : '' ?>>
-            <span class="smaily-step-index"><span class="smaily-step-num"><?= (int)$stepNo ?></span></span><?= $escaper->escapeHtml($stepLabel) ?>
+            <span class="smaily-step-index"><span class="smaily-step-num"><?= (int)$stepNo ?></span></span><span class="smaily-step-text"><span class="smaily-step-name"><?= $escaper->escapeHtml($stepLabel) ?></span><span class="smaily-step-sub"><?= $escaper->escapeHtml($stepSub) ?></span></span>
         </li>
         <?php endforeach; ?>
     </ul>

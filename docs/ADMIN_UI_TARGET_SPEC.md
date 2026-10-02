@@ -208,6 +208,7 @@ wizard step — see 2.7.
 |---|---|
 | Connect / Subscribers / Automations / Intelligence | Ühendus / Tellijad / Automaatikad / Intelligence (brand term, intentionally untranslated) |
 | Done (step label) | **[i18n gap — see §5]** |
+| Rail sub-labels (PRO-2456; WooCommerce plugin wording): Set up Smaily account connections / Synchronization settings / Setting up triggers for automations / Create a connection with Campaign Intelligence (optional) / Summary and last check | Smaily kontoga ühenduse loomine / Sünkroniseerimise seaded / Automaatsete kirjade seadistamine / Loo ühendus Campaign Intelligence’ga (valikuline) / Kokkuvõte ja viimane kontroll |
 | You are all set! | Kõik on valmis! |
 | Back | (shipped) |
 | Continue / Finish | (shipped) |

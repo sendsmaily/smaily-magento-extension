@@ -74,6 +74,13 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   above the next one and above the footer divider. Settings tabs keep
   their cards (same partials, CSS scoped to `.smaily-wizard`). No
   behaviour change.
+  The step rail shows the pack's 11px muted line under each step name
+  (circle top-aligned with the name); the narrow strip across the top
+  keeps the names only. Copy is the WooCommerce plugin's approved step
+  descriptions, EN + ET from its `.pot` / `-et.po`: "Set up Smaily account
+  connections", "Synchronization settings" (already in our catalogs),
+  "Setting up triggers for automations", "Create a connection with Campaign
+  Intelligence (optional)", "Summary and last check".
 
 - **PRO-2456 evening walk-through — admin pages checked in en_US and
   et_EE at 1440, 1100 and 400 px (2026-10-02).** Every Smaily page and

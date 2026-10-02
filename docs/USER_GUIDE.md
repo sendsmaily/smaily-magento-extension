@@ -124,7 +124,8 @@ Initial setup** — five steps (Connect, Contacts, Automations,
 Intelligence, Overview), each saved separately, with connection testing and
 live workflow lists built in. Each step is headed by its position ("Step 1
 of 5") and its title. Completed steps stay unlocked in the step
-list (a rail on the left; a bar across the top on narrow screens), so you
+list (a rail on the left, with a short description under each step name; a
+bar across the top on narrow screens), so you
 can move back and forward between them freely — also when
 revisiting the initial setup after finishing it. A finished setup reopens on
 the Connect step as a read-only summary marked *Completed*: the subdomain,

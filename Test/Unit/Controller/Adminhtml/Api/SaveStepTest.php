@@ -18,6 +18,7 @@ use Smaily\Connect\Controller\Adminhtml\Api\SaveStep;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
+use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
  * PRO-3628: the answer to the initial setup's finish step says whether Smaily
@@ -50,6 +51,39 @@ class SaveStepTest extends TestCase
         return ['connected' => [true], 'not connected' => [false]];
     }
 
+    /**
+     * PRO-3570: a connection save answers the result of the check it made,
+     * so the Connection status changes without a reload.
+     *
+     * @dataProvider verifiedProvider
+     */
+    public function testAConnectionSaveAnswersTheResultOfItsCheck(bool $accepted): void
+    {
+        $verifiedCredentials = $this->createMock(VerifiedCredentials::class);
+        $verifiedCredentials->expects(self::never())->method('isVerified');
+        $body = ['step' => 'connect', 'data' => ['subdomain' => 'https://Demo.sendsmaily.net/', 'username' => 'u']];
+
+        $this->controller($body, $verifiedCredentials, [], $accepted)->execute();
+
+        self::assertSame(
+            ['saved' => true, 'errors' => [], 'verified' => $accepted, 'accountName' => 'demo'],
+            $this->response
+        );
+    }
+
+    public function testARefusedConnectionSaveAnswersOnlyTheErrors(): void
+    {
+        $errors = [['field' => 'subdomain', 'message' => 'Subdomain and username are required.']];
+
+        $this->controller(
+            ['step' => 'connect', 'data' => []],
+            $this->createMock(VerifiedCredentials::class),
+            $errors
+        )->execute();
+
+        self::assertSame(['saved' => false, 'errors' => $errors], $this->response);
+    }
+
     public function testOtherStepsAnswerOnlyTheSave(): void
     {
         $verifiedCredentials = $this->createMock(VerifiedCredentials::class);
@@ -62,9 +96,14 @@ class SaveStepTest extends TestCase
 
     /**
      * @param array<string, mixed> $body
+     * @param array<int, array{field: string, message: string}> $errors
      */
-    private function controller(array $body, VerifiedCredentials $verifiedCredentials): SaveStep
-    {
+    private function controller(
+        array $body,
+        VerifiedCredentials $verifiedCredentials,
+        array $errors = [],
+        bool $connectionAccepted = false
+    ): SaveStep {
         $request = $this->createMock(HttpRequest::class);
         $request->method('getContent')->willReturn((string)json_encode($body));
         $context = $this->createMock(Context::class);
@@ -80,7 +119,8 @@ class SaveStepTest extends TestCase
         $jsonFactory->method('create')->willReturn($result);
 
         $stepSaver = $this->createMock(WizardStepSaver::class);
-        $stepSaver->method('save')->willReturn([]);
+        $stepSaver->method('save')->willReturn($errors);
+        $stepSaver->method('isConnectionAccepted')->willReturn($connectionAccepted);
         $websiteContext = $this->createMock(WebsiteContext::class);
         $websiteContext->method('getStoreId')->willReturn(4);
 
@@ -90,7 +130,8 @@ class SaveStepTest extends TestCase
             new JsonSerializer(),
             $stepSaver,
             $verifiedCredentials,
-            $websiteContext
+            $websiteContext,
+            new SubdomainNormalizer()
         );
     }
 }

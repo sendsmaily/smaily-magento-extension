@@ -138,7 +138,11 @@ account name once connected).
 **Connected** means that Smaily accepted the saved credentials the last
 time they were checked: when you pressed Test Connection, or when you saved
 the connection (each save asks Smaily once). Filled-in fields alone are not
-enough. Changed credentials show *Not connected* until they are checked, and
+enough. The status line shows the answer of each check at once, without a
+reload: after Test Connection it shows the result for the credentials as
+typed, after a save the result for the credentials just saved. Test
+Connection with empty fields or a refused subdomain asks Smaily nothing and
+leaves the status as it was. Changed credentials show *Not connected* until they are checked, and
 if Smaily later refuses them — for example because the API user was
 removed — the status turns to *Not connected* too. The Dashboard then shows
 a **Not connected** verdict with an **Open Connection settings** button;
@@ -165,8 +169,13 @@ refreshes the automation workflow dropdowns. With the password field left
 blank, Test Connection uses the saved password, as long as the subdomain and
 username are filled in. With empty fields and nothing saved to fall back on,
 it asks you to fill in the subdomain, username and password. Saving succeeds whenever the
-subdomain is a plain one; if the saved credentials are wrong you get a clear
-warning instead of a blocked save.
+subdomain and username are filled in and the subdomain is a plain one — wrong
+credentials do not block it. On **Settings > Connection** a save with
+credentials Smaily does not accept shows *Saved.* beside the button and
+turns the status line to *Not connected*; press Test Connection to see
+Smaily's reason. In the initial setup the Connect step is saved and the
+setup moves on; the Overview step then says that syncing starts once Smaily
+accepts the credentials.
 
 Credentials can be set per **website**, or per **store view** when each
 language uses its own Smaily account (multilingual mode "Per-language

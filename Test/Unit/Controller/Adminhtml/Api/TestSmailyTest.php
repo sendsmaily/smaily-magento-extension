@@ -55,6 +55,33 @@ class TestSmailyTest extends TestCase
     }
 
     /**
+     * PRO-3570: the Connection status follows a test only when Smaily was
+     * asked — an answer, a refusal or no answer at all.
+     *
+     * @dataProvider askedProvider
+     */
+    public function testATestThatAskedSmailyIsMarkedChecked(?\Throwable $refusal): void
+    {
+        $this->pressTestConnection($refusal);
+
+        self::assertTrue($this->response['checked']);
+        self::assertSame($refusal === null, $this->response['connected']);
+    }
+
+    /**
+     * @return array<string, array{?\Throwable}>
+     */
+    public static function askedProvider(): array
+    {
+        return [
+            'accepted' => [null],
+            'refused' => [new AuthenticationException('refused', 401)],
+            'a package without API access' => [new PlanBlockedException(self::PLAN_MESSAGE, 403)],
+            'unreachable' => [new SmailyClientException('timeout')],
+        ];
+    }
+
+    /**
      * PRO-3575: a subdomain that would change the request host is refused
      * before any client is built — neither the posted nor the stored
      * password is sent.
@@ -72,6 +99,7 @@ class TestSmailyTest extends TestCase
         $this->controller($body, $clientFactory, $clientProvider)->execute();
 
         self::assertFalse($this->response['connected']);
+        self::assertFalse($this->response['checked']);
         self::assertSame(
             'The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.',
             $this->response['error']
@@ -113,7 +141,7 @@ class TestSmailyTest extends TestCase
         $this->controller($body, $clientFactory, $clientProvider)->execute();
 
         self::assertSame(
-            ['connected' => false, 'error' => 'Please fill in the subdomain, username and password.'],
+            ['connected' => false, 'checked' => false, 'error' => 'Please fill in the subdomain, username and password.'],
             $this->response
         );
     }
@@ -203,7 +231,7 @@ class TestSmailyTest extends TestCase
         );
     }
 
-    private function pressTestConnection(\Throwable $refusal): void
+    private function pressTestConnection(?\Throwable $refusal): void
     {
         $request = $this->createMock(HttpRequest::class);
         $request->method('getContent')->willReturn(
@@ -222,7 +250,9 @@ class TestSmailyTest extends TestCase
         $jsonFactory->method('create')->willReturn($result);
 
         $client = $this->createMock(SmailyClient::class);
-        $client->method('validateCredentials')->willThrowException($refusal);
+        if ($refusal !== null) {
+            $client->method('validateCredentials')->willThrowException($refusal);
+        }
         $clientFactory = $this->createMock(SmailyClientFactory::class);
         $clientFactory->method('create')->willReturn($client);
 

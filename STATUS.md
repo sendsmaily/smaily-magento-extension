@@ -16,6 +16,24 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3570 done — the Connection status follows each check without a
+  reload (2026-10-02).** Settings > Connection renders the status pill and
+  the account from the server-known state (`WizardData::isSmailyVerified()`,
+  `getSavedSubdomain()`), so the page no longer shows "Not connected" for a
+  moment on every load. A connection save answers `verified` (the result of
+  the check the save itself made — `WizardStepSaver::isConnectionAccepted()`,
+  read from the check, not from the configuration cache, which can still
+  hold the old credentials) and `accountName`; Test connection answers
+  `checked` (Smaily was asked: accepted, refused, package or unreachable) and
+  the pill follows only a test that asked — empty fields and a refused
+  subdomain leave it as it was. User Guide: what a save with wrong
+  credentials shows (*Saved.* + *Not connected*; the setup moves on and the
+  Overview says syncing starts once Smaily accepts them). No new phrases.
+  Verified by rendering the real templates with stubs in headless Chrome:
+  before the change the pill read "Not connected" without JavaScript for a
+  verified store and kept "Connected" after a refused test and a refused
+  save; after it, the first paint is right and both answers show at once.
+
 - **PRO-3628 — PRO-3603 findings fixed (2026-10-02).** Test connection
   with empty fields asks "Please fill in the subdomain, username and
   password." (EN + ET) instead of "Smaily API credentials are not
@@ -44,7 +62,7 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   walks `PILOT_CHECKLIST.md` with real credentials (human acceptance of
   everything that needs a real Smaily account and engine) — PRO-2474's last
   item. After the pilot (open backlog): PRO-3625 (remaining low hardening),
-  PRO-3573, PRO-3570 + the UI/UX parity Stories (PRO-3561–3569), PRO-2506,
+  PRO-3573, the UI/UX parity Stories (PRO-3561–3569), PRO-2506,
   PRO-1967, PRO-1198 (Smaily hand-over). Sandbox: run `git worktree list`
   and remove finished agent worktrees under `.claude/worktrees` before any
   sandbox `setup:di:compile` (they are inside the bind-mounted module).

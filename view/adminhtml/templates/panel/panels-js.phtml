@@ -96,6 +96,20 @@ window.smailyPanelsInit = function ($) {
         }
     }
 
+    // Settings > Connection status line (PRO-3570): rendered server-side
+    // from the saved state, then set to the answer of each check that asked
+    // Smaily — Test connection, or a connection save.
+    function setConnectionStatus(verified, accountName) {
+        $('#smaily-w-connection-pill').toggleClass('smaily-pill--active', verified)
+            .toggleClass('smaily-pill--off', !verified);
+        $('#smaily-w-connection-pill-text').text(verified
+            ? '<?= $escaper->escapeJs(__('Connected')) ?>'
+            : '<?= $escaper->escapeJs(__('Not connected')) ?>');
+        $('#smaily-w-connection-account').text(verified && accountName
+            ? '<?= $escaper->escapeJs(__('as "%1"')) ?>'.replace('%1', accountName)
+            : '');
+    }
+
     function credentials() {
         return {
             subdomain: $('#smaily-w-subdomain').val(),
@@ -115,6 +129,9 @@ window.smailyPanelsInit = function ($) {
             if (!response.saved) {
                 var message = (response.errors || []).map(function (e) { return e.message; }).join(' ');
                 throw new Error(message || '<?= $escaper->escapeJs(__('Saving failed.')) ?>');
+            }
+            if (name === 'connect' && typeof response.verified === 'boolean') {
+                setConnectionStatus(response.verified, response.accountName);
             }
             if (name === 'connect' && data) {
                 // The saved multilingual state is the new baseline: switching
@@ -449,16 +466,6 @@ window.smailyPanelsInit = function ($) {
             // PRO-3579) — not a verdict on the credentials.
             result('#smaily-w-test-result', '<?= $escaper->escapeJs(__('Smaily refused the request because this account\'s package does not include API access. Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all.')) ?>', false);
         }
-        if ($('#smaily-w-connection-status').length) {
-            $('#smaily-w-connection-pill').toggleClass('smaily-pill--active', boot.verified)
-                .toggleClass('smaily-pill--off', !boot.verified);
-            $('#smaily-w-connection-pill-text').text(boot.verified
-                ? '<?= $escaper->escapeJs(__('Connected')) ?>'
-                : '<?= $escaper->escapeJs(__('Not connected')) ?>');
-            $('#smaily-w-connection-account').text(boot.verified
-                ? '<?= $escaper->escapeJs(__('as "%1"')) ?>'.replace('%1', boot.connection.subdomain)
-                : '');
-        }
 
         // Subscribers (sync-field checkboxes are server-rendered).
         $('#smaily-w-sync-enabled').prop('checked', boot.subscribers.syncEnabled);
@@ -561,6 +568,9 @@ window.smailyPanelsInit = function ($) {
             result('#smaily-w-test-result', '<?= $escaper->escapeJs(__('Testing…')) ?>', true);
             post(urls.test, credentials()).then(function (data) {
                 connected = !!data.connected;
+                if (data.checked) {
+                    setConnectionStatus(!!data.connected, data.accountName);
+                }
                 result('#smaily-w-test-result', data.connected
                     ? '<?= $escaper->escapeJs(__('Connected! Continue to the next step.')) ?>'
                     : (data.error || '<?= $escaper->escapeJs(__('Connection failed.')) ?>'), data.connected);

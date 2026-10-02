@@ -114,6 +114,32 @@ class WizardData implements ArgumentInterface
         return ['_query' => ['website' => $this->websiteContext->getWebsiteId()]];
     }
 
+    /**
+     * Whether Smaily accepted the saved credentials at the last real check
+     * (PRO-3560) — what the Connection status shows. Rendered into the page
+     * so no other state shows before the script runs (PRO-3570).
+     */
+    public function isSmailyVerified(): bool
+    {
+        return $this->verifiedCredentials->isVerified($this->websiteContext->getStoreId());
+    }
+
+    /**
+     * The saved Smaily subdomain of the selected website.
+     */
+    public function getSavedSubdomain(): string
+    {
+        return $this->config->getSubdomain($this->websiteContext->getStoreId());
+    }
+
+    /**
+     * The saved Smaily API username of the selected website.
+     */
+    public function getSavedUsername(): string
+    {
+        return $this->config->getUsername($this->websiteContext->getStoreId());
+    }
+
     public function getBootJson(): string
     {
         $websiteId = $this->websiteContext->getWebsiteId();
@@ -124,7 +150,7 @@ class WizardData implements ArgumentInterface
             // What the Connection status shows: Smaily accepted these saved
             // credentials at the last real check (PRO-3560). `connected`
             // above only says they are filled in.
-            'verified' => $this->verifiedCredentials->isVerified($storeId),
+            'verified' => $this->isSmailyVerified(),
             // Why not: the package has no API access, not the credentials (PRO-3579).
             'planBlocked' => $this->verifiedCredentials->isPlanBlocked($storeId),
             'setupCompleted' => $this->isSetupCompleted(),

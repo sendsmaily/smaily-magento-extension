@@ -316,6 +316,41 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
+     * PRO-3570: the connection status shows the answer of the check a save
+     * made, without a reload — the saver tells whether Smaily accepted the
+     * credentials it just saved.
+     */
+    public function testAConnectionSaveTellsWhetherSmailyAcceptedTheCredentials(): void
+    {
+        $this->clientFactory->method('create')->willReturn($this->createMock(SmailyClient::class));
+
+        $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'password' => 'secret']);
+
+        self::assertTrue($this->saver->isConnectionAccepted());
+    }
+
+    public function testAConnectionSaveSmailyRefusesIsNotAccepted(): void
+    {
+        $client = $this->createMock(SmailyClient::class);
+        $client->method('validateCredentials')->willThrowException(new AuthenticationException('refused', 401));
+        $this->clientFactory->method('create')->willReturn($client);
+
+        $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'password' => 'x']);
+
+        self::assertFalse($this->saver->isConnectionAccepted());
+    }
+
+    public function testAConnectionSaveWithoutAPasswordToCheckIsNotAccepted(): void
+    {
+        $this->config->method('getPassword')->willReturn('');
+        $this->clientFactory->expects(self::never())->method('create');
+
+        $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'password' => '']);
+
+        self::assertFalse($this->saver->isConnectionAccepted());
+    }
+
+    /**
      * PRO-3575: a subdomain that would change the request host is refused
      * with a message; nothing is saved and Smaily is not asked, so the stored
      * password is never sent with it.

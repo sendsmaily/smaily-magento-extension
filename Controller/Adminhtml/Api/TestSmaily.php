@@ -24,7 +24,11 @@ use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
  * POST /test-smaily {subdomain, username, password} or {store_id}
- * -> {connected: bool, accountName?: string, error?: string}
+ * -> {connected: bool, checked: bool, accountName?: string, error?: string}
+ *
+ * `checked` says whether Smaily was asked (it answered, refused or could
+ * not be reached); the Connection status follows only a test that asked
+ * (PRO-3570). Empty fields and a refused subdomain ask nothing.
  *
  * With credentials posted, those are tested as typed. Without a password, a
  * store_id falls back to the credentials SAVED for that store view when the
@@ -58,7 +62,11 @@ class TestSmaily extends AbstractJsonAction implements HttpPostActionInterface
         $storeId = isset($body['store_id']) && $body['store_id'] !== '' ? (int)$body['store_id'] : null;
 
         if ($subdomain !== '' && !SmailyUrl::isPlainSubdomain($subdomain)) {
-            return $this->jsonResponse(['connected' => false, 'error' => (new InvalidSubdomainException())->getMessage()]);
+            return $this->jsonResponse([
+                'connected' => false,
+                'checked' => false,
+                'error' => (new InvalidSubdomainException())->getMessage(),
+            ]);
         }
 
         // A per-language account block re-tests its saved account by
@@ -88,18 +96,20 @@ class TestSmaily extends AbstractJsonAction implements HttpPostActionInterface
         try {
             $client->validateCredentials();
 
-            return $this->jsonResponse(['connected' => true, 'accountName' => $subdomain]);
+            return $this->jsonResponse(['connected' => true, 'checked' => true, 'accountName' => $subdomain]);
         } catch (PlanBlockedException $exception) {
             // The package, not the credentials (PRO-3579).
-            return $this->jsonResponse(['connected' => false, 'error' => $exception->getMessage()]);
+            return $this->jsonResponse(['connected' => false, 'checked' => true, 'error' => $exception->getMessage()]);
         } catch (AuthenticationException) {
             return $this->jsonResponse([
                 'connected' => false,
+                'checked' => true,
                 'error' => (string)__('Smaily rejected these credentials. Check the subdomain, username and password.'),
             ]);
         } catch (SmailyClientException $exception) {
             return $this->jsonResponse([
                 'connected' => false,
+                'checked' => true,
                 'error' => (string)__('Could not reach Smaily: %1', $exception->getMessage()),
             ]);
         }
@@ -112,6 +122,7 @@ class TestSmaily extends AbstractJsonAction implements HttpPostActionInterface
     {
         return $this->jsonResponse([
             'connected' => false,
+            'checked' => false,
             'error' => (string)__('Please fill in the subdomain, username and password.'),
         ]);
     }

@@ -146,6 +146,21 @@ class WizardDataTest extends TestCase
     }
 
     /**
+     * PRO-3570: the Connection status is rendered into the page, so no
+     * wrong state shows before the script runs.
+     */
+    public function testTheConnectionStatusIsReadAtTheSelectedWebsitesStoreScope(): void
+    {
+        $this->verifiedCredentials->expects(self::once())->method('isVerified')->with(5)->willReturn(true);
+        $this->config->method('getSubdomain')->with(5)->willReturn('demo');
+        $this->config->method('getUsername')->with(5)->willReturn('api-user');
+
+        self::assertTrue($this->viewModel->isSmailyVerified());
+        self::assertSame('demo', $this->viewModel->getSavedSubdomain());
+        self::assertSame('api-user', $this->viewModel->getSavedUsername());
+    }
+
+    /**
      * PRO-3579: when Smaily's last answer was that the package has no API
      * access, the Connection status says so instead of blaming the
      * credentials.

@@ -53,6 +53,9 @@ class WizardStepSaver
 {
     public const XML_PATH_SETUP_COMPLETED = 'smaily_connect/internal/setup_completed';
 
+    /** Whether Smaily accepted the credentials the last connection save checked (PRO-3570). */
+    private bool $connectionAccepted = false;
+
     public function __construct(
         private readonly WriterInterface $configWriter,
         private readonly EncryptorInterface $encryptor,
@@ -93,11 +96,24 @@ class WizardStepSaver
     }
 
     /**
+     * Whether Smaily accepted the credentials that the last connection save
+     * in this request checked — the answer the Connection status shows
+     * without a reload (PRO-3570). Read from the check itself, because the
+     * configuration cache can still hold the credentials from before the
+     * save. False when the save made no check.
+     */
+    public function isConnectionAccepted(): bool
+    {
+        return $this->connectionAccepted;
+    }
+
+    /**
      * @param array<string, mixed> $data
      * @return array<int, array{field: string, message: string}>
      */
     private function saveConnect(array $data, int $websiteId): array
     {
+        $this->connectionAccepted = false;
         $subdomain = $this->normalizer->normalize((string)($data['subdomain'] ?? ''));
         $username = trim((string)($data['username'] ?? ''));
         $password = (string)($data['password'] ?? '');
@@ -231,7 +247,7 @@ class WizardStepSaver
         );
 
         try {
-            $this->credentialCheck->check($subdomain, $username, $password);
+            $this->connectionAccepted = $this->credentialCheck->check($subdomain, $username, $password);
         } catch (SmailyClientException) {
             // Remembered (or not) by SmailyClient; the save stands either way.
         }

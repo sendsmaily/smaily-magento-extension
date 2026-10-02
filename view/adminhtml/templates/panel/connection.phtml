@@ -101,14 +101,17 @@ $modeCards = [
             <p class="note" id="smaily-w-password-note" style="display:none;"><?= $escaper->escapeHtml(__('A password is already saved — leave this empty to keep it.')) ?></p>
         </div>
         <?php if ($isSettings): ?>
-        <?php // Settings shows a saved-connection status line in-card; the Test button lives in the tab footer (settings/index.phtml). ?>
+        <?php // Settings shows a saved-connection status line in-card; the Test button lives in the tab footer (settings/index.phtml).
+        // Rendered from the server-known state, so no other state shows before the
+        // script runs; Test connection and Save update it in place (PRO-3570). ?>
+        <?php $verified = $viewModel->isSmailyVerified(); ?>
         <div class="smaily-connection-status" id="smaily-w-connection-status">
             <span class="smaily-connection-status__label"><?= $escaper->escapeHtml(__('Status')) ?>:</span>
-            <span class="smaily-pill smaily-pill--off" id="smaily-w-connection-pill">
+            <span class="smaily-pill smaily-pill--<?= $verified ? 'active' : 'off' ?>" id="smaily-w-connection-pill">
                 <span class="smaily-pill__dot"></span>
-                <span id="smaily-w-connection-pill-text"><?= $escaper->escapeHtml(__('Not connected')) ?></span>
+                <span id="smaily-w-connection-pill-text"><?= $escaper->escapeHtml($verified ? __('Connected') : __('Not connected')) ?></span>
             </span>
-            <span class="smaily-connection-status__account" id="smaily-w-connection-account"></span>
+            <span class="smaily-connection-status__account" id="smaily-w-connection-account"><?= $verified ? $escaper->escapeHtml(__('as "%1"', $viewModel->getSavedSubdomain())) : '' ?></span>
         </div>
         <?php else: ?>
         <button type="button" class="action-secondary" id="smaily-w-test">

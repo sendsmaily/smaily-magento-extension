@@ -24,7 +24,10 @@ use Magento\Framework\Lock\LockManagerInterface;
  * unsubscribe, or the store writing the opt-out to the Smaily contact), or
  * 0 for an entry that only mirrors an opt-out read back from Smaily. A cache
  * flush or a Smaily outage cannot undo an entry; only an explicit opt-in
- * removes it.
+ * removes it — or, for an opt-out the shopper made only by unsubscribing
+ * from marketing, subscribing again (PRO-3594). Such an entry is kept as
+ * {"at": moment, "by": "unsubscribe"}; a plain moment, the only form before
+ * PRO-3594, is a profiling opt-out of its own.
  *
  * Every change is a read-modify-write of the one row, so it holds a named
  * lock: two shoppers opting out at the same moment must not lose one entry.
@@ -35,6 +38,7 @@ class ProfilingOptOuts
 
     private const LOCK_NAME = 'smaily_connect_profiling_optouts';
     private const LOCK_TIMEOUT_SECONDS = 10;
+    private const BY_UNSUBSCRIBE = 'unsubscribe';
 
     public function __construct(
         private readonly FlagManager $flagManager,
@@ -48,15 +52,27 @@ class ProfilingOptOuts
      */
     public function moment(string $email): ?int
     {
-        $moment = $this->all()[self::key($email)] ?? null;
+        $entry = $this->all()[self::key($email)] ?? null;
+        $moment = is_array($entry) ? ($entry['at'] ?? null) : $entry;
 
         return is_int($moment) ? $moment : null;
     }
 
-    public function record(string $email, int $moment): void
+    /**
+     * Did the store's opt-out come only from unsubscribing from marketing?
+     */
+    public function isByUnsubscribe(string $email): bool
     {
-        $this->change(static function (array $optOuts) use ($email, $moment): array {
-            $optOuts[self::key($email)] = $moment;
+        $entry = $this->all()[self::key($email)] ?? null;
+
+        return is_array($entry) && ($entry['by'] ?? null) === self::BY_UNSUBSCRIBE;
+    }
+
+    public function record(string $email, int $moment, bool $byUnsubscribe = false): void
+    {
+        $entry = $byUnsubscribe ? ['at' => $moment, 'by' => self::BY_UNSUBSCRIBE] : $moment;
+        $this->change(static function (array $optOuts) use ($email, $entry): array {
+            $optOuts[self::key($email)] = $entry;
 
             return $optOuts;
         });
@@ -72,7 +88,7 @@ class ProfilingOptOuts
     }
 
     /**
-     * @param callable(array<string, int>): array<string, int> $change
+     * @param callable(array<string, mixed>): array<string, mixed> $change
      */
     private function change(callable $change): void
     {
@@ -87,7 +103,7 @@ class ProfilingOptOuts
     }
 
     /**
-     * @return array<string, int>
+     * @return array<string, mixed>
      */
     private function all(): array
     {

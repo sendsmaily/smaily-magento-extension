@@ -72,6 +72,34 @@ class ProfilingOptOutsTest extends TestCase
         self::assertSame(0, $this->optOuts->moment('person@example.com'));
     }
 
+    public function testAnOptOutMadeByUnsubscribingIsKeptAsSuch(): void
+    {
+        $this->optOuts->record('person@example.com', 1790000000, true);
+        $this->optOuts->record('other@example.com', 1790000001);
+
+        self::assertSame(1790000000, $this->optOuts->moment('person@example.com'));
+        self::assertTrue($this->optOuts->isByUnsubscribe('person@example.com'));
+        self::assertFalse($this->optOuts->isByUnsubscribe('other@example.com'));
+        self::assertFalse($this->optOuts->isByUnsubscribe('nobody@example.com'));
+    }
+
+    public function testAProfilingOptOutReplacesAnUnsubscribeOne(): void
+    {
+        $this->optOuts->record('person@example.com', 1790000000, true);
+        $this->optOuts->record('person@example.com', 1790000001);
+
+        self::assertSame(1790000001, $this->optOuts->moment('person@example.com'));
+        self::assertFalse($this->optOuts->isByUnsubscribe('person@example.com'));
+    }
+
+    public function testAnEntryKeptBeforeOriginsWereRecordedCountsAsAProfilingOptOut(): void
+    {
+        $this->flags[ProfilingOptOuts::FLAG_CODE] = [sha1('person@example.com') => 1790000000];
+
+        self::assertSame(1790000000, $this->optOuts->moment('person@example.com'));
+        self::assertFalse($this->optOuts->isByUnsubscribe('person@example.com'));
+    }
+
     public function testForgettingRemovesOnlyThatAddress(): void
     {
         $this->optOuts->record('person@example.com', 1790000000);

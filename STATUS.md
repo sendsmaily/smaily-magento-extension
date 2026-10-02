@@ -5,14 +5,14 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 — the pre-rc1 work list is closed, including the
-final clean-install pass (PRO-3603: passed, six low findings queued). PRO-3575 security review landed in full (browse relay,
-2.8.x settings deleted after migration, 30-day cart restore link, keyed-hash
-profiling opt-out record and consent cache, https-only engine setup address,
-plain Smaily subdomain); PRO-3619 (no profiling choice or purchase marker
-creates a Smaily contact); PRO-3606/3610/3616 (contact-sync modes); PRO-1965
-(Log evidence); PRO-2456, PRO-2474, PRO-3560, PRO-3571/3572, PRO-3576–3584,
-PRO-3591/3594/3602, PRO-1952. Earlier sessions: 2026-09-11, 2026-09-10._
+_Last updated: 2026-10-02 — 3.0.0-rc1 is released as a GitHub pre-release on
+the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc1),
+built by the release workflow from commit 9af1d9e; the ZIP and its .sha256
+were checked after publishing (354 files, checksum OK). Milestone "rc1 tagged
++ pilot runbook" reached. Done before the tag: parity work (PRO-3576–3584,
+3591, 3594, 3602, 3606, 3610, 3616, 3619), PRO-1952, PRO-1965/1963, PRO-3560,
+PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
+(PRO-2456 page frame), PRO-3603, PRO-3628. Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
@@ -38,21 +38,16 @@ PRO-3591/3594/3602, PRO-1952. Earlier sessions: 2026-09-11, 2026-09-10._
   in-process instance — nothing stored). Fixes PRO-3603 findings 1, 5
   and 6.
 
-- **Next session opens here (2026-10-02).** Done today: PRO-2456 (+ page
-  frame), PRO-2474 runbook, pilot-day checklist and clean ZIP install,
-  PRO-3560, PRO-3571, PRO-3572, the PRO-3574 parity spike and its Stories
-  PRO-3576/3577/3578/3579/3580/3581/3584/3591, PRO-3582, PRO-3583 (+
-  follow-up), PRO-3594, PRO-3602, PRO-3606, PRO-3610, PRO-3616, PRO-3619
-  (+ remainder: the purchase marker goes only to a contact Smaily has),
-  PRO-1952, PRO-1965 (+ PRO-1963), and the PRO-3575 security fixes (browse
-  relay, 2.8.x settings, cart restore link, opt-out record and consent
-  cache keys, setup address and subdomain), and PRO-3603 (final
-  clean-install pass, entry below). Remaining before rc1: Erkki decides
-  which PRO-3603 findings (if any) go in before the tag, then the rc1 tag
-  on Erkki's go. Milestones: rc1 2026-10-03 (may move — Erkki 2026-10-02: rc1 waits
-  for the whole list), pilot store live 2026-10-09. After the pilot:
-  PRO-2506, PRO-1967, PRO-1198 (hand-over), and the UI/UX parity Stories
-  (PRO-1357, PRO-1398, PRO-1385).
+- **Next session opens here (2026-10-02).** 3.0.0-rc1 is out (header).
+  Next: pilot day — milestone "Pilot store live", 2026-10-09. The pilot's
+  developer installs from the release ZIP per `docs/INSTALLING.md`; Erkki
+  walks `PILOT_CHECKLIST.md` with real credentials (human acceptance of
+  everything that needs a real Smaily account and engine) — PRO-2474's last
+  item. After the pilot (open backlog): PRO-3625 (remaining low hardening),
+  PRO-3573, PRO-3570 + the UI/UX parity Stories (PRO-3561–3569), PRO-2506,
+  PRO-1967, PRO-1198 (Smaily hand-over). Sandbox: run `git worktree list`
+  and remove finished agent worktrees under `.claude/worktrees` before any
+  sandbox `setup:di:compile` (they are inside the bind-mounted module).
 
 - **PRO-3603 done — final clean-install pass of the release ZIP
   (2026-10-02).** On fresh sandbox volumes, without the working-tree

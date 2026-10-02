@@ -222,7 +222,7 @@ if Smaily is briefly unreachable — deliveries retry with backoff).
 | Mode | Who is synced | Smaily unsubscribes mirror back? |
 |---|---|---|
 | **Subscribers only (consent)** — default | Only opted-in newsletter subscribers | **Yes** — a contact who unsubscribes in Smaily is unsubscribed in Magento too (and vice versa) |
-| All customers (legitimate interest) | Every registered customer; `is_unsubscribed` is omitted so Smaily manages suppression (the [historical import](#historical-import-backfill) sends each customer's status) | No |
+| All customers (legitimate interest) | Every registered customer, as a soft opt-in: `is_unsubscribed` is omitted, so a customer new to Smaily becomes a subscriber and a contact Smaily already has keeps its status. A customer who unsubscribes in the store is sent as unsubscribed | No |
 | Checkout opt-in only | Nobody automatically — only shoppers who tick the checkout newsletter checkbox. A signup through the newsletter form, the admin or the API alone is not synced; an unsubscribe in the store is | No |
 
 With Magento's **Need to Confirm** newsletter option on, a checkout opt-in
@@ -230,6 +230,13 @@ waits for its confirmation email and syncs once it is confirmed. Magento
 does not record where a pending signup came from, so under checkout opt-in
 only every confirmed signup syncs, a confirmed newsletter-form signup
 included.
+
+**What "All customers" requires.** This mode is the EU soft opt-in for
+existing customers. It lets you send marketing emails only about products
+similar to those the customer bought. The customer must have had a clear
+way to refuse marketing emails when they bought, and every email needs an
+unsubscribe link. You are responsible for the legal basis. The mode card
+in Initial setup and on Settings > Contacts says the same.
 
 Additional options:
 
@@ -483,13 +490,17 @@ traffic:
   - **Checkout opt-in only** — nobody: a contact reaches Smaily only when
     a shopper ticks the checkout checkbox, so the import finishes at 0.
 
-  Every contact goes with its subscription status in the store: someone
-  subscribed to the newsletter as subscribed, everyone else as
-  unsubscribed. Nobody becomes subscribed by being imported, and a contact
-  Smaily already has takes the store's status. A signup still waiting for its confirmation email counts
-  as not subscribed (under subscribers only it is not imported at all); it
-  syncs as subscribed once it is confirmed. Guest-order emails are not
-  imported. The estimate above the **Start import** button counts these
+  A newsletter subscriber goes with its subscription status in the store,
+  subscribed or unsubscribed, and a contact Smaily already has takes that
+  status. Under **Subscribers only** nobody becomes subscribed by being
+  imported: a signup still waiting for its confirmation email is not
+  imported, and it syncs as subscribed once it is confirmed. Under **All
+  customers** (the soft opt-in) every other customer goes without a
+  status, as the live sync sends them: a customer new to Smaily becomes a
+  subscriber, and a contact Smaily already has keeps its status. This
+  includes a customer whose newsletter signup still waits for its
+  confirmation email. A customer who unsubscribed in the store goes as
+  unsubscribed. Guest-order emails are not imported. The estimate above the **Start import** button counts these
   contacts for the mode picked on the panel.
   The import obeys that website's **Sync contacts to Smaily**
   switch exactly like the live syncs do: with the switch off the import

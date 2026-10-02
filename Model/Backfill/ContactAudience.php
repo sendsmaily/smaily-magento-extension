@@ -23,13 +23,15 @@ use Smaily\Connect\Model\Config\Source\SyncMode;
  * - consent: the website's newsletter subscribers, subscribed or
  *   unsubscribed — the two statuses Observer\SubscriberSaveAfter sends;
  * - legitimate_interest: those subscribers, then every other registered
- *   customer of the website (Observer\CustomerSaveAfter), as not subscribed;
+ *   customer of the website (Observer\CustomerSaveAfter) with no status —
+ *   the soft opt-in (PRO-3610): nobody who objected is in that pass;
  * - checkout_optin: nobody — a contact reaches Smaily only when a shopper
  *   ticks the checkout checkbox.
  *
- * Each row carries the contact's real subscription status, so nobody becomes
- * subscribed by being imported. count() reads the same two queries the pages
- * walk, so the estimate in the admin and the import never disagree.
+ * A subscriber row carries the contact's real subscription status; a
+ * customer row carries null, which the import sends as no status at all, as
+ * the live sync does. count() reads the same two queries the pages walk, so
+ * the estimate in the admin and the import never disagree.
  */
 class ContactAudience
 {
@@ -91,11 +93,12 @@ class ContactAudience
 
     /**
      * The website's registered customers the subscriber page does not
-     * already send, after $afterId, by customer id. None of them is
-     * subscribed on this website. A customer without a store of this website
-     * (an account created in the admin) goes through its default store.
+     * already send, after $afterId, by customer id. None of them has a
+     * subscribed or unsubscribed status on this website, so subscribed is
+     * null. A customer without a store of this website (an account created
+     * in the admin) goes through its default store.
      *
-     * @return list<array{id: int, email: string, store_id: int, customer_id: int, subscribed: bool}>
+     * @return list<array{id: int, email: string, store_id: int, customer_id: int, subscribed: null}>
      */
     public function customerPage(int $websiteId, int $afterId, int $limit): array
     {
@@ -119,7 +122,7 @@ class ContactAudience
                 'email' => (string)$row['email'],
                 'store_id' => in_array($storeId, $storeIds, true) ? $storeId : $defaultStoreId,
                 'customer_id' => (int)$row['entity_id'],
-                'subscribed' => false,
+                'subscribed' => null,
             ];
         }
 

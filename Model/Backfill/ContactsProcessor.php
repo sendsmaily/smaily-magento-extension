@@ -22,8 +22,11 @@ use Smaily\Connect\Model\Logger\Logger;
 
 /**
  * Backfills a website's existing contacts into Smaily: the audience of the
- * website's contact-sync mode (Model\Backfill\ContactAudience, PRO-3582),
- * each contact with its real subscription status (is_unsubscribed set).
+ * website's contact-sync mode (Model\Backfill\ContactAudience, PRO-3582).
+ * A newsletter subscriber goes with its real subscription status; under
+ * "All customers" (the soft opt-in, PRO-3610) every other customer goes
+ * without is_unsubscribed, as the live sync sends them: Smaily keeps an
+ * existing contact's status and creates a new contact as subscribed.
  *
  * The cursor is the last processed subscriber_id while the walk is in the
  * subscribers; under "All customers" it then moves on to the other
@@ -120,7 +123,7 @@ class ContactsProcessor implements ProcessorInterface
      * subscribers first, then — under "All customers" only — the other
      * registered customers.
      *
-     * @return array{list<array{id: int, email: string, store_id: int, customer_id: int, subscribed: bool}>, string}
+     * @return array{list<array{id: int, email: string, store_id: int, customer_id: int, subscribed: ?bool}>, string}
      */
     private function loadPage(int $websiteId, string $mode, string $cursor): array
     {
@@ -142,7 +145,7 @@ class ContactsProcessor implements ProcessorInterface
     }
 
     /**
-     * @param list<array{id: int, email: string, store_id: int, customer_id: int, subscribed: bool}> $page
+     * @param list<array{id: int, email: string, store_id: int, customer_id: int, subscribed: ?bool}> $page
      * @return array{int, int} processed, failed
      */
     private function sendPage(array $page): array
@@ -158,7 +161,7 @@ class ContactsProcessor implements ProcessorInterface
             $byStore[$contact['store_id']][] = $this->payloadBuilder->build(
                 $contact['email'],
                 $contact['store_id'],
-                !$contact['subscribed'],
+                $contact['subscribed'] === null ? null : !$contact['subscribed'],
                 $customers[$contact['customer_id']] ?? null
             );
         }
@@ -183,7 +186,7 @@ class ContactsProcessor implements ProcessorInterface
     }
 
     /**
-     * @param list<array{id: int, email: string, store_id: int, customer_id: int, subscribed: bool}> $page
+     * @param list<array{id: int, email: string, store_id: int, customer_id: int, subscribed: ?bool}> $page
      * @return array<int, CustomerInterface>
      */
     private function loadCustomers(array $page): array

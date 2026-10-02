@@ -111,7 +111,13 @@ class ContactsProcessorTest extends TestCase
             ->process($job);
     }
 
-    public function testAllCustomersSendsTheSubscribersThenEveryOtherCustomerAsNotSubscribed(): void
+    /**
+     * PRO-3610: "All customers" is the soft opt-in. A customer who never
+     * answered the newsletter goes without is_unsubscribed, so Smaily keeps
+     * an existing contact's status and creates a new one as subscribed; a
+     * customer who unsubscribed in the store goes as unsubscribed.
+     */
+    public function testAllCustomersSendsTheSubscribersThenEveryOtherCustomerWithoutAStatus(): void
     {
         $client = $this->createMock(SmailyClient::class);
         $client->expects(self::exactly(2))
@@ -119,8 +125,11 @@ class ContactsProcessorTest extends TestCase
             ->willReturnCallback(function (string $endpoint, array $contacts): array {
                 static $calls = 0;
                 $expected = [
-                    [['email' => 'person@example.com', 'is_unsubscribed' => 0]],
-                    [['email' => 'person-customer@example.com', 'is_unsubscribed' => 1]],
+                    [
+                        ['email' => 'person@example.com', 'is_unsubscribed' => 0],
+                        ['email' => 'person-left@example.com', 'is_unsubscribed' => 1],
+                    ],
+                    [['email' => 'person-customer@example.com']],
                 ];
                 self::assertSame(SmailyClient::ENDPOINT_CONTACT, $endpoint);
                 self::assertSame($expected[$calls++], $contacts);
@@ -132,19 +141,22 @@ class ContactsProcessorTest extends TestCase
 
         $audience = $this->createAudience(SyncMode::MODE_LEGITIMATE_INTEREST, 2);
         $audience->method('subscriberPage')
-            ->willReturnOnConsecutiveCalls([$this->row(77, 'person@example.com', true)], []);
+            ->willReturnOnConsecutiveCalls([
+                $this->row(77, 'person@example.com', true),
+                $this->row(78, 'person-left@example.com', false),
+            ], []);
         $audience->expects(self::exactly(2))->method('customerPage')
             ->willReturnCallback(fn (int $websiteId, int $afterId): array => $afterId === 0
-                ? [$this->row(12, 'person-customer@example.com', false, 12)]
+                ? [$this->row(12, 'person-customer@example.com', null, 12)]
                 : []);
 
-        $job = $this->createJob(null, ['0', '77', 'customer:12']);
+        $job = $this->createJob(null, ['0', '78', 'customer:12']);
 
         $jobManager = $this->createMock(JobManager::class);
         $jobManager->expects(self::exactly(2))->method('recordProgress')
             ->willReturnCallback(function (Job $job, int $processed, int $failed, ?string $cursor): void {
                 static $calls = 0;
-                self::assertSame([['77'], ['customer:12']][$calls++], [$cursor]);
+                self::assertSame([['78'], ['customer:12']][$calls++], [$cursor]);
             });
         $jobManager->expects(self::once())->method('complete')->with($job);
 
@@ -200,9 +212,9 @@ class ContactsProcessorTest extends TestCase
     }
 
     /**
-     * @return array{id: int, email: string, store_id: int, customer_id: int, subscribed: bool}
+     * @return array{id: int, email: string, store_id: int, customer_id: int, subscribed: ?bool}
      */
-    private function row(int $id, string $email, bool $subscribed, int $customerId = 0): array
+    private function row(int $id, string $email, ?bool $subscribed, int $customerId = 0): array
     {
         return [
             'id' => $id,
@@ -234,11 +246,11 @@ class ContactsProcessorTest extends TestCase
         string $mode = SyncMode::MODE_CONSENT
     ): ContactsProcessor {
         $payloadBuilder = $this->createMock(SubscriberPayloadBuilder::class);
+        // As the real builder: a null status is left out of the payload.
         $payloadBuilder->method('build')->willReturnCallback(
-            fn (string $email, int $storeId, ?bool $isUnsubscribed): array => [
-                'email' => $email,
-                'is_unsubscribed' => $isUnsubscribed ? 1 : 0,
-            ]
+            fn (string $email, int $storeId, ?bool $isUnsubscribed): array => $isUnsubscribed === null
+                ? ['email' => $email]
+                : ['email' => $email, 'is_unsubscribed' => $isUnsubscribed ? 1 : 0]
         );
 
         $config = $this->createMock(Config::class);

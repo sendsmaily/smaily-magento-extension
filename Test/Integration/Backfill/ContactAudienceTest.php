@@ -76,7 +76,7 @@ class ContactAudienceTest extends IntegrationTestCase
         );
     }
 
-    public function testAllCustomersAddsEveryOtherRegisteredCustomerAsNotSubscribed(): void
+    public function testAllCustomersAddsEveryOtherRegisteredCustomerWithoutAStatus(): void
     {
         self::assertSame(7, $this->audience->count(self::WEBSITE_ID, SyncMode::MODE_LEGITIMATE_INTEREST));
         self::assertSame(
@@ -86,11 +86,12 @@ class ContactAudienceTest extends IntegrationTestCase
                 ['person-guest@example.com', 1, true],
                 ['person-guest-left@example.com', 2, false],
                 ['person-registered-later@example.com', 1, true],
-                // Never subscribed, and a pending confirmation: both go as
-                // not subscribed. The admin-created account has no store of
-                // its own, so it goes through the website's default store.
-                ['person-never@example.com', 2, false],
-                ['person-pending@example.com', self::DEFAULT_STORE_ID, false],
+                // Never subscribed, and a pending confirmation: neither has
+                // objected, so both go without a status (PRO-3610, soft
+                // opt-in). The admin-created account has no store of its
+                // own, so it goes through the website's default store.
+                ['person-never@example.com', 2, null],
+                ['person-pending@example.com', self::DEFAULT_STORE_ID, null],
             ],
             $this->walk(SyncMode::MODE_LEGITIMATE_INTEREST)
         );
@@ -117,7 +118,7 @@ class ContactAudienceTest extends IntegrationTestCase
     /**
      * Every row the import would send, page by page, as [email, store, subscribed].
      *
-     * @return list<array{string, int, bool}>
+     * @return list<array{string, int, ?bool}>
      */
     private function walk(string $mode): array
     {

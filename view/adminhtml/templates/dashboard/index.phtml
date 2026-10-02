@@ -106,7 +106,10 @@ $showFailures = $failed > 0
     <div class="smaily-banner smaily-banner--warning smaily-dashboard-banner" role="status">
         <span class="smaily-banner__icon">&#9888;</span>
         <div class="smaily-banner__body">
-            <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('%1 events failed in the last 24 hours', $failed)) ?></div>
+            <?php // Magento's __() has no plural forms: one phrase per number. ?>
+            <div class="smaily-banner__title"><?= $escaper->escapeHtml($failed === 1
+                ? __('%1 event failed in the last 24 hours', $failed)
+                : __('%1 events failed in the last 24 hours', $failed)) ?></div>
         </div>
         <a class="smaily-banner__action" href="<?= $escaper->escapeUrl($urls['logFailed']) ?>"><?= $escaper->escapeHtml(__('Review failures')) ?></a>
     </div>

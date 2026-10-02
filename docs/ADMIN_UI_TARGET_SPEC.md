@@ -266,7 +266,7 @@ chip / API Username / API Password + hint), max-width 440px inside the
 620px card; status line below ("Status:" + Pill(`active`,"Connected") + "as
 '<account name>'"); when the store has >1 detected language, the
 multilingual routing-mode choice cards render above/around the form (see
-2.2 layout). Footer: Test Connection (secondary) | Save Connection
+2.2 layout). Footer: Test connection (secondary) | Save Connection
 (primary) | InlineStatus.
 
 **(b) Exposed options/controls** (source: A2 §A, confirmed):
@@ -275,7 +275,7 @@ multilingual routing-mode choice cards render above/around the form (see
 |---|---|
 | Subdomain | normalizes a pasted full URL to bare subdomain |
 | API Username / API Password | plain text / encrypted |
-| Test Connection | AJAX, tests as-typed credentials, no save |
+| Test connection | AJAX, tests as-typed credentials, no save |
 | Multilingual routing mode (4 cards, shown only when store views span >1 detected language) | drives which section renders below; saved as `multilingual_mode` |
 | Per-language account blocks (subdomain/username/password/Test per language) | mode "Per-language Smaily accounts" only |
 | Default fallback account picker | same mode only — which account's credentials serve unmatched scope + become the default-scope credentials |
@@ -287,7 +287,7 @@ multilingual routing-mode choice cards render above/around the form (see
 | Subdomain | Alamdomeen |
 | API Username | API kasutajanimi |
 | API Password | API parool |
-| Test Connection | Testi ühendust |
+| Test connection | Testi ühendust |
 | Single language | Üks keel |
 | Per-language Smaily accounts | Keelepõhised Smaily kontod |
 | One account, per-language workflows | Üks konto, keelepõhised töövood |
@@ -640,7 +640,7 @@ redacted payload the panel shows.
 | Source / Type / Entity / Status / Attempts / Created / Updated / Last Error / Actions | Allikas / Tüüp / Kirje / Olek / Katsed / Loodud / Uuendatud / Viimane viga / Tegevused |
 | Retry (mass action) | Proovi uuesti |
 | "All %1 automatic attempts are used up — this row will NOT retry on its own. Select it in the log and press Retry to queue it again." | (shipped) |
-| "%1 events failed in the last 24 hours" | (shipped) |
+| "%1 events failed in the last 24 hours" / "%1 event failed in the last 24 hours" (one phrase per number) | (shipped) |
 | "Sensitive values (passwords, API keys) are never shown here, and email addresses are masked." | (shipped) |
 
 **(d) REMOVE:** none.
@@ -806,7 +806,7 @@ on a wizard/Settings panel today; **both** = duplicated right now.
 | `connection/subdomain` | Smaily account subdomain | both (native: default+website+store scope; ours: Connection tab default scope, mode-A writes store-view scope programmatically) | **ours.** Native's scope switcher is redundant — mode A already manages store-view scope without exposing it to the merchant (decision 2). |
 | `connection/username` | Smaily API username | both, same shape as subdomain | **ours**, same reasoning. |
 | `connection/password` | Smaily API password (encrypted) | both, same shape as subdomain | **ours**, same reasoning. |
-| `connection/test_connection` | Test-Connection button (no stored value) | both (native `frontend_model` button; ours: AJAX Test Connection) | **ours.** Pure UI duplication, not a config value. |
+| `connection/test_connection` | Test connection button (no stored value) | both (native `frontend_model` button; ours: AJAX Test connection) | **ours.** Pure UI duplication, not a config value. |
 | `connection/multilingual_mode` | Routing mode (single/a/b/c) | both (native: default+website scope; ours: Connection tab mode cards, default scope only) | **ours** — resolved (Erkki, 2026-07-14): native's per-website differentiation is dropped, one mode per Magento instance, owned entirely by the Connection tab. |
 | `subscribers/sync_enabled` | Master subscriber-sync toggle | both (native: website scope; ours: default scope) | **ours.** |
 | `subscribers/sync_mode` | Lawful-basis preset | both, same shape | **ours.** |

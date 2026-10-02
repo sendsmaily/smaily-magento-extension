@@ -16,6 +16,35 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
 
 ## Where we are
 
+- **PRO-3644 done — copy consistency leftovers (2026-10-02).** (1) The
+  failed-events banner on the Dashboard and the Log has a singular: "1
+  event failed in the last 24 hours" / "Viimase 24 tunni jooksul
+  ebaõnnestus 1 sündmus" (new phrase; the plural one stays). The
+  Cron/HealthCheck admin notice is unchanged: it fires only at 25 or more
+  failures (`FAILED_EVENTS_THRESHOLD`), so it is always plural — PHPStan
+  flags a `=== 1` branch there as always false. (2) **Refresh workflows**
+  shows a workflow list that cannot be loaded: beside Save Automations in
+  Settings, beside the step's buttons (`#smaily-w-save-result`) in the
+  setup; a stale message clears on each press. (3) Docs call the button
+  **Test connection**, as the admin does (USER_GUIDE, CHANGELOG,
+  ARCHITECTURE, ADMIN_UI_TARGET_SPEC, UPSTREAM_PROPOSAL); the unrendered
+  `system.xml` button block uses the same phrase. (4) US spelling in
+  English strings and their keys: organized, personalized, Canceled /
+  Canceling… (the import pill and the canceled-import line; ET unchanged),
+  the GDPR erase CLI's "anonymized"; public docs' prose likewise (colored,
+  labeled, honored, gray, summarized, anonymized, favor). Code identifiers
+  and stored values (`isCancelled`, `CANCELLED_RESPONSE`, `cancelled`
+  status) are unchanged. Estonian uses *sünkroonimine* / *sünkrooni*
+  everywhere (the more common form in our CSV — 12 noun forms against 4;
+  the PRO-1748 canon strings used *sünkroniseerimine* but Woo mixes both):
+  "Kontaktide sünkroonimine Smailysse", "Sünkroonimise seaded",
+  "Sünkrooni kontaktid Smailysse", the contact-sync-off import line and
+  the Log intro. Verified with the real templates and stub data in
+  headless Chrome (banners at 1 and 12 in both languages; Refresh
+  workflows with a failing list in Settings en_US and the setup et_EE).
+  Gates: unit 639, phpcs 0 errors, phpstan `[OK]`, integration 135
+  (`GdprEraseTest` reads the CLI's new spelling).
+
 - **PRO-2456 — four copy fixes the owner approved (2026-10-02).**
   Settings > Automations, Campaign Intelligence not connected: the empty
   state reads "Connect Campaign Intelligence to set up these automations"

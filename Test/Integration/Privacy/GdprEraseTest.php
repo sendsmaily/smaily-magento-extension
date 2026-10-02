@@ -181,9 +181,9 @@ class GdprEraseTest extends IntegrationTestCase
         $tester = $this->runCommand(['action' => 'erase', 'email' => self::SUBJECT, '--force' => true]);
 
         self::assertSame(0, $tester->getStatusCode());
-        self::assertStringContainsString('Queued messages: 1 removed, 1 anonymised', $tester->getDisplay());
-        self::assertStringContainsString('Engine queue: 0 removed, 0 anonymised', $tester->getDisplay());
-        self::assertStringContainsString('Abandoned carts: 0 removed, 1 anonymised', $tester->getDisplay());
+        self::assertStringContainsString('Queued messages: 1 removed, 1 anonymized', $tester->getDisplay());
+        self::assertStringContainsString('Engine queue: 0 removed, 0 anonymized', $tester->getDisplay());
+        self::assertStringContainsString('Abandoned carts: 0 removed, 1 anonymized', $tester->getDisplay());
     }
 
     public function testAFailingEngineStillLeavesTheLocalHalfErased(): void

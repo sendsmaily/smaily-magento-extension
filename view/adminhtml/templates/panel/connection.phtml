@@ -51,7 +51,7 @@ $modeCards = [
 ?>
 <?php if ($isMultilingual): ?>
 <div class="smaily-card" id="smaily-ml-modes">
-    <h2><?= $escaper->escapeHtml(__('How is Smaily organised for your store languages?')) ?></h2>
+    <h2><?= $escaper->escapeHtml(__('How is Smaily organized for your store languages?')) ?></h2>
     <p><?= $escaper->escapeHtml(__('Your store views speak %1 languages (%2). Pick how contacts and automations should route between them — the sections below adapt right away.', count($languages), strtoupper(implode(', ', $languages)))) ?></p>
     <?php foreach ($modeCards as $modeValue => $card): ?>
     <label class="smaily-choice<?= $modeValue === $mode ? ' is-selected' : '' ?>">

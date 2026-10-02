@@ -115,7 +115,7 @@ class GdprCommand extends Command
     {
         foreach ($this->localEraser->erase($email) as $label => $counts) {
             $output->writeln(sprintf(
-                '<info>%s: %d removed, %d anonymised</info>',
+                '<info>%s: %d removed, %d anonymized</info>',
                 $label,
                 $counts['removed'],
                 $counts['anonymised']

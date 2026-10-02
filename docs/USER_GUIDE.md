@@ -64,7 +64,7 @@ Everything lives under **Marketing > Smaily Connect**, four pages:
 
 | Page | What it is |
 |---|---|
-| **Dashboard** | The landing page: a one-sentence health verdict, connection status for Smaily / Campaign Intelligence / browse tracking, operational counters (deliveries in the last 30 days — only events that reached Smaily or Campaign Intelligence, never a skipped or withdrawn row — the events queued today that are still waiting to send, failures) and the latest queue activity, each row's status labelled and coloured as in the Log (*Skipped* and *Withdrawn* included). Every number is a real local queue query. When deliveries failed in the last 24 hours, a warning banner above the verdict counts them and the verdict carries a red **Review failures** button — both open the Log filtered to failed rows; when everything runs, the verdict offers **View full log**. |
+| **Dashboard** | The landing page: a one-sentence health verdict, connection status for Smaily / Campaign Intelligence / browse tracking, operational counters (deliveries in the last 30 days — only events that reached Smaily or Campaign Intelligence, never a skipped or withdrawn row — the events queued today that are still waiting to send, failures) and the latest queue activity, each row's status labeled and colored as in the Log (*Skipped* and *Withdrawn* included). Every number is a real local queue query. When deliveries failed in the last 24 hours, a warning banner above the verdict counts them and the verdict carries a red **Review failures** button — both open the Log filtered to failed rows; when everything runs, the verdict offers **View full log**. |
 | **Initial setup** | The guided five-step onboarding. On a fresh install every Smaily Connect page brings you here until setup is completed; you can re-run it any time — your settings are kept. |
 | **Settings** | The initial setup's content as always-available tabs — Connection, Contacts, Automations, Intelligence, RSS. Each tab saves instantly via AJAX. Tabs are deep-linkable (`?tab=rss`). |
 | **Log** | One unified delivery log for both Smaily and Campaign Intelligence, with mass retry for failed rows. |
@@ -136,48 +136,48 @@ credentials; otherwise it says that syncing starts once Smaily accepts them
 and points you to **Settings > Connection**. It ends with **Go to
 Dashboard** and **Open Settings**. Everything it writes
 lands in the regular configuration, so you can fine-tune it later on the
-**Settings > Connection** tab — its own Test Connection / Save Connection
+**Settings > Connection** tab — its own Test connection / Save Connection
 footer and connection-status line (Connected / Not connected, with the
 account name once connected).
 
 **Connected** means that Smaily accepted the saved credentials the last
-time they were checked: when you pressed Test Connection, or when you saved
+time they were checked: when you pressed Test connection, or when you saved
 the connection (each save asks Smaily once). Filled-in fields alone are not
 enough. The status line shows the answer of each check at once, without a
-reload: after Test Connection it shows the result for the credentials as
+reload: after Test connection it shows the result for the credentials as
 typed, after a save the result for the credentials just saved. Test
-Connection with empty fields or a refused subdomain asks Smaily nothing and
+connection with empty fields or a refused subdomain asks Smaily nothing and
 leaves the status as it was. Changed credentials show *Not connected* until they are checked, and
 if Smaily later refuses them — for example because the API user was
 removed — the status turns to *Not connected* too. The Dashboard then shows
 a **Not connected** verdict with an **Open Connection settings** button;
-press Test Connection there to check the credentials again.
+press Test connection there to check the credentials again.
 
 When the Smaily account's package does not include API access, Smaily
 refuses every request before it looks at the credentials (Smaily response
 code 227, "A paid package is required"). The store then shows *Not
-connected* as well — nothing can reach Smaily — but Test Connection, the
+connected* as well — nothing can reach Smaily — but Test connection, the
 connection status, a configuration save, the Dashboard and the Log name
 the package as the reason instead of calling the credentials wrong. The
 credentials cannot be checked until the account is on a package that
-includes the API; press Test Connection again after the package is changed.
+includes the API; press Test connection again after the package is changed.
 
 | Field | Notes |
 |---|---|
-| Subdomain | Your Smaily subdomain. Pasting the full URL (`https://demo.sendsmaily.net`) also works — it is normalized on save. The subdomain must be a plain one, such as `demo`: letters, digits and hyphens only. Any other value is refused on save and on Test Connection, and nothing is sent to Smaily with it. |
+| Subdomain | Your Smaily subdomain. Pasting the full URL (`https://demo.sendsmaily.net`) also works — it is normalized on save. The subdomain must be a plain one, such as `demo`: letters, digits and hyphens only. Any other value is refused on save and on Test connection, and nothing is sent to Smaily with it. |
 | API Username / Password | Create these in Smaily under *Preferences > API*. The password is stored encrypted. |
 | Multilingual Mode | See [Multilingual stores](#multilingual-stores). |
 
-Use the **Test Connection** button next to the fields for instant feedback
+Use the **Test connection** button next to the fields for instant feedback
 on the credentials as typed — no save needed; a successful test also
 refreshes the automation workflow dropdowns. With the password field left
-blank, Test Connection uses the saved password, as long as the subdomain and
+blank, Test connection uses the saved password, as long as the subdomain and
 username are filled in. With empty fields and nothing saved to fall back on,
 it asks you to fill in the subdomain, username and password. Saving succeeds whenever the
 subdomain and username are filled in and the subdomain is a plain one — wrong
 credentials do not block it. On **Settings > Connection** a save with
 credentials Smaily does not accept shows *Saved.* beside the button and
-turns the status line to *Not connected*; press Test Connection to see
+turns the status line to *Not connected*; press Test connection to see
 Smaily's reason. In the initial setup the Connect step is saved and the
 setup moves on; the Overview step then says that syncing starts once Smaily
 accepts the credentials.
@@ -211,7 +211,7 @@ selected card, nothing is saved until you press Save/Continue:
 | Mode | Meaning |
 |---|---|
 | Single language | One account, one workflow per trigger (default). |
-| Per-language Smaily accounts | Each language has its own Smaily account. The Connection panel shows one credential block per detected language — side by side, each headed by its language — with its own Test Connection button and its own status (*Connected* when Smaily accepted that language's saved credentials at the last check, otherwise *Not connected*), plus a **default fallback account** picker. |
+| Per-language Smaily accounts | Each language has its own Smaily account. The Connection panel shows one credential block per detected language — side by side, each headed by its language — with its own Test connection button and its own status (*Connected* when Smaily accepted that language's saved credentials at the last check, otherwise *Not connected*), plus a **default fallback account** picker. |
 | One account, per-language workflows | One Smaily account; each language fires its own workflow. The most common multilingual setup. |
 | One workflow branching by language | One workflow; the language split happens inside Smaily. The `language` field is sent with every contact. |
 
@@ -291,7 +291,7 @@ Additional options:
   newsletter checkbox, whatever this option says.
 - **Show Newsletter Checkbox At Checkout** — adds an opt-in checkbox to the
   checkout payment step; ticking it creates a real Magento newsletter
-  subscriber (double opt-in is honoured if your store requires
+  subscriber (double opt-in is honored if your store requires
   confirmation).
 - **Let Smaily Send Opt-In Emails** — suppresses Magento's own confirmation
   success/unsubscribe emails so your Smaily automations own that
@@ -309,8 +309,9 @@ to store events. Only enabled workflows with the **"form submitted"**
 trigger are listed — that is the only trigger type the Smaily API can
 enroll contacts into; workflows with other triggers (e.g. "subscribed to
 list") cannot be fired by an integration and are therefore not offered.
-When the list cannot be loaded on **Settings > Automations**, the reason
-shows beside the tab's **Save Automations** button.
+When the list cannot be loaded — on opening the tab or after **Refresh
+workflows** — the reason shows beside the tab's **Save Automations** button
+(in the initial setup, beside the step's buttons).
 The events:
 
 - **Welcome** — fires when a shopper subscribes to the newsletter in your
@@ -378,7 +379,7 @@ reminder that failed for good means nothing is written either.
 The field is written only to a contact Smaily already has, so it never
 creates a contact. Before sending it, the extension looks the address up in
 Smaily; when Smaily does not have it, the Log row is closed without being
-sent, labelled *Skipped*, and says why. A shopper who unsubscribed in the store is sent as
+sent, labeled *Skipped*, and says why. A shopper who unsubscribed in the store is sent as
 unsubscribed with this field.
 
 ## Abandoned cart
@@ -566,7 +567,7 @@ traffic:
   button is disabled and says so, and an import started any other way
   (the CLI, or one already queued when you switched it off) sends nothing
   and finishes at 0. An import that was already running when you switched
-  it off stops at its next chunk and is reported as cancelled, keeping the
+  it off stops at its next chunk and is reported as canceled, keeping the
   count it had genuinely sent.
 - **Catalog / Customers / Orders → Campaign Intelligence** — Settings >
   **Intelligence** tab, one card per import.
@@ -574,10 +575,10 @@ traffic:
 Each import is a card. Before its first run it offers **Start import**.
 Once started, a status pill in the card's header says where it is —
 *Pending* (queued for the next cron run), *Running*, *Done*, *Stopped* or
-*Cancelled* — and a progress bar shows how far it got, with "X of Y" and the
+*Canceled* — and a progress bar shows how far it got, with "X of Y" and the
 percentage under it. While a job is queued or running the card offers only
 **Cancel import** — the background worker stops cleanly at its next page
-boundary. After it ends, **Run again** starts a fresh import. A cancelled import is
+boundary. After it ends, **Run again** starts a fresh import. A canceled import is
 terminal: starting the same import again begins a fresh run from the
 beginning. (An import interrupted by an error, on the other hand, resumes
 from its last cursor.) Imports are safe to re-run either way: deliveries
@@ -593,7 +594,7 @@ card — you do not have to keep the page open:
 - **"Stopped before an error"** — the job itself hit an error and stopped
   at a page boundary; nothing was lost, press **Run again** to run it
   again.
-- **"Cancelled"** — stopped on your request; starting again begins a
+- **"Canceled"** — stopped on your request; starting again begins a
   fresh import.
 
 ## The log and troubleshooting
@@ -601,8 +602,8 @@ card — you do not have to keep the page open:
 - **Marketing > Smaily Connect > Log** — every delivery in one grid:
   Smaily (contact syncs, automation triggers) and Campaign Intelligence
   (catalog, customers, orders, browse events), told apart by the
-  **Source** column, with status (a coloured pill: amber while a row waits
-  or is being sent, green when delivered, red when failed, grey when
+  **Source** column, with status (a colored pill: amber while a row waits
+  or is being sent, green when delivered, red when failed, gray when
   withdrawn or skipped), attempts and the last error. The error
   column shows what the other side actually said, not our internal name
   for the failure. A Smaily delivery error reads in your admin language,
@@ -624,7 +625,7 @@ card — you do not have to keep the page open:
   "already reached".
 - **Withdrawn** is its own status in the grid and in the status filter: a
   reminder the store called back because the shopper bought in the
-  meantime. Nothing was delivered and nothing failed, so it is labelled as
+  meantime. Nothing was delivered and nothing failed, so it is labeled as
   neither.
 - **Skipped** is its own status too: a row the store closed without
   sending anything, because sending could not have done what it was for:
@@ -682,7 +683,7 @@ card — you do not have to keep the page open:
   Smaily API request and its response code. The command takes effect at
   once — it clears Magento's configuration cache itself. **The detailed
   levels write more about your contacts to a file on the server**: request
-  payloads are summarised and email addresses masked, and a network failure
+  payloads are summarized and email addresses masked, and a network failure
   is logged with the address it called but without its query string or the
   contact's address — but a message that Smaily or Campaign Intelligence
   sends back can still carry a contact's email address. Treat the file as personal
@@ -740,11 +741,11 @@ card — you do not have to keep the page open:
 - **What the erasure does locally.** A queued message that could still be
   sent (`pending` or `sending`) is **deleted** — not sending it is the point
   of the request. A message that is over (`sent` or `failed`) is
-  **anonymised and kept**, so you keep your own record that you messaged
+  **anonymized and kept**, so you keep your own record that you messaged
   this person: the row keeps its type, status, attempts and timestamps, and
   its Entity, payload, response and error all read `[erased]`. Such a row
   can no longer be retried from the Log. The contact's abandoned-cart record
-  is **anonymised and kept**: the address is removed and the record is marked
+  is **anonymized and kept**: the address is removed and the record is marked
   erased, but the record itself stays, because it is what tells the extension
   that this cart has already been dealt with — remove it and a cart that is
   still sitting in the store would be picked up as a fresh abandoned cart and
@@ -758,9 +759,9 @@ card — you do not have to keep the page open:
 - **What it prints.** One line per place it reached, then the engine:
 
   ```
-  Queued messages: 1 removed, 1 anonymised
-  Engine queue: 1 removed, 0 anonymised
-  Abandoned carts: 0 removed, 1 anonymised
+  Queued messages: 1 removed, 1 anonymized
+  Engine queue: 1 removed, 0 anonymized
+  Abandoned carts: 0 removed, 1 anonymized
   Erased engine data for shopper@example.com.
   ```
 

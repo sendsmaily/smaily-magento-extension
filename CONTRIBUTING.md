@@ -16,7 +16,7 @@ Dependencies install from the committed `composer.lock`. If your local PHP is
 newer than 8.4, or you are missing one of the Magento PHP extensions, add
 `--ignore-platform-reqs`.
 
-`composer` reports `magento/module-catalog-inventory` as abandoned in favour of
+`composer` reports `magento/module-catalog-inventory` as abandoned in favor of
 `magento/inventory-metapackage`. The requirement stays as it is: the module
 reads the legacy `is_in_stock` flag that package owns, and the metapackage
 would pull all of Multi-Source Inventory in as a hard dependency when MSI is

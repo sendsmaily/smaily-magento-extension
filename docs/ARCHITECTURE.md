@@ -237,7 +237,7 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   assigned to no website at all keeps the canonical scope and is still
   ingested, never skipped. The row's `currency` still names the canonical
   store's display currency: an install whose second website has a different
-  base currency is mislabelled there, and per-website tenants (the
+  base currency is mislabeled there, and per-website tenants (the
   multi-website RFC's Phase 4, PRO-1762) are the fix for that, not this.
 
 ### Queue semantics (both queues)
@@ -272,7 +272,7 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   never reached the wire (a skip, a withdrawal, a refusal before any
   request) has no `sent_payload`, and the Details drawer says so. Nothing
   of it is logged; the drawer shows it through `PayloadRedactor`, and the
-  Art. 17 eraser already anonymises both columns.
+  Art. 17 eraser already anonymizes both columns.
 - **Sending again (PRO-2454):** the Log's per-row **Send again** and the
   mass **Retry** both ask `Model\Log\ResendGuard` first — one server-owned
   answer, shaped after Woo's `TransactionalRetryGuard`: a reason code
@@ -316,13 +316,13 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   (driven by `Console\Command\GdprCommand`) walks BOTH queue tables plus
   `smaily_abandoned_cart` for one address: a row that could still send
   (`pending`, `sending`) is DELETED, a row that is over (`sent`, `failed`)
-  is ANONYMISED in place — `entity_id`, `payload`, `sent_payload`,
+  is ANONYMIZED in place — `entity_id`, `payload`, `sent_payload`,
   `last_response` and `last_error` become one placeholder, keys and
   structure kept, so the merchant keeps the record of the send. Rows are
   matched by DECODING the stored JSON (`Model\Privacy\PayloadAnonymizer`),
   never by searching its raw text: `json_encode` escapes a non-ASCII
   address, which a substring search would miss. The walk reads a narrow
-  column list in 1000-row chunks and deletes or anonymises each chunk's
+  column list in 1000-row chunks and deletes or anonymizes each chunk's
   matches in one transaction before reading the next, so peak memory is one
   chunk; a blob is decoded once and the same decoding answers the match and
   feeds the redaction. The queue tables are `Cron\QueueJanitor::TABLES` —
@@ -330,7 +330,7 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   `Model\AbandonedCart\StateManager`, their only owner. Both `retry()`
   methods skip a row carrying `Model\Privacy\Erasure::PLACEHOLDER` —
   reviving one would put the placeholder on the wire.
-  **A cart row is always ANONYMISED, never deleted (PRO-2467)**, whatever
+  **A cart row is always ANONYMIZED, never deleted (PRO-2467)**, whatever
   its status: it is not a message but the marker saying this quote has been
   handled, and the module may not touch the core `quote` table. Delete it
   and a quote that is still active and idle past the cutoff (a merchant who
@@ -638,7 +638,7 @@ Initial setup, Settings, Log. Design rules:
   store-view language is detected (`Multilingual\AccountResolver`), the
   Connection panel renders the routing-mode choice cards; mode `a` swaps
   the single credential block for per-language blocks (each with its own
-  Test Connection — saved accounts re-test via `store_id` against the
+  Test connection — saved accounts re-test via `store_id` against the
   saved store-view credentials) plus a default-fallback picker whose
   account's credentials double as the default scope. Modes `a`/`b` reveal
   the per-language workflow mapping editor on the Automations panel
@@ -660,7 +660,7 @@ Initial setup, Settings, Log. Design rules:
   accepted, as keyed hashes (`EncryptorInterface::hash`, the last 20) in
   one flag row, `smaily_connect_verified_credentials`. `SmailyClient`
   records the answers at its one chokepoint: a passed
-  `validateCredentials()` accepts (Test Connection, and the connection save
+  `validateCredentials()` accepts (Test connection, and the connection save
   — `WizardStepSaver::saveConnect()` checks what it just saved and never
   fails the save on the answer); any 401/403 refuses, wherever it came
   from, the queue's deliveries included. Changed credentials hash
@@ -706,7 +706,7 @@ implemented here:
 - Endpoint URLs always come from the stored endpoints map
   (`Engine\Settings`), never concatenated; `{email}` placeholders are
   substituted with `str_replace`.
-- Retry: 1/2/4/8/16 s on 429 (honouring `retry_after_seconds` from the
+- Retry: 1/2/4/8/16 s on 429 (honoring `retry_after_seconds` from the
   body, up to 60 s) and 5xx; other 4xx never retry; every call has a 10 s
   connect and 30 s total timeout (`Engine\Client`). The storefront browse
   relay makes one 3 s attempt and never retries or waits.

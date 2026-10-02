@@ -34,7 +34,7 @@ class TestConnection extends Field
      */
     protected function _getElementHtml(AbstractElement $element)
     {
-        $buttonLabel = $this->_escaper->escapeHtml((string)__('Test Connection'));
+        $buttonLabel = $this->_escaper->escapeHtml((string)__('Test connection'));
 
         return '<button type="button" id="smaily-test-connection" class="action-default scalable">'
             . '<span>' . $buttonLabel . '</span></button>'

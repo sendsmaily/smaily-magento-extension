@@ -188,7 +188,7 @@ button, exactly as it does today for 2.8.x.
 ## 6. Open items, stated honestly
 
 - **The Smaily-side happy paths are verified against a live Smaily account.**
-  Test Connection, live workflow dropdowns, storefront subscribe → contact sync,
+  Test connection, live workflow dropdowns, storefront subscribe → contact sync,
   the subscriber backfill, guest checkout opt-in and the abandoned-cart / welcome
   automation triggers were each clicked through against a real Smaily test
   account and verified server-side over the Smaily API (the walk also caught and

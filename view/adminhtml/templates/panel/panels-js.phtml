@@ -452,7 +452,7 @@ window.smailyPanelsInit = function ($) {
         done: {pill: 'sent', label: '<?= $escaper->escapeJs(__('Done')) ?>', icon: '✓'},
         failures: {pill: 'sent', label: '<?= $escaper->escapeJs(__('Done')) ?>', icon: '!'},
         stopped: {pill: 'failed', label: '<?= $escaper->escapeJs(__('Stopped')) ?>', icon: '×', primary: true},
-        cancelled: {pill: 'off', label: '<?= $escaper->escapeJs(__('Cancelled')) ?>', icon: '—', primary: true}
+        cancelled: {pill: 'off', label: '<?= $escaper->escapeJs(__('Canceled')) ?>', icon: '—', primary: true}
     };
 
     function backfillState(data) {
@@ -531,7 +531,7 @@ window.smailyPanelsInit = function ($) {
             }
         } else {
             setProgress(ui, data, data.percent, 'stopped');
-            text = '<?= $escaper->escapeJs(__('Cancelled — %1 of %2 synced. Starting again begins a fresh import.')) ?>'
+            text = '<?= $escaper->escapeJs(__('Canceled — %1 of %2 synced. Starting again begins a fresh import.')) ?>'
                 .replace('%1', data.processed).replace('%2', data.total || '?');
         }
         ui.verdict.attr('data-state', state).show();
@@ -552,7 +552,7 @@ window.smailyPanelsInit = function ($) {
 
     function cancelBackfill(jobType, ui) {
         clearTimeout(backfillTimers[jobType]);
-        result(ui.result, '<?= $escaper->escapeJs(__('Cancelling…')) ?>', true);
+        result(ui.result, '<?= $escaper->escapeJs(__('Canceling…')) ?>', true);
         pollBackfill(jobType, ui, 'cancel');
     }
 
@@ -785,9 +785,15 @@ window.smailyPanelsInit = function ($) {
             pollBackfill(jobType, ui, 'status');
         });
 
-        // Workflow refresh.
+        // Workflow refresh. A list that cannot be loaded says why where the
+        // page's other workflow-list errors show (PRO-3641): beside Save
+        // Automations in Settings, beside the step's buttons in the setup.
         $('#smaily-w-refresh-workflows').on('click', function () {
-            loadWorkflows(null);
+            var target = $('#smaily-w-automations-result').length
+                ? '#smaily-w-automations-result'
+                : '#smaily-w-save-result';
+            result(target, '');
+            loadWorkflows(target);
         });
 
         // "Check again" on the deactivated-account panel (PRO-2451): the one

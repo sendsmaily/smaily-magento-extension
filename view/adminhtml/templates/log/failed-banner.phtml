@@ -23,7 +23,10 @@ $failedUrl = $block->getUrl('smaily_connect/log', ['_query' => ['filters' => ['s
 <div class="smaily-banner smaily-banner--warning smaily-log-failed-banner">
     <span class="smaily-banner__icon">&#9888;</span>
     <div class="smaily-banner__body">
-        <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('%1 events failed in the last 24 hours', $failed)) ?></div>
+        <?php // Magento's __() has no plural forms: one phrase per number. ?>
+        <div class="smaily-banner__title"><?= $escaper->escapeHtml($failed === 1
+            ? __('%1 event failed in the last 24 hours', $failed)
+            : __('%1 events failed in the last 24 hours', $failed)) ?></div>
         <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Most retry automatically with backoff; anything still failed can be retried manually from the grid.')) ?></div>
     </div>
     <a class="smaily-banner__action" href="<?= $escaper->escapeUrl($failedUrl) ?>"><?= $escaper->escapeHtml(__('Show failed (24h)')) ?></a>

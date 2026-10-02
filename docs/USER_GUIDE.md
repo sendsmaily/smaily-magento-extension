@@ -249,7 +249,12 @@ enroll contacts into; workflows with other triggers (e.g. "subscribed to
 list") cannot be fired by an integration and are therefore not offered.
 The events:
 
-- **Welcome** — fires when someone subscribes to the newsletter.
+- **Welcome** — fires when a shopper subscribes to the newsletter in your
+  store: the newsletter form, the registration form, the newsletter page of
+  their account, the checkout opt-in or the double opt-in confirmation link.
+  A shopper who unsubscribed and subscribes again gets it again. A
+  subscription made in the admin, through the API (REST, SOAP or GraphQL)
+  or by an import still syncs the contact to Smaily, but sends no welcome.
 - **First Order** — fires on a customer's first order, with
   `order_id`, `order_total`, `order_currency`, `is_first_order` fields for
   template personalization.

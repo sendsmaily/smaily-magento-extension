@@ -10,12 +10,15 @@ namespace Smaily\Connect\Observer;
 
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\CustomerInterface;
+use Magento\Framework\App\Area;
+use Magento\Framework\App\State;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Newsletter\Model\Subscriber;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\ContactSync\ReconcileGuard;
+use Smaily\Connect\Model\ContactSync\StorefrontSubscription;
 use Smaily\Connect\Model\ContactSync\SubscriberPayloadBuilder;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
 use Smaily\Connect\Model\Automation\Trigger;
@@ -28,6 +31,13 @@ use Smaily\Connect\Model\Automation\Trigger;
  * opt-in act. Pending double-opt-in confirmations are not synced until
  * confirmed. Reconcile writes are suppressed via the guard so Smaily-origin
  * changes never echo back.
+ *
+ * The welcome automation fires only for a subscription the shopper makes on
+ * the storefront (frontend area, or the checkout opt-in, which Luma's
+ * checkout saves through the REST API), a resubscription included. A
+ * subscription made in the admin, through the REST/SOAP/GraphQL API or by an
+ * import (cron or command line) syncs the contact but fires no welcome
+ * (PRO-3580).
  */
 class SubscriberSaveAfter implements ObserverInterface
 {
@@ -36,7 +46,9 @@ class SubscriberSaveAfter implements ObserverInterface
         private readonly ReconcileGuard $guard,
         private readonly SyncDispatcher $dispatcher,
         private readonly SubscriberPayloadBuilder $payloadBuilder,
-        private readonly CustomerRepositoryInterface $customerRepository
+        private readonly CustomerRepositoryInterface $customerRepository,
+        private readonly State $appState,
+        private readonly StorefrontSubscription $storefrontSubscription
     ) {
     }
 
@@ -74,10 +86,22 @@ class SubscriberSaveAfter implements ObserverInterface
 
         $this->dispatcher->dispatchContactSync($email, $storeId, $isUnsubscribed, $customer);
 
-        if (!$isUnsubscribed && $this->config->isWelcomeEnabled($websiteId)) {
+        if (!$isUnsubscribed && $this->isStorefront() && $this->config->isWelcomeEnabled($websiteId)) {
             $address = $this->payloadBuilder->build($email, $storeId, null, $customer);
             unset($address['language']);
             $this->dispatcher->dispatchAutomation(Trigger::WELCOME, $storeId, $address);
+        }
+    }
+
+    private function isStorefront(): bool
+    {
+        if ($this->storefrontSubscription->isActive()) {
+            return true;
+        }
+        try {
+            return $this->appState->getAreaCode() === Area::AREA_FRONTEND;
+        } catch (LocalizedException) {
+            return false;
         }
     }
 

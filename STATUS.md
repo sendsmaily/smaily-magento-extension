@@ -5,7 +5,7 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out, and an opt-out made in Smaily reaches the engine. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
+_Last updated: 2026-10-02 (PRO-3580 — the welcome automation fires only for a subscription the shopper makes on the storefront, a resubscription included; not for one made in the admin, through the API or by an import. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out, and an opt-out made in Smaily reaches the engine. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
 and the Dashboard fill the content area on the pack's grey pane under a
 full-width white tab strip, in Magento's Open Sans, with 33 px buttons and
 our own text, link and status colours. Earlier the same day: PRO-3572 — a
@@ -150,6 +150,24 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   (was 2.2), and a footer under a divider offers **Go to Dashboard**
   (primary) and **Open Settings** — new phrases "Ava töölaud" / "Ava
   seaded". Checked by screenshot at 1440 and 1100 px in en_US and et_EE.
+
+- **PRO-3580 done — only the shopper's own storefront subscription fires
+  the welcome (2026-10-02).** Owner decision (2026-10-02): a storefront
+  subscription fires the welcome, a storefront resubscription too; a
+  subscription made in the admin, through the API or by an import does
+  not (audit gap R6). `SubscriberSaveAfter` still syncs every subscription,
+  but dispatches the welcome only in the `frontend` area or while the new
+  shared `Model\ContactSync\StorefrontSubscription` mark is set.
+  `OrderPlaced` sets the mark around the checkout opt-in's subscribe,
+  because Luma's checkout places the order through the REST API
+  (`webapi_rest`). Admin (`adminhtml`), REST/SOAP/GraphQL, `crontab` and a
+  command line without an area fire no welcome. A headless storefront that
+  subscribes through GraphQL counts as the API (see Questions). The
+  once-per-contact welcome Shopify has (PRO-1755) is out of scope. New
+  `Test\Unit\Observer\SubscriberSaveAfterTest` and `OrderPlacedTest`
+  (RED first). The Automations card says "Fires when a shopper subscribes
+  to the newsletter in your store." (EN + ET); USER_GUIDE and CHANGELOG
+  say so.
 
 - **PRO-3577 done — no setting can re-subscribe an unsubscribed contact
   (2026-10-02).** `AutomationHandler` sends `force_opt_in => false`
@@ -3336,3 +3354,9 @@ PRO-1267 (engine: Magento product-identity contract note).
    because Woo's format stands (decision PRO-1723) — the full rationale is
    at `Trigger::MARKER_STAMP_FORMAT`. Nothing to change unless you want all
    four marker fields moved to Z form on all three platforms at once.
+8. PRO-3580 — a headless storefront's newsletter subscription (Low
+   urgency; reversible). The welcome now fires only in Magento's storefront
+   (`frontend` area) and for the checkout opt-in. A shopper who subscribes
+   on a headless storefront (PWA Studio and similar) goes through GraphQL,
+   which the rule counts as "the API", so no welcome. No supported theme is
+   headless today. Say if a headless store must count as the storefront.

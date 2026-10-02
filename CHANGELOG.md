@@ -66,6 +66,7 @@ Ground-up rewrite as module `Smaily_Connect`, targeting feature parity with the 
 - Gender now reaches Smaily under the field name `user_gender` (2.8.x sent `gender`), the name Smaily's WooCommerce plugin uses, so one shopper syncing from two stores lands in one field. Your tick in Synchronized Fields migrates automatically; Smaily segments and templates that reference `gender` need repointing to `user_gender` once.
 - The RSS feed lists catalog-visible products only; configurable variants resolve to their parent.
 - An automation never re-subscribes a contact who unsubscribed in Smaily, in any contact sync mode. The release candidate's *Automations May Re-Subscribe (Advanced)* setting (legitimate interest mode only) is gone, the same choice the WooCommerce plugin retired. A store that had it on keeps its stored value, but nothing reads it: its welcome, first-order and abandoned-cart triggers now honour every unsubscribe, and contacts keep syncing with their real subscription state. A contact Smaily has never seen is still enrolled.
+- The welcome automation fires only when a shopper subscribes in your store — the newsletter form, registration, their account's newsletter page, the checkout opt-in or a double opt-in confirmation — and again when they resubscribe there. A subscription made in the admin, through the REST, SOAP or GraphQL API or by an import still syncs the contact, but sends no welcome. The WooCommerce plugin applies the same rule to accounts the shopper did not create.
 
 ### 2.8.1
 

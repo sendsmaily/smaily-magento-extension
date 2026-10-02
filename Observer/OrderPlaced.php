@@ -19,6 +19,7 @@ use Smaily\Connect\Model\AbandonedCart\StateManager;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\ContactSync\Mode;
+use Smaily\Connect\Model\ContactSync\StorefrontSubscription;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
 
 /**
@@ -38,7 +39,8 @@ class OrderPlaced implements ObserverInterface
         private readonly StateManager $abandonedCartState,
         private readonly OrderCollectionFactory $orderCollectionFactory,
         private readonly StoreManagerInterface $storeManager,
-        private readonly SubscriptionManagerInterface $subscriptionManager
+        private readonly SubscriptionManagerInterface $subscriptionManager,
+        private readonly StorefrontSubscription $storefrontSubscription
     ) {
     }
 
@@ -113,13 +115,18 @@ class OrderPlaced implements ObserverInterface
         if ($optedIn) {
             // Explicit checkout opt-in: create a native newsletter subscriber.
             // The subscriber-save observer handles the Smaily sync + welcome
-            // automation, and double opt-in confirmation is honoured.
+            // automation, and double opt-in confirmation is honoured. It is
+            // marked as the shopper's own storefront subscription, because
+            // Luma's checkout places the order through the REST API
+            // (PRO-3580).
             $customerId = (int)$order->getCustomerId();
-            if ($customerId > 0) {
-                $this->subscriptionManager->subscribeCustomer($customerId, $storeId);
-            } else {
-                $this->subscriptionManager->subscribe($email, $storeId);
-            }
+            $this->storefrontSubscription->run(function () use ($customerId, $email, $storeId): void {
+                if ($customerId > 0) {
+                    $this->subscriptionManager->subscribeCustomer($customerId, $storeId);
+                } else {
+                    $this->subscriptionManager->subscribe($email, $storeId);
+                }
+            });
 
             return;
         }

@@ -39,7 +39,7 @@ $triggers = [
 // (first_order -> firstorder, abandoned_cart -> abandoned) to match the
 // element ids panel/panels-js.phtml already binds; names reuse $triggers.
 $storeTriggers = [
-    ['id' => 'welcome', 'name' => $triggers['welcome'], 'desc' => __('Fires when someone subscribes to the newsletter.')],
+    ['id' => 'welcome', 'name' => $triggers['welcome'], 'desc' => __('Fires when a shopper subscribes to the newsletter in your store.')],
     ['id' => 'firstorder', 'name' => $triggers['first_order'], 'desc' => __('Fires on a customer\'s first purchase.')],
     ['id' => 'abandoned', 'name' => $triggers['abandoned_cart'], 'desc' => __('Fires when a cart is left behind.'), 'abandoned' => true],
 ];

@@ -9,6 +9,9 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Integration\Migration;
 
 use Magento\Framework\App\ResourceConnection;
+use Magento\Store\Api\Data\StoreInterface;
+use Magento\Store\Api\Data\WebsiteInterface;
+use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Config;
@@ -17,6 +20,7 @@ use Smaily\Connect\Setup\Patch\Data\MigrateLegacyConfig;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\DataSetup;
 use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
+use Smaily\Connect\Test\Unit\Support\StoreLocale;
 
 /**
  * An upgrade of a multi-website 2.8.x store: one Smaily account at the
@@ -28,9 +32,14 @@ use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
  * 2.8.x showed every setting at the default and website scope only and read
  * every setting at the website scope; a store-view row could come only from
  * `config:set --scope=stores`, and 2.8.x never read it. See docs/UPGRADING.md.
+ *
+ * PRO-3681: Enable Module = No switches contact sync, welcome and abandoned
+ * cart off at its scope, and a store-view account row is not carried over.
  */
 class LegacyScopeUpgradeTest extends IntegrationTestCase
 {
+    private const NOTICE_TITLE = 'Smaily Connect upgrade: store-view Smaily account not carried over';
+
     /**
      * Store view id => [website id, locale].
      */
@@ -76,25 +85,23 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
             'smaily/sync/fields' => 'first_name',
             'smaily/abandoned/enableAbandonedCart' => '0',
         ]);
+        $this->seed('stores', 2, ['smaily/general/enable' => '0']);
         foreach (self::STORES as $storeId => [, $locale]) {
             $this->seed('stores', $storeId, ['general/locale/code' => $locale]);
         }
 
-        /** @var ResourceConnection $resourceConnection */
-        $resourceConnection = $this->objectManager->get(ResourceConnection::class);
-        $this->objectManager->create(MigrateLegacyConfig::class, [
-            'moduleDataSetup' => new DataSetup($resourceConnection),
-        ])->apply();
+        $this->migrate();
+    }
 
-        $this->config = $this->objectManager->create(Config::class, ['scopeConfig' => $this->configScope()]);
+    protected function tearDown(): void
+    {
+        StoreLocale::reset();
+        parent::tearDown();
     }
 
     public function testTheDefaultScopeAccountServesEveryStoreViewOfEveryWebsite(): void
     {
         foreach (array_keys(self::STORES) as $storeId) {
-            if ($storeId === 3) {
-                continue; // The store-view row, below.
-            }
             self::assertTrue($this->config->isConnected($storeId), 'Store view ' . $storeId);
             self::assertSame('shop', $this->config->getSubdomain($storeId));
             self::assertSame('api-user', $this->config->getUsername($storeId));
@@ -108,8 +115,6 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
         self::assertSame(66, $this->config->getWelcomeWorkflow(2));
         self::assertSame(55, $this->config->getWelcomeWorkflow(3));
         foreach ([1, 2, 3, 4] as $websiteId) {
-            self::assertTrue($this->config->isWelcomeEnabled($websiteId));
-            self::assertTrue($this->config->isSyncEnabled($websiteId));
             self::assertSame(77, $this->config->getAbandonedCartWorkflow($websiteId));
         }
 
@@ -119,28 +124,101 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
         self::assertFalse($this->config->isAbandonedCartEnabled(3));
     }
 
-    public function testAStoreViewRowIsReadForTheAccountOnlyAsItWasNeverReadBy28x(): void
+    public function testAStoreViewAccountRowIsNotCarriedOverAndTheAdminNoticeNamesTheStoreView(): void
     {
-        // The account is read per store view in v3 (per-language accounts),
-        // so the row 2.8.x ignored now replaces the user for this store view.
-        self::assertSame('stale-user', $this->config->getUsername(3));
-        self::assertSame('shop', $this->config->getSubdomain(3));
+        // v3 reads the account per store view (per-language accounts), so
+        // the row 2.8.x ignored is left out: store view 3 keeps its
+        // website's account.
+        self::assertSame('api-user', $this->config->getUsername(3));
+        self::assertSame([], $this->storeViewRows(3, Config::XML_PATH_USERNAME));
 
-        // Every other setting is read per website, as in 2.8.x: the
-        // store-view rows stay unread.
-        self::assertSame(['first_name', 'last_name', 'user_gender'], $this->config->getSyncFields(1));
-        self::assertTrue($this->config->isAbandonedCartEnabled(1));
+        self::assertSame(
+            [
+                'The Smaily subdomain, API username or API password saved for these store views was not'
+                . ' carried over, because Smaily for Magento 2.8.x did not use it: Store view 3 (Website 1).'
+                . ' These store views use their website\'s Smaily account, as they did in 2.8.x.',
+            ],
+            $this->noticeDescriptions(self::NOTICE_TITLE)
+        );
     }
 
-    public function testEnableModuleIsNotCarriedOverSoASwitchedOffWebsiteStartsSyncing(): void
+    public function testTheStoreViewAccountNoticeIsInEstonianInAnEstonianAdmin(): void
+    {
+        $this->env->resetState();
+        $this->seed('stores', 5, ['smaily/general/password' => 'stale-secret']);
+        StoreLocale::use('et_EE');
+
+        $this->migrate();
+
+        self::assertSame(
+            [
+                'Nende poevaadete jaoks salvestatud Smaily alamdomeeni, API kasutajanime ega API parooli üle'
+                . ' ei toodud, sest Smaily for Magento 2.8.x neid ei kasutanud: Store view 5 (Website 2).'
+                . ' Need poevaated kasutavad oma veebisaidi Smaily kontot, nagu 2.8.x-is.',
+            ],
+            $this->noticeDescriptions('Smaily Connecti uuendus: poevaate Smaily kontot üle ei toodud')
+        );
+        self::assertSame([], $this->storeViewRows(5, Config::XML_PATH_PASSWORD));
+    }
+
+    public function testOtherStoreViewRowsAreCarriedOverAtTheStoreViewAndStayUnread(): void
+    {
+        // Every other setting is read per website, as in 2.8.x: the
+        // store-view rows are carried over and stay unread.
+        self::assertSame(
+            ['first_name'],
+            array_column($this->storeViewRows(3, Config::XML_PATH_SYNC_FIELDS), 'value')
+        );
+        self::assertSame(['first_name', 'last_name', 'user_gender'], $this->config->getSyncFields(1));
+        self::assertTrue($this->config->isAbandonedCartEnabled(1));
+        // A store-view Enable Module row is not carried over.
+        self::assertSame([], $this->storeViewRows(2, Config::XML_PATH_SYNC_ENABLED));
+        self::assertTrue($this->config->isSyncEnabled(1));
+    }
+
+    public function testAWebsiteWithEnableModuleNoHasSyncWelcomeAndAbandonedCartOff(): void
     {
         // 2.8.x "Enable Module = No" on website 4 stopped its sync, opt-in
-        // and abandoned cart. v3 has no such switch and the migration does
-        // not read it: website 4 inherits the default-scope settings.
+        // and abandoned cart; the upgrade switches the three off there.
         self::assertTrue($this->config->isConnected(10));
-        self::assertTrue($this->config->isSyncEnabled(4));
-        self::assertTrue($this->config->isWelcomeEnabled(4));
-        self::assertTrue($this->config->isAbandonedCartEnabled(4));
+        self::assertFalse($this->config->isSyncEnabled(4));
+        self::assertFalse($this->config->isWelcomeEnabled(4));
+        self::assertFalse($this->config->isAbandonedCartEnabled(4));
+        // The default scope has Yes: no other website is switched off.
+        foreach ([1, 2, 3] as $websiteId) {
+            self::assertTrue($this->config->isSyncEnabled($websiteId), 'Website ' . $websiteId);
+            self::assertTrue($this->config->isWelcomeEnabled($websiteId), 'Website ' . $websiteId);
+        }
+    }
+
+    public function testEnableModuleNoAtTheDefaultScopeIsInheritedByAWebsiteWithoutItsOwnValue(): void
+    {
+        $this->env->resetState();
+        $this->seed('default', 0, [
+            'smaily/general/enable' => '0',
+            'smaily/subscribe/enableNewsletterSubscriptions' => '1',
+            'smaily/subscribe/workflowId' => '55',
+            'smaily/sync/enableCronSync' => '1',
+            'smaily/abandoned/enableAbandonedCart' => '1',
+        ]);
+        // Websites 2 and 3 have their own Yes; website 2 also its own sync
+        // switch, website 3 inherits every other setting.
+        $this->seed('websites', 2, ['smaily/general/enable' => '1', 'smaily/sync/enableCronSync' => '1']);
+        $this->seed('websites', 3, ['smaily/general/enable' => '1']);
+
+        $this->migrate();
+
+        foreach ([1, 4] as $websiteId) {
+            self::assertFalse($this->config->isSyncEnabled($websiteId), 'Website ' . $websiteId);
+            self::assertFalse($this->config->isWelcomeEnabled($websiteId), 'Website ' . $websiteId);
+            self::assertFalse($this->config->isAbandonedCartEnabled($websiteId), 'Website ' . $websiteId);
+        }
+        // Yes writes nothing extra: a website's own value wins, and what it
+        // inherits from the default scope is the default scope's off.
+        self::assertTrue($this->config->isSyncEnabled(2));
+        self::assertFalse($this->config->isWelcomeEnabled(2));
+        self::assertFalse($this->config->isSyncEnabled(3));
+        self::assertFalse($this->config->isAbandonedCartEnabled(3));
     }
 
     public function testEveryStoreViewLanguageResolvesAndRoutesToItsWebsiteWorkflowThroughTheOneAccount(): void
@@ -167,6 +245,68 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
             self::assertNull($welcome->accountKey);
             self::assertSame(77, $router->resolve(Trigger::ABANDONED_CART, $websiteId, $language)?->workflowId);
         }
+    }
+
+    /**
+     * Run the migration and read its result through the real v3 getters.
+     * The store manager names store view N "Store view N" and website N
+     * "Website N".
+     */
+    private function migrate(): void
+    {
+        $storeManager = $this->createMock(StoreManagerInterface::class);
+        $storeManager->method('getStore')->willReturnCallback(function (int $storeId): StoreInterface {
+            $store = $this->createMock(StoreInterface::class);
+            $store->method('getName')->willReturn('Store view ' . $storeId);
+            $store->method('getWebsiteId')->willReturn(self::STORES[$storeId][0]);
+
+            return $store;
+        });
+        $storeManager->method('getWebsite')->willReturnCallback(function (int $websiteId): WebsiteInterface {
+            $website = $this->createMock(WebsiteInterface::class);
+            $website->method('getName')->willReturn('Website ' . $websiteId);
+
+            return $website;
+        });
+
+        /** @var ResourceConnection $resourceConnection */
+        $resourceConnection = $this->objectManager->get(ResourceConnection::class);
+        $this->objectManager->create(MigrateLegacyConfig::class, [
+            'moduleDataSetup' => new DataSetup($resourceConnection),
+            'storeManager' => $storeManager,
+        ])->apply();
+
+        $this->config = $this->objectManager->create(Config::class, ['scopeConfig' => $this->configScope()]);
+    }
+
+    /**
+     * The descriptions of the admin notices posted with this title.
+     *
+     * @return string[]
+     */
+    private function noticeDescriptions(string $title): array
+    {
+        $descriptions = [];
+        foreach ($this->env->getNotifier()->getNotifications() as $notification) {
+            if ($notification['title'] === $title) {
+                $descriptions[] = $notification['description'];
+            }
+        }
+
+        return $descriptions;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function storeViewRows(int $storeId, string $path): array
+    {
+        return $this->connection->fetchAll(
+            $this->connection->select()->from('core_config_data')
+                ->where('scope = ?', 'stores')
+                ->where('scope_id = ?', $storeId)
+                ->where('path = ?', $path)
+        );
     }
 
     private function configScope(): DatabaseScopeConfig

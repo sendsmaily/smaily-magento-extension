@@ -20,6 +20,9 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * - sync frequency: v3 uses a fixed daily full sync + 15-min reconcile.
  * - captcha settings: v3 relies on Magento's native reCAPTCHA module.
  * - lastSyncedAt: the v3 reconcile cursor is sequence-based.
+ *
+ * "Enable Module = No" (general/enable 0) has no v3 switch: it becomes
+ * contact sync, welcome and abandoned cart off at the same scope.
  */
 class LegacyConfigMapper
 {
@@ -41,6 +44,17 @@ class LegacyConfigMapper
         'last_name' => 'last_name',
         'gender' => 'user_gender',
         'birthday' => 'birthday',
+    ];
+
+    /**
+     * The v3 settings that 2.8.x "Enable Module = No" stopped.
+     *
+     * @var string[]
+     */
+    private const MODULE_SWITCH_PATHS = [
+        Config::XML_PATH_SYNC_ENABLED,
+        Config::XML_PATH_WELCOME_ENABLED,
+        Config::XML_PATH_ABANDONED_ENABLED,
     ];
 
     public function __construct(
@@ -130,6 +144,17 @@ class LegacyConfigMapper
             $notices[] = 'The legacy newsletter captcha settings were not migrated: '
                 . 'enable Magento\'s built-in reCAPTCHA for newsletter forms instead '
                 . '(Stores > Configuration > Security > Google reCAPTCHA Storefront).';
+        }
+
+        // Enable Module = No stopped this scope's sync, opt-in and abandoned cart.
+        if (isset($legacy['general/enable']) && !$this->flag($legacy, 'general/enable')) {
+            $configs = array_values(array_filter(
+                $configs,
+                static fn (array $config): bool => !in_array($config['path'], self::MODULE_SWITCH_PATHS, true)
+            ));
+            foreach (self::MODULE_SWITCH_PATHS as $path) {
+                $set($path, '0');
+            }
         }
 
         return ['configs' => $configs, 'notices' => $notices];

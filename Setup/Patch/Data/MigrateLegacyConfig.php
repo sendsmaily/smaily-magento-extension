@@ -11,9 +11,11 @@ namespace Smaily\Connect\Setup\Patch\Data;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Notification\NotifierInterface;
 use Magento\Framework\Setup\ModuleDataSetupInterface;
 use Magento\Framework\Setup\Patch\DataPatchInterface;
+use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Migration\LegacyConfigMapper;
@@ -29,16 +31,29 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
  * legacy `smaily/*` rows are deleted at every scope (the plaintext password
  * among them): a downgrade to 2.8.x then starts with empty settings. A
  * failure before that point leaves them in place.
+ *
+ * Store-view rows: 2.8.x read every setting per website, so it never read a
+ * store-view row. v3 reads the Smaily account per store view, so the
+ * store-view account rows (and Enable Module) are not carried over, and an
+ * admin notice names the store views whose account values were left out.
+ * Every other store-view row is carried over at its store view, where v3,
+ * like 2.8.x, does not read it.
  */
 class MigrateLegacyConfig implements DataPatchInterface
 {
+    /**
+     * Legacy paths (relative to "smaily/") not carried over at store-view scope.
+     */
+    private const STORE_VIEW_ACCOUNT_PATHS = ['general/subdomain', 'general/username', 'general/password'];
+
     public function __construct(
         private readonly ModuleDataSetupInterface $moduleDataSetup,
         private readonly LegacyConfigMapper $mapper,
         private readonly WriterInterface $configWriter,
         private readonly EncryptorInterface $encryptor,
         private readonly NotifierInterface $notifier,
-        private readonly MigrationOutcome $migrationOutcome
+        private readonly MigrationOutcome $migrationOutcome,
+        private readonly StoreManagerInterface $storeManager
     ) {
     }
 
@@ -83,9 +98,18 @@ class MigrateLegacyConfig implements DataPatchInterface
         }
 
         $allNotices = [];
+        $storeViewAccountIds = [];
         foreach ($byScope as $scopeKey => $legacy) {
             [$scope, $scopeId] = explode(':', $scopeKey, 2);
             $scope = $scope === 'default' ? ScopeConfigInterface::SCOPE_TYPE_DEFAULT : $scope;
+            if ($scope === 'stores') {
+                $account = array_intersect_key($legacy, array_flip(self::STORE_VIEW_ACCOUNT_PATHS));
+                if (array_filter($account, static fn (?string $value): bool => trim((string)$value) !== '')) {
+                    $storeViewAccountIds[] = (int)$scopeId;
+                }
+                unset($legacy['general/enable']);
+                $legacy = array_diff_key($legacy, $account);
+            }
             $result = $this->mapper->map($legacy);
 
             foreach ($result['configs'] as $config) {
@@ -111,10 +135,45 @@ class MigrateLegacyConfig implements DataPatchInterface
         foreach (array_unique($allNotices) as $notice) {
             $this->notifier->addNotice('Smaily Connect upgrade', $notice);
         }
+        $this->noticeStoreViewAccounts($storeViewAccountIds);
         // AddSetupNotice, next in this run, says the settings were migrated.
         $this->migrationOutcome->markMigrated();
 
         return $this;
+    }
+
+    /**
+     * Name the store views whose store-view account values were not carried
+     * over, each with its website (store-view names repeat across websites).
+     * A store view that no longer exists has nothing to name.
+     *
+     * @param int[] $storeIds
+     */
+    private function noticeStoreViewAccounts(array $storeIds): void
+    {
+        $names = [];
+        foreach ($storeIds as $storeId) {
+            try {
+                $store = $this->storeManager->getStore($storeId);
+                $website = $this->storeManager->getWebsite($store->getWebsiteId());
+                $names[] = $store->getName() . ' (' . $website->getName() . ')';
+            } catch (NoSuchEntityException) {
+                continue;
+            }
+        }
+        if (!$names) {
+            return;
+        }
+
+        $this->notifier->addNotice(
+            (string)__('Smaily Connect upgrade: store-view Smaily account not carried over'),
+            (string)__(
+                'The Smaily subdomain, API username or API password saved for these store views was not'
+                . ' carried over, because Smaily for Magento 2.8.x did not use it: %1.'
+                . ' These store views use their website\'s Smaily account, as they did in 2.8.x.',
+                implode(', ', $names)
+            )
+        );
     }
 
     /**

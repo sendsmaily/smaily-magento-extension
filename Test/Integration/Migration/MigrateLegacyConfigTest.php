@@ -10,6 +10,7 @@ namespace Smaily\Connect\Test\Integration\Migration;
 
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
 use Smaily\Connect\Setup\Patch\Data\MigrateLegacyConfig;
@@ -216,6 +217,7 @@ class MigrateLegacyConfigTest extends IntegrationTestCase
         /** @var MigrateLegacyConfig $patch */
         $patch = $this->objectManager->create(MigrateLegacyConfig::class, $arguments + [
             'moduleDataSetup' => new DataSetup($resourceConnection),
+            'storeManager' => $this->createMock(StoreManagerInterface::class),
         ]);
         $patch->apply();
     }

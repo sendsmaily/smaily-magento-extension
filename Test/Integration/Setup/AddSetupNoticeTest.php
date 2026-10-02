@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Integration\Setup;
 
 use Magento\Framework\App\ResourceConnection;
+use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Migration\MigrationOutcome;
 use Smaily\Connect\Setup\Patch\Data\AddSetupNotice;
 use Smaily\Connect\Setup\Patch\Data\MigrateLegacyConfig;
@@ -62,6 +63,7 @@ class AddSetupNoticeTest extends IntegrationTestCase
         $this->objectManager->create(MigrateLegacyConfig::class, [
             'moduleDataSetup' => new DataSetup($resourceConnection),
             'migrationOutcome' => $outcome,
+            'storeManager' => $this->createMock(StoreManagerInterface::class),
         ])->apply();
         $this->objectManager->create(AddSetupNotice::class, ['migrationOutcome' => $outcome])->apply();
     }

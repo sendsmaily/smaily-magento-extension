@@ -84,6 +84,66 @@ class LegacyConfigMapperTest extends TestCase
         self::assertArrayNotHasKey(Config::XML_PATH_WELCOME_WORKFLOW, $configs);
     }
 
+    public function testEnableModuleNoSwitchesSyncWelcomeAndAbandonedCartOffAtThatScope(): void
+    {
+        $result = $this->mapper->map([
+            'general/enable' => '0',
+            'subscribe/enableNewsletterSubscriptions' => '1',
+            'subscribe/workflowId' => '55',
+            'sync/enableCronSync' => '1',
+            'abandoned/enableAbandonedCart' => '1',
+            'abandoned/autoresponderId' => '77',
+        ]);
+
+        $switches = [];
+        foreach ($result['configs'] as $config) {
+            if (in_array($config['path'], [
+                Config::XML_PATH_SYNC_ENABLED,
+                Config::XML_PATH_WELCOME_ENABLED,
+                Config::XML_PATH_ABANDONED_ENABLED,
+            ], true)) {
+                $switches[] = $config['path'] . '=' . $config['value'];
+            }
+        }
+
+        self::assertSame([
+            Config::XML_PATH_SYNC_ENABLED . '=0',
+            Config::XML_PATH_WELCOME_ENABLED . '=0',
+            Config::XML_PATH_ABANDONED_ENABLED . '=0',
+        ], $switches, 'One row each, off');
+        self::assertContains(
+            ['path' => Config::XML_PATH_ABANDONED_WORKFLOW, 'value' => '77', 'flags' => []],
+            $result['configs'],
+            'The workflows still carry over'
+        );
+    }
+
+    /**
+     * @dataProvider enableModuleOnProvider
+     *
+     * @param array<string, string> $enable
+     */
+    public function testEnableModuleYesOrAbsentWritesNothingExtra(array $enable): void
+    {
+        $result = $this->mapper->map($enable + ['sync/enableCronSync' => '1']);
+
+        self::assertSame(
+            [['path' => Config::XML_PATH_SYNC_ENABLED, 'value' => '1', 'flags' => []]],
+            $result['configs']
+        );
+    }
+
+    /**
+     * @return array<string, array{array<string, string>}>
+     */
+    public static function enableModuleOnProvider(): array
+    {
+        return [
+            'yes' => [['general/enable' => '1']],
+            'absent' => [[]],
+        ];
+    }
+
     public function testCaptchaSettingsProduceANotice(): void
     {
         $result = $this->mapper->map([

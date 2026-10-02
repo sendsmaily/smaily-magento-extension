@@ -11,8 +11,8 @@ namespace Smaily\Connect\Plugin\Adminhtml;
 use Magento\Config\Model\Config as SystemConfig;
 use Magento\Framework\Message\ManagerInterface;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
+use Smaily\Connect\Model\Client\CredentialCheck;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
-use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\SubdomainNormalizer;
@@ -28,7 +28,7 @@ use Smaily\Connect\Model\SubdomainNormalizer;
 class ValidateConnectionOnSave
 {
     public function __construct(
-        private readonly SmailyClientFactory $clientFactory,
+        private readonly CredentialCheck $credentialCheck,
         private readonly Config $config,
         private readonly SubdomainNormalizer $normalizer,
         private readonly ManagerInterface $messageManager,
@@ -54,24 +54,13 @@ class ValidateConnectionOnSave
             $this->resolveValue($fields, 'subdomain') ?? $this->config->getSubdomain($storeId)
         );
         $username = trim($this->resolveValue($fields, 'username') ?? $this->config->getUsername($storeId));
-        $password = $this->resolveValue($fields, 'password');
-        if ($password === null || preg_match('/^\*+$/', $password)) {
-            // Obscured/unchanged value: fall back to the stored password.
-            $password = $this->config->getPassword($storeId);
-        }
-
-        if ($subdomain === '' || $username === '' || $password === '') {
-            return;
-        }
-
-        $client = $this->clientFactory->create([
-            'subdomain' => $subdomain,
-            'username' => $username,
-            'password' => $password,
-        ]);
+        // A missing or obscured (unchanged) value falls back to the stored password.
+        $password = $this->credentialCheck->resolvePassword($this->resolveValue($fields, 'password'), $storeId);
 
         try {
-            $client->validateCredentials();
+            if (!$this->credentialCheck->check($subdomain, $username, $password)) {
+                return;
+            }
             $this->messageManager->addSuccessMessage(
                 (string)__('Smaily connection verified — the API credentials work.')
             );

@@ -22,6 +22,7 @@ use Smaily\Connect\Model\Automation\MappingSaver;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
 use Smaily\Connect\Model\Client\SmailyClient;
+use Smaily\Connect\Model\Client\CredentialCheck;
 use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
@@ -103,7 +104,7 @@ class WizardStepSaverTest extends TestCase
             $this->mappingSaver,
             $this->clientProvider,
             new ConfigRowNormalizer(),
-            $this->clientFactory
+            new CredentialCheck($this->clientFactory, $this->config)
         );
     }
 

@@ -18,8 +18,8 @@ use Magento\Store\Model\Website;
 use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
 use Smaily\Connect\Model\Automation\Mapping;
 use Smaily\Connect\Model\Automation\MappingSaver;
+use Smaily\Connect\Model\Client\CredentialCheck;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
-use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Source\MultilingualMode;
@@ -63,7 +63,7 @@ class WizardStepSaver
         private readonly MappingSaver $mappingSaver,
         private readonly SmailyClientProvider $smailyClientProvider,
         private readonly ConfigRowNormalizer $rowNormalizer,
-        private readonly SmailyClientFactory $smailyClientFactory
+        private readonly CredentialCheck $credentialCheck
     ) {
     }
 
@@ -105,7 +105,7 @@ class WizardStepSaver
 
         $this->configWriter->save(Config::XML_PATH_SUBDOMAIN, $subdomain, ScopeInterface::SCOPE_WEBSITES, $websiteId);
         $this->configWriter->save(Config::XML_PATH_USERNAME, $username, ScopeInterface::SCOPE_WEBSITES, $websiteId);
-        if ($password !== '' && preg_match('/^\*+$/', $password) !== 1) {
+        if ($password !== '' && !$this->credentialCheck->isKeptPassword($password)) {
             $this->configWriter->save(
                 Config::XML_PATH_PASSWORD,
                 $this->encryptor->encrypt($password),
@@ -153,7 +153,7 @@ class WizardStepSaver
                     ScopeInterface::SCOPE_STORES,
                     $storeId
                 );
-                if ($accountPassword !== '' && preg_match('/^\*+$/', $accountPassword) !== 1) {
+                if ($accountPassword !== '' && !$this->credentialCheck->isKeptPassword($accountPassword)) {
                     $this->configWriter->save(
                         Config::XML_PATH_PASSWORD,
                         $this->encryptor->encrypt($accountPassword),
@@ -207,23 +207,16 @@ class WizardStepSaver
      */
     private function checkCredentials(string $subdomain, string $username, string $password): void
     {
-        if ($password === '' || preg_match('/^\*+$/', $password) === 1) {
-            // Kept password: the stored one, still unchanged in this request.
-            $password = $this->config->getPassword($this->websiteContext->getStoreId());
-        }
-        if ($password === '') {
-            return;
-        }
+        // An empty or masked password keeps the stored one, still unchanged in this request.
+        $password = $this->credentialCheck->resolvePassword(
+            $password === '' ? null : $password,
+            $this->websiteContext->getStoreId()
+        );
 
         try {
-            $this->smailyClientFactory->create([
-                'subdomain' => $subdomain,
-                'username' => $username,
-                'password' => $password,
-            ])->validateCredentials();
+            $this->credentialCheck->check($subdomain, $username, $password);
         } catch (SmailyClientException) {
             // Remembered (or not) by SmailyClient; the save stands either way.
-            return;
         }
     }
 

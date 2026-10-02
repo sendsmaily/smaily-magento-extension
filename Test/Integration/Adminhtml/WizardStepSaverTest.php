@@ -20,6 +20,7 @@ use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
 use Smaily\Connect\Model\Automation\MappingSaver;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
+use Smaily\Connect\Model\Client\CredentialCheck;
 use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
@@ -69,7 +70,10 @@ class WizardStepSaverTest extends IntegrationTestCase
             $this->objectManager->get(MappingSaver::class),
             $this->smailyClientProvider,
             new ConfigRowNormalizer(),
-            $this->createMock(SmailyClientFactory::class)
+            new CredentialCheck(
+                $this->createMock(SmailyClientFactory::class),
+                $this->objectManager->get(Config::class)
+            )
         );
     }
 

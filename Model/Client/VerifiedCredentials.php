@@ -39,16 +39,22 @@ class VerifiedCredentials
     }
 
     /**
+     * Whether Smaily accepted the credentials saved for this store.
+     *
      * @param int|string|null $storeId
      */
     public function isVerified(int|string|null $storeId = null): bool
     {
-        return $this->config->isConnected($storeId)
-            && in_array($this->fingerprint(
-                $this->config->getSubdomain($storeId),
-                $this->config->getUsername($storeId),
-                $this->config->getPassword($storeId)
-            ), $this->remembered(), true);
+        $credentials = [
+            $this->config->getSubdomain($storeId),
+            $this->config->getUsername($storeId),
+            $this->config->getPassword($storeId),
+        ];
+        if (in_array('', $credentials, true)) {
+            return false;
+        }
+
+        return in_array($this->fingerprint(...$credentials), $this->remembered(), true);
     }
 
     public function accept(string $subdomain, string $username, string $password): void

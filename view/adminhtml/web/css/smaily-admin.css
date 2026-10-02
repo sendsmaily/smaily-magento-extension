@@ -168,7 +168,10 @@
 .smaily-dashboard .smaily-tiles { display: flex; gap: var(--sp-3); margin-bottom: 18px; flex-wrap: wrap; }
 /* Tiles use the Stage A .smaily-tile component (BEM); layout only lives here. */
 .smaily-dashboard .smaily-columns { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
-.smaily-dashboard .smaily-activity { flex: 2 1 40rem; min-width: 0; }
+/* 66rem: the recent-activity table needs about 660px (with Estonian
+ * headings), so below that the panel takes the full row and Quick links
+ * moves under it instead of the table scrolling sideways. */
+.smaily-dashboard .smaily-activity { flex: 2 1 66rem; min-width: 0; }
 .smaily-dashboard .smaily-activity .admin__table-wrapper { overflow-x: auto; }
 .smaily-dashboard .smaily-quick-links { flex: 1 1 24rem; }
 .smaily-dashboard .smaily-quick-links ul { margin: 0; padding-left: 1.8rem; line-height: 2.2; }
@@ -440,7 +443,7 @@
     box-shadow: var(--shadow-1);
 }
 .smaily-tile--attention { border-color: var(--s-danger-border); border-top-color: var(--s-bar-error); }
-.smaily-tile__label-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.smaily-tile__label-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); }
 .smaily-tile__label {
     font-size: var(--fs-12);
     font-weight: 600;

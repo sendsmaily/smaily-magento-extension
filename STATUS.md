@@ -30,7 +30,11 @@ PRO-3571, PRO-3572, release-candidate review fixes (PRO-3575), admin look
   Connection tab's default-account card, error banner and footer share the
   mode cards' 680 px measure (were 620 px under 680 px cards); radio
   buttons (the fallback account) use the accent colour like the
-  checkboxes. No behaviour change.
+  checkboxes. Dashboard: below about 1300 px the recent-activity panel
+  takes the full row and Quick links moves under it, so the table no
+  longer scrolls sideways with its Updated column cut off (1100 px, both
+  languages); the Failed tile's ATTENTION badge wraps under the label
+  instead of sticking out of the tile (et_EE). No behaviour change.
 
 - **PRO-3642 done — skipped and withdrawn rows are not deliveries for Send
   again, and the Dashboard reads them as the Log does (2026-10-02).**

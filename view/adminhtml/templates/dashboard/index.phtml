@@ -192,9 +192,9 @@ $connections = [
         <div class="smaily-card smaily-quick-links">
             <h2><?= $escaper->escapeHtml(__('Quick links')) ?></h2>
             <ul>
-                <li><a href="<?= $escaper->escapeUrl($urls['settings']) ?>"><?= $escaper->escapeHtml(__('Settings')) ?></a> — <?= $escaper->escapeHtml(__('connection, contacts, automations, Intelligence and RSS in one tabbed page')) ?></li>
-                <li><a href="<?= $escaper->escapeUrl($urls['log']) ?>"><?= $escaper->escapeHtml(__('Log')) ?></a> — <?= $escaper->escapeHtml(__('every delivery with retry for failed rows')) ?></li>
-                <li><a href="<?= $escaper->escapeUrl($urls['wizard']) ?>"><?= $escaper->escapeHtml(__('Initial setup')) ?></a> — <?= $escaper->escapeHtml(__('re-run the guided setup at any time; your settings are kept')) ?></li>
+                <li><a href="<?= $escaper->escapeUrl($urls['settings']) ?>"><?= $escaper->escapeHtml(__('Settings')) ?></a><span class="smaily-quick-links__desc"><?= $escaper->escapeHtml(__('connection, contacts, automations, Intelligence and RSS in one tabbed page')) ?></span></li>
+                <li><a href="<?= $escaper->escapeUrl($urls['log']) ?>"><?= $escaper->escapeHtml(__('Log')) ?></a><span class="smaily-quick-links__desc"><?= $escaper->escapeHtml(__('every delivery with retry for failed rows')) ?></span></li>
+                <li><a href="<?= $escaper->escapeUrl($urls['wizard']) ?>"><?= $escaper->escapeHtml(__('Initial setup')) ?></a><span class="smaily-quick-links__desc"><?= $escaper->escapeHtml(__('re-run the guided setup at any time; your settings are kept')) ?></span></li>
             </ul>
         </div>
     </div>

@@ -19,7 +19,7 @@
 /** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
 $viewModel = $block->getData('view_model');
 // In the Settings context this partial renders the in-card saved-connection
-// status line + the subdomain suffix chip; the tab-scoped footer (Test /
+// status line; the tab-scoped footer (Test /
 // Save Connection) is chrome owned by settings/index.phtml. The wizard step
 // keeps the in-card Test button and saves via its own step nav.
 $isSettings = $block->getData('context') === 'settings';
@@ -85,10 +85,10 @@ $modeCards = [
         <?php endif; ?>
         <div class="smaily-field">
             <label for="smaily-w-subdomain"><?= $escaper->escapeHtml(__('Subdomain')) ?></label>
-            <?php // Settings adds a fixed .sendsmaily.net suffix chip (design §2.3.A); wizard shows the bare input. ?>
-            <?php if ($isSettings): ?><div class="smaily-subdomain-row"><?php endif; ?>
+            <?php // Fixed .sendsmaily.net suffix chip (design §2.3.A; the pack's wizard frame shows it too). ?>
+            <div class="smaily-subdomain-row">
             <input type="text" id="smaily-w-subdomain" placeholder="demo"/>
-            <?php if ($isSettings): ?><span class="smaily-subdomain-suffix">.sendsmaily.net</span></div><?php endif; ?>
+            <span class="smaily-subdomain-suffix">.sendsmaily.net</span></div>
             <p class="note"><?= $escaper->escapeHtml(__('If your Smaily URL is https://demo.sendsmaily.net, the subdomain is "demo". Pasting the full URL also works.')) ?></p>
         </div>
         <div class="smaily-field">

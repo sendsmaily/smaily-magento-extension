@@ -120,7 +120,8 @@ The fastest path is the guided flow: **Marketing > Smaily Connect >
 Initial setup** — five steps (Connect, Contacts, Automations,
 Intelligence, Overview), each saved separately, with connection testing and
 live workflow lists built in. Completed steps stay unlocked in the step
-bar, so you can move back and forward between them freely — also when
+list (a rail on the left; a bar across the top on narrow screens), so you
+can move back and forward between them freely — also when
 revisiting the initial setup after finishing it. Everything it writes
 lands in the regular configuration, so you can fine-tune it later on the
 **Settings > Connection** tab — its own Test Connection / Save Connection
@@ -340,7 +341,8 @@ straight to it.
 Items include `smly:price` / `smly:old_price` / `smly:discount` (prices as
 shown in your storefront, tax included). Only catalog-visible, enabled
 products are listed; configurable variants resolve to their parent. The feed
-is a single store-wide on/off toggle on the **Settings > RSS** tab. Responses
+is a single store-wide on/off toggle on the **Settings > RSS** tab, saved with
+that tab's own **Save** button. Responses
 are cached for 15 minutes.
 
 ---

@@ -96,7 +96,17 @@ $tabs = [
         </div>
     </div>
     <div class="smaily-tab-panel" data-tab="intelligence"><?= $block->getChildHtml('panel.intelligence') ?></div>
-    <div class="smaily-tab-panel" data-tab="rss"><?= $block->getChildHtml('panel.rss') ?></div>
+    <div class="smaily-tab-panel" data-tab="rss">
+        <h3><?= $escaper->escapeHtml(__('Product RSS feed')) ?></h3>
+        <p class="smaily-tab-desc"><?= $escaper->escapeHtml(__('A product feed for the RSS block of the Smaily template editor. Optional query parameters filter by category and control the amount and order of products.')) ?></p>
+        <?= $block->getChildHtml('panel.rss') ?>
+        <div class="smaily-tab-footer">
+            <button type="button" class="action-primary" id="smaily-w-rss-save">
+                <span><?= $escaper->escapeHtml(__('Save')) ?></span>
+            </button>
+            <span class="smaily-result" id="smaily-w-rss-result"></span>
+        </div>
+    </div>
 
     <div class="smaily-footer" id="smaily-settings-global-footer">
         <div>
@@ -201,6 +211,10 @@ require(['jquery'], function ($) {
 
     $('#smaily-w-automations-save').on('click', function () {
         saveTab($(this), 'automations', '#smaily-w-automations-result');
+    });
+
+    $('#smaily-w-rss-save').on('click', function () {
+        saveTab($(this), 'rss', '#smaily-w-rss-result');
     });
 
     // Live reactivity across tabs: edited credentials re-render the

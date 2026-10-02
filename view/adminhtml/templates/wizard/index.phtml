@@ -139,6 +139,8 @@ require(['jquery'], function ($) {
         $('.smaily-step-panel[data-step=' + step + ']').addClass('active');
         $('#smaily-w-back').toggle(step > 1 && step < 5);
         $('#smaily-w-next').toggle(step < 5);
+        // Overview has no step actions: drop the footer (and its divider).
+        $('#smaily-wizard-main > .smaily-footer').toggle(step < 5);
         $('#smaily-w-next span').text(step === 4
             ? '<?= $escaper->escapeJs(__('Finish')) ?>'
             : '<?= $escaper->escapeJs(__('Continue')) ?>');

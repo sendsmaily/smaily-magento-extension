@@ -11,43 +11,41 @@
  * @var \Magento\Framework\Escaper $escaper
  */
 ?>
-<div id="smaily-rss-builder" style="max-width: 44rem;">
-    <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
-        <label style="flex: 1 1 10rem;">
-            <span><?= $escaper->escapeHtml(__('Category ID (optional)')) ?></span><br/>
-            <input type="number" id="smaily-rss-category" min="1" style="width: 100%;"
+<div id="smaily-rss-builder">
+    <div class="smaily-rss-builder__grid">
+        <label class="smaily-rss-builder__field">
+            <span><?= $escaper->escapeHtml(__('Category ID (optional)')) ?></span>
+            <input type="number" id="smaily-rss-category" min="1"
                    placeholder="<?= $escaper->escapeHtmlAttr(__('All products')) ?>"/>
         </label>
-        <label style="flex: 1 1 10rem;">
-            <span><?= $escaper->escapeHtml(__('Number of products (1-250)')) ?></span><br/>
-            <input type="number" id="smaily-rss-limit" min="1" max="250" value="50" style="width: 100%;"/>
+        <label class="smaily-rss-builder__field">
+            <span><?= $escaper->escapeHtml(__('Number of products (1-250)')) ?></span>
+            <input type="number" id="smaily-rss-limit" min="1" max="250" value="50"/>
         </label>
-        <label style="flex: 1 1 10rem;">
-            <span><?= $escaper->escapeHtml(__('Sort by')) ?></span><br/>
-            <select id="smaily-rss-sort" style="width: 100%;">
+        <label class="smaily-rss-builder__field">
+            <span><?= $escaper->escapeHtml(__('Sort by')) ?></span>
+            <select id="smaily-rss-sort">
                 <option value="created_at"><?= $escaper->escapeHtml(__('Date created')) ?></option>
                 <option value="updated_at"><?= $escaper->escapeHtml(__('Date updated')) ?></option>
                 <option value="name"><?= $escaper->escapeHtml(__('Product name')) ?></option>
                 <option value="price"><?= $escaper->escapeHtml(__('Price')) ?></option>
             </select>
         </label>
-        <label style="flex: 1 1 10rem;">
-            <span><?= $escaper->escapeHtml(__('Sort order')) ?></span><br/>
-            <select id="smaily-rss-order" style="width: 100%;">
+        <label class="smaily-rss-builder__field">
+            <span><?= $escaper->escapeHtml(__('Sort order')) ?></span>
+            <select id="smaily-rss-order">
                 <option value="desc"><?= $escaper->escapeHtml(__('Descending')) ?></option>
                 <option value="asc"><?= $escaper->escapeHtml(__('Ascending')) ?></option>
             </select>
         </label>
     </div>
-    <div style="display: flex; gap: 0.5rem; align-items: center;">
-        <input type="text" id="smaily-rss-url" readonly
-               style="flex: 1; font-family: var(--mono); background: var(--s-surface-3); color: var(--s-text);"
-               onclick="this.select();"/>
-        <button type="button" id="smaily-rss-copy" class="action-default scalable">
+    <div class="smaily-rss-builder__url">
+        <input type="text" id="smaily-rss-url" readonly onclick="this.select();"/>
+        <button type="button" id="smaily-rss-copy" class="action-secondary">
             <span><?= $escaper->escapeHtml(__('Copy')) ?></span>
         </button>
     </div>
-    <p class="note" style="margin-top: 0.5rem;">
+    <p class="note">
         <span id="smaily-rss-copy-result"></span>
         <?= $escaper->escapeHtml(__(
             'Paste this URL into the RSS block of the Smaily template editor.'

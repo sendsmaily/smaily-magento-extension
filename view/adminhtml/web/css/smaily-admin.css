@@ -106,13 +106,15 @@
  * also what the rest of this sheet's components (pill, choice-card, etc.)
  * already opt into. Switching our own pages onto --font (no new asset — same
  * OS-installed fonts the design pack renders with) plus matching smoothing
- * closes that gap. Scoped to .smaily-settings only, not the wizard. */
-.smaily-settings { font-family: var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-.smaily-settings input, .smaily-settings select, .smaily-settings button { font-family: var(--font); }
+ * closes that gap. PRO-2456 widened it from .smaily-settings to every page
+ * of ours (.smaily-ui: wizard, Settings, Dashboard) — the wizard is the
+ * first screen a merchant sees and still rendered in Open Sans. */
+.smaily-ui { font-family: var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+.smaily-ui input, .smaily-ui select, .smaily-ui button { font-family: var(--font); }
 .smaily-settings .smaily-tabs { display: flex; gap: 0; margin: 0 0 3rem; padding: 0; list-style: none; border-bottom: 1px solid #e3e3e3; }
-.smaily-settings .smaily-tabs li { padding: 1rem 2rem; margin-bottom: -1px; border-bottom: 3px solid transparent; color: #666; cursor: pointer; }
+.smaily-settings .smaily-tabs li { padding: 1rem 2rem; margin-bottom: -1px; border-bottom: 2px solid transparent; color: #666; cursor: pointer; }
 .smaily-settings .smaily-tabs li:hover { color: #333; }
-.smaily-settings .smaily-tabs li.active { border-color: #eb5202; color: #333; font-weight: 600; }
+.smaily-settings .smaily-tabs li.active { border-color: #eb5202; color: #333; font-weight: 700; }
 .smaily-settings .smaily-tab-panel { display: none; }
 .smaily-settings .smaily-tab-panel.active { display: block; }
 .smaily-settings .smaily-footer .note { margin: 0; }
@@ -356,7 +358,7 @@
 /* --- Metric tile: <div class="smaily-tile smaily-tile--attention"> --------- *
  * Dashboard counts. Default + attention only — attention flips the 3px top bar
  * and value to danger and shows a badge. Grid should be
- * auto-fill minmax(210px,1fr) so it reflows 4→2→1. */
+ * auto-fit minmax(210px,1fr) so it reflows 4→2→1. */
 .smaily-tile {
     display: flex;
     flex-direction: column;
@@ -479,16 +481,57 @@
 .smaily-wizard .smaily-steps li.done .smaily-step-index::before { content: "\2713"; }
 .smaily-wizard .smaily-steps li.done .smaily-step-index .smaily-step-num { display: none; }
 
+/* --- Wizard shell (PRO-2456, pack "Setup Wizard" frames): a left stepper
+ * rail beside a gray content pane on desktop widths, a footer divider, the
+ * primary group pinned right (also when Back is hidden on step 1) and a
+ * ghost Back. CSS-only — the rail is the same <ul> the JS already drives;
+ * narrower screens keep the horizontal strip above. -------------------------*/
+.smaily-wizard #smaily-wizard-main > .smaily-footer { margin-top: 0; padding-top: 18px; border-top: 1px solid var(--s-border); }
+.smaily-wizard .smaily-footer > div { margin-left: auto; flex-shrink: 1; min-width: 0; }
+/* A long step error (e.g. the workflow list failing) wraps beside the button
+ * instead of pushing it out of the pane. */
+.smaily-wizard .smaily-footer .smaily-inline-status { white-space: normal; line-height: 1.4; }
+.smaily-wizard #smaily-w-back {
+    padding: 9px 14px; background: transparent; border-color: transparent;
+    color: var(--s-link); font-weight: 600; font-size: var(--fs-13);
+}
+.smaily-wizard #smaily-w-back:hover { color: var(--s-link-hover); text-decoration: underline; }
+@media (min-width: 1024px) {
+    .smaily-wizard { max-width: 110rem; }
+    .smaily-wizard #smaily-wizard-main {
+        display: grid; grid-template-columns: 232px minmax(0, 1fr);
+        background: var(--s-bg); border: 1px solid var(--s-border); border-radius: 6px;
+    }
+    .smaily-wizard #smaily-wizard-main > * { grid-column: 2; }
+    .smaily-wizard #smaily-wizard-main > .smaily-steps {
+        grid-column: 1; grid-row: 1 / span 2; flex-direction: column; margin: 0; padding: 14px 0;
+        background: var(--s-surface-2); border-right: 1px solid var(--s-border); border-radius: 6px 0 0 6px;
+    }
+    .smaily-wizard .smaily-step-panel.active { padding: 26px 30px 0; }
+    .smaily-wizard #smaily-wizard-main > .smaily-footer { margin: 0 30px 26px; }
+    .smaily-wizard .smaily-steps li,
+    .smaily-wizard .smaily-steps li.active,
+    .smaily-wizard .smaily-steps li.done {
+        flex: none; display: flex; align-items: center; gap: var(--sp-3); padding: 11px 18px; text-align: left;
+        border-bottom: 0; border-left: 3px solid transparent;
+        font-size: var(--fs-13); font-weight: 700; line-height: 1.3; color: var(--s-text);
+    }
+    .smaily-wizard .smaily-steps li:not(.active):not(.done) { font-weight: 500; color: var(--s-text-3); }
+    .smaily-wizard .smaily-steps li.active { background: var(--s-surface); border-left-color: var(--s-accent); }
+    .smaily-wizard .smaily-steps li .smaily-step-index { flex: 0 0 auto; width: 26px; height: 26px; margin-right: 0; }
+    .smaily-wizard .smaily-steps li.active .smaily-step-index { border-width: 2px; }
+}
+
 /* --- Settings tabs: accent underline for the active tab. -------------------- */
 .smaily-settings .smaily-tabs li { color: var(--s-text-2); }
 .smaily-settings .smaily-tabs li.active { border-bottom-color: var(--s-accent); color: var(--s-text); }
 
 /* --- Dashboard ------------------------------------------------------------- */
-.smaily-dashboard .smaily-verdict { align-items: flex-start; gap: var(--sp-4); border-left-width: 5px; box-shadow: var(--shadow-1); }
-.smaily-dashboard .smaily-verdict-dot { flex: 0 0 auto; width: 14px; height: 14px; margin-top: 4px; border-radius: 50%; background: var(--s-neutral); }
+.smaily-dashboard .smaily-verdict { align-items: center; gap: var(--sp-4); border-left-width: 5px; box-shadow: var(--shadow-1); }
+.smaily-dashboard .smaily-verdict-dot { flex: 0 0 auto; width: 14px; height: 14px; border-radius: 50%; background: var(--s-neutral); }
 .smaily-dashboard .smaily-verdict-body { flex: 1; min-width: 0; }
 .smaily-dashboard .smaily-verdict-kicker { font: 700 var(--fs-11)/1 var(--font); letter-spacing: .6px; text-transform: uppercase; margin-bottom: 5px; }
-.smaily-dashboard .smaily-verdict-text { font-size: var(--fs-16); font-weight: 700; color: var(--s-text); line-height: 1.35; }
+.smaily-dashboard .smaily-verdict-text { font-size: var(--fs-18); font-weight: 700; color: var(--s-text); line-height: 1.35; }
 .smaily-dashboard .smaily-verdict-ok { background: var(--s-success-soft); border-color: var(--s-success-border); border-left-color: var(--s-bar-success); }
 .smaily-dashboard .smaily-verdict-ok .smaily-verdict-dot { background: var(--s-bar-success); }
 .smaily-dashboard .smaily-verdict-ok .smaily-verdict-kicker { color: var(--s-success); }
@@ -508,10 +551,23 @@
 .smaily-dashboard .smaily-connection.is-on .smaily-dot { background: var(--s-bar-success); box-shadow: 0 0 0 3px var(--s-success-soft); }
 .smaily-dashboard .smaily-connection.is-off .smaily-dot { background: var(--s-border-2); }
 
-.smaily-dashboard .smaily-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+/* auto-fit, not auto-fill: with the engine disconnected there are three
+ * tiles, and auto-fill left an empty fourth track instead of spanning the
+ * row like the pack's grid (PRO-2456). Still reflows 4→2→1. */
+.smaily-dashboard .smaily-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 
 .smaily-dashboard .smaily-activity-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .smaily-dashboard .smaily-activity-head h2 { margin: 0; }
+/* Panel headers + quick-link rows (PRO-2456, pack Dashboard lower area). */
+.smaily-dashboard .smaily-activity-head h2,
+.smaily-dashboard .smaily-quick-links > h2 { font-size: var(--fs-14); font-weight: 700; color: var(--s-text); }
+.smaily-dashboard .smaily-activity-head a::after,
+.smaily-dashboard .smaily-quick-links a::after { content: " \2192"; }
+.smaily-dashboard .smaily-quick-links ul { list-style: none; padding: 0; line-height: 1.45; }
+.smaily-dashboard .smaily-quick-links li { padding: var(--sp-3) 0; border-top: 1px solid var(--s-border); font-size: var(--fs-13); }
+.smaily-dashboard .smaily-quick-links__desc { display: block; margin-top: 2px; font-size: var(--fs-12); color: var(--s-text-3); }
+/* The descriptions were written to follow an em dash, lower-case first. */
+.smaily-dashboard .smaily-quick-links__desc::first-letter { text-transform: uppercase; }
 
 /* --- Engine automations: trigger cards + run-mode pill --------------------- */
 .smaily-engine-triggers { display: flex; flex-direction: column; gap: var(--sp-3); margin: var(--sp-4) 0; }
@@ -570,14 +626,15 @@
  * 620px card with 440px-wide fields, a status line (Pill + account) and a
  * tab-scoped footer (Test/Save Connection + InlineStatus). Scoped to
  * .smaily-settings so the shared wizard step-1 partial keeps its own,
- * wider layout untouched. */
+ * wider layout untouched — except the subdomain suffix chip, which the
+ * pack's wizard frame shows too (PRO-2456). */
 .smaily-settings .smaily-tab-panel > h3 { margin: 0 0 var(--sp-1); font-size: var(--fs-18); font-weight: 700; }
 .smaily-settings .smaily-tab-desc { margin: 0 0 var(--sp-5); font-size: var(--fs-13); color: var(--s-text-2); }
 .smaily-settings #smaily-w-default-account .smaily-card { max-width: 620px; padding: 20px 22px; border-radius: 6px; color: var(--s-text); }
 .smaily-settings #smaily-w-default-account .smaily-field { max-width: 440px; }
-.smaily-settings .smaily-subdomain-row { display: flex; max-width: 440px; }
-.smaily-settings #smaily-w-default-account .smaily-subdomain-row input[type=text] { flex: 1; min-width: 0; border-radius: var(--r-1) 0 0 var(--r-1); }
-.smaily-settings .smaily-subdomain-suffix {
+.smaily-ui .smaily-subdomain-row { display: flex; max-width: 440px; }
+.smaily-ui #smaily-w-default-account .smaily-subdomain-row input[type=text] { flex: 1; min-width: 0; border-radius: var(--r-1) 0 0 var(--r-1); }
+.smaily-ui .smaily-subdomain-suffix {
     display: flex; align-items: center; padding: 0 11px; white-space: nowrap;
     background: var(--s-surface-3); border: 1px solid var(--s-border-strong); border-left: none;
     border-radius: 0 var(--r-1) var(--r-1) 0; font-size: var(--fs-13); color: var(--s-text-3);
@@ -595,31 +652,34 @@
  * max-width/padding/radius/color are consolidated into the .smaily-card rule
  * above. ------------------------------------------------------------------ */
 .smaily-settings .smaily-tab-panel { background: var(--s-bg); padding: var(--sp-6) 28px; }
-.smaily-settings #smaily-w-default-account .smaily-card > h2 { font-size: var(--fs-16); font-weight: 700; color: var(--s-text); }
-.smaily-settings #smaily-w-default-account .smaily-card > p { font-size: var(--fs-13); color: var(--s-text-2); }
-/* Field label/note typography — shared by every rebuilt tab (Connection,
- * Subscribers); extend this selector list as later tabs get the same pass
- * rather than re-declaring the same values under a new tab scope. */
-.smaily-settings #smaily-w-default-account .smaily-field label,
-.smaily-settings [data-tab="subscribers"] .smaily-field label {
+/* Card + field typography, form controls and buttons — measured from the
+ * pack's Connection frame for Settings (PRO-1391), widened by PRO-2456 to
+ * every page of ours (.smaily-ui): the wizard renders the same partials and
+ * still showed browser-default inputs and Magento's dark secondary buttons. */
+.smaily-ui .smaily-card > h2 { margin: 0 0 var(--sp-2); font-size: var(--fs-16); font-weight: 700; color: var(--s-text); }
+.smaily-ui .smaily-card > p:not(.message) { margin: 0 0 var(--sp-4); font-size: var(--fs-13); color: var(--s-text-2); }
+.smaily-ui .smaily-field label {
     font-size: var(--fs-13); font-weight: 600; color: var(--s-text); margin-bottom: 5px;
 }
-.smaily-settings #smaily-w-default-account .smaily-field .note,
-.smaily-settings [data-tab="subscribers"] .smaily-field .note {
+.smaily-ui .smaily-field .note {
     color: var(--s-text-3); font-size: var(--fs-12);
 }
-.smaily-settings #smaily-w-default-account input[type=text],
-.smaily-settings #smaily-w-default-account input[type=password] {
+.smaily-ui input[type=text],
+.smaily-ui input[type=password],
+.smaily-ui input[type=number],
+.smaily-ui select {
     padding: 8px 11px; border: 1px solid var(--s-border-strong); border-radius: var(--r-1);
     font-size: var(--fs-14); color: var(--s-text); background: var(--s-surface); box-sizing: border-box;
 }
-.smaily-settings .smaily-tab-footer .action-primary {
+.smaily-ui select { padding: 7px 10px; cursor: pointer; }
+.smaily-ui .action-primary {
     padding: 9px 18px; border-radius: var(--r-2); border-color: #d44f00; font-weight: 700; font-size: var(--fs-13);
 }
-.smaily-settings .smaily-tab-footer .action-secondary {
+.smaily-ui .action-secondary {
     padding: 9px 16px; background: var(--s-surface); border: 1px solid var(--s-border-strong);
     border-radius: var(--r-2); color: var(--s-text); font-weight: 700; font-size: var(--fs-13);
 }
+.smaily-ui .action-secondary:hover { background: var(--s-surface-3); border-color: var(--s-border-strong); color: var(--s-text); }
 
 /* --- Settings > Subscribers tab (PRO-1397) --------------------------------- *
  * Same shell as Connection: H3 title + description above a white card. The
@@ -629,11 +689,16 @@
  * measured sizes (fs-13 labels, fs-12 muted notes) and fixes findings #6/#7
  * (no opt-in-mode leak was ever built; checkboxes were unstyled with no
  * spacing scale — every checkbox on this page now picks up an accent color
- * and the toggle rows/checkbox grid use the 4px spacing tokens). */
-.smaily-settings input[type=checkbox] { accent-color: var(--s-accent); width: 15px; height: 15px; cursor: pointer; }
-.smaily-settings [data-tab="subscribers"] .smaily-card { max-width: 680px; padding: 20px 22px; border-radius: 6px; color: var(--s-text); }
-.smaily-settings [data-tab="subscribers"] .smaily-card .smaily-card { max-width: none; }
-.smaily-settings [data-tab="subscribers"] #smaily-w-subscribers-body > p { margin: 0 0 var(--sp-4); font-size: var(--fs-13); color: var(--s-text-2); }
+ * and the toggle rows/checkbox grid use the 4px spacing tokens). PRO-2456:
+ * the wizard's Contacts step renders the same partial, so every rule below
+ * also covers it ([data-step="2"]). */
+.smaily-ui input[type=checkbox] { accent-color: var(--s-accent); width: 15px; height: 15px; cursor: pointer; }
+.smaily-settings [data-tab="subscribers"] .smaily-card,
+.smaily-wizard [data-step="2"] .smaily-card { max-width: 680px; padding: 20px 22px; border-radius: 6px; color: var(--s-text); }
+.smaily-settings [data-tab="subscribers"] .smaily-card .smaily-card,
+.smaily-wizard [data-step="2"] .smaily-card .smaily-card { max-width: none; }
+.smaily-settings [data-tab="subscribers"] #smaily-w-subscribers-body > p,
+.smaily-wizard [data-step="2"] #smaily-w-subscribers-body > p { margin: 0 0 var(--sp-4); font-size: var(--fs-13); color: var(--s-text-2); }
 /* Spacing rhythm (PRO-1397 polish #2): the heading-to-first-row gap used to
  * collapse to ~8px — smaller than the 12px gap between checkbox rows — so
  * "Extra fields to sync..." didn't read as a heading at all. Rhythm is now
@@ -642,18 +707,46 @@
  * standalone toggles get their own sp-6 gap before the group starts (via
  * this block's own margin-bottom, overriding the base 1.6rem), so they read
  * as a separate cluster from the checkbox grid. */
-.smaily-settings [data-tab="subscribers"] .smaily-field { margin-bottom: var(--sp-6); }
-.smaily-settings [data-tab="subscribers"] #smaily-w-fields {
+.smaily-settings [data-tab="subscribers"] .smaily-field,
+.smaily-wizard [data-step="2"] .smaily-field { margin-bottom: var(--sp-6); }
+.smaily-settings [data-tab="subscribers"] #smaily-w-fields,
+.smaily-wizard [data-step="2"] #smaily-w-fields {
     display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-6); margin-top: var(--sp-5);
 }
-.smaily-settings [data-tab="subscribers"] #smaily-w-fields label {
+.smaily-settings [data-tab="subscribers"] #smaily-w-fields label,
+.smaily-wizard [data-step="2"] #smaily-w-fields label {
     display: flex; align-items: center; gap: var(--sp-2); width: auto; min-width: 170px;
     font-size: var(--fs-13); font-weight: 400; color: var(--s-text);
 }
-.smaily-settings [data-tab="subscribers"] .smaily-inline-toggle { margin: 0 0 var(--sp-3); }
-.smaily-settings [data-tab="subscribers"] .smaily-inline-toggle label {
+.smaily-settings [data-tab="subscribers"] .smaily-inline-toggle,
+.smaily-wizard [data-step="2"] .smaily-inline-toggle { margin: 0 0 var(--sp-3); }
+.smaily-settings [data-tab="subscribers"] .smaily-inline-toggle label,
+.smaily-wizard [data-step="2"] .smaily-inline-toggle label {
     display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); font-weight: 600; color: var(--s-text);
 }
-.smaily-settings [data-tab="subscribers"] .smaily-inline-toggle .note {
+.smaily-settings [data-tab="subscribers"] .smaily-inline-toggle .note,
+.smaily-wizard [data-step="2"] .smaily-inline-toggle .note {
     margin: 3px 0 0 23px; font-size: var(--fs-12); color: var(--s-text-3);
 }
+
+/* --- Settings > RSS tab (PRO-2456, pack Settings "RSS tab" frame) --------- *
+ * Same shell as the other tabs (H3 + description + tab footer, in
+ * settings/index.phtml); the URL builder is a two-column field grid with the
+ * feed URL as a monospace read-only chip beside a secondary Copy button. The
+ * builder rules are id-scoped because the same block also renders inside
+ * native system config. */
+.smaily-settings [data-tab="rss"] .smaily-card { max-width: 620px; padding: 20px 22px; border-radius: 6px; color: var(--s-text); }
+.smaily-settings [data-tab="rss"] .smaily-inline-toggle label {
+    display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); font-weight: 600; color: var(--s-text);
+}
+#smaily-rss-builder { max-width: 520px; margin-top: var(--sp-4); }
+#smaily-rss-builder .smaily-rss-builder__grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-4); }
+#smaily-rss-builder .smaily-rss-builder__field { display: flex; flex-direction: column; gap: 5px; font-size: var(--fs-13); font-weight: 600; color: var(--s-text); }
+#smaily-rss-builder .smaily-rss-builder__field input,
+#smaily-rss-builder .smaily-rss-builder__field select { width: 100%; max-width: none; font-weight: 400; }
+#smaily-rss-builder .smaily-rss-builder__url { display: flex; gap: var(--sp-2); align-items: stretch; }
+#smaily-rss-builder .smaily-rss-builder__url input {
+    flex: 1; min-width: 0; max-width: none; font-family: var(--mono); font-size: var(--fs-13);
+    color: var(--s-text); background: var(--s-surface-3);
+}
+#smaily-rss-builder .note { margin-top: var(--sp-2); font-size: var(--fs-12); color: var(--s-text-3); }

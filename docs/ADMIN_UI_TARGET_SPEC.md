@@ -1,8 +1,11 @@
 # Admin UI target spec (PRO-1369 — consolidation of A1 + A2)
 
 **Status:** authoritative reconciliation. Supersedes the design pack
-(`docs/Magento Connect admin visual system.zip`) and the two standalone
-analyses below as the thing Phase B builds against.
+(`Magento Connect admin visual system.zip`, exported 2026-07-12) and the two
+standalone analyses below as the thing Phase B builds against. The pack is
+not kept in the repository (it stays in git history, commit `db2fc53`); the
+latest fidelity check against it is
+`docs/audits/2026-10-02-ADMIN_DESIGN_PACK_FIDELITY.md`.
 
 **Inputs:**
 - `docs/audits/2026-07-14-ADMIN_DESIGN_LAYOUT_EXTRACT.md` (A1) — design pack's

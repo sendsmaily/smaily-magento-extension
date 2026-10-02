@@ -5,8 +5,11 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-2474: the ZIP install runbook and the
-pilot-day checklist are written. Earlier the same day: CLAUDE.md anchors on the two Magento Epics — v3
+_Last updated: 2026-10-02 (PRO-2456 — the admin was checked against the
+design pack in en_US + et_EE; twelve visual deviations are fixed, the
+larger ones are listed for Stories, and the pack is no longer tracked in the
+repository. Earlier the same day: PRO-2474 — the ZIP install runbook and the
+pilot-day checklist are written; CLAUDE.md anchors on the two Magento Epics — v3
 rewrite and UI/UX parity — and names their outcome gauges; queue set for
 the pilot; `composer.lock` refreshed, gates unchanged. Previous session, 2026-09-11: PRO-2472 — the release train's packaging
 leftovers are closed: the checksum ships with the release, the module
@@ -27,8 +30,8 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
 
 ## Where we are
 
-- **Next session opens here (2026-10-02).** Queue: **PRO-2456** (design-pack
-  fidelity, before rc1 — Erkki 2026-10-02) → **PRO-2474** (pilot readiness:
+- **Next session opens here (2026-10-02).** Queue: ~~PRO-2456~~ (design-pack
+  fidelity, done before rc1 — Erkki 2026-10-02) → **PRO-2474** (pilot readiness:
   ZIP install on a clean sandbox, runbook, pilot-day checklist, rc1 tag on
   Erkki's go). Milestones: rc1 tagged + pilot runbook 2026-10-03, pilot store
   live 2026-10-09. PRO-2460 decided A — contract §3 SKU key stands, PRO-1484
@@ -64,8 +67,37 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   lock, identical to the old: 299 unit, phpcs 0 errors / 997 warnings,
   phpstan `[OK]`, integration 87 tests.
 
-- **PRO-2456 in progress — fidelity check of the admin against the design
-  pack (2026-10-02).** The pack (`Magento Connect admin visual system.zip`,
+- **PRO-2456 done — fidelity check of the admin against the design pack
+  (2026-10-02).** Every artboard was rendered and compared with the sandbox
+  admin in en_US and et_EE; the deviation list (24 rows, ordered by
+  visibility) is `docs/audits/2026-10-02-ADMIN_DESIGN_PACK_FIDELITY.md`.
+  Tokens are byte-identical and the six components match; the two
+  design-pack leaks are absent. **Fixed (CSS + template only, no PHP, no
+  copy):** the initial setup — the first screen a merchant sees — rendered
+  the shared panels without the Settings polish: browser-default inputs and
+  selects, Open Sans, Magento's dark secondary buttons, a left-aligned
+  Continue on step 1, no subdomain suffix. The control, typography, button
+  and checkbox rules that PRO-1391/PRO-1397 scoped to `.smaily-settings` now
+  cover every page of ours (`.smaily-ui`), the Contacts rules also cover
+  wizard step 2, and the wizard got the pack's shell: a 232 px left step
+  rail beside a grey pane at ≥ 1024 px (the strip stays below that), a
+  footer divider with the primary group pinned right, a ghost Back, long
+  step errors that wrap, and no empty footer on Overview (one JS line).
+  Settings > RSS got the pack's layout (two-column fields, monospace URL
+  chip + Copy, tab title/description and its own footer Save — the same
+  `rss` save step); the Dashboard's tiles span the row with three tiles,
+  panel headers and quick links follow the pack, the verdict is
+  `--fs-18`; the Settings tab underline is 2 px / 700. **Deferred** (larger:
+  logic, behaviour, JS state rendering or new copy): no "Not connected"
+  Dashboard verdict, the wizard's "Step N of 5" kicker, the two-layer error
+  model, the completed-revisit summary, the Backfill card anatomy, Log grid
+  status pills, the Log Details panel, multilingual credential blocks,
+  Intelligence tab header. Gates: 299 unit, phpcs 0 errors / 997 warnings,
+  phpstan `[OK]` (needs `--memory-limit=1G` on this host), sandbox
+  `setup:upgrade` + `setup:di:compile` + `setup:static-content:deploy
+  --area adminhtml en_US et_EE` green (the deployed adminhtml files were
+  removed afterwards so default mode serves the live symlinks again).
+  The pack (`Magento Connect admin visual system.zip`,
   exported 2026-07-12) had been tracked in `docs/` since `db2fc53` — swept
   in by an unrelated docs commit. It is now removed from the tree and
   `/docs/*.zip` is ignored, so a re-dropped export stays local; history

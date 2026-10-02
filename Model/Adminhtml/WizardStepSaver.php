@@ -19,6 +19,7 @@ use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
 use Smaily\Connect\Model\Automation\Mapping;
 use Smaily\Connect\Model\Automation\MappingSaver;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
+use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Source\MultilingualMode;
@@ -61,7 +62,8 @@ class WizardStepSaver
         private readonly StoreManagerInterface $storeManager,
         private readonly MappingSaver $mappingSaver,
         private readonly SmailyClientProvider $smailyClientProvider,
-        private readonly ConfigRowNormalizer $rowNormalizer
+        private readonly ConfigRowNormalizer $rowNormalizer,
+        private readonly SmailyClientFactory $smailyClientFactory
     ) {
     }
 
@@ -191,7 +193,38 @@ class WizardStepSaver
             }
         }
 
+        $this->checkCredentials($subdomain, $username, $password);
+
         return [];
+    }
+
+    /**
+     * Saving the connection is a real check (PRO-3560): Smaily is asked once
+     * whether it accepts the credentials just saved, and SmailyClient
+     * remembers the answer for the Dashboard and the Connection status. The
+     * save never depends on it — a refusal or an unreachable Smaily is shown
+     * as "Not connected", not as a failed save.
+     */
+    private function checkCredentials(string $subdomain, string $username, string $password): void
+    {
+        if ($password === '' || preg_match('/^\*+$/', $password) === 1) {
+            // Kept password: the stored one, still unchanged in this request.
+            $password = $this->config->getPassword($this->websiteContext->getStoreId());
+        }
+        if ($password === '') {
+            return;
+        }
+
+        try {
+            $this->smailyClientFactory->create([
+                'subdomain' => $subdomain,
+                'username' => $username,
+                'password' => $password,
+            ])->validateCredentials();
+        } catch (SmailyClientException) {
+            // Remembered (or not) by SmailyClient; the save stands either way.
+            return;
+        }
     }
 
     /**

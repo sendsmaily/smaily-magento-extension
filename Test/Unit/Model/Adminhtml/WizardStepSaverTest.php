@@ -20,7 +20,9 @@ use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
 use Smaily\Connect\Model\Automation\MappingSaver;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
+use Smaily\Connect\Model\Client\Exception\AuthenticationException;
 use Smaily\Connect\Model\Client\SmailyClient;
+use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Source\SyncMode;
@@ -45,6 +47,9 @@ class WizardStepSaverTest extends TestCase
     /** @var SmailyClientProvider&\PHPUnit\Framework\MockObject\MockObject */
     private $clientProvider;
 
+    /** @var SmailyClientFactory&\PHPUnit\Framework\MockObject\MockObject */
+    private $clientFactory;
+
     /** @var AccountResolver&\PHPUnit\Framework\MockObject\MockObject */
     private $accountResolver;
 
@@ -64,6 +69,7 @@ class WizardStepSaverTest extends TestCase
         $this->configWriter = $this->createMock(WriterInterface::class);
         $this->config = $this->createMock(Config::class);
         $this->clientProvider = $this->createMock(SmailyClientProvider::class);
+        $this->clientFactory = $this->createMock(SmailyClientFactory::class);
 
         $normalizer = $this->createMock(SubdomainNormalizer::class);
         $normalizer->method('normalize')->willReturnArgument(0);
@@ -96,7 +102,8 @@ class WizardStepSaverTest extends TestCase
             $this->createMock(StoreManagerInterface::class),
             $this->mappingSaver,
             $this->clientProvider,
-            new ConfigRowNormalizer()
+            new ConfigRowNormalizer(),
+            $this->clientFactory
         );
     }
 
@@ -250,6 +257,45 @@ class WizardStepSaverTest extends TestCase
         self::assertSame($expectedScope, $this->savedScope(Config::XML_PATH_USERNAME));
         self::assertSame($expectedScope, $this->savedScope(Config::XML_PATH_PASSWORD));
         self::assertSame($expectedScope, $this->savedScope(Config::XML_PATH_MULTILINGUAL_MODE));
+    }
+
+    /**
+     * PRO-3560: saving the connection is a real check — Smaily is asked once
+     * whether it accepts what was just saved (SmailyClient remembers the
+     * answer for the status displays).
+     */
+    public function testSavingTheConnectionChecksTheSavedCredentials(): void
+    {
+        $client = $this->createMock(SmailyClient::class);
+        $client->expects(self::once())->method('validateCredentials');
+        $this->clientFactory->expects(self::once())->method('create')
+            ->with(['subdomain' => 'demo', 'username' => 'api-user', 'password' => 'secret'])
+            ->willReturn($client);
+
+        $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'password' => 'secret']);
+    }
+
+    public function testAKeptPasswordIsCheckedAsStored(): void
+    {
+        $this->websiteContext->method('getStoreId')->willReturn(1);
+        $this->config->method('getPassword')->with(1)->willReturn('stored-secret');
+        $this->clientFactory->expects(self::once())->method('create')
+            ->with(['subdomain' => 'demo', 'username' => 'api-user', 'password' => 'stored-secret'])
+            ->willReturn($this->createMock(SmailyClient::class));
+
+        $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'password' => '******']);
+    }
+
+    public function testCredentialsSmailyRefusesAreStillSaved(): void
+    {
+        $client = $this->createMock(SmailyClient::class);
+        $client->method('validateCredentials')->willThrowException(new AuthenticationException('refused', 401));
+        $this->clientFactory->method('create')->willReturn($client);
+
+        $errors = $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'password' => 'x']);
+
+        self::assertSame([], $errors);
+        self::assertSame('demo', $this->savedValue(Config::XML_PATH_SUBDOMAIN));
     }
 
     /**

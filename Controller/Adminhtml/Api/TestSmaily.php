@@ -14,6 +14,7 @@ use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
+use Smaily\Connect\Model\Client\Exception\PlanBlockedException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
@@ -76,6 +77,9 @@ class TestSmaily extends AbstractJsonAction implements HttpPostActionInterface
             $client->validateCredentials();
 
             return $this->jsonResponse(['connected' => true, 'accountName' => $subdomain]);
+        } catch (PlanBlockedException $exception) {
+            // The package, not the credentials (PRO-3579).
+            return $this->jsonResponse(['connected' => false, 'error' => $exception->getMessage()]);
         } catch (AuthenticationException) {
             return $this->jsonResponse([
                 'connected' => false,

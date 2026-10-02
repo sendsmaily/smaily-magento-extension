@@ -600,7 +600,18 @@ Initial setup, Settings, Log. Design rules:
   differently, so they are not connected until checked. The Dashboard's
   Smaily card and verdict and the Connection status (`boot.verified` from
   `WizardData`) all ask `isVerified()` for the target website's default
-  store view, so they cannot disagree; no page load calls Smaily. The
+  store view, so they cannot disagree; no page load calls Smaily. A third
+  answer (PRO-3579, Woo `RefusalReason`): an error body with Smaily code
+  227 ("A paid package is required") is the package, not the
+  credentials — Smaily gives it before it authenticates. `SmailyClient`
+  throws `PlanBlockedException` (a `TransportException`, HTTP 403, so the
+  queue still parks the row on the spot; not an `AuthenticationException`)
+  and `VerifiedCredentials::planBlocked()` moves the fingerprint from the
+  accepted list to a second flag row,
+  `smaily_connect_plan_blocked_credentials`; a later accept or refusal
+  clears it. Such a store is *Not connected* — every request is refused —
+  and `isPlanBlocked()` (`boot.planBlocked`, the Dashboard's card and
+  verdict sentence) names the package instead of the credentials. The
   verdict order is: setup incomplete > Smaily not connected > Campaign
   Intelligence account not active > failures > engine unreachable > all
   good.

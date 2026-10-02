@@ -143,6 +143,24 @@ class WizardDataTest extends TestCase
         $decoded = json_decode($this->viewModel->getBootJson(), true);
 
         self::assertTrue($decoded['verified']);
+        self::assertFalse($decoded['planBlocked']);
+    }
+
+    /**
+     * PRO-3579: when Smaily's last answer was that the package has no API
+     * access, the Connection status says so instead of blaming the
+     * credentials.
+     */
+    public function testAPackageWithoutApiAccessIsShownAsTheReason(): void
+    {
+        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->verifiedCredentials->method('isVerified')->with(5)->willReturn(false);
+        $this->verifiedCredentials->method('isPlanBlocked')->with(5)->willReturn(true);
+
+        $decoded = json_decode($this->viewModel->getBootJson(), true);
+
+        self::assertFalse($decoded['verified']);
+        self::assertTrue($decoded['planBlocked']);
     }
 
     public function testGetBootJsonReadsSubscriberAndAutomationFieldsAtTheSelectedWebsiteScope(): void

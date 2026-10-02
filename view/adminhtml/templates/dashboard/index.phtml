@@ -19,6 +19,9 @@ $verdict = $viewModel->getVerdict();
 $failed = $viewModel->getFailedLast24h();
 $engineRefused = $viewModel->isEngineRefused();
 $engineDown = $viewModel->isEngineDown();
+// Smaily refuses every request because the package has no API access
+// (code 227, PRO-3579): not connected, but not the credentials' fault.
+$smailyPlanBlocked = $viewModel->isSmailyPlanBlocked();
 
 $urls = [
     'wizard' => $block->getUrl('smaily_connect/wizard'),
@@ -48,7 +51,9 @@ if ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_INCO
     $verdictText = __('Setup is not finished yet — complete the initial setup to start syncing.');
 } elseif ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_DISCONNECTED) {
     $verdictKicker = __('Not connected');
-    $verdictText = __('The Smaily credentials are missing or Smaily has not accepted them — check them in Settings > Connection and test the connection.');
+    $verdictText = $smailyPlanBlocked
+        ? __('Smaily is refusing every request because this account\'s package does not include API access. Contact sync and email automations stay stopped until the account is on a package that includes it — waiting will not restore them, and the credentials cannot be checked until then.')
+        : __('The Smaily credentials are missing or Smaily has not accepted them — check them in Settings > Connection and test the connection.');
 } elseif ($engineRefused) {
     $verdictKicker = __('Needs attention');
     $verdictText = __('Campaign Intelligence has stopped accepting data from this store, so product, customer and order data is no longer being sent and recommendations will go stale. Waiting will not fix it — the account has to be made active again on the Smaily side. Your Smaily email sending is unaffected; everything queued here waits and is sent once the account is active.');
@@ -69,7 +74,9 @@ $engineState = $viewModel->getEngineStateLabels();
 $connections = [
     [
         __('Smaily'),
-        $viewModel->isSmailyConnected() ? __('Connected (%1)', $viewModel->getSmailySubdomain()) : __('Credentials missing or invalid'),
+        $viewModel->isSmailyConnected()
+            ? __('Connected (%1)', $viewModel->getSmailySubdomain())
+            : ($smailyPlanBlocked ? __('Package does not include API access') : __('Credentials missing or invalid')),
         $viewModel->isSmailyConnected(),
         $viewModel->isSmailyConnected() ? 'active' : 'failed',
         $viewModel->isSmailyConnected() ? __('Connected') : __('Not connected'),

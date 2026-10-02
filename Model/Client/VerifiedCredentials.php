@@ -23,10 +23,16 @@ use Smaily\Connect\Model\Config;
  * credentials, and any 401/403 refusal — the queue's included — refuses
  * them. Credentials are remembered as keyed hashes, never in plain text, so
  * changed credentials are not connected until they are checked.
+ *
+ * A third answer (PRO-3579): Smaily code 227, "a paid package is
+ * required". Smaily gives it before it checks the credentials, so they are
+ * neither accepted nor refused — the store is not connected, because every
+ * request is refused, and the reason is the package.
  */
 class VerifiedCredentials
 {
     public const FLAG_CODE = 'smaily_connect_verified_credentials';
+    public const PLAN_BLOCKED_FLAG_CODE = 'smaily_connect_plan_blocked_credentials';
 
     /** Bounded because every passed Test connection is remembered. */
     public const MAX_REMEMBERED = 20;
@@ -45,6 +51,46 @@ class VerifiedCredentials
      */
     public function isVerified(int|string|null $storeId = null): bool
     {
+        return $this->isRemembered(self::FLAG_CODE, $storeId);
+    }
+
+    /**
+     * Whether Smaily's last answer for the credentials saved for this store
+     * was that the account's package does not include API access.
+     *
+     * @param int|string|null $storeId
+     */
+    public function isPlanBlocked(int|string|null $storeId = null): bool
+    {
+        return $this->isRemembered(self::PLAN_BLOCKED_FLAG_CODE, $storeId);
+    }
+
+    public function accept(string $subdomain, string $username, string $password): void
+    {
+        $fingerprint = $this->fingerprint($subdomain, $username, $password);
+        $this->forget(self::PLAN_BLOCKED_FLAG_CODE, $fingerprint);
+        $this->remember(self::FLAG_CODE, $fingerprint);
+    }
+
+    public function refuse(string $subdomain, string $username, string $password): void
+    {
+        $fingerprint = $this->fingerprint($subdomain, $username, $password);
+        $this->forget(self::PLAN_BLOCKED_FLAG_CODE, $fingerprint);
+        $this->forget(self::FLAG_CODE, $fingerprint);
+    }
+
+    public function planBlocked(string $subdomain, string $username, string $password): void
+    {
+        $fingerprint = $this->fingerprint($subdomain, $username, $password);
+        $this->forget(self::FLAG_CODE, $fingerprint);
+        $this->remember(self::PLAN_BLOCKED_FLAG_CODE, $fingerprint);
+    }
+
+    /**
+     * @param int|string|null $storeId
+     */
+    private function isRemembered(string $flagCode, int|string|null $storeId): bool
+    {
         $credentials = [
             $this->config->getSubdomain($storeId),
             $this->config->getUsername($storeId),
@@ -54,41 +100,36 @@ class VerifiedCredentials
             return false;
         }
 
-        return in_array($this->fingerprint(...$credentials), $this->remembered(), true);
+        return in_array($this->fingerprint(...$credentials), $this->remembered($flagCode), true);
     }
 
-    public function accept(string $subdomain, string $username, string $password): void
+    private function remember(string $flagCode, string $fingerprint): void
     {
-        $fingerprint = $this->fingerprint($subdomain, $username, $password);
-        $remembered = $this->remembered();
+        $remembered = $this->remembered($flagCode);
         if (in_array($fingerprint, $remembered, true)) {
             return;
         }
 
         $remembered[] = $fingerprint;
-        $this->flagManager->saveFlag(self::FLAG_CODE, array_slice($remembered, -self::MAX_REMEMBERED));
+        $this->flagManager->saveFlag($flagCode, array_slice($remembered, -self::MAX_REMEMBERED));
     }
 
-    public function refuse(string $subdomain, string $username, string $password): void
+    private function forget(string $flagCode, string $fingerprint): void
     {
-        $fingerprint = $this->fingerprint($subdomain, $username, $password);
-        $remembered = $this->remembered();
+        $remembered = $this->remembered($flagCode);
         if (!in_array($fingerprint, $remembered, true)) {
             return;
         }
 
-        $this->flagManager->saveFlag(
-            self::FLAG_CODE,
-            array_values(array_diff($remembered, [$fingerprint]))
-        );
+        $this->flagManager->saveFlag($flagCode, array_values(array_diff($remembered, [$fingerprint])));
     }
 
     /**
      * @return string[]
      */
-    private function remembered(): array
+    private function remembered(string $flagCode): array
     {
-        $data = $this->flagManager->getFlagData(self::FLAG_CODE);
+        $data = $this->flagManager->getFlagData($flagCode);
 
         return is_array($data) ? array_values(array_filter($data, 'is_string')) : [];
     }

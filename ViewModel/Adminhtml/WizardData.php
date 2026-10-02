@@ -124,6 +124,8 @@ class WizardData implements ArgumentInterface
             // credentials at the last real check (PRO-3560). `connected`
             // above only says they are filled in.
             'verified' => $this->verifiedCredentials->isVerified($storeId),
+            // Why not: the package has no API access, not the credentials (PRO-3579).
+            'planBlocked' => $this->verifiedCredentials->isPlanBlocked($storeId),
             'setupCompleted' => $this->isSetupCompleted(),
             'storeId' => $storeId,
             'connection' => [

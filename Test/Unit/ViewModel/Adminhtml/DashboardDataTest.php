@@ -59,6 +59,27 @@ class DashboardDataTest extends TestCase
         self::assertSame(DashboardData::VERDICT_DISCONNECTED, $viewModel->getVerdict());
     }
 
+    /**
+     * PRO-3579: a package without API access is "Not connected" too —
+     * nothing reaches Smaily — but the Dashboard can tell it apart from
+     * refused credentials.
+     */
+    public function testAPackageWithoutApiAccessIsNotConnectedAndNamed(): void
+    {
+        $viewModel = $this->createViewModel(false, smailyVerified: false, planBlocked: true);
+
+        self::assertFalse($viewModel->isSmailyConnected());
+        self::assertTrue($viewModel->isSmailyPlanBlocked());
+        self::assertSame(DashboardData::VERDICT_DISCONNECTED, $viewModel->getVerdict());
+    }
+
+    public function testRefusedCredentialsAreNotABlockedPackage(): void
+    {
+        $viewModel = $this->createViewModel(false, smailyVerified: false);
+
+        self::assertFalse($viewModel->isSmailyPlanBlocked());
+    }
+
     public function testAnUnfinishedSetupOutranksTheConnection(): void
     {
         $viewModel = $this->createViewModel(false, smailyVerified: false, setupCompleted: false);
@@ -70,7 +91,8 @@ class DashboardDataTest extends TestCase
         bool $refused,
         bool $smailyVerified = true,
         int $failed = 0,
-        bool $setupCompleted = true
+        bool $setupCompleted = true,
+        bool $planBlocked = false
     ): DashboardData {
         $engineSettings = $this->createMock(EngineSettings::class);
         $engineSettings->method('isConnected')->willReturn(true);
@@ -88,6 +110,7 @@ class DashboardDataTest extends TestCase
         $websiteContext->method('getStoreId')->willReturn(4);
         $verifiedCredentials = $this->createMock(VerifiedCredentials::class);
         $verifiedCredentials->method('isVerified')->with(4)->willReturn($smailyVerified);
+        $verifiedCredentials->method('isPlanBlocked')->with(4)->willReturn($planBlocked);
 
         return new DashboardData(
             $this->createMock(Config::class),

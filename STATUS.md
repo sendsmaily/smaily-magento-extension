@@ -5,7 +5,7 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-02 (PRO-1952 — a product with no real category is synced with `tags.category_defaulted: "true"`. Earlier the same day: PRO-3581 — uninstalling the module removes its settings, the Smaily password and the engine key included, and its flag rows, the profiling opt-out record included; disabling keeps everything. Earlier the same day: PRO-3584 — an over-long or malformed visitor token, context or session id is dropped on its own; the order keeps every other attribution signal. Earlier the same day: PRO-3580 — the welcome automation fires only for a subscription the shopper makes on the storefront, a resubscription included; not for one made in the admin, through the API or by an import. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out, and an opt-out made in Smaily reaches the engine. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
+_Last updated: 2026-10-02 (PRO-3579 — a Smaily package without API access (code 227) is named as such in the admin, not called refused credentials. Earlier the same day: PRO-1952 — a product with no real category is synced with `tags.category_defaulted: "true"`. Earlier the same day: PRO-3581 — uninstalling the module removes its settings, the Smaily password and the engine key included, and its flag rows, the profiling opt-out record included; disabling keeps everything. Earlier the same day: PRO-3584 — an over-long or malformed visitor token, context or session id is dropped on its own; the order keeps every other attribution signal. Earlier the same day: PRO-3580 — the welcome automation fires only for a subscription the shopper makes on the storefront, a resubscription included; not for one made in the admin, through the API or by an import. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out, and an opt-out made in Smaily reaches the engine. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, a marketing unsubscribe also stops profiling, and an older opt-in on the Smaily contact no longer lifts a newer store opt-out. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, login no longer merges an opted-out shopper's browsing, and a marketing unsubscribe also stops profiling. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, the store keeps its own durable opt-out record, and login no longer merges an opted-out shopper's browsing. Earlier the same day: PRO-3578 — a shopper's profiling choice reaches the engine through the retried marketing queue, and the store keeps its own durable opt-out record. Earlier the same day: PRO-3577 — no setting can make an automation re-subscribe a contact who unsubscribed in Smaily. Earlier the same day: PRO-3576 — a malformed recommendation id is left off the order instead of costing the engine the whole order; the storefront stores only a well-formed id. Earlier the same day: PRO-2456 page frame — Settings, Initial setup
 and the Dashboard fill the content area on the pack's grey pane under a
 full-width white tab strip, in Magento's Open Sans, with 33 px buttons and
 our own text, link and status colours. Earlier the same day: PRO-3572 — a
@@ -57,6 +57,37 @@ canon in EN + ET; PRO-2469 swept the abandoned-cart tracker)_
   tag on Erkki's go remains). Milestones: rc1 tagged + pilot runbook 2026-10-03, pilot store
   live 2026-10-09. PRO-2460 decided A — contract §3 SKU key stands, PRO-1484
   closed. After the pilot: PRO-2506, PRO-1967, PRO-1198 (Smaily hand-over).
+
+- **PRO-3579 in progress — a package without the API is not "credentials
+  refused" (2026-10-02, parity audit R5, Woo PRO-1686 `RefusalReason`).**
+  Smaily answers `HTTP 403 {"code":227}` ("A paid package is required",
+  confirmed in Smaily's response-code docs) before it checks the
+  credentials. `SmailyClient` now reads the error body: code 227 throws
+  `Model\Client\Exception\PlanBlockedException` (a `TransportException`
+  with status 403, so `RetryPolicy` still parks a queued row on the spot,
+  and the Log shows the package sentence; deliberately not an
+  `AuthenticationException`) and calls `VerifiedCredentials::planBlocked()`
+  instead of `refuse()`. Decision: a 227 counts as **Not connected** —
+  every request is refused, so "Connected" would hide that nothing syncs —
+  but it is not recorded as refused credentials: the fingerprint moves to a
+  second flag row, `smaily_connect_plan_blocked_credentials` (no schema
+  change), which the next accept or refusal clears. Test connection (wizard,
+  Settings, the per-language blocks), the Connection status
+  (`boot.planBlocked`), the configuration-save message, the Dashboard
+  verdict sentence and the Smaily card sub-line name the package. New
+  phrases (EN + ET, for Erkki's proofread; ET adapted from the WooCommerce
+  `.po` to this module's "kasutajaandmed" / "automaatikad" terms): the Test
+  connection / status / Log sentence "Smaily refused the request because
+  this account's package does not include API access. Upgrade the package
+  in Smaily to connect — until then the credentials cannot be checked at
+  all." / "Smaily keeldus päringust, sest selle konto pakett ei sisalda
+  API-ligipääsu. Ühendamiseks uuenda Smailys paketti — enne seda ei saa
+  kasutajaandmeid üldse kontrollida."; the configuration-save message "The
+  configuration was saved, but Smaily refused the check because …" /
+  "Seadistus salvestati, kuid Smaily keeldus kontrollist, sest …"; the
+  Dashboard verdict "Smaily is refusing every request because …" /
+  "Smaily keeldub igast päringust, sest …"; the card sub-line "Package does
+  not include API access" / "Pakett ei sisalda API-ligipääsu".
 
 - **PRO-2456 page frame — the admin pages feel native (2026-10-02).**
   Owner decisions, recorded in `docs/ADMIN_UI_TARGET_SPEC.md` "Page frame

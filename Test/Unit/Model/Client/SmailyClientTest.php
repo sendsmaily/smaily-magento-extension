@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\RequestInterface;
 use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
+use Smaily\Connect\Model\Client\Exception\PlanBlockedException;
 use Smaily\Connect\Model\Client\Exception\TransportException;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Client\SmailyClient;
@@ -132,6 +133,30 @@ class SmailyClientTest extends TestCase
 
         $this->expectException(AuthenticationException::class);
         $client->post(SmailyClient::ENDPOINT_CONTACT, []);
+    }
+
+    /**
+     * PRO-3579: Smaily answers 403 code 227 when the account's package has no
+     * API access — before it checks the credentials. That is not a credential
+     * refusal: the credentials are not marked refused, and the exception says
+     * what is wrong.
+     */
+    public function testAPackageWithoutApiAccessIsNotACredentialRefusal(): void
+    {
+        $client = $this->createClient([
+            new Response(403, [], '{"code":227,"message":"A paid package is required."}'),
+        ]);
+        $this->verifiedCredentials->expects(self::once())->method('planBlocked')->with('demo', 'user', 'secret');
+        $this->verifiedCredentials->expects(self::never())->method('refuse');
+        $this->verifiedCredentials->expects(self::never())->method('accept');
+
+        try {
+            $client->validateCredentials();
+            self::fail('Expected PlanBlockedException');
+        } catch (PlanBlockedException $exception) {
+            self::assertSame(403, $exception->getHttpStatus());
+            self::assertStringContainsString('package does not include API access', $exception->getMessage());
+        }
     }
 
     public function testAnOutageNeitherAcceptsNorRefusesTheCredentials(): void

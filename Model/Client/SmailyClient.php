@@ -15,6 +15,7 @@ use GuzzleHttp\RequestOptions;
 use Psr\Http\Message\ResponseInterface;
 use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
+use Smaily\Connect\Model\Client\Exception\PlanBlockedException;
 use Smaily\Connect\Model\Client\Exception\TransportException;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\ModuleInfo;
@@ -119,6 +120,7 @@ class SmailyClient
      * as "Connected" for these credentials (PRO-3560).
      *
      * @throws AuthenticationException when credentials are rejected
+     * @throws PlanBlockedException when the account's package has no API access
      * @throws TransportException on network failure
      */
     public function validateCredentials(): void
@@ -149,6 +151,19 @@ class SmailyClient
                 'endpoint' => $uri,
                 'status' => $status,
             ]);
+            if ($this->isPlanBlocked($exception->getResponse())) {
+                // Smaily answers this before it checks the credentials: they
+                // are not refused, the package is (PRO-3579).
+                $this->verifiedCredentials->planBlocked($this->subdomain, $this->username, $this->password);
+                throw new PlanBlockedException(
+                    (string)__(
+                        'Smaily refused the request because this account\'s package does not include API access.'
+                        . ' Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all.'
+                    ),
+                    $status,
+                    $exception
+                );
+            }
             if (in_array($status, [401, 403], true)) {
                 // Wherever the refusal came from (the queue included), these
                 // credentials are no longer "Connected" (PRO-3560).
@@ -200,6 +215,18 @@ class SmailyClient
         }
 
         return $decoded;
+    }
+
+    /**
+     * Smaily code 227 in an error response body: "A paid package is required".
+     */
+    private function isPlanBlocked(ResponseInterface $response): bool
+    {
+        $decoded = json_decode((string)$response->getBody(), true);
+
+        return is_array($decoded)
+            && isset($decoded['code'])
+            && (int)$decoded['code'] === PlanBlockedException::SMAILY_CODE;
     }
 
     /**

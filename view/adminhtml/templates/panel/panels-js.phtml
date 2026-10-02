@@ -441,6 +441,10 @@ window.smailyPanelsInit = function ($) {
         // last real check (PRO-3560) — filled-in fields alone are not enough.
         if (boot.verified) {
             result('#smaily-w-test-result', '<?= $escaper->escapeJs(__('Connected with the saved credentials.')) ?>', true);
+        } else if (boot.planBlocked) {
+            // Smaily's last answer: the package has no API access (code 227,
+            // PRO-3579) — not a verdict on the credentials.
+            result('#smaily-w-test-result', '<?= $escaper->escapeJs(__('Smaily refused the request because this account\'s package does not include API access. Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all.')) ?>', false);
         }
         if ($('#smaily-w-connection-status').length) {
             $('#smaily-w-connection-pill').toggleClass('smaily-pill--active', boot.verified)

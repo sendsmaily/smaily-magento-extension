@@ -21,7 +21,8 @@ use Smaily\Connect\Model\Config;
  */
 class VerifiedCredentialsTest extends TestCase
 {
-    private mixed $flagData = null;
+    /** @var array<string, mixed> flag data by flag code */
+    private array $flags = [];
 
     /** @var array{subdomain: string, username: string, password: string} */
     private array $saved = ['subdomain' => '', 'username' => '', 'password' => ''];
@@ -31,11 +32,14 @@ class VerifiedCredentialsTest extends TestCase
     protected function setUp(): void
     {
         $flagManager = $this->createMock(FlagManager::class);
-        $flagManager->method('getFlagData')->with(VerifiedCredentials::FLAG_CODE)
-            ->willReturnCallback(fn () => $this->flagData);
+        $flagManager->method('getFlagData')
+            ->willReturnCallback(fn (string $code) => $this->flags[$code] ?? null);
         $flagManager->method('saveFlag')->willReturnCallback(function (string $code, $value): bool {
-            self::assertSame(VerifiedCredentials::FLAG_CODE, $code);
-            $this->flagData = $value;
+            self::assertContains(
+                $code,
+                [VerifiedCredentials::FLAG_CODE, VerifiedCredentials::PLAN_BLOCKED_FLAG_CODE]
+            );
+            $this->flags[$code] = $value;
 
             return true;
         });
@@ -102,12 +106,66 @@ class VerifiedCredentialsTest extends TestCase
         self::assertTrue($this->verified->isVerified(1));
     }
 
+    /**
+     * PRO-3579: a package without API access (Smaily code 227) is answered
+     * before the credentials are checked. The store is not connected — nothing
+     * gets through — but the reason is the package, not the credentials.
+     */
+    public function testAPackageWithoutApiAccessIsNotConnectedForThatReason(): void
+    {
+        $this->save('demo', 'user', 'secret');
+        $this->verified->accept('demo', 'user', 'secret');
+        $this->verified->planBlocked('demo', 'user', 'secret');
+
+        self::assertFalse($this->verified->isVerified(1));
+        self::assertTrue($this->verified->isPlanBlocked(1));
+    }
+
+    public function testAPassedCheckClearsTheBlockedPackage(): void
+    {
+        $this->save('demo', 'user', 'secret');
+        $this->verified->planBlocked('demo', 'user', 'secret');
+        $this->verified->accept('demo', 'user', 'secret');
+
+        self::assertTrue($this->verified->isVerified(1));
+        self::assertFalse($this->verified->isPlanBlocked(1));
+    }
+
+    public function testACredentialRefusalReplacesTheBlockedPackage(): void
+    {
+        $this->save('demo', 'user', 'secret');
+        $this->verified->planBlocked('demo', 'user', 'secret');
+        $this->verified->refuse('demo', 'user', 'secret');
+
+        self::assertFalse($this->verified->isVerified(1));
+        self::assertFalse($this->verified->isPlanBlocked(1));
+    }
+
+    public function testABlockedPackageOfOtherCredentialsLeavesTheSavedOnesConnected(): void
+    {
+        $this->save('demo', 'user', 'secret');
+        $this->verified->accept('demo', 'user', 'secret');
+        $this->verified->planBlocked('other', 'user', 'secret');
+
+        self::assertTrue($this->verified->isVerified(1));
+        self::assertFalse($this->verified->isPlanBlocked(1));
+    }
+
+    public function testMissingCredentialsAreNotBlocked(): void
+    {
+        $this->verified->planBlocked('demo', 'user', 'secret');
+
+        self::assertFalse($this->verified->isPlanBlocked(1));
+    }
+
     public function testThePasswordIsNeverStored(): void
     {
         $this->verified->accept('demo', 'user', 'secret');
 
-        self::assertIsArray($this->flagData);
-        self::assertStringNotContainsString('secret', (string)json_encode($this->flagData));
+        $this->verified->planBlocked('demo', 'user', 'other-secret');
+
+        self::assertCount(2, $this->flags);
+        self::assertStringNotContainsString('secret', (string)json_encode($this->flags));
     }
 
     public function testOnlyTheLatestAcceptedCredentialsAreKept(): void
@@ -118,7 +176,7 @@ class VerifiedCredentialsTest extends TestCase
             $this->verified->accept('demo', 'user', 'tested-' . $i);
         }
 
-        self::assertCount(VerifiedCredentials::MAX_REMEMBERED, $this->flagData);
+        self::assertCount(VerifiedCredentials::MAX_REMEMBERED, $this->flags[VerifiedCredentials::FLAG_CODE]);
         self::assertFalse($this->verified->isVerified(1));
     }
 

@@ -65,6 +65,16 @@ class DashboardData implements ArgumentInterface
         );
     }
 
+    /**
+     * Whether Smaily's last answer for the saved credentials was that the
+     * account's package does not include API access (PRO-3579) — the reason
+     * the store is not connected, in place of refused credentials.
+     */
+    public function isSmailyPlanBlocked(): bool
+    {
+        return $this->verifiedCredentials->isPlanBlocked($this->websiteContext->getStoreId());
+    }
+
     public function getSmailySubdomain(): string
     {
         return $this->config->getSubdomain($this->websiteContext->getStoreId());

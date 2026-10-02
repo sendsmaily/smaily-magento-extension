@@ -11,6 +11,7 @@ namespace Smaily\Connect\Plugin\Adminhtml;
 use Magento\Config\Model\Config as SystemConfig;
 use Magento\Framework\Message\ManagerInterface;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
+use Smaily\Connect\Model\Client\Exception\PlanBlockedException;
 use Smaily\Connect\Model\Client\CredentialCheck;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Config;
@@ -63,6 +64,15 @@ class ValidateConnectionOnSave
             }
             $this->messageManager->addSuccessMessage(
                 (string)__('Smaily connection verified — the API credentials work.')
+            );
+        } catch (PlanBlockedException) {
+            // The package, not the credentials (PRO-3579).
+            $this->messageManager->addErrorMessage(
+                (string)__(
+                    'The configuration was saved, but Smaily refused the check because this account\'s package'
+                    . ' does not include API access. Synchronization will not work until the account is on a package'
+                    . ' that includes it — until then the credentials cannot be checked.'
+                )
             );
         } catch (AuthenticationException) {
             $this->messageManager->addErrorMessage(

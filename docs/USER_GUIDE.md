@@ -138,6 +138,15 @@ removed — the status turns to *Not connected* too. The Dashboard then shows
 a **Not connected** verdict with an **Open Connection settings** button;
 press Test Connection there to check the credentials again.
 
+When the Smaily account's package does not include API access, Smaily
+refuses every request before it looks at the credentials (Smaily response
+code 227, "A paid package is required"). The store then shows *Not
+connected* as well — nothing can reach Smaily — but Test Connection, the
+connection status, a configuration save, the Dashboard and the Log name
+the package as the reason instead of calling the credentials wrong. The
+credentials cannot be checked until the account is on a package that
+includes the API; press Test Connection again after the package is changed.
+
 | Field | Notes |
 |---|---|
 | Subdomain | Your Smaily subdomain. Pasting the full URL (`https://demo.sendsmaily.net`) also works — it is normalized on save. |

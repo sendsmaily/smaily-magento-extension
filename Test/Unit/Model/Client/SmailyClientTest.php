@@ -20,12 +20,16 @@ use Smaily\Connect\Model\Client\Exception\AuthenticationException;
 use Smaily\Connect\Model\Client\Exception\TransportException;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Client\SmailyClient;
+use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Logger\Logger;
 
 class SmailyClientTest extends TestCase
 {
     /** @var array<int, array{request: RequestInterface}> */
     private array $history = [];
+
+    /** @var VerifiedCredentials&\PHPUnit\Framework\MockObject\MockObject */
+    private $verifiedCredentials;
 
     public function testGetReturnsDecodedBody(): void
     {
@@ -103,6 +107,39 @@ class SmailyClientTest extends TestCase
         $client->validateCredentials();
     }
 
+    public function testAPassedCredentialCheckIsRemembered(): void
+    {
+        $client = $this->createClient([new Response(200, [], '[]')]);
+        $this->verifiedCredentials->expects(self::once())->method('accept')->with('demo', 'user', 'secret');
+        $this->verifiedCredentials->expects(self::never())->method('refuse');
+
+        $client->validateCredentials();
+    }
+
+    /**
+     * PRO-3560: a refusal seen anywhere — the queue's sends included — takes
+     * the "Connected" status away from these credentials.
+     */
+    public function testAnyAuthenticationRefusalIsRemembered(): void
+    {
+        $client = $this->createClient([new Response(403, [], 'Forbidden')]);
+        $this->verifiedCredentials->expects(self::once())->method('refuse')->with('demo', 'user', 'secret');
+        $this->verifiedCredentials->expects(self::never())->method('accept');
+
+        $this->expectException(AuthenticationException::class);
+        $client->post(SmailyClient::ENDPOINT_CONTACT, []);
+    }
+
+    public function testAnOutageNeitherAcceptsNorRefusesTheCredentials(): void
+    {
+        $client = $this->createClient([new Response(503, [], 'Unavailable')]);
+        $this->verifiedCredentials->expects(self::never())->method('accept');
+        $this->verifiedCredentials->expects(self::never())->method('refuse');
+
+        $this->expectException(TransportException::class);
+        $client->validateCredentials();
+    }
+
     public function testHttp500ThrowsTransportExceptionWithStatus(): void
     {
         $client = $this->createClient([new Response(500, [], 'Server error')]);
@@ -169,9 +206,12 @@ class SmailyClientTest extends TestCase
             }
         );
 
+        $this->verifiedCredentials = $this->createMock(VerifiedCredentials::class);
+
         return new SmailyClient(
             $factory,
             $this->createMock(Logger::class),
+            $this->verifiedCredentials,
             'demo',
             'user',
             'secret'

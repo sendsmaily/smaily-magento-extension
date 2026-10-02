@@ -20,6 +20,7 @@ use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
+use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
@@ -241,7 +242,14 @@ class FlushEventQueueTest extends IntegrationTestCase
         $logger = $this->objectManager->get(Logger::class);
         $clientProvider = $this->createMock(SmailyClientProvider::class);
         $clientProvider->method('forStore')->willReturn(
-            new SmailyClient($httpClientFactory, $logger, 'demo', 'user', 'secret')
+            new SmailyClient(
+                $httpClientFactory,
+                $logger,
+                $this->createMock(VerifiedCredentials::class),
+                'demo',
+                'user',
+                'secret'
+            )
         );
 
         /** @var ContactSyncHandler $handler */

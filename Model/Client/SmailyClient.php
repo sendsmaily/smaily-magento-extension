@@ -50,6 +50,7 @@ class SmailyClient
     public function __construct(
         private readonly HttpClientFactory $httpClientFactory,
         private readonly Logger $logger,
+        private readonly VerifiedCredentials $verifiedCredentials,
         private readonly string $subdomain,
         private readonly string $username,
         private readonly string $password
@@ -114,7 +115,8 @@ class SmailyClient
     }
 
     /**
-     * Validate credentials with a lightweight API call.
+     * Validate credentials with a lightweight API call. A pass is remembered
+     * as "Connected" for these credentials (PRO-3560).
      *
      * @throws AuthenticationException when credentials are rejected
      * @throws TransportException on network failure
@@ -122,6 +124,7 @@ class SmailyClient
     public function validateCredentials(): void
     {
         $this->get(self::ENDPOINT_WORKFLOWS, ['trigger_type' => 'form_submitted']);
+        $this->verifiedCredentials->accept($this->subdomain, $this->username, $this->password);
     }
 
     /**
@@ -147,6 +150,9 @@ class SmailyClient
                 'status' => $status,
             ]);
             if (in_array($status, [401, 403], true)) {
+                // Wherever the refusal came from (the queue included), these
+                // credentials are no longer "Connected" (PRO-3560).
+                $this->verifiedCredentials->refuse($this->subdomain, $this->username, $this->password);
                 throw new AuthenticationException((string)__('Smaily API credentials were rejected'), $status, $exception);
             }
             throw new TransportException(

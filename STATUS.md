@@ -5,9 +5,16 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-04 — 3.0.0-rc6 is prepared, not published (the
-owner decided today that the pilot store, which has a separate (headless)
-storefront, installs rc6 on pilot day 2026-10-09): the version is
+_Last updated: 2026-10-04 — 3.0.0-rc6 is released as a GitHub pre-release on
+the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc6),
+built by the release workflow (run 37228529206) from commit bb6831e; the ZIP
+and its .sha256 were checked after publishing (380 entries, `shasum -a 256 -c`
+OK, sha256 3c048a8b7e5eb9bddeb5…, composer.json inside says 3.0.0-rc6); the
+CI and Contract staleness workflows are green on bb6831e. The rc6 ZIP from
+the release installs on a clean store by docs/INSTALLING.md as written
+(PRO-3748, below). The pilot installs rc6 on pilot day 2026-10-09 (owner
+decision today: the pilot store has a separate (headless) storefront). The
+version is
 `3.0.0-rc6` (composer.json, `ModuleInfo::VERSION`, the ModuleVersion
 docblock, the upstream proposal; composer.lock content-hash refreshed, no
 dependency change), and CHANGELOG's "Changes since 3.0.0-rc5" list is the
@@ -21,10 +28,8 @@ setup's Intelligence step and on Settings > Intelligence) and PRO-1969 +
 PRO-3742 (the catalog, customer and order imports do not start while
 Campaign Intelligence is not connected). PRO-3735, PRO-3729, PRO-3737,
 PRO-3736, PRO-3738, PRO-3739, PRO-1960 and the simplification passes
-change nothing a merchant sees, so they have no bullet. rc6 is prepared
-in the version-cut commit on top of 0dac0c3; the ZIP builds and verifies
-locally from it. It awaits publishing as a GitHub pre-release on the fork
-(as rc1 to rc5); the pilot installs rc6.
+change nothing a merchant sees, so they have no bullet. The version cut
+is commit bb6831e on top of 0dac0c3.
 Earlier 2026-10-04 — after 3.0.0-rc5, PRO-3735 (CI parses every
 PHP and PHTML file on PHP 8.1), PRO-3733 (a command-line Campaign
 Intelligence connection sends the storefront's site address), PRO-3729 and
@@ -116,6 +121,39 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3748 — the rc6 package installs on a clean store by the install
+  guide (2026-10-04; docs only, no CHANGELOG bullet).** As PRO-3739 for
+  rc5: the ZIP and its .sha256 were downloaded from the 3.0.0-rc6 GitHub
+  release (`shasum -a 256 -c` OK on macOS, `sha256sum -c` OK in the
+  container; 380 entries, composer.json 3.0.0-rc6) and installed into a
+  real `app/code` on a fresh Magento 2.4.8-p4 (PHP 8.3) without sample
+  data, in production mode, on a separate temporary compose project (own
+  name, containers, volumes, ports; sandbox image; no working-tree mount —
+  the sandbox stayed untouched and Up with the same container IDs),
+  following `docs/INSTALLING.md` step by step: extract (the guide's
+  `mkdir -p` creates `app/code`), the production sequence with
+  `setup:static-content:deploy en_US et_EE`, `crontab -l` / `cron:install`
+  (the cron package installed in the temporary container first), module
+  enabled, six `smaily_*` tables, the "ready to set up" notice under the
+  bell, four menu entries. All seven `smaily_*` cron jobs (the nightly
+  catalog re-sync is gone since PRO-1968) finished `success` without a
+  Smaily or engine connection (the daily janitor and the two 15-minute
+  jobs queued by hand), plus one plain `cron:run`; no `exception.log`, no
+  `var/report`, no Smaily_Connect line in `system.log`. Initial setup opens
+  from every module page; step 1 refuses Continue without a tested
+  connection; the Campaign Intelligence step renders the
+  separate-storefront hint (no Storefront URL saved). Dashboard, Settings
+  (all five tabs; Intelligence with its hint) and Log were opened with
+  `setup_completed` set in the database: no console errors, Not connected
+  everywhere, no browser request left the store. PRO-1969/PRO-3742 hold:
+  `smaily:backfill:start catalog|customers|orders` prints the
+  not-connected sentence and exits 1, the admin import endpoint answers a
+  catalog start with the same message, and no job or queue row is
+  written. The update section (fresh extraction, the step 3 commands,
+  second `setup:upgrade`) passed; settings and tables kept, the Dashboard
+  opens, the group runs again with no failure. No guide step needed a
+  change. TESTING.md records the run. Stack removed afterwards (`down -v`).
 
 - **PRO-3745 follow-up — Settings > Intelligence shows the
   separate-storefront hint before Connect too (2026-10-04).** Settings >
@@ -1916,10 +1954,9 @@ Earlier: 2026-09-11, 2026-09-10._
   in-process instance — nothing stored). Fixes PRO-3603 findings 1, 5
   and 6.
 
-- **Next session opens here (2026-10-04).** 3.0.0-rc6 is prepared
-  (header) and awaits publishing as a GitHub pre-release on the fork;
-  **the pilot installs rc6 on 09.10** (owner decision 2026-10-04; rc5
-  stays the newest published build until then), following
+- **Next session opens here (2026-10-04).** 3.0.0-rc6 is out (header)
+  and its ZIP installs on a clean store by the guide (PRO-3748) —
+  **the pilot installs rc6 on 09.10** (owner decision 2026-10-04), following
   PILOT_CHECKLIST.md in the headless order: the Storefront URL first
   (Finish the initial setup without connecting, Settings > Connection >
   Using a separate storefront?), then connect under Settings >
@@ -1939,7 +1976,8 @@ Earlier: 2026-09-11, 2026-09-10._
   PRO-3741 (connecting starts the catalog import, with a Hold back),
   PRO-3745 (separate-storefront note on the setup step and on Settings >
   Intelligence), the simplification passes (behaviour-neutral); PRO-1954
-  closed, PRO-1958 narrowed. Done 2026-10-02/03: headless storefronts +
+  closed, PRO-1958 narrowed; rc6 released, PRO-3748 (rc6 clean install by
+  the guide passed; no guide change). Done 2026-10-02/03: headless storefronts +
   the Storefront URL (PRO-3614/3660), browse consent as in Woo and per
   website (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the
   standard checkout + one reminder per address a day + erase stops
@@ -1947,7 +1985,7 @@ Earlier: 2026-09-11, 2026-09-10._
   (PRO-3661/3681), catalog import per website with save-path prices
   (PRO-2506/3692), variants take the parent's category (PRO-3714/3715),
   seven per-language account fixes (PRO-3683/3690/3699/3717/3718/3719),
-  contract 1.8.2 (PRO-3654); rc2, rc3, rc4 released; rc5 released
+  contract 1.8.2 (PRO-3654); rc2, rc3, rc4 released; rc5 and rc6 released
   2026-10-04. Next, in order: (1) pilot day 09.10 — the pilot installs
   rc6; Erkki passes the storefront hand-off in
   docs/HEADLESS_STOREFRONTS.md to the storefront team (keep the query
@@ -4873,8 +4911,7 @@ Earlier: 2026-09-11, 2026-09-10._
   merchant recovery).
 
 **All 6 v3 phases implemented** (~110 files) on branch `v3`, version
-**3.0.0-rc6 — unreleased** (3.0.0-rc5 is the newest GitHub pre-release
-on the fork). Current truth:
+**3.0.0-rc6 — GitHub pre-release on the fork** (the newest). Current truth:
 
 - **PRO-1391 final-polish done — four refinements on Settings > Connection
   after Erkki's side-by-side review of the PRO-1391 visual-fidelity pass.**

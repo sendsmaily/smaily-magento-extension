@@ -391,7 +391,7 @@ admin walk in en_US and et_EE, a contact sync, an order and a product
 save without Smaily or Campaign Intelligence credentials, and the
 uninstall.
 
-Latest run: 3.0.0-rc5 (the ZIP downloaded from the GitHub release) on
+Earlier run: 3.0.0-rc5 (the ZIP downloaded from the GitHub release) on
 Magento 2.4.8-p4 without sample data, 2026-10-04, in production mode —
 steps 1–5 and the update section passed as written. It ran on a separate,
 temporary compose project (its own name, containers, volumes and ports,
@@ -403,3 +403,16 @@ was written to `exception.log` or `var/report`. The Dashboard, Settings
 and Log were opened by setting `smaily_connect/internal/setup_completed`
 for the website directly in the database, since step 1 of the initial
 setup needs a working Smaily connection.
+
+Latest run: 3.0.0-rc6 (the ZIP downloaded from the GitHub release) on
+Magento 2.4.8-p4 without sample data, 2026-10-04, in production mode, the
+same way as the rc5 run — steps 1–5 and the update section passed as
+written, with no guide change. All seven `smaily_*` cron jobs finished with
+`success` (the daily janitor and the two 15-minute jobs queued by hand),
+and nothing was written to `exception.log` or `var/report`. The initial
+setup's Campaign Intelligence step and Settings > Intelligence show the
+separate-storefront note while no Storefront URL is saved. While
+Campaign Intelligence is not connected, `bin/magento smaily:backfill:start
+catalog` (and `customers`, `orders`) prints "Campaign Intelligence is not
+connected, …" and exits 1, and the admin import endpoint answers a catalog
+start with the same message; neither writes a job or a queue row.

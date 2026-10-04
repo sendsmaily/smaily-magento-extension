@@ -952,7 +952,11 @@ implemented here:
   invalid data, 206 = email not found (`Model\Client\SmailyClient`).
 - Engine automations config (§13): every row carries all eight keys;
   validation is all-or-nothing; `per_language` rows saved by other
-  platforms survive a Magento save.
+  platforms survive a Magento save. The engine stores a row asking for
+  real sends in test mode until a Smaily operator switches them on, so
+  `Automations\Save` reads §12 after a successful PUT and answers each
+  trigger's stored `enabled` / `test_mode`; the Automations tab redraws
+  its cards from that, never from the request.
 
 ## Extension points
 

@@ -71,6 +71,9 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
                             <span class="smaily-engine-trigger__ctrl"><label><input type="checkbox" data-field="enabled" <?= $row['enabled'] ? 'checked' : '' ?>/> <?= $escaper->escapeHtml(__('Enabled')) ?></label></span>
                             <span class="smaily-engine-trigger__ctrl"><label><input type="checkbox" data-field="test_mode" <?= $row['test_mode'] ? 'checked' : '' ?>/> <?= $escaper->escapeHtml(__('Test mode')) ?></label></span>
                         </div>
+                        <?php // The go-live step (PRO-3734): the engine keeps a trigger in test
+                            // mode until a Smaily operator switches real sends on. ?>
+                        <div class="smaily-engine-trigger__hint"<?= $modeClass === 'is-active' ? ' hidden' : '' ?>><?= $escaper->escapeHtml(__('Smaily switches real sends on after you confirm. Until then the trigger runs in test mode.')) ?></div>
                     </div>
                     <div class="smaily-engine-trigger__controls">
                         <label class="smaily-engine-trigger__ctrl">
@@ -166,6 +169,43 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
             return invalid === 0;
         }
 
+        // After a save, every card shows the state the engine stored (§12),
+        // not the one requested: a trigger asking for real sends stays in
+        // test mode until Smaily switches them on (PRO-3734). Returns true
+        // when a trigger asked for real sends and the engine kept test mode.
+        var goLiveNote = '<?= $escaper->escapeJs(__('Smaily switches real sends on after you confirm. Until then the trigger runs in test mode.')) ?>',
+            pills = {
+                'off': '<?= $escaper->escapeJs(__('Off')) ?>',
+                'test': '<?= $escaper->escapeJs(__('Test mode')) ?>',
+                'active': '<?= $escaper->escapeJs(__('Active')) ?>'
+            };
+
+        function showStoredStates(states) {
+            var keptInTest = false;
+            $('#smaily-engine-automations-table .smaily-engine-trigger').each(function () {
+                var $card = $(this),
+                    state = states[$card.data('trigger')];
+                if (!state) {
+                    return;
+                }
+                var $enabled = $card.find('[data-field="enabled"]'),
+                    $testMode = $card.find('[data-field="test_mode"]'),
+                    mode = !state.enabled ? 'off' : (state.test_mode ? 'test' : 'active');
+                if ($enabled.is(':checked') && !$testMode.is(':checked') && mode === 'test') {
+                    keptInTest = true;
+                }
+                $enabled.prop('checked', state.enabled);
+                $testMode.prop('checked', state.test_mode);
+                $card.removeClass('is-off is-test is-active').addClass('is-' + mode);
+                $card.find('.smaily-pill')
+                    .removeClass('smaily-pill--off smaily-pill--test smaily-pill--active')
+                    .addClass('smaily-pill--' + mode)
+                    .contents().last().replaceWith(document.createTextNode(pills[mode]));
+                $card.find('.smaily-engine-trigger__hint').prop('hidden', mode === 'active');
+            });
+            return keptInTest;
+        }
+
         $('#smaily-engine-automations-save').on('click', function () {
             if (!validate()) {
                 $('#smaily-engine-automations-result')
@@ -204,7 +244,13 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
             }).then(function (response) { return response.json(); }).then(function (data) {
                 if (data.saved) {
                     clearValidation();
-                    $result.text('<?= $escaper->escapeJs(__('Saved.')) ?>').css('color', '#006400');
+                    var message = '<?= $escaper->escapeJs(__('Saved.')) ?>';
+                    if (!data.states) {
+                        message = '<?= $escaper->escapeJs(__('Saved. Reload the page to see the state of each trigger.')) ?>';
+                    } else if (showStoredStates(data.states)) {
+                        message += ' ' + goLiveNote;
+                    }
+                    $result.text(message).css('color', '#006400');
                 } else {
                     $result.text((data.errors || []).join(' ')
                         || '<?= $escaper->escapeJs(__('Saving failed.')) ?>').css('color', '#e22626');

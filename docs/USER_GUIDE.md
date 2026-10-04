@@ -800,8 +800,18 @@ The engine-run triggers live right under your regular automations on
 **Settings > Automations**, which lists the triggers available to your
 sector. Each row maps a trigger to a
 Smaily workflow with a cooldown, an optional daily cap and a **test mode**
-(on by default — fires reach only the listed test emails until you turn it
-off). Nothing is enabled without your explicit action.
+(on by default — fires reach only the listed test emails). Nothing is
+enabled without your explicit action.
+
+Going live: turning **Test mode** off and saving asks for real sends, but
+does not switch them on. Smaily switches real sends on after you confirm;
+until then the trigger stays in test mode, and each card says so. After a
+save, every card shows the state Campaign Intelligence stored — **Off**,
+**Test mode** or **Active** — so a trigger whose real sends are not on yet
+shows **Test mode** with its box ticked again. **Active** means real
+customers receive the emails. An **Active** trigger saved again with
+**Test mode** off stays active. Ticking **Test mode** or unticking
+**Enabled** takes effect at once; real sends then need Smaily again.
 
 ---
 

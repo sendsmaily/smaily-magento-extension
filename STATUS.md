@@ -5,7 +5,10 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-04 — 3.0.0-rc5 is prepared, not published (the
+_Last updated: 2026-10-04 — PRO-3734 lands on top of the rc5 cut and the
+PHP 8.1 fix (the Automations tab shows the engine's stored trigger state
+after a save; the CHANGELOG rc5 list has its bullet), so rc5 is built from
+the PRO-3734 commit, not from the fix commit. 3.0.0-rc5 is prepared, not published (the
 owner gave the go for an rc5 for the pilot today): the version is
 `3.0.0-rc5` (composer.json, `ModuleInfo::VERSION`, the ModuleVersion
 docblock, the upstream proposal; composer.lock content-hash refreshed, no
@@ -71,18 +74,41 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
-- **PRO-3734 — engine contract copy synced to engine main 32f6222
-  (2026-10-04; still v1.8.2, a clarification).** Byte-identical with engine
-  main (`bin/check-contract-staleness.sh` against the fetched copy: OK, md5
-  `36ebd8b9…`; the copy before was STALE). The only change is §13
-  (PRO-3705): a row with `enabled: true` + `test_mode: false` is stored
-  with `test_mode: true` unless the trigger already sends to real
-  customers — a Smaily operator switches real sends on in the engine admin
-  after the merchant's written yes; the response stays `200 {ok,
-  upserted}`, §12 returns the stored state, and every `enabled` /
+- **PRO-3734 — the Automations tab shows the engine's stored trigger
+  state after a save; the go-live step says Smaily switches real sends on
+  (2026-10-04; owner design via the orchestrator: as Woo PRO-3707, the
+  go-live control stays).** Contract copy synced byte-identically with
+  engine main 32f6222 (`bin/check-contract-staleness.sh` against the
+  fetched copy: OK, md5 `36ebd8b9…`; STALE before). Still v1.8.2, a
+  clarification: §13 (PRO-3705) stores a row with `enabled: true` +
+  `test_mode: false` with `test_mode: true` unless the trigger already
+  sends to real customers — a Smaily operator switches real sends on in
+  the engine admin after the merchant's written yes; the response stays
+  `200 {ok, upserted}`, §12 returns the stored state, every `enabled` /
   `test_mode` change is recorded engine-side. No new endpoint, field or
-  shape; no pending-request field. What the Automations tab shows after a
-  save follows in the next commit.
+  shape, and no pending-request field, so the tab shows none.
+  **Change:** `Automations\Save` reads §12 after a successful PUT and
+  answers `states` (each saved trigger's stored `enabled` / `test_mode`,
+  fail-closed defaults for a row the read lacks; `null` when the read
+  fails); the template redraws each card from it — pill (Off / Test mode /
+  Active), border, both checkboxes — and the result says *Saved.* plus the
+  go-live note when a trigger asked for real sends and was kept in test
+  mode, or *Saved. Reload the page…* when the read failed. Every card that
+  is not Active carries the note "Smaily switches real sends on after you
+  confirm. Until then the trigger runs in test mode." (EN + ET; the same
+  template serves Settings > Automations and the hidden system-config
+  group). Tests: `SaveTest` (kept in test mode while live was asked →
+  answers test; an operator-activated trigger stays active; read fails →
+  `states: null`; refused save reads nothing) — red without the change.
+  **Visual (sandbox, en_US + et_EE):** the real block rendered by Magento
+  in the adminhtml area (probe, read-only catalog + config GETs on the
+  live tenant; all four triggers Off) with the module CSS in headless
+  Chrome; the save's fetch was stubbed with an engine answer (nothing sent
+  to the engine): Replenishment due asked for real sends → pill TEST MODE,
+  Test mode ticked again, note shown, result "Saved. Smaily switches real
+  sends on…"; Post-purchase stored active → ACTIVE, note hidden; Off cards
+  unchanged with the note. Probe removed. USER_GUIDE (Engine automations
+  — going live), ARCHITECTURE, CHANGELOG (rc5 list).
 
 - **PRO-1967 simplification pass, behaviour-neutral (2026-10-04).** One
   `Model\Engine\CatalogProductLoader` loads the backfill page and the

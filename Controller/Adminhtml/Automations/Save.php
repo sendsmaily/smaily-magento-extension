@@ -25,6 +25,9 @@ use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 /**
  * Persists engine automation configuration (contract §13). Every row carries
  * all eight keys — no server-side defaults; validation is all-or-nothing.
+ * The engine may store a row differently from the request (a row asking for
+ * real sends stays in test mode until a Smaily operator switches them on), so
+ * the AJAX answer carries each trigger's stored state from §12.
  */
 class Save extends Action implements HttpPostActionInterface
 {
@@ -45,7 +48,8 @@ class Save extends Action implements HttpPostActionInterface
     public function execute(): Redirect|Json
     {
         $errors = [];
-        $saved = $this->save($errors);
+        $savedKeys = [];
+        $saved = $this->save($errors, $savedKeys);
 
         // Embedded config-page block saves via AJAX; plain form posts get a
         // redirect back with flash messages.
@@ -54,7 +58,12 @@ class Save extends Action implements HttpPostActionInterface
             /** @var Json $json */
             $json = $this->resultFactory->create(ResultFactory::TYPE_JSON);
 
-            return $json->setData(['saved' => $saved, 'errors' => $errors]);
+            $data = ['saved' => $saved, 'errors' => $errors];
+            if ($saved) {
+                $data['states'] = $this->storedStates($savedKeys);
+            }
+
+            return $json->setData($data);
         }
 
         /** @var Redirect $redirect */
@@ -65,8 +74,9 @@ class Save extends Action implements HttpPostActionInterface
 
     /**
      * @param string[] $errors collected error strings (also flashed)
+     * @param string[] $savedKeys the trigger keys sent to the engine
      */
-    private function save(array &$errors): bool
+    private function save(array &$errors, array &$savedKeys): bool
     {
         // The currently loadable Smaily workflow ids — a saved id absent here
         // was not offered in the dropdown, so the normalizer must not treat an
@@ -90,6 +100,7 @@ class Save extends Action implements HttpPostActionInterface
 
         try {
             $this->client->putAutomationsConfig($rows);
+            $savedKeys = array_map(static fn (array $row): string => (string)$row['trigger_key'], $rows);
             $this->messageManager->addSuccessMessage(
                 (string)__('%1 automation trigger(s) saved.', count($rows))
             );
@@ -116,6 +127,40 @@ class Save extends Action implements HttpPostActionInterface
         }
 
         return false;
+    }
+
+    /**
+     * Each saved trigger's state as the engine stored it (§12), with the
+     * page's fail-closed defaults for a row the read does not return. Null
+     * when the read fails — the screen then cannot tell what was stored.
+     *
+     * @param string[] $keys
+     * @return array<string, array{enabled: bool, test_mode: bool}>|null
+     */
+    private function storedStates(array $keys): ?array
+    {
+        try {
+            $config = $this->client->getAutomationsConfig();
+        } catch (EngineException) {
+            return null;
+        }
+
+        $stored = [];
+        foreach ((array)($config['configs'] ?? []) as $row) {
+            if (is_array($row) && isset($row['trigger_key'])) {
+                $stored[(string)$row['trigger_key']] = $row;
+            }
+        }
+
+        $states = [];
+        foreach ($keys as $key) {
+            $states[$key] = [
+                'enabled' => (bool)($stored[$key]['enabled'] ?? false),
+                'test_mode' => (bool)($stored[$key]['test_mode'] ?? true),
+            ];
+        }
+
+        return $states;
     }
 
     /**

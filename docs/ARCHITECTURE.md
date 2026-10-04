@@ -164,13 +164,19 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   rows go out in the same run, so the ~1–2 min latency holds; the build reads
   the committed state at flush time, so it can never be older than the change
   that queued the marker. The rows are built in the cron context, as the
-  backfill and nightly re-sync rows are: what the builder reads off the
-  running context — the area in a placeholder `image_url`, the theme behind
-  an image's cache path, and, with Use Web Server Rewrites off, the script
-  name in `product_url` — now matches those rows, not what the store request
-  that changed the stock would have built. Category, parent and website lookups are memoized
-  across the batch; the frontend emulation for each product URL stays per
-  product and store (PRO-1458 — Magento allows one emulation level, so one
+  backfill and nightly re-sync rows are, and the running context does not
+  change a row (PRO-3731): `CatalogPayloadBuilder` reads `image_url` under
+  the frontend emulation of the store the product is priced at, so the image
+  size and the placeholder come from that store's storefront theme, never
+  from the running area (cron's `crontab` area has no theme, and the admin's
+  is the admin theme — both gave a placeholder link that does not open, also
+  for a product with an image). With Use Web Server Rewrites off, Magento
+  adds the running script's name to each link (`Store::_updatePathUseRewrites()`
+  — `magento` under bin/magento), which the emulation does not change;
+  `productUrl()` puts the storefront's `index.php` in its place. Category,
+  parent and website lookups are memoized across the batch; the frontend
+  emulations for a product's URL and image link stay per product and store,
+  one after the other (PRO-1458 — Magento allows one emulation level, so one
   emulation per batch cannot serve a product priced on another website).
   Markers are never collapsed at insert time: a marker skipped because one
   for the product was already queued could be built before the skipping

@@ -5,7 +5,9 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-03 — 3.0.0-rc4 is released as a GitHub pre-release on
+_Last updated: 2026-10-04 — the catalog's image and product links are
+right in background builds (PRO-3731, below); unreleased, the pilot stays
+on rc4 until the owner's go for an rc5. 2026-10-03 — 3.0.0-rc4 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc4),
 built by the release workflow from commit 5684a1c; the ZIP and its .sha256
 were checked after publishing (377 entries, checksum OK, file contents
@@ -53,6 +55,43 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3731 — catalog image and product links built in cron, CLI and the
+  admin are the storefront's (2026-10-04; found during PRO-1967;
+  unreleased, the pilot stays on rc4).** Reproduced on the sandbox (Luma,
+  et_EE, rewrites off), building through the backfill page loader (=
+  nightly re-sync) and the PRO-1967 `buildChanged()` loader by reflection
+  in the crontab area under a script named `magento`, nothing queued or
+  sent (queue empty after). **Red:** a product WITH an image (24-MB01)
+  and one without (24-MB04, image roles set to `no_selection`
+  temporarily) both got
+  `static/…/crontab/_view/et_EE/Magento_Catalog/images/product/placeholder/.jpg`
+  (HTTP 404) — the crontab area has no theme, so the
+  `product_page_image_large` id is unknown; the same old code under the
+  admin theme gave `…/adminhtml/Magento/backend/…/placeholder/.jpg`, so
+  admin product saves sent it too. `product_url` was
+  `http://localhost:8080/magento/joust-duffle-bag.html` (404). Storefront
+  reference (the product page): image
+  `media/catalog/product/cache/74c1057f…/m/b/mb01-blue-0.jpg` (200
+  image/jpeg), placeholder `…/frontend/Magento/luma/et_EE/…/placeholder/image.jpg`
+  (200 image/jpeg), link `/index.php/joust-duffle-bag.html` (200).
+  **Fix:** `CatalogPayloadBuilder::imageUrl()` runs under frontend emulation
+  of the product's price/link store (its own start/stop after
+  `productUrl()`'s, never nested; PRO-1458 pricing unchanged, it is read
+  outside both); `productUrl()` puts `index.php` where Magento put another
+  running script's name (`withStorefrontScript()`: only when the request's
+  `SCRIPT_FILENAME` is not index.php and the store's direct-link base ends
+  in that name, secure or not). **Green:** both loaders give the storefront
+  reference exactly for both products, rewrites off and on (on:
+  `/joust-duffle-bag.html`, as the storefront links), and the same payload
+  sha per product from both loaders. A 100-product page builds in
+  130–137 ms after vs 132–137 ms before. Sandbox restored (image rows,
+  `web/seo/use_rewrites` row removed again, FPC cleaned). Tests: image link
+  read inside its own emulation of the product's store; rewrites off under
+  bin/magento → index.php; rewrites on and a web request unchanged; the
+  three PRO-1458 emulation tests now expect two emulations. ARCHITECTURE,
+  CHANGELOG. Not covered: a store whose storefront entry script is not
+  index.php.
+
 - **PRO-1967 — stock hooks no longer build catalog rows inside the stock
   write's transaction (2026-10-04; owner design 2026-10-04; unreleased, the
   pilot stays on rc4).** The legacy stock observer and both MSI plugins now
@@ -88,8 +127,8 @@ Earlier: 2026-09-11, 2026-09-10._
   sandbox has no image files), and with Use Web Server Rewrites off
   (sandbox: off) `product_url` carries the script name
   (`/magento/x.html` under `bin/magento`, vs `/index.php/x.html` in a web
-  request) — the per-product frontend emulation fixes neither. Follow-up
-  filed for the orchestrator; worth fixing before the next rc. PRO-1951 scenarios
+  request) — the per-product frontend emulation fixes neither. Fixed by
+  PRO-3731 (above; a real image got a broken placeholder too). PRO-1951 scenarios
   re-run through the legacy stock API: sell-out, restock = exactly one
   catalog row each with the right `in_stock`, disconnected = none; product
   rename = one row (before and after); shipping the last unit = one row,
@@ -1321,8 +1360,18 @@ Earlier: 2026-09-11, 2026-09-10._
   in-process instance — nothing stored). Fixes PRO-3603 findings 1, 5
   and 6.
 
-- **Next session opens here (2026-10-03).** 3.0.0-rc4 is out (header) —
-  the pilot installs rc4. Done 2026-10-02/03: headless storefronts + the
+- **Next session opens here (2026-10-04).** 3.0.0-rc4 is the pilot's
+  build (header). Done 2026-10-04, unreleased: PRO-3559 (phpstan on a
+  default local PHP), PRO-2477 (translation and doc leftovers), PRO-3713
+  (spike, abandoned-cart scan on very large cart tables), PRO-1967 (stock
+  hooks queue a marker; the flusher builds the rows), PRO-3731 (catalog
+  image and product links built in cron, CLI and the admin are the
+  storefront's). **An rc5 for the pilot awaits the owner's go** — it would
+  carry PRO-1967 and PRO-3731 (the pilot's first catalog import is built in
+  cron, so PRO-3731 matters to it). Open queue: the PRO-1967
+  simplification pass, PRO-3730 (abandoned-cart scan on busy stores),
+  PRO-3729 (low wording leftovers). Done 2026-10-02/03: headless
+  storefronts + the
   Storefront URL (PRO-3614/3660), browse consent as in Woo and per website
   (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the standard
   checkout + one reminder per address a day + erase stops reminders + busy
@@ -1336,13 +1385,14 @@ Earlier: 2026-09-11, 2026-09-10._
   Storefront URL, walks PILOT_CHECKLIST.md; human acceptance of PRO-2474 and
   PRO-3660 (a recommendation and a back-in-stock link open on the
   storefront), plus one look at a configurable product's category and
-  price in the engine; (2) HC Pro (legacy 2.x upgrade, 4 websites, one
+  price in the engine, and one look that a catalog entry's image opens
+  (PRO-3731); (2) HC Pro (legacy 2.x upgrade, 4 websites, one
   Smaily account): Erkki reads their 2.x settings with the UPGRADING
   checklist (PRO-3661), the Mageplaza live checks (PRO-3663), the
   other-abandoned-cart-senders check (PRO-3665), the Campaign Intelligence
-  questions (spike PRO-3662); (3) open backlog: PRO-3713 (spike, cart scan on
-  millions of carts), PRO-3675 (live Hyvä check), PRO-1357,
-  PRO-1198 (Smaily hand-over); PRO-1967 is done since (unreleased). Erkki still proofreads the Estonian strings
+  questions (spike PRO-3662); (3) open backlog: the queue above, PRO-3675
+  (live Hyvä check), PRO-1357, PRO-1198 (Smaily hand-over). Erkki still
+  proofreads the Estonian strings
   added 2026-10-02/03. Sandbox: remove finished agent worktrees under
   `.claude/worktrees` before any sandbox `setup:di:compile`.
 

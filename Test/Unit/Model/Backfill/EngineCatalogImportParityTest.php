@@ -23,6 +23,7 @@ use Magento\CatalogInventory\Api\Data\StockItemInterface;
 use Magento\CatalogInventory\Api\StockRegistryInterface;
 use Magento\CatalogInventory\Model\StockRegistryStorage;
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\App\Request\Http;
 use Magento\Framework\App\ScopeInterface;
 use Magento\Framework\App\ScopeResolverInterface;
 use Magento\Framework\Locale\ResolverInterface;
@@ -314,7 +315,8 @@ class EngineCatalogImportParityTest extends TestCase
             $this->createMock(LanguageResolver::class),
             $parentResolver,
             $this->createMock(Emulation::class),
-            new StorefrontUrl($this->createMock(Config::class))
+            new StorefrontUrl($this->createMock(Config::class)),
+            $this->createMock(Http::class)
         );
     }
 

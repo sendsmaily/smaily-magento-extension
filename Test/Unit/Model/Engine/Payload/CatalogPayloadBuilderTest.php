@@ -18,9 +18,11 @@ use Magento\CatalogInventory\Api\Data\StockItemInterface;
 use Magento\CatalogInventory\Api\StockRegistryInterface;
 use Magento\CatalogInventory\Model\StockRegistryStorage;
 use Magento\Framework\App\Area;
+use Magento\Framework\App\Request\Http;
 use Magento\Framework\Pricing\Amount\AmountInterface;
 use Magento\Framework\Pricing\Price\PriceInterface;
 use Magento\Framework\Pricing\PriceInfoInterface;
+use Magento\Framework\UrlInterface;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\App\Emulation;
 use Magento\Store\Model\Store;
@@ -83,15 +85,16 @@ class CatalogPayloadBuilderTest extends TestCase
      * PRO-1269: product_url must be generated under frontend store emulation
      * so it is the clean storefront URL in any execution context (web/CLI/
      * cron) — never one embedding the invoking PHP entry script path. The
-     * emulation is forced to the frontend area and always stopped.
+     * emulation is forced to the frontend area and always stopped (once for
+     * the product link, once for the image link — PRO-3731).
      */
     public function testProductUrlIsBuiltUnderFrontendStoreEmulation(): void
     {
         $emulation = $this->createMock(Emulation::class);
-        $emulation->expects(self::once())
+        $emulation->expects(self::exactly(2))
             ->method('startEnvironmentEmulation')
             ->with(self::anything(), Area::AREA_FRONTEND, true);
-        $emulation->expects(self::once())->method('stopEnvironmentEmulation');
+        $emulation->expects(self::exactly(2))->method('stopEnvironmentEmulation');
 
         $builder = $this->createBuilder('42', $emulation);
 
@@ -179,7 +182,8 @@ class CatalogPayloadBuilderTest extends TestCase
             $this->createMock(LanguageResolver::class),
             $parentResolver,
             $this->createMock(Emulation::class),
-            $this->storefrontUrl('')
+            $this->storefrontUrl(''),
+            $this->createMock(Http::class)
         );
 
         $item = $builder->build($loadedProduct);
@@ -226,7 +230,8 @@ class CatalogPayloadBuilderTest extends TestCase
             $this->createMock(LanguageResolver::class),
             $parentResolver,
             $this->createMock(Emulation::class),
-            $this->storefrontUrl('')
+            $this->storefrontUrl(''),
+            $this->createMock(Http::class)
         );
 
         $item = $builder->build($product);
@@ -321,7 +326,7 @@ class CatalogPayloadBuilderTest extends TestCase
             ->willReturn($scopedProduct);
 
         $emulation = $this->createMock(Emulation::class);
-        $emulation->expects(self::once())
+        $emulation->expects(self::exactly(2)) // the product link and the image link
             ->method('startEnvironmentEmulation')
             ->with(7, Area::AREA_FRONTEND, true);
 
@@ -349,7 +354,7 @@ class CatalogPayloadBuilderTest extends TestCase
         $productRepository->expects(self::never())->method('getById');
 
         $emulation = $this->createMock(Emulation::class);
-        $emulation->expects(self::once())
+        $emulation->expects(self::exactly(2)) // the product link and the image link
             ->method('startEnvironmentEmulation')
             ->with(1, Area::AREA_FRONTEND, true);
 
@@ -372,7 +377,7 @@ class CatalogPayloadBuilderTest extends TestCase
         $product->method('getStoreId')->willReturn(1);
 
         $emulation = $this->createMock(Emulation::class);
-        $emulation->expects(self::once())
+        $emulation->expects(self::exactly(2)) // the product link and the image link
             ->method('startEnvironmentEmulation')
             ->with(1, Area::AREA_FRONTEND, true);
 
@@ -380,6 +385,109 @@ class CatalogPayloadBuilderTest extends TestCase
 
         self::assertSame('SHIRT', $item['sku']);
         self::assertSame(19.99, $item['price']);
+    }
+
+    /**
+     * PRO-3731: the image link is read under the frontend emulation of the
+     * store the product is priced and linked at, so it is the storefront
+     * theme's image (or placeholder), never one of the running area's
+     * (crontab under cron, adminhtml in the admin). Each emulation is stopped
+     * before the next starts: Magento allows one level.
+     */
+    public function testImageLinkIsBuiltUnderFrontendEmulationOfTheProductsStore(): void
+    {
+        $websiteStore = $this->createMock(Store::class);
+        $websiteStore->method('getId')->willReturn(7);
+        $website = $this->createMock(Website::class);
+        $website->method('getDefaultStore')->willReturn($websiteStore);
+        $storeManager = $this->canonicalStoreManager();
+        $storeManager->method('getWebsite')->with(2)->willReturn($website);
+
+        $loadedProduct = $this->product(42, 'SHIRT', 19.99, [2]);
+        $loadedProduct->method('getStoreId')->willReturn(1);
+        $scopedProduct = $this->product(42, 'SHIRT', 29.99, [2]);
+        $scopedProduct->method('getStoreId')->willReturn(7);
+        $productRepository = $this->createMock(ProductRepositoryInterface::class);
+        $productRepository->method('getById')->willReturn($scopedProduct);
+
+        $events = [];
+        $emulation = $this->createMock(Emulation::class);
+        $emulation->method('startEnvironmentEmulation')->willReturnCallback(
+            static function (int $storeId, string $area, bool $force) use (&$events): void {
+                $events[] = sprintf('start %d %s%s', $storeId, $area, $force ? ' forced' : '');
+            }
+        );
+        $emulation->method('stopEnvironmentEmulation')->willReturnCallback(
+            static function () use (&$events, $emulation): Emulation {
+                $events[] = 'stop';
+
+                return $emulation;
+            }
+        );
+        $helper = $this->createMock(ImageHelper::class);
+        $helper->method('init')->willReturnSelf();
+        $helper->method('getUrl')->willReturnCallback(static function () use (&$events): string {
+            $events[] = 'image';
+
+            return self::IMAGE_URL;
+        });
+        $imageHelperFactory = $this->createMock(ImageHelperFactory::class);
+        $imageHelperFactory->method('create')->willReturn($helper);
+
+        $item = $this->createBuilder(
+            '42',
+            $emulation,
+            $storeManager,
+            null,
+            $productRepository,
+            imageHelperFactory: $imageHelperFactory
+        )->build($loadedProduct);
+
+        self::assertSame(self::IMAGE_URL, $item['image_url']);
+        self::assertSame(
+            ['start 7 frontend forced', 'stop', 'start 7 frontend forced', 'image', 'stop'],
+            $events
+        );
+    }
+
+    /**
+     * PRO-3731: with web server rewrites off, Magento puts the running
+     * script's name in each link — `magento` under bin/magento, where cron
+     * builds the catalog import, the nightly re-sync and stock changes — and
+     * that link does not open. The storefront's script is index.php, so it
+     * takes that name's place.
+     */
+    public function testWithRewritesOffALinkBuiltUnderBinMagentoNamesTheStorefrontsIndexPhp(): void
+    {
+        $item = $this->createBuilder(
+            '42',
+            storeManager: $this->storeManagerWithLinkBase('http://shop.example/magento/'),
+            request: $this->request('/var/www/html/bin/magento')
+        )->build($this->product(42, 'SHIRT', productUrl: 'http://shop.example/magento/shirt.html?a=1'));
+
+        self::assertSame('http://shop.example/index.php/shirt.html?a=1', $item['product_url']);
+    }
+
+    public function testWithRewritesOnALinkBuiltUnderBinMagentoIsUnchanged(): void
+    {
+        $item = $this->createBuilder(
+            '42',
+            storeManager: $this->storeManagerWithLinkBase('http://shop.example/'),
+            request: $this->request('/var/www/html/bin/magento')
+        )->build($this->product(42, 'SHIRT', productUrl: 'http://shop.example/magento/shirt.html'));
+
+        self::assertSame('http://shop.example/magento/shirt.html', $item['product_url']);
+    }
+
+    public function testWithRewritesOffALinkBuiltInAWebRequestIsUnchanged(): void
+    {
+        $item = $this->createBuilder(
+            '42',
+            storeManager: $this->storeManagerWithLinkBase('http://shop.example/index.php/'),
+            request: $this->request('/var/www/html/pub/index.php')
+        )->build($this->product(42, 'SHIRT', productUrl: 'http://shop.example/index.php/shirt.html'));
+
+        self::assertSame('http://shop.example/index.php/shirt.html', $item['product_url']);
     }
 
     /**
@@ -517,6 +625,31 @@ class CatalogPayloadBuilderTest extends TestCase
     }
 
     /**
+     * The canonical store manager whose stores' link base (no store code)
+     * is $linkBase, secure and not.
+     */
+    private function storeManagerWithLinkBase(string $linkBase): StoreManagerInterface&MockObject
+    {
+        $store = $this->createMock(Store::class);
+        $store->method('getBaseUrl')->willReturnCallback(
+            static fn (string $type = UrlInterface::URL_TYPE_LINK, $secure = null): string =>
+                $type === UrlInterface::URL_TYPE_DIRECT_LINK ? $linkBase : 'http://shop.example/'
+        );
+        $storeManager = $this->canonicalStoreManager();
+        $storeManager->method('getStore')->willReturn($store);
+
+        return $storeManager;
+    }
+
+    private function request(string $scriptFilename): Http&MockObject
+    {
+        $request = $this->createMock(Http::class);
+        $request->method('getServerValue')->with('SCRIPT_FILENAME')->willReturn($scriptFilename);
+
+        return $request;
+    }
+
+    /**
      * @param int[] $parentCategoryIds what the resolver answers for the parent's category ids
      */
     private function createBuilder(
@@ -528,7 +661,8 @@ class CatalogPayloadBuilderTest extends TestCase
         ?CategoryRepositoryInterface $categoryRepository = null,
         string $storefrontUrl = '',
         ?ImageHelperFactory $imageHelperFactory = null,
-        array $parentCategoryIds = []
+        array $parentCategoryIds = [],
+        ?Http $request = null
     ): CatalogPayloadBuilder {
         $parentResolver = $this->createMock(ParentProductResolver::class);
         $parentResolver->method('productIdOf')->with(42)->willReturn($resolvedProductId);
@@ -554,7 +688,8 @@ class CatalogPayloadBuilderTest extends TestCase
             $this->createMock(LanguageResolver::class),
             $parentResolver,
             $emulation ?? $this->createMock(Emulation::class),
-            $this->storefrontUrl($storefrontUrl)
+            $this->storefrontUrl($storefrontUrl),
+            $request ?? $this->createMock(Http::class)
         );
     }
 

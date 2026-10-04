@@ -7,6 +7,7 @@ The package version is currently `3.0.0-rc4` — the fourth release-candidate cu
 **Changes since 3.0.0-rc4**
 
 - A stock change no longer builds the product's Campaign Intelligence catalog entry inside the shipment, credit memo, order or inventory save that made it: the save records which products changed (one lookup and one insert, however many lines or products), and the catalog sync builds and sends their entries within the next minute, as before. A shipment of many lines and a bulk inventory update finish faster. What is sent is unchanged; in the Log, a stock change shows as a waiting *catalog_changed* row until its *catalog* row replaces it, and several stock changes of one product within a minute send one catalog row.
+- Image and product links in the catalog sent to Campaign Intelligence open on the storefront. The catalog import, the nightly catalog re-sync and a product save in the admin sent each product's image link as a placeholder link that did not open, also for a product with an image; a product now gets the image its storefront shows, and a product without an image the storefront's placeholder image. On a store with *Use Web Server Rewrites* off, the product link from the catalog import and the nightly re-sync had `magento` in place of the storefront's `index.php` and did not open; it is now the storefront's link. The nightly catalog re-sync corrects the entries already sent; a catalog import corrects them at once.
 
 **Changes since 3.0.0-rc3**
 

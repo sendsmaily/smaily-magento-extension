@@ -18,7 +18,9 @@ use Magento\Catalog\Model\Product\Visibility;
 use Magento\CatalogInventory\Api\StockRegistryInterface;
 use Magento\CatalogInventory\Model\StockRegistryStorage;
 use Magento\Framework\App\Area;
+use Magento\Framework\App\Request\Http;
 use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Framework\UrlInterface;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\App\Emulation;
 use Magento\Store\Model\Store;
@@ -82,7 +84,8 @@ class CatalogPayloadBuilder
         private readonly LanguageResolver $languageResolver,
         private readonly ParentProductResolver $parentProductResolver,
         private readonly Emulation $emulation,
-        private readonly StorefrontUrl $storefrontUrl
+        private readonly StorefrontUrl $storefrontUrl,
+        private readonly Http $request
     ) {
     }
 
@@ -147,7 +150,7 @@ class CatalogPayloadBuilder
             $item['description'] = $languageValues['description'];
         }
 
-        $imageUrl = $this->imageUrl($product);
+        $imageUrl = $this->imageUrl($product, $scopeStoreId);
         if ($imageUrl !== null) {
             $item['image_url'] = $imageUrl;
         }
@@ -274,6 +277,10 @@ class CatalogPayloadBuilder
      * canonical-scoped product would keep emitting the canonical store's
      * link no matter which store is emulated around it (PRO-1458).
      *
+     * Emulation does not change the running script, though: with web server
+     * rewrites off, Magento puts its name in the link — see
+     * withStorefrontScript() (PRO-3731).
+     *
      * A store with a separate storefront gets the link on the storefront's
      * address (PRO-3660).
      */
@@ -286,7 +293,38 @@ class CatalogPayloadBuilder
             $this->emulation->stopEnvironmentEmulation();
         }
 
-        return $this->storefrontUrl->apply($url, $storeId);
+        return $this->storefrontUrl->apply($this->withStorefrontScript($url, $storeId), $storeId);
+    }
+
+    /**
+     * With web server rewrites off, Magento adds the running script's name
+     * to every link (`Store::_updatePathUseRewrites()`): `index.php` in a
+     * storefront, admin or API request, but `magento` under bin/magento —
+     * where cron builds the catalog import, the nightly re-sync and stock
+     * changes — and that link does not open. The storefront's script is
+     * index.php, so a link built under another script name gets index.php
+     * in its place (PRO-3731). With rewrites on, the store's link base has
+     * no script name and the link is left as it is.
+     */
+    private function withStorefrontScript(string $url, int $storeId): string
+    {
+        $script = ltrim((string)strrchr('/' . (string)$this->request->getServerValue('SCRIPT_FILENAME'), '/'), '/');
+        if ($script === '' || $script === 'index.php') {
+            return $url;
+        }
+
+        $store = $this->storeManager->getStore($storeId);
+        if (!$store instanceof Store) {
+            return $url;
+        }
+        foreach ([false, true] as $secure) {
+            $base = $store->getBaseUrl(UrlInterface::URL_TYPE_DIRECT_LINK, $secure);
+            if (str_ends_with($base, '/' . $script . '/') && str_starts_with($url, $base)) {
+                return substr($base, 0, -strlen($script . '/')) . 'index.php/' . substr($url, strlen($base));
+            }
+        }
+
+        return $url;
     }
 
     /**
@@ -505,8 +543,19 @@ class CatalogPayloadBuilder
         }
     }
 
-    private function imageUrl(Product $product): ?string
+    /**
+     * The product page's large image, as the storefront of `$storeId` shows
+     * it (PRO-3731). The image size comes from the theme in effect and a
+     * placeholder's path names the area, so outside frontend emulation a
+     * cron build asked the crontab area — which has no theme — and got a
+     * placeholder that does not open, even for a product with an image (a
+     * save in the admin got the same from the admin theme). A separate
+     * emulation from productUrl()'s, never nested in it: Magento allows one
+     * level.
+     */
+    private function imageUrl(Product $product, int $storeId): ?string
     {
+        $this->emulation->startEnvironmentEmulation($storeId, Area::AREA_FRONTEND, true);
         try {
             $url = $this->imageHelperFactory->create()
                 ->init($product, 'product_page_image_large')
@@ -515,6 +564,8 @@ class CatalogPayloadBuilder
             return $url !== '' ? $url : null;
         } catch (\Throwable) {
             return null;
+        } finally {
+            $this->emulation->stopEnvironmentEmulation();
         }
     }
 

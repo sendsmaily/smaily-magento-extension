@@ -119,8 +119,9 @@ bin/magento cron:run --group smaily_connect
 - In the admin, **Marketing > Smaily Connect** has four entries:
   **Dashboard**, **Initial setup**, **Settings**, **Log**. Log out and in
   again if the menu does not show yet.
-- A system message "Smaily Connect is ready to set up" appears in the
-  admin notifications. Finishing the initial setup marks it as read.
+- A notice "Smaily Connect is ready to set up" appears in the admin
+  notifications (the bell at the top of every admin page), not under
+  System Messages. Finishing the initial setup marks it as read.
 - On a fresh install every Smaily Connect page opens **Initial setup**
   until it is completed once. Continue with
   [Connecting your Smaily account](USER_GUIDE.md#connecting-your-smaily-account).

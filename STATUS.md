@@ -8,8 +8,9 @@
 _Last updated: 2026-10-04 — after 3.0.0-rc5, PRO-3735 (CI parses every
 PHP and PHTML file on PHP 8.1), PRO-3733 (a command-line Campaign
 Intelligence connection sends the storefront's site address), PRO-3729 and
-PRO-3737 (admin target spec wording) and PRO-3736 (a browser harness for the
-Automations tab's save result) landed on v3, unreleased; CHANGELOG's
+PRO-3737 (admin target spec wording), PRO-3736 (a browser harness for the
+Automations tab's save result) and PRO-3739 (the rc5 ZIP installed on a
+clean store by docs/INSTALLING.md; one wording fix) landed on v3, unreleased; CHANGELOG's
 "Changes since 3.0.0-rc5" has PRO-3733, the others change nothing a merchant
 sees. 3.0.0-rc5 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc5),
@@ -82,6 +83,33 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3739 — the rc5 package installs on a clean store by the install
+  guide (2026-10-04; docs only, no CHANGELOG bullet).** The ZIP and its
+  .sha256 were downloaded from the 3.0.0-rc5 GitHub release (`shasum -a
+  256 -c` OK on macOS, `sha256sum -c` OK in the container) and installed
+  into a real `app/code` on a fresh Magento 2.4.8-p4 without sample data,
+  in production mode, on a separate temporary compose project (own name,
+  containers, volumes, ports; sandbox image; no working-tree mount — the
+  sandbox stayed untouched and Up), following `docs/INSTALLING.md` step by
+  step: extract (the guide's `mkdir -p` creates `app/code`), the production
+  sequence with `setup:static-content:deploy en_US et_EE`, `crontab -l` /
+  `cron:install` (the cron package installed in the temporary container
+  first), module enabled, six `smaily_*` tables, the "ready to set up"
+  notice, four menu entries. `cron:run --group smaily_connect` returns at
+  once and runs the group in its own process: all eight `smaily_*` jobs
+  finished `success` without a Smaily or engine connection (the two daily
+  jobs queued by hand), plus one plain `cron:run`; no `exception.log`, no
+  `var/report`, no Smaily_Connect line in `system.log`. Initial setup opens
+  from every module page; step 1 refuses Continue without a tested
+  connection (no request leaves the store). Dashboard, Settings (all five
+  tabs) and Log were opened with `setup_completed` set in the database:
+  no console errors, Not connected everywhere. The update section (fresh
+  extraction, the step 3 commands, second `setup:upgrade`) passed; settings
+  and tables kept, the Dashboard opens. One guide fix: the setup notice is
+  in the admin notifications (the bell), not under System Messages, as
+  step 5 implied. TESTING.md records the run. Stack removed afterwards
+  (`down -v`).
 
 - **PRO-3736 — a browser harness checks the Automations tab's save result
   (2026-10-04; tooling, no CHANGELOG bullet).** PRO-3734's save result had
@@ -1580,7 +1608,8 @@ Earlier: 2026-09-11, 2026-09-10._
   the pilot's first catalog import is built in cron, so PRO-3731 matters
   to it. Done 2026-10-04 after rc5, unreleased on v3: PRO-3735 (CI PHP 8.1
   syntax check), PRO-3733 (CLI site address), PRO-3729 and PRO-3737
-  (target spec wording), PRO-3736 (admin browser harness). Done
+  (target spec wording), PRO-3736 (admin browser harness), PRO-3739
+  (rc5 clean install by the guide passed; one wording fix). Done
   2026-10-02/03: headless storefronts + the
   Storefront URL (PRO-3614/3660), browse consent as in Woo and per website
   (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the standard

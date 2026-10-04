@@ -178,6 +178,34 @@ class AbandonedCartTest extends IntegrationTestCase
         );
     }
 
+    /**
+     * PRO-3730: the page holds the oldest carts by id, whatever order they
+     * were last changed in — a newer cart changed earlier waits for the next
+     * run, as before the scan stopped walking the whole cart table.
+     */
+    public function testThePageHoldsTheOldestCartsByIdWhateverOrderTheyChangedIn(): void
+    {
+        $rows = [];
+        for ($quoteId = 1; $quoteId <= 101; $quoteId++) {
+            $rows[] = [
+                'entity_id' => $quoteId,
+                'store_id' => 1,
+                'is_active' => 1,
+                'items_count' => 1,
+                'customer_email' => 'cart-' . $quoteId . '@example.com',
+                'updated_at' => $this->clockDate(-3600 - $quoteId * 60),
+            ];
+        }
+        $this->connection->insertMultiple('quote', $rows);
+
+        $this->cron()->execute();
+
+        self::assertSame(
+            range(1, 100),
+            array_map('intval', array_column($this->fetchAll(self::CART_TABLE, 'quote_id'), 'quote_id'))
+        );
+    }
+
     private function cron(): AbandonedCart
     {
         $store = $this->createMock(Store::class);

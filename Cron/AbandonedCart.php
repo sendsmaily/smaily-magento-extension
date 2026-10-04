@@ -101,8 +101,15 @@ class AbandonedCart
             ->addFieldToFilter('main_table.items_count', ['gt' => 0])
             ->addFieldToFilter('main_table.store_id', ['in' => $storeIds])
             ->addFieldToFilter('main_table.updated_at', ['from' => $maxAge, 'to' => $idleSince])
-            ->setOrder('entity_id', 'ASC')
             ->setPageSize(self::BATCH_SIZE);
+        // Oldest cart id first, as an expression (PRO-3730): ordered by the
+        // bare column, MySQL walks the primary key in id order from the
+        // store's first cart once more than a few thousand carts changed in
+        // the window — on a store that keeps old carts, the whole table
+        // (3M rows, ~1.8 s per website per run). An expression cannot be read
+        // from an index, so MySQL reads only the window through Magento's
+        // store_id/updated_at index and sorts it. Same order, same carts.
+        $collection->getSelect()->order(new \Zend_Db_Expr('main_table.entity_id + 0 ASC'));
 
         // Magento fills quote.customer_email only once payment info is
         // submitted; on its own checkout the checkout email field puts a

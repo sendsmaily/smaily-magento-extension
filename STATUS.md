@@ -5,10 +5,12 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-04 — the abandoned-cart reminder's cart and store
-links open with web server rewrites off (PRO-3732, below); the catalog's
-image and product links are right in background builds (PRO-3731, below);
-both unreleased, the pilot stays on rc4 until the owner's go for an rc5. 2026-10-03 — 3.0.0-rc4 is released as a GitHub pre-release on
+_Last updated: 2026-10-04 — the abandoned-cart scan reads only the carts
+changed in 24 h on a busy store that keeps old carts (PRO-3730, below); the
+abandoned-cart reminder's cart and store links open with web server
+rewrites off (PRO-3732, below); the catalog's image and product links are
+right in background builds (PRO-3731, below); all unreleased, the pilot
+stays on rc4 until the owner's go for an rc5. 2026-10-03 — 3.0.0-rc4 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc4),
 built by the release workflow from commit 5684a1c; the ZIP and its .sha256
 were checked after publishing (377 entries, checksum OK, file contents
@@ -55,6 +57,36 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3730 — the abandoned-cart scan reads only the window on a busy
+  store that keeps old carts (2026-10-04; measured in spike PRO-3713; owner
+  decision via the orchestrator: keep the id order).** The scan's page is
+  ordered by `main_table.entity_id + 0` instead of `entity_id`
+  (`Cron\AbandonedCart`, one line): an expression cannot be read from an
+  index, so MySQL and MariaDB no longer walk the primary key in id order,
+  and the order — so the page of 100 — is the same. An index hint
+  (`IGNORE INDEX FOR ORDER BY (PRIMARY)`) measures the same but
+  `Zend_Db_Select` cannot place it after the table alias (Magento core
+  str_replaces the SQL string for that). **Evidence** — the SQL the code
+  emits, captured from the integration run (general log) with the window
+  set to the dataset's 24 h, on the PRO-3713 synthetic 3M carts (throwaway
+  MySQL 8.4 `pro3730-mysql`, removed): **60k window** (58,868 carts changed in
+  the 24 h), one store view: before 3,068,044 rows examined, 1.80–1.88 s
+  (Index scan on PRIMARY, 3.06M rows); after 59,435 rows, 51–54 ms (range
+  on QUOTE_STORE_ID_UPDATED_AT, 32,422 rows, sort 16,969); a website of all
+  four store views (the whole window): before 3,076,353 / 1.88 s, after
+  108,204 rows examined / 96–99 ms — the cart table reads exactly the
+  58,868 window rows, the rest are the address and tracker lookups per
+  cart. **Normal store, ~3k window** (3,255): before and after the same plan
+  and rows (4,832 one store, 8,881 four stores; 3.5–7 ms); one of five
+  before-runs right after ANALYZE walked the table (3,002,124 rows,
+  1.8 s), the after-runs never did. **MariaDB 10.6.28**, same data: the old
+  SQL walks PRIMARY at 60k too (3,059,724 rows read, 1.88 s); the new reads
+  the range (34,146 + 42,291 handler reads, 59 ms; four stores 108 ms); the
+  3k window unchanged (6 ms). Reminder rules: the PRO-3711/PRO-3693
+  integration scenarios pass unchanged, plus a new one — 101 idle carts
+  whose last changes run opposite to their ids: the page holds carts 1–100
+  (it would not under an updated_at order). ARCHITECTURE, CHANGELOG.
 
 - **PRO-3732 — the abandoned-cart reminder's cart link opens with web
   server rewrites off (2026-10-04; found during PRO-3731; unreleased, the
@@ -1399,11 +1431,12 @@ Earlier: 2026-09-11, 2026-09-10._
   hooks queue a marker; the flusher builds the rows), PRO-3731 (catalog
   image and product links built in cron, CLI and the admin are the
   storefront's), PRO-3732 (the abandoned-cart cart link opens with web
-  server rewrites off). **An rc5 for the pilot awaits the owner's go** — it
-  would carry PRO-1967, PRO-3731 and PRO-3732 (the pilot's first catalog
-  import is built in cron, so PRO-3731 matters to it). Open queue: the PRO-1967
-  simplification pass, PRO-3730 (abandoned-cart scan on busy stores),
-  PRO-3729 (low wording leftovers). Done 2026-10-02/03: headless
+  server rewrites off), PRO-3730 (the abandoned-cart scan reads only the
+  window on busy stores). **An rc5 for the pilot awaits the owner's go** —
+  it would carry PRO-1967, PRO-3731, PRO-3732 and PRO-3730 (the pilot's
+  first catalog import is built in cron, so PRO-3731 matters to it). Open
+  queue: the PRO-1967 simplification pass, PRO-3729 (low wording
+  leftovers). Done 2026-10-02/03: headless
   storefronts + the
   Storefront URL (PRO-3614/3660), browse consent as in Woo and per website
   (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the standard

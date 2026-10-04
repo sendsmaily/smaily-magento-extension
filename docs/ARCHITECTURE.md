@@ -571,6 +571,19 @@ page held only handled carts and a newer cart was never loaded. The
 exclusion is in the SQL, before the LIMIT, so the page holds only
 candidates.
 
+**The scan reads only the window (PRO-3730).** The page is ordered by
+`main_table.entity_id + 0`, not by the bare `entity_id`. Ordered by the
+column, MySQL and MariaDB switch, once more than a few thousand carts
+changed in the window, from Magento's `QUOTE_STORE_ID_UPDATED_AT` index to
+walking the primary key in id order from the store's first cart until 100
+candidates turn up — on a store that keeps old carts, the whole table
+(3M carts: ~3.07M rows, ~1.8 s per website per run). An expression cannot
+be read from an index, so the plan stays on the store/updated_at range and
+sorts the window (3M carts, 60k changed in 24 h: the 59k window rows, about
+50–100 ms). The order is the same, so the page holds the same 100 carts. An
+index hint (`IGNORE INDEX FOR ORDER BY (PRIMARY)`) does the same, but
+`Zend_Db_Select` cannot place one after the table alias.
+
 **One reminder per address per 24 hours (PRO-3693).** Once per page of
 candidates the cron reads `StateManager::addressesRemindedSince()`: the
 addresses (lower-cased) of the tracker rows with a `mail_sent_at` in the last

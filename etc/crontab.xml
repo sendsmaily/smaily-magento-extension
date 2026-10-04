@@ -29,10 +29,5 @@
         <job name="smaily_health_check" instance="Smaily\Connect\Cron\HealthCheck" method="execute">
             <schedule>*/15 * * * *</schedule>
         </job>
-        <!-- Nightly catalog reconciler (PRO-1951): off-peak, and after the
-             janitor so it never queues into a table that is being pruned. -->
-        <job name="smaily_catalog_resync" instance="Smaily\Connect\Cron\CatalogResync" method="execute">
-            <schedule>40 3 * * *</schedule>
-        </job>
     </group>
 </config>

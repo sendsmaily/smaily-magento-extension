@@ -18,10 +18,9 @@ use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 
 /**
- * Historical catalog import (and the nightly re-sync, which is just a job of
- * this type): pages products through Engine\CatalogIngest — the same funnel
- * the live hooks use, so a paged row can never disagree with a live one — and
- * the flusher delivers at the engine's batch pace. A flood guard pauses the
+ * Historical catalog import: pages products through Engine\CatalogIngest —
+ * the same funnel the live hooks use, so a paged row can never disagree with
+ * a live one — and the flusher delivers at the engine's batch pace. A flood guard pauses the
  * job while the queue backlog is high, so live events are never starved.
  */
 class EngineCatalogProcessor implements ProcessorInterface

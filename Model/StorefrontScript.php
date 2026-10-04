@@ -17,8 +17,8 @@ use Magento\Store\Model\StoreManagerInterface;
  * With web server rewrites off, Magento adds the running script's name to
  * every link (`Store::_updatePathUseRewrites()`): `index.php` in a
  * storefront, admin or API request, but `magento` under bin/magento — where
- * cron builds the catalog import, the nightly re-sync, stock changes and
- * abandoned-cart reminders — and that link does not open. The storefront's
+ * cron builds the catalog import, stock changes and abandoned-cart
+ * reminders — and that link does not open. The storefront's
  * script is index.php, so a link built under another script name gets
  * index.php in its place (PRO-3731, PRO-3732). With rewrites on, the store's
  * link base has no script name and the link is left as it is.

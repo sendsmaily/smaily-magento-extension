@@ -11,10 +11,11 @@ Intelligence connection sends the storefront's site address), PRO-3729 and
 PRO-3737 (admin target spec wording), PRO-3736 (a browser harness for the
 Automations tab's save result), PRO-3739 (the rc5 ZIP installed on a
 clean store by docs/INSTALLING.md; one wording fix), PRO-3738 (CI runs
-the browser harnesses) and PRO-1960 (the abandoned-cart reminders are built
-once per store) landed on v3, unreleased; CHANGELOG's
-"Changes since 3.0.0-rc5" has PRO-3733, the others change nothing a merchant
-sees. 3.0.0-rc5 is released as a GitHub pre-release on
+the browser harnesses), PRO-1960 (the abandoned-cart reminders are built
+once per store) and PRO-1968 (the nightly full catalog re-sync is removed)
+landed on v3, unreleased; CHANGELOG's
+"Changes since 3.0.0-rc5" has PRO-3733 and PRO-1968, the others change
+nothing a merchant sees. 3.0.0-rc5 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc5),
 built by the release workflow (run 37208243039) from commit 1911c41; the ZIP
 and its .sha256 were checked after publishing (379 entries, `shasum -a 256 -c`
@@ -86,6 +87,45 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-1968 — the nightly full catalog re-sync is removed (2026-10-04;
+  owner decision: as in WooCommerce, no new table).** `Cron/CatalogResync`
+  (job `smaily_catalog_resync`, daily 03:40, PRO-1951), its unit test and its
+  `etc/crontab.xml` entry are gone; nothing else started it or depended on
+  it (no DI, config, UI string or admin state names it — BackfillState and
+  the Dashboard never mentioned it). The catalog now reaches the engine as
+  in Woo: in full through the catalog import, then only changes. **Setup
+  does not start the import today**, and none was added (a separate owner
+  decision): the engine connection only stores the exchange
+  (`Controller/Adminhtml/Api/EngineExchange.php:50-51`,
+  `Model/Config/Backend/EngineSetupToken.php:60-61` →
+  `Model/Engine/Settings.php:204-230`, no job start); the only catalog job
+  starts are the admin card (`Controller/Adminhtml/Api/BackfillState.php:67`)
+  and `smaily:backfill:start` (`Console/Command/BackfillStartCommand.php:81`).
+  The setup step leads the merchant to it
+  (`view/adminhtml/templates/panel/intelligence.phtml:79-81`: historical
+  data is imported under Settings > Intelligence); USER_GUIDE's Connecting
+  now has step 3 "Start the Catalog import". Until now the first night's
+  re-sync sent the full catalog to a merchant who never pressed Start
+  import; from now on such a store has only the products saved or stock-
+  changed since connecting. Changes still flow unchanged — product save
+  (`CatalogIngestTest` same-row/changed-row/tombstone cases), stock changes
+  (`StockItemSaveAfterTest`, `SourceItemsSaveTest`, `SourceDeductionTest`,
+  `CatalogIngestTest` marker + `buildChanged()` cases,
+  `IngestQueueTest::testEnqueueChangedPayloadsLeaves…`), deletion
+  (`ProductDeleteBeforeTest`, the §3b cases in both `FlushIngestQueueTest`s).
+  **Upgrades:** Magento reads and prunes `cron_schedule` only for the job
+  codes its configuration lists (`ProcessCronQueueObserver::
+  getPendingSchedules()`/`cleanupJobs()`), so a leftover
+  `smaily_catalog_resync` row is never run and never breaks anything; it
+  just stays. Sandbox after `setup:upgrade` + `setup:di:compile`: Magento's
+  cron config lists seven `smaily_*` jobs. **The engine contract §3
+  (lifecycle) and §3b still say the plugin's periodic full re-sync is the
+  reconciler**; the engine was asked to align it (Linear PRO-3740) — the
+  copy is not edited here. Docs: ARCHITECTURE (catalog lifecycle, cron
+  table, the send-gate list), USER_GUIDE (Connecting step 3, What syncs,
+  Historical import: start the catalog import by hand after ERP/CSV/
+  direct-database changes), HEADLESS_STOREFRONTS, CHANGELOG; stale code
+  comments that named the re-sync fixed.
 - **PRO-1960 — the abandoned-cart reminders are built once per store
   (2026-10-04; behaviour-neutral, no CHANGELOG bullet).** `Cron\AbandonedCart`
   builds the page's payloads before the reminder rules weigh it, grouped by
@@ -1668,7 +1708,8 @@ Earlier: 2026-09-11, 2026-09-10._
   (target spec wording), PRO-3736 (admin browser harness), PRO-3739
   (rc5 clean install by the guide passed; one wording fix), PRO-3738 (CI
   runs the browser harnesses), PRO-1960 (abandoned-cart reminders built
-  once per store; behaviour-neutral). Done
+  once per store; behaviour-neutral), PRO-1968 (nightly catalog re-sync
+  removed; the catalog import is started by hand). Done
   2026-10-02/03: headless storefronts + the
   Storefront URL (PRO-3614/3660), browse consent as in Woo and per website
   (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the standard

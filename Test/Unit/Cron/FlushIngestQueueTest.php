@@ -279,7 +279,7 @@ class FlushIngestQueueTest extends TestCase
     public function testCatalogRemoveRequestErrorIsTerminal(): void
     {
         // A 404 here means the engine predates §3b ("not yet available") —
-        // parked, never retried; the periodic full re-sync reconciles.
+        // parked, never retried automatically.
         $event = $this->createEvent(51, Client::DOMAIN_CATALOG_REMOVE);
         $this->payloads = [51 => ['product_id' => '7']];
         $this->stubClaims([Client::DOMAIN_CATALOG_REMOVE => [$event]]);

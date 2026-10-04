@@ -500,7 +500,7 @@ class CatalogPayloadBuilder
         // published as still in stock until this drop (caught on the sandbox,
         // not by the unit tests). Dropping it here, at the only read, keeps
         // every caller correct by construction: live hooks, the delete
-        // tombstone and the backfill/nightly-resync pages alike.
+        // tombstone and the catalog import pages alike.
         $productId = (int)$product->getId();
         $this->stockRegistryStorage->removeStockItem($productId);
 

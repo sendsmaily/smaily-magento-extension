@@ -15,7 +15,7 @@ use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 
 /**
  * Loads products the way every catalog row built from a collection needs
- * them — the backfill/nightly re-sync page (EngineCatalogProcessor) and the
+ * them — the catalog import page (EngineCatalogProcessor) and the
  * stock-change batch (CatalogIngest::buildChanged()) alike. Each caller adds
  * only its own filter.
  */

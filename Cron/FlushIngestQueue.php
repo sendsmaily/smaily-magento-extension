@@ -206,7 +206,7 @@ class FlushIngestQueue
 
             // 4xx is terminal: a malformed wrapper cannot improve by
             // resending, and a 404 means the engine predates §3b — the
-            // periodic full re-sync stays the reconciler either way.
+            // parked row can be retried from the Log once it has it.
             $this->recordRemoveExchange($keyed);
             foreach ($keyed as [$event]) {
                 $this->queue->markFailed($event, $exception->getMessage(), true);

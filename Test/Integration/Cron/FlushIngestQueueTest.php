@@ -234,7 +234,7 @@ class FlushIngestQueueTest extends IntegrationTestCase
 
     public function testCatalogRemoveRequestErrorParksTheRowsTerminally(): void
     {
-        // A 404 = the engine predates §3b; the full re-sync reconciles.
+        // A 404 = the engine predates §3b; the row is parked.
         $this->queue->enqueue(Client::DOMAIN_CATALOG_REMOVE, ['product_id' => '7'], '7', null, 'fr-r1');
 
         $client = $this->createMock(Client::class);

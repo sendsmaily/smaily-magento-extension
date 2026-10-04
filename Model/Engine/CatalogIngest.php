@@ -18,8 +18,8 @@ use Smaily\Connect\Model\Logger\Logger;
 
 /**
  * The single place a product turns into a catalog ingest row — live hooks,
- * the delete observer's soft tombstone and the backfill/nightly-resync
- * processor alike.
+ * the delete observer's soft tombstone and the catalog import processor
+ * alike.
  *
  * Product save, the tombstone and the backfill pages already hold the
  * product and queue its row at once. The stock hooks do not (PRO-1967): a

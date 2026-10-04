@@ -87,9 +87,8 @@ settings. The field opens by itself when the last 30 days' orders all came
 through the API (GraphQL, or REST without Magento's storefront session).
 
 After a change, run the catalog import again (**Settings > Intelligence >
-Historical imports > Catalog**) so Campaign Intelligence gets the new links
-at once; the nightly catalog re-sync brings them too. The RSS feed shows
-them within 15 minutes (its cache).
+Historical imports > Catalog**) so Campaign Intelligence gets the new links.
+The RSS feed shows them within 15 minutes (its cache).
 
 The storefront must open the path: either it routes `/<url-key>.html`
 itself, or it redirects it to its own product page. **A redirect must keep

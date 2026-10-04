@@ -108,10 +108,10 @@ per-website — one engine connection currently serves the whole installation
 regardless of which website is selected. Each product is sent to it once,
 with the price and link of your default website; a product that does not
 sell on the default website is sent with the price and link of the first
-website it is assigned to. The catalog import and the nightly catalog
-re-sync send every product of every website the same way, with the same
-price and sale end date as a product save; a disabled, hidden or
-out-of-stock product goes as out of stock.
+website it is assigned to. The catalog import sends every product of
+every website the same way, with the same price and sale end date as a
+product save; a disabled, hidden or out-of-stock product goes as out of
+stock.
 
 After installation the admin notifications show "Smaily Connect is ready to
 set up", with a link to this guide; after an upgrade from 2.8.x it also says
@@ -233,9 +233,9 @@ query or a fragment is refused on save, with the message under the field
 (a trailing `/` is dropped). After a save that changes the address, the
 result beside the button asks you to run the catalog import again under
 **Settings > Intelligence > Historical imports**, so that Campaign
-Intelligence gets the new links; the nightly catalog re-sync brings them
-too. The RSS feed shows them within 15 minutes. The storefront must open
-Magento's product paths, or redirect them keeping the query string — see
+Intelligence gets the new links. The RSS feed shows them within 15 minutes.
+The storefront must open Magento's product paths, or redirect them keeping
+the query string — see
 [HEADLESS_STOREFRONTS.md](HEADLESS_STOREFRONTS.md#product-links-and-images).
 
 
@@ -633,6 +633,10 @@ connected.
 2. Paste it on **Settings > Intelligence** (or Initial setup step 4) and save.
    The token is exchanged immediately and never stored; the status row shows
    the connected tenant.
+3. Start the **Catalog** import under **Settings > Intelligence >
+   Historical imports** (see [Historical import](#historical-import-backfill)).
+   Connecting does not send the existing catalog: the import sends it once,
+   and after that Campaign Intelligence gets only the changes.
 
 The setup URL must be an https address on `intelligence.smaily.com`; a bare
 token is exchanged there too. Any other address is refused before anything is
@@ -648,7 +652,7 @@ toggle; catalog, customer and order sync run automatically once connected.
 
 | Data | When |
 |---|---|
-| Catalog | On product save/delete (deletes become out-of-stock) and on every stock change — a shipment that sells the last unit, a credit memo that puts it back, an Advanced Inventory or Sources edit, an API stock update. A nightly re-sync (03:40 store time) catches what no event can see, such as a CSV/`bin/magento import` run that writes the tables directly |
+| Catalog | On product save/delete (deletes become out-of-stock) and on every stock change — a shipment that sells the last unit, a credit memo that puts it back, an Advanced Inventory or Sources edit, an API stock update. The whole catalog goes once, with the catalog import; there is no periodic full re-sync. A change made outside Magento's own product save — an ERP link, a CSV or `bin/magento import` run, a direct database import — is not seen: start the catalog import by hand afterwards |
 | Customers | On profile create/update (no consent fields — the engine is a separate lawful surface) |
 | Orders | On order placement, status changes, and refunds — a credit memo re-syncs the order, so a fully credited line is reported as returned and stops being recommended back to that customer (a partly credited line still counts as kept) |
 | Browse events | Product views, searches, cart adds, checkout — batched from the storefront (**Enable storefront browse tracking (product views, searches, cart activity)**, off by default — a separate, consent-gated toggle, not part of the always-on sync above) |
@@ -852,6 +856,15 @@ traffic:
   count it had genuinely sent.
 - **Catalog / Customers / Orders → Campaign Intelligence** — Settings >
   **Intelligence** tab, one card per import.
+  Campaign Intelligence gets the whole catalog once, from the **Catalog**
+  import: connecting does not start it, so start it after connecting.
+  After that, product saves, stock changes and deletions reach Campaign
+  Intelligence on their own within a minute or two; nothing re-sends the
+  whole catalog periodically. If your store changes products outside
+  Magento's own product save — an ERP or PIM link, a CSV or
+  `bin/magento import` run, a direct database import — start the
+  **Catalog** import by hand after such a change, so Campaign
+  Intelligence gets the new prices, stock and products.
 
 Each import is a card. Before its first run it offers **Start import**.
 Once started, a status pill in the card's header says where it is —

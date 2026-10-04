@@ -285,7 +285,7 @@ class CatalogPayloadBuilderTest extends TestCase
      * PRO-1951: the stock registry memoises the item per request and MSI
      * mirrors onto the legacy row with direct SQL, so the memo is dropped
      * here — at the only read — rather than in one caller. Every path (live
-     * hooks, the delete tombstone, backfill and the nightly re-sync) is then
+     * hooks, the delete tombstone, the catalog import) is then
      * correct by construction.
      */
     public function testTheStockRegistryMemoIsDroppedAtTheOnlyStockRead(): void
@@ -454,7 +454,7 @@ class CatalogPayloadBuilderTest extends TestCase
     /**
      * PRO-3731: with web server rewrites off, Magento puts the running
      * script's name in each link — `magento` under bin/magento, where cron
-     * builds the catalog import, the nightly re-sync and stock changes — and
+     * builds the catalog import and stock changes — and
      * that link does not open. The storefront's script is index.php, so it
      * takes that name's place.
      */

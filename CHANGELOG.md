@@ -7,6 +7,7 @@ The package version is currently `3.0.0-rc5` — the fifth release-candidate cut
 **Changes since 3.0.0-rc5**
 
 - On a store with *Use Web Server Rewrites* off, connecting Campaign Intelligence from the command line sent the engine a store address with `magento` in place of the storefront's `index.php`; the engine keeps that address in its audit log. It now sends the storefront's address, as a connection from the admin does. With rewrites on, the address is unchanged.
+- The nightly full catalog re-sync to Campaign Intelligence (03:40 store time) is removed, as in the WooCommerce plugin: Campaign Intelligence gets the whole catalog once, from the catalog import, and after that the changes — product saves, stock changes and deletions, as before. Connecting does not start the catalog import; start it after connecting under **Settings > Intelligence > Historical imports** (or `bin/magento smaily:backfill:start catalog`). A store that changes products outside Magento's own product save — an ERP link, a CSV or `bin/magento import` run, a direct database import — starts the catalog import by hand after such a change; before, the nightly re-sync sent those changes within a day.
 
 **Changes since 3.0.0-rc4**
 

@@ -167,7 +167,7 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   rows go out in the same run, so the ~1–2 min latency holds; the build reads
   the committed state at flush time, so it can never be older than the change
   that queued the marker. The rows are built in the cron context, as the
-  backfill and nightly re-sync rows are, and the running context does not
+  catalog import rows are, and the running context does not
   change a row (PRO-3731): `CatalogPayloadBuilder` reads `image_url` under
   the frontend emulation of the store the product is priced at, so the image
   size and the placeholder come from that store's storefront theme, never
@@ -211,23 +211,29 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   it reads (MSI mirrors onto the legacy row with direct SQL and so never
   invalidates that memo — otherwise selling out publishes `in_stock: true`).
   It lives at the read, not in a caller, so live hooks, the delete tombstone
-  and the backfill/nightly-resync pages are all correct by construction. It
+  and the catalog import pages are all correct by construction. It
   falls back to **true** if the stock read throws: the fallback is
   deliberate — the engine's recommender excludes out-of-stock products, so
   defaulting to false would silently pull a product out of every campaign over
-  a transient read error, which is the worse failure. The nightly reconciler
-  corrects a wrong `true` within a day.
-- **Periodic catalog reconciler (PRO-1951).** `Cron/CatalogResync` (daily,
-  `40 3 * * *` store time — off-peak, just after the queue janitor) starts an
-  ordinary catalog backfill job rather than walking the catalog itself, so
-  `Cron/BackfillTick` pages it in with the same cursor, time budget and flood
-  guard a merchant-started import gets. It never runs disconnected, and the
-  one-active-job lock refuses the start while a catalog import is already
-  open, so a merchant's own import is never trampled — the sweep skips that
-  night instead. It exists for
-  the one class of change events cannot see: a CSV / `bin/magento import` run
-  writes the catalog tables directly. Latency: event-driven changes ~1–2 min,
-  everything else at most ~24 h.
+  a transient read error, which is the worse failure. The product's next
+  save or stock change, or a catalog import, corrects a wrong `true`.
+- **Catalog lifecycle: the full catalog once, then changes (PRO-1968).** As
+  in the WooCommerce plugin, the whole catalog reaches the engine through
+  the catalog import (`Job::TYPE_CATALOG`, paged by `Cron/BackfillTick` →
+  `Model/Backfill/EngineCatalogProcessor`), and after that only changes
+  do: product save, the stock hooks' markers and the delete paths above
+  (~1–2 min). Connecting does not start the import: the setup step says
+  that historical data is imported under Settings > Intelligence, and the
+  merchant starts it there or with `smaily:backfill:start catalog`. There
+  is no periodic full re-sync any more — the nightly `Cron/CatalogResync`
+  of PRO-1951 is removed. A change no event sees (a CSV / `bin/magento
+  import` run, an ERP link or any other direct write to the catalog
+  tables) reaches the engine with the product's next save or stock change,
+  or with a catalog import the merchant starts by hand; the user guide
+  says so. The engine contract (§3, §3b) still describes a periodic full
+  re-sync by the plugin; the engine side was asked to align it (PRO-3740).
+  On an upgrade, Magento ignores the removed job's leftover `cron_schedule`
+  rows: it reads and prunes only the job codes its configuration lists.
 - **Order line `sku`.** A line is the parent order item (a configurable's
   child item is skipped; its price is on the parent), keyed on the item's
   SKU — for a configurable, Magento's own copy of the chosen variant's SKU.
@@ -258,7 +264,7 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   is the one gate every SENDING path consults: `Cron/FlushIngestQueue`,
   the engine-bound backfills at `Cron/BackfillTick`'s router,
   `Controller/Relay/Index`, `Queue\Handler\IdentityMergeHandler`,
-  `Queue\Handler\ProfilingConsentHandler` and `Cron/CatalogResync`. The
+  and `Queue\Handler\ProfilingConsentHandler`. The
   paths that loop re-ask only its refusal half once connectedness is proved —
   per domain in the flusher (so one refusal ends the run) and per row in the
   merge and profiling-consent handlers — because that is the half a mid-run
@@ -300,10 +306,10 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   what `countProducts()` counts. `addPriceData()` INNER JOINs
   `catalog_product_index_price` on the scope's website (Magento's
   `Product\Collection::_productLimitationPrice()`), which kept every product
-  outside the default website out of the catalog import and the nightly
-  re-sync — and every product the price index leaves out (disabled, and out
-  of stock while the store hides out-of-stock products), so the re-sync
-  never corrected those either. Prices are read through the product's price
+  outside the default website out of the catalog import — and every
+  product the price index leaves out (disabled, and out of stock while the
+  store hides out-of-stock products), so the import never corrected those
+  either. Prices are read through the product's price
   info at the store `storeIdForProduct()` picks, as on the live path; the
   page selects `tax_class_id`, which the price index used to supply and the
   tax adjustment reads. A disabled or hidden product is sent as its
@@ -526,7 +532,6 @@ invoke `bin/magento cron:run` every minute.
 | `smaily_contact_reconcile` | every 15 min | Smaily→Magento consent mirror |
 | `smaily_health_check` | every 15 min | Engine-down / failure-volume / missing-consent-source notices |
 | `smaily_queue_janitor` | daily 02:20 | Retention pruning (both queues + the abandoned-cart tracker) |
-| `smaily_catalog_resync` | daily 03:40 | Full catalog re-sync — the reconciler for stock/price changes no event can see (CSV import) |
 
 ## Key flows
 

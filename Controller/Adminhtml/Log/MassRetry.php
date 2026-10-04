@@ -13,19 +13,20 @@ use Magento\Backend\App\Action\Context;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\Result\Redirect;
 use Magento\Framework\Controller\ResultFactory;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Ui\Component\MassAction\Filter;
-use Smaily\Connect\Model\Engine\Queue\IngestQueue;
-use Smaily\Connect\Model\Log\QueueRowLoader;
-use Smaily\Connect\Model\Log\ResendGuard;
-use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Log\SelectionRetry;
 use Smaily\Connect\Model\ResourceModel\Log\Collection;
-use Smaily\Connect\Model\ResourceModel\Log\CollectionFactory;
 
 /**
  * Resets selected failed rows back to pending — the composite log id routes
  * each row to its own queue (Smaily events / Intelligence ingest). A row
  * ResendGuard refuses is left alone and counted (PRO-2454): the merchant is
  * told how many were skipped rather than quietly getting a smaller number.
+ *
+ * The selection reaches SelectionRetry as the grid's own query (PRO-2510):
+ * Filter::getCollection() would first load every row of a "Select all"
+ * and filter the grid again by the whole list of their ids.
  */
 class MassRetry extends Action implements HttpPostActionInterface
 {
@@ -34,11 +35,7 @@ class MassRetry extends Action implements HttpPostActionInterface
     public function __construct(
         Context $context,
         private readonly Filter $filter,
-        private readonly CollectionFactory $collectionFactory,
-        private readonly EventQueue $eventQueue,
-        private readonly IngestQueue $ingestQueue,
-        private readonly QueueRowLoader $rowLoader,
-        private readonly ResendGuard $resendGuard
+        private readonly SelectionRetry $selectionRetry
     ) {
         parent::__construct($context);
     }
@@ -48,30 +45,7 @@ class MassRetry extends Action implements HttpPostActionInterface
      */
     public function execute(): Redirect
     {
-        $collection = $this->filter->getCollection($this->collectionFactory->create());
-
-        $ids = [Collection::SOURCE_SMAILY => [], Collection::SOURCE_INTELLIGENCE => []];
-        foreach ($collection->getAllIds() as $logId) {
-            [$source, $id] = Collection::splitLogId((string)$logId);
-            if ($source !== '') {
-                $ids[$source][] = $id;
-            }
-        }
-
-        $skipped = 0;
-        foreach ($ids as $source => $sourceIds) {
-            // Only the failed rows of the selection are the retry's business;
-            // anything else in it is left alone without a word, as before.
-            $refused = $this->resendGuard->refusalReasons(
-                $source,
-                $this->rowLoader->loadFailed($source, $sourceIds)
-            );
-            $skipped += count($refused);
-            $ids[$source] = array_diff($sourceIds, array_keys($refused));
-        }
-
-        $retried = $this->eventQueue->retry($ids[Collection::SOURCE_SMAILY])
-            + $this->ingestQueue->retry($ids[Collection::SOURCE_INTELLIGENCE]);
+        [$retried, $skipped] = $this->selectionRetry->retry($this->selection());
 
         $this->messageManager->addSuccessMessage(
             $skipped > 0
@@ -87,5 +61,27 @@ class MassRetry extends Action implements HttpPostActionInterface
         $redirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
 
         return $redirect->setPath('smaily_connect/log');
+    }
+
+    /**
+     * The grid's rows as the request selects them — its filters, and the
+     * ticked rows or "Select all" less the unticked ones — still unloaded.
+     * Refuses an empty selection as Filter::getCollection() does.
+     */
+    private function selection(): Collection
+    {
+        $selected = $this->getRequest()->getParam(Filter::SELECTED_PARAM);
+        $excluded = $this->getRequest()->getParam(Filter::EXCLUDED_PARAM);
+        if ($excluded !== 'false' && !(is_array($excluded) && $excluded) && !(is_array($selected) && $selected)) {
+            throw new LocalizedException(__('An item needs to be selected. Select and try again.'));
+        }
+
+        $this->filter->applySelectionOnTargetProvider();
+        $selection = $this->filter->getComponent()->getContext()->getDataProvider()->getSearchResult();
+        if (!$selection instanceof Collection) {
+            throw new \UnexpectedValueException('The Log grid is not backed by the Log collection.');
+        }
+
+        return $selection;
     }
 }

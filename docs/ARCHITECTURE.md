@@ -457,7 +457,16 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   `Model\Log\Resend::PAYLOAD_KEY`
   (`_resend: {of, by, at}`, Z-suffixed), which both `decodePayload()`
   methods strip before anything goes on the wire. No column was added for
-  it. The mass retry skips what the guard refuses and says how many.
+  it. The mass retry skips what the guard refuses and says how many. It
+  never lists the selection (PRO-2510): `Controller\Adminhtml\Log\MassRetry`
+  takes the grid's selection from the listing's data provider as an
+  unloaded `Log\Collection` (filters plus the ticked or excluded log ids,
+  instead of `Filter::getCollection()`, which loads every row of a "Select
+  all" and re-filters by all their ids), and `Model\Log\SelectionRetry`
+  reads its failed rows' log ids in one query and asks the guard and the
+  queue about them `BATCH_SIZE` (1,000) ids of one queue at a time. A
+  retried row turns pending, never delivered, so a batch's guard answer is
+  the one the whole selection would get.
   `withdrawn` is a derived status, not a stored one: one rule — `status =
   sent` plus the `CANCELLED_RESPONSE` marker — applied by the grid's UNION
   and by `Model\Log\QueueRowLoader` for the single row the drawer and the
@@ -1009,7 +1018,7 @@ Initial setup, Settings, Log. Design rules:
   `Model\ResourceModel\Log\Collection` builds a `UNION ALL` of the two
   queue tables as a derived table, keyed by the synthetic
   `log_id` (`smaily-<id>` / `intelligence-<id>`) that
-  `Controller\Adminhtml\Log\MassRetry` splits to route retries back to the
+  `Model\Log\SelectionRetry` splits to route the mass retry back to the
   right queue. Grid filters/sorting apply to the outer select.
 - **Wizard-first gating.** `Model\Adminhtml\SetupGuard`: while
   `smaily_connect/internal/setup_completed` is unset for the current

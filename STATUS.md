@@ -10,7 +10,8 @@ land on v3: PRO-2508 (the Log's error column describes rejected Smaily
 credentials in the extension's own sentence, on purpose; docs only),
 PRO-2509 (the Log's Last Error filter matches the text the column shows),
 PRO-2511 (Details on a delivered, later-superseded automation row reads as
-delivered).
+delivered) and PRO-2510 (mass Retry over "Select all" works in batches of
+1,000).
 Earlier the same day: 3.0.0-rc6 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc6),
 built by the release workflow (run 37228529206) from commit bb6831e; the ZIP
@@ -127,6 +128,34 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-2510 — the Log's mass Retry works through a large selection in
+  batches (2026-10-04; CHANGELOG bullet).** Before, `MassRetry` took
+  `Filter::getCollection()`, which loads every grid row of a "Select all"
+  through the data provider and filters the grid again by all their log
+  ids, then the controller listed every id and asked the guard and the
+  queues with one IN (...) of the whole selection. Now the controller
+  validates the selection as Filter does ("An item needs to be selected"),
+  applies it to the listing's data provider and hands the unloaded
+  `Log\Collection` (grid filters + ticked/excluded ids) to the new
+  `Model\Log\SelectionRetry`, which streams the failed rows' log ids from
+  one query and runs guard + retry per 1,000 ids of one queue. The guard
+  still decides every row; a retried row turns pending, never delivered,
+  so per-batch answers equal the whole-selection answer. Measured on
+  20,500 failed rows (300-character errors): the old path peaked at
+  +45.5 MB, the new at +1.4 MB, both about 0.35 s. Tests: integration
+  `Log/SelectionRetryTest` (20,000 failed contact syncs + 500 failed
+  ingest rows + a superseded, an erased, a pending, a delivered and a
+  withdrawn row: 20,500 retried, 2 skipped — exactly the rows the guard
+  refuses when asked about the whole selection at once — in 22 batches of
+  at most 1,000; grid filters and exclusions narrow it; an empty
+  selection asks nothing), unit `MassRetryTest` (the selection goes on
+  unloaded, `getCollection()` is never called; nothing selected is
+  refused). DI change: sandbox `setup:upgrade` + `setup:di:compile`
+  clean; the controller's selection path was run read-only in the sandbox
+  (real UI component, Last Error + status filters and an exclusion end up
+  in the one query; the sandbox has no failed rows, nothing retried).
+  ARCHITECTURE (Sending again, Unified log).
 
 - **PRO-2511 — Details on a delivered automation row reads as delivered
   (2026-10-04; CHANGELOG bullet).** `ResendGuard` answers `superseded`
@@ -2059,7 +2088,7 @@ Earlier: 2026-09-11, 2026-09-10._
   notice under the bell to be read after the initial setup (PRO-3739) and
   for one catalog entry's image and product link opened from the engine
   (PRO-3731); (2) open queue: PRO-3746 (after the pilot), PRO-3747,
-  PRO-1958; the Event Log leftover PRO-2510; small
+  PRO-1958; small
   cleanups PRO-2475/1469/2514/2462; robustness PRO-1962/2465/2466/1961;
   (3) cross-repo asks: PRO-3740 (engine contract wording: §3/§3b still
   describe a periodic full re-sync), PRO-3743 (WooCommerce), PRO-3744

@@ -77,6 +77,16 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3737 — the admin target spec names the initial setup as the admin
+  does (2026-10-04; docs only, no CHANGELOG bullet).**
+  `docs/ADMIN_UI_TARGET_SPEC.md` said "Setup Wizard" where it means the
+  shipped page — the dashboard's Quick links row, the §2.2 heading and the
+  PRO-1357 finding table's row 5; all three now say "Initial setup", as the
+  admin shows. No link points at the §2.2 heading's anchor. The design-pack
+  file name `Setup Wizard.dc.html` in §2.2's source line stays (it names a
+  file, not the page); dated audits, the upstream proposal and the
+  multi-website RFC stay as written.
+
 - **PRO-3729 — the admin target spec and three code comments use the
   canon wording (2026-10-04; docs and comments only, no CHANGELOG
   bullet).** `docs/ADMIN_UI_TARGET_SPEC.md` quotes the shipped dashboard

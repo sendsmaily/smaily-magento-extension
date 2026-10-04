@@ -122,7 +122,7 @@ form fields — source: A2 §F, `ViewModel\Adminhtml\DashboardData`):
 | Connection strip | live pills from `isSmailyConnected`, `isEngineConnected`/`isEngineDown`, `isBrowseTrackingEnabled` |
 | Metric tiles | Contact syncs delivered 30d, Catalog items delivered 30d (only if engine connected), Queued today, Failed 24h — real local queue queries |
 | Recent activity | last 10 queue rows: Source/Type/Entity/Status/Updated |
-| Quick links | Settings, Log, Setup Wizard, Stores > Configuration — **the last link is a consequence of §4's now-resolved decision 3 (native config shrinks to advanced-only or disappears) and should be revisited once that lands**, not removed by this doc pass alone |
+| Quick links | Settings, Log, Initial setup, Stores > Configuration — **the last link is a consequence of §4's now-resolved decision 3 (native config shrinks to advanced-only or disappears) and should be revisited once that lands**, not removed by this doc pass alone |
 
 The design pack's specific dependency wording ("Intelligence/Browse tracking
 → Off with reason 'Requires Smaily connection'" when Smaily is disconnected)
@@ -159,7 +159,7 @@ the pack invents a setting here.
 
 ---
 
-### 2.2 Setup Wizard
+### 2.2 Initial setup
 
 **(a) Target layout** (source: A1 §2.2, `Setup Wizard.dc.html`):
 
@@ -717,7 +717,7 @@ canonical per (c).
 | 2 | Two config surfaces, partial/duplicated | Settings (all tabs) vs native `Stores > Configuration` | **RESOLVED** (§4, decisions 1+3, plus the four field-level resolutions in §4.2, Erkki 2026-07-14): one source of truth = our own pages; **native `Stores > Configuration > Smaily` disappears entirely** — every field, including the four that were native-only orphans, now has a target home on the module's own pages. The RSS tab's own duplication (finding #10) is folded into the same fix. |
 | 3 | Opaque "overridden" scope banner | Settings (all tabs) | **RESOLVED** (§4, decision 2): scope is handled by us, never shown to the merchant. Shipped: the banner + manual "Use Default" and the PRO-1274 detection/clear machinery (`OverrideDetector`/`OverrideClearer`) are gone from every Settings tab and initial-setup step (PRO-1461; the leftover phrases went with PRO-1398); the native page is hidden, so no merchant surface shows scope. The website selector says which website a page edits. Clearing a leftover override on save is a separate follow-up. |
 | 4 | Settings page diverges from design layout + wrong wording | Settings (all 5 tabs) | §2.3 (a) layout target + (c) EST+ENG text tables, per tab. |
-| 5 | Setup Wizard choice-cards broken | Setup Wizard | §2.2 (a) Radio Choice-Card layout target (anatomy, states, reactive region) + §2.3.A (a)/(b) for the underlying 4-mode data it must render. |
+| 5 | Initial setup choice-cards broken | Initial setup | §2.2 (a) Radio Choice-Card layout target (anatomy, states, reactive region) + §2.3.A (a)/(b) for the underlying 4-mode data it must render. |
 | 6 | Single/double opt-in is a design-pack leak | Settings > Subscribers | §2.3.B (d) REMOVE — confirmed leak, delete rather than build. |
 | 7 | Unstyled checkboxes, ugly spacing, progress bar stuck on import button | Settings > Subscribers (checkboxes) + Backfill (progress bar) | §2.3.B (a) layout (extra-fields checkbox set, Radio Choice-Card) + §2.5 (a)/(b) — idle state must show no progress affordance. |
 | 8 | Stuck "Importing… 0/?" with no import started | Backfill (embedded, Subscribers + Intelligence) | §2.5 (a) — explicit rule: idle = no Pill, no ProgressBar at all. |

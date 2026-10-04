@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Runs the browser JS harnesses under Test/Js in headless Chrome and fails
-# unless every page ends with "RESULT: PASS". The harnesses load Magento's own
-# checkout JS and jQuery from vendor/, so run `composer install` first. The
-# admin pages are rendered from their templates first (Test/Js/render-admin.php,
-# into Test/Js/build/).
+# unless every page ends with "RESULT: PASS"; the last lines name each failed
+# page and its failed checks. CI runs it (the browser job). The harnesses load
+# Magento's own checkout JS and jQuery from vendor/, so run `composer install`
+# first. The admin pages are rendered from their templates first
+# (Test/Js/render-admin.php, into Test/Js/build/).
 #
 #   bin/test-js.sh            # CHROME=/path/to/chrome to pick the browser
 set -euo pipefail
@@ -28,15 +29,27 @@ fi
 php "$root/Test/Js/render-admin.php"
 
 status=0
+failed=""
 for page in "$root"/Test/Js/*.html; do
     # Virtual time runs the checkout's typing pauses without waiting for them.
     output="$("$chrome" --headless=new --disable-gpu --no-sandbox \
-        --virtual-time-budget=120000 --dump-dom "file://$page" 2>/dev/null)"
-    echo "== ${page#"$root"/}"
-    sed -n '/<pre id="log">/,/<\/pre>/p' <<<"$output" | sed -e 's/<[^>]*>//g' -e '/^$/d'
+        --virtual-time-budget=120000 --dump-dom "file://$page" 2>/dev/null || true)"
+    name="${page#"$root"/}"
+    log="$(sed -n '/<pre id="log">/,/<\/pre>/p' <<<"$output" | sed -e 's/<[^>]*>//g' -e '/^$/d')"
+    echo "== $name"
+    [[ -z "$log" ]] || echo "$log"
     result="$(grep -o '<div id="result">[^<]*' <<<"$output" | sed 's/.*>//' || true)"
     result="${result:-RESULT: FAIL (no result)}"
     echo "$result"
-    [[ "$result" == "RESULT: PASS"* ]] || status=1
+    if [[ "$result" != "RESULT: PASS"* ]]; then
+        status=1
+        failed+="$name: $result"$'\n'
+        failed+="$(grep '^FAIL ' <<<"$log" | sed 's/^/    /' || true)"$'\n'
+    fi
 done
+if [[ "$status" -ne 0 ]]; then
+    echo
+    echo "Failed browser tests:"
+    printf '%s' "$failed" | sed '/^$/d'
+fi
 exit "$status"

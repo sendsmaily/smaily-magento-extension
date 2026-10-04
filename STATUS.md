@@ -9,8 +9,9 @@ _Last updated: 2026-10-04 — after 3.0.0-rc5, PRO-3735 (CI parses every
 PHP and PHTML file on PHP 8.1), PRO-3733 (a command-line Campaign
 Intelligence connection sends the storefront's site address), PRO-3729 and
 PRO-3737 (admin target spec wording), PRO-3736 (a browser harness for the
-Automations tab's save result) and PRO-3739 (the rc5 ZIP installed on a
-clean store by docs/INSTALLING.md; one wording fix) landed on v3, unreleased; CHANGELOG's
+Automations tab's save result), PRO-3739 (the rc5 ZIP installed on a
+clean store by docs/INSTALLING.md; one wording fix) and PRO-3738 (CI runs
+the browser harnesses) landed on v3, unreleased; CHANGELOG's
 "Changes since 3.0.0-rc5" has PRO-3733, the others change nothing a merchant
 sees. 3.0.0-rc5 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc5),
@@ -84,6 +85,29 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3738 — CI runs the browser harnesses (2026-10-04; tooling, no
+  CHANGELOG bullet).** New `browser` job in `.github/workflows/ci.yaml`:
+  PHP 8.3, the Mage-OS mirror, `composer install` from the lock (as the
+  other jobs), then `bin/test-js.sh` with the runner's Google Chrome.
+  `bin/test-js.sh` now ends a failed run with "Failed browser tests:", each
+  failed page with its result and its `FAIL` lines; a browser that exits
+  non-zero or prints nothing no longer stops the script silently (`set -e`),
+  the page reads `RESULT: FAIL (no result)`. Found on the way: on Linux
+  (Debian Chromium 154 in a throwaway php:8.3-cli container, the closest
+  local stand-in for the runner) `Test/Js/tracker-consent.html` stopped
+  part-way at random (4–26 of 40 checks, `RESULT: RUNNING`, even with a
+  budget of 3 600 000): Chrome's virtual time jumps to the end of its
+  budget when no timer is pending, even while a frame loads. The page now
+  keeps a 10 ms interval running until its result is written; 20 of 20
+  full runs green on Linux, green on macOS. Red evidence: the Automations
+  template's go-live note hidden for every state → exit 1, "Failed browser
+  tests: Test/Js/automations-save.html: RESULT: FAIL (4 of 39 checks
+  failed)" and the four checks (macOS, reverted); the Hyvä tracker reading
+  website 1's consent → exit 1, tracker-consent.html 4 of 40 named (Linux,
+  in the container's copy only). Not verified: the job on GitHub's runner
+  (Google Chrome on Ubuntu, not run from here). TESTING.md ("Browser JS
+  harnesses"), CLAUDE.md gates.
+
 - **PRO-3739 — the rc5 package installs on a clean store by the install
   guide (2026-10-04; docs only, no CHANGELOG bullet).** The ZIP and its
   .sha256 were downloaded from the 3.0.0-rc5 GitHub release (`shasum -a
@@ -131,7 +155,7 @@ Earlier: 2026-09-11, 2026-09-10._
   rather than AutomationsForm on stubbed engine calls — the harness tests the
   page's script; the view model has its unit tests. Adding the Connection
   screen means one `$pages` entry and one page. TESTING.md ("Browser JS
-  harnesses"). CI does not run the harnesses yet.
+  harnesses"). CI runs the harnesses since PRO-3738.
 
 - **PRO-3737 — the admin target spec names the initial setup as the admin
   does (2026-10-04; docs only, no CHANGELOG bullet).**
@@ -1609,7 +1633,8 @@ Earlier: 2026-09-11, 2026-09-10._
   to it. Done 2026-10-04 after rc5, unreleased on v3: PRO-3735 (CI PHP 8.1
   syntax check), PRO-3733 (CLI site address), PRO-3729 and PRO-3737
   (target spec wording), PRO-3736 (admin browser harness), PRO-3739
-  (rc5 clean install by the guide passed; one wording fix). Done
+  (rc5 clean install by the guide passed; one wording fix), PRO-3738 (CI
+  runs the browser harnesses). Done
   2026-10-02/03: headless storefronts + the
   Storefront URL (PRO-3614/3660), browse consent as in Woo and per website
   (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the standard

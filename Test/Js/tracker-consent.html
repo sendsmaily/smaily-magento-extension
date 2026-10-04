@@ -200,6 +200,12 @@
             await p(2, '{"2":1}', {override: false}));
     }
 
+    // bin/test-js.sh runs the page on Chrome's virtual time, which jumps to
+    // the end of its budget whenever no timer is pending, even while a frame
+    // loads or a beacon body is read (seen on Linux Chrome, PRO-3738). A short
+    // interval keeps it stepping until the run ends.
+    var keepAlive = setInterval(function () {}, 10);
+
     run('Luma').then(function () {
         return run('Hyvä');
     }).then(function () {
@@ -208,6 +214,8 @@
             : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
     }).catch(function (error) {
         document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }).then(function () {
+        clearInterval(keepAlive);
     });
 </script>
 </body>

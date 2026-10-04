@@ -66,7 +66,8 @@ bin/test-js.sh              # headless Chrome; CHROME=/path/to/chrome to pick on
 ```
 
 Each page under `Test/Js/` ends with `RESULT: PASS` or `RESULT: FAIL`; the
-script exits non-zero on a failure. `Test/Js/email-mixin.html` loads
+script exits non-zero on a failure and ends with a list of each failed page
+and its failed checks. `Test/Js/email-mixin.html` loads
 Magento's own checkout JS from `vendor/` (so `composer install` first),
 applies the module's mixin as `view/frontend/requirejs-config.js` declares
 it and stubs the rest of the checkout. `Test/Js/email-mixin.html` drives Magento's checkout
@@ -98,7 +99,13 @@ state could not be read, the result asks for a reload and the cards keep
 the page's state. To check another admin screen, add its template and view
 model to `$pages` in `Test/Js/render-admin.php` and a page under `Test/Js/`.
 
-CI does not run the harnesses yet.
+CI runs `bin/test-js.sh` on every push and pull request (the `browser` job:
+PHP 8.3, an install from `composer.lock`, the Google Chrome the runner image
+ships); a failed check fails the job, and the end of its log names the page
+and the check. The pages run on Chrome's virtual time, which jumps to the end
+of its budget whenever no timer is pending — even while a frame loads — so a
+page that waits on frames or promises keeps a short interval running until
+its result is written (see `Test/Js/tracker-consent.html`).
 
 ## Integration tests (real MySQL)
 

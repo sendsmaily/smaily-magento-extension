@@ -82,6 +82,10 @@ style (str_replace, never sprintf).
     MySQL (`docker run --rm -d -e MYSQL_ROOT_PASSWORD=root -p 3316:3306
     mysql:8.4` + `SMAILY_IT_DB_PORT=3316`, see TESTING.md); NEVER point
     `SMAILY_IT_DB_*` at the sandbox DB — the suite drops/recreates tables.
+  - `bin/test-js.sh` — the browser harnesses in headless Chrome. Chrome's
+    virtual time jumps to the end of its budget when no timer is pending, so a
+    page that waits on frames or promises keeps a short interval running
+    (Linux Chrome cut `tracker-consent.html` short without one; TESTING.md).
 - **Local PHP 8.5 accepts syntax PHP 8.1 rejects** (DNF types such as
   `(A&B)|null` are 8.2+, `new Foo()->bar()` without wrapping parens is
   8.4+), and neither phpstan (even with `phpVersion: 80100`) nor phpcs

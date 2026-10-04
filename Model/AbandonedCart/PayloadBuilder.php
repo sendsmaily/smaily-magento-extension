@@ -51,9 +51,48 @@ class PayloadBuilder
     }
 
     /**
+     * The reminder address of each cart, by quote id. Built under frontend
+     * emulation of the carts' store (the cron emulates once per store): the
+     * carts' products load in one collection per store, and each product's
+     * description, image link and regular price resolve once per store, not
+     * once per cart line (PRO-1960).
+     *
+     * @param Quote[] $quotes
+     * @return array<int, array<string, string>>
+     */
+    public function buildAll(array $quotes): array
+    {
+        $items = [];
+        $productIds = [];
+        foreach ($quotes as $key => $quote) {
+            $items[$key] = $quote->getAllVisibleItems();
+            foreach ($items[$key] as $item) {
+                $productIds[(int)$quote->getStoreId()][] = (int)$item->getProduct()->getId();
+            }
+        }
+        $products = [];
+        foreach ($productIds as $storeId => $ids) {
+            $products[$storeId] = $this->loadProducts($ids, $storeId);
+        }
+
+        $details = [];
+        $addresses = [];
+        foreach ($quotes as $key => $quote) {
+            $storeId = (int)$quote->getStoreId();
+            $details[$storeId] ??= [];
+            $addresses[(int)$quote->getId()] = array_merge(
+                $this->contactFields($quote),
+                $this->productFields($items[$key], $products[$storeId] ?? [], $details[$storeId])
+            );
+        }
+
+        return $addresses;
+    }
+
+    /**
      * @return array<string, string>
      */
-    public function build(Quote $quote): array
+    private function contactFields(Quote $quote): array
     {
         $address = [
             'email' => $this->resolveEmail($quote),
@@ -98,7 +137,7 @@ class PayloadBuilder
             // Store context is decorative; the address stays valid without it.
         }
 
-        return array_merge($address, $this->productFields($quote));
+        return $address;
     }
 
     /**
@@ -129,14 +168,16 @@ class PayloadBuilder
     }
 
     /**
+     * @param Item[] $items
+     * @param array<int, Product> $products
+     * @param array<int, array<string, string>> $details Each product's half
+     *        of a slot, by product id, resolved on first use and shared by
+     *        every cart of the store.
      * @return array<string, string>
      */
-    private function productFields(Quote $quote): array
+    private function productFields(array $items, array $products, array &$details): array
     {
         $fields = $this->blankSlots();
-
-        $items = $quote->getAllVisibleItems();
-        $products = $this->loadProducts($items, (int)$quote->getStoreId());
 
         $slot = 0;
         foreach ($items as $item) {
@@ -145,9 +186,12 @@ class PayloadBuilder
                 break;
             }
             $slot++;
-            $product = $products[(int)$item->getProduct()->getId()] ?? null;
+            $productId = (int)$item->getProduct()->getId();
+            if (isset($products[$productId])) {
+                $details[$productId] ??= $this->productDetails($products[$productId]);
+            }
 
-            foreach ($this->productRow($item, $product) as $field => $value) {
+            foreach ($this->productRow($item, $details[$productId] ?? []) as $field => $value) {
                 $fields[sprintf('product_%s_%d', $field, $slot)] = $value;
             }
         }
@@ -156,29 +200,42 @@ class PayloadBuilder
     }
 
     /**
-     * The product half of one slot: payload key suffix => value. A null item
-     * yields the blank row every unused slot is prefilled with.
+     * One slot: payload key suffix => value. A null item yields the blank row
+     * every unused slot is prefilled with; a cart line whose product did not
+     * load keeps the product half empty.
      *
+     * @param array<string, string> $product productDetails() of the line's product.
      * @return array<string, string>
      */
-    private function productRow(?Item $item, ?Product $product): array
+    private function productRow(?Item $item, array $product): array
     {
-        $description = $product === null ? '' : trim(strip_tags(
-            (string)($product->getData('short_description') ?: $product->getData('description'))
-        ));
-        $regular = $product === null
-            ? 0.0
-            : (float)$product->getPriceInfo()->getPrice('regular_price')->getAmount()->getValue();
-
         return [
             'name' => (string)$item?->getName(),
-            'description' => $description,
-            'image_url' => $product === null ? '' : (string)$this->imageUrl($product),
+            'description' => $product['description'] ?? '',
+            'image_url' => $product['image_url'] ?? '',
             'sku' => (string)$item?->getSku(),
             'quantity' => $item === null ? '' : (string)(float)$item->getQty(),
             'price' => $item === null
                 ? ''
                 : number_format((float)($item->getPriceInclTax() ?: $item->getPrice()), 2, '.', ''),
+            'base_price' => $product['base_price'] ?? '',
+        ];
+    }
+
+    /**
+     * The product half of a slot: the same in every cart of the store.
+     *
+     * @return array<string, string>
+     */
+    private function productDetails(Product $product): array
+    {
+        $regular = (float)$product->getPriceInfo()->getPrice('regular_price')->getAmount()->getValue();
+
+        return [
+            'description' => trim(strip_tags(
+                (string)($product->getData('short_description') ?: $product->getData('description'))
+            )),
+            'image_url' => (string)$this->imageUrl($product),
             'base_price' => $regular > 0 ? number_format($regular, 2, '.', '') : '',
         ];
     }
@@ -192,7 +249,7 @@ class PayloadBuilder
     private function blankSlots(): array
     {
         if (self::$blankSlots === []) {
-            foreach (array_keys($this->productRow(null, null)) as $field) {
+            foreach (array_keys($this->productRow(null, [])) as $field) {
                 for ($i = 1; $i <= self::MAX_PRODUCTS; $i++) {
                     self::$blankSlots[sprintf('product_%s_%d', $field, $i)] = '';
                 }
@@ -203,19 +260,11 @@ class PayloadBuilder
     }
 
     /**
-     * @param Item[] $items
+     * @param int[] $productIds
      * @return array<int, Product>
      */
-    private function loadProducts(array $items, int $storeId): array
+    private function loadProducts(array $productIds, int $storeId): array
     {
-        $productIds = [];
-        foreach ($items as $item) {
-            $productIds[] = (int)$item->getProduct()->getId();
-        }
-        if (!$productIds) {
-            return [];
-        }
-
         $collection = $this->productCollectionFactory->create();
         $collection->setStoreId($storeId)
             ->addAttributeToSelect(['name', 'short_description', 'description', 'thumbnail', 'image', 'price'])

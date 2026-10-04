@@ -10,8 +10,9 @@ PHP and PHTML file on PHP 8.1), PRO-3733 (a command-line Campaign
 Intelligence connection sends the storefront's site address), PRO-3729 and
 PRO-3737 (admin target spec wording), PRO-3736 (a browser harness for the
 Automations tab's save result), PRO-3739 (the rc5 ZIP installed on a
-clean store by docs/INSTALLING.md; one wording fix) and PRO-3738 (CI runs
-the browser harnesses) landed on v3, unreleased; CHANGELOG's
+clean store by docs/INSTALLING.md; one wording fix), PRO-3738 (CI runs
+the browser harnesses) and PRO-1960 (the abandoned-cart reminders are built
+once per store) landed on v3, unreleased; CHANGELOG's
 "Changes since 3.0.0-rc5" has PRO-3733, the others change nothing a merchant
 sees. 3.0.0-rc5 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc5),
@@ -84,6 +85,38 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-1960 — the abandoned-cart reminders are built once per store
+  (2026-10-04; behaviour-neutral, no CHANGELOG bullet).** `Cron\AbandonedCart`
+  builds the page's payloads before the reminder rules weigh it, grouped by
+  store: one frontend emulation per store (was one per cart), and the new
+  `PayloadBuilder::buildAll()` (replaces `build()`) loads all that store's
+  cart products in one collection (was one per cart) and resolves each
+  product's description, image link and regular price once (was once per
+  cart line; the price still through Magento's price model, so configurable
+  and tax-inclusive prices are unchanged). The rules still weigh the carts
+  oldest id first, whatever their store; a build that fails now leaves the
+  whole page for the next run (before, the carts ahead of it were
+  enqueued). **Measured** on the sandbox with a cron-like CLI probe named
+  `magento` (crontab area, frontend emulation, nothing queued, marked or
+  sent; 40 inactive guest carts at example.com, 129 cart lines, 12 products
+  incl. four configurables, one cart over ten lines; Zend DB profiler): the
+  builder's own queries 32/52/92 → 14/14/14 at 10/20/40 carts (2 per cart +
+  12 → constant); the whole build 2 810 → 2 732 queries at 40 carts.
+  Magento's own cart loading is the rest: ~21 queries per cart line, mostly
+  MSI stock checks run by *Enable Inventory Check On Cart Load* (Magento's
+  default, on); with it off the whole build is 723 → 645. **Payloads
+  byte-identical** before/after for the same carts with a fixed clock
+  (sha256 equal): rewrites off (the sandbox's state; links carry
+  `index.php`), rewrites on (temporary config row, removed) and the
+  inventory check off (temporary row, removed). Tests: a unit test (two
+  carts of one store sharing a product: one product collection, one image
+  helper, the price model read once; red with the per-line resolution), an
+  integration scenario (carts of two stores interleaved: two emulations,
+  one build per store, the older cart of a shared address reminded across
+  stores; red with a build per cart). ARCHITECTURE ("One build per store").
+  Sandbox restored (probe, fixture carts and config rows removed, config
+  cache cleaned).
 
 - **PRO-3738 — CI runs the browser harnesses (2026-10-04; tooling, no
   CHANGELOG bullet).** New `browser` job in `.github/workflows/ci.yaml`:
@@ -1634,7 +1667,8 @@ Earlier: 2026-09-11, 2026-09-10._
   syntax check), PRO-3733 (CLI site address), PRO-3729 and PRO-3737
   (target spec wording), PRO-3736 (admin browser harness), PRO-3739
   (rc5 clean install by the guide passed; one wording fix), PRO-3738 (CI
-  runs the browser harnesses). Done
+  runs the browser harnesses), PRO-1960 (abandoned-cart reminders built
+  once per store; behaviour-neutral). Done
   2026-10-02/03: headless storefronts + the
   Storefront URL (PRO-3614/3660), browse consent as in Woo and per website
   (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the standard

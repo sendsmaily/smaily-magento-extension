@@ -569,6 +569,24 @@ name in `abandoned_cart_url` and `store_url` (`magento` under bin/magento),
 so `Model\StorefrontScript` puts the storefront's `index.php` in its place,
 as for catalog product links (PRO-3732).
 
+**One build per store (PRO-1960).** Before the reminder rules below weigh
+the page, the cron builds every candidate's payload, grouped by store: one
+frontend emulation per store around the whole build (Magento allows one
+emulation level, so nothing inside it emulates), and
+`PayloadBuilder::buildAll()` loads the products of all that store's carts in
+one collection and resolves each product's description, image link and
+regular price once, whatever number of carts hold it. The regular price
+still comes from Magento's price model, so configurable and tax-inclusive
+prices are what they were. The rules then weigh the carts oldest id first,
+whatever their store. A build that fails leaves the whole page for the next
+run. On the sandbox (40 carts, 129 cart lines, 12 products) the builder's
+own queries went from 92 (two per cart, plus 12 for the prices of the four
+configurable products) to 14 (the same at 10 and 20 carts), payloads
+byte-identical with rewrites on and off. Magento's own cart loading (`getAllVisibleItems()`) stays per
+cart; with *Enable Inventory Check On Cart Load* on (Magento's default) it
+runs MSI's stock checks for every cart line, about 21 queries a line — most
+of a page's build queries. That check is Magento's and is left as it is.
+
 **Handled carts never fill the page (PRO-3711).** A handled cart (a
 terminal row: `mailed`, `skipped`, `completed`, `erased`, `expired`) that is
 still active keeps matching the scan's `quote` filters for the rest of its

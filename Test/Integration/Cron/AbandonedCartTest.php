@@ -41,13 +41,17 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  * PRO-3693: one address gets at most one reminder in 24 hours, whatever
  * number of carts carry it. PRO-3711: handled carts never keep a new one
  * out of the scan's page. The payload builder is stubbed: it reads the
- * cart's own email.
+ * cart's own email. PRO-1960: the reminders are built once per store, under
+ * one emulation of that store.
  */
 class AbandonedCartTest extends IntegrationTestCase
 {
     private const CART_TABLE = 'smaily_abandoned_cart';
 
     private StateManager $stateManager;
+
+    /** @var array<int, int[]> The quote ids of each payload build, in build order. */
+    private array $builds = [];
 
     protected function setUp(): void
     {
@@ -206,13 +210,46 @@ class AbandonedCartTest extends IntegrationTestCase
         );
     }
 
-    private function cron(): AbandonedCart
+    public function testRemindersAreBuiltOncePerStoreAndStillWeighedOldestCartFirst(): void
+    {
+        $carts = [5 => [2, 'both@example.com'], 6 => [1, 'both@example.com'], 7 => [2, 'other@example.com']];
+        $rows = [];
+        foreach ($carts as $quoteId => [$storeId, $email]) {
+            $rows[] = [
+                'entity_id' => $quoteId,
+                'store_id' => $storeId,
+                'is_active' => 1,
+                'items_count' => 1,
+                'customer_email' => $email,
+                'updated_at' => $this->clockDate(-3600),
+            ];
+        }
+        $this->connection->insertMultiple('quote', $rows);
+        $emulated = [];
+        $emulation = $this->createMock(Emulation::class);
+        $emulation->method('startEnvironmentEmulation')->willReturnCallback(
+            function (int $storeId) use (&$emulated): void {
+                $emulated[] = $storeId;
+            }
+        );
+        $emulation->expects(self::exactly(2))->method('stopEnvironmentEmulation');
+
+        $this->cron($emulation)->execute();
+
+        self::assertSame([2, 1], $emulated, 'One emulation per store');
+        self::assertSame([[5, 7], [6]], $this->builds, 'One build per store');
+        self::assertSame(StateManager::STATUS_MAILED, $this->statusOf(5), 'The older cart of the address');
+        self::assertSame(StateManager::STATUS_SKIPPED, $this->statusOf(6));
+        self::assertSame(StateManager::STATUS_MAILED, $this->statusOf(7));
+    }
+
+    private function cron(?Emulation $emulation = null): AbandonedCart
     {
         $store = $this->createMock(Store::class);
         $store->method('getId')->willReturn(1);
         $website = $this->createMock(Website::class);
         $website->method('getId')->willReturn(1);
-        $website->method('getStoreIds')->willReturn([1]);
+        $website->method('getStoreIds')->willReturn([1, 2]);
         $website->method('getDefaultStore')->willReturn($store);
         $storeView = $this->createMock(StoreInterface::class);
         $storeView->method('getWebsiteId')->willReturn(1);
@@ -235,9 +272,15 @@ class AbandonedCartTest extends IntegrationTestCase
         );
 
         $payloadBuilder = $this->createMock(PayloadBuilder::class);
-        $payloadBuilder->method('build')->willReturnCallback(
-            fn (Quote $quote): array => ['email' => (string)$quote->getData('customer_email')]
-        );
+        $payloadBuilder->method('buildAll')->willReturnCallback(function (array $quotes): array {
+            $addresses = [];
+            foreach ($quotes as $quote) {
+                $addresses[(int)$quote->getId()] = ['email' => (string)$quote->getData('customer_email')];
+            }
+            $this->builds[] = array_keys($addresses);
+
+            return $addresses;
+        });
 
         return new AbandonedCart(
             $storeManager,
@@ -246,7 +289,7 @@ class AbandonedCartTest extends IntegrationTestCase
             $this->stateManager,
             $payloadBuilder,
             $dispatcher,
-            $this->createMock(Emulation::class),
+            $emulation ?? $this->createMock(Emulation::class),
             $this->clock,
             $this->createMock(Logger::class)
         );

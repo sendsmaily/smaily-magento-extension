@@ -144,15 +144,11 @@ class AbandonedCart
             array_map(static fn (Quote $quote): int => (int)$quote->getId(), $candidates)
         );
 
+        $addresses = $this->buildAddresses($candidates);
         $mailed = 0;
         foreach ($candidates as $quote) {
             $storeId = (int)$quote->getStoreId();
-            $this->emulation->startEnvironmentEmulation($storeId, Area::AREA_FRONTEND, true);
-            try {
-                $address = $this->payloadBuilder->build($quote);
-            } finally {
-                $this->emulation->stopEnvironmentEmulation();
-            }
+            $address = $addresses[(int)$quote->getId()];
 
             if (($address['email'] ?? '') === '') {
                 continue;
@@ -187,6 +183,34 @@ class AbandonedCart
                 'count' => $mailed,
             ]);
         }
+    }
+
+    /**
+     * Each candidate's reminder address, by quote id: one frontend emulation
+     * and one batch build per store (PRO-1960). The reminder rules above still
+     * weigh the carts oldest id first, whatever their store.
+     *
+     * @param Quote[] $candidates
+     * @return array<int, array<string, string>>
+     */
+    private function buildAddresses(array $candidates): array
+    {
+        $byStore = [];
+        foreach ($candidates as $quote) {
+            $byStore[(int)$quote->getStoreId()][] = $quote;
+        }
+
+        $addresses = [];
+        foreach ($byStore as $storeId => $quotes) {
+            $this->emulation->startEnvironmentEmulation($storeId, Area::AREA_FRONTEND, true);
+            try {
+                $addresses += $this->payloadBuilder->buildAll($quotes);
+            } finally {
+                $this->emulation->stopEnvironmentEmulation();
+            }
+        }
+
+        return $addresses;
     }
 
     /**

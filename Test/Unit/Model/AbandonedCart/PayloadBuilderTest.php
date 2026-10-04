@@ -8,12 +8,16 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Unit\Model\AbandonedCart;
 
+use Magento\Catalog\Helper\Image as ImageHelper;
 use Magento\Catalog\Helper\ImageFactory as ImageHelperFactory;
 use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Framework\App\Request\Http;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Pricing\Amount\AmountInterface;
+use Magento\Framework\Pricing\Price\PriceInterface;
+use Magento\Framework\Pricing\PriceInfo\Base as PriceInfo;
 use Magento\Framework\UrlInterface;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Address;
@@ -35,6 +39,9 @@ use Smaily\Connect\Model\StorefrontScript;
  * PRO-1760: product details are always sent (no merchant selection), and all
  * ten slots are written on every send so a smaller cart clears the previous
  * one from the contact.
+ *
+ * PRO-1960: one store's carts are built together — their products load once
+ * and each product's details resolve once, whatever number of carts hold it.
  */
 class PayloadBuilderTest extends TestCase
 {
@@ -139,27 +146,93 @@ class PayloadBuilderTest extends TestCase
         self::assertSame('http://shop.example/', $address['store_url']);
     }
 
+    public function testCartsOfOneStoreLoadTheirProductsOnceAndResolveEachProductOnce(): void
+    {
+        $product = $this->createMock(Product::class);
+        $product->method('getId')->willReturn(7);
+        $product->method('getData')->willReturnMap([
+            ['short_description', null, '<p>Roomy tent</p>'],
+            ['description', null, null],
+        ]);
+        $product->expects(self::once())->method('getPriceInfo')->willReturn($this->priceInfo(199.0));
+
+        $collection = $this->createMock(ProductCollection::class);
+        $collection->method('setStoreId')->willReturnSelf();
+        $collection->method('addAttributeToSelect')->willReturnSelf();
+        $collection->method('addIdFilter')->willReturnSelf();
+        $collection->method('addPriceData')->willReturnSelf();
+        $collection->method('getItems')->willReturn([$product]);
+        $products = $this->createMock(ProductCollectionFactory::class);
+        $products->expects(self::once())->method('create')->willReturn($collection);
+
+        $image = $this->createMock(ImageHelper::class);
+        $image->method('init')->willReturnSelf();
+        $image->method('resize')->willReturnSelf();
+        $image->method('getUrl')->willReturn('http://shop.example/media/tent.jpg');
+        $images = $this->createMock(ImageHelperFactory::class);
+        $images->expects(self::once())->method('create')->willReturn($image);
+
+        $addresses = $this->builder(products: $products, images: $images)->buildAll([
+            $this->quote('mari@example.com', null, null, [$this->item('Tent', 'TENT-1', 1.0, 149.0)], 21),
+            $this->quote('jaan@example.com', null, null, [
+                $this->item('Mug', 'MUG-1', 1.0, 9.5),
+                $this->item('Tent', 'TENT-1', 2.0, 149.0),
+            ], 22),
+        ]);
+
+        self::assertSame([21, 22], array_keys($addresses));
+        self::assertSame('mari@example.com', $addresses[21]['email']);
+        self::assertSame('jaan@example.com', $addresses[22]['email']);
+        foreach ([$addresses[21], $addresses[22]] as $slot => $address) {
+            $slot++;
+            self::assertSame('Tent', $address['product_name_' . $slot]);
+            self::assertSame('Roomy tent', $address['product_description_' . $slot]);
+            self::assertSame('http://shop.example/media/tent.jpg', $address['product_image_url_' . $slot]);
+            self::assertSame('199.00', $address['product_base_price_' . $slot]);
+        }
+        self::assertSame('2', $addresses[22]['product_quantity_2']);
+    }
+
     /**
      * @return array<string, string>
      */
     private function build(Quote $quote, ?StoreManagerInterface $storeManager = null, ?Http $request = null): array
     {
+        return $this->builder($storeManager, $request)->buildAll([$quote])[0];
+    }
+
+    private function builder(
+        ?StoreManagerInterface $storeManager = null,
+        ?Http $request = null,
+        ?ProductCollectionFactory $products = null,
+        ?ImageHelperFactory $images = null
+    ): PayloadBuilder {
         if ($storeManager === null) {
             $storeManager = $this->createMock(StoreManagerInterface::class);
             // Store context is decorative; a failure keeps the address valid.
             $storeManager->method('getStore')->willThrowException(new LocalizedException(__('no store')));
         }
 
-        $builder = new PayloadBuilder(
+        return new PayloadBuilder(
             $storeManager,
-            $this->productCollectionFactory(),
-            new ImageHelperFactory(),
+            $products ?? $this->productCollectionFactory(),
+            $images ?? new ImageHelperFactory(),
             $this->createMock(RestoreTokenManager::class),
             $this->createMock(Logger::class),
             new StorefrontScript($storeManager, $request ?? $this->createMock(Http::class))
         );
+    }
 
-        return $builder->build($quote);
+    private function priceInfo(float $regular): PriceInfo
+    {
+        $amount = $this->createMock(AmountInterface::class);
+        $amount->method('getValue')->willReturn($regular);
+        $price = $this->createMock(PriceInterface::class);
+        $price->method('getAmount')->willReturn($amount);
+        $priceInfo = $this->createMock(PriceInfo::class);
+        $priceInfo->method('getPrice')->with('regular_price')->willReturn($price);
+
+        return $priceInfo;
     }
 
     /**
@@ -216,18 +289,20 @@ class PayloadBuilderTest extends TestCase
         ?string $customerEmail,
         ?string $billingEmail,
         ?string $shippingEmail,
-        array $items = []
+        array $items = [],
+        ?int $quoteId = null
     ): Quote {
         // getCustomerEmail / *name are magic getters (addMethods); getStoreId,
         // getAllVisibleItems and the address getters are real methods.
         $quote = $this->getMockBuilder(Quote::class)
             ->disableOriginalConstructor()
             ->addMethods(['getCustomerEmail', 'getCustomerFirstname', 'getCustomerLastname'])
-            ->onlyMethods(['getStoreId', 'getBillingAddress', 'getShippingAddress', 'getAllVisibleItems'])
+            ->onlyMethods(['getId', 'getStoreId', 'getBillingAddress', 'getShippingAddress', 'getAllVisibleItems'])
             ->getMock();
         $quote->method('getCustomerEmail')->willReturn($customerEmail);
         $quote->method('getCustomerFirstname')->willReturn(null);
         $quote->method('getCustomerLastname')->willReturn(null);
+        $quote->method('getId')->willReturn($quoteId);
         $quote->method('getStoreId')->willReturn(1);
         $quote->method('getBillingAddress')->willReturn($this->address($billingEmail));
         $quote->method('getShippingAddress')->willReturn($this->address($shippingEmail));
@@ -238,6 +313,7 @@ class PayloadBuilderTest extends TestCase
 
     private function item(string $name, string $sku, float $qty, float $price): Item
     {
+        $productId = ['TENT-1' => 7, 'MUG-1' => 8][$sku] ?? 7;
         // getPriceInclTax is a magic data getter; the rest are real methods.
         $item = $this->getMockBuilder(Item::class)
             ->disableOriginalConstructor()
@@ -250,7 +326,7 @@ class PayloadBuilderTest extends TestCase
         $item->method('getPrice')->willReturn($price);
         $item->method('getPriceInclTax')->willReturn($price);
         $product = $this->createMock(Product::class);
-        $product->method('getId')->willReturn(7);
+        $product->method('getId')->willReturn($productId);
         $item->method('getProduct')->willReturn($product);
 
         return $item;

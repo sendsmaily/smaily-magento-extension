@@ -172,6 +172,10 @@ docker exec magento2 bash -c 'cd /var/www/html && bin/magento setup:upgrade && b
 docker exec magento2 bash -c 'cd /var/www/html && bin/magento cron:run --group smaily_connect'
 ```
 
+phpMyAdmin for the sandbox database listens on host port 8888. Where that
+port is taken, pick another one with `PMA_PORT` when the stack starts, for
+example `PMA_PORT=8889 docker compose up -d`.
+
 **The admin has no second factor.** `setup:install` enables
 `Magento_TwoFactorAuth` and `Magento_AdminAdobeImsTwoFactorAuth`, which send
 every login to `tfa/tfa/requestconfig` and make the admin unreachable to a
@@ -354,7 +358,11 @@ working tree, which is not what a merchant installs.
    [docs/INSTALLING.md](docs/INSTALLING.md) as `www-data` from
    `/var/www/html` — `sha256sum -c`, extract, the production command
    sequence with `setup:static-content:deploy en_US et_EE`,
-   `cron:run --group smaily_connect`, the admin checks. Then the update
+   `cron:run --group smaily_connect`, the admin checks. The sandbox image
+   has no `crontab` binary, so the guide's step 4 (`crontab -l`,
+   `cron:install`) needs the cron package first:
+   `docker exec -u root magento2 bash -c 'apt-get update && apt-get install -y cron'`
+   (it lasts until the container is recreated). Then the update
    section (a fresh extraction of the ZIP and the step 3 commands again)
    and the disable section with `--safe-mode=1`, followed by re-enabling
    with `--data-restore=1`. To check removal, follow the guide's

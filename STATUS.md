@@ -129,6 +129,20 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-2462 — sandbox: phpMyAdmin's port is configurable, the ZIP install
+  check names the missing `crontab` (2026-10-04; tooling, no CHANGELOG
+  bullet; the sample-data part is a question, item 16 below).**
+  `docker-compose.yaml` publishes phpMyAdmin on `${PMA_PORT:-8888}`:
+  `docker compose config` resolves 8888 without the variable and 8899
+  with `PMA_PORT=8899`; the running phpMyAdmin container was not
+  restarted. TESTING.md's sandbox section names the port and the
+  variable, and the clean-install-from-the-ZIP step 4 says the sandbox
+  image has no `crontab` binary (found in PRO-3739; confirmed: `command -v
+  crontab` finds nothing, the exec user is www-data), so INSTALLING's step
+  4 needs `apt-get install -y cron` as root first. The sample-data
+  promise stays: the running sandbox, installed on fresh volumes on
+  2026-10-02, has the sample data (item 16).
+
 - **PRO-2514 — `etc/module.xml` sequences every Magento module composer
   requires (2026-10-04; no merchant-visible change, no CHANGELOG bullet).**
   Rule: the `<sequence>` mirrors composer's `magento/module-*`
@@ -2143,7 +2157,8 @@ Earlier: 2026-09-11, 2026-09-10._
   for one catalog entry's image and product link opened from the engine
   (PRO-3731); (2) open queue: PRO-3746 (after the pilot), PRO-3747,
   PRO-1958; small
-  cleanup PRO-2462 (PRO-2475, PRO-1469, PRO-2514 done); robustness PRO-1962/2465/2466/1961;
+  cleanup PRO-2462 (sample data: question 16; PRO-2475, PRO-1469,
+  PRO-2514 done); robustness PRO-1962/2465/2466/1961;
   (3) cross-repo asks: PRO-3740 (engine contract wording: §3/§3b still
   describe a periodic full re-sync), PRO-3743 (WooCommerce), PRO-3744
   (Shopify); (4) Erkki: the engine pilot decisions (PRO-3600); HC Pro
@@ -6170,3 +6185,16 @@ PRO-1267 (engine: Magento product-identity contract note).
     default scope's, else the config.xml default
     (`LegacyConfigMapper::MODULE_SWITCH_DEFAULTS`, unit-checked against
     `etc/config.xml`); the UPGRADING guide step is gone.
+16. PRO-2462 — does the sandbox's sample data still need fixing (Low
+    urgency; tooling only)? The task said sample data no longer installs
+    and decided to drop the promise from TESTING.md. The running sandbox
+    says otherwise: its volumes were created fresh on 2026-10-02 from the
+    image built that morning, and the install loaded the Luma sample data
+    (2,046 products created 09:43:09–09:43:21 UTC, 40 categories, the
+    sample CMS pages, all 20 `*SampleData` modules enabled); PRO-1967 and
+    PRO-3731 verified on those products (24-MB01, 24-MB04). Only the
+    product image files are missing (the image clones
+    `magento2-sample-data`, which carries no media). So TESTING.md still
+    says "with sample data" and no create-a-product recipe was added. Say
+    which: keep the promise (and note the missing images), or drop it as
+    decided (then the "create one product + reindex" recipe goes in).

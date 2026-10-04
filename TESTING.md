@@ -12,6 +12,11 @@ vendor/bin/phpstan analyse  # level 6 with the bitexpert/phpstan-magento extensi
 CI (GitHub Actions) runs the unit suite on PHP 8.1 and 8.3 plus the static
 analysis job on every push and pull request.
 
+PHPStan needs more memory than PHP's default 128M. `phpstan.neon.dist` loads
+`Test/phpstan-bootstrap.php`, which raises the limit to 1G in the main process
+and in every worker, so the command above runs as written; a higher limit
+from php.ini or `--memory-limit` is left as it is.
+
 **`composer.lock` is committed.** Every job installs from it, so an upstream
 release can no longer turn a green build red without a change in this
 repository — which is exactly what happened on 2026-09-10, when a freshly

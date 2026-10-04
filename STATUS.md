@@ -53,6 +53,17 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3559 — the static-analysis gate runs on a default local PHP
+  (2026-10-04; found during the lock refresh).** With PHP's default 128M,
+  `vendor/bin/phpstan analyse` stopped with a worker out-of-memory error.
+  `phpstan.neon.dist` now loads `Test/phpstan-bootstrap.php`
+  (`bootstrapFiles`, main process and every worker), which raises a lower
+  limit to 1G; `-1`, a higher php.ini limit or `--memory-limit` stay. The
+  documented command is unchanged; what PHPStan checks is unchanged.
+  Evidence, result cache cleared: `php -d memory_limit=128M
+  vendor/bin/phpstan analyse` red on the old config, `[OK]` on the new.
+  TESTING says why. CI (memory unlimited) is unaffected.
+
 - **Simplification pass, behaviour-neutral (2026-10-03).** One
   `Model\RateLimit\FixedWindowCounter` holds the relay's and the guest
   cart email's cache counters (same keys, limits, TTLs);

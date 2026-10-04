@@ -71,6 +71,19 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3734 — engine contract copy synced to engine main 32f6222
+  (2026-10-04; still v1.8.2, a clarification).** Byte-identical with engine
+  main (`bin/check-contract-staleness.sh` against the fetched copy: OK, md5
+  `36ebd8b9…`; the copy before was STALE). The only change is §13
+  (PRO-3705): a row with `enabled: true` + `test_mode: false` is stored
+  with `test_mode: true` unless the trigger already sends to real
+  customers — a Smaily operator switches real sends on in the engine admin
+  after the merchant's written yes; the response stays `200 {ok,
+  upserted}`, §12 returns the stored state, and every `enabled` /
+  `test_mode` change is recorded engine-side. No new endpoint, field or
+  shape; no pending-request field. What the Automations tab shows after a
+  save follows in the next commit.
+
 - **PRO-1967 simplification pass, behaviour-neutral (2026-10-04).** One
   `Model\Engine\CatalogProductLoader` loads the backfill page and the
   stock-change batch (canonical scope, `PRODUCT_ATTRIBUTES`, URL rewrites;

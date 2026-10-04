@@ -1587,15 +1587,17 @@ Saves the merchant's automation configuration. **Full-selection upsert**: the pl
 | `automation_map` | object `{string: string}` | YES | Smaily workflow/autoresponder ids. **Every value must be a numeric string** (`/^\d+$/`) — e.g. `"123"`, not `123` or `"abc"`. Keys are free-form: `"id"` (single mode), language codes + `"fallback"` (per_language mode). When `enabled=true`: `single` requires the `id` key; `per_language` requires the `fallback` key (422 otherwise). When `enabled=false` the map may be empty `{}` — but the key itself must be present. |
 | `cooldown_days` | integer 1–365 | YES | Minimum days between fires per customer per trigger. **Required even on `enabled=false` rows** (no server default — the plugin supplies its UI default, e.g. 7). |
 | `daily_cap` | integer 1–100000 \| null | YES (nullable) | Max fires per day for this trigger. **Nullable but the key must be present** — `null` = no cap. |
-| `test_mode` | boolean | YES | When true, fires only reach `test_emails` recipients. UI default: true (fail-closed). |
+| `test_mode` | boolean | YES | When true, fires only reach `test_emails` recipients. UI default: true (fail-closed). **This endpoint cannot switch real sends on** — see the Semantics note below. |
 | `test_emails` | array of email strings, max 50 | YES | May be empty `[]`. Each entry must be a valid email. |
 
 > **Unknown keys are stripped, not rejected** (standard Zod object behavior): extra keys in a row — including round-tripped `configured_via` / `updated_at` from §12 — are silently ignored. Cleaner to not send them.
 
 **Semantics**:
-- **UPSERT by `(tenant_id, trigger_key)`** — a row in the body creates or fully replaces that trigger's config.
+- **UPSERT by `(tenant_id, trigger_key)`** — a row in the body creates or fully replaces that trigger's config (one exception: the real-sends rule below).
 - **PUT never deletes rows**: a trigger absent from the body keeps its stored config unchanged (and if it was never configured, it stays off). There is no delete operation — to disable a trigger, send its row with `enabled: false`.
 - `configured_via` is written as `'plugin'` on every row this endpoint touches (the engine-side admin UI writes `'admin'`).
+- **Real sends are switched on engine-side only** (pilot consent rule): a row with `enabled: true` and `test_mode: false` is stored with `test_mode: true` unless that trigger already sends to real customers. Every other field in the row is stored as sent, and the response is the normal `200` shape. Read the stored state back with §12. A trigger whose real sends the operator already switched on keeps them when the plugin re-saves it; `enabled: false` and `test_mode: true` are always stored as sent. The merchant asks for real sends in writing; a Smaily operator switches them on in the engine admin.
+- Every change of a row's `enabled` / `test_mode` state is recorded engine-side with the authenticating API key.
 - **Validation is all-or-nothing** (unlike ingest's per-item D6 partial success): any invalid row → 422 and **nothing** is written. Retry with the whole corrected selection.
 
 **Response 200 OK**:
@@ -2056,6 +2058,10 @@ curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
 - **The rule.** Once a visitor token is bound to a customer, the engine never binds that token's browsing (past or future) to a different customer. The first binding wins; no age limit. An unbound token binds as before; the same customer with their own token behaves as before.
 - **What still binds.** The merge's `anon_session_id` and the browse event's own `customer_email` / `external_id` resolution are unchanged — only the token-based binding is refused.
 - **Nothing to implement sender-side.** Request and response shapes are unchanged; a refused token binding reports `0` in the existing counts, not an error.
+
+**v1.8.2 — clarification: §13 cannot switch real sends on** (no new endpoint, field, status or shape). PRO-3705, Erkki's decision 2026-10-02:
+- **The rule.** For the pilot, consent for engine-sent emails is the merchant's written yes plus a Smaily operator switching real sends on in the engine admin. A §13 row with `enabled: true` + `test_mode: false` is stored with `test_mode: true` unless the trigger already sends to real customers; the rest of the row is stored as sent and the response stays `200 {ok, upserted}`.
+- **What the plugin sees.** §12 returns the stored state, so after such a save the row reads `test_mode: true`. The plugin's UI should show the §12 state, not its own request.
 
 ### Appendix F: Migration notes
 

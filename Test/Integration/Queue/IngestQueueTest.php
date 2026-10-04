@@ -150,7 +150,7 @@ class IngestQueueTest extends IntegrationTestCase
      * pending or being sent; a delivered or failed row, another domain or
      * another entity never counts.
      */
-    public function testUndeliveredPayloadsReturnsTheNewestUnsentRowPerEntity(): void
+    public function testLatestUndeliveredPayloadsReturnsTheNewestUnsentRowPerEntity(): void
     {
         $this->queue->enqueue('catalog', ['v' => 1], '1', null, 'u-old');
         $this->queue->enqueue('catalog', ['v' => 2], '1', null, 'u-new');
@@ -169,9 +169,35 @@ class IngestQueueTest extends IntegrationTestCase
 
         self::assertSame(
             ['1' => '{"v":2}', '5' => '{"v":6}'],
-            $this->queue->undeliveredPayloads('catalog', ['1', '2', '3', '4', '5'])
+            $this->queue->latestUndeliveredPayloads('catalog', ['1', '2', '3', '4', '5'])
         );
-        self::assertSame([], $this->queue->undeliveredPayloads('catalog', []));
+        self::assertSame([], $this->queue->latestUndeliveredPayloads('catalog', []));
+    }
+
+    /**
+     * PRO-1967: a product save queues its row and also reaches the stock
+     * hooks; the row their marker builds is the same row, still waiting to be
+     * sent, so it is not queued a second time. A different row is, and so is
+     * a row whose only unsent match is older than the entity's newest.
+     */
+    public function testEnqueueChangedPayloadsLeavesOutARowIdenticalToTheNewestUnsentRow(): void
+    {
+        $this->queue->enqueue('catalog', ['sku' => 'SKU-8'], '8', 1, 'c-8');
+        $this->queue->enqueue('catalog', ['sku' => 'OLD'], '9', 1, 'c-9');
+        $this->queue->enqueue('catalog', ['sku' => 'SKU-7'], '7', 1, 'c-7-old');
+        $this->queue->enqueue('catalog', ['sku' => 'NEWER'], '7', 1, 'c-7-new');
+
+        self::assertSame(2, $this->queue->enqueueChangedPayloads('catalog', [
+            '7' => ['sku' => 'SKU-7'],
+            '8' => ['sku' => 'SKU-8'],
+            '9' => ['sku' => 'SKU-9'],
+        ], 1));
+        self::assertSame(0, $this->queue->enqueueChangedPayloads('catalog', [], 1));
+
+        $queued = array_slice($this->fetchAll(IngestEventResource::TABLE_NAME), 4);
+        self::assertSame(['7', '9'], array_column($queued, 'entity_id'));
+        self::assertSame(['{"sku":"SKU-7"}', '{"sku":"SKU-9"}'], array_column($queued, 'payload'));
+        self::assertSame(['1', '1'], array_map('strval', array_column($queued, 'store_id')));
     }
 
     public function testDeleteRemovesExactlyTheGivenRows(): void

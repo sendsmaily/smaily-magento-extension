@@ -17,6 +17,7 @@ use Smaily\Connect\Model\Backfill\EngineCatalogProcessor;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\CatalogIngest;
+use Smaily\Connect\Model\Engine\CatalogProductLoader;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 
@@ -64,7 +65,8 @@ class EngineCatalogProcessorTest extends TestCase
             $collectionFactory,
             $payloadBuilder,
             $ingestQueue,
-            $this->createMock(CatalogIngest::class)
+            $this->createMock(CatalogIngest::class),
+            new CatalogProductLoader($collectionFactory, $payloadBuilder)
         );
 
         $processor->process($job);
@@ -103,7 +105,8 @@ class EngineCatalogProcessorTest extends TestCase
             $collectionFactory,
             $payloadBuilder,
             $ingestQueue,
-            $this->createMock(CatalogIngest::class)
+            $this->createMock(CatalogIngest::class),
+            new CatalogProductLoader($collectionFactory, $payloadBuilder)
         );
 
         $processor->process($job);
@@ -175,7 +178,8 @@ class EngineCatalogProcessorTest extends TestCase
             $collectionFactory,
             $payloadBuilder,
             $ingestQueue,
-            $catalogIngest
+            $catalogIngest,
+            new CatalogProductLoader($collectionFactory, $payloadBuilder)
         );
 
         $processor->process($job);

@@ -12,10 +12,10 @@ use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\ResourceModel\Product as ProductResource;
 use Magento\Catalog\Model\ResourceModel\Product\Collection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
-use Magento\Framework\Serialize\Serializer\Json;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\CatalogIngest;
+use Smaily\Connect\Model\Engine\CatalogProductLoader;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
@@ -127,11 +127,12 @@ class CatalogIngestTest extends TestCase
             ->with(CatalogIngest::DOMAIN_CHANGED, [['payload' => [], 'entity_id' => '8', 'store_id' => null]])
             ->willReturn(1);
 
-        self::assertTrue($this->ingest()->enqueueProductId(8));
+        self::assertTrue($this->ingest()->markProductChanged(8));
     }
 
     /**
-     * A bulk source-item save: one sku lookup, one multi-row insert.
+     * A bulk source-item save: one sku lookup, one multi-row insert; a sku
+     * listed twice (two order lines, two sources) is looked up once.
      */
     public function testSkusAreLookedUpWithOneQueryAndMarkedWithOneInsert(): void
     {
@@ -146,7 +147,7 @@ class CatalogIngestTest extends TestCase
             ])
             ->willReturn(2);
 
-        self::assertTrue($this->ingest()->enqueueSkus(['TENT', '  ', 'MUG']));
+        self::assertTrue($this->ingest()->markSkusChanged(['TENT', '  ', 'MUG', 'TENT']));
     }
 
     public function testUnknownOrBlankSkusRecordNothing(): void
@@ -154,9 +155,9 @@ class CatalogIngestTest extends TestCase
         $this->productResource->method('getProductsIdsBySkus')->willReturn([]);
         $this->queue->expects(self::never())->method('enqueueMany');
 
-        self::assertFalse($this->ingest()->enqueueSkus(['GONE']));
-        self::assertFalse($this->ingest()->enqueueSkus(['  ']));
-        self::assertFalse($this->ingest()->enqueueProductId(0));
+        self::assertFalse($this->ingest()->markSkusChanged(['GONE']));
+        self::assertFalse($this->ingest()->markSkusChanged(['  ']));
+        self::assertFalse($this->ingest()->markProductChanged(0));
     }
 
     /**
@@ -175,29 +176,29 @@ class CatalogIngestTest extends TestCase
         $ingest = $this->ingest(null, null, $settings);
         self::assertFalse($ingest->enqueueProduct($this->product(8)));
         self::assertFalse($ingest->enqueueTombstone($this->product(8)));
-        self::assertFalse($ingest->enqueueProductId(8));
-        self::assertFalse($ingest->enqueueSkus(['TENT']));
+        self::assertFalse($ingest->markProductChanged(8));
+        self::assertFalse($ingest->markSkusChanged(['TENT']));
     }
 
     public function testNoChangedProductsMeansNoProductLoad(): void
     {
         $this->queue->method('claimBatch')->willReturn([]);
         $this->collectionFactory->expects(self::never())->method('create');
-        $this->queue->expects(self::never())->method('enqueueMany');
+        $this->queue->expects(self::never())->method('enqueueChangedPayloads');
 
         $this->ingest()->buildChanged();
     }
 
     /**
      * Repeated markers for one product collapse into one build; the batch is
-     * loaded as one canonical-scope collection, queued with one insert, and
-     * the markers are removed.
+     * loaded as one canonical-scope collection, handed to the queue in one
+     * call (which leaves out a row identical to the product's newest unsent
+     * row), and the markers are removed.
      */
     public function testChangedProductsAreBuiltAsOneBatch(): void
     {
         $markers = [$this->marker(1, '8'), $this->marker(2, '9'), $this->marker(3, '8')];
         $this->queue->method('claimBatch')->with(CatalogIngest::DOMAIN_CHANGED, 100)->willReturn($markers);
-        $this->queue->method('undeliveredPayloads')->willReturn([]);
         $collection = $this->collection([$this->product(8), $this->product(9)]);
         $collection->expects(self::once())->method('setStoreId')->with(1);
         $collection->expects(self::once())->method('addAttributeToSelect')
@@ -208,10 +209,10 @@ class CatalogIngestTest extends TestCase
         $this->payloadBuilder->method('build')->willReturnCallback(
             static fn (Product $product): array => ['sku' => 'SKU-' . $product->getId()]
         );
-        $this->queue->expects(self::once())->method('enqueueMany')->with(Client::DOMAIN_CATALOG, [
-            ['payload' => ['sku' => 'SKU-8'], 'entity_id' => '8', 'store_id' => 1],
-            ['payload' => ['sku' => 'SKU-9'], 'entity_id' => '9', 'store_id' => 1],
-        ]);
+        $this->queue->expects(self::once())->method('enqueueChangedPayloads')->with(Client::DOMAIN_CATALOG, [
+            '8' => ['sku' => 'SKU-8'],
+            '9' => ['sku' => 'SKU-9'],
+        ], 1);
         $this->queue->expects(self::once())->method('delete')->with($markers);
 
         $this->ingest()->buildChanged();
@@ -225,32 +226,9 @@ class CatalogIngestTest extends TestCase
     {
         $markers = [$this->marker(1, '7')];
         $this->queue->method('claimBatch')->willReturn($markers);
-        $this->queue->method('undeliveredPayloads')->willReturn([]);
         $this->collectionFactory->method('create')->willReturn($this->collection([]));
-        $this->queue->expects(self::once())->method('enqueueMany')->with(Client::DOMAIN_CATALOG, []);
+        $this->queue->expects(self::once())->method('enqueueChangedPayloads')->with(Client::DOMAIN_CATALOG, [], 1);
         $this->queue->expects(self::once())->method('delete')->with($markers);
-
-        $this->ingest()->buildChanged();
-    }
-
-    /**
-     * A product save queues its row and also reaches the stock hooks; the
-     * row their marker builds is the same row, still waiting to be sent, so
-     * it is not queued a second time. A different row is.
-     */
-    public function testARowIdenticalToTheProductsUnsentRowIsNotQueuedAgain(): void
-    {
-        $this->queue->method('claimBatch')->willReturn([$this->marker(1, '8'), $this->marker(2, '9')]);
-        $this->queue->method('undeliveredPayloads')->with(Client::DOMAIN_CATALOG, ['8', '9'])
-            ->willReturn(['8' => '{"sku":"SKU-8"}', '9' => '{"sku":"OLD"}']);
-        $this->collectionFactory->method('create')
-            ->willReturn($this->collection([$this->product(8), $this->product(9)]));
-        $this->payloadBuilder->method('build')->willReturnCallback(
-            static fn (Product $product): array => ['sku' => 'SKU-' . $product->getId()]
-        );
-        $this->queue->expects(self::once())->method('enqueueMany')->with(Client::DOMAIN_CATALOG, [
-            ['payload' => ['sku' => 'SKU-9'], 'entity_id' => '9', 'store_id' => 1],
-        ]);
 
         $this->ingest()->buildChanged();
     }
@@ -262,11 +240,10 @@ class CatalogIngestTest extends TestCase
         $payloadBuilder->method('isIngestible')->willReturn(false);
         $payloadBuilder->method('buildTombstone')->willReturn(['sku' => 'TENT', 'in_stock' => false]);
         $this->queue->method('claimBatch')->willReturn([$this->marker(1, '8')]);
-        $this->queue->method('undeliveredPayloads')->willReturn([]);
         $this->collectionFactory->method('create')->willReturn($this->collection([$this->product(8)]));
-        $this->queue->expects(self::once())->method('enqueueMany')->with(Client::DOMAIN_CATALOG, [
-            ['payload' => ['sku' => 'TENT', 'in_stock' => false], 'entity_id' => '8', 'store_id' => 1],
-        ]);
+        $this->queue->expects(self::once())->method('enqueueChangedPayloads')->with(Client::DOMAIN_CATALOG, [
+            '8' => ['sku' => 'TENT', 'in_stock' => false],
+        ], 1);
 
         $this->ingest($payloadBuilder)->buildChanged();
     }
@@ -274,7 +251,6 @@ class CatalogIngestTest extends TestCase
     public function testAFailedBuildInTheBatchIsLoggedAndTheRestStillQueue(): void
     {
         $this->queue->method('claimBatch')->willReturn([$this->marker(1, '8'), $this->marker(2, '9')]);
-        $this->queue->method('undeliveredPayloads')->willReturn([]);
         $this->collectionFactory->method('create')
             ->willReturn($this->collection([$this->product(8), $this->product(9)]));
         $this->payloadBuilder->method('build')->willReturnCallback(
@@ -288,9 +264,9 @@ class CatalogIngestTest extends TestCase
         );
         $logger = $this->createMock(Logger::class);
         $logger->expects(self::once())->method('error');
-        $this->queue->expects(self::once())->method('enqueueMany')->with(Client::DOMAIN_CATALOG, [
-            ['payload' => ['sku' => 'SKU-9'], 'entity_id' => '9', 'store_id' => 1],
-        ]);
+        $this->queue->expects(self::once())->method('enqueueChangedPayloads')->with(Client::DOMAIN_CATALOG, [
+            '9' => ['sku' => 'SKU-9'],
+        ], 1);
         $this->queue->expects(self::once())->method('delete');
 
         $this->ingest(null, $logger)->buildChanged();
@@ -306,13 +282,14 @@ class CatalogIngestTest extends TestCase
             $settings->method('isConnected')->willReturn(true);
         }
 
+        $payloadBuilder ??= $this->payloadBuilder;
+
         return new CatalogIngest(
             $settings,
-            $this->collectionFactory,
+            new CatalogProductLoader($this->collectionFactory, $payloadBuilder),
             $this->productResource,
-            $payloadBuilder ?? $this->payloadBuilder,
+            $payloadBuilder,
             $this->queue,
-            new Json(),
             $logger ?? $this->createMock(Logger::class)
         );
     }

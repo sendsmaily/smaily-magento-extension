@@ -49,6 +49,6 @@ class StockItemSaveAfter implements ObserverInterface
             return;
         }
 
-        $this->catalogIngest->enqueueProductId((int)$item->getProductId());
+        $this->catalogIngest->markProductChanged((int)$item->getProductId());
     }
 }

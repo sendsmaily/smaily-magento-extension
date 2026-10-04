@@ -31,7 +31,7 @@ class SourceDeductionTest extends TestCase
 
     public function testADeductionRequestIsReadThroughItsItems(): void
     {
-        $this->catalogIngest->expects(self::once())->method('enqueueSkus')->with(['TENT-1']);
+        $this->catalogIngest->expects(self::once())->method('markSkusChanged')->with(['TENT-1', 'TENT-1']);
 
         $this->plugin()->afterExecute(new \stdClass(), null, $this->deductionRequest('TENT-1', 'TENT-1'));
     }
@@ -42,7 +42,8 @@ class SourceDeductionTest extends TestCase
      */
     public function testEveryLineOfAShipmentIsHandedOverInOneCall(): void
     {
-        $this->catalogIngest->expects(self::once())->method('enqueueSkus')->with(['TENT-1', 'MUG-2', 'CAP-3']);
+        $this->catalogIngest->expects(self::once())->method('markSkusChanged')
+            ->with(['TENT-1', 'MUG-2', 'TENT-1', 'CAP-3']);
 
         $this->plugin()->afterExecute(
             new \stdClass(),
@@ -53,7 +54,7 @@ class SourceDeductionTest extends TestCase
 
     public function testAnUnrecognisedPayloadQueuesNothing(): void
     {
-        $this->catalogIngest->expects(self::never())->method('enqueueSkus');
+        $this->catalogIngest->expects(self::never())->method('markSkusChanged');
 
         $this->plugin()->afterExecute(new \stdClass(), null, 'nonsense');
     }

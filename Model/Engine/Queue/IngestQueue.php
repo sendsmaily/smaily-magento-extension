@@ -60,15 +60,7 @@ class IngestQueue
         ?string $eventUuid = null
     ): bool {
         $event = $this->eventFactory->create();
-        $event->addData([
-            'domain' => $domain,
-            'entity_id' => $entityId,
-            'event_uuid' => $eventUuid ?? $this->identityGenerator->generateId(),
-            'store_id' => $storeId,
-            'payload' => $this->serializer->serialize($payload),
-            'status' => IngestEvent::STATUS_PENDING,
-            'attempts' => 0,
-        ]);
+        $event->addData($this->row($domain, $payload, $entityId, $storeId, $eventUuid));
 
         try {
             $this->eventResource->save($event);
@@ -95,44 +87,63 @@ class IngestQueue
 
         $data = [];
         foreach ($rows as $row) {
-            $data[] = [
-                'domain' => $domain,
-                'entity_id' => $row['entity_id'],
-                'event_uuid' => $this->identityGenerator->generateId(),
-                'store_id' => $row['store_id'],
-                'payload' => $this->serializer->serialize($row['payload']),
-                'status' => IngestEvent::STATUS_PENDING,
-                'attempts' => 0,
-            ];
+            $data[] = $this->row($domain, $row['payload'], $row['entity_id'], $row['store_id']);
         }
 
-        return $this->resourceConnection->getConnection()->insertMultiple(
-            $this->resourceConnection->getTableName(IngestEventResource::TABLE_NAME),
-            $data
-        );
+        return $this->resourceConnection->getConnection()->insertMultiple($this->table(), $data);
+    }
+
+    /**
+     * Queue each entity's payload unless it is exactly the entity's newest
+     * row that is not delivered yet — compared as the queue stores it, so
+     * one change that reaches several hooks queues one row, not two
+     * (PRO-1967). Not a queue-wide dedupe: an older unsent row, or one
+     * already delivered, does not stop a new row.
+     *
+     * @param array<int|string, array<string, mixed>> $payloads entity id => payload
+     * @return int the number of rows queued
+     */
+    public function enqueueChangedPayloads(string $domain, array $payloads, ?int $storeId): int
+    {
+        $latest = $this->latestUndeliveredPayloads($domain, array_map('strval', array_keys($payloads)));
+
+        $rows = [];
+        foreach ($payloads as $entityId => $payload) {
+            $entityId = (string)$entityId;
+            if (isset($latest[$entityId]) && $latest[$entityId] === $this->serializer->serialize($payload)) {
+                continue;
+            }
+            $rows[] = ['payload' => $payload, 'entity_id' => $entityId, 'store_id' => $storeId];
+        }
+
+        return $this->enqueueMany($domain, $rows);
     }
 
     /**
      * The stored payload of each entity's newest row that is not delivered
-     * yet (pending or being sent). Reads only undelivered rows, so it stays
-     * on the domain/status index however many delivered rows are retained.
+     * yet (pending or being sent) — one row per entity is read. Reads only
+     * undelivered rows, so it stays on the domain/status index however many
+     * delivered rows are retained.
      *
      * @param string[] $entityIds
      * @return array<string, string> entity id => payload as stored
      */
-    public function undeliveredPayloads(string $domain, array $entityIds): array
+    public function latestUndeliveredPayloads(string $domain, array $entityIds): array
     {
         if (!$entityIds) {
             return [];
         }
 
         $connection = $this->resourceConnection->getConnection();
-        $select = $connection->select()
-            ->from($this->resourceConnection->getTableName(IngestEventResource::TABLE_NAME), ['entity_id', 'payload'])
+        $newest = $connection->select()
+            ->from($this->table(), ['id' => 'MAX(id)'])
             ->where('domain = ?', $domain)
             ->where('status IN (?)', [IngestEvent::STATUS_PENDING, IngestEvent::STATUS_SENDING])
             ->where('entity_id IN (?)', $entityIds)
-            ->order('id ASC');
+            ->group('entity_id');
+        $select = $connection->select()
+            ->from(['queue' => $this->table()], ['entity_id', 'payload'])
+            ->join(['newest' => $newest], 'newest.id = queue.id', []);
 
         $payloads = [];
         foreach ($connection->fetchAll($select) as $row) {
@@ -153,10 +164,7 @@ class IngestQueue
             return;
         }
 
-        $this->resourceConnection->getConnection()->delete(
-            $this->resourceConnection->getTableName(IngestEventResource::TABLE_NAME),
-            ['id IN (?)' => array_map(static fn (IngestEvent $event): int => (int)$event->getId(), $events)]
-        );
+        $this->resourceConnection->getConnection()->delete($this->table(), ['id IN (?)' => $this->ids($events)]);
     }
 
     /**
@@ -191,7 +199,7 @@ class IngestQueue
         // double-send (see EventQueue::claimBatch for the rationale).
         $token = $this->identityGenerator->generateId();
         $connection = $this->resourceConnection->getConnection();
-        $table = $this->resourceConnection->getTableName(IngestEventResource::TABLE_NAME);
+        $table = $this->table();
         $connection->update(
             $table,
             [
@@ -200,7 +208,7 @@ class IngestQueue
                 'claimed_at' => $now,
             ],
             [
-                'id IN (?)' => array_keys($events),
+                'id IN (?)' => $this->ids($events),
                 'status = ?' => IngestEvent::STATUS_PENDING,
             ]
         );
@@ -256,13 +264,10 @@ class IngestQueue
             return;
         }
 
-        $ids = array_map(static fn (IngestEvent $event): int => (int)$event->getId(), $events);
-
-        $connection = $this->resourceConnection->getConnection();
-        $connection->update(
-            $this->resourceConnection->getTableName(IngestEventResource::TABLE_NAME),
+        $this->resourceConnection->getConnection()->update(
+            $this->table(),
             ['status' => IngestEvent::STATUS_PENDING, 'claim_token' => null],
-            ['id IN (?)' => $ids]
+            ['id IN (?)' => $this->ids($events)]
         );
         foreach ($events as $event) {
             $event->setData('status', IngestEvent::STATUS_PENDING);
@@ -381,6 +386,44 @@ class IngestQueue
         $payload['event_id'] = $event->getEventUuid();
 
         return $payload;
+    }
+
+    /**
+     * The row enqueue() saves and enqueueMany() inserts.
+     *
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function row(
+        string $domain,
+        array $payload,
+        ?string $entityId,
+        ?int $storeId,
+        ?string $eventUuid = null
+    ): array {
+        return [
+            'domain' => $domain,
+            'entity_id' => $entityId,
+            'event_uuid' => $eventUuid ?? $this->identityGenerator->generateId(),
+            'store_id' => $storeId,
+            'payload' => $this->serializer->serialize($payload),
+            'status' => IngestEvent::STATUS_PENDING,
+            'attempts' => 0,
+        ];
+    }
+
+    /**
+     * @param IngestEvent[] $events
+     * @return int[]
+     */
+    private function ids(array $events): array
+    {
+        return array_map(static fn (IngestEvent $event): int => (int)$event->getId(), array_values($events));
+    }
+
+    private function table(): string
+    {
+        return $this->resourceConnection->getTableName(IngestEventResource::TABLE_NAME);
     }
 
     private function nextRetryAt(int $attempts): string

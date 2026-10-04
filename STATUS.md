@@ -58,6 +58,16 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-1967 simplification pass, behaviour-neutral (2026-10-04).** One
+  `Model\Engine\CatalogProductLoader` loads the backfill page and the
+  stock-change batch (canonical scope, `PRODUCT_ATTRIBUTES`, URL rewrites;
+  each caller adds its filter); the queue leaves out a row identical to the
+  entity's newest unsent row (`IngestQueue::enqueueChangedPayloads()`, one
+  newest row per entity read in SQL by `latestUndeliveredPayloads()`; new
+  integration test); `CatalogIngest::markProductChanged()` /
+  `markSkusChanged()` (renamed; sku dedupe there, the MSI plugins pass
+  their skus as read); IngestQueue shares its row, id and table helpers.
+
 - **PRO-3730 — the abandoned-cart scan reads only the window on a busy
   store that keeps old carts (2026-10-04; measured in spike PRO-3713; owner
   decision via the orchestrator: keep the id order).** The scan's page is
@@ -1435,8 +1445,8 @@ Earlier: 2026-09-11, 2026-09-10._
   window on busy stores). **An rc5 for the pilot awaits the owner's go** —
   it would carry PRO-1967, PRO-3731, PRO-3732 and PRO-3730 (the pilot's
   first catalog import is built in cron, so PRO-3731 matters to it). Open
-  queue: the PRO-1967 simplification pass, PRO-3729 (low wording
-  leftovers). Done 2026-10-02/03: headless
+  queue: PRO-3729 (low wording leftovers); the PRO-1967 simplification
+  pass is done (behaviour-neutral, above). Done 2026-10-02/03: headless
   storefronts + the
   Storefront URL (PRO-3614/3660), browse consent as in Woo and per website
   (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the standard

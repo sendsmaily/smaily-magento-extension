@@ -150,17 +150,20 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   stock hooks build nothing there: they queue one `catalog_changed` row per
   product (payload `[]`, `entity_id` = the product id; a queue domain of its
   own, never sent and never claimed by the catalog send). The legacy observer
-  knows the product id; the MSI plugins hand all of a write's unique skus to
-  `CatalogIngest::enqueueSkus()` — one `sku IN (...)` lookup
+  knows the product id (`CatalogIngest::markProductChanged()`); the MSI
+  plugins hand all of a write's skus to `CatalogIngest::markSkusChanged()`,
+  which counts a repeated sku once — one `sku IN (...)` lookup
   (`ProductResource::getProductsIdsBySkus()`) and one multi-row insert
   (`IngestQueue::enqueueMany()`), so a 20-line shipment or a Sources-grid mass
   action costs two queries, not 20 product builds. Each `FlushIngestQueue` run
   starts with `CatalogIngest::buildChanged()`: it claims up to 100 markers,
-  loads their products as one collection — scoped and selected exactly as the
-  backfill page loads them (`CatalogPayloadBuilder::PRODUCT_ATTRIBUTES`; the
+  loads their products as one collection through `CatalogProductLoader` —
+  the class that loads the backfill page too, so the scope and the selected
+  attributes are the same (`CatalogPayloadBuilder::PRODUCT_ATTRIBUTES`; the
   canonical store set before `addUrlRewrite()`) — builds each row through the
   same `CatalogPayloadBuilder` (a tombstone for a product that left the
-  sellable set), queues the rows with one insert and deletes the markers. The
+  sellable set), hands the rows to `IngestQueue::enqueueChangedPayloads()`,
+  which queues them with one insert, and deletes the markers. The
   rows go out in the same run, so the ~1–2 min latency holds; the build reads
   the committed state at flush time, so it can never be older than the change
   that queued the marker. The rows are built in the cron context, as the
@@ -182,9 +185,11 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   Markers are never collapsed at insert time: a marker skipped because one
   for the product was already queued could be built before the skipping
   transaction commits, losing its change. They collapse at build time
-  instead — several markers for one product build one row — and a built row
-  is not queued when the product's newest unsent catalog row (pending or
-  being sent) is that very row, which is what keeps a product save at one
+  instead — several markers for one product build one row — and the queue
+  leaves out a built row when the product's newest unsent catalog row
+  (pending or being sent; one row per product read in SQL,
+  `IngestQueue::latestUndeliveredPayloads()`) is that very row, compared as
+  the queue stores it, which is what keeps a product save at one
   row: it queues its row itself and reaches the stock hooks on the way. A
   product deleted between marker and build is not in the collection; its
   marker is dropped, since the delete observer already sent the §3b removal
@@ -277,7 +282,8 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   the default website, the same "default scope" concept as `Engine\Client`'s
   base-URL fallback and `Multilingual\AccountResolver`'s default account),
   never Magento's implicit current-store resolver: the backfill collection
-  (`EngineCatalogProcessor::loadPage()`) calls `setStoreId()` with it
+  (`CatalogProductLoader`, which loads `EngineCatalogProcessor::loadPage()`
+  and the stock-change batch) calls `setStoreId()` with it
   explicitly before `addUrlRewrite()`, and the live path
   (`ProductSaveAfter`/`ProductDeleteBefore`) re-scopes the product to it via
   `ProductRepository::getById($id, false, $canonicalStoreId)` before reading
@@ -288,8 +294,8 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   per product. Each `smaily_ingest_queue` catalog row's `store_id` column
   records that canonical ingest scope for audit — not necessarily the store
   the price was read at, see the exception below.
-- **The backfill page holds every product (PRO-2506):** `loadPage()` calls
-  neither `addPriceData()` nor any store/website filter, so it pages exactly
+- **The backfill page holds every product (PRO-2506):**
+  `CatalogProductLoader` calls neither `addPriceData()` nor any store/website filter, so it pages exactly
   what `countProducts()` counts. `addPriceData()` INNER JOINs
   `catalog_product_index_price` on the scope's website (Magento's
   `Product\Collection::_productLimitationPrice()`), which kept every product
@@ -303,7 +309,7 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   tombstone (`in_stock: false`).
 - **The backfill page selects what a product save holds (PRO-3692):** a
   collection item carries only the static columns and the attributes
-  `loadPage()` selects, while a saved product carries all of them. The list
+  `CatalogProductLoader` selects, while a saved product carries all of them. The list
   holds every attribute the payload and Magento's price classes read:
   `special_from_date`/`special_to_date` (`SpecialPrice` checks the sale
   window; `on_sale_until` is `special_to_date`) and `price_type` (the bundle

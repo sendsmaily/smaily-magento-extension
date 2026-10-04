@@ -31,14 +31,14 @@ class StockItemSaveAfterTest extends TestCase
 
     public function testAStockItemSaveEnqueuesItsProduct(): void
     {
-        $this->catalogIngest->expects(self::once())->method('enqueueProductId')->with(42);
+        $this->catalogIngest->expects(self::once())->method('markProductChanged')->with(42);
 
         $this->observer()->execute($this->eventFor($this->stockItem(42)));
     }
 
     public function testAnEventWithoutAStockItemIsANoOp(): void
     {
-        $this->catalogIngest->expects(self::never())->method('enqueueProductId');
+        $this->catalogIngest->expects(self::never())->method('markProductChanged');
 
         $this->observer()->execute($this->eventFor(null));
     }

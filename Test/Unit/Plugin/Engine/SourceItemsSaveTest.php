@@ -34,7 +34,7 @@ class SourceItemsSaveTest extends TestCase
      */
     public function testEverySavedSkuIsHandedOverInOneCall(): void
     {
-        $this->catalogIngest->expects(self::once())->method('enqueueSkus')->with(['TENT-1', 'MUG-2']);
+        $this->catalogIngest->expects(self::once())->method('markSkusChanged')->with(['TENT-1', 'MUG-2']);
 
         $this->plugin()->afterExecute(
             new \stdClass(),
@@ -43,9 +43,13 @@ class SourceItemsSaveTest extends TestCase
         );
     }
 
-    public function testTheSameSkuOnTwoSourcesCollapsesIntoOneRow(): void
+    /**
+     * The same sku on two sources is handed over as it came; CatalogIngest
+     * marks the product once.
+     */
+    public function testTheSameSkuOnTwoSourcesIsHandedOverInTheSameCall(): void
     {
-        $this->catalogIngest->expects(self::once())->method('enqueueSkus')->with(['TENT-1']);
+        $this->catalogIngest->expects(self::once())->method('markSkusChanged')->with(['TENT-1', 'TENT-1']);
 
         $this->plugin()->afterExecute(
             new \stdClass(),
@@ -54,9 +58,9 @@ class SourceItemsSaveTest extends TestCase
         );
     }
 
-    public function testAnUnrecognisedPayloadQueuesNothing(): void
+    public function testAnUnrecognisedPayloadHandsOverNoSkus(): void
     {
-        $this->catalogIngest->expects(self::never())->method('enqueueSkus');
+        $this->catalogIngest->expects(self::once())->method('markSkusChanged')->with([]);
 
         $this->plugin()->afterExecute(new \stdClass(), null, 'nonsense');
     }

@@ -53,9 +53,7 @@ class SourceDeduction
         }
 
         // One marker per product, not per order line; one insert for them all.
-        if ($skus) {
-            $this->catalogIngest->enqueueSkus(array_values(array_unique($skus)));
-        }
+        $this->catalogIngest->markSkusChanged($skus);
 
         return $result;
     }

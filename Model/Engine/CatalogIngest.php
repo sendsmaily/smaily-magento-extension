@@ -11,8 +11,6 @@ namespace Smaily\Connect\Model\Engine;
 use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\ResourceModel\Product as ProductResource;
 use Magento\Catalog\Model\ResourceModel\Product\Collection;
-use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
-use Magento\Framework\Serialize\Serializer\Json;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
@@ -36,9 +34,10 @@ use Smaily\Connect\Model\Logger\Logger;
  * Duplicates collapse in two places, neither of them queue-wide dedupe:
  * a byte-identical row queued twice in a row within one request (see
  * $lastPayloadHash); and in buildChanged(), several markers for one product
- * build one row, which is not queued when the product's newest unsent row is
- * already that row — one product save reaches product save and the stock
- * hooks, and queues one row, not two.
+ * build one row, which the queue leaves out when the product's newest unsent
+ * row is already that row (IngestQueue::enqueueChangedPayloads()) — one
+ * product save reaches product save and the stock hooks, and queues one row,
+ * not two.
  */
 class CatalogIngest
 {
@@ -53,11 +52,10 @@ class CatalogIngest
 
     public function __construct(
         private readonly Settings $settings,
-        private readonly ProductCollectionFactory $productCollectionFactory,
+        private readonly CatalogProductLoader $productLoader,
         private readonly ProductResource $productResource,
         private readonly CatalogPayloadBuilder $payloadBuilder,
         private readonly IngestQueue $ingestQueue,
-        private readonly Json $serializer,
         private readonly Logger $logger
     ) {
     }
@@ -87,20 +85,21 @@ class CatalogIngest
     /**
      * Record that the product's stock changed; buildChanged() queues its row.
      */
-    public function enqueueProductId(int $productId): bool
+    public function markProductChanged(int $productId): bool
     {
         return $productId > 0 && $this->settings->isConnected() && $this->markChanged([$productId]);
     }
 
     /**
      * Record that these products' stock changed: one sku lookup, one insert,
-     * however many skus. An unknown sku is skipped.
+     * however many skus — a sku listed twice (two order lines, two sources)
+     * counts once. A blank or unknown sku is skipped.
      *
      * @param string[] $skus
      */
-    public function enqueueSkus(array $skus): bool
+    public function markSkusChanged(array $skus): bool
     {
-        $skus = array_values(array_filter($skus, static fn (string $sku): bool => trim($sku) !== ''));
+        $skus = array_values(array_unique(array_filter($skus, static fn (string $sku): bool => trim($sku) !== '')));
         if (!$skus || !$this->settings->isConnected()) {
             return false;
         }
@@ -111,9 +110,11 @@ class CatalogIngest
     /**
      * Build the rows of the products the stock hooks marked changed — called
      * by the ingest flusher before it sends the catalog batch. The products
-     * load as one collection, scoped and selected as the backfill page loads
-     * them; a product deleted since its marker is not there, and its marker
-     * is dropped (the delete observer already told the engine).
+     * load as one collection, as the backfill page loads them
+     * (CatalogProductLoader); a product deleted since its marker is not
+     * there, and its marker is dropped (the delete observer already told the
+     * engine). The queue leaves out a row identical to the product's newest
+     * unsent row.
      */
     public function buildChanged(): void
     {
@@ -126,26 +127,17 @@ class CatalogIngest
             static fn (IngestEvent $marker): int => (int)$marker->getEntityId(),
             $markers
         )));
-        $unsent = $this->ingestQueue->undeliveredPayloads(
-            Client::DOMAIN_CATALOG,
-            array_map('strval', $productIds)
-        );
+        $storeId = $this->payloadBuilder->canonicalStoreId();
 
-        $rows = [];
+        $payloads = [];
         foreach ($this->loadProducts($productIds) as $product) {
             $item = $this->build($product, false);
-            $productId = (string)$product->getId();
-            if ($item === null || ($unsent[$productId] ?? null) === $this->serializer->serialize($item)) {
-                continue;
+            if ($item !== null) {
+                $payloads[(string)$product->getId()] = $item;
             }
-            $rows[] = [
-                'payload' => $item,
-                'entity_id' => $productId,
-                'store_id' => $this->payloadBuilder->canonicalStoreId(),
-            ];
         }
 
-        $this->ingestQueue->enqueueMany(Client::DOMAIN_CATALOG, $rows);
+        $this->ingestQueue->enqueueChangedPayloads(Client::DOMAIN_CATALOG, $payloads, $storeId);
         $this->ingestQueue->delete($markers);
     }
 
@@ -167,28 +159,14 @@ class CatalogIngest
     }
 
     /**
-     * The products as the backfill page loads them (EngineCatalogProcessor::
-     * loadPage() says why each call is there): the canonical store set
-     * before addUrlRewrite(), the builder's attributes, no website limit.
-     *
      * @param int[] $productIds
      * @return Product[]
      */
     private function loadProducts(array $productIds): array
     {
-        $collection = $this->productCollectionFactory->create();
-        if (!$collection instanceof Collection) {
-            return [];
-        }
-        $collection->setStoreId($this->payloadBuilder->canonicalStoreId());
-        $collection->addAttributeToSelect(CatalogPayloadBuilder::PRODUCT_ATTRIBUTES);
-        $collection->addFieldToFilter('entity_id', ['in' => $productIds]);
-        $collection->addUrlRewrite();
-
-        return array_values(array_filter(
-            $collection->getItems(),
-            static fn ($product): bool => $product instanceof Product
-        ));
+        return $this->productLoader->load(static function (Collection $collection) use ($productIds): void {
+            $collection->addFieldToFilter('entity_id', ['in' => $productIds]);
+        });
     }
 
     private function enqueue(Product $product, bool $forceTombstone): bool

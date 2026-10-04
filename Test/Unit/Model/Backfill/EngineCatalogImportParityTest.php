@@ -33,7 +33,6 @@ use Magento\Framework\Pricing\Price\PriceInterface;
 use Magento\Framework\Pricing\PriceCurrencyInterface;
 use Magento\Framework\Pricing\PriceInfoInterface;
 use Magento\Framework\Pricing\SaleableInterface;
-use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\Stdlib\DateTime;
 use Magento\Framework\Stdlib\DateTime\Intl\DateFormatterFactory;
 use Magento\Framework\Stdlib\DateTime\Timezone;
@@ -48,6 +47,7 @@ use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Engine\CatalogIngest;
+use Smaily\Connect\Model\Engine\CatalogProductLoader;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Payload\ParentProductResolver;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
@@ -64,16 +64,16 @@ use Smaily\Connect\Model\StorefrontUrl;
  *
  * The save path hands CatalogIngest the saved product, which holds every
  * attribute. The import hands it a collection item, which holds only the
- * static columns plus what loadPage() selects. Both run through the real
- * CatalogIngest and CatalogPayloadBuilder, priced by Magento's own
+ * static columns plus what CatalogProductLoader selects. Both run through
+ * the real CatalogIngest and CatalogPayloadBuilder, priced by Magento's own
  * RegularPrice, SpecialPrice, BasePrice and FinalPrice (the sale window is
  * Magento's Timezone::isScopeDateInInterval()). The adjustment calculator
  * stands in for Magento's bundle Calculator: it adds a bundle's selections
  * as a fixed or a dynamic bundle by `price_type`, as that Calculator does.
  *
  * PRO-1967: a stock change is built the same way since — its product comes
- * from CatalogIngest::buildChanged()'s collection, which selects the same
- * attributes — so it too sends the row a product save sends.
+ * from the same CatalogProductLoader collection — so it too sends the row a
+ * product save sends.
  */
 class EngineCatalogImportParityTest extends TestCase
 {
@@ -167,7 +167,7 @@ class EngineCatalogImportParityTest extends TestCase
 
     /**
      * Runs one import page; the collection item holds only the static
-     * columns plus the attributes loadPage() selects.
+     * columns plus the attributes CatalogProductLoader selects.
      *
      * @param array<string, mixed> $row
      * @return array<string, mixed>
@@ -184,12 +184,14 @@ class EngineCatalogImportParityTest extends TestCase
         $sent = [];
         $ingestQueue = $this->createMock(IngestQueue::class);
         $ingestQueue->method('countPending')->willReturn(0);
+        $payloadBuilder = $this->payloadBuilder();
         (new EngineCatalogProcessor(
             $jobManager,
             $collectionFactory,
-            $this->payloadBuilder(),
+            $payloadBuilder,
             $ingestQueue,
-            $this->catalogIngest($sent)
+            $this->catalogIngest($sent),
+            new CatalogProductLoader($collectionFactory, $payloadBuilder)
         ))->process($job);
         self::assertCount(1, $sent);
 
@@ -210,14 +212,13 @@ class EngineCatalogImportParityTest extends TestCase
         $sent = [];
         $ingestQueue = $this->createMock(IngestQueue::class);
         $ingestQueue->method('claimBatch')->willReturn([$marker]);
-        $ingestQueue->method('undeliveredPayloads')->willReturn([]);
-        $ingestQueue->method('enqueueMany')->willReturnCallback(
-            function (string $domain, array $rows) use (&$sent): int {
-                foreach ($rows as $queued) {
-                    $sent[] = $queued['payload'];
+        $ingestQueue->method('enqueueChangedPayloads')->willReturnCallback(
+            function (string $domain, array $payloads) use (&$sent): int {
+                foreach ($payloads as $payload) {
+                    $sent[] = $payload;
                 }
 
-                return count($rows);
+                return count($payloads);
             }
         );
 
@@ -278,13 +279,17 @@ class EngineCatalogImportParityTest extends TestCase
             }
         );
 
+        $payloadBuilder = $this->payloadBuilder();
+
         return new CatalogIngest(
             $settings,
-            $collectionFactory ?? $this->createMock(ProductCollectionFactory::class),
+            new CatalogProductLoader(
+                $collectionFactory ?? $this->createMock(ProductCollectionFactory::class),
+                $payloadBuilder
+            ),
             $this->createMock(ProductResource::class),
-            $this->payloadBuilder(),
+            $payloadBuilder,
             $ingestQueue,
-            new Json(),
             $this->createMock(Logger::class)
         );
     }

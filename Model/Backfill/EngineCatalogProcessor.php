@@ -9,8 +9,10 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Backfill;
 
 use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\ResourceModel\Product\Collection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Smaily\Connect\Model\Engine\CatalogIngest;
+use Smaily\Connect\Model\Engine\CatalogProductLoader;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
@@ -33,7 +35,8 @@ class EngineCatalogProcessor implements ProcessorInterface
         private readonly ProductCollectionFactory $productCollectionFactory,
         private readonly CatalogPayloadBuilder $payloadBuilder,
         private readonly IngestQueue $ingestQueue,
-        private readonly CatalogIngest $catalogIngest
+        private readonly CatalogIngest $catalogIngest,
+        private readonly CatalogProductLoader $productLoader
     ) {
     }
 
@@ -89,52 +92,17 @@ class EngineCatalogProcessor implements ProcessorInterface
      */
     private function loadPage(int $cursor): array
     {
-        $collection = $this->productCollectionFactory->create();
-        if (!$collection instanceof \Magento\Catalog\Model\ResourceModel\Product\Collection) {
-            return [];
-        }
-        // Explicit canonical scope (PRO-1352/1353) — without it the
-        // collection falls back to Magento's implicit current-store
-        // resolver, an undocumented scope that depends on the invoking
-        // CLI/cron context and can disagree with the live save path. Must
-        // be set before addUrlRewrite(), which reads the collection's store
-        // id at call time.
-        //
-        // No addPriceData() and no store/website filter (PRO-2506): Magento
-        // INNER JOINs the price index on the scope's website, which drops
-        // every product outside the default website (and every product the
-        // price index leaves out). The page holds every product, as
-        // countProducts() counts them; CatalogPayloadBuilder reads each
-        // price at the store it belongs to (PRO-1458), as on the live path.
-        // `tax_class_id` came from the price index before; it is one of the
-        // builder's PRODUCT_ATTRIBUTES, the attributes an imported row needs
-        // to be the row a product save sends (PRO-3692).
-        //
-        // No flat-catalog switch is needed: Magento reads the flat product
-        // tables only in the frontend area (Flat\State's `isAvailable` is
-        // true only in Magento_Catalog's etc/frontend/di.xml), and the import
-        // runs in cron.
-        $collection->setStoreId($this->payloadBuilder->canonicalStoreId());
-        $collection->addAttributeToSelect(CatalogPayloadBuilder::PRODUCT_ATTRIBUTES);
-        $collection->addFieldToFilter('entity_id', ['gt' => $cursor]);
-        $collection->addUrlRewrite();
-        $collection->setOrder('entity_id', 'ASC');
-        $collection->setPageSize(self::PAGE_SIZE);
-
-        $products = [];
-        foreach ($collection->getItems() as $product) {
-            if ($product instanceof Product) {
-                $products[] = $product;
-            }
-        }
-
-        return $products;
+        return $this->productLoader->load(static function (Collection $collection) use ($cursor): void {
+            $collection->addFieldToFilter('entity_id', ['gt' => $cursor]);
+            $collection->setOrder('entity_id', 'ASC');
+            $collection->setPageSize(self::PAGE_SIZE);
+        });
     }
 
     private function countProducts(): int
     {
         $collection = $this->productCollectionFactory->create();
-        if ($collection instanceof \Magento\Catalog\Model\ResourceModel\Product\Collection) {
+        if ($collection instanceof Collection) {
             // Same canonical scope as loadPage() (PRO-1353) — otherwise the
             // progress-bar total can disagree with the scoped pages on
             // multi-store installs.

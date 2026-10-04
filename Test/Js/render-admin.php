@@ -184,7 +184,7 @@ $pages = [
  * with its behaviour (panel/panels-js.phtml), Campaign Intelligence not
  * connected yet: the initial setup's step and the Settings tab, where the
  * import cards render too (PRO-3741). No Storefront URL is saved, except on
- * the setup step's intelligence-setup-storefront page (PRO-3745).
+ * the -storefront pages of each (PRO-3745).
  */
 $intelligenceViewModel = static fn (string $storefrontUrl): object => new class ($storefrontUrl) {
     /**
@@ -255,6 +255,7 @@ $intelligenceStrings = [
     'Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.',
     'The catalog import had already finished, so there was nothing left to hold back.',
     'Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: finish the setup without connecting, enter the address under Marketing > Smaily Connect > Settings > Connection > Using a separate storefront? > Storefront URL, then connect under Settings > Intelligence. Or connect now and press Hold back the import.',
+    'Using a separate storefront? Set its Storefront URL under Settings > Connection > Using a separate storefront? before you connect, so that the catalog import sends the storefront\'s product links. Or connect now and press Hold back the import.',
 ];
 $intelligenceTemplates = [
     $root . '/view/adminhtml/templates/panel/intelligence.phtml',
@@ -273,6 +274,12 @@ $pages['intelligence-setup-storefront'] = [
 $pages['intelligence-settings'] = [
     'template' => $intelligenceTemplates,
     'viewModel' => $intelligence,
+    'data' => ['context' => 'settings'],
+    'strings' => $intelligenceStrings,
+];
+$pages['intelligence-settings-storefront'] = [
+    'template' => $intelligenceTemplates,
+    'viewModel' => $intelligenceViewModel('https://shop.example.com'),
     'data' => ['context' => 'settings'],
     'strings' => $intelligenceStrings,
 ];

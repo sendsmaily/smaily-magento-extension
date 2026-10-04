@@ -19,7 +19,8 @@ PRO-3741 (connecting Campaign Intelligence starts the catalog import, with
 a Hold back) and PRO-3745 (the setup's Intelligence step tells a separate
 storefront to set its Storefront URL first) landed on v3, unreleased,
 followed by a behaviour-neutral simplification pass over PRO-1960 and
-PRO-1969/3742/3741;
+PRO-1969/3742/3741, and a PRO-3745 follow-up (Settings > Intelligence
+shows the separate-storefront hint before Connect too);
 CHANGELOG's
 "Changes since 3.0.0-rc5" has PRO-3733, PRO-1968 (its bullet now points to
 PRO-3741's), PRO-3741, PRO-3745 and PRO-1969 (its bullet widened by PRO-3742), the
@@ -96,6 +97,31 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3745 follow-up — Settings > Intelligence shows the
+  separate-storefront hint before Connect too (2026-10-04).** Settings >
+  Intelligence has its own Connect, which also starts the catalog import
+  (PRO-3741), but showed no hint. `panel/intelligence.phtml` now renders
+  the note on both screens while `WizardData::getSavedStorefrontUrl()` is
+  empty for the selected website; the Settings wording drops "finish the
+  setup without connecting": "Using a separate storefront? Set its
+  Storefront URL under Settings > Connection > Using a separate
+  storefront? before you connect, so that the catalog import sends the
+  storefront's product links. Or connect now and press Hold back the
+  import." (ET "Kas pood töötab eraldi veebilehel? Sisesta poe veebilehe
+  aadress menüüs Seaded > Ühendus > Kas pood töötab eraldi veebilehel?
+  enne ühendamist, et kataloogi import saadaks poe veebilehe tootelingid.
+  Või ühenda kohe ja vajuta „Peata import“."). It sits in the disconnected
+  block, so it goes once connected. Known limit: rendered server-side, so
+  a Storefront URL saved on the Connection tab hides it only after a
+  reload (USER_GUIDE and PILOT_CHECKLIST §0 say so). Test: browser
+  `Test/Js/intelligence-connect.html` 36 → 41 checks (Settings: shown and
+  translated without a Storefront URL, absent with one, hidden once
+  connected; red with the setup-only condition restored and with the
+  Storefront URL condition removed) — `render-admin.php` adds the
+  `intelligence-settings-storefront` page. Docs: USER_GUIDE (Connecting),
+  HEADLESS_STOREFRONTS, ARCHITECTURE, TESTING, PILOT_CHECKLIST §0,
+  CHANGELOG (merged into PRO-3745's bullet). Template-only PHP change, no
+  DI change.
 - **Simplification pass, behaviour-neutral (2026-10-04; over PRO-1960,
   PRO-1969, PRO-3742 and PRO-3741).** `AbandonedCart\PayloadBuilder::
   buildAll()` takes one store (`buildAll($storeId, $quotes)`; its only

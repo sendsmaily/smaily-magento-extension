@@ -396,9 +396,14 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   order in the last 30 days. Installation-wide; no table or column.
   Connecting starts the catalog import, and the initial setup has no
   Storefront URL field (Settings opens once the setup is finished), so
-  `panel/intelligence.phtml` adds a note on the setup step only, while
+  `panel/intelligence.phtml` adds a note under the setup URL field while
   `WizardData::getSavedStorefrontUrl()` is empty for the selected website:
-  set the Storefront URL first, or hold the import back (PRO-3745).
+  set the Storefront URL first, or hold the import back (PRO-3745). The
+  setup step says to finish without connecting; Settings > Intelligence,
+  which has its own Connect, points to the Connection tab. The note sits
+  in the disconnected block, so it goes once connected; it is rendered
+  server-side, so a Storefront URL saved on the Connection tab hides it
+  after a reload.
 
 ### Queue semantics (both queues)
 

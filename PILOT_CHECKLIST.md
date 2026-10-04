@@ -56,7 +56,7 @@ run in this order:
 |---|---|
 | On the **Intelligence** step, do not connect: press **Finish**, then **Go to Dashboard** on **Overview**. | Under **Setup URL or token from Smaily** the step says "Using a separate storefront? Set its Storefront URL before you connect, …" — it shows while no Storefront URL is saved for the website. |
 | **Settings > Connection** → open **Using a separate storefront?** → enter the storefront's https address (host only, e.g. `https://shop.example.com`) as **Storefront URL** → **Save Connection**. | Saved; the field stays filled after a reload. |
-| **Settings > Intelligence**: do the rows below from **Before connecting** on there — **Connect** is the same; **Enable storefront browse tracking** is saved with the tab's **Save** (no **Finish** / **Overview**). | The catalog import that connecting starts sends the storefront's product links. |
+| **Settings > Intelligence**: do the rows below from **Before connecting** on there — **Connect** is the same; **Enable storefront browse tracking** is saved with the tab's **Save** (no **Finish** / **Overview**). | Before **Connect**, no "Using a separate storefront? …" note under the setup URL field (the Storefront URL is saved; reload the page if it still shows). The catalog import that connecting starts sends the storefront's product links. |
 | Connected before the Storefront URL was set (by mistake)? | Press **Hold back the import** at once (before the next cron run, usually within a minute), set the Storefront URL as above, then **Run again** on the Catalog card under **Settings > Intelligence**. |
 
 A store on Magento's own theme runs the rows below on the initial setup's

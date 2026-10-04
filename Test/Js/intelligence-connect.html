@@ -11,8 +11,8 @@
   real templates (view/adminhtml/templates/panel/intelligence.phtml and
   panel/panels-js.phtml), rendered in en_US and et_EE by
   Test/Js/render-admin.php into Test/Js/build/ as the initial setup's step
-  (without and with a saved Storefront URL, for the storefront hint of
-  PRO-3745) and as the Settings tab, run with jQuery from vendor/, one fresh frame per
+  and as the Settings tab (each without and with a saved Storefront URL, for
+  the storefront hint of PRO-3745), run with jQuery from vendor/, one fresh frame per
   scenario. Stubbed: only the requests (fetch) — the Connect answers with
   the EngineExchange endpoint's answer, the import requests with the
   BackfillState endpoint's. Run it with bin/test-js.sh (it renders the pages
@@ -28,6 +28,8 @@
     <script src="build/intelligence-setup-storefront.et_EE.js"></script>
     <script src="build/intelligence-settings.en_US.js"></script>
     <script src="build/intelligence-settings.et_EE.js"></script>
+    <script src="build/intelligence-settings-storefront.en_US.js"></script>
+    <script src="build/intelligence-settings-storefront.et_EE.js"></script>
 </head>
 <body>
 <pre id="log"></pre>
@@ -39,6 +41,7 @@
     var HELD_BACK = 'Held back: the catalog import is canceled. Start it any time under Marketing > Smaily Connect > Settings > Intelligence.';
     var CANCELED = 'Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.';
     var STOREFRONT_HINT = 'Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: finish the setup without connecting, enter the address under Marketing > Smaily Connect > Settings > Connection > Using a separate storefront? > Storefront URL, then connect under Settings > Intelligence. Or connect now and press Hold back the import.';
+    var SETTINGS_STOREFRONT_HINT = 'Using a separate storefront? Set its Storefront URL under Settings > Connection > Using a separate storefront? before you connect, so that the catalog import sends the storefront\'s product links. Or connect now and press Hold back the import.';
     var FINISHED ='The catalog import had already finished, so there was nothing left to hold back.';
     var failures = 0;
     var passes = 0;
@@ -184,11 +187,14 @@
                 strings['The catalog import has started'] !== 'The catalog import has started');
         }
 
-        // Initial setup, before a Connect: without a saved Storefront URL the
-        // step tells a separate storefront to set it first or to hold the
-        // import back (PRO-3745); with one, and on the Settings tab, it does not.
+        // Before a Connect: without a saved Storefront URL the setup step and
+        // the Settings tab tell a separate storefront to set it first or to
+        // hold the import back (PRO-3745), each in its own words; with one
+        // they do not, nor once connected.
         if (locale !== 'en_US') {
             check(locale + ': the storefront hint is translated', strings[STOREFRONT_HINT] !== STOREFRONT_HINT);
+            check(locale + ': the Settings storefront hint is translated',
+                strings[SETTINGS_STOREFRONT_HINT] !== SETTINGS_STOREFRONT_HINT);
         }
         frame = await open(setup, {status: catalog('idle', 0)});
         hint = frame.contentDocument.getElementById('smaily-w-engine-storefront-hint');
@@ -202,7 +208,13 @@
             && !frame.contentDocument.getElementById('smaily-w-engine-storefront-hint'));
         frame.remove();
         frame = await open(settings, {status: catalog('idle', 0)});
-        check(locale + ', settings: no storefront hint',
+        hint = frame.contentDocument.getElementById('smaily-w-engine-storefront-hint');
+        check(locale + ', settings: without a Storefront URL, the storefront hint is shown before Connect',
+            visible(frame.contentDocument, 'smaily-w-engine-storefront-hint')
+            && hint.textContent === strings[SETTINGS_STOREFRONT_HINT]);
+        frame.remove();
+        frame = await open('intelligence-settings-storefront.' + locale, {status: catalog('idle', 0)});
+        check(locale + ', settings: with a Storefront URL, no storefront hint',
             visible(frame.contentDocument, 'smaily-w-engine-connect')
             && !frame.contentDocument.getElementById('smaily-w-engine-storefront-hint'));
         frame.remove();
@@ -261,6 +273,9 @@
         card = doc.querySelector('.smaily-backfill-card[data-job-type="catalog"]');
         check(locale + ', settings: the notice says the catalog import has started',
             shown(doc, 'smaily-w-engine-catalog-import'));
+        check(locale + ', settings: once connected, no storefront hint',
+            !!doc.getElementById('smaily-w-engine-storefront-hint')
+            && !visible(doc, 'smaily-w-engine-storefront-hint'));
         check(locale + ', settings: the Catalog card shows the queued import', card.getAttribute('data-state') === 'pending');
         // The card renders the cancel's own answer: a status read after it
         // would answer the import still queued here.

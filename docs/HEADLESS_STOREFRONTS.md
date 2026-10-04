@@ -93,8 +93,9 @@ Storefront URL before connecting Campaign Intelligence — leave the initial
 setup's optional Intelligence step unconnected and connect under
 **Settings > Intelligence** afterwards — or press **Hold back the import** right after connecting and
 run the import once the Storefront URL is set. While no Storefront URL is
-saved, the initial setup's Intelligence step says the same under its setup
-URL field.
+saved, the initial setup's Intelligence step and **Settings > Intelligence**
+say the same under their setup URL field, until Campaign Intelligence is
+connected.
 The RSS feed shows them within 15 minutes (its cache).
 
 The storefront must open the path: either it routes `/<url-key>.html`

@@ -106,10 +106,11 @@ that a Connect that started the catalog import shows the notice with
 Hold back cancels the catalog import and says what happened — canceled
 before it began, after products were queued (how many), or already
 finished — and that on Settings the Catalog card shows the queued import,
-then the canceled one from the cancel's own answer. Before a Connect it checks that the initial setup's
-step shows the hint to set the Storefront URL first, or hold the import
-back, only while no Storefront URL is saved, and that Settings never shows
-it. To check another admin screen, add its template(s)
+then the canceled one from the cancel's own answer. Before a Connect it
+checks that the initial setup's step and the Settings tab each show their
+hint to set the Storefront URL first, or hold the import back, only while
+no Storefront URL is saved, and that Settings drops it once connected. To
+check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.
 

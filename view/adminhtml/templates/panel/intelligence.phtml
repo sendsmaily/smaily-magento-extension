@@ -41,12 +41,17 @@ $isRefused = $viewModel->isEngineRefused();
             <input type="text" id="smaily-w-setup-url" placeholder="https://intelligence.smaily.com/setup/…"/>
             <p class="note"><?= $escaper->escapeHtml(__('The one-time token is exchanged immediately and never stored.')) ?></p>
             <?php // Connecting starts the catalog import (PRO-3741), with the
-            // product links of the website's Storefront URL. The initial setup
-            // has no Storefront URL field (Settings > Connection has), so while
-            // none is saved the step says to set it first or hold the import
-            // back (PRO-3745). ?>
-            <?php if (!$isSettings && $viewModel->getSavedStorefrontUrl() === ''): ?>
-            <p class="note" id="smaily-w-engine-storefront-hint"><?= $escaper->escapeHtml(__('Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: finish the setup without connecting, enter the address under Marketing > Smaily Connect > Settings > Connection > Using a separate storefront? > Storefront URL, then connect under Settings > Intelligence. Or connect now and press Hold back the import.')) ?></p>
+            // product links of the website's Storefront URL, so while none is
+            // saved for the selected website the panel says to set it first or
+            // hold the import back. The initial setup has no Storefront URL
+            // field (Settings > Connection has): the step says to finish
+            // without connecting (PRO-3745); Settings > Intelligence points to
+            // the Connection tab. Inside the disconnected block, so it is gone
+            // once connected. ?>
+            <?php if ($viewModel->getSavedStorefrontUrl() === ''): ?>
+            <p class="note" id="smaily-w-engine-storefront-hint"><?= $escaper->escapeHtml($isSettings
+                ? __('Using a separate storefront? Set its Storefront URL under Settings > Connection > Using a separate storefront? before you connect, so that the catalog import sends the storefront\'s product links. Or connect now and press Hold back the import.')
+                : __('Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: finish the setup without connecting, enter the address under Marketing > Smaily Connect > Settings > Connection > Using a separate storefront? > Storefront URL, then connect under Settings > Intelligence. Or connect now and press Hold back the import.')) ?></p>
             <?php endif; ?>
         </div>
         <button type="button" class="action-secondary" id="smaily-w-engine-connect">

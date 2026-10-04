@@ -468,6 +468,7 @@
 "User Guide","User Guide"
 "Using a separate storefront?","Using a separate storefront?"
 "Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront's product links: finish the setup without connecting, enter the address under Marketing > Smaily Connect > Settings > Connection > Using a separate storefront? > Storefront URL, then connect under Settings > Intelligence. Or connect now and press Hold back the import.","Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront's product links: finish the setup without connecting, enter the address under Marketing > Smaily Connect > Settings > Connection > Using a separate storefront? > Storefront URL, then connect under Settings > Intelligence. Or connect now and press Hold back the import."
+"Using a separate storefront? Set its Storefront URL under Settings > Connection > Using a separate storefront? before you connect, so that the catalog import sends the storefront's product links. Or connect now and press Hold back the import.","Using a separate storefront? Set its Storefront URL under Settings > Connection > Using a separate storefront? before you connect, so that the catalog import sends the storefront's product links. Or connect now and press Hold back the import."
 "Verify","Verify"
 "View failed deliveries","View failed deliveries"
 "View full log","View full log"

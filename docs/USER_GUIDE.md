@@ -664,14 +664,17 @@ connected.
    **Cancel import** on the **Catalog** card under **Settings >
    Intelligence > Historical imports** holds it back.
 
-While no Storefront URL is saved for the website, Initial setup step 4
-says under the setup URL field that a store with a separate storefront
-sets its Storefront URL first — finish the setup without connecting, enter
-the address under **Settings > Connection > Using a separate storefront? >
-Storefront URL**, then connect under **Settings > Intelligence** — or
-connects and presses **Hold back the import** (see
-[A separate storefront](#a-separate-storefront)). With a Storefront URL
-saved, the step does not say it; **Settings > Intelligence** never does.
+While no Storefront URL is saved for the website, the setup URL field
+says that a store with a separate storefront sets its Storefront URL
+before connecting — or connects and presses **Hold back the import** (see
+[A separate storefront](#a-separate-storefront)). Initial setup step 4
+says to finish the setup without connecting, enter the address under
+**Settings > Connection > Using a separate storefront? > Storefront URL**,
+then connect under **Settings > Intelligence**; **Settings > Intelligence**
+says to set it under **Settings > Connection > Using a separate
+storefront?** first. With a Storefront URL saved, and once connected,
+neither says it. The note reads the value saved when the page opened: after
+saving the Storefront URL on **Settings > Connection**, reload the page.
 
 The setup URL must be an https address on `intelligence.smaily.com`; a bare
 token is exchanged there too. Any other address is refused before anything is

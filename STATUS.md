@@ -53,6 +53,20 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-2477 — translation and doc leftovers after the terminology canon
+  (2026-10-04; found during PRO-1748; nothing merchant-visible).** Both i18n
+  CSVs lose six rows no php, phtml, js, xml or html file references, all
+  with pre-canon wording: "1. Connect" … "5. Done" and "Welcome — fires
+  when someone becomes a subscriber" (483 rows each, same key set). The
+  target spec's dashboard text table reads "Settings / Log / Initial setup
+  | Seaded / Logi / Algseadistus" (was Setup Wizard / Seadistusviisard;
+  owner decision 2026-10-04). Dated audits, UPSTREAM_PROPOSAL and
+  RFC_MULTI_WEBSITE are unedited. No "Test Connection" row is added: since
+  PRO-3644 the button reads "Test connection", which both CSVs already
+  translate ("Testi ühendust"), so a title-case row would be a new orphan
+  (open with the owner). No CHANGELOG bullet: nothing a merchant sees
+  changes.
+
 - **PRO-3559 — the static-analysis gate runs on a default local PHP
   (2026-10-04; found during the lock refresh).** With PHP's default 128M,
   `vendor/bin/phpstan analyse` stopped with a worker out-of-memory error.

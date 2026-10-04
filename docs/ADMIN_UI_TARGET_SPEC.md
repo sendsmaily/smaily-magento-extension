@@ -139,7 +139,7 @@ bilingual):
 |---|---|
 | Recent activity | Viimane tegevus |
 | Quick links | Kiirlingid |
-| Settings / Log / Setup Wizard | Seaded / Logi / Seadistusviisard |
+| Settings / Log / Initial setup | Seaded / Logi / Algseadistus |
 | Source / Type / Entity / Status | Allikas / Tüüp / Kirje / Olek |
 | "Setup is not finished yet — complete the setup wizard to start syncing." | (shipped) |
 | "Smaily Connect is running, but %1 delivery failed in the last 24 hours." / "… %1 deliveries failed …" (singular / plural) | (shipped) |

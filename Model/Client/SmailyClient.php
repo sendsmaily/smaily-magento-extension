@@ -35,7 +35,7 @@ use Smaily\Connect\Model\SmailyUrl;
  * SmailyClientProvider to obtain a client for a store view.
  *
  * Exception messages are translated with __(): they surface in the admin UI
- * (wizard step 1, config assist, workflow loading). The exception keeps the
+ * (wizard step 1, Test connection, workflow loading). The exception keeps the
  * English source text too (getSourceMessage()): the queue stores that, and
  * the Log translates it in the admin's language (Model\Log\FailureMessage,
  * whose list names these messages).

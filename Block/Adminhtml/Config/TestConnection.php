@@ -13,9 +13,10 @@ use Magento\Config\Block\System\Config\Form\Field;
 use Magento\Framework\Data\Form\Element\AbstractElement;
 
 /**
- * "Test connection" button in the API Connection group. The click handler
- * (view/adminhtml/templates/config/assist.phtml) reads the CURRENTLY typed
- * credentials, so the merchant gets instant feedback without saving.
+ * "Test connection" button in the API Connection group of the native config
+ * section. That section is hidden (PRO-1461), so the button never renders and
+ * has no click handler; it stays because etc/adminhtml/system.xml keeps every
+ * field unchanged. Merchants test credentials on Settings > Connection.
  */
 class TestConnection extends Field
 {

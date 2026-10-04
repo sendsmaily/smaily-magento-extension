@@ -129,6 +129,25 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-1469 — the native config page's dead script is removed
+  (2026-10-04; no merchant-visible change, no CHANGELOG bullet).**
+  `view/adminhtml/templates/config/assist.phtml` (Test connection and
+  workflow dropdowns for Stores > Configuration > Smaily Connect) and its
+  layout `adminhtml_system_config_edit.xml` are deleted: the template ran
+  only when `section=smaily_connect`, and Magento redirects that URL since
+  PRO-1461 hid the section. Shown in the sandbox with an admin session:
+  `…/system_config/edit/section/smaily_connect/` → 302 to
+  `system_config/index`; `section/general` renders (200, no Smaily
+  script); Settings and Log render (200). `setup:upgrade` +
+  `setup:di:compile` clean. `Block\Adminhtml\Config\TestConnection` stays:
+  `etc/adminhtml/system.xml` still names it as the hidden field's
+  frontend model (that file keeps every field unchanged); its docblock and
+  a `SmailyClient` comment no longer point at the template. The two phrases
+  only the template used ("Connected! The workflow dropdowns below are now
+  up to date.", "Fill in the subdomain and username first.") leave
+  `en_US.csv` / `et_EE.csv`, and "Queued today" now sorts before "Queued —
+  the import starts…" (the files are sorted case-insensitively).
+
 - **PRO-2475 — CI hygiene (2026-10-04; tooling, no CHANGELOG bullet).**
   The four `composer config repositories.mage-os …` steps in `ci.yaml`
   (unit, integration, static, browser) are gone: `composer.json` declares
@@ -2106,7 +2125,7 @@ Earlier: 2026-09-11, 2026-09-10._
   for one catalog entry's image and product link opened from the engine
   (PRO-3731); (2) open queue: PRO-3746 (after the pilot), PRO-3747,
   PRO-1958; small
-  cleanups PRO-1469/2514/2462 (PRO-2475 done); robustness PRO-1962/2465/2466/1961;
+  cleanups PRO-2514/2462 (PRO-2475, PRO-1469 done); robustness PRO-1962/2465/2466/1961;
   (3) cross-repo asks: PRO-3740 (engine contract wording: §3/§3b still
   describe a periodic full re-sync), PRO-3743 (WooCommerce), PRO-3744
   (Shopify); (4) Erkki: the engine pilot decisions (PRO-3600); HC Pro

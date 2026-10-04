@@ -5,11 +5,14 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-04 — PRO-3734 lands on top of the rc5 cut and the
-PHP 8.1 fix (the Automations tab shows the engine's stored trigger state
-after a save; the CHANGELOG rc5 list has its bullet), so rc5 is built from
-the PRO-3734 commit, not from the fix commit. 3.0.0-rc5 is prepared, not published (the
-owner gave the go for an rc5 for the pilot today): the version is
+_Last updated: 2026-10-04 — 3.0.0-rc5 is released as a GitHub pre-release on
+the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc5),
+built by the release workflow (run 37208243039) from commit 1911c41; the ZIP
+and its .sha256 were checked after publishing (379 entries, `shasum -a 256 -c`
+OK, sha256 8b616e83e7df09e0ad2d…, composer.json inside says 3.0.0-rc5); the
+CI and Contract staleness workflows are green on 1911c41 (the contract check
+for the first time since 2026-10-03, after PRO-3734 synced the copy). The
+pilot installs rc5. The version is
 `3.0.0-rc5` (composer.json, `ModuleInfo::VERSION`, the ModuleVersion
 docblock, the upstream proposal; composer.lock content-hash refreshed, no
 dependency change), and CHANGELOG has a "Changes since 3.0.0-rc4" list.
@@ -18,17 +21,17 @@ the per-minute sync builds the catalog row; the Log shows a short-lived
 *catalog_changed* row), PRO-3731 (the catalog's image and product links
 open; broken in rc4 for the catalog import, the nightly re-sync and admin
 saves), PRO-3732 (the abandoned-cart cart and store links open with web
-server rewrites off) and PRO-3730 (a busy store's abandoned-cart scan
-reads only the carts changed in 24 h). PRO-3559, PRO-2477 and the PRO-1967
+server rewrites off), PRO-3730 (a busy store's abandoned-cart scan
+reads only the carts changed in 24 h) and PRO-3734 (the Automations tab
+shows the engine's stored trigger state after a save; the go-live step
+says Smaily switches real sends on). PRO-3559, PRO-2477 and the PRO-1967
 simplification pass change nothing a merchant sees, so they have no
-bullet. rc5 is prepared in the version-cut commit 4c1b8f9 on top of
-51edd08; the ZIP builds and verifies locally from it. A test-only fix lands
-on top of 4c1b8f9 before publishing, and the release is built from that fix
-commit: a unit-test helper used a PHP 8.2 type (`(A&B)|null`, since
-0b4c1ea), so CI's PHP 8.1 unit job could not parse the suite; every PHP
-and PHTML file now lints on PHP 8.1, no production file was affected, and
-the unit suite passes on PHP 8.1. It awaits publishing as a GitHub
-pre-release on the fork (as rc1 to rc4); the pilot installs rc5.
+bullet. The version cut is commit 4c1b8f9 on top of 51edd08; two commits
+land on top of it before the release: a test-only fix (a unit-test helper
+used a PHP 8.2 type, `(A&B)|null`, since 0b4c1ea, so CI's PHP 8.1 unit job
+could not parse the suite; every PHP and PHTML file now lints on PHP 8.1,
+no production file was affected, and the unit suite passes on PHP 8.1) and
+PRO-3734 (its CHANGELOG rc5 bullet included).
 2026-10-03 — 3.0.0-rc4 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc4),
 built by the release workflow from commit 5684a1c; the ZIP and its .sha256
@@ -77,7 +80,7 @@ Earlier: 2026-09-11, 2026-09-10._
 - **PRO-3734 — the Automations tab shows the engine's stored trigger
   state after a save; the go-live step says Smaily switches real sends on
   (2026-10-04; owner design via the orchestrator: as Woo PRO-3707, the
-  go-live control stays).** Contract copy synced byte-identically with
+  go-live control stays; in rc5).** Contract copy synced byte-identically with
   engine main 32f6222 (`bin/check-contract-staleness.sh` against the
   fetched copy: OK, md5 `36ebd8b9…`; STALE before). Still v1.8.2, a
   clarification: §13 (PRO-3705) stores a row with `enabled: true` +
@@ -122,7 +125,7 @@ Earlier: 2026-09-11, 2026-09-10._
 
 - **PRO-3730 — the abandoned-cart scan reads only the window on a busy
   store that keeps old carts (2026-10-04; measured in spike PRO-3713; owner
-  decision via the orchestrator: keep the id order).** The scan's page is
+  decision via the orchestrator: keep the id order; in rc5).** The scan's page is
   ordered by `main_table.entity_id + 0` instead of `entity_id`
   (`Cron\AbandonedCart`, one line): an expression cannot be read from an
   index, so MySQL and MariaDB no longer walk the primary key in id order,
@@ -151,8 +154,7 @@ Earlier: 2026-09-11, 2026-09-10._
   (it would not under an updated_at order). ARCHITECTURE, CHANGELOG.
 
 - **PRO-3732 — the abandoned-cart reminder's cart link opens with web
-  server rewrites off (2026-10-04; found during PRO-3731; unreleased, the
-  pilot stays on rc4).** Reproduced on the sandbox (Luma, rewrites off) with
+  server rewrites off (2026-10-04; found during PRO-3731; in rc5).** Reproduced on the sandbox (Luma, rewrites off) with
   a probe that builds the reminder as `Cron\AbandonedCart` does (crontab
   area, frontend emulation of the cart's store, script named `magento`;
   nothing queued or sent; a guest cart made through the storefront, deleted
@@ -183,7 +185,7 @@ Earlier: 2026-09-11, 2026-09-10._
 
 - **PRO-3731 — catalog image and product links built in cron, CLI and the
   admin are the storefront's (2026-10-04; found during PRO-1967;
-  unreleased, the pilot stays on rc4).** Reproduced on the sandbox (Luma,
+  in rc5).** Reproduced on the sandbox (Luma,
   et_EE, rewrites off), building through the backfill page loader (=
   nightly re-sync) and the PRO-1967 `buildChanged()` loader by reflection
   in the crontab area under a script named `magento`, nothing queued or
@@ -219,8 +221,8 @@ Earlier: 2026-09-11, 2026-09-10._
   index.php.
 
 - **PRO-1967 — stock hooks no longer build catalog rows inside the stock
-  write's transaction (2026-10-04; owner design 2026-10-04; unreleased, the
-  pilot stays on rc4).** The legacy stock observer and both MSI plugins now
+  write's transaction (2026-10-04; owner design 2026-10-04; in
+  rc5).** The legacy stock observer and both MSI plugins now
   queue a `catalog_changed` marker per product (payload `[]`, product id in
   `entity_id`; existing `smaily_ingest_queue`, no schema change); the MSI
   plugins resolve all skus with one `getProductsIdsBySkus()` query and
@@ -1486,20 +1488,21 @@ Earlier: 2026-09-11, 2026-09-10._
   in-process instance — nothing stored). Fixes PRO-3603 findings 1, 5
   and 6.
 
-- **Next session opens here (2026-10-04).** 3.0.0-rc5 is prepared
-  (header) and awaits publishing as a GitHub pre-release on the fork; **the
-  pilot installs rc5** (rc4 stays the newest published build until then).
-  Done 2026-10-04, all in rc5: PRO-3559 (phpstan on a default local PHP),
+- **Next session opens here (2026-10-04).** 3.0.0-rc5 is out (header) —
+  **the pilot installs rc5**. Done 2026-10-04, all in rc5: PRO-3559 (phpstan on a default local PHP),
   PRO-2477 (translation and doc leftovers), PRO-3713 (spike, abandoned-cart
   scan on very large cart tables), PRO-1967 (stock hooks queue a marker;
   the flusher builds the rows) + its simplification pass
   (behaviour-neutral, above), PRO-3731 (catalog image and product links
   built in cron, CLI and the admin are the storefront's), PRO-3732 (the
   abandoned-cart cart and store links open with web server rewrites off),
-  PRO-3730 (the abandoned-cart scan reads only the window on busy stores);
+  PRO-3730 (the abandoned-cart scan reads only the window on busy stores),
+  PRO-3734 (the Automations tab shows the engine's stored trigger state
+  after a save; contract copy synced, the staleness check green again);
   the pilot's first catalog import is built in cron, so PRO-3731 matters
-  to it. Open queue: PRO-3729 (low, wording leftovers), PRO-3733 (low, the
-  engine connection's site address built under the CLI). Done
+  to it. Open queue, all low: PRO-3729 (wording leftovers), PRO-3733 (the
+  engine connection's site address built under the CLI), PRO-3735,
+  PRO-3736. Done
   2026-10-02/03: headless storefronts + the
   Storefront URL (PRO-3614/3660), browse consent as in Woo and per website
   (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the standard
@@ -1508,7 +1511,7 @@ Earlier: 2026-09-11, 2026-09-10._
   import per website with save-path prices (PRO-2506/3692), variants take the
   parent's category (PRO-3714/3715), seven per-language account fixes
   (PRO-3683/3690/3699/3717/3718/3719), contract 1.8.2 (PRO-3654); rc2, rc3,
-  rc4 released. Next, in order: (1) pilot day 09.10 — the pilot installs
+  rc4 released; rc5 released 2026-10-04. Next, in order: (1) pilot day 09.10 — the pilot installs
   rc5; Erkki passes the
   storefront hand-off in docs/HEADLESS_STOREFRONTS.md to the storefront team
   (keep the query string on the `/<url_key>.html` redirect), sets the
@@ -1523,8 +1526,10 @@ Earlier: 2026-09-11, 2026-09-10._
   (PRO-3665), the Campaign Intelligence questions (spike PRO-3662); (3)
   open backlog: the queue above, PRO-3675 (live Hyvä check), PRO-1198
   (Smaily hand-over); PRO-1357 is closed (2026-10-04). Erkki still
-  proofreads the Estonian strings
-  added 2026-10-02/03. Sandbox: remove finished agent worktrees under
+  proofreads the Estonian strings added 2026-10-02/04, incl. PRO-3734's
+  go-live note and the term "päästik". With Erkki: the Automations tab
+  intro ("nothing reaches real customers without your explicit action")
+  is still true but incomplete since PRO-3734 — does it need more copy? Sandbox: remove finished agent worktrees under
   `.claude/worktrees` before any sandbox `setup:di:compile`.
 
 - **PRO-3603 done — final clean-install pass of the release ZIP
@@ -4424,8 +4429,7 @@ Earlier: 2026-09-11, 2026-09-10._
   merchant recovery).
 
 **All 6 v3 phases implemented** (~110 files) on branch `v3`, version
-**3.0.0-rc5 — unreleased** (3.0.0-rc4 is the newest GitHub pre-release
-on the fork). Current truth:
+**3.0.0-rc5 — GitHub pre-release on the fork** (the newest). Current truth:
 
 - **PRO-1391 final-polish done — four refinements on Settings > Connection
   after Erkki's side-by-side review of the PRO-1391 visual-fidelity pass.**

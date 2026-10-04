@@ -15,6 +15,7 @@ use Magento\Framework\DB\Select;
 use Magento\Framework\Event\ManagerInterface as EventManager;
 use Magento\Framework\View\Element\UiComponent\DataProvider\SearchResult;
 use Psr\Log\LoggerInterface as Logger;
+use Smaily\Connect\Model\Log\FailureMessage;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
@@ -92,7 +93,8 @@ class Collection extends SearchResult
         EntityFactory $entityFactory,
         Logger $logger,
         FetchStrategy $fetchStrategy,
-        EventManager $eventManager
+        EventManager $eventManager,
+        private readonly FailureMessage $failureMessage
     ) {
         parent::__construct(
             $entityFactory,
@@ -102,6 +104,46 @@ class Collection extends SearchResult
             EventResource::TABLE_NAME,
             UnifiedRow::class
         );
+    }
+
+    /**
+     * The error column's text filter matches what the column shows
+     * (PRO-2509), not the stored value: RetryPolicy's
+     * `permanent_http_<code>:` prefix is not searched, and a client message
+     * shown translated is found by its translated words too (FailureMessage
+     * strips and translates the same way for display). A stored error that
+     * the column shows as redacted JSON is never matched, so the filter
+     * cannot find a row by a secret the column hides.
+     *
+     * @param string|array<int, mixed> $field
+     * @param null|string|array<int|string, mixed> $condition
+     * @return $this
+     */
+    public function addFieldToFilter($field, $condition = null)
+    {
+        if ($field !== 'last_error' || !is_array($condition) || !isset($condition['like'])) {
+            return parent::addFieldToFilter($field, $condition);
+        }
+
+        $connection = $this->getConnection();
+        $like = (string)$condition['like'];
+        // The grid's text filter sends "%<term>%" with % and _ escaped.
+        $term = str_replace(['\\%', '\\_'], ['%', '_'], (string)preg_replace('/^%|%$/', '', $like));
+        $shown = 'CASE WHEN main_table.last_error REGEXP \'^permanent_http_[0-9]+:\' THEN TRIM(LEADING \' \''
+            . ' FROM SUBSTRING(main_table.last_error, LOCATE(\':\', main_table.last_error) + 1))'
+            . ' ELSE main_table.last_error END';
+
+        $matches = [];
+        foreach ([$like, ...$this->failureMessage->storedPatternsShowing($term)] as $pattern) {
+            $matches[] = $connection->quoteInto($shown . ' LIKE ?', $pattern);
+        }
+        $this->getSelect()->where(sprintf(
+            '(%1$s) AND NOT (JSON_VALID(%2$s) AND LEFT(%2$s, 1) IN (\'{\', \'[\'))',
+            implode(' OR ', $matches),
+            $shown
+        ));
+
+        return $this;
     }
 
     /**

@@ -962,7 +962,9 @@ card — you do not have to keep the page open:
   shows what Smaily actually answered, under the last API response. A
   Smaily delivery error reads in your admin language,
   whatever the language of the store that sent the row; the log file
-  records it in English. Select failed rows and **Retry** — each row is routed
+  records it in English. The column's filter finds a row by the words the
+  column shows, in your admin language; it does not find our internal
+  failure class, nor a password or key that the column hides. Select failed rows and **Retry** — each row is routed
   back to its own queue; rows that cannot safely be sent again are left
   alone and counted ("2 event(s) queued for retry, 1 skipped because
   sending again would not be safe").

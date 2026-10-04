@@ -470,7 +470,13 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   Smaily 401/403 stores the client's own sentence ("Smaily API credentials
   were rejected") instead of Smaily's body, because it names what to fix;
   the body stays in `last_response`. The package refusal and a Smaily HTTP
-  error without an error envelope are client sentences too.
+  error without an error envelope are client sentences too. The grid's
+  text filter on that column matches the shown text, not the stored value
+  (PRO-2509): `Log\Collection::addFieldToFilter()` strips the same prefix
+  in SQL, adds a LIKE per client message whose translation in the admin's
+  language holds the term (`FailureMessage::storedPatternsShowing()`), and
+  never matches an error the column shows as redacted JSON (`JSON_VALID`
+  object/array), so a filter cannot probe a hidden secret.
 - **Retention:** sent 30 days, failed 90 days (`Cron/QueueJanitor`). The
   same job sweeps `smaily_abandoned_cart` (PRO-2469) — it owns the schedule
   and the window, while the SQL stays with the table's owner

@@ -58,7 +58,10 @@ class FailureMessage
         AbandonedCart::SKIPPED_RECENTLY_REMINDED,
     ];
 
-    /** What RetryPolicy prepends to a refusal it parked on the spot. */
+    /**
+     * What RetryPolicy prepends to a refusal it parked on the spot. The Log
+     * grid's error filter strips it the same way, in SQL (Log\Collection).
+     */
     private const CLASS_PATTERN = '/^(permanent_http_\d+):\s*/';
 
     public function __construct(
@@ -87,6 +90,38 @@ class FailureMessage
         preg_match(self::CLASS_PATTERN, trim((string)$lastError), $matches);
 
         return $matches[1] ?? '';
+    }
+
+    /**
+     * The stored client messages that the admin reads with $term in them
+     * because they are shown translated (PRO-2509): one SQL LIKE pattern per
+     * message whose translation has $term in its own wording, the values
+     * filled into it matching anything. The grid's error filter matches
+     * these besides the stored text itself, so the admin finds a row by the
+     * words the column shows.
+     *
+     * @return string[]
+     */
+    public function storedPatternsShowing(string $term): array
+    {
+        $patterns = [];
+        foreach ($term === '' ? [] : self::TRANSLATED as $source) {
+            $translated = (string)__($source);
+            if ($translated === $source) {
+                continue;
+            }
+            foreach ((array)preg_split('/%\d+/', $translated) as $wording) {
+                if (mb_stripos((string)$wording, $term) !== false) {
+                    $patterns[] = implode('%', array_map(
+                        static fn ($part): string => addcslashes((string)$part, '%_\\'),
+                        (array)preg_split('/%\d+/', $source)
+                    ));
+                    break;
+                }
+            }
+        }
+
+        return $patterns;
     }
 
     private function translate(string $message): string

@@ -7,7 +7,8 @@
 
 _Last updated: 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
 land on v3: PRO-2508 (the Log's error column describes rejected Smaily
-credentials in the extension's own sentence, on purpose; docs only).
+credentials in the extension's own sentence, on purpose; docs only),
+PRO-2509 (the Log's Last Error filter matches the text the column shows).
 Earlier the same day: 3.0.0-rc6 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc6),
 built by the release workflow (run 37228529206) from commit bb6831e; the ZIP
@@ -124,6 +125,32 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-2509 — the Log's Last Error filter matches what the column shows
+  (2026-10-04; CHANGELOG "Changes since 3.0.0-rc6" opened with its
+  bullet).** The column shows `FailureMessage::forDisplay()` (RetryPolicy's
+  `permanent_http_<code>:` prefix stripped, a client message translated
+  into the admin's language, `PayloadRedactor` applied) while the filter
+  searched the raw stored value. `Log\Collection::addFieldToFilter()` now
+  takes the `last_error` LIKE itself: it matches the stored text with the
+  prefix stripped in SQL, OR any client message whose translation holds
+  the typed words (`FailureMessage::storedPatternsShowing()`, values filled
+  into the message match anything), and never a row whose shown text is a
+  JSON object/array. Redaction check: the redactor only changes an error
+  that is whole JSON (secret keys become `[redacted]`); no queue path
+  stores one today (errors are client/engine sentences, D6 `field:
+  message`), but a raw-value filter would have found such a row by its
+  hidden value, so those rows are excluded from the text filter. Known
+  limit: an Estonian admin typing English words still finds an English
+  stored message (a superset, not a miss). Tests: unit
+  `FailureMessageTest` +2 (ET patterns, none in EN or for other words),
+  integration `Log/ErrorFilterTest` (5 tests: server words found, prefix
+  not; ET words found; `hunter2`/`api_key` in a JSON error not found;
+  escaped `_`/`%` literal) — 4 of 5 red with the raw filter restored.
+  DI change (a constructor argument on the collection): sandbox
+  `setup:upgrade` + `setup:di:compile` clean; the filter queries run on
+  the sandbox's MySQL 8.4 (its Log is empty, so nothing to compare there).
+  Docs: USER_GUIDE (the log), ARCHITECTURE (Sending again), CHANGELOG.
 
 - **PRO-2508 — rejected Smaily credentials keep the extension's sentence
   in the Log (2026-10-04; docs + a code comment, no behaviour change, no
@@ -2015,7 +2042,7 @@ Earlier: 2026-09-11, 2026-09-10._
   notice under the bell to be read after the initial setup (PRO-3739) and
   for one catalog entry's image and product link opened from the engine
   (PRO-3731); (2) open queue: PRO-3746 (after the pilot), PRO-3747,
-  PRO-1958; the Event Log leftovers PRO-2509/2510/2511; small
+  PRO-1958; the Event Log leftovers PRO-2510/2511; small
   cleanups PRO-2475/1469/2514/2462; robustness PRO-1962/2465/2466/1961;
   (3) cross-repo asks: PRO-3740 (engine contract wording: §3/§3b still
   describe a periodic full re-sync), PRO-3743 (WooCommerce), PRO-3744

@@ -185,6 +185,35 @@ class FailureMessageTest extends TestCase
         }
     }
 
+    /**
+     * PRO-2509: the grid's error filter finds a translated client message by
+     * the words the admin reads, its filled-in values matching anything.
+     */
+    public function testATranslatedMessageIsFoundByItsTranslatedWords(): void
+    {
+        StoreLocale::use('et_EE');
+
+        self::assertSame(
+            ['Smaily API credentials were rejected', 'Smaily API credentials are not configured (store scope: %)'],
+            $this->failureMessage->storedPatternsShowing('KASUTAJAANDMED')
+        );
+        self::assertSame(
+            ['Smaily API request failed with HTTP %'],
+            $this->failureMessage->storedPatternsShowing('päring ebaõnnestus (HTTP')
+        );
+    }
+
+    public function testAWordThatIsNotInATranslationFindsNoStoredMessage(): void
+    {
+        StoreLocale::use('et_EE');
+        self::assertSame([], $this->failureMessage->storedPatternsShowing('Invalid data'));
+        self::assertSame([], $this->failureMessage->storedPatternsShowing(''));
+
+        // An English admin reads the stored text itself: nothing to add.
+        StoreLocale::use('en_US');
+        self::assertSame([], $this->failureMessage->storedPatternsShowing('credentials'));
+    }
+
     protected function tearDown(): void
     {
         StoreLocale::reset();

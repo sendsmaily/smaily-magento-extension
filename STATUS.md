@@ -77,6 +77,18 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3735 — CI parses every PHP and PHTML file on PHP 8.1 (2026-10-04;
+  tooling, no bullet in CHANGELOG).** New CI job "PHP 8.1 syntax" runs
+  `bin/lint-php.sh`: `php -l` over every `*.php` / `*.phtml` outside
+  vendor/, .git and .claude, reporting every failure and ending with the
+  list of files PHP 8.1 cannot parse (exit 1). Before, only the PHP 8.1 unit
+  job noticed newer syntax, and only in files a test loads (aa07b2d: red
+  for five commits). Checked locally under `php:8.1-cli`: green on the tree
+  (370 files); with a DNF type in `Model/StorefrontScript.php` and an
+  8.4-only `new X()->y()` in `config/assist.phtml` (temporary, reverted) it
+  failed naming both files. CLAUDE.md's PHP 8.1 gotcha and TESTING.md now
+  point at the script.
+
 - **PRO-3734 — the Automations tab shows the engine's stored trigger
   state after a save; the go-live step says Smaily switches real sends on
   (2026-10-04; owner design via the orchestrator: as Woo PRO-3707, the

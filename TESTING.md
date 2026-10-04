@@ -12,6 +12,15 @@ vendor/bin/phpstan analyse  # level 6 with the bitexpert/phpstan-magento extensi
 CI (GitHub Actions) runs the unit suite on PHP 8.1 and 8.3 plus the static
 analysis job on every push and pull request.
 
+A newer local PHP accepts syntax PHP 8.1 rejects, and neither PHPStan nor
+phpcs flags it, so CI also parses every PHP and PHTML file outside `vendor/`
+on PHP 8.1, whether or not a test loads it, and fails naming each file it
+cannot parse. Run the same check locally:
+
+```bash
+docker run --rm -v "$PWD":/app -w /app php:8.1-cli bin/lint-php.sh
+```
+
 PHPStan needs more memory than PHP's default 128M. `phpstan.neon.dist` loads
 `Test/phpstan-bootstrap.php`, which raises the limit to 1G in the main process
 and in every worker, so the command above runs as written; a higher limit

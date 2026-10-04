@@ -85,12 +85,13 @@ style (str_replace, never sprintf).
 - **Local PHP 8.5 accepts syntax PHP 8.1 rejects** (DNF types such as
   `(A&B)|null` are 8.2+, `new Foo()->bar()` without wrapping parens is
   8.4+), and neither phpstan (even with `phpVersion: 80100`) nor phpcs
-  (`magento/php-compatibility-fork`) flags it — CI's PHP 8.1 unit job is the
-  first to fail. Before calling work done, lint the changed files under
-  PHP 8.1 (the whole repo, excluding vendor/, takes a minute; it prints
-  only failures — a plain `xargs php -l` stops at the first one):
+  (`magento/php-compatibility-fork`) flags it. CI's "PHP 8.1 syntax" job
+  runs `bin/lint-php.sh` (PRO-3735): `php -l` over every PHP and PHTML file
+  outside vendor/, failing with the name of each file 8.1 cannot parse.
+  Before calling work done, run the same script under PHP 8.1 locally (the
+  whole repo takes seconds; it reports every failure, not only the first):
   ```sh
-  docker run --rm -v "$PWD":/app -w /app php:8.1-cli sh -c 'for f in $(find . \( -path ./vendor -o -path ./.git -o -path ./.claude \) -prune -o \( -name "*.php" -o -name "*.phtml" \) -print); do php -l "$f" >/tmp/o 2>&1 || cat /tmp/o; done'
+  docker run --rm -v "$PWD":/app -w /app php:8.1-cli bin/lint-php.sh
   ```
   The unit suite runs on 8.1 the same way after `apt-get install -y
   libicu-dev && docker-php-ext-install intl` in the container.

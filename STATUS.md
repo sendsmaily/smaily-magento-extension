@@ -1650,8 +1650,10 @@ Earlier: 2026-09-11, 2026-09-10._
   Storefront URL, walks PILOT_CHECKLIST.md; human acceptance of PRO-2474 and
   PRO-3660 (a recommendation and a back-in-stock link open on the
   storefront), plus one look at a configurable product's category and
-  price in the engine, and — extra check for rc5 — open one catalog
-  entry's image link in the engine (PRO-3731); (2) HC Pro (legacy 2.x
+  price in the engine; PILOT_CHECKLIST §2 also asks for the setup notice
+  under the bell to be read after the initial setup (PRO-3739) and for one
+  catalog entry's image and product link opened from the engine
+  (PRO-3731); (2) HC Pro (legacy 2.x
   upgrade, 4 websites, one Smaily account), awaiting the owner: Erkki reads
   their 2.x settings with the UPGRADING checklist (PRO-3661), the Mageplaza
   live checks (PRO-3663), the other-abandoned-cart-senders check

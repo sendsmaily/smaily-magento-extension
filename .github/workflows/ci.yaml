@@ -10,7 +10,7 @@ jobs:
     name: PHP 8.1 syntax (every PHP and PHTML file)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
@@ -28,16 +28,13 @@ jobs:
       matrix:
         php: ['8.1', '8.3']
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: ${{ matrix.php }}
           extensions: bcmath, gd, intl, pdo_mysql, soap, xsl, zip
           coverage: none
-
-      - name: Add Mage-OS mirror for Magento packages
-        run: composer config repositories.mage-os composer https://mirror.mage-os.org/
 
       - name: Install dependencies
         run: composer install --no-interaction --no-progress
@@ -62,16 +59,13 @@ jobs:
           --health-timeout=5s
           --health-retries=10
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: '8.3'
           extensions: bcmath, gd, intl, pdo_mysql, soap, sodium, xsl, zip
           coverage: none
-
-      - name: Add Mage-OS mirror for Magento packages
-        run: composer config repositories.mage-os composer https://mirror.mage-os.org/
 
       - name: Install dependencies
         run: composer install --no-interaction --no-progress
@@ -89,16 +83,13 @@ jobs:
     name: Static analysis (phpcs + phpstan)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: '8.3'
           extensions: bcmath, gd, intl, pdo_mysql, soap, xsl, zip
           coverage: none
-
-      - name: Add Mage-OS mirror for Magento packages
-        run: composer config repositories.mage-os composer https://mirror.mage-os.org/
 
       - name: Install dependencies
         run: composer install --no-interaction --no-progress
@@ -113,16 +104,13 @@ jobs:
     name: Browser tests (headless Chrome)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: '8.3'
           extensions: bcmath, gd, intl, pdo_mysql, soap, xsl, zip
           coverage: none
-
-      - name: Add Mage-OS mirror for Magento packages
-        run: composer config repositories.mage-os composer https://mirror.mage-os.org/
 
       - name: Install dependencies
         run: composer install --no-interaction --no-progress
@@ -140,7 +128,7 @@ jobs:
     name: Release package (build + verify)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
@@ -150,7 +138,7 @@ jobs:
       - name: Build and verify the release ZIP
         run: bash bin/verify-release-zip.sh smaily-connect-magento2.zip
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: release-zip
           path: |

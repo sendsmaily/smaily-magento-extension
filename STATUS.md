@@ -129,6 +129,23 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-2475 — CI hygiene (2026-10-04; tooling, no CHANGELOG bullet).**
+  The four `composer config repositories.mage-os …` steps in `ci.yaml`
+  (unit, integration, static, browser) are gone: `composer.json` declares
+  the mirror itself, and the step would rewrite `composer.json` (and so
+  invalidate the lock's content-hash) the day its URL or form differed.
+  Shown locally: on a fresh clone of v3 the step leaves `composer.json`
+  byte-identical today (the latent hazard, not a live one), and a clean
+  `composer install --ignore-platform-reqs` there says "Installing
+  dependencies from lock file", installs without a stale-lock warning and
+  runs the unit suite. Node.js 20 deprecation: `actions/checkout` is
+  pinned to v5.1.0 (fbc6f39, `node24`) in all four workflows;
+  `actions/upload-artifact` (ci.yaml `package`) to v6.0.0 (b7c566a) —
+  v5.0.0 still declares `runs.using: node20`, v6.0.0 is the first major
+  that runs on Node.js 24 and changes nothing else. `shivammathur/setup-php`
+  2.37.2 already runs on `node24`, unchanged. Confirmed by the next push,
+  not from here: CI green on GitHub's runner and no Node.js 20 annotation.
+
 - **PRO-2510 — the Log's mass Retry works through a large selection in
   batches (2026-10-04; CHANGELOG bullet).** Before, `MassRetry` took
   `Filter::getCollection()`, which loads every grid row of a "Select all"
@@ -2089,7 +2106,7 @@ Earlier: 2026-09-11, 2026-09-10._
   for one catalog entry's image and product link opened from the engine
   (PRO-3731); (2) open queue: PRO-3746 (after the pilot), PRO-3747,
   PRO-1958; small
-  cleanups PRO-2475/1469/2514/2462; robustness PRO-1962/2465/2466/1961;
+  cleanups PRO-1469/2514/2462 (PRO-2475 done); robustness PRO-1962/2465/2466/1961;
   (3) cross-repo asks: PRO-3740 (engine contract wording: §3/§3b still
   describe a periodic full re-sync), PRO-3743 (WooCommerce), PRO-3744
   (Shopify); (4) Erkki: the engine pilot decisions (PRO-3600); HC Pro

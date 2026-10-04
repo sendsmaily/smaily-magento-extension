@@ -80,6 +80,86 @@ class IngestQueue
     }
 
     /**
+     * Queue several rows for one domain with a single INSERT (PRO-1967: a
+     * bulk stock write must not turn into one round trip per product). Each
+     * row gets its own uuid, as enqueue() gives it.
+     *
+     * @param array<int, array{payload: array<string, mixed>, entity_id: ?string, store_id: ?int}> $rows
+     * @return int the number of rows queued
+     */
+    public function enqueueMany(string $domain, array $rows): int
+    {
+        if (!$rows) {
+            return 0;
+        }
+
+        $data = [];
+        foreach ($rows as $row) {
+            $data[] = [
+                'domain' => $domain,
+                'entity_id' => $row['entity_id'],
+                'event_uuid' => $this->identityGenerator->generateId(),
+                'store_id' => $row['store_id'],
+                'payload' => $this->serializer->serialize($row['payload']),
+                'status' => IngestEvent::STATUS_PENDING,
+                'attempts' => 0,
+            ];
+        }
+
+        return $this->resourceConnection->getConnection()->insertMultiple(
+            $this->resourceConnection->getTableName(IngestEventResource::TABLE_NAME),
+            $data
+        );
+    }
+
+    /**
+     * The stored payload of each entity's newest row that is not delivered
+     * yet (pending or being sent). Reads only undelivered rows, so it stays
+     * on the domain/status index however many delivered rows are retained.
+     *
+     * @param string[] $entityIds
+     * @return array<string, string> entity id => payload as stored
+     */
+    public function undeliveredPayloads(string $domain, array $entityIds): array
+    {
+        if (!$entityIds) {
+            return [];
+        }
+
+        $connection = $this->resourceConnection->getConnection();
+        $select = $connection->select()
+            ->from($this->resourceConnection->getTableName(IngestEventResource::TABLE_NAME), ['entity_id', 'payload'])
+            ->where('domain = ?', $domain)
+            ->where('status IN (?)', [IngestEvent::STATUS_PENDING, IngestEvent::STATUS_SENDING])
+            ->where('entity_id IN (?)', $entityIds)
+            ->order('id ASC');
+
+        $payloads = [];
+        foreach ($connection->fetchAll($select) as $row) {
+            $payloads[(string)$row['entity_id']] = (string)$row['payload'];
+        }
+
+        return $payloads;
+    }
+
+    /**
+     * Remove rows that have done their job without being sent.
+     *
+     * @param IngestEvent[] $events
+     */
+    public function delete(array $events): void
+    {
+        if (!$events) {
+            return;
+        }
+
+        $this->resourceConnection->getConnection()->delete(
+            $this->resourceConnection->getTableName(IngestEventResource::TABLE_NAME),
+            ['id IN (?)' => array_map(static fn (IngestEvent $event): int => (int)$event->getId(), $events)]
+        );
+    }
+
+    /**
      * Claim due pending events for one domain (marks them as sending).
      *
      * @return IngestEvent[]

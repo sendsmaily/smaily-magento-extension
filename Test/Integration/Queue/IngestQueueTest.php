@@ -120,4 +120,70 @@ class IngestQueueTest extends IntegrationTestCase
         self::assertSame(IngestEvent::STATUS_PENDING, $row['status']);
         self::assertSame('0', (string)$row['attempts']);
     }
+
+    /**
+     * PRO-1967: a bulk stock write queues all its rows with one INSERT, each
+     * with its own uuid (the wire event_id) and the pending defaults.
+     */
+    public function testEnqueueManyQueuesEveryRowPendingWithItsOwnUuid(): void
+    {
+        self::assertSame(2, $this->queue->enqueueMany('catalog', [
+            ['payload' => ['sku' => 'A'], 'entity_id' => '1', 'store_id' => 1],
+            ['payload' => [], 'entity_id' => '2', 'store_id' => null],
+        ]));
+        self::assertSame(0, $this->queue->enqueueMany('catalog', []));
+
+        $rows = $this->fetchAll(IngestEventResource::TABLE_NAME);
+        self::assertCount(2, $rows);
+        self::assertSame(['1', '2'], array_column($rows, 'entity_id'));
+        self::assertSame(['sku' => 'A'], json_decode((string)$rows[0]['payload'], true));
+        self::assertSame('[]', $rows[1]['payload']);
+        self::assertSame('1', (string)$rows[0]['store_id']);
+        self::assertNull($rows[1]['store_id']);
+        self::assertSame([IngestEvent::STATUS_PENDING, IngestEvent::STATUS_PENDING], array_column($rows, 'status'));
+        self::assertNotSame($rows[0]['event_uuid'], $rows[1]['event_uuid']);
+        self::assertSame(36, strlen((string)$rows[0]['event_uuid']));
+    }
+
+    /**
+     * PRO-1967: the newest row per entity that has not been delivered yet —
+     * pending or being sent; a delivered or failed row, another domain or
+     * another entity never counts.
+     */
+    public function testUndeliveredPayloadsReturnsTheNewestUnsentRowPerEntity(): void
+    {
+        $this->queue->enqueue('catalog', ['v' => 1], '1', null, 'u-old');
+        $this->queue->enqueue('catalog', ['v' => 2], '1', null, 'u-new');
+        $this->queue->enqueue('catalog', ['v' => 3], '2', null, 'u-sent');
+        $this->queue->enqueue('catalog', ['v' => 4], '3', null, 'u-failed');
+        $this->queue->enqueue('orders', ['v' => 5], '4', null, 'u-orders');
+        $this->queue->enqueue('catalog', ['v' => 6], '5', null, 'u-sending');
+        $this->queue->enqueue('catalog', ['v' => 7], '9', null, 'u-other');
+        $claimed = array_column(array_map(
+            static fn (IngestEvent $event): array => [$event->getEventUuid(), $event],
+            $this->queue->claimBatch('catalog', 100)
+        ), 1, 0);
+        $this->queue->markSent($claimed['u-sent']);
+        $this->queue->markFailed($claimed['u-failed'], 'bad', true);
+        $this->queue->release([$claimed['u-old'], $claimed['u-new'], $claimed['u-other']]);
+
+        self::assertSame(
+            ['1' => '{"v":2}', '5' => '{"v":6}'],
+            $this->queue->undeliveredPayloads('catalog', ['1', '2', '3', '4', '5'])
+        );
+        self::assertSame([], $this->queue->undeliveredPayloads('catalog', []));
+    }
+
+    public function testDeleteRemovesExactlyTheGivenRows(): void
+    {
+        $this->queue->enqueue('catalog_changed', [], '1', null, 'd-1');
+        $this->queue->enqueue('catalog_changed', [], '2', null, 'd-2');
+        $this->queue->enqueue('catalog_changed', [], '3', null, 'd-3');
+        $claimed = $this->queue->claimBatch('catalog_changed', 2);
+
+        $this->queue->delete($claimed);
+        $this->queue->delete([]);
+
+        self::assertSame(['d-3'], array_column($this->fetchAll(IngestEventResource::TABLE_NAME), 'event_uuid'));
+    }
 }

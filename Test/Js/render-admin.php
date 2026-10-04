@@ -291,9 +291,11 @@ $render = static function (string $template, object $block, Escaper $escaper): s
     return (string)ob_get_clean();
 };
 
+// A page that could not be written would leave the harnesses reading an
+// older build, so any write failure stops the run (non-zero exit).
 $build = __DIR__ . '/build';
-if (!is_dir($build)) {
-    mkdir($build); // phpcs:ignore Magento2.Functions.DiscouragedFunction
+if (!is_dir($build) && !mkdir($build) && !is_dir($build)) { // phpcs:ignore Magento2.Functions.DiscouragedFunction
+    throw new RuntimeException('Cannot create ' . $build . '.');
 }
 foreach ($pages as $name => $page) {
     foreach (['en_US', 'et_EE'] as $locale) {
@@ -307,12 +309,16 @@ foreach ($pages as $name => $page) {
             $html .= $render($template, $block($page['viewModel'], $page['data'] ?? []), $escaper);
         }
         $data = ['html' => $html, 'strings' => $strings];
-        file_put_contents( // phpcs:ignore Magento2.Functions.DiscouragedFunction
-            $build . '/' . $name . '.' . $locale . '.js',
+        $file = $build . '/' . $name . '.' . $locale . '.js';
+        $written = file_put_contents( // phpcs:ignore Magento2.Functions.DiscouragedFunction
+            $file,
             'window.smailyAdminPages = window.smailyAdminPages || {};' . "\n"
             . 'window.smailyAdminPages[' . json_encode($name . '.' . $locale) . '] = '
             . json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ";\n"
         );
+        if ($written === false) {
+            throw new RuntimeException('Cannot write ' . $file . '.');
+        }
     }
 }
 StoreLocale::reset();

@@ -11,7 +11,13 @@ credentials in the extension's own sentence, on purpose; docs only),
 PRO-2509 (the Log's Last Error filter matches the text the column shows),
 PRO-2511 (Details on a delivered, later-superseded automation row reads as
 delivered) and PRO-2510 (mass Retry over "Select all" works in batches of
-1,000).
+1,000). Then four tooling cleanups, nothing merchant-visible: PRO-2475
+(CI drops the redundant mirror step; actions on Node.js 24), PRO-1469
+(the hidden native config page's dead script is removed), PRO-2514
+(module.xml sequences every Magento module composer requires, pinned by a
+unit test), PRO-2462 (phpMyAdmin port via `PMA_PORT`, the crontab note;
+sample data is question 16), and the admin browser-test renderer stops
+when it cannot write its output.
 Earlier the same day: 3.0.0-rc6 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc6),
 built by the release workflow (run 37228529206) from commit bb6831e; the ZIP
@@ -128,6 +134,19 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **The admin browser-test renderer stops when it cannot write its output
+  (2026-10-04; PRO-3738 follow-up, no issue; tooling, no CHANGELOG
+  bullet).** `Test/Js/render-admin.php` only warned when `Test/Js/build/`
+  or a page file in it could not be written and exited 0, so
+  `bin/test-js.sh` went on and the harnesses read the older build. It now
+  throws (exit 255) when the directory cannot be created or a file cannot
+  be written. Shown in a temporary clone: a read-only build directory with
+  a stale `automations.en_US.js` — before: a PHP warning, exit 0, the stale
+  file kept; after: "Cannot write …/automations.en_US.js.", exit 255; a
+  directory that cannot be created → exit 255; read-only page files →
+  `bin/test-js.sh` exits 255 before any page runs; writable → exit 0, 10
+  files. TESTING.md ("Browser JS harnesses").
 
 - **PRO-2462 — sandbox: phpMyAdmin's port is configurable, the ZIP install
   check names the missing `crontab` (2026-10-04; tooling, no CHANGELOG

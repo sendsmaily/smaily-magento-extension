@@ -16,6 +16,7 @@ use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Item;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\StorefrontScript;
 
 /**
  * Builds the abandoned cart automation address payload.
@@ -44,7 +45,8 @@ class PayloadBuilder
         private readonly ProductCollectionFactory $productCollectionFactory,
         private readonly ImageHelperFactory $imageHelperFactory,
         private readonly RestoreTokenManager $restoreTokenManager,
-        private readonly Logger $logger
+        private readonly Logger $logger,
+        private readonly StorefrontScript $storefrontScript
     ) {
     }
 
@@ -68,22 +70,28 @@ class PayloadBuilder
         }
 
         try {
-            $store = $this->storeManager->getStore((int)$quote->getStoreId());
+            $storeId = (int)$quote->getStoreId();
+            $store = $this->storeManager->getStore($storeId);
             if ($store instanceof \Magento\Store\Model\Store) {
                 // Legacy Magento templates use {{store}} as the store NAME —
                 // kept for upgrade continuity; store_url serves templates
                 // shared with the Woo/Shopify plugins (which send a URL).
+                // Cron builds the reminder, so both links name the
+                // storefront's script, not bin/magento's (PRO-3732).
                 $address['store'] = (string)$store->getName();
-                $address['store_url'] = (string)$store->getBaseUrl();
+                $address['store_url'] = $this->storefrontScript->apply((string)$store->getBaseUrl(), $storeId);
                 // getGroup(), not the magic getStoreGroup() (silently null).
                 $group = $store->getGroup();
                 $address['store_group'] = $group ? (string)$group->getName() : '';
                 $address['store_website'] = (string)$store->getWebsite()->getName();
                 // A signed recovery link that restores this exact quote
                 // for 30 days from now, when the reminder is created.
-                $address['abandoned_cart_url'] = $store->getUrl(
-                    'smaily/cart/restore',
-                    $this->restoreTokenManager->linkParams((int)$quote->getId())
+                $address['abandoned_cart_url'] = $this->storefrontScript->apply(
+                    $store->getUrl(
+                        'smaily/cart/restore',
+                        $this->restoreTokenManager->linkParams((int)$quote->getId())
+                    ),
+                    $storeId
                 );
             }
         } catch (LocalizedException) {

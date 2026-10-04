@@ -34,6 +34,7 @@ use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Payload\ParentProductResolver;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
+use Smaily\Connect\Model\StorefrontScript;
 use Smaily\Connect\Model\StorefrontUrl;
 
 /**
@@ -183,7 +184,7 @@ class CatalogPayloadBuilderTest extends TestCase
             $parentResolver,
             $this->createMock(Emulation::class),
             $this->storefrontUrl(''),
-            $this->createMock(Http::class)
+            new StorefrontScript($storeManager, $this->createMock(Http::class))
         );
 
         $item = $builder->build($loadedProduct);
@@ -231,7 +232,7 @@ class CatalogPayloadBuilderTest extends TestCase
             $parentResolver,
             $this->createMock(Emulation::class),
             $this->storefrontUrl(''),
-            $this->createMock(Http::class)
+            new StorefrontScript($storeManager, $this->createMock(Http::class))
         );
 
         $item = $builder->build($product);
@@ -689,7 +690,7 @@ class CatalogPayloadBuilderTest extends TestCase
             $parentResolver,
             $emulation ?? $this->createMock(Emulation::class),
             $this->storefrontUrl($storefrontUrl),
-            $request ?? $this->createMock(Http::class)
+            new StorefrontScript($storeManager, $request ?? $this->createMock(Http::class))
         );
     }
 

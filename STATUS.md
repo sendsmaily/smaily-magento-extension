@@ -5,9 +5,10 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-04 — the catalog's image and product links are
-right in background builds (PRO-3731, below); unreleased, the pilot stays
-on rc4 until the owner's go for an rc5. 2026-10-03 — 3.0.0-rc4 is released as a GitHub pre-release on
+_Last updated: 2026-10-04 — the abandoned-cart reminder's cart and store
+links open with web server rewrites off (PRO-3732, below); the catalog's
+image and product links are right in background builds (PRO-3731, below);
+both unreleased, the pilot stays on rc4 until the owner's go for an rc5. 2026-10-03 — 3.0.0-rc4 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc4),
 built by the release workflow from commit 5684a1c; the ZIP and its .sha256
 were checked after publishing (377 entries, checksum OK, file contents
@@ -54,6 +55,37 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3732 — the abandoned-cart reminder's cart link opens with web
+  server rewrites off (2026-10-04; found during PRO-3731; unreleased, the
+  pilot stays on rc4).** Reproduced on the sandbox (Luma, rewrites off) with
+  a probe that builds the reminder as `Cron\AbandonedCart` does (crontab
+  area, frontend emulation of the cart's store, script named `magento`;
+  nothing queued or sent; a guest cart made through the storefront, deleted
+  after). **Red:** `abandoned_cart_url`
+  `http://localhost:8080/magento/smaily/cart/restore/id/12/ts/…/token/…/`
+  (404) and `store_url` `http://localhost:8080/magento/` (404). **Fix:** the
+  PRO-3731 script-name rule moved from `CatalogPayloadBuilder` into one
+  shared class, `Model\StorefrontScript::apply()` (same code; the catalog
+  product link uses it), and `AbandonedCart\PayloadBuilder` passes both
+  links through it. **Green (same probe):** `…/index.php/smaily/cart/restore/…`
+  302 to `/index.php/checkout/cart/`, and the cart page in a fresh session
+  shows the cart's product (one cart line); a tampered token lands on an
+  empty cart (signature check intact); `store_url` `…/index.php/` 200.
+  Rewrites on: both links byte-identical to what Magento builds (the old
+  code's value), restore link 302 to the cart with the product. **Every link
+  a background job sends, checked with rewrites off under `magento`:** cart
+  link and store link (fixed here), the reminder's product image links
+  (media links, no script name, 200), the catalog's `product_url` and
+  `image_url` (PRO-3731, `/index.php/…` and media). The RSS feed is built in
+  a storefront request only; contact, order and event payloads carry no
+  links. Not a background job: the engine connection's `site_url` (audit
+  only, built in the admin, or under `bin/magento config:set` where it
+  would carry `magento`) — left as a follow-up. Tests: abandoned-cart
+  payload rewrites off under bin/magento → index.php, rewrites on unchanged;
+  catalog tests unchanged and green through the shared class. ARCHITECTURE,
+  CHANGELOG. Sandbox restored (`web/seo/use_rewrites` row removed again,
+  config and FPC cleaned, test cart and probe removed).
 
 - **PRO-3731 — catalog image and product links built in cron, CLI and the
   admin are the storefront's (2026-10-04; found during PRO-1967;
@@ -1366,9 +1398,10 @@ Earlier: 2026-09-11, 2026-09-10._
   (spike, abandoned-cart scan on very large cart tables), PRO-1967 (stock
   hooks queue a marker; the flusher builds the rows), PRO-3731 (catalog
   image and product links built in cron, CLI and the admin are the
-  storefront's). **An rc5 for the pilot awaits the owner's go** — it would
-  carry PRO-1967 and PRO-3731 (the pilot's first catalog import is built in
-  cron, so PRO-3731 matters to it). Open queue: the PRO-1967
+  storefront's), PRO-3732 (the abandoned-cart cart link opens with web
+  server rewrites off). **An rc5 for the pilot awaits the owner's go** — it
+  would carry PRO-1967, PRO-3731 and PRO-3732 (the pilot's first catalog
+  import is built in cron, so PRO-3731 matters to it). Open queue: the PRO-1967
   simplification pass, PRO-3730 (abandoned-cart scan on busy stores),
   PRO-3729 (low wording leftovers). Done 2026-10-02/03: headless
   storefronts + the

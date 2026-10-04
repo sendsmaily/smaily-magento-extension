@@ -173,7 +173,8 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   for a product with an image). With Use Web Server Rewrites off, Magento
   adds the running script's name to each link (`Store::_updatePathUseRewrites()`
   — `magento` under bin/magento), which the emulation does not change;
-  `productUrl()` puts the storefront's `index.php` in its place. Category,
+  `productUrl()` puts the storefront's `index.php` in its place
+  (`Model\StorefrontScript`, shared with the abandoned-cart links). Category,
   parent and website lookups are memoized across the batch; the frontend
   emulations for a product's URL and image link stay per product and store,
   one after the other (PRO-1458 — Magento allows one emulation level, so one
@@ -555,6 +556,11 @@ the moment the reminder was created, inside the signature; the link expires
 30 days later and then lands on the cart page with a notice, restoring
 nothing. A link without `ts` (issued before links carried it) is accepted for
 30 days after the tracker row's `mail_sent_at`, and is expired without one.
+The reminder is built in cron, under frontend emulation of the cart's store;
+with Use Web Server Rewrites off, Magento still puts the running script's
+name in `abandoned_cart_url` and `store_url` (`magento` under bin/magento),
+so `Model\StorefrontScript` puts the storefront's `index.php` in its place,
+as for catalog product links (PRO-3732).
 
 **Handled carts never fill the page (PRO-3711).** A handled cart (a
 terminal row: `mailed`, `skipped`, `completed`, `erased`, `expired`) that is

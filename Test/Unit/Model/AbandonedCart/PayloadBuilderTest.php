@@ -12,15 +12,20 @@ use Magento\Catalog\Helper\ImageFactory as ImageHelperFactory;
 use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
+use Magento\Framework\App\Request\Http;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\UrlInterface;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Address;
 use Magento\Quote\Model\Quote\Item;
+use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
+use Magento\Store\Model\Website;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\AbandonedCart\PayloadBuilder;
 use Smaily\Connect\Model\AbandonedCart\RestoreTokenManager;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\StorefrontScript;
 
 /**
  * PRO-1275: the reminder recipient falls back from quote.customer_email (set
@@ -102,24 +107,87 @@ class PayloadBuilderTest extends TestCase
     }
 
     /**
+     * PRO-3732: with web server rewrites off, Magento puts the running
+     * script's name in each link — `magento` under bin/magento, where cron
+     * builds the reminder — and that link does not open. The cart link and
+     * the store link name the storefront's index.php instead.
+     */
+    public function testWithRewritesOffTheCartAndStoreLinksBuiltUnderBinMagentoNameTheStorefrontsIndexPhp(): void
+    {
+        $address = $this->build(
+            $this->quote('mari@example.com', null, null),
+            $this->storeManagerWithLinkBase('http://shop.example/magento/'),
+            $this->request('/var/www/html/bin/magento')
+        );
+
+        self::assertSame(
+            'http://shop.example/index.php/smaily/cart/restore/id/12/ts/1/token/abc/',
+            $address['abandoned_cart_url']
+        );
+        self::assertSame('http://shop.example/index.php/', $address['store_url']);
+    }
+
+    public function testWithRewritesOnTheCartAndStoreLinksBuiltUnderBinMagentoAreUnchanged(): void
+    {
+        $address = $this->build(
+            $this->quote('mari@example.com', null, null),
+            $this->storeManagerWithLinkBase('http://shop.example/'),
+            $this->request('/var/www/html/bin/magento')
+        );
+
+        self::assertSame('http://shop.example/smaily/cart/restore/id/12/ts/1/token/abc/', $address['abandoned_cart_url']);
+        self::assertSame('http://shop.example/', $address['store_url']);
+    }
+
+    /**
      * @return array<string, string>
      */
-    private function build(Quote $quote): array
+    private function build(Quote $quote, ?StoreManagerInterface $storeManager = null, ?Http $request = null): array
     {
-        $storeManager = $this->createMock(StoreManagerInterface::class);
-        // Store context is decorative; a failure keeps the address valid and
-        // avoids code-generated store dependencies in the unit sandbox.
-        $storeManager->method('getStore')->willThrowException(new LocalizedException(__('no store')));
+        if ($storeManager === null) {
+            $storeManager = $this->createMock(StoreManagerInterface::class);
+            // Store context is decorative; a failure keeps the address valid.
+            $storeManager->method('getStore')->willThrowException(new LocalizedException(__('no store')));
+        }
 
         $builder = new PayloadBuilder(
             $storeManager,
             $this->productCollectionFactory(),
             new ImageHelperFactory(),
             $this->createMock(RestoreTokenManager::class),
-            $this->createMock(Logger::class)
+            $this->createMock(Logger::class),
+            new StorefrontScript($storeManager, $request ?? $this->createMock(Http::class))
         );
 
         return $builder->build($quote);
+    }
+
+    /**
+     * A store whose links start at `$linkBase`, as Magento builds them: with
+     * rewrites off, the base ends in the running script's name.
+     */
+    private function storeManagerWithLinkBase(string $linkBase): StoreManagerInterface
+    {
+        $store = $this->createMock(Store::class);
+        $store->method('getName')->willReturn('Shop');
+        $store->method('getWebsite')->willReturn($this->createMock(Website::class));
+        $store->method('getBaseUrl')->willReturnCallback(
+            static fn (string $type = UrlInterface::URL_TYPE_LINK): string => $linkBase
+        );
+        $store->method('getUrl')->with('smaily/cart/restore')
+            ->willReturn($linkBase . 'smaily/cart/restore/id/12/ts/1/token/abc/');
+        $storeManager = $this->createMock(StoreManagerInterface::class);
+        $storeManager->method('getStore')->with(1)->willReturn($store);
+
+        return $storeManager;
+    }
+
+    private function request(string $scriptFilename): Http
+    {
+        $request = $this->createMock(Http::class);
+        $request->method('getServerValue')->with('SCRIPT_FILENAME')->willReturn($scriptFilename);
+
+        return $request;
     }
 
     /**

@@ -55,6 +55,7 @@ use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
+use Smaily\Connect\Model\StorefrontScript;
 use Smaily\Connect\Model\StorefrontUrl;
 
 /**
@@ -316,7 +317,7 @@ class EngineCatalogImportParityTest extends TestCase
             $parentResolver,
             $this->createMock(Emulation::class),
             new StorefrontUrl($this->createMock(Config::class)),
-            $this->createMock(Http::class)
+            new StorefrontScript($storeManager, $this->createMock(Http::class))
         );
     }
 

@@ -18,15 +18,14 @@ use Magento\Catalog\Model\Product\Visibility;
 use Magento\CatalogInventory\Api\StockRegistryInterface;
 use Magento\CatalogInventory\Model\StockRegistryStorage;
 use Magento\Framework\App\Area;
-use Magento\Framework\App\Request\Http;
 use Magento\Framework\Exception\NoSuchEntityException;
-use Magento\Framework\UrlInterface;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\App\Emulation;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
+use Smaily\Connect\Model\StorefrontScript;
 use Smaily\Connect\Model\StorefrontUrl;
 
 /**
@@ -85,7 +84,7 @@ class CatalogPayloadBuilder
         private readonly ParentProductResolver $parentProductResolver,
         private readonly Emulation $emulation,
         private readonly StorefrontUrl $storefrontUrl,
-        private readonly Http $request
+        private readonly StorefrontScript $storefrontScript
     ) {
     }
 
@@ -279,7 +278,7 @@ class CatalogPayloadBuilder
      *
      * Emulation does not change the running script, though: with web server
      * rewrites off, Magento puts its name in the link — see
-     * withStorefrontScript() (PRO-3731).
+     * StorefrontScript (PRO-3731).
      *
      * A store with a separate storefront gets the link on the storefront's
      * address (PRO-3660).
@@ -293,38 +292,7 @@ class CatalogPayloadBuilder
             $this->emulation->stopEnvironmentEmulation();
         }
 
-        return $this->storefrontUrl->apply($this->withStorefrontScript($url, $storeId), $storeId);
-    }
-
-    /**
-     * With web server rewrites off, Magento adds the running script's name
-     * to every link (`Store::_updatePathUseRewrites()`): `index.php` in a
-     * storefront, admin or API request, but `magento` under bin/magento —
-     * where cron builds the catalog import, the nightly re-sync and stock
-     * changes — and that link does not open. The storefront's script is
-     * index.php, so a link built under another script name gets index.php
-     * in its place (PRO-3731). With rewrites on, the store's link base has
-     * no script name and the link is left as it is.
-     */
-    private function withStorefrontScript(string $url, int $storeId): string
-    {
-        $script = ltrim((string)strrchr('/' . (string)$this->request->getServerValue('SCRIPT_FILENAME'), '/'), '/');
-        if ($script === '' || $script === 'index.php') {
-            return $url;
-        }
-
-        $store = $this->storeManager->getStore($storeId);
-        if (!$store instanceof Store) {
-            return $url;
-        }
-        foreach ([false, true] as $secure) {
-            $base = $store->getBaseUrl(UrlInterface::URL_TYPE_DIRECT_LINK, $secure);
-            if (str_ends_with($base, '/' . $script . '/') && str_starts_with($url, $base)) {
-                return substr($base, 0, -strlen($script . '/')) . 'index.php/' . substr($url, strlen($base));
-            }
-        }
-
-        return $url;
+        return $this->storefrontUrl->apply($this->storefrontScript->apply($url, $storeId), $storeId);
     }
 
     /**

@@ -552,6 +552,11 @@ window.smailyPanelsInit = function ($) {
     function pollBackfill(jobType, ui, action) {
         post(urls.backfill, {job_type: jobType, action: action}).then(function (data) {
             renderBackfill(jobType, data, ui);
+            // A start the server refused says why (PRO-1969: the catalog
+            // import needs a Campaign Intelligence connection).
+            if (data.message) {
+                result(ui.result, data.message, false);
+            }
         });
     }
 

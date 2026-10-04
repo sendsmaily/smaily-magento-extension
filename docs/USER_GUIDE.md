@@ -865,6 +865,13 @@ traffic:
   `bin/magento import` run, a direct database import — start the
   **Catalog** import by hand after such a change, so Campaign
   Intelligence gets the new prices, stock and products.
+  The **Catalog** import needs a Campaign Intelligence connection. The
+  import cards show only while Campaign Intelligence is connected; a
+  **Start import** pressed on a page opened before it was disconnected
+  does not start the import and says why beside the button —
+  "Campaign Intelligence is not connected, so there is nowhere to send
+  the catalog." — and `smaily:backfill:start catalog` stops with the same
+  message.
 
 Each import is a card. Before its first run it offers **Start import**.
 Once started, a status pill in the card's header says where it is —

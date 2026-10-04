@@ -12,10 +12,11 @@ PRO-3737 (admin target spec wording), PRO-3736 (a browser harness for the
 Automations tab's save result), PRO-3739 (the rc5 ZIP installed on a
 clean store by docs/INSTALLING.md; one wording fix), PRO-3738 (CI runs
 the browser harnesses), PRO-1960 (the abandoned-cart reminders are built
-once per store) and PRO-1968 (the nightly full catalog re-sync is removed)
-landed on v3, unreleased; CHANGELOG's
-"Changes since 3.0.0-rc5" has PRO-3733 and PRO-1968, the others change
-nothing a merchant sees. 3.0.0-rc5 is released as a GitHub pre-release on
+once per store), PRO-1968 (the nightly full catalog re-sync is removed) and
+PRO-1969 (a catalog import does not start while Campaign Intelligence is
+not connected) landed on v3, unreleased; CHANGELOG's
+"Changes since 3.0.0-rc5" has PRO-3733, PRO-1968 and PRO-1969, the others
+change nothing a merchant sees. 3.0.0-rc5 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc5),
 built by the release workflow (run 37208243039) from commit 1911c41; the ZIP
 and its .sha256 were checked after publishing (379 entries, `shasum -a 256 -c`
@@ -87,6 +88,41 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-1969 — catalog funnel edges (2026-10-04).** (1) **A catalog import
+  does not start while Campaign Intelligence is not connected** (owner
+  decision 2026-10-04: block). Started anyway it recorded every product as
+  failed (`CatalogIngest::enqueue()` queues nothing while disconnected, so
+  `EngineCatalogProcessor` counted each product failed and the card said
+  "N failed"). `Controller/Adminhtml/Api/BackfillState` answers a catalog
+  start with the current outcome plus `message` "Campaign Intelligence is
+  not connected, so there is nowhere to send the catalog." (EN + ET,
+  `panels-js.phtml` shows it beside the button) and starts nothing;
+  `smaily:backfill:start catalog` prints the same sentence as an error and
+  exits 1 (English, as the other commands). The import cards render only
+  while connected, so in the admin this is reached from a page opened
+  before a disconnect (or a direct POST). The customers and orders imports
+  are unchanged: the decision named the catalog. Unit tests: the
+  controller and the command each refuse while disconnected and start
+  while connected (both refusals red without the guard). No browser-harness
+  page: the card lives in `panel/intelligence.phtml` + the 1 000-line
+  `panels-js.phtml` with the whole boot model, not cheap to render.
+  (2) **Product creation's double row is gone since PRO-1967, accepted
+  with no code change.** Measured on the sandbox in a transaction rolled
+  back afterwards (nothing committed, nothing sent; the sandbox cron does
+  not run): a new simple product saved through the repository, through
+  `$product->save()`, and through `$product->save()` plus the admin Save
+  controller's `controller_action_catalog_product_save_entity_after` (MSI
+  saves the source items) queues 2–3 `catalog_changed` markers and one
+  `catalog` row; after `CatalogIngest::buildChanged()` it is still one
+  `catalog` row — the markers build the same payload (product URL already
+  `…/<url-key>.html`) and `IngestQueue::enqueueChangedPayloads()` leaves it
+  out. The old pair came from a stock hook building before
+  CatalogUrlRewrite wrote the rewrite; since PRO-1967 the stock hooks only
+  mark, and Smaily_Connect's save observer runs after
+  `process_url_rewrite_saving` (Magento loads Magento_* modules before
+  Smaily_*). Covered by `IngestQueueTest::testEnqueueChangedPayloadsLeaves…`
+  and `CatalogIngestTest`. Docs: USER_GUIDE (Historical import),
+  ARCHITECTURE (catalog lifecycle), CHANGELOG.
 - **PRO-1968 — the nightly full catalog re-sync is removed (2026-10-04;
   owner decision: as in WooCommerce, no new table).** `Cron/CatalogResync`
   (job `smaily_catalog_resync`, daily 03:40, PRO-1951), its unit test and its
@@ -1709,7 +1745,8 @@ Earlier: 2026-09-11, 2026-09-10._
   (rc5 clean install by the guide passed; one wording fix), PRO-3738 (CI
   runs the browser harnesses), PRO-1960 (abandoned-cart reminders built
   once per store; behaviour-neutral), PRO-1968 (nightly catalog re-sync
-  removed; the catalog import is started by hand). Done
+  removed; the catalog import is started by hand), PRO-1969 (no catalog
+  import while disconnected; the product-create double row is gone). Done
   2026-10-02/03: headless storefronts + the
   Storefront URL (PRO-3614/3660), browse consent as in Woo and per website
   (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the standard

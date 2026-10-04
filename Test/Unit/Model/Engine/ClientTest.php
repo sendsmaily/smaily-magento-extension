@@ -15,6 +15,8 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
 use Magento\Framework\App\ProductMetadataInterface;
+use Magento\Framework\App\Request\Http;
+use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -26,6 +28,7 @@ use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\SleeperInterface;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\StorefrontScript;
 
 class ClientTest extends TestCase
 {
@@ -328,6 +331,40 @@ class ClientTest extends TestCase
         self::assertSame('', $request->getHeaderLine('Authorization'));
     }
 
+    /**
+     * PRO-3733: with web server rewrites off, Magento puts the running
+     * script's name in the store's link base — `magento` when Campaign
+     * Intelligence is connected with bin/magento. The site address sent at
+     * the setup exchange names the storefront's index.php instead.
+     */
+    public function testWithRewritesOffTheSiteAddressSentFromTheCommandLineIsTheStorefronts(): void
+    {
+        $client = $this->createClient(
+            [new Response(200, [], '{"tenant_id":"t1","api_key":"sk_x","endpoints":{}}')],
+            $this->storeManagerWithLinkBase('http://shop.example/magento/'),
+            $this->request('/var/www/html/bin/magento')
+        );
+
+        $client->setupExchange('tok_abc123');
+
+        $body = json_decode((string)$this->history[0]['request']->getBody(), true);
+        self::assertSame('http://shop.example/index.php/', $body['plugin_info']['site_url']);
+    }
+
+    public function testWithRewritesOnTheSiteAddressSentFromTheCommandLineIsUnchanged(): void
+    {
+        $client = $this->createClient(
+            [new Response(200, [], '{"tenant_id":"t1","api_key":"sk_x","endpoints":{}}')],
+            $this->storeManagerWithLinkBase('http://shop.example/'),
+            $this->request('/var/www/html/bin/magento')
+        );
+
+        $client->setupExchange('tok_abc123');
+
+        $body = json_decode((string)$this->history[0]['request']->getBody(), true);
+        self::assertSame('http://shop.example/', $body['plugin_info']['site_url']);
+    }
+
     public function testABareSetupTokenIsExchangedAtTheSmailyEngine(): void
     {
         $client = $this->createClient([
@@ -460,8 +497,11 @@ class ClientTest extends TestCase
     /**
      * @param array<int, Response|callable> $responses
      */
-    private function createClient(array $responses): Client
-    {
+    private function createClient(
+        array $responses,
+        ?StoreManagerInterface $storeManager = null,
+        ?Http $request = null
+    ): Client {
         $this->history = [];
         $this->sleeps = [];
 
@@ -483,14 +523,41 @@ class ClientTest extends TestCase
 
         $productMetadata = $this->createMock(ProductMetadataInterface::class);
         $productMetadata->method('getVersion')->willReturn('2.4.8');
+        $storeManager ??= $this->createMock(StoreManagerInterface::class);
 
         return new Client(
             $this->settings,
             $factory,
             $productMetadata,
-            $this->createMock(StoreManagerInterface::class),
+            $storeManager,
             $this->createMock(Logger::class),
-            $sleeper
+            $sleeper,
+            new StorefrontScript($storeManager, $request ?? $this->createMock(Http::class))
         );
+    }
+
+    /**
+     * A default store view whose links start at `$linkBase`, as Magento
+     * builds them: with rewrites off, the base ends in the running script's
+     * name.
+     */
+    private function storeManagerWithLinkBase(string $linkBase): StoreManagerInterface
+    {
+        $store = $this->createMock(Store::class);
+        $store->method('getId')->willReturn(1);
+        $store->method('getBaseUrl')->willReturn($linkBase);
+        $storeManager = $this->createMock(StoreManagerInterface::class);
+        $storeManager->method('getDefaultStoreView')->willReturn($store);
+        $storeManager->method('getStore')->with(1)->willReturn($store);
+
+        return $storeManager;
+    }
+
+    private function request(string $scriptFilename): Http
+    {
+        $request = $this->createMock(Http::class);
+        $request->method('getServerValue')->with('SCRIPT_FILENAME')->willReturn($scriptFilename);
+
+        return $request;
     }
 }

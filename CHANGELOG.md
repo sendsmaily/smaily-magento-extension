@@ -4,6 +4,10 @@
 
 The package version is currently `3.0.0-rc5` — the fifth release-candidate cut of everything below. Release candidates are GitHub pre-releases for pilot stores; composer still resolves 2.8.1 as the newest stable release.
 
+**Changes since 3.0.0-rc5**
+
+- On a store with *Use Web Server Rewrites* off, connecting Campaign Intelligence from the command line sent the engine a store address with `magento` in place of the storefront's `index.php`; the engine keeps that address in its audit log. It now sends the storefront's address, as a connection from the admin does. With rewrites on, the address is unchanged.
+
 **Changes since 3.0.0-rc4**
 
 - A stock change no longer builds the product's Campaign Intelligence catalog entry inside the shipment, credit memo, order or inventory save that made it: the save records which products changed (one lookup and one insert, however many lines or products), and the catalog sync builds and sends their entries within the next minute, as before. A shipment of many lines and a bulk inventory update finish faster. What is sent is unchanged; in the Log, a stock change shows as a waiting *catalog_changed* row until its *catalog* row replaces it, and several stock changes of one product within a minute send one catalog row.

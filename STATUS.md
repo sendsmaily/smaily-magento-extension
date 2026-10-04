@@ -77,6 +77,21 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3733 — a command-line Campaign Intelligence connection with
+  rewrites off sends the storefront's site address (2026-10-04; after
+  rc5).** `Engine\Client::siteUrl()` (the `plugin_info.site_url` of the
+  setup exchange, kept in the engine's audit log) now passes the default
+  store view's base link through `Model\StorefrontScript` (PRO-3732): under
+  bin/magento with rewrites off it was `…/magento/`, now `…/index.php/` —
+  what an admin connection sends. New constructor dependency (appended).
+  Tests: `ClientTest` rewrites off under bin/magento → `index.php` (red
+  without the change), rewrites on unchanged. Sandbox: `setup:upgrade` +
+  `setup:di:compile` OK; a CLI probe named `magento` built the address only
+  (nothing sent): rewrites off (in-memory) link base
+  `http://localhost:8080/magento/` → site address
+  `http://localhost:8080/index.php/`; rewrites on `http://localhost:8080/`
+  both. CHANGELOG opens "Changes since 3.0.0-rc5"; ARCHITECTURE.
+
 - **PRO-3735 — CI parses every PHP and PHTML file on PHP 8.1 (2026-10-04;
   tooling, no bullet in CHANGELOG).** New CI job "PHP 8.1 syntax" runs
   `bin/lint-php.sh`: `php -l` over every `*.php` / `*.phtml` outside

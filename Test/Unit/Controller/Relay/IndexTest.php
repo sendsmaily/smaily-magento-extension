@@ -32,6 +32,7 @@ use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\SleeperInterface;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
+use Smaily\Connect\Model\StorefrontScript;
 
 /**
  * PRO-3575: the storefront browse relay rate-limits by the connection's own
@@ -139,7 +140,8 @@ class IndexTest extends TestCase
             $this->createMock(ProductMetadataInterface::class),
             $this->createMock(StoreManagerInterface::class),
             $this->createMock(Logger::class),
-            $sleeper
+            $sleeper,
+            $this->createMock(StorefrontScript::class)
         );
 
         // A client may put any value in the forwarding headers: each request

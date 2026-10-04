@@ -22,6 +22,7 @@ use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\ModuleInfo;
+use Smaily\Connect\Model\StorefrontScript;
 
 /**
  * Campaign Intelligence engine client (RECENGINE_API_CONTRACT.md v1.2).
@@ -100,7 +101,8 @@ class Client
         private readonly ProductMetadataInterface $productMetadata,
         private readonly StoreManagerInterface $storeManager,
         private readonly Logger $logger,
-        private readonly SleeperInterface $sleeper
+        private readonly SleeperInterface $sleeper,
+        private readonly StorefrontScript $storefrontScript
     ) {
     }
 
@@ -568,10 +570,19 @@ class Client
         ];
     }
 
+    /**
+     * The default store view's storefront address, also when connected from
+     * bin/magento with web server rewrites off (PRO-3733).
+     */
     private function siteUrl(): string
     {
         try {
-            return (string)$this->storeManager->getDefaultStoreView()?->getBaseUrl();
+            $store = $this->storeManager->getDefaultStoreView();
+            if ($store === null) {
+                return '';
+            }
+
+            return $this->storefrontScript->apply((string)$store->getBaseUrl(), (int)$store->getId());
         } catch (\Exception) {
             return '';
         }

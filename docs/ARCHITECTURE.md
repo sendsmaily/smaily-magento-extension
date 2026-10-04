@@ -177,7 +177,8 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   adds the running script's name to each link (`Store::_updatePathUseRewrites()`
   — `magento` under bin/magento), which the emulation does not change;
   `productUrl()` puts the storefront's `index.php` in its place
-  (`Model\StorefrontScript`, shared with the abandoned-cart links). Category,
+  (`Model\StorefrontScript`, shared with the abandoned-cart links and the
+  site address sent at the engine setup exchange, PRO-3733). Category,
   parent and website lookups are memoized across the batch; the frontend
   emulations for a product's URL and image link stay per product and store,
   one after the other (PRO-1458 — Magento allows one emulation level, so one

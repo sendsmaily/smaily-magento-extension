@@ -88,6 +88,11 @@ through the API (GraphQL, or REST without Magento's storefront session).
 
 After a change, run the catalog import again (**Settings > Intelligence >
 Historical imports > Catalog**) so Campaign Intelligence gets the new links.
+Connecting Campaign Intelligence starts the catalog import, so set the
+Storefront URL before connecting Campaign Intelligence — leave the initial
+setup's optional Intelligence step unconnected and connect under
+**Settings > Intelligence** afterwards — or press **Hold back the import** right after connecting and
+run the import once the Storefront URL is set.
 The RSS feed shows them within 15 minutes (its cache).
 
 The storefront must open the path: either it routes `/<url-key>.html`

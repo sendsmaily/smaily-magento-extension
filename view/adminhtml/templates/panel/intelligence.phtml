@@ -76,8 +76,22 @@ $isRefused = $viewModel->isEngineRefused();
             </div>
         </div>
         <?php endif; ?>
+        <?php // A Connect starts the catalog import (PRO-3741); panels-js shows
+        // this banner when it did, and Hold back cancels that import. ?>
+        <div class="smaily-banner smaily-banner--info" id="smaily-w-engine-catalog-import" role="status" style="display:none;">
+            <div class="smaily-banner__body">
+                <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('The catalog import has started')) ?></div>
+                <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Your whole catalog goes to Campaign Intelligence once, in the background, from the next cron run (usually within a minute). To hold it back, press Hold back the import before then: nothing is sent, and you can start the import later under Marketing > Smaily Connect > Settings > Intelligence.')) ?></div>
+                <div class="smaily-banner__message">
+                    <button type="button" class="action-secondary" id="smaily-w-engine-catalog-holdback">
+                        <span><?= $escaper->escapeHtml(__('Hold back the import')) ?></span>
+                    </button>
+                    <span class="smaily-result" id="smaily-w-engine-catalog-holdback-result"></span>
+                </div>
+            </div>
+        </div>
         <?php if (!$isSettings): ?>
-        <p><?= $escaper->escapeHtml(__('Catalog, customer and order sync started automatically. Historical data can be imported any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?></p>
+        <p><?= $escaper->escapeHtml(__('Catalog, customer and order sync started automatically. Connecting also starts the catalog import, which sends your whole catalog once. Customer and order history can be imported, and the catalog import run again, any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?></p>
         <?php endif; ?>
         <div class="smaily-inline-toggle">
             <label><input type="checkbox" id="smaily-w-browse"/>

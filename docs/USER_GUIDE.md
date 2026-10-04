@@ -633,10 +633,27 @@ connected.
 2. Paste it on **Settings > Intelligence** (or Initial setup step 4) and save.
    The token is exchanged immediately and never stored; the status row shows
    the connected tenant.
-3. Start the **Catalog** import under **Settings > Intelligence >
+3. Connecting starts the **Catalog** import, which sends your whole catalog
+   once; after that Campaign Intelligence gets only the changes. A notice
+   under the status row says "The catalog import has started". The import
+   waits for the next cron run (usually within a minute): press **Hold back
+   the import** before then and nothing is sent. Pressed once the import
+   has begun, it stops the import after the batch of products (up to 100)
+   it is queuing: the products already queued for sending still reach
+   Campaign Intelligence, the rest are not sent, and the notice says how
+   many were queued. Either way
+   you can start the import later under **Settings > Intelligence >
    Historical imports** (see [Historical import](#historical-import-backfill)).
-   Connecting does not send the existing catalog: the import sends it once,
-   and after that Campaign Intelligence gets only the changes.
+   A catalog import that is already queued or running when you connect
+   again is left as it is — connecting does not start a second one. The
+   **Customers** and **Orders** imports are not started by connecting:
+   start them there when Campaign Intelligence should get your history.
+   A connection made from the command line (`bin/magento config:set
+   smaily_connect/intelligence/setup_token <setup URL>`) starts the
+   catalog import as well, but the command prints no notice:
+   `bin/magento smaily:backfill:status` lists the import, and
+   **Cancel import** on the **Catalog** card under **Settings >
+   Intelligence > Historical imports** holds it back.
 
 The setup URL must be an https address on `intelligence.smaily.com`; a bare
 token is exchanged there too. Any other address is refused before anything is
@@ -857,7 +874,8 @@ traffic:
 - **Catalog / Customers / Orders → Campaign Intelligence** — Settings >
   **Intelligence** tab, one card per import.
   Campaign Intelligence gets the whole catalog once, from the **Catalog**
-  import: connecting does not start it, so start it after connecting.
+  import: connecting starts it (see [Connecting](#connecting) — it can be
+  held back right after connecting).
   After that, product saves, stock changes and deletions reach Campaign
   Intelligence on their own within a minute or two; nothing re-sends the
   whole catalog periodically. If your store changes products outside

@@ -571,6 +571,16 @@ window.smailyPanelsInit = function ($) {
         pollBackfill(jobType, ui, 'cancel');
     }
 
+    // The Catalog card on Settings > Intelligence follows a Connect and a
+    // Hold back (PRO-3741); the setup step has no card.
+    function refreshCatalogCard() {
+        var $card = $('.smaily-backfill-card[data-job-type="catalog"]');
+        if ($card.length) {
+            clearTimeout(backfillTimers.catalog);
+            pollBackfill('catalog', backfillUi($card), 'status');
+        }
+    }
+
     function engineConnected(tenantName, engineVersion) {
         $('#smaily-w-engine-disconnected').hide();
         // Settings only: the setup step renders the introduction without this id.
@@ -829,12 +839,37 @@ window.smailyPanelsInit = function ($) {
             });
         });
 
+        // Hold back the catalog import a Connect started (PRO-3741): the
+        // card's own cancel. While the import waits for its first cron run
+        // nothing has been sent; canceled later, the products it already
+        // queued are still sent and the rest are not.
+        $('#smaily-w-engine-catalog-holdback').on('click', function () {
+            var $button = $(this).prop('disabled', true);
+            result('#smaily-w-engine-catalog-holdback-result', '<?= $escaper->escapeJs(__('Canceling…')) ?>', true);
+            post(urls.backfill, {job_type: 'catalog', action: 'cancel'}).then(function (data) {
+                var text = '<?= $escaper->escapeJs(__('The catalog import had already finished, so there was nothing left to hold back.')) ?>';
+                if (data.status === 'cancelled') {
+                    text = data.processed > 0
+                        ? '<?= $escaper->escapeJs(__('Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?>'
+                            .replace('%1', data.processed)
+                        : '<?= $escaper->escapeJs(__('Held back: the catalog import is canceled. Start it any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?>';
+                }
+                $button.hide();
+                result('#smaily-w-engine-catalog-holdback-result', text, true);
+                refreshCatalogCard();
+            });
+        });
+
         // Engine connect.
         $('#smaily-w-engine-connect').on('click', function () {
             result('#smaily-w-engine-result', '<?= $escaper->escapeJs(__('Connecting…')) ?>', true);
             post(urls.engineExchange, {setup_url: $('#smaily-w-setup-url').val()}).then(function (data) {
                 if (data.connected) {
                     engineConnected(data.tenantName, data.engineVersion);
+                    if (data.catalogImportStarted) {
+                        $('#smaily-w-engine-catalog-import').show();
+                        refreshCatalogCard();
+                    }
                 } else {
                     result('#smaily-w-engine-result',
                         data.message || '<?= $escaper->escapeJs(__('Connection failed.')) ?>', false);

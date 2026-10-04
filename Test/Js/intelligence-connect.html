@@ -1,0 +1,242 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the notice a Campaign Intelligence Connect shows when
+  it started the catalog import, and its Hold back action (PRO-3741): the
+  real templates (view/adminhtml/templates/panel/intelligence.phtml and
+  panel/panels-js.phtml), rendered in en_US and et_EE by
+  Test/Js/render-admin.php into Test/Js/build/ as the initial setup's step
+  and as the Settings tab, run with jQuery from vendor/, one fresh frame per
+  scenario. Stubbed: only the requests (fetch) — the Connect answers with
+  the EngineExchange endpoint's answer, the import requests with the
+  BackfillState endpoint's. Run it with bin/test-js.sh (it renders the pages
+  first); the page ends with "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>intelligence connect harness</title>
+    <script src="build/intelligence-setup.en_US.js"></script>
+    <script src="build/intelligence-setup.et_EE.js"></script>
+    <script src="build/intelligence-settings.en_US.js"></script>
+    <script src="build/intelligence-settings.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var HELD_BACK = 'Held back: the catalog import is canceled. Start it any time under Marketing > Smaily Connect > Settings > Intelligence.';
+    var CANCELED = 'Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.';
+    var FINISHED = 'The catalog import had already finished, so there was nothing left to hold back.';
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    // The endpoints' answers. EngineExchange: connected, and whether the
+    // Connect started the catalog import. BackfillState: the aggregated
+    // catalog import after a status read or a cancel.
+    function connected(started) {
+        return {connected: true, tenantName: 'Pilot', engineVersion: '1.8.2', catalogImportStarted: started};
+    }
+
+    function catalog(status, processed) {
+        return {status: status, processed: processed, failed: 0, total: 1200, percent: 0, finished_at: '', error: ''};
+    }
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    // Runs in the frame before the page: the admin's form key and the
+    // requests, answered from window.answers (exchange, status, cancel),
+    // which a scenario changes as the server's state changes.
+    function stubs(answers) {
+        return [
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.requests = [];',
+            'window.answers = ' + JSON.stringify(answers) + ';',
+            'window.fetch = function (url, options) {',
+            '  var body = JSON.parse(options.body || "{}");',
+            '  window.requests.push({url: url, body: body});',
+            '  var answer = url.indexOf("engineexchange") !== -1 ? window.answers.exchange',
+            '    : (body.action === "cancel" ? window.answers.cancel : window.answers.status);',
+            '  return Promise.resolve(new Response(JSON.stringify(answer),',
+            '    {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>'
+        ].join('\n');
+    }
+
+    // Opens the panel as the page boots it, then presses Connect.
+    function connect(page, answers) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.onload = function () {
+                wait(50).then(function () {
+                    var doc = frame.contentDocument;
+
+                    frame.contentWindow.answers.status = answers.statusAfterConnect || answers.status;
+                    doc.getElementById('smaily-w-setup-url').value = 'https://intelligence.smaily.com/setup/tok_test';
+                    doc.getElementById('smaily-w-engine-connect').click();
+
+                    return wait(50);
+                }).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs(answers)
+                + '</head><body>' + rendered.html
+                + '<script>window.smailyPanelsInit(window.jQuery).initAll();<\/script></body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function holdBack(frame, statusAfter) {
+        frame.contentWindow.answers.status = statusAfter;
+        frame.contentDocument.getElementById('smaily-w-engine-catalog-holdback').click();
+
+        return wait(50);
+    }
+
+    function shown(doc, id) {
+        var element = doc.getElementById(id);
+
+        return !!element && element.style.display !== 'none';
+    }
+
+    function holdBackResult(doc) {
+        return doc.getElementById('smaily-w-engine-catalog-holdback-result').textContent;
+    }
+
+    function cancelRequests(frame) {
+        return frame.contentWindow.requests.filter(function (request) {
+            return request.url.indexOf('backfillstate') !== -1 && request.body.action === 'cancel';
+        });
+    }
+
+    async function run(locale) {
+        var setup = 'intelligence-setup.' + locale,
+            settings = 'intelligence-settings.' + locale,
+            strings = window.smailyAdminPages[setup].strings,
+            frame,
+            doc,
+            card,
+            cancels;
+
+        log('# ' + locale);
+        if (locale !== 'en_US') {
+            check(locale + ': the page is translated',
+                strings['The catalog import has started'] !== 'The catalog import has started');
+        }
+
+        // Initial setup: a Connect that started the catalog import, held back
+        // before its first cron run.
+        frame = await connect(setup, {exchange: connected(true), status: catalog('idle', 0), cancel: catalog('cancelled', 0)});
+        doc = frame.contentDocument;
+        check(locale + ', setup: the Connect is sent',
+            frame.contentWindow.requests.some(function (request) {
+                return request.url.indexOf('engineexchange') !== -1
+                    && request.body.setup_url === 'https://intelligence.smaily.com/setup/tok_test';
+            }));
+        check(locale + ', setup: the notice says the catalog import has started',
+            shown(doc, 'smaily-w-engine-catalog-import')
+            && doc.querySelector('#smaily-w-engine-catalog-import .smaily-banner__title').textContent
+                === strings['The catalog import has started']);
+        check(locale + ', setup: Hold back is offered', shown(doc, 'smaily-w-engine-catalog-holdback'));
+        await holdBack(frame, catalog('cancelled', 0));
+        cancels = cancelRequests(frame);
+        check(locale + ', setup: Hold back cancels the catalog import',
+            cancels.length === 1 && cancels[0].body.job_type === 'catalog');
+        check(locale + ', setup: held back before it began, the import is canceled',
+            holdBackResult(doc) === strings[HELD_BACK]);
+        check(locale + ', setup: Hold back is not offered again', !shown(doc, 'smaily-w-engine-catalog-holdback'));
+        frame.remove();
+
+        // A Connect that started no import (one already queued or running).
+        frame = await connect(setup, {exchange: connected(false), status: catalog('pending', 0), cancel: null});
+        check(locale + ', setup: no notice when the Connect started no import',
+            !shown(frame.contentDocument, 'smaily-w-engine-catalog-import'));
+        frame.remove();
+
+        // Held back after the import began sending.
+        frame = await connect(setup, {exchange: connected(true), status: catalog('pending', 0), cancel: catalog('cancelled', 250)});
+        await holdBack(frame, catalog('cancelled', 250));
+        check(locale + ', setup: held back after sending began says what still reaches Campaign Intelligence',
+            holdBackResult(frame.contentDocument) === strings[CANCELED].replace('%1', '250'));
+        frame.remove();
+
+        // Held back after the import had finished.
+        frame = await connect(setup, {exchange: connected(true), status: catalog('completed', 12), cancel: catalog('completed', 12)});
+        await holdBack(frame, catalog('completed', 12));
+        check(locale + ', setup: held back after it finished says there was nothing left',
+            holdBackResult(frame.contentDocument) === strings[FINISHED]);
+        frame.remove();
+
+        // Settings > Intelligence: the Catalog card follows the Connect and the Hold back.
+        frame = await connect(settings, {
+            exchange: connected(true),
+            status: catalog('idle', 0),
+            statusAfterConnect: catalog('pending', 0),
+            cancel: catalog('cancelled', 0)
+        });
+        doc = frame.contentDocument;
+        card = doc.querySelector('.smaily-backfill-card[data-job-type="catalog"]');
+        check(locale + ', settings: the notice says the catalog import has started',
+            shown(doc, 'smaily-w-engine-catalog-import'));
+        check(locale + ', settings: the Catalog card shows the queued import', card.getAttribute('data-state') === 'pending');
+        await holdBack(frame, catalog('cancelled', 0));
+        check(locale + ', settings: held back', holdBackResult(doc) === strings[HELD_BACK]);
+        check(locale + ', settings: the Catalog card shows the import canceled', card.getAttribute('data-state') === 'cancelled');
+        frame.remove();
+    }
+
+    run('en_US').then(function () {
+        return run('et_EE');
+    }).then(function () {
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    }).catch(function (error) {
+        document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }).then(function () {
+        clearInterval(keepAlive);
+    });
+</script>
+</body>
+</html>

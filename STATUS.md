@@ -14,10 +14,12 @@ clean store by docs/INSTALLING.md; one wording fix), PRO-3738 (CI runs
 the browser harnesses), PRO-1960 (the abandoned-cart reminders are built
 once per store), PRO-1968 (the nightly full catalog re-sync is removed) and
 PRO-1969 (a catalog import does not start while Campaign Intelligence is
-not connected) and PRO-3742 (nor do the customers and orders imports)
-landed on v3, unreleased; CHANGELOG's
-"Changes since 3.0.0-rc5" has PRO-3733, PRO-1968 and PRO-1969 (its bullet
-widened by PRO-3742), the others
+not connected), PRO-3742 (nor do the customers and orders imports) and
+PRO-3741 (connecting Campaign Intelligence starts the catalog import, with
+a Hold back) landed on v3, unreleased; CHANGELOG's
+"Changes since 3.0.0-rc5" has PRO-3733, PRO-1968 (its bullet now points to
+PRO-3741's), PRO-3741 and PRO-1969 (its bullet widened by PRO-3742), the
+others
 change nothing a merchant sees. 3.0.0-rc5 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc5),
 built by the release workflow (run 37208243039) from commit 1911c41; the ZIP
@@ -90,6 +92,61 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3741 — connecting Campaign Intelligence starts the catalog import
+  (2026-10-04; owner decision: "the catalog import starts automatically
+  when Campaign Intelligence is connected; the merchant is told at once
+  and can hold it back at the start").** Supersedes PRO-1968's "setup does
+  not start the import". `Model/Backfill/CatalogImportOnConnect::start()`
+  queues the catalog job through `JobManager::start()` — the admin Start
+  import's path and its one-active-job lock — and answers whether it did;
+  both connect paths call it after a successful setup exchange:
+  `Controller/Adminhtml/Api/EngineExchange` (initial setup step 4 and
+  Settings > Intelligence; the answer adds `catalogImportStarted`) and
+  `Model/Config/Backend/EngineSetupToken` (`bin/magento config:set
+  smaily_connect/intelligence/setup_token`, the native form is hidden; it
+  adds a notice message, which config:set does not print). A save without
+  a token exchanges nothing and starts nothing. A reconnect while a catalog
+  import is queued or running starts none (`catalogImportStarted: false`,
+  no notice); a reconnect after it ended starts a fresh one (assumption:
+  every successful exchange is a new connection — possibly a new tenant).
+  **Hold back:** `panel/intelligence.phtml` has an info banner (the
+  screen's existing banner pattern) "The catalog import has started" with
+  **Hold back the import**; `panels-js.phtml` shows it when the Connect
+  started the import and posts the existing BackfillState `cancel`
+  (`JobManager::requestCancel()`). **Window:** the job stays `pending`
+  until the next `smaily_backfill_tick` (every minute; its first page can
+  be flushed in the same cron run) — so usually under a minute. Cancelled
+  while pending, nothing is queued or sent (integration test). Once
+  running, the cancel stops it at the next page boundary (≤100 products):
+  rows already queued are still sent, the rest never queued — the banner
+  then says how many were queued, the user guide says the same. Residual
+  race: a cancel between the tick's `nextActive()` and `markRunning()` can
+  still let the first page through (ARCHITECTURE). On Settings the Catalog
+  card follows (Pending, then Canceled with Run again). The setup step's
+  text now says connecting starts the catalog import and that customer and
+  order history are imported, and the catalog import run again, under
+  Settings > Intelligence. Customers/orders imports stay a merchant
+  choice. Tests: unit `EngineExchangeTest` (starts; reconnect while active
+  → false; failed exchange starts nothing), `EngineSetupTokenTest` (starts
+  + notice; reconnect → no notice; no token / failed exchange start
+  nothing; both red without the start calls); integration
+  `CatalogImportOnConnectTest` (one job, a reconnect
+  while queued and while running starts none; held back before the first
+  tick: the tick runs no processor and the ingest queue stays empty, a
+  later start works); browser `Test/Js/intelligence-connect.html` (27
+  checks, EN + ET, setup step and Settings tab; red with the banner's show
+  removed) — `Test/Js/render-admin.php` now renders several templates per
+  page and block data, phpcs excludes the rendered `Test/Js/build/`.
+  Sandbox setup:upgrade + di:compile green; nothing was connected or
+  imported on the sandbox. Docs: USER_GUIDE (Connecting step 3 with the
+  hold-back window and the CLI path, Historical import), ARCHITECTURE
+  (catalog lifecycle), HEADLESS_STOREFRONTS (set the Storefront URL before
+  connecting, or hold back), PILOT_CHECKLIST §2 (decide before connecting;
+  hold back at once if the catalog should not go), TESTING (the new
+  harness), CHANGELOG. **Pilot note:** PILOT_CHECKLIST §2 now describes
+  v3 from this commit on; rc5 (what the pilot installs today) does not
+  start the import on connect and has no Hold back — the checklist holds
+  for the pilot only with a release cut after this commit.
 - **PRO-3742 — the customers and orders imports do not start while
   Campaign Intelligence is not connected either (2026-10-04; owner
   decision: refuse them as the catalog import).** The PRO-1969 guard now
@@ -156,8 +213,8 @@ Earlier: 2026-09-11, 2026-09-10._
   it (no DI, config, UI string or admin state names it — BackfillState and
   the Dashboard never mentioned it). The catalog now reaches the engine as
   in Woo: in full through the catalog import, then only changes. **Setup
-  does not start the import today**, and none was added (a separate owner
-  decision): the engine connection only stores the exchange
+  did not start the import then**, and none was added (a separate owner
+  decision; since PRO-3741 connecting starts it): the engine connection only stores the exchange
   (`Controller/Adminhtml/Api/EngineExchange.php:50-51`,
   `Model/Config/Backend/EngineSetupToken.php:60-61` →
   `Model/Engine/Settings.php:204-230`, no job start); the only catalog job
@@ -1773,7 +1830,8 @@ Earlier: 2026-09-11, 2026-09-10._
   once per store; behaviour-neutral), PRO-1968 (nightly catalog re-sync
   removed; the catalog import is started by hand), PRO-1969 (no catalog
   import while disconnected; the product-create double row is gone),
-  PRO-3742 (nor customers or orders imports while disconnected). Done
+  PRO-3742 (nor customers or orders imports while disconnected),
+  PRO-3741 (connecting starts the catalog import, with a Hold back). Done
   2026-10-02/03: headless storefronts + the
   Storefront URL (PRO-3614/3660), browse consent as in Woo and per website
   (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the standard

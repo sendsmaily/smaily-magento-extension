@@ -16,7 +16,8 @@ declare(strict_types=1);
  * window.smailyAdminPages['<page>.<locale>'] = {html, strings}, where strings
  * holds the page's phrases in that locale for the checks.
  *
- * To add a screen: add an entry to $pages below.
+ * To add a screen: add an entry to $pages below ('template' may list several
+ * templates, rendered one after another; 'data' is the block's other data).
  */
 
 use Magento\Framework\Escaper;
@@ -28,13 +29,14 @@ $root = dirname(__DIR__, 2);
 require $root . '/vendor/autoload.php';
 
 /**
- * The template's $block: the view model and an admin URL.
+ * The template's $block: the view model, the block's other data and an admin URL.
  */
-$block = static fn (object $viewModel): object => new class ($viewModel) {
+$block = static fn (object $viewModel, array $data = []): object => new class ($viewModel, $data) {
     /**
      * @param object $viewModel
+     * @param array<string, mixed> $data
      */
-    public function __construct(private readonly object $viewModel)
+    public function __construct(private readonly object $viewModel, private readonly array $data)
     {
     }
 
@@ -44,7 +46,7 @@ $block = static fn (object $viewModel): object => new class ($viewModel) {
      */
     public function getData(string $key)
     {
-        return $key === 'view_model' ? $this->viewModel : null;
+        return $key === 'view_model' ? $this->viewModel : ($this->data[$key] ?? null);
     }
 
     /**
@@ -177,6 +179,81 @@ $pages = [
     ],
 ];
 
+/*
+ * The Campaign Intelligence panel (view/adminhtml/templates/panel/intelligence.phtml)
+ * with its behaviour (panel/panels-js.phtml), Campaign Intelligence not
+ * connected yet: the initial setup's step and the Settings tab, where the
+ * import cards render too (PRO-3741).
+ */
+$intelligence = new class {
+    /**
+     * @return bool
+     */
+    public function isEngineRefused(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isCookieRestrictionOnEverywhere(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getWebsiteQuery(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return string
+     */
+    public function getBootJson(): string
+    {
+        return (string)json_encode([
+            'connected' => true,
+            'verified' => true,
+            'planBlocked' => false,
+            'setupCompleted' => false,
+            'storeId' => 1,
+            'connection' => ['subdomain' => 'demo', 'username' => 'api', 'hasPassword' => true, 'multilingualMode' => 'single'],
+            'websiteAccount' => ['subdomain' => 'demo', 'username' => 'api'],
+            'multilingual' => ['languages' => ['en'], 'fallbackLanguage' => 'en'],
+            'subscribers' => [],
+            'automations' => [],
+            'intelligence' => ['connected' => false, 'tenantName' => '', 'engineVersion' => '', 'browseTracking' => false],
+            'rss' => ['enabled' => false],
+            'totals' => [],
+        ]);
+    }
+};
+$intelligenceStrings = [
+    'The catalog import has started',
+    'Held back: the catalog import is canceled. Start it any time under Marketing > Smaily Connect > Settings > Intelligence.',
+    'Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.',
+    'The catalog import had already finished, so there was nothing left to hold back.',
+];
+$intelligenceTemplates = [
+    $root . '/view/adminhtml/templates/panel/intelligence.phtml',
+    $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+];
+$pages['intelligence-setup'] = [
+    'template' => $intelligenceTemplates,
+    'viewModel' => $intelligence,
+    'strings' => $intelligenceStrings,
+];
+$pages['intelligence-settings'] = [
+    'template' => $intelligenceTemplates,
+    'viewModel' => $intelligence,
+    'data' => ['context' => 'settings'],
+    'strings' => $intelligenceStrings,
+];
+
 $render = static function (string $template, object $block, Escaper $escaper): string {
     ob_start();
     include $template;
@@ -195,7 +272,11 @@ foreach ($pages as $name => $page) {
         foreach ($page['strings'] as $phrase) {
             $strings[$phrase] = (string)__($phrase);
         }
-        $data = ['html' => $render($page['template'], $block($page['viewModel']), $escaper), 'strings' => $strings];
+        $html = '';
+        foreach ((array)$page['template'] as $template) {
+            $html .= $render($template, $block($page['viewModel'], $page['data'] ?? []), $escaper);
+        }
+        $data = ['html' => $html, 'strings' => $strings];
         file_put_contents( // phpcs:ignore Magento2.Functions.DiscouragedFunction
             $build . '/' . $name . '.' . $locale . '.js',
             'window.smailyAdminPages = window.smailyAdminPages || {};' . "\n"

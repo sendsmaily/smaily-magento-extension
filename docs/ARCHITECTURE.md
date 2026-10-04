@@ -222,11 +222,37 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   the catalog import (`Job::TYPE_CATALOG`, paged by `Cron/BackfillTick` →
   `Model/Backfill/EngineCatalogProcessor`), and after that only changes
   do: product save, the stock hooks' markers and the delete paths above
-  (~1–2 min). Connecting does not start the import: the setup step says
-  that historical data is imported under Settings > Intelligence, and the
-  merchant starts it there or with `smaily:backfill:start catalog`. Both
-  refuse the start while Campaign Intelligence is not connected
-  (`Model/Backfill/EngineImportGuard`, PRO-1969; the customers and orders
+  (~1–2 min). Connecting starts the import (PRO-3741): both connect
+  paths — the admin Connect (`Controller/Adminhtml/Api/EngineExchange`,
+  setup step and Settings tab) and the config save behind `bin/magento
+  config:set smaily_connect/intelligence/setup_token`
+  (`Model/Config/Backend/EngineSetupToken`) — call
+  `Model/Backfill/CatalogImportOnConnect::start()` after a successful
+  setup exchange. It queues the job through `JobManager::start()`, as the
+  admin Start import does, so the one-active-job lock keeps a reconnect
+  from starting a second import while one is queued or running (a
+  reconnect after it ended starts a fresh one, which the engine
+  deduplicates); a config save without a token exchanges nothing and
+  starts nothing. EngineExchange answers `catalogImportStarted`, and
+  `panels-js.phtml` then shows an info banner with **Hold back the
+  import**, which posts the BackfillState `cancel` (`requestCancel()`).
+  The window: the job is `pending` until the next `smaily_backfill_tick`
+  (every minute) picks it up, and its first page can be flushed in that
+  same cron run (`smaily_flush_ingest_queue` follows it in the group).
+  Cancelled while pending, the tick never runs it — nothing is queued or
+  sent. Cancelled once running, the processor stops at its next page
+  boundary (100 products): rows it already queued are still flushed, the
+  rest are never queued; a cancel landing between the tick's
+  `nextActive()` read and `markRunning()` can still let that first page
+  through. The banner's answer says "Held back" when the cancel answer
+  counts nothing processed, else how many were queued (read before the
+  worker's current page is recorded, so it can lag by one page).
+  EngineSetupToken adds a notice message instead, which `config:set`
+  does not print; the user guide points CLI users to
+  `smaily:backfill:status` and the card's Cancel import. The merchant
+  starts the import again on the card or with `smaily:backfill:start
+  catalog`. Both refuse the start while Campaign Intelligence is not
+  connected (`Model/Backfill/EngineImportGuard`, PRO-1969; the customers and orders
   imports likewise, PRO-3742 — every engine-target type of
   `Job::TYPE_TARGETS`, never the contacts import to Smaily) and say why —
   the admin endpoint (`Controller/Adminhtml/Api/BackfillState`) answers

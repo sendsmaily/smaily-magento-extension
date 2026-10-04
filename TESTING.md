@@ -96,8 +96,19 @@ test mode shows Test mode with the box ticked again and the go-live note,
 and the result adds the note; a trigger the engine stored active shows
 Active without the note; a trigger left off stays Off; when the stored
 state could not be read, the result asks for a reload and the cards keep
-the page's state. To check another admin screen, add its template and view
-model to `$pages` in `Test/Js/render-admin.php` and a page under `Test/Js/`.
+the page's state. `Test/Js/intelligence-connect.html` renders the
+Campaign Intelligence panel with its behaviour (`panel/intelligence.phtml`
+and `panel/panels-js.phtml`) as the initial setup's step and as the
+Settings tab, presses Connect with the requests answered by recorded
+answers of the connect and import endpoints, and checks in both languages
+that a Connect that started the catalog import shows the notice with
+**Hold back the import** (and one that started none shows no notice), that
+Hold back cancels the catalog import and says what happened — canceled
+before it began, after products were queued (how many), or already
+finished — and that on Settings the Catalog card shows the queued import,
+then the canceled one. To check another admin screen, add its template(s)
+and view model to `$pages` in `Test/Js/render-admin.php` and a page under
+`Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.
 
 CI runs `bin/test-js.sh` on every push and pull request (the `browser` job:
 PHP 8.3, an install from `composer.lock`, the Google Chrome the runner image

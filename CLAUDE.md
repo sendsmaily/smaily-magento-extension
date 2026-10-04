@@ -163,7 +163,8 @@ is written in English.
   (set 2026-10-02): "rc1 tagged + pilot runbook" 2026-10-03, "Pilot store
   live" 2026-10-09. Values: 2026-10-02 morning 0/5, evening 4/5;
   2026-10-03 4/5 (rc4 released; only the pilot install is left);
-  2026-10-04 4/5 (rc5 released; only the pilot install is left).
+  2026-10-04 4/5 (rc5 released; only the pilot install is left), later
+  the same day 4/5 (rc6 prepared; only the pilot install is left).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

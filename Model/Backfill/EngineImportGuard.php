@@ -27,10 +27,12 @@ class EngineImportGuard
 
     /**
      * The reason an import of this type does not start, or null when it may.
+     *
+     * @param string $target The type's target (Job::TYPE_TARGETS), as the caller resolved it.
      */
-    public function refusal(string $jobType): ?Phrase
+    public function refusal(string $jobType, string $target): ?Phrase
     {
-        if ((Job::TYPE_TARGETS[$jobType] ?? null) !== Job::TARGET_ENGINE || $this->engineSettings->isConnected()) {
+        if ($target !== Job::TARGET_ENGINE || $this->engineSettings->isConnected()) {
             return null;
         }
 

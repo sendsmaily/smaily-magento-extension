@@ -40,7 +40,7 @@ class BackfillStartCommandTest extends TestCase
         string $jobType,
         string $message
     ): void {
-        $this->jobManager->expects(self::never())->method('start');
+        $this->jobManager->expects(self::never())->method('startIfIdle');
 
         $tester = $this->startImport($jobType, false);
 
@@ -55,7 +55,7 @@ class BackfillStartCommandTest extends TestCase
     {
         $job = $this->createMock(Job::class);
         $job->method('getId')->willReturn(7);
-        $this->jobManager->expects(self::once())->method('start')
+        $this->jobManager->expects(self::once())->method('startIfIdle')
             ->with($jobType, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID)
             ->willReturn($job);
 
@@ -90,7 +90,7 @@ class BackfillStartCommandTest extends TestCase
     {
         $job = $this->createMock(Job::class);
         $job->method('getId')->willReturn(8);
-        $this->jobManager->expects(self::once())->method('start')
+        $this->jobManager->expects(self::once())->method('startIfIdle')
             ->with(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1)
             ->willReturn($job);
 
@@ -98,6 +98,20 @@ class BackfillStartCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode());
         self::assertStringContainsString('Started contacts backfill #8', $tester->getDisplay());
+    }
+
+    public function testAnImportAlreadyActiveIsNotStartedAgainAndSaysSo(): void
+    {
+        $message = 'A "catalog" import to engine is already running for website 0.';
+        $this->jobManager->expects(self::once())->method('startIfIdle')->willReturn(null);
+        $this->jobManager->method('alreadyActiveMessage')
+            ->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID)
+            ->willReturn($message);
+
+        $tester = $this->startImport(Job::TYPE_CATALOG, true);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString($message, $tester->getDisplay());
     }
 
     /**

@@ -69,7 +69,7 @@ class BackfillStartCommand extends Command
             return Command::FAILURE;
         }
 
-        $refusal = $this->engineImportGuard->refusal($jobType);
+        $refusal = $this->engineImportGuard->refusal($jobType, $target);
         if ($refusal !== null) {
             // English, as the command's other output.
             $output->writeln(sprintf('<error>%s</error>', $refusal->getText()));
@@ -88,18 +88,21 @@ class BackfillStartCommand extends Command
 
         $started = 0;
         foreach ($websiteIds as $websiteId) {
-            try {
-                $job = $this->jobManager->start($jobType, $target, $websiteId);
+            $job = $this->jobManager->startIfIdle($jobType, $target, $websiteId);
+            if ($job === null) {
                 $output->writeln(sprintf(
-                    '<info>Started %s backfill #%d for website %d.</info>',
-                    $jobType,
-                    (int)$job->getId(),
-                    $websiteId
+                    '<comment>%s</comment>',
+                    $this->jobManager->alreadyActiveMessage($jobType, $target, $websiteId)
                 ));
-                $started++;
-            } catch (\RuntimeException $exception) {
-                $output->writeln(sprintf('<comment>%s</comment>', $exception->getMessage()));
+                continue;
             }
+            $output->writeln(sprintf(
+                '<info>Started %s backfill #%d for website %d.</info>',
+                $jobType,
+                (int)$job->getId(),
+                $websiteId
+            ));
+            $started++;
         }
 
         return $started > 0 ? Command::SUCCESS : Command::FAILURE;

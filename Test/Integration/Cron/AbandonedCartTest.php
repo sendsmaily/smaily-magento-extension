@@ -272,7 +272,7 @@ class AbandonedCartTest extends IntegrationTestCase
         );
 
         $payloadBuilder = $this->createMock(PayloadBuilder::class);
-        $payloadBuilder->method('buildAll')->willReturnCallback(function (array $quotes): array {
+        $payloadBuilder->method('buildAll')->willReturnCallback(function (int $storeId, array $quotes): array {
             $addresses = [];
             foreach ($quotes as $quote) {
                 $addresses[(int)$quote->getId()] = ['email' => (string)$quote->getData('customer_email')];

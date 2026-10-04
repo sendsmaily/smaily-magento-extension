@@ -41,10 +41,23 @@ class JobManager
      */
     public function start(string $jobType, string $target, int $websiteId, ?int $totalCount = null): Job
     {
+        $job = $this->startIfIdle($jobType, $target, $websiteId, $totalCount);
+        if ($job === null) {
+            throw new \RuntimeException($this->alreadyActiveMessage($jobType, $target, $websiteId));
+        }
+
+        return $job;
+    }
+
+    /**
+     * Queue the import unless an equivalent job is already active.
+     *
+     * @return Job|null the new job, or null when one was already queued or running
+     */
+    public function startIfIdle(string $jobType, string $target, int $websiteId, ?int $totalCount = null): ?Job
+    {
         if ($this->findActive($jobType, $target, $websiteId) !== null) {
-            throw new \RuntimeException(
-                (string)__('A "%1" import to %2 is already running for website %3.', $jobType, $target, $websiteId)
-            );
+            return null;
         }
 
         $job = $this->jobFactory->create();
@@ -60,6 +73,14 @@ class JobManager
         $this->jobResource->save($job);
 
         return $job;
+    }
+
+    /**
+     * What a start says when an equivalent job is already active.
+     */
+    public function alreadyActiveMessage(string $jobType, string $target, int $websiteId): string
+    {
+        return (string)__('A "%1" import to %2 is already running for website %3.', $jobType, $target, $websiteId);
     }
 
     /**

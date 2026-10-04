@@ -572,12 +572,18 @@ window.smailyPanelsInit = function ($) {
     }
 
     // The Catalog card on Settings > Intelligence follows a Connect and a
-    // Hold back (PRO-3741); the setup step has no card.
-    function refreshCatalogCard() {
+    // Hold back (PRO-3741); the setup step has no card. The Hold back's
+    // cancel answers with the import's state, which the card renders as is;
+    // after a Connect the card asks for it.
+    function refreshCatalogCard(data) {
         var $card = $('.smaily-backfill-card[data-job-type="catalog"]');
         if ($card.length) {
             clearTimeout(backfillTimers.catalog);
-            pollBackfill('catalog', backfillUi($card), 'status');
+            if (data) {
+                renderBackfill('catalog', data, backfillUi($card));
+            } else {
+                pollBackfill('catalog', backfillUi($card), 'status');
+            }
         }
     }
 
@@ -856,7 +862,7 @@ window.smailyPanelsInit = function ($) {
                 }
                 $button.hide();
                 result('#smaily-w-engine-catalog-holdback-result', text, true);
-                refreshCatalogCard();
+                refreshCatalogCard(data);
             });
         });
 

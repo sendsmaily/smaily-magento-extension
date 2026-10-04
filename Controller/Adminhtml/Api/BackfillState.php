@@ -63,21 +63,17 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
         }
 
         $action = (string)($body['action'] ?? 'status');
-        $refusal = $action === 'start' ? $this->engineImportGuard->refusal($jobType) : null;
-        if ($refusal !== null) {
-            return $this->jsonResponse($this->aggregate($jobType, $target) + ['message' => (string)$refusal]);
-        }
-
         if ($action === 'start') {
+            $refusal = $this->engineImportGuard->refusal($jobType, $target);
+            if ($refusal !== null) {
+                return $this->jsonResponse($this->aggregate($jobType, $target) + ['message' => (string)$refusal]);
+            }
             $websiteIds = $target === Job::TARGET_ENGINE
                 ? [Job::ENGINE_WEBSITE_ID]
                 : array_map(static fn ($website) => (int)$website->getId(), $this->storeManager->getWebsites());
             foreach ($websiteIds as $websiteId) {
-                try {
-                    $this->jobManager->start($jobType, $target, $websiteId);
-                } catch (\RuntimeException) {
-                    // Already active — idempotent start.
-                }
+                // Idempotent: an already-active job is not an error.
+                $this->jobManager->startIfIdle($jobType, $target, $websiteId);
             }
         } elseif ($action === 'cancel') {
             $this->jobManager->requestCancel($jobType, $target);

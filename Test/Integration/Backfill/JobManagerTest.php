@@ -42,6 +42,16 @@ class JobManagerTest extends IntegrationTestCase
         $this->jobManager->start(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1);
     }
 
+    public function testStartIfIdleQueuesOneJobAndAnswersNullWhileItIsActive(): void
+    {
+        $job = $this->jobManager->startIfIdle(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0);
+
+        self::assertNotNull($job);
+        self::assertSame(Job::STATUS_PENDING, $this->fetchRow(self::TABLE, (int)$job->getId())['status']);
+        self::assertNull($this->jobManager->startIfIdle(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0));
+        self::assertCount(1, $this->fetchAll(self::TABLE));
+    }
+
     public function testRecordProgressPersistsCountsCursorAndDiscoveredTotal(): void
     {
         $job = $this->jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0);

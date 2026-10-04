@@ -262,9 +262,13 @@
         check(locale + ', settings: the notice says the catalog import has started',
             shown(doc, 'smaily-w-engine-catalog-import'));
         check(locale + ', settings: the Catalog card shows the queued import', card.getAttribute('data-state') === 'pending');
-        await holdBack(frame, catalog('cancelled', 0));
+        // The card renders the cancel's own answer: a status read after it
+        // would answer the import still queued here.
+        await holdBack(frame, catalog('pending', 0));
         check(locale + ', settings: held back', holdBackResult(doc) === strings[HELD_BACK]);
         check(locale + ', settings: the Catalog card shows the import canceled', card.getAttribute('data-state') === 'cancelled');
+        check(locale + ', settings: no status read follows the cancel',
+            frame.contentWindow.requests[frame.contentWindow.requests.length - 1].body.action === 'cancel');
         frame.remove();
     }
 

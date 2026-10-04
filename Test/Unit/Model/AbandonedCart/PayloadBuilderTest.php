@@ -159,7 +159,8 @@ class PayloadBuilderTest extends TestCase
         $collection = $this->createMock(ProductCollection::class);
         $collection->method('setStoreId')->willReturnSelf();
         $collection->method('addAttributeToSelect')->willReturnSelf();
-        $collection->method('addIdFilter')->willReturnSelf();
+        // Each product once, though two carts hold the tent.
+        $collection->expects(self::once())->method('addIdFilter')->with([7, 8])->willReturnSelf();
         $collection->method('addPriceData')->willReturnSelf();
         $collection->method('getItems')->willReturn([$product]);
         $products = $this->createMock(ProductCollectionFactory::class);
@@ -172,7 +173,7 @@ class PayloadBuilderTest extends TestCase
         $images = $this->createMock(ImageHelperFactory::class);
         $images->expects(self::once())->method('create')->willReturn($image);
 
-        $addresses = $this->builder(products: $products, images: $images)->buildAll([
+        $addresses = $this->builder(products: $products, images: $images)->buildAll(1, [
             $this->quote('mari@example.com', null, null, [$this->item('Tent', 'TENT-1', 1.0, 149.0)], 21),
             $this->quote('jaan@example.com', null, null, [
                 $this->item('Mug', 'MUG-1', 1.0, 9.5),
@@ -194,11 +195,57 @@ class PayloadBuilderTest extends TestCase
     }
 
     /**
+     * The store's fields are the same in every cart of the store, so they
+     * resolve once; each cart keeps its own recovery link.
+     */
+    public function testCartsOfOneStoreResolveTheStoreOnceAndKeepTheirOwnCartLinks(): void
+    {
+        $store = $this->createMock(Store::class);
+        $store->method('getName')->willReturn('Shop');
+        $store->method('getWebsite')->willReturn($this->createMock(Website::class));
+        $store->method('getBaseUrl')->willReturn('http://shop.example/');
+        $store->expects(self::exactly(2))->method('getUrl')->willReturnCallback(
+            static fn (string $route, array $params): string
+                => 'http://shop.example/smaily/cart/restore/id/' . $params['id'] . '/'
+        );
+        $storeManager = $this->createMock(StoreManagerInterface::class);
+        $storeManager->expects(self::once())->method('getStore')->with(1)->willReturn($store);
+        $tokens = $this->createMock(RestoreTokenManager::class);
+        $tokens->method('linkParams')->willReturnCallback(static fn (int $quoteId): array => ['id' => $quoteId]);
+
+        $addresses = (new PayloadBuilder(
+            $storeManager,
+            $this->productCollectionFactory(),
+            new ImageHelperFactory(),
+            $tokens,
+            $this->createMock(Logger::class),
+            // index.php: the links need no script fix, so nothing else reads the store.
+            new StorefrontScript($storeManager, $this->request('/var/www/html/pub/index.php'))
+        ))->buildAll(1, [
+            $this->quote('mari@example.com', null, null, [], 21),
+            $this->quote('jaan@example.com', null, null, [], 22),
+        ]);
+
+        foreach ([21, 22] as $quoteId) {
+            self::assertSame('Shop', $addresses[$quoteId]['store']);
+            self::assertSame('http://shop.example/', $addresses[$quoteId]['store_url']);
+            self::assertSame(
+                'http://shop.example/smaily/cart/restore/id/' . $quoteId . '/',
+                $addresses[$quoteId]['abandoned_cart_url']
+            );
+        }
+        self::assertSame(
+            ['email', 'is_abandoned_cart', 'store', 'store_url', 'store_group', 'store_website', 'abandoned_cart_url'],
+            array_slice(array_keys($addresses[21]), 0, 7)
+        );
+    }
+
+    /**
      * @return array<string, string>
      */
     private function build(Quote $quote, ?StoreManagerInterface $storeManager = null, ?Http $request = null): array
     {
-        return $this->builder($storeManager, $request)->buildAll([$quote])[0];
+        return $this->builder($storeManager, $request)->buildAll(1, [$quote])[0];
     }
 
     private function builder(

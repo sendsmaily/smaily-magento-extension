@@ -17,7 +17,9 @@ PRO-1969 (a catalog import does not start while Campaign Intelligence is
 not connected), PRO-3742 (nor do the customers and orders imports) and
 PRO-3741 (connecting Campaign Intelligence starts the catalog import, with
 a Hold back) and PRO-3745 (the setup's Intelligence step tells a separate
-storefront to set its Storefront URL first) landed on v3, unreleased;
+storefront to set its Storefront URL first) landed on v3, unreleased,
+followed by a behaviour-neutral simplification pass over PRO-1960 and
+PRO-1969/3742/3741;
 CHANGELOG's
 "Changes since 3.0.0-rc5" has PRO-3733, PRO-1968 (its bullet now points to
 PRO-3741's), PRO-3741, PRO-3745 and PRO-1969 (its bullet widened by PRO-3742), the
@@ -94,6 +96,36 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **Simplification pass, behaviour-neutral (2026-10-04; over PRO-1960,
+  PRO-1969, PRO-3742 and PRO-3741).** `AbandonedCart\PayloadBuilder::
+  buildAll()` takes one store (`buildAll($storeId, $quotes)`; its only
+  caller, the cron's `buildAddresses()`, already passes one store's carts
+  under that store's emulation): it loads each product once (de-duplicated
+  ids, only the lines that get one of the ten slots), resolves the product
+  details right after the load, and the store's fields (name, `store_url`,
+  group, website) once per build — each cart keeps its own
+  `abandoned_cart_url`, and a store that does not resolve still leaves
+  those fields and the link out. The cron reads the quote id once per
+  cart. New `JobManager::startIfIdle()` (null while an equivalent job is
+  active; `start()` still throws) replaces the "catch RuntimeException =
+  already active" pattern in `CatalogImportOnConnect`, `BackfillState` and
+  `smaily:backfill:start` (which prints the same message, now
+  `JobManager::alreadyActiveMessage()`). `EngineImportGuard::refusal()`
+  takes the target its callers already resolved; `BackfillState` asks it
+  inside its start branch. After **Hold back the import** the Settings
+  tab's Catalog card renders the cancel's answer instead of a second
+  status request. Payloads byte-identical: a cron-like CLI probe named
+  `magento` on the sandbox (crontab area, store 1 frontend emulation, fixed
+  clock, in a rolled-back transaction, nothing queued, marked or sent; the
+  three sandbox carts incl. two configurable lines plus six unsaved carts
+  of overlapping products, one with 12 lines) printed the same bytes before
+  and after, rewrites off (md5 f61c9d11…) and on (md5 7249ec75…; the
+  setting restored to its default afterwards). Tests: unit (the store
+  resolves once and each cart keeps its link; product ids de-duplicated;
+  the command's already-active path), integration `JobManagerTest`
+  (`startIfIdle()`), browser `Test/Js/intelligence-connect.html` 34 → 36
+  checks (the card shows the cancel's answer and no status read follows;
+  red with the second request restored). No CHANGELOG bullet.
 - **PRO-3745 — the initial setup's Intelligence step tells a separate
   storefront to set its Storefront URL before connecting (2026-10-04; pilot
   milestone: the pilot runs a headless storefront and installs rc6).**

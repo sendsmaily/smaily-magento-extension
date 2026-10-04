@@ -14,6 +14,7 @@ use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductColl
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Item;
+use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\StorefrontScript;
@@ -51,45 +52,83 @@ class PayloadBuilder
     }
 
     /**
-     * The reminder address of each cart, by quote id. Built under frontend
-     * emulation of the carts' store (the cron emulates once per store): the
-     * carts' products load in one collection per store, and each product's
-     * description, image link and regular price resolve once per store, not
-     * once per cart line (PRO-1960).
+     * The reminder address of each cart of one store, by quote id. Built
+     * under frontend emulation of that store (the cron emulates once per
+     * store): the carts' products load in one collection, and each product's
+     * description, image link and regular price resolve once, not once per
+     * cart line (PRO-1960); the store's own fields resolve once too.
      *
-     * @param Quote[] $quotes
+     * @param Quote[] $quotes The store's carts.
      * @return array<int, array<string, string>>
      */
-    public function buildAll(array $quotes): array
+    public function buildAll(int $storeId, array $quotes): array
     {
         $items = [];
         $productIds = [];
         foreach ($quotes as $key => $quote) {
             $items[$key] = $quote->getAllVisibleItems();
-            foreach ($items[$key] as $item) {
-                $productIds[(int)$quote->getStoreId()][] = (int)$item->getProduct()->getId();
+            // Only the lines that get a slot; each product once.
+            foreach (array_slice($items[$key], 0, self::MAX_PRODUCTS) as $item) {
+                $productIds[(int)$item->getProduct()->getId()] = true;
             }
         }
-        $products = [];
-        foreach ($productIds as $storeId => $ids) {
-            $products[$storeId] = $this->loadProducts($ids, $storeId);
-        }
+        $details = $productIds
+            ? array_map($this->productDetails(...), $this->loadProducts(array_keys($productIds), $storeId))
+            : [];
+        [$storeFields, $store] = $this->storeFields($storeId);
 
-        $details = [];
         $addresses = [];
         foreach ($quotes as $key => $quote) {
-            $storeId = (int)$quote->getStoreId();
-            $details[$storeId] ??= [];
-            $addresses[(int)$quote->getId()] = array_merge(
-                $this->contactFields($quote),
-                $this->productFields($items[$key], $products[$storeId] ?? [], $details[$storeId])
-            );
+            $quoteId = (int)$quote->getId();
+            $address = $this->contactFields($quote) + $storeFields;
+            if ($store !== null) {
+                $cartUrl = $this->cartUrl($store, $storeId, $quoteId);
+                if ($cartUrl !== null) {
+                    $address['abandoned_cart_url'] = $cartUrl;
+                }
+            }
+            $addresses[$quoteId] = array_merge($address, $this->productFields($items[$key], $details));
         }
 
         return $addresses;
     }
 
     /**
+     * The store's fields, the same in every cart of the store, and the store
+     * when its cart links can be built (null when its fields did not resolve).
+     *
+     * @return array{0: array<string, string>, 1: ?Store}
+     */
+    private function storeFields(int $storeId): array
+    {
+        $fields = [];
+        try {
+            $store = $this->storeManager->getStore($storeId);
+            if (!$store instanceof Store) {
+                return [$fields, null];
+            }
+            // Legacy Magento templates use {{store}} as the store NAME —
+            // kept for upgrade continuity; store_url serves templates
+            // shared with the Woo/Shopify plugins (which send a URL).
+            // Cron builds the reminder, so both links name the
+            // storefront's script, not bin/magento's (PRO-3732).
+            $fields['store'] = (string)$store->getName();
+            $fields['store_url'] = $this->storefrontScript->apply((string)$store->getBaseUrl(), $storeId);
+            // getGroup(), not the magic getStoreGroup() (silently null).
+            $group = $store->getGroup();
+            $fields['store_group'] = $group ? (string)$group->getName() : '';
+            $fields['store_website'] = (string)$store->getWebsite()->getName();
+        } catch (LocalizedException) {
+            // Store context is decorative; the address stays valid without it.
+            return [$fields, null];
+        }
+
+        return [$fields, $store];
+    }
+
+    /**
+     * The cart's own contact fields: the recipient and their name.
+     *
      * @return array<string, string>
      */
     private function contactFields(Quote $quote): array
@@ -108,36 +147,24 @@ class PayloadBuilder
             $address['last_name'] = $lastname;
         }
 
-        try {
-            $storeId = (int)$quote->getStoreId();
-            $store = $this->storeManager->getStore($storeId);
-            if ($store instanceof \Magento\Store\Model\Store) {
-                // Legacy Magento templates use {{store}} as the store NAME —
-                // kept for upgrade continuity; store_url serves templates
-                // shared with the Woo/Shopify plugins (which send a URL).
-                // Cron builds the reminder, so both links name the
-                // storefront's script, not bin/magento's (PRO-3732).
-                $address['store'] = (string)$store->getName();
-                $address['store_url'] = $this->storefrontScript->apply((string)$store->getBaseUrl(), $storeId);
-                // getGroup(), not the magic getStoreGroup() (silently null).
-                $group = $store->getGroup();
-                $address['store_group'] = $group ? (string)$group->getName() : '';
-                $address['store_website'] = (string)$store->getWebsite()->getName();
-                // A signed recovery link that restores this exact quote
-                // for 30 days from now, when the reminder is created.
-                $address['abandoned_cart_url'] = $this->storefrontScript->apply(
-                    $store->getUrl(
-                        'smaily/cart/restore',
-                        $this->restoreTokenManager->linkParams((int)$quote->getId())
-                    ),
-                    $storeId
-                );
-            }
-        } catch (LocalizedException) {
-            // Store context is decorative; the address stays valid without it.
-        }
-
         return $address;
+    }
+
+    /**
+     * A signed recovery link that restores this exact quote for 30 days from
+     * now, when the reminder is created; null when it cannot be built (as
+     * the store's fields, decorative).
+     */
+    private function cartUrl(Store $store, int $storeId, int $quoteId): ?string
+    {
+        try {
+            return $this->storefrontScript->apply(
+                $store->getUrl('smaily/cart/restore', $this->restoreTokenManager->linkParams($quoteId)),
+                $storeId
+            );
+        } catch (LocalizedException) {
+            return null;
+        }
     }
 
     /**
@@ -169,13 +196,11 @@ class PayloadBuilder
 
     /**
      * @param Item[] $items
-     * @param array<int, Product> $products
-     * @param array<int, array<string, string>> $details Each product's half
-     *        of a slot, by product id, resolved on first use and shared by
-     *        every cart of the store.
+     * @param array<int, array<string, string>> $details productDetails() of
+     *        the store's cart products, by product id.
      * @return array<string, string>
      */
-    private function productFields(array $items, array $products, array &$details): array
+    private function productFields(array $items, array $details): array
     {
         $fields = $this->blankSlots();
 
@@ -187,10 +212,6 @@ class PayloadBuilder
             }
             $slot++;
             $productId = (int)$item->getProduct()->getId();
-            if (isset($products[$productId])) {
-                $details[$productId] ??= $this->productDetails($products[$productId]);
-            }
-
             foreach ($this->productRow($item, $details[$productId] ?? []) as $field => $value) {
                 $fields[sprintf('product_%s_%d', $field, $slot)] = $value;
             }

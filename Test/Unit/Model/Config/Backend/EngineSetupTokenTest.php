@@ -49,8 +49,9 @@ class EngineSetupTokenTest extends TestCase
     public function testConnectingStartsTheCatalogImportAndSaysSo(): void
     {
         $this->client->method('setupExchange')->willReturn(['tenant_name' => 'Pilot', 'engine_version' => '1.8.2']);
-        $this->jobManager->expects(self::once())->method('start')
-            ->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
+        $this->jobManager->expects(self::once())->method('startIfIdle')
+            ->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID)
+            ->willReturn($this->createMock(Job::class));
         $this->messageManager->expects(self::once())->method('addNoticeMessage')
             ->with(self::stringStartsWith('The catalog import has started:'));
 
@@ -60,8 +61,8 @@ class EngineSetupTokenTest extends TestCase
     public function testAReconnectWhileACatalogImportIsQueuedOrRunningStartsNoSecond(): void
     {
         $this->client->method('setupExchange')->willReturn(['tenant_name' => 'Pilot', 'engine_version' => '1.8.2']);
-        $this->jobManager->expects(self::once())->method('start')
-            ->willThrowException(new \RuntimeException('A "catalog" import to engine is already running.'));
+        $this->jobManager->expects(self::once())->method('startIfIdle')
+            ->willReturn(null);
         $this->messageManager->expects(self::never())->method('addNoticeMessage');
 
         $this->model('tok_abc123')->beforeSave();
@@ -70,7 +71,7 @@ class EngineSetupTokenTest extends TestCase
     public function testASaveWithoutATokenStartsNothing(): void
     {
         $this->client->expects(self::never())->method('setupExchange');
-        $this->jobManager->expects(self::never())->method('start');
+        $this->jobManager->expects(self::never())->method('startIfIdle');
 
         $this->model('')->beforeSave();
     }
@@ -78,7 +79,7 @@ class EngineSetupTokenTest extends TestCase
     public function testAFailedConnectionStartsNothing(): void
     {
         $this->client->method('setupExchange')->willThrowException(new EngineRequestException('setup_token_not_found', 404));
-        $this->jobManager->expects(self::never())->method('start');
+        $this->jobManager->expects(self::never())->method('startIfIdle');
 
         $this->expectException(ValidatorException::class);
         $this->model('tok_abc123')->beforeSave();

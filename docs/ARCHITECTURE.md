@@ -228,14 +228,16 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   config:set smaily_connect/intelligence/setup_token`
   (`Model/Config/Backend/EngineSetupToken`) — call
   `Model/Backfill/CatalogImportOnConnect::start()` after a successful
-  setup exchange. It queues the job through `JobManager::start()`, as the
-  admin Start import does, so the one-active-job lock keeps a reconnect
+  setup exchange. It queues the job through `JobManager::startIfIdle()`, as
+  the admin Start import does, so the one-active-job lock keeps a reconnect
   from starting a second import while one is queued or running (a
   reconnect after it ended starts a fresh one, which the engine
   deduplicates); a config save without a token exchanges nothing and
   starts nothing. EngineExchange answers `catalogImportStarted`, and
   `panels-js.phtml` then shows an info banner with **Hold back the
-  import**, which posts the BackfillState `cancel` (`requestCancel()`).
+  import**, which posts the BackfillState `cancel` (`requestCancel()`);
+  the Settings tab's Catalog card renders the cancel's answer, which
+  carries the import's state.
   The window: the job is `pending` until the next `smaily_backfill_tick`
   (every minute) picks it up, and its first page can be flushed in that
   same cron run (`smaily_flush_ingest_queue` follows it in the group).
@@ -619,9 +621,12 @@ as for catalog product links (PRO-3732).
 the page, the cron builds every candidate's payload, grouped by store: one
 frontend emulation per store around the whole build (Magento allows one
 emulation level, so nothing inside it emulates), and
-`PayloadBuilder::buildAll()` loads the products of all that store's carts in
-one collection and resolves each product's description, image link and
-regular price once, whatever number of carts hold it. The regular price
+`PayloadBuilder::buildAll($storeId, $quotes)` loads the products of all that
+store's carts in one collection (each product once, only the lines that get
+one of the ten slots) and resolves each product's description, image link and
+regular price once, whatever number of carts hold it; the store's own fields
+(name, `store_url`, group, website) resolve once per build, and each cart
+keeps its own `abandoned_cart_url`. The regular price
 still comes from Magento's price model, so configurable and tax-inclusive
 prices are what they were. The rules then weigh the carts oldest id first,
 whatever their store. A build that fails leaves the whole page for the next

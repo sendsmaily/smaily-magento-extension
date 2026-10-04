@@ -147,14 +147,14 @@ class AbandonedCart
         $addresses = $this->buildAddresses($candidates);
         $mailed = 0;
         foreach ($candidates as $quote) {
+            $quoteId = (int)$quote->getId();
             $storeId = (int)$quote->getStoreId();
-            $address = $addresses[(int)$quote->getId()];
+            $address = $addresses[$quoteId];
 
             if (($address['email'] ?? '') === '') {
                 continue;
             }
 
-            $quoteId = (int)$quote->getId();
             if (isset($reminded[strtolower((string)$address['email'])])) {
                 $this->stateManager->markSkipped($quoteId, $storeId, $address['email']);
                 $this->dispatcher->recordSkippedAutomation(
@@ -204,7 +204,7 @@ class AbandonedCart
         foreach ($byStore as $storeId => $quotes) {
             $this->emulation->startEnvironmentEmulation($storeId, Area::AREA_FRONTEND, true);
             try {
-                $addresses += $this->payloadBuilder->buildAll($quotes);
+                $addresses += $this->payloadBuilder->buildAll($storeId, $quotes);
             } finally {
                 $this->emulation->stopEnvironmentEmulation();
             }

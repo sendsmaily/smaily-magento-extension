@@ -51,7 +51,7 @@ class BackfillStateTest extends TestCase
         string $jobType,
         string $message
     ): void {
-        $this->jobManager->expects(self::never())->method('start');
+        $this->jobManager->expects(self::never())->method('startIfIdle');
 
         $this->controller(false, ['action' => 'start', 'job_type' => $jobType])->execute();
 
@@ -64,8 +64,9 @@ class BackfillStateTest extends TestCase
      */
     public function testAnEngineImportStartsWhileCampaignIntelligenceIsConnected(string $jobType): void
     {
-        $this->jobManager->expects(self::once())->method('start')
-            ->with($jobType, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
+        $this->jobManager->expects(self::once())->method('startIfIdle')
+            ->with($jobType, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID)
+            ->willReturn($this->createMock(Job::class));
 
         $this->controller(true, ['action' => 'start', 'job_type' => $jobType])->execute();
 
@@ -95,8 +96,9 @@ class BackfillStateTest extends TestCase
 
     public function testTheContactsImportStartsWhileCampaignIntelligenceIsNotConnected(): void
     {
-        $this->jobManager->expects(self::once())->method('start')
-            ->with(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1);
+        $this->jobManager->expects(self::once())->method('startIfIdle')
+            ->with(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1)
+            ->willReturn($this->createMock(Job::class));
 
         $this->controller(false, ['action' => 'start', 'job_type' => Job::TYPE_CONTACTS])->execute();
 

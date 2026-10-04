@@ -46,8 +46,9 @@ class EngineExchangeTest extends TestCase
     public function testConnectingStartsTheCatalogImport(): void
     {
         $this->client->method('setupExchange')->willReturn(['tenant_name' => 'Pilot', 'engine_version' => '1.8.2']);
-        $this->jobManager->expects(self::once())->method('start')
-            ->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
+        $this->jobManager->expects(self::once())->method('startIfIdle')
+            ->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID)
+            ->willReturn($this->createMock(Job::class));
 
         $this->controller()->execute();
 
@@ -58,8 +59,8 @@ class EngineExchangeTest extends TestCase
     public function testAReconnectWhileACatalogImportIsQueuedOrRunningStartsNoSecond(): void
     {
         $this->client->method('setupExchange')->willReturn(['tenant_name' => 'Pilot', 'engine_version' => '1.8.2']);
-        $this->jobManager->expects(self::once())->method('start')
-            ->willThrowException(new \RuntimeException('A "catalog" import to engine is already running.'));
+        $this->jobManager->expects(self::once())->method('startIfIdle')
+            ->willReturn(null);
 
         $this->controller()->execute();
 
@@ -70,7 +71,7 @@ class EngineExchangeTest extends TestCase
     public function testAFailedConnectionStartsNothing(): void
     {
         $this->client->method('setupExchange')->willThrowException(new EngineRequestException('setup_token_not_found', 404));
-        $this->jobManager->expects(self::never())->method('start');
+        $this->jobManager->expects(self::never())->method('startIfIdle');
 
         $this->controller()->execute();
 

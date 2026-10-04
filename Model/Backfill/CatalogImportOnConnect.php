@@ -33,12 +33,6 @@ class CatalogImportOnConnect
      */
     public function start(): bool
     {
-        try {
-            $this->jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
-        } catch (\RuntimeException) {
-            return false;
-        }
-
-        return true;
+        return $this->jobManager->startIfIdle(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID) !== null;
     }
 }

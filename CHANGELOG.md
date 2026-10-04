@@ -7,6 +7,7 @@ The package version is currently `3.0.0-rc6` — the sixth release-candidate cut
 **Changes since 3.0.0-rc6**
 
 - The Log's **Last Error** filter finds rows by the text the column shows. Before, it searched the stored value: a refusal's internal failure class (`permanent_http_400: …`), which the column does not show, could be found, and an extension message shown in the admin's language (for example in Estonian) could not be found by the words on screen. An error that the column shows with its secrets redacted is not found by the hidden values.
+- **Details** on a delivered automation row reads as delivered. When a later message of the same kind had reached the same contact, it said "A later message of this kind already reached this contact; sending again would deliver it twice." although the row was delivered and never offered **Send again**. That sentence now shows only on a failed row, where it explains why **Send again** is missing.
 
 **Changes since 3.0.0-rc5**
 

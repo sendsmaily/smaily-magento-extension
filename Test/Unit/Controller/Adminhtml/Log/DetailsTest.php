@@ -69,6 +69,36 @@ class DetailsTest extends TestCase
         self::assertSame('sent', $this->blockData['status_pill']);
     }
 
+    /**
+     * PRO-2511: a delivered automation row that a later delivery of the
+     * same kind superseded was never a candidate for sending again, so its
+     * drawer reads as delivered, without the refusal sentence.
+     */
+    public function testADeliveredRowALaterDeliverySupersededReadsAsDelivered(): void
+    {
+        $this->render(['status' => 'sent'] + $this->automationRow(), ResendGuard::REASON_SUPERSEDED);
+
+        self::assertNull($this->blockData['resend_url']);
+        self::assertNull($this->blockData['refusal']);
+        self::assertSame('sent', $this->blockData['status_pill']);
+    }
+
+    public function testAFailedRowALaterDeliverySupersededSaysWhyItIsNotSentAgain(): void
+    {
+        $this->render($this->automationRow(), ResendGuard::REASON_SUPERSEDED);
+
+        self::assertNull($this->blockData['resend_url']);
+        self::assertSame('superseded sentence', (string)$this->blockData['refusal']);
+    }
+
+    public function testAWithdrawnReminderSaysItWasWithdrawn(): void
+    {
+        $this->render(['status' => 'withdrawn'] + $this->automationRow(), ResendGuard::REASON_WITHDRAWN);
+
+        self::assertNull($this->blockData['resend_url']);
+        self::assertSame('withdrawn sentence', (string)$this->blockData['refusal']);
+    }
+
     public function testAMissingRowOffersNothing(): void
     {
         $this->render(null, '');
@@ -95,6 +125,17 @@ class DetailsTest extends TestCase
             'updated_at' => '2026-10-02 10:05:00',
             'next_retry_at' => null,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function automationRow(): array
+    {
+        return [
+            'type' => 'automation.trigger',
+            'payload' => '{"trigger_type":"abandoned_cart"}',
+        ] + $this->failedRow();
     }
 
     /**

@@ -23,6 +23,7 @@ use Smaily\Connect\Model\Log\QueueRowLoader;
 use Smaily\Connect\Model\Log\Resend;
 use Smaily\Connect\Model\Log\ResendGuard;
 use Smaily\Connect\Model\Log\StatusPill;
+use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\PayloadDecoder;
 use Smaily\Connect\Ui\Component\QueueStatusOptions;
 
@@ -89,11 +90,15 @@ class Details extends Action implements HttpGetActionInterface
             'redactor' => $this->redactor,
             'payload' => $payload,
             'status_labels' => array_column($this->statusOptions->toOptionArray(), 'label', 'value'),
-            // A row that simply never failed is refused too, but the drawer
-            // has its own honest line for a pending or delivered row.
-            'refusal' => $reason === '' || $reason === ResendGuard::REASON_NOT_FAILED
-                ? null
-                : $this->resendGuard->message($reason),
+            // The refusal stands in for a "Send again" the row would
+            // otherwise have, so only a failed row shows it — a delivered
+            // row that a later delivery superseded reads as delivered
+            // (PRO-2511). A withdrawn reminder never failed; its sentence
+            // is the drawer's only line for it.
+            'refusal' => $reason === ResendGuard::REASON_WITHDRAWN
+                || ($reason !== '' && (string)($row['status'] ?? '') === Event::STATUS_FAILED)
+                ? $this->resendGuard->message($reason)
+                : null,
             'resend_record' => $this->resend->recordOf($payload),
             'last_error' => $this->failureMessage->forDisplay($lastError),
             'failure_class' => $this->failureMessage->failureClass($lastError),

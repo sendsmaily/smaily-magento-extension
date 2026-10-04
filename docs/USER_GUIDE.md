@@ -238,6 +238,15 @@ The storefront must open Magento's product paths, or redirect them keeping
 the query string — see
 [HEADLESS_STOREFRONTS.md](HEADLESS_STOREFRONTS.md#product-links-and-images).
 
+Connecting Campaign Intelligence starts the catalog import, so set the
+Storefront URL before you connect Campaign Intelligence. The initial setup
+has no Storefront URL field: on a new install, finish the initial setup
+with its Campaign Intelligence step left unconnected, set the Storefront
+URL here, and connect under **Settings > Intelligence**. Connected already
+without it: press **Hold back the import** at once, set the Storefront
+URL, and start the catalog import then (see
+[Connecting](#connecting)).
+
 
 
 ### Multilingual stores
@@ -654,6 +663,15 @@ connected.
    `bin/magento smaily:backfill:status` lists the import, and
    **Cancel import** on the **Catalog** card under **Settings >
    Intelligence > Historical imports** holds it back.
+
+While no Storefront URL is saved for the website, Initial setup step 4
+says under the setup URL field that a store with a separate storefront
+sets its Storefront URL first — finish the setup without connecting, enter
+the address under **Settings > Connection > Using a separate storefront? >
+Storefront URL**, then connect under **Settings > Intelligence** — or
+connects and presses **Hold back the import** (see
+[A separate storefront](#a-separate-storefront)). With a Storefront URL
+saved, the step does not say it; **Settings > Intelligence** never does.
 
 The setup URL must be an https address on `intelligence.smaily.com`; a bare
 token is exchanged there too. Any other address is refused before anything is

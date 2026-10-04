@@ -11,7 +11,8 @@
   real templates (view/adminhtml/templates/panel/intelligence.phtml and
   panel/panels-js.phtml), rendered in en_US and et_EE by
   Test/Js/render-admin.php into Test/Js/build/ as the initial setup's step
-  and as the Settings tab, run with jQuery from vendor/, one fresh frame per
+  (without and with a saved Storefront URL, for the storefront hint of
+  PRO-3745) and as the Settings tab, run with jQuery from vendor/, one fresh frame per
   scenario. Stubbed: only the requests (fetch) — the Connect answers with
   the EngineExchange endpoint's answer, the import requests with the
   BackfillState endpoint's. Run it with bin/test-js.sh (it renders the pages
@@ -23,6 +24,8 @@
     <title>intelligence connect harness</title>
     <script src="build/intelligence-setup.en_US.js"></script>
     <script src="build/intelligence-setup.et_EE.js"></script>
+    <script src="build/intelligence-setup-storefront.en_US.js"></script>
+    <script src="build/intelligence-setup-storefront.et_EE.js"></script>
     <script src="build/intelligence-settings.en_US.js"></script>
     <script src="build/intelligence-settings.et_EE.js"></script>
 </head>
@@ -35,7 +38,8 @@
     var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
     var HELD_BACK = 'Held back: the catalog import is canceled. Start it any time under Marketing > Smaily Connect > Settings > Intelligence.';
     var CANCELED = 'Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.';
-    var FINISHED = 'The catalog import had already finished, so there was nothing left to hold back.';
+    var STOREFRONT_HINT = 'Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: finish the setup without connecting, enter the address under Marketing > Smaily Connect > Settings > Connection > Using a separate storefront? > Storefront URL, then connect under Settings > Intelligence. Or connect now and press Hold back the import.';
+    var FINISHED ='The catalog import had already finished, so there was nothing left to hold back.';
     var failures = 0;
     var passes = 0;
 
@@ -96,8 +100,8 @@
         ].join('\n');
     }
 
-    // Opens the panel as the page boots it, then presses Connect.
-    function connect(page, answers) {
+    // Opens the panel as the page boots it.
+    function open(page, answers) {
         return new Promise(function (resolve, reject) {
             var frame = document.createElement('iframe'),
                 rendered = (window.smailyAdminPages || {})[page];
@@ -109,14 +113,6 @@
             }
             frame.onload = function () {
                 wait(50).then(function () {
-                    var doc = frame.contentDocument;
-
-                    frame.contentWindow.answers.status = answers.statusAfterConnect || answers.status;
-                    doc.getElementById('smaily-w-setup-url').value = 'https://intelligence.smaily.com/setup/tok_test';
-                    doc.getElementById('smaily-w-engine-connect').click();
-
-                    return wait(50);
-                }).then(function () {
                     resolve(frame);
                 }, reject);
             };
@@ -124,6 +120,21 @@
                 + '</head><body>' + rendered.html
                 + '<script>window.smailyPanelsInit(window.jQuery).initAll();<\/script></body></html>';
             document.body.appendChild(frame);
+        });
+    }
+
+    // Opens the panel, then presses Connect.
+    function connect(page, answers) {
+        return open(page, answers).then(function (frame) {
+            var doc = frame.contentDocument;
+
+            frame.contentWindow.answers.status = answers.statusAfterConnect || answers.status;
+            doc.getElementById('smaily-w-setup-url').value = 'https://intelligence.smaily.com/setup/tok_test';
+            doc.getElementById('smaily-w-engine-connect').click();
+
+            return wait(50).then(function () {
+                return frame;
+            });
         });
     }
 
@@ -138,6 +149,13 @@
         var element = doc.getElementById(id);
 
         return !!element && element.style.display !== 'none';
+    }
+
+    // On screen: the element and every element around it are displayed.
+    function visible(doc, id) {
+        var element = doc.getElementById(id);
+
+        return !!element && element.getClientRects().length > 0;
     }
 
     function holdBackResult(doc) {
@@ -155,6 +173,7 @@
             settings = 'intelligence-settings.' + locale,
             strings = window.smailyAdminPages[setup].strings,
             frame,
+            hint,
             doc,
             card,
             cancels;
@@ -164,6 +183,29 @@
             check(locale + ': the page is translated',
                 strings['The catalog import has started'] !== 'The catalog import has started');
         }
+
+        // Initial setup, before a Connect: without a saved Storefront URL the
+        // step tells a separate storefront to set it first or to hold the
+        // import back (PRO-3745); with one, and on the Settings tab, it does not.
+        if (locale !== 'en_US') {
+            check(locale + ': the storefront hint is translated', strings[STOREFRONT_HINT] !== STOREFRONT_HINT);
+        }
+        frame = await open(setup, {status: catalog('idle', 0)});
+        hint = frame.contentDocument.getElementById('smaily-w-engine-storefront-hint');
+        check(locale + ', setup: without a Storefront URL, the storefront hint is shown before Connect',
+            visible(frame.contentDocument, 'smaily-w-engine-storefront-hint')
+            && hint.textContent === strings[STOREFRONT_HINT]);
+        frame.remove();
+        frame = await open('intelligence-setup-storefront.' + locale, {status: catalog('idle', 0)});
+        check(locale + ', setup: with a Storefront URL, no storefront hint',
+            visible(frame.contentDocument, 'smaily-w-engine-connect')
+            && !frame.contentDocument.getElementById('smaily-w-engine-storefront-hint'));
+        frame.remove();
+        frame = await open(settings, {status: catalog('idle', 0)});
+        check(locale + ', settings: no storefront hint',
+            visible(frame.contentDocument, 'smaily-w-engine-connect')
+            && !frame.contentDocument.getElementById('smaily-w-engine-storefront-hint'));
+        frame.remove();
 
         // Initial setup: a Connect that started the catalog import, held back
         // before its first cron run.

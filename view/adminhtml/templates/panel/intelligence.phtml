@@ -40,6 +40,14 @@ $isRefused = $viewModel->isEngineRefused();
             <label for="smaily-w-setup-url"><?= $escaper->escapeHtml(__('Setup URL or token from Smaily')) ?></label>
             <input type="text" id="smaily-w-setup-url" placeholder="https://intelligence.smaily.com/setup/…"/>
             <p class="note"><?= $escaper->escapeHtml(__('The one-time token is exchanged immediately and never stored.')) ?></p>
+            <?php // Connecting starts the catalog import (PRO-3741), with the
+            // product links of the website's Storefront URL. The initial setup
+            // has no Storefront URL field (Settings > Connection has), so while
+            // none is saved the step says to set it first or hold the import
+            // back (PRO-3745). ?>
+            <?php if (!$isSettings && $viewModel->getSavedStorefrontUrl() === ''): ?>
+            <p class="note" id="smaily-w-engine-storefront-hint"><?= $escaper->escapeHtml(__('Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: finish the setup without connecting, enter the address under Marketing > Smaily Connect > Settings > Connection > Using a separate storefront? > Storefront URL, then connect under Settings > Intelligence. Or connect now and press Hold back the import.')) ?></p>
+            <?php endif; ?>
         </div>
         <button type="button" class="action-secondary" id="smaily-w-engine-connect">
             <span><?= $escaper->escapeHtml(__('Connect')) ?></span>

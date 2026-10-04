@@ -92,7 +92,9 @@ Connecting Campaign Intelligence starts the catalog import, so set the
 Storefront URL before connecting Campaign Intelligence — leave the initial
 setup's optional Intelligence step unconnected and connect under
 **Settings > Intelligence** afterwards — or press **Hold back the import** right after connecting and
-run the import once the Storefront URL is set.
+run the import once the Storefront URL is set. While no Storefront URL is
+saved, the initial setup's Intelligence step says the same under its setup
+URL field.
 The RSS feed shows them within 15 minutes (its cache).
 
 The storefront must open the path: either it routes `/<url-key>.html`
@@ -266,8 +268,10 @@ only in the same browser, while the storefront still holds the cart.
 ## Before switching anything on
 
 1. Install the module and connect it as usual; leave contact sync and
-   automations off.
-2. Set the **Storefront URL** when shoppers cannot open the back-end host.
+   automations off, and leave the initial setup's Campaign Intelligence
+   step unconnected — connecting starts the catalog import.
+2. Set the **Storefront URL** when shoppers cannot open the back-end host,
+   then connect Campaign Intelligence under **Settings > Intelligence**.
    Run one catalog sync and open a product's `product_url` and `image_url`
    from **Log > Details**: the link opens the right product page on the
    storefront, with an added `?probe=1` still in the address bar after any

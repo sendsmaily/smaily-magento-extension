@@ -29,7 +29,7 @@ uses, and that you cancel or refund it afterwards.
 |---|---|
 | Confirm the store has one website. | Stores > All Stores lists one website. More than one: Initial setup opens with "Which website are you setting up?" and Settings shows a **Website** selector — onboard each website, and note it in PRO-2474. |
 | Confirm the storefront theme is Luma-based, not Hyvä. | Content > Design > Configuration. A Hyvä theme needs the separate compat module (`compat/hyva`), which the ZIP does not carry — stop and raise it. |
-| Confirm shoppers buy on Magento's own theme, not on a separate (headless) storefront application. | Open a product page on the public shop: Magento's own theme loads `requirejs` (Luma) or Alpine.js (Hyvä). A headless storefront (PRO-3614): walk `docs/HEADLESS_STOREFRONTS.md` "Before switching anything on" first — keep contact sync and automations off until its product-link check passes; §5's `{{abandoned_cart_url}}`, the checkout checkbox and §6 do not apply until the storefront team's hand-off items are in place. |
+| Confirm shoppers buy on Magento's own theme, not on a separate (headless) storefront application. | Open a product page on the public shop: Magento's own theme loads `requirejs` (Luma) or Alpine.js (Hyvä). A headless storefront (PRO-3614): walk `docs/HEADLESS_STOREFRONTS.md` "Before switching anything on" first — keep contact sync and automations off until its product-link check passes, and set the Storefront URL before connecting Campaign Intelligence (§2); §5's `{{abandoned_cart_url}}`, the checkout checkbox and §6 do not apply until the storefront team's hand-off items are in place. |
 | Confirm the ZIP the developer installed is the release build. | Developer ran `sha256sum -c smaily-connect-magento2.zip.sha256` → `OK`. `bin/magento module:status Smaily_Connect` → `Module is enabled`. |
 | List which modules send abandoned-cart emails today — for example a Magento extension such as Mageplaza SMTP or Avada Email Marketing, or Adobe Commerce's own email reminder rules. | Developer runs `bin/magento module:status --enabled`; the merchant says which of those send abandoned-cart emails. Each one's abandoned-cart emails are off before §1's **Automations** step ticks **Enabled** on **Abandoned cart**, or the test shopper in §5 gets two reminders. Note the list (or "none") in PRO-2474. |
 | Confirm the store's Magento cron is installed. | `crontab -l` on the server shows the `#~ MAGENTO START` block running `bin/magento cron:run` every minute. |
@@ -44,6 +44,23 @@ uses, and that you cancel or refund it afterwards.
 | **Automations** step: map **Abandoned cart** to the merchant's Smaily workflow and tick **Enabled** (needed for §5). Map **Welcome** / **First order** only if the merchant has those workflows. **Wait (minutes)** stays at **30** unless the merchant asked otherwise. | Workflow dropdowns list the Smaily account's workflows (**Refresh workflows** if one is missing). |
 
 ## 2. Engine setup exchange (Intelligence step)
+
+**Separate (headless) storefront — the pilot's case: set the Storefront URL
+BEFORE connecting Campaign Intelligence.** Connecting starts the catalog
+import at once, and without a Storefront URL every product link in it is
+the back-end's. The initial setup has no Storefront URL field (Settings
+opens only once the setup is finished), so on such a store the rows below
+run in this order:
+
+| What to do | Where to look / what good looks like |
+|---|---|
+| On the **Intelligence** step, do not connect: press **Finish**, then **Go to Dashboard** on **Overview**. | Under **Setup URL or token from Smaily** the step says "Using a separate storefront? Set its Storefront URL before you connect, …" — it shows while no Storefront URL is saved for the website. |
+| **Settings > Connection** → open **Using a separate storefront?** → enter the storefront's https address (host only, e.g. `https://shop.example.com`) as **Storefront URL** → **Save Connection**. | Saved; the field stays filled after a reload. |
+| **Settings > Intelligence**: do the rows below from **Before connecting** on there — **Connect** is the same; **Enable storefront browse tracking** is saved with the tab's **Save** (no **Finish** / **Overview**). | The catalog import that connecting starts sends the storefront's product links. |
+| Connected before the Storefront URL was set (by mistake)? | Press **Hold back the import** at once (before the next cron run, usually within a minute), set the Storefront URL as above, then **Run again** on the Catalog card under **Settings > Intelligence**. |
+
+A store on Magento's own theme runs the rows below on the initial setup's
+Intelligence step:
 
 | What to do | Where to look / what good looks like |
 |---|---|

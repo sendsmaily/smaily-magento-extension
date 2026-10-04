@@ -16,9 +16,11 @@ once per store), PRO-1968 (the nightly full catalog re-sync is removed) and
 PRO-1969 (a catalog import does not start while Campaign Intelligence is
 not connected), PRO-3742 (nor do the customers and orders imports) and
 PRO-3741 (connecting Campaign Intelligence starts the catalog import, with
-a Hold back) landed on v3, unreleased; CHANGELOG's
+a Hold back) and PRO-3745 (the setup's Intelligence step tells a separate
+storefront to set its Storefront URL first) landed on v3, unreleased;
+CHANGELOG's
 "Changes since 3.0.0-rc5" has PRO-3733, PRO-1968 (its bullet now points to
-PRO-3741's), PRO-3741 and PRO-1969 (its bullet widened by PRO-3742), the
+PRO-3741's), PRO-3741, PRO-3745 and PRO-1969 (its bullet widened by PRO-3742), the
 others
 change nothing a merchant sees. 3.0.0-rc5 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc5),
@@ -92,6 +94,32 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3745 — the initial setup's Intelligence step tells a separate
+  storefront to set its Storefront URL before connecting (2026-10-04; pilot
+  milestone: the pilot runs a headless storefront and installs rc6).**
+  Since PRO-3741 connecting starts the catalog import, and the Storefront
+  URL lives under Settings > Connection (not Settings > Intelligence),
+  which redirects to the wizard until the setup is finished — so a
+  headless store connecting in the setup sent back-end product links
+  unless it held the import back. `panel/intelligence.phtml` now renders a
+  note under the setup URL field, setup step only, while
+  `WizardData::getSavedStorefrontUrl()` is empty for the selected website:
+  "Using a separate storefront? Set its Storefront URL before you connect,
+  …: finish the setup without connecting, enter the address under
+  Marketing > Smaily Connect > Settings > Connection > Using a separate
+  storefront? > Storefront URL, then connect under Settings > Intelligence.
+  Or connect now and press Hold back the import." (EN + ET; ET uses the
+  canon's "Poe veebilehe aadress", "Kas pood töötab eraldi veebilehel?",
+  "Peata import"). Moving the field into the setup is out of scope. Test:
+  browser `Test/Js/intelligence-connect.html` 27 → 34 checks (shown without
+  a Storefront URL, translated, absent with one and on Settings; red with
+  the condition removed) — `render-admin.php` adds the
+  `intelligence-setup-storefront` page. Docs: PILOT_CHECKLIST §0 and §2
+  (headless order: Finish without connecting, set the Storefront URL,
+  connect under Settings > Intelligence; Hold back + Run again if connected
+  first), HEADLESS_STOREFRONTS ("Before switching anything on" order; the
+  note), USER_GUIDE (A separate storefront; Connecting), ARCHITECTURE,
+  TESTING, CHANGELOG. Template-only PHP change, no DI change.
 - **PRO-3741 — connecting Campaign Intelligence starts the catalog import
   (2026-10-04; owner decision: "the catalog import starts automatically
   when Campaign Intelligence is connected; the merchant is told at once

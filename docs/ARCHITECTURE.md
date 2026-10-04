@@ -392,6 +392,11 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   session; every other order (Luma's checkout REST call carries the cookie)
   is a storefront order. `isApiOnly()`: an API order and no storefront
   order in the last 30 days. Installation-wide; no table or column.
+  Connecting starts the catalog import, and the initial setup has no
+  Storefront URL field (Settings opens once the setup is finished), so
+  `panel/intelligence.phtml` adds a note on the setup step only, while
+  `WizardData::getSavedStorefrontUrl()` is empty for the selected website:
+  set the Storefront URL first, or hold the import back (PRO-3745).
 
 ### Queue semantics (both queues)
 

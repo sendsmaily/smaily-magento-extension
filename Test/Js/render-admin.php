@@ -183,9 +183,25 @@ $pages = [
  * The Campaign Intelligence panel (view/adminhtml/templates/panel/intelligence.phtml)
  * with its behaviour (panel/panels-js.phtml), Campaign Intelligence not
  * connected yet: the initial setup's step and the Settings tab, where the
- * import cards render too (PRO-3741).
+ * import cards render too (PRO-3741). No Storefront URL is saved, except on
+ * the setup step's intelligence-setup-storefront page (PRO-3745).
  */
-$intelligence = new class {
+$intelligenceViewModel = static fn (string $storefrontUrl): object => new class ($storefrontUrl) {
+    /**
+     * @param string $storefrontUrl
+     */
+    public function __construct(private readonly string $storefrontUrl)
+    {
+    }
+
+    /**
+     * @return string
+     */
+    public function getSavedStorefrontUrl(): string
+    {
+        return $this->storefrontUrl;
+    }
+
     /**
      * @return bool
      */
@@ -232,11 +248,13 @@ $intelligence = new class {
         ]);
     }
 };
+$intelligence = $intelligenceViewModel('');
 $intelligenceStrings = [
     'The catalog import has started',
     'Held back: the catalog import is canceled. Start it any time under Marketing > Smaily Connect > Settings > Intelligence.',
     'Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.',
     'The catalog import had already finished, so there was nothing left to hold back.',
+    'Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: finish the setup without connecting, enter the address under Marketing > Smaily Connect > Settings > Connection > Using a separate storefront? > Storefront URL, then connect under Settings > Intelligence. Or connect now and press Hold back the import.',
 ];
 $intelligenceTemplates = [
     $root . '/view/adminhtml/templates/panel/intelligence.phtml',
@@ -245,6 +263,11 @@ $intelligenceTemplates = [
 $pages['intelligence-setup'] = [
     'template' => $intelligenceTemplates,
     'viewModel' => $intelligence,
+    'strings' => $intelligenceStrings,
+];
+$pages['intelligence-setup-storefront'] = [
+    'template' => $intelligenceTemplates,
+    'viewModel' => $intelligenceViewModel('https://shop.example.com'),
     'strings' => $intelligenceStrings,
 ];
 $pages['intelligence-settings'] = [

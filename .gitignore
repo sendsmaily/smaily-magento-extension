@@ -10,3 +10,4 @@ phpstan.neon
 phpunit.xml
 # Design-pack exports are working material, not repository content (PRO-2456).
 /docs/*.zip
+/Test/Js/build/

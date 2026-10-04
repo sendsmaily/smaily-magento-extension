@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Runs the storefront JS harnesses under Test/Js in headless Chrome and fails
+# Runs the browser JS harnesses under Test/Js in headless Chrome and fails
 # unless every page ends with "RESULT: PASS". The harnesses load Magento's own
-# checkout JS from vendor/, so run `composer install` first.
+# checkout JS and jQuery from vendor/, so run `composer install` first. The
+# admin pages are rendered from their templates first (Test/Js/render-admin.php,
+# into Test/Js/build/).
 #
 #   bin/test-js.sh            # CHROME=/path/to/chrome to pick the browser
 set -euo pipefail
@@ -22,6 +24,8 @@ if [[ -z "$chrome" ]]; then
     echo "No Chrome found; set CHROME=/path/to/chrome" >&2
     exit 2
 fi
+
+php "$root/Test/Js/render-admin.php"
 
 status=0
 for page in "$root"/Test/Js/*.html; do

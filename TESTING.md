@@ -59,7 +59,7 @@ only because their vendor tree predated 2.2.6. Lift the cap once
 bitexpert/phpstan-magento releases the fix it carries on its unreleased
 `bugfix/autoloader-requires-generated-file-not-source` branch.
 
-## Storefront JS harness
+## Browser JS harnesses
 
 ```bash
 bin/test-js.sh              # headless Chrome; CHROME=/path/to/chrome to pick one
@@ -79,7 +79,26 @@ runs the real Luma and Hyvä browse trackers, one fresh frame per scenario
 (document.cookie, sendBeacon and the Luma tracker's jQuery stubbed), and
 checks Magento's cookie notice consent: accepted on another website, on this
 website, not parseable, accepted later on the page, and the consent override
-first. CI does not run the harness yet.
+first.
+
+The admin screens that save through the browser are checked the same way,
+from their real templates. `Test/Js/render-admin.php` (run by
+`bin/test-js.sh` first) renders each template in en_US and et_EE as Magento
+does — Magento's Escaper, `__()` translated with `i18n/<locale>.csv`, a view
+model with fixed data — into `Test/Js/build/` (not committed), and the page
+loads the result with jQuery from `vendor/` (the copy PHPUnit's coverage
+report ships; the module's dev install has no Magento `lib/web`).
+`Test/Js/automations-save.html` saves the Automations tab with the save
+request answered by a recorded answer of the save endpoint and checks each Campaign Intelligence trigger's
+card in both languages: a trigger that asked for real sends and was kept in
+test mode shows Test mode with the box ticked again and the go-live note,
+and the result adds the note; a trigger the engine stored active shows
+Active without the note; a trigger left off stays Off; when the stored
+state could not be read, the result asks for a reload and the cards keep
+the page's state. To check another admin screen, add its template and view
+model to `$pages` in `Test/Js/render-admin.php` and a page under `Test/Js/`.
+
+CI does not run the harnesses yet.
 
 ## Integration tests (real MySQL)
 

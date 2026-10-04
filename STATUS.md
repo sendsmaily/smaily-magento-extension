@@ -5,7 +5,13 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-04 — 3.0.0-rc5 is released as a GitHub pre-release on
+_Last updated: 2026-10-04 — after 3.0.0-rc5, PRO-3735 (CI parses every
+PHP and PHTML file on PHP 8.1), PRO-3733 (a command-line Campaign
+Intelligence connection sends the storefront's site address), PRO-3729 and
+PRO-3737 (admin target spec wording) and PRO-3736 (a browser harness for the
+Automations tab's save result) landed on v3, unreleased; CHANGELOG's
+"Changes since 3.0.0-rc5" has PRO-3733, the others change nothing a merchant
+sees. 3.0.0-rc5 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc5),
 built by the release workflow (run 37208243039) from commit 1911c41; the ZIP
 and its .sha256 were checked after publishing (379 entries, `shasum -a 256 -c`
@@ -76,6 +82,28 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3736 — a browser harness checks the Automations tab's save result
+  (2026-10-04; tooling, no CHANGELOG bullet).** PRO-3734's save result had
+  been checked only with one-off stubs. `Test/Js/render-admin.php` renders
+  the real `config/engine-automations.phtml` in en_US and et_EE as Magento
+  does (Magento's Escaper, `__()` from `i18n/<locale>.csv`, a fixed view
+  model: three triggers, Campaign Intelligence connected) into
+  `Test/Js/build/` (gitignored); `bin/test-js.sh` runs it before the pages.
+  `Test/Js/automations-save.html` runs the template's own script with
+  jQuery from `vendor/` (phpunit's code-coverage copy, 3.6.1; the module's
+  vendor/ has no Magento lib/web), stubs only the save request with the
+  save endpoint's recorded answer and checks in both languages: Replenishment
+  due asked for real sends and was kept in test mode → Test mode pill, box
+  ticked again, go-live note, result "Saved." + note; Post-purchase stored
+  active → Active, note hidden; Win-back off → Off; stored state not
+  readable → the reload message, cards keep the page's state (39 checks).
+  With `showStoredStates()` reduced to the pre-PRO-3734 behaviour (the cards
+  keep the request) it fails 10 of 39 (reverted). A view model is fixed data
+  rather than AutomationsForm on stubbed engine calls — the harness tests the
+  page's script; the view model has its unit tests. Adding the Connection
+  screen means one `$pages` entry and one page. TESTING.md ("Browser JS
+  harnesses"). CI does not run the harnesses yet.
 
 - **PRO-3737 — the admin target spec names the initial setup as the admin
   does (2026-10-04; docs only, no CHANGELOG bullet).**
@@ -1550,9 +1578,9 @@ Earlier: 2026-09-11, 2026-09-10._
   PRO-3734 (the Automations tab shows the engine's stored trigger state
   after a save; contract copy synced, the staleness check green again);
   the pilot's first catalog import is built in cron, so PRO-3731 matters
-  to it. Open queue, all low: PRO-3729 (wording leftovers), PRO-3733 (the
-  engine connection's site address built under the CLI), PRO-3735,
-  PRO-3736. Done
+  to it. Done 2026-10-04 after rc5, unreleased on v3: PRO-3735 (CI PHP 8.1
+  syntax check), PRO-3733 (CLI site address), PRO-3729 and PRO-3737
+  (target spec wording), PRO-3736 (admin browser harness). Done
   2026-10-02/03: headless storefronts + the
   Storefront URL (PRO-3614/3660), browse consent as in Woo and per website
   (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the standard
@@ -1574,12 +1602,12 @@ Earlier: 2026-09-11, 2026-09-10._
   their 2.x settings with the UPGRADING checklist (PRO-3661), the Mageplaza
   live checks (PRO-3663), the other-abandoned-cart-senders check
   (PRO-3665), the Campaign Intelligence questions (spike PRO-3662); (3)
-  open backlog: the queue above, PRO-3675 (live Hyvä check), PRO-1198
-  (Smaily hand-over); PRO-1357 is closed (2026-10-04). Erkki still
-  proofreads the Estonian strings added 2026-10-02/04, incl. PRO-3734's
-  go-live note and the term "päästik". With Erkki: the Automations tab
-  intro ("nothing reaches real customers without your explicit action")
-  is still true but incomplete since PRO-3734 — does it need more copy? Sandbox: remove finished agent worktrees under
+  Erkki's engine pilot decisions (PRO-3600); (4) open backlog: PRO-3675
+  (live Hyvä check), PRO-1198 (Smaily hand-over); PRO-1357 is closed
+  (2026-10-04). Erkki still proofreads the Estonian strings added
+  2026-10-02/04, incl. PRO-3734's go-live note and the term "päästik". The
+  Automations tab intro stays as it is (owner decision 2026-10-04,
+  PRO-3729). Sandbox: remove finished agent worktrees under
   `.claude/worktrees` before any sandbox `setup:di:compile`.
 
 - **PRO-3603 done — final clean-install pass of the release ZIP

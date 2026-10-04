@@ -82,6 +82,18 @@ style (str_replace, never sprintf).
     MySQL (`docker run --rm -d -e MYSQL_ROOT_PASSWORD=root -p 3316:3306
     mysql:8.4` + `SMAILY_IT_DB_PORT=3316`, see TESTING.md); NEVER point
     `SMAILY_IT_DB_*` at the sandbox DB — the suite drops/recreates tables.
+- **Local PHP 8.5 accepts syntax PHP 8.1 rejects** (DNF types such as
+  `(A&B)|null` are 8.2+, `new Foo()->bar()` without wrapping parens is
+  8.4+), and neither phpstan (even with `phpVersion: 80100`) nor phpcs
+  (`magento/php-compatibility-fork`) flags it — CI's PHP 8.1 unit job is the
+  first to fail. Before calling work done, lint the changed files under
+  PHP 8.1 (the whole repo, excluding vendor/, takes a minute; it prints
+  only failures — a plain `xargs php -l` stops at the first one):
+  ```sh
+  docker run --rm -v "$PWD":/app -w /app php:8.1-cli sh -c 'for f in $(find . \( -path ./vendor -o -path ./.git -o -path ./.claude \) -prune -o \( -name "*.php" -o -name "*.phtml" \) -print); do php -l "$f" >/tmp/o 2>&1 || cat /tmp/o; done'
+  ```
+  The unit suite runs on 8.1 the same way after `apt-get install -y
+  libicu-dev && docker-php-ext-install intl` in the container.
 - Sandbox: `docker compose up -d` — real Magento 2 at
   `localhost:8080/admin` (admin / smailydev1, 2FA modules disabled). The repo
   is bind-mounted as the module; `vendor/` inside the container is shadowed by

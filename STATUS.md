@@ -18,8 +18,13 @@ saves), PRO-3732 (the abandoned-cart cart and store links open with web
 server rewrites off) and PRO-3730 (a busy store's abandoned-cart scan
 reads only the carts changed in 24 h). PRO-3559, PRO-2477 and the PRO-1967
 simplification pass change nothing a merchant sees, so they have no
-bullet. rc5 is prepared in the version-cut commit on top of 51edd08; the
-ZIP builds and verifies locally from it. It awaits publishing as a GitHub
+bullet. rc5 is prepared in the version-cut commit 4c1b8f9 on top of
+51edd08; the ZIP builds and verifies locally from it. A test-only fix lands
+on top of 4c1b8f9 before publishing, and the release is built from that fix
+commit: a unit-test helper used a PHP 8.2 type (`(A&B)|null`, since
+0b4c1ea), so CI's PHP 8.1 unit job could not parse the suite; every PHP
+and PHTML file now lints on PHP 8.1, no production file was affected, and
+the unit suite passes on PHP 8.1. It awaits publishing as a GitHub
 pre-release on the fork (as rc1 to rc4); the pilot installs rc5.
 2026-10-03 — 3.0.0-rc4 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc4),

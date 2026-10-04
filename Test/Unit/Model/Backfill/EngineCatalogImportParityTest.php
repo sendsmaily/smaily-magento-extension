@@ -262,11 +262,12 @@ class EngineCatalogImportParityTest extends TestCase
 
     /**
      * @param array<int, array<string, mixed>> $sent
+     * @param (IngestQueue&MockObject)|null $ingestQueue
      */
     private function catalogIngest(
         array &$sent,
         ?ProductCollectionFactory $collectionFactory = null,
-        (IngestQueue&MockObject)|null $ingestQueue = null
+        ?IngestQueue $ingestQueue = null
     ): CatalogIngest {
         $settings = $this->createMock(Settings::class);
         $settings->method('isConnected')->willReturn(true);

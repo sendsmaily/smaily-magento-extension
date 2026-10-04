@@ -77,6 +77,19 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3729 — the admin target spec and three code comments use the
+  canon wording (2026-10-04; docs and comments only, no CHANGELOG
+  bullet).** `docs/ADMIN_UI_TARGET_SPEC.md` quotes the shipped dashboard
+  prompt ("Setup is not finished yet — complete the initial setup to start
+  syncing.") and the shipped welcome automation text (EN "fires when a
+  shopper subscribes to the newsletter in your store", ET "käivitub, kui
+  ostja liitub poes uudiskirjaga"); the comments in
+  `Block/Adminhtml/Config/TestConnection.php`, `config/assist.phtml` and
+  `panel/panels-js.phtml` name the button "Test connection", as it reads
+  since PRO-3644. No text a merchant sees changes (the Automations tab
+  intro stays, owner decision 2026-10-04); dated audits, the upstream
+  proposal and the multi-website RFC stay as written.
+
 - **PRO-3733 — a command-line Campaign Intelligence connection with
   rewrites off sends the storefront's site address (2026-10-04; after
   rc5).** `Engine\Client::siteUrl()` (the `plugin_info.site_url` of the

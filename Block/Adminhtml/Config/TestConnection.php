@@ -13,7 +13,7 @@ use Magento\Config\Block\System\Config\Form\Field;
 use Magento\Framework\Data\Form\Element\AbstractElement;
 
 /**
- * "Test Connection" button in the API Connection group. The click handler
+ * "Test connection" button in the API Connection group. The click handler
  * (view/adminhtml/templates/config/assist.phtml) reads the CURRENTLY typed
  * credentials, so the merchant gets instant feedback without saving.
  */

@@ -141,7 +141,7 @@ bilingual):
 | Quick links | Kiirlingid |
 | Settings / Log / Initial setup | Seaded / Logi / Algseadistus |
 | Source / Type / Entity / Status | Allikas / Tüüp / Kirje / Olek |
-| "Setup is not finished yet — complete the setup wizard to start syncing." | (shipped) |
+| "Setup is not finished yet — complete the initial setup to start syncing." | (shipped) |
 | "Smaily Connect is running, but %1 delivery failed in the last 24 hours." / "… %1 deliveries failed …" (singular / plural) | (shipped) |
 | "Everything is running — deliveries to Smaily are flowing normally." | (shipped) |
 
@@ -435,7 +435,7 @@ the pack's sample set.
 |---|---|
 | Map store events to Smaily automations | Seo poe sündmused Smaily automaatikatega |
 | Refresh workflows | Värskenda töövooge |
-| Welcome — fires when someone becomes a subscriber | Tervitus — käivitub, kui keegi saab tellijaks |
+| Welcome — fires when a shopper subscribes to the newsletter in your store | Tervitus — käivitub, kui ostja liitub poes uudiskirjaga |
 | First order — fires on a customer's first purchase | Esimene tellimus — käivitub kliendi esimesel ostul |
 | Abandoned cart — fires when a cart is left behind | Hüljatud ostukorv — käivitub, kui ostukorv jäetakse maha |
 | Campaign Intelligence Automations | Campaign Intelligence'i automaatikad |

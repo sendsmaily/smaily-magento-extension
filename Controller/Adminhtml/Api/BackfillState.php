@@ -15,10 +15,10 @@ use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use Smaily\Connect\Model\Backfill\EngineImportGuard;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\JobStatusAggregator;
-use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
 
 /**
@@ -27,8 +27,9 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  *
  * "start" starts jobs (per website for contacts, installation-wide for
  * engine types) and is idempotent — an already-active job is not an error.
- * A catalog import does not start while Campaign Intelligence is not
- * connected: the answer then carries a `message` saying why (PRO-1969).
+ * A Campaign Intelligence import (catalog, customers, orders) does not
+ * start while Campaign Intelligence is not connected: the answer then
+ * carries a `message` saying why (PRO-1969, PRO-3742).
  * "cancel" flips every active job of the type to cancelled; the background
  * worker stops at its next page boundary, and a later "start" begins a
  * fresh import.
@@ -44,7 +45,7 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
         private readonly StoreManagerInterface $storeManager,
         private readonly TimezoneInterface $timezone,
         private readonly JobStatusAggregator $statusAggregator,
-        private readonly EngineSettings $engineSettings
+        private readonly EngineImportGuard $engineImportGuard
     ) {
         parent::__construct($context, $jsonFactory, $serializer);
     }
@@ -62,11 +63,9 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
         }
 
         $action = (string)($body['action'] ?? 'status');
-        if ($action === 'start' && $jobType === Job::TYPE_CATALOG && !$this->engineSettings->isConnected()) {
-            // Every product would be recorded as failed: there is nowhere to send them.
-            return $this->jsonResponse($this->aggregate($jobType, $target) + [
-                'message' => (string)__('Campaign Intelligence is not connected, so there is nowhere to send the catalog.'),
-            ]);
+        $refusal = $action === 'start' ? $this->engineImportGuard->refusal($jobType) : null;
+        if ($refusal !== null) {
+            return $this->jsonResponse($this->aggregate($jobType, $target) + ['message' => (string)$refusal]);
         }
 
         if ($action === 'start') {

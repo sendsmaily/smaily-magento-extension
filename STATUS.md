@@ -14,8 +14,10 @@ clean store by docs/INSTALLING.md; one wording fix), PRO-3738 (CI runs
 the browser harnesses), PRO-1960 (the abandoned-cart reminders are built
 once per store), PRO-1968 (the nightly full catalog re-sync is removed) and
 PRO-1969 (a catalog import does not start while Campaign Intelligence is
-not connected) landed on v3, unreleased; CHANGELOG's
-"Changes since 3.0.0-rc5" has PRO-3733, PRO-1968 and PRO-1969, the others
+not connected) and PRO-3742 (nor do the customers and orders imports)
+landed on v3, unreleased; CHANGELOG's
+"Changes since 3.0.0-rc5" has PRO-3733, PRO-1968 and PRO-1969 (its bullet
+widened by PRO-3742), the others
 change nothing a merchant sees. 3.0.0-rc5 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc5),
 built by the release workflow (run 37208243039) from commit 1911c41; the ZIP
@@ -88,6 +90,29 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3742 — the customers and orders imports do not start while
+  Campaign Intelligence is not connected either (2026-10-04; owner
+  decision: refuse them as the catalog import).** The PRO-1969 guard now
+  lives in one place, `Model/Backfill/EngineImportGuard::refusal()`: every
+  engine-target type of `Job::TYPE_TARGETS` (catalog, customers, orders)
+  is refused while `Settings::isConnected()` is false, the contacts import
+  to Smaily never. `Controller/Adminhtml/Api/BackfillState` and
+  `smaily:backfill:start` both ask it (they no longer check
+  `Settings` themselves); the admin answer's `message` is translated, the
+  command prints the English text (`Phrase::getText()`), as before.
+  Messages: "Campaign Intelligence is not connected, so there is nowhere
+  to send the customer data." / "…the order data." (ET "…seega pole
+  kliendiandmeid / tellimusandmeid kuhugi saata."). Before, such an
+  import queued its rows (the ingest queue takes them; the flusher sends
+  nothing while disconnected), to be sent after a later connection —
+  possibly to another tenant. Not changed: an import already running when
+  the connection is removed. Unit tests: `BackfillStateTest` and
+  `BackfillStartCommandTest` each refuse catalog/customers/orders while
+  disconnected (customers/orders red with a catalog-only guard), start
+  them while connected, and start the contacts import while disconnected.
+  Sandbox setup:upgrade + di:compile green. Docs: USER_GUIDE (Historical
+  import), ARCHITECTURE (catalog lifecycle), CHANGELOG (the PRO-1969
+  bullet widened).
 - **PRO-1969 — catalog funnel edges (2026-10-04).** (1) **A catalog import
   does not start while Campaign Intelligence is not connected** (owner
   decision 2026-10-04: block). Started anyway it recorded every product as
@@ -101,7 +126,8 @@ Earlier: 2026-09-11, 2026-09-10._
   exits 1 (English, as the other commands). The import cards render only
   while connected, so in the admin this is reached from a page opened
   before a disconnect (or a direct POST). The customers and orders imports
-  are unchanged: the decision named the catalog. Unit tests: the
+  were unchanged: the decision named the catalog (PRO-3742 refuses them
+  too). Unit tests: the
   controller and the command each refuse while disconnected and start
   while connected (both refusals red without the guard). No browser-harness
   page: the card lives in `panel/intelligence.phtml` + the 1 000-line
@@ -1746,7 +1772,8 @@ Earlier: 2026-09-11, 2026-09-10._
   runs the browser harnesses), PRO-1960 (abandoned-cart reminders built
   once per store; behaviour-neutral), PRO-1968 (nightly catalog re-sync
   removed; the catalog import is started by hand), PRO-1969 (no catalog
-  import while disconnected; the product-create double row is gone). Done
+  import while disconnected; the product-create double row is gone),
+  PRO-3742 (nor customers or orders imports while disconnected). Done
   2026-10-02/03: headless storefronts + the
   Storefront URL (PRO-3614/3660), browse consent as in Woo and per website
   (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the standard

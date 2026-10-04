@@ -58,6 +58,8 @@
 "Campaign Intelligence is not connected","Campaign Intelligence is not connected"
 "Campaign Intelligence is not connected.","Campaign Intelligence is not connected."
 "Campaign Intelligence is not connected, so there is nowhere to send the catalog.","Campaign Intelligence is not connected, so there is nowhere to send the catalog."
+"Campaign Intelligence is not connected, so there is nowhere to send the customer data.","Campaign Intelligence is not connected, so there is nowhere to send the customer data."
+"Campaign Intelligence is not connected, so there is nowhere to send the order data.","Campaign Intelligence is not connected, so there is nowhere to send the order data."
 "Campaign Intelligence setup failed: %1","Campaign Intelligence setup failed: %1"
 "Campaign Intelligence still reports that this account is not active.","Campaign Intelligence still reports that this account is not active."
 "Campaign Intelligence uses your store’s product, customer and order data to create personalized product recommendations for Smaily campaigns and automations. This helps you send more relevant emails with less manual work.","Campaign Intelligence uses your store’s product, customer and order data to create personalized product recommendations for Smaily campaigns and automations. This helps you send more relevant emails with less manual work."

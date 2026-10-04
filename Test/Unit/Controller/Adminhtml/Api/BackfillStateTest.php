@@ -18,6 +18,7 @@ use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Controller\Adminhtml\Api\BackfillState;
+use Smaily\Connect\Model\Backfill\EngineImportGuard;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\JobStatusAggregator;
@@ -26,9 +27,10 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\Collection;
 use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
 
 /**
- * PRO-1969: a catalog import started while Campaign Intelligence is not
- * connected recorded every product as failed. The start is refused instead,
- * with the reason beside the Start import button.
+ * PRO-1969, PRO-3742: a Campaign Intelligence import (catalog, customers,
+ * orders) started while Campaign Intelligence is not connected recorded
+ * every row as failed. The start is refused instead, with the reason beside
+ * the Start import button. The contacts import goes to Smaily and starts.
  */
 class BackfillStateTest extends TestCase
 {
@@ -42,25 +44,61 @@ class BackfillStateTest extends TestCase
         $this->jobManager = $this->createMock(JobManager::class);
     }
 
-    public function testACatalogImportDoesNotStartWhileCampaignIntelligenceIsNotConnected(): void
-    {
+    /**
+     * @dataProvider engineImports
+     */
+    public function testAnEngineImportDoesNotStartWhileCampaignIntelligenceIsNotConnected(
+        string $jobType,
+        string $message
+    ): void {
         $this->jobManager->expects(self::never())->method('start');
 
-        $this->controller(false, ['action' => 'start', 'job_type' => Job::TYPE_CATALOG])->execute();
+        $this->controller(false, ['action' => 'start', 'job_type' => $jobType])->execute();
 
-        self::assertSame(
-            'Campaign Intelligence is not connected, so there is nowhere to send the catalog.',
-            $this->response['message']
-        );
+        self::assertSame($message, $this->response['message']);
         self::assertSame('idle', $this->response['status']);
     }
 
-    public function testACatalogImportStartsWhileCampaignIntelligenceIsConnected(): void
+    /**
+     * @dataProvider engineImports
+     */
+    public function testAnEngineImportStartsWhileCampaignIntelligenceIsConnected(string $jobType): void
     {
         $this->jobManager->expects(self::once())->method('start')
-            ->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
+            ->with($jobType, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
 
-        $this->controller(true, ['action' => 'start', 'job_type' => Job::TYPE_CATALOG])->execute();
+        $this->controller(true, ['action' => 'start', 'job_type' => $jobType])->execute();
+
+        self::assertArrayNotHasKey('message', $this->response);
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function engineImports(): array
+    {
+        return [
+            'catalog' => [
+                Job::TYPE_CATALOG,
+                'Campaign Intelligence is not connected, so there is nowhere to send the catalog.',
+            ],
+            'customers' => [
+                Job::TYPE_CUSTOMERS,
+                'Campaign Intelligence is not connected, so there is nowhere to send the customer data.',
+            ],
+            'orders' => [
+                Job::TYPE_ORDERS,
+                'Campaign Intelligence is not connected, so there is nowhere to send the order data.',
+            ],
+        ];
+    }
+
+    public function testTheContactsImportStartsWhileCampaignIntelligenceIsNotConnected(): void
+    {
+        $this->jobManager->expects(self::once())->method('start')
+            ->with(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1);
+
+        $this->controller(false, ['action' => 'start', 'job_type' => Job::TYPE_CONTACTS])->execute();
 
         self::assertArrayNotHasKey('message', $this->response);
     }
@@ -95,16 +133,21 @@ class BackfillStateTest extends TestCase
         $engineSettings = $this->createMock(EngineSettings::class);
         $engineSettings->method('isConnected')->willReturn($connected);
 
+        $website = $this->createMock(\Magento\Store\Api\Data\WebsiteInterface::class);
+        $website->method('getId')->willReturn(1);
+        $storeManager = $this->createMock(StoreManagerInterface::class);
+        $storeManager->method('getWebsites')->willReturn([$website]);
+
         return new BackfillState(
             $context,
             $jsonFactory,
             new JsonSerializer(),
             $this->jobManager,
             $collectionFactory,
-            $this->createMock(StoreManagerInterface::class),
+            $storeManager,
             $this->createMock(TimezoneInterface::class),
             new JobStatusAggregator(),
-            $engineSettings
+            new EngineImportGuard($engineSettings)
         );
     }
 }

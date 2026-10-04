@@ -226,11 +226,15 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   that historical data is imported under Settings > Intelligence, and the
   merchant starts it there or with `smaily:backfill:start catalog`. Both
   refuse the start while Campaign Intelligence is not connected
-  (`Settings::isConnected()`, PRO-1969) and say why — the admin endpoint
-  (`Controller/Adminhtml/Api/BackfillState`) answers with a `message` the
-  card shows beside its button, the command exits with an error; started
-  anyway, the import would record every product as failed, since
-  `CatalogIngest` queues nothing while disconnected. There
+  (`Model/Backfill/EngineImportGuard`, PRO-1969; the customers and orders
+  imports likewise, PRO-3742 — every engine-target type of
+  `Job::TYPE_TARGETS`, never the contacts import to Smaily) and say why —
+  the admin endpoint (`Controller/Adminhtml/Api/BackfillState`) answers
+  with a `message` the card shows beside its button, the command exits
+  with an error; started anyway, the catalog import would record every
+  product as failed, since `CatalogIngest` queues nothing while
+  disconnected, and a customers or orders import would queue rows with
+  no tenant to send them to. There
   is no periodic full re-sync any more — the nightly `Cron/CatalogResync`
   of PRO-1951 is removed. A change no event sees (a CSV / `bin/magento
   import` run, an ERP link or any other direct write to the catalog

@@ -58,6 +58,8 @@
 "Campaign Intelligence is not connected","Campaign Intelligence ei ole ühendatud"
 "Campaign Intelligence is not connected.","Campaign Intelligence ei ole ühendatud."
 "Campaign Intelligence is not connected, so there is nowhere to send the catalog.","Campaign Intelligence ei ole ühendatud, seega pole kataloogi kuhugi saata."
+"Campaign Intelligence is not connected, so there is nowhere to send the customer data.","Campaign Intelligence ei ole ühendatud, seega pole kliendiandmeid kuhugi saata."
+"Campaign Intelligence is not connected, so there is nowhere to send the order data.","Campaign Intelligence ei ole ühendatud, seega pole tellimusandmeid kuhugi saata."
 "Campaign Intelligence setup failed: %1","Campaign Intelligence'i seadistamine ebaõnnestus: %1"
 "Campaign Intelligence still reports that this account is not active.","Campaign Intelligence teatab endiselt, et see konto ei ole aktiivne."
 "Campaign Intelligence uses your store’s product, customer and order data to create personalized product recommendations for Smaily campaigns and automations. This helps you send more relevant emails with less manual work.","Campaign Intelligence kasutab sinu poe toote-, kliendi- ja tellimuseandmeid, et luua Smaily kampaaniate ja automaatikate jaoks personaalseid tootesoovitusi. Nii saad saata asjakohasemaid kirju vähema käsitööga."

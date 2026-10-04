@@ -26,6 +26,39 @@ class ModuleDefinitionTest extends TestCase
         self::assertSame(self::MODULE_NAME, (string)$xml->module['name']);
     }
 
+    /**
+     * The module.xml sequence mirrors composer's Magento module requirements
+     * exactly: `magento/module-foo-bar` is required if and only if
+     * `Magento_FooBar` is sequenced, so Magento loads this module after
+     * everything composer installs for it (PRO-2472, PRO-2514).
+     */
+    public function testModuleSequenceMirrorsComposerModuleRequirements(): void
+    {
+        $composer = json_decode((string)file_get_contents(self::PACKAGE_ROOT . '/composer.json'), true);
+        $required = [];
+        foreach (array_keys($composer['require']) as $package) {
+            if (preg_match('#^magento/module-(.+)$#', $package, $match) === 1) {
+                $required[] = 'Magento_' . str_replace('-', '', ucwords($match[1], '-'));
+            }
+        }
+
+        $xml = simplexml_load_file(self::PACKAGE_ROOT . '/etc/module.xml');
+        self::assertNotFalse($xml);
+        $sequenced = [];
+        foreach ($xml->module->sequence->module as $module) {
+            $sequenced[] = (string)$module['name'];
+        }
+
+        sort($required);
+        sort($sequenced);
+        self::assertNotEmpty($required);
+        self::assertSame(
+            $required,
+            $sequenced,
+            'etc/module.xml <sequence> must list exactly the magento/module-* packages composer.json requires'
+        );
+    }
+
     public function testRegistrationRegistersModuleAtPackageRoot(): void
     {
         $contents = (string)file_get_contents(self::PACKAGE_ROOT . '/registration.php');

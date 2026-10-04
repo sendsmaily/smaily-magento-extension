@@ -129,6 +129,24 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-2514 — `etc/module.xml` sequences every Magento module composer
+  requires (2026-10-04; no merchant-visible change, no CHANGELOG bullet).**
+  Rule: the `<sequence>` mirrors composer's `magento/module-*`
+  requirements exactly, the pattern PRO-2472 started. Three were missing,
+  not only `Magento_Backend`: `Magento_Backend`, `Magento_Config` and
+  `Magento_Cookie` are added (the existing nine untouched). The new unit
+  test `ModuleDefinitionTest::testModuleSequenceMirrorsComposerModuleRequirements`
+  maps `magento/module-foo-bar` → `Magento_FooBar` and requires the two
+  lists to be equal, so a requirement cannot be added without its sequence
+  entry (or the reverse); red before the fix (the three names). Sandbox:
+  `setup:upgrade` + `setup:di:compile` clean, `module:status
+  Smaily_Connect` enabled, `app/etc/config.php` loads Backend (16), Config
+  (21), Cookie (71) and Ui (103) ahead of Smaily_Connect (384). The
+  header of `bin/build-release-zip.sh` credited "PRO-2470 release train";
+  PRO-2470 is the event-queue index. The script came from the 3.0.0-rc1
+  release train of 2026-09-10 (commit ab5c355, no issue of its own), so
+  the header names that train and PRO-2472, its packaging follow-ups.
+
 - **PRO-1469 — the native config page's dead script is removed
   (2026-10-04; no merchant-visible change, no CHANGELOG bullet).**
   `view/adminhtml/templates/config/assist.phtml` (Test connection and
@@ -2125,7 +2143,7 @@ Earlier: 2026-09-11, 2026-09-10._
   for one catalog entry's image and product link opened from the engine
   (PRO-3731); (2) open queue: PRO-3746 (after the pilot), PRO-3747,
   PRO-1958; small
-  cleanups PRO-2514/2462 (PRO-2475, PRO-1469 done); robustness PRO-1962/2465/2466/1961;
+  cleanup PRO-2462 (PRO-2475, PRO-1469, PRO-2514 done); robustness PRO-1962/2465/2466/1961;
   (3) cross-repo asks: PRO-3740 (engine contract wording: §3/§3b still
   describe a periodic full re-sync), PRO-3743 (WooCommerce), PRO-3744
   (Shopify); (4) Erkki: the engine pilot decisions (PRO-3600); HC Pro

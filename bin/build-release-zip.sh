@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# bin/build-release-zip.sh — assemble the release ZIP (PRO-2470 release train).
+# bin/build-release-zip.sh — assemble the release ZIP (3.0.0-rc1 release train,
+# 2026-09-10; its packaging follow-ups are PRO-2472).
 #
 # This is the ONE build of a shipped package: the release workflow
 # (.github/workflows/release.yaml) and the packaging check

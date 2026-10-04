@@ -2,7 +2,7 @@
 
 ### 3.0.0 (unreleased)
 
-The package version is currently `3.0.0-rc4` — the fourth release-candidate cut of everything below. Release candidates are GitHub pre-releases for pilot stores; composer still resolves 2.8.1 as the newest stable release.
+The package version is currently `3.0.0-rc5` — the fifth release-candidate cut of everything below. Release candidates are GitHub pre-releases for pilot stores; composer still resolves 2.8.1 as the newest stable release.
 
 **Changes since 3.0.0-rc4**
 

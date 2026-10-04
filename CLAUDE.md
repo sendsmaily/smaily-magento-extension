@@ -145,9 +145,10 @@ is written in English.
   checklist, items ticked out of 5 (read from the Linear issue). Milestones
   (set 2026-10-02): "rc1 tagged + pilot runbook" 2026-10-03, "Pilot store
   live" 2026-10-09. Values: 2026-10-02 morning 0/5, evening 4/5;
-  2026-10-03 4/5 (rc4 released; only the pilot install is left).
+  2026-10-03 4/5 (rc4 released; only the pilot install is left);
+  2026-10-04 4/5 (rc5 prepared; only the pilot install is left).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385
-  canceled, PRO-3680 done). Dates: none yet (2026-10-02 —
+  canceled, PRO-3680 done); 2026-10-04: 0 open (PRO-1357 closed). Dates: none yet (2026-10-02 —
   not asked; PRO-2456 is placed before the rc1 tag).

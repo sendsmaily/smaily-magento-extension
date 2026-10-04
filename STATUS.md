@@ -5,12 +5,23 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-04 — the abandoned-cart scan reads only the carts
-changed in 24 h on a busy store that keeps old carts (PRO-3730, below); the
-abandoned-cart reminder's cart and store links open with web server
-rewrites off (PRO-3732, below); the catalog's image and product links are
-right in background builds (PRO-3731, below); all unreleased, the pilot
-stays on rc4 until the owner's go for an rc5. 2026-10-03 — 3.0.0-rc4 is released as a GitHub pre-release on
+_Last updated: 2026-10-04 — 3.0.0-rc5 is prepared, not published (the
+owner gave the go for an rc5 for the pilot today): the version is
+`3.0.0-rc5` (composer.json, `ModuleInfo::VERSION`, the ModuleVersion
+docblock, the upstream proposal; composer.lock content-hash refreshed, no
+dependency change), and CHANGELOG has a "Changes since 3.0.0-rc4" list.
+Everything since rc4 is in it: PRO-1967 (a stock change queues a marker,
+the per-minute sync builds the catalog row; the Log shows a short-lived
+*catalog_changed* row), PRO-3731 (the catalog's image and product links
+open; broken in rc4 for the catalog import, the nightly re-sync and admin
+saves), PRO-3732 (the abandoned-cart cart and store links open with web
+server rewrites off) and PRO-3730 (a busy store's abandoned-cart scan
+reads only the carts changed in 24 h). PRO-3559, PRO-2477 and the PRO-1967
+simplification pass change nothing a merchant sees, so they have no
+bullet. rc5 is prepared in the version-cut commit on top of 51edd08; the
+ZIP builds and verifies locally from it. It awaits publishing as a GitHub
+pre-release on the fork (as rc1 to rc4); the pilot installs rc5.
+2026-10-03 — 3.0.0-rc4 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc4),
 built by the release workflow from commit 5684a1c; the ZIP and its .sha256
 were checked after publishing (377 entries, checksum OK, file contents
@@ -30,10 +41,7 @@ PRO-3724 (browse tracking counts a cookie-notice acceptance only for the
 current website; the bullet and the user guide's consent section now say
 that on Luma Magento's notice is not shown again on a second website that
 shares the cookie domain, on Hyvä it shows per website). PRO-3675 and the
-simplification pass change no behaviour, so they have no bullet. The ZIP
-builds and verifies locally from the prepared commit. It awaits the
-owner's go to tag and publish (a GitHub pre-release on the fork, as rc1,
-rc2 and rc3).
+simplification pass change no behaviour, so they have no bullet.
 2026-10-02: 3.0.0-rc3 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc3),
 built by the release workflow from commit a1ff618; the ZIP and its .sha256
@@ -1434,20 +1442,21 @@ Earlier: 2026-09-11, 2026-09-10._
   in-process instance — nothing stored). Fixes PRO-3603 findings 1, 5
   and 6.
 
-- **Next session opens here (2026-10-04).** 3.0.0-rc4 is the pilot's
-  build (header). Done 2026-10-04, unreleased: PRO-3559 (phpstan on a
-  default local PHP), PRO-2477 (translation and doc leftovers), PRO-3713
-  (spike, abandoned-cart scan on very large cart tables), PRO-1967 (stock
-  hooks queue a marker; the flusher builds the rows), PRO-3731 (catalog
-  image and product links built in cron, CLI and the admin are the
-  storefront's), PRO-3732 (the abandoned-cart cart link opens with web
-  server rewrites off), PRO-3730 (the abandoned-cart scan reads only the
-  window on busy stores). **An rc5 for the pilot awaits the owner's go** —
-  it would carry PRO-1967, PRO-3731, PRO-3732 and PRO-3730 (the pilot's
-  first catalog import is built in cron, so PRO-3731 matters to it). Open
-  queue: PRO-3729 (low wording leftovers); the PRO-1967 simplification
-  pass is done (behaviour-neutral, above). Done 2026-10-02/03: headless
-  storefronts + the
+- **Next session opens here (2026-10-04).** 3.0.0-rc5 is prepared
+  (header) and awaits publishing as a GitHub pre-release on the fork; **the
+  pilot installs rc5** (rc4 stays the newest published build until then).
+  Done 2026-10-04, all in rc5: PRO-3559 (phpstan on a default local PHP),
+  PRO-2477 (translation and doc leftovers), PRO-3713 (spike, abandoned-cart
+  scan on very large cart tables), PRO-1967 (stock hooks queue a marker;
+  the flusher builds the rows) + its simplification pass
+  (behaviour-neutral, above), PRO-3731 (catalog image and product links
+  built in cron, CLI and the admin are the storefront's), PRO-3732 (the
+  abandoned-cart cart and store links open with web server rewrites off),
+  PRO-3730 (the abandoned-cart scan reads only the window on busy stores);
+  the pilot's first catalog import is built in cron, so PRO-3731 matters
+  to it. Open queue: PRO-3729 (low, wording leftovers), PRO-3733 (low, the
+  engine connection's site address built under the CLI). Done
+  2026-10-02/03: headless storefronts + the
   Storefront URL (PRO-3614/3660), browse consent as in Woo and per website
   (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the standard
   checkout + one reminder per address a day + erase stops reminders + busy
@@ -1455,19 +1464,21 @@ Earlier: 2026-09-11, 2026-09-10._
   import per website with save-path prices (PRO-2506/3692), variants take the
   parent's category (PRO-3714/3715), seven per-language account fixes
   (PRO-3683/3690/3699/3717/3718/3719), contract 1.8.2 (PRO-3654); rc2, rc3,
-  rc4 released. Next, in order: (1) pilot day 09.10 — Erkki passes the
+  rc4 released. Next, in order: (1) pilot day 09.10 — the pilot installs
+  rc5; Erkki passes the
   storefront hand-off in docs/HEADLESS_STOREFRONTS.md to the storefront team
   (keep the query string on the `/<url_key>.html` redirect), sets the
   Storefront URL, walks PILOT_CHECKLIST.md; human acceptance of PRO-2474 and
   PRO-3660 (a recommendation and a back-in-stock link open on the
   storefront), plus one look at a configurable product's category and
-  price in the engine, and one look that a catalog entry's image opens
-  (PRO-3731); (2) HC Pro (legacy 2.x upgrade, 4 websites, one
-  Smaily account): Erkki reads their 2.x settings with the UPGRADING
-  checklist (PRO-3661), the Mageplaza live checks (PRO-3663), the
-  other-abandoned-cart-senders check (PRO-3665), the Campaign Intelligence
-  questions (spike PRO-3662); (3) open backlog: the queue above, PRO-3675
-  (live Hyvä check), PRO-1357, PRO-1198 (Smaily hand-over). Erkki still
+  price in the engine, and — extra check for rc5 — open one catalog
+  entry's image link in the engine (PRO-3731); (2) HC Pro (legacy 2.x
+  upgrade, 4 websites, one Smaily account), awaiting the owner: Erkki reads
+  their 2.x settings with the UPGRADING checklist (PRO-3661), the Mageplaza
+  live checks (PRO-3663), the other-abandoned-cart-senders check
+  (PRO-3665), the Campaign Intelligence questions (spike PRO-3662); (3)
+  open backlog: the queue above, PRO-3675 (live Hyvä check), PRO-1198
+  (Smaily hand-over); PRO-1357 is closed (2026-10-04). Erkki still
   proofreads the Estonian strings
   added 2026-10-02/03. Sandbox: remove finished agent worktrees under
   `.claude/worktrees` before any sandbox `setup:di:compile`.
@@ -4369,7 +4380,8 @@ Earlier: 2026-09-11, 2026-09-10._
   merchant recovery).
 
 **All 6 v3 phases implemented** (~110 files) on branch `v3`, version
-**3.0.0-rc4 — GitHub pre-release on the fork**. Current truth:
+**3.0.0-rc5 — unreleased** (3.0.0-rc4 is the newest GitHub pre-release
+on the fork). Current truth:
 
 - **PRO-1391 final-polish done — four refinements on Settings > Connection
   after Erkki's side-by-side review of the PRO-1391 visual-fidelity pass.**

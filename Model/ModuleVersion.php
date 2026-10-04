@@ -29,7 +29,7 @@ class ModuleVersion
     }
 
     /**
-     * Get the module version ("3.0.0-rc4"), or "" when unreadable.
+     * Get the module version ("3.0.0-rc5"), or "" when unreadable.
      */
     public function current(): string
     {

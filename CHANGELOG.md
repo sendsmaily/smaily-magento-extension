@@ -4,6 +4,10 @@
 
 The package version is currently `3.0.0-rc4` — the fourth release-candidate cut of everything below. Release candidates are GitHub pre-releases for pilot stores; composer still resolves 2.8.1 as the newest stable release.
 
+**Changes since 3.0.0-rc4**
+
+- A stock change no longer builds the product's Campaign Intelligence catalog entry inside the shipment, credit memo, order or inventory save that made it: the save records which products changed (one lookup and one insert, however many lines or products), and the catalog sync builds and sends their entries within the next minute, as before. A shipment of many lines and a bulk inventory update finish faster. What is sent is unchanged; in the Log, a stock change shows as a waiting *catalog_changed* row until its *catalog* row replaces it, and several stock changes of one product within a minute send one catalog row.
+
 **Changes since 3.0.0-rc3**
 
 - Campaign Intelligence gets a category for every variant: a variant of a configurable product that has no category of its own is sent with its parent product's category. Before, such a variant was sent as uncategorized. A variant with a category of its own keeps it.

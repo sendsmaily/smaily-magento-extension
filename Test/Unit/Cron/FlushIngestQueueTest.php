@@ -12,6 +12,7 @@ use Magento\Framework\Serialize\Serializer\Json;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Cron\FlushIngestQueue;
+use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
@@ -25,6 +26,7 @@ class FlushIngestQueueTest extends TestCase
     private IngestQueue&MockObject $queue;
     private Client&MockObject $client;
     private Settings&MockObject $settings;
+    private CatalogIngest&MockObject $catalogIngest;
 
     /** @var array<int, array<string, mixed>> payloads by event id (decodePayload stub) */
     private array $payloads = [];
@@ -35,6 +37,7 @@ class FlushIngestQueueTest extends TestCase
         $this->client = $this->createMock(Client::class);
         $this->settings = $this->createMock(Settings::class);
         $this->settings->method('isSendingAllowed')->willReturn(true);
+        $this->catalogIngest = $this->createMock(CatalogIngest::class);
         $this->queue->method('decodePayload')->willReturnCallback(
             fn (IngestEvent $event): array => $this->payloads[(int)$event->getId()] ?? ['sku' => 'X']
         );
@@ -150,9 +153,58 @@ class FlushIngestQueueTest extends TestCase
         $settings = $this->createMock(Settings::class);
         $settings->method('isSendingAllowed')->willReturn(false);
         $this->queue->expects(self::never())->method('claimBatch');
+        $this->catalogIngest->expects(self::never())->method('buildChanged');
 
-        (new FlushIngestQueue($settings, $this->queue, $this->client, new Json(), $this->createMock(Logger::class)))
-            ->execute();
+        (new FlushIngestQueue(
+            $settings,
+            $this->queue,
+            $this->catalogIngest,
+            $this->client,
+            new Json(),
+            $this->createMock(Logger::class)
+        ))->execute();
+    }
+
+    /**
+     * PRO-1967: the stock hooks only mark products changed; each run builds
+     * their rows before it claims the catalog batch, so they go out in the
+     * same run (the ~1–2 min latency holds).
+     */
+    public function testChangedProductsAreBuiltBeforeTheCatalogBatchIsClaimed(): void
+    {
+        $calls = [];
+        $this->catalogIngest->expects(self::once())->method('buildChanged')->willReturnCallback(
+            static function () use (&$calls): void {
+                $calls[] = 'build';
+            }
+        );
+        $this->queue->method('claimBatch')->willReturnCallback(
+            static function (string $domain) use (&$calls): array {
+                $calls[] = $domain;
+
+                return [];
+            }
+        );
+
+        $this->createCron()->execute();
+
+        self::assertSame(['build', Client::DOMAIN_CATALOG], array_slice($calls, 0, 2));
+    }
+
+    /**
+     * A catalog build that throws must not hold up the customer, order and
+     * browse deliveries of the run; its markers come back via requeueStale().
+     */
+    public function testAFailedCatalogBuildStillLetsTheRunSend(): void
+    {
+        $this->catalogIngest->method('buildChanged')->willThrowException(new \RuntimeException('db gone'));
+        $event = $this->createEvent(8, Client::DOMAIN_ORDERS);
+        $this->stubClaims([Client::DOMAIN_ORDERS => [$event]]);
+        $this->client->method('ingest')->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+
+        $this->queue->expects(self::once())->method('markSent')->with($event);
+
+        $this->createCron()->execute();
     }
 
     /**
@@ -255,6 +307,7 @@ class FlushIngestQueueTest extends TestCase
         return new FlushIngestQueue(
             $this->settings,
             $this->queue,
+            $this->catalogIngest,
             $this->client,
             new Json(),
             $this->createMock(Logger::class)

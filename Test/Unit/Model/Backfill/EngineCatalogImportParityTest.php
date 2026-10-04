@@ -12,6 +12,7 @@ use Magento\Catalog\Api\CategoryRepositoryInterface;
 use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Catalog\Helper\ImageFactory as ImageHelperFactory;
 use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\ResourceModel\Product as ProductResource;
 use Magento\Catalog\Model\ResourceModel\Product\Collection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Catalog\Pricing\Price\BasePrice;
@@ -31,6 +32,7 @@ use Magento\Framework\Pricing\Price\PriceInterface;
 use Magento\Framework\Pricing\PriceCurrencyInterface;
 use Magento\Framework\Pricing\PriceInfoInterface;
 use Magento\Framework\Pricing\SaleableInterface;
+use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\Stdlib\DateTime;
 use Magento\Framework\Stdlib\DateTime\Intl\DateFormatterFactory;
 use Magento\Framework\Stdlib\DateTime\Timezone;
@@ -47,6 +49,7 @@ use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Payload\ParentProductResolver;
+use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
@@ -65,6 +68,10 @@ use Smaily\Connect\Model\StorefrontUrl;
  * Magento's Timezone::isScopeDateInInterval()). The adjustment calculator
  * stands in for Magento's bundle Calculator: it adds a bundle's selections
  * as a fixed or a dynamic bundle by `price_type`, as that Calculator does.
+ *
+ * PRO-1967: a stock change is built the same way since — its product comes
+ * from CatalogIngest::buildChanged()'s collection, which selects the same
+ * attributes — so it too sends the row a product save sends.
  */
 class EngineCatalogImportParityTest extends TestCase
 {
@@ -130,12 +137,14 @@ class EngineCatalogImportParityTest extends TestCase
 
         $saved = $this->sendOnSave($this->product($row));
         $imported = $this->sendByImport($row);
+        $stockChange = $this->sendOnStockChange($row);
 
         $fields = static fn (array $item): array => array_intersect_key(
             $item,
             array_flip(['price', 'compare_price', 'on_sale_until'])
         );
         self::assertSame($fields($saved), $fields($imported));
+        self::assertSame($saved, $stockChange);
         self::assertSame($price, $saved['price']);
         self::assertSame($comparePrice, $saved['compare_price'] ?? null);
         self::assertSame($onSale, isset($saved['on_sale_until']));
@@ -163,26 +172,7 @@ class EngineCatalogImportParityTest extends TestCase
      */
     private function sendByImport(array $row): array
     {
-        $selected = [];
-        $collection = $this->createMock(Collection::class);
-        $collection->method('addAttributeToSelect')->willReturnCallback(
-            function (array $attributes) use (&$selected, $collection): Collection {
-                $selected = $attributes;
-
-                return $collection;
-            }
-        );
-        $collection->method('getItems')->willReturnCallback(
-            function () use (&$selected, $row): array {
-                return [$this->product(array_intersect_key(
-                    $row,
-                    array_flip([...self::STATIC_COLUMNS, ...$selected])
-                ))];
-            }
-        );
-        $collection->method('getSize')->willReturn(1);
-        $collectionFactory = $this->createMock(ProductCollectionFactory::class);
-        $collectionFactory->method('create')->willReturn($collection);
+        $collectionFactory = $this->collectionFactory($row);
 
         $jobManager = $this->createMock(JobManager::class);
         $jobManager->method('isCancelled')->willReturn(true);
@@ -205,13 +195,79 @@ class EngineCatalogImportParityTest extends TestCase
     }
 
     /**
+     * Records a stock change and runs the flusher's build; the collection
+     * item holds only the static columns plus the attributes it selects.
+     *
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function sendOnStockChange(array $row): array
+    {
+        $marker = $this->createMock(IngestEvent::class);
+        $marker->method('getEntityId')->willReturn('42');
+        $sent = [];
+        $ingestQueue = $this->createMock(IngestQueue::class);
+        $ingestQueue->method('claimBatch')->willReturn([$marker]);
+        $ingestQueue->method('undeliveredPayloads')->willReturn([]);
+        $ingestQueue->method('enqueueMany')->willReturnCallback(
+            function (string $domain, array $rows) use (&$sent): int {
+                foreach ($rows as $queued) {
+                    $sent[] = $queued['payload'];
+                }
+
+                return count($rows);
+            }
+        );
+
+        $this->catalogIngest($sent, $this->collectionFactory($row), $ingestQueue)->buildChanged();
+        self::assertCount(1, $sent);
+
+        return $sent[0];
+    }
+
+    /**
+     * A product collection whose one item holds only the static columns plus
+     * the attributes the caller selects.
+     *
+     * @param array<string, mixed> $row
+     */
+    private function collectionFactory(array $row): ProductCollectionFactory
+    {
+        $selected = [];
+        $collection = $this->createMock(Collection::class);
+        $collection->method('addAttributeToSelect')->willReturnCallback(
+            function (array $attributes) use (&$selected, $collection): Collection {
+                $selected = $attributes;
+
+                return $collection;
+            }
+        );
+        $collection->method('getItems')->willReturnCallback(
+            function () use (&$selected, $row): array {
+                return [$this->product(array_intersect_key(
+                    $row,
+                    array_flip([...self::STATIC_COLUMNS, ...$selected])
+                ))];
+            }
+        );
+        $collection->method('getSize')->willReturn(1);
+        $collectionFactory = $this->createMock(ProductCollectionFactory::class);
+        $collectionFactory->method('create')->willReturn($collection);
+
+        return $collectionFactory;
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $sent
      */
-    private function catalogIngest(array &$sent): CatalogIngest
-    {
+    private function catalogIngest(
+        array &$sent,
+        ?ProductCollectionFactory $collectionFactory = null,
+        (IngestQueue&MockObject)|null $ingestQueue = null
+    ): CatalogIngest {
         $settings = $this->createMock(Settings::class);
         $settings->method('isConnected')->willReturn(true);
-        $ingestQueue = $this->createMock(IngestQueue::class);
+        $ingestQueue ??= $this->createMock(IngestQueue::class);
         $ingestQueue->method('enqueue')->willReturnCallback(
             function (string $domain, array $item) use (&$sent): bool {
                 $sent[] = $item;
@@ -222,9 +278,11 @@ class EngineCatalogImportParityTest extends TestCase
 
         return new CatalogIngest(
             $settings,
-            $this->createMock(ProductRepositoryInterface::class),
+            $collectionFactory ?? $this->createMock(ProductCollectionFactory::class),
+            $this->createMock(ProductResource::class),
             $this->payloadBuilder(),
             $ingestQueue,
+            new Json(),
             $this->createMock(Logger::class)
         );
     }

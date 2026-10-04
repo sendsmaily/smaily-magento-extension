@@ -53,6 +53,55 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-1967 — stock hooks no longer build catalog rows inside the stock
+  write's transaction (2026-10-04; owner design 2026-10-04; unreleased, the
+  pilot stays on rc4).** The legacy stock observer and both MSI plugins now
+  queue a `catalog_changed` marker per product (payload `[]`, product id in
+  `entity_id`; existing `smaily_ingest_queue`, no schema change); the MSI
+  plugins resolve all skus with one `getProductsIdsBySkus()` query and
+  insert with one `IngestQueue::enqueueMany()`. `FlushIngestQueue` starts
+  each run with `CatalogIngest::buildChanged()`: up to 100 markers, one
+  product collection (the backfill page's scope and attributes, now shared
+  as `CatalogPayloadBuilder::PRODUCT_ATTRIBUTES`), one insert, markers
+  deleted; markers for one product collapse, and a row identical to the
+  product's newest unsent row is not queued (keeps a product save at one
+  row). Markers are not deduped at insert time (would race the flusher —
+  a skipped marker could be built before its transaction commits). URL
+  emulation stays per product (Magento allows one emulation level; a batch
+  emulation would break PRO-1458 pricing on other websites). Product save,
+  the delete tombstone and the backfill build at once, unchanged.
+  **Sandbox evidence (MSI, 2,046 products, engine sending never run):**
+  20-line shipment deduction inside a rolled-back transaction — before
+  136 ms / 745 queries / 20 product EAV loads / 20 INSERTs; after 32 ms /
+  259 queries / 0 EAV loads / 1 sku SELECT + 1 INSERT (MSI alone, engine
+  disconnected: 27–34 ms / 257). 20-item source-items save: before 134 ms /
+  680 / 20 INSERTs; after 32 ms / 211 / 1 SELECT + 1 INSERT (MSI alone 209).
+  Payloads of 88 products (simple, variants, configurable, bundle, grouped,
+  downloadable) byte-identical before/after when built in the same context
+  (sha256 843a6378…3421); the batch builds them in 216 ms vs 501 ms one by
+  one. **Caveat (found here, pre-existing in the cron build):** the rows are
+  now built in cron, as the backfill and nightly re-sync rows already are,
+  and three things the builder reads off the running context differ from an
+  in-request build — a placeholder `image_url` carries the area
+  (`static/…/crontab/_view/…` vs `adminhtml`/`frontend`/`webapi_rest`), a
+  real image's cache path depends on the theme in effect (hypothesis, the
+  sandbox has no image files), and with Use Web Server Rewrites off
+  (sandbox: off) `product_url` carries the script name
+  (`/magento/x.html` under `bin/magento`, vs `/index.php/x.html` in a web
+  request) — the per-product frontend emulation fixes neither. Follow-up
+  filed for the orchestrator; worth fixing before the next rc. PRO-1951 scenarios
+  re-run through the legacy stock API: sell-out, restock = exactly one
+  catalog row each with the right `in_stock`, disconnected = none; product
+  rename = one row (before and after); shipping the last unit = one row,
+  `in_stock: false` (before and after). Tests: CatalogIngest marker/batch
+  unit tests (collapse, deleted product, unsent-duplicate, tombstone, failed
+  build), the PRO-3692 parity test now also covers the stock-change path,
+  plugin and flusher order tests, IngestQueue `enqueueMany` /
+  `undeliveredPayloads` / `delete` integration tests. ARCHITECTURE, USER_GUIDE
+  (Log), BACKLOG (pending-row dedupe now only for product saves), CHANGELOG
+  (the Log shows a new transient row type, so a bullet, as PRO-3714 opened
+  the rc3 list).
+
 - **PRO-2477 — translation and doc leftovers after the terminology canon
   (2026-10-04; found during PRO-1748; nothing merchant-visible).** Both i18n
   CSVs lose six rows no php, phtml, js, xml or html file references, all
@@ -1292,8 +1341,8 @@ Earlier: 2026-09-11, 2026-09-10._
   checklist (PRO-3661), the Mageplaza live checks (PRO-3663), the
   other-abandoned-cart-senders check (PRO-3665), the Campaign Intelligence
   questions (spike PRO-3662); (3) open backlog: PRO-3713 (spike, cart scan on
-  millions of carts), PRO-3675 (live Hyvä check), PRO-1357, PRO-1967,
-  PRO-1198 (Smaily hand-over). Erkki still proofreads the Estonian strings
+  millions of carts), PRO-3675 (live Hyvä check), PRO-1357,
+  PRO-1198 (Smaily hand-over); PRO-1967 is done since (unreleased). Erkki still proofreads the Estonian strings
   added 2026-10-02/03. Sandbox: remove finished agent worktrees under
   `.claude/worktrees` before any sandbox `setup:di:compile`.
 

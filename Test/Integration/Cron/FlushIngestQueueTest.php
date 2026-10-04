@@ -10,6 +10,7 @@ namespace Smaily\Connect\Test\Integration\Cron;
 
 use Magento\Framework\Serialize\Serializer\Json;
 use Smaily\Connect\Cron\FlushIngestQueue;
+use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
@@ -317,6 +318,13 @@ class FlushIngestQueueTest extends IntegrationTestCase
         /** @var Json $serializer */
         $serializer = $this->objectManager->get(Json::class);
 
-        return new FlushIngestQueue($settings, $this->queue, $client, $serializer, $logger);
+        return new FlushIngestQueue(
+            $settings,
+            $this->queue,
+            $this->createMock(CatalogIngest::class),
+            $client,
+            $serializer,
+            $logger
+        );
     }
 }

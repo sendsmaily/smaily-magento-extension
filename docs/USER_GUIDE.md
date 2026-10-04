@@ -875,7 +875,11 @@ card — you do not have to keep the page open:
   (catalog, customers, orders, browse events), told apart by the
   **Source** column, with status (a colored pill: amber while a row waits
   or is being sent, green when delivered, red when failed, gray when
-  withdrawn or skipped), attempts and the last error. The error
+  withdrawn or skipped), attempts and the last error. A stock change
+  (a shipment, a credit memo, a Sources or Advanced Inventory edit) first
+  shows as a waiting *catalog_changed* row that names the product; within
+  a minute it is replaced by the product's *catalog* row, one per product
+  however many stock changes it had in that minute. The error
   column shows what the other side actually said, not our internal name
   for the failure. A Smaily delivery error reads in your admin language,
   whatever the language of the store that sent the row; the log file

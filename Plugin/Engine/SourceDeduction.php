@@ -23,8 +23,7 @@ use Smaily\Connect\Model\Engine\CatalogIngest;
  * — because MSI is removable: a plugin declared on a class that does not exist
  * is simply never wired, so an install without the Inventory modules still
  * compiles and runs on the legacy observer alone. sortOrder keeps us last in
- * the after-chain, behind MSI's own legacy-stock sync, so the payload is built
- * from the row MSI has already written.
+ * the after-chain, behind MSI's own legacy-stock sync.
  */
 class SourceDeduction
 {
@@ -34,7 +33,9 @@ class SourceDeduction
     }
 
     /**
-     * Queue a catalog row per affected sku.
+     * Mark every affected product changed; the ingest flusher builds its
+     * catalog row (PRO-1967 — nothing is loaded or built in this write's
+     * transaction).
      *
      * @param mixed $request the source deduction request
      */
@@ -51,9 +52,9 @@ class SourceDeduction
             }
         }
 
-        // One row per product, not per order line.
-        foreach (array_values(array_unique($skus)) as $sku) {
-            $this->catalogIngest->enqueueSku($sku);
+        // One marker per product, not per order line; one insert for them all.
+        if ($skus) {
+            $this->catalogIngest->enqueueSkus(array_values(array_unique($skus)));
         }
 
         return $result;

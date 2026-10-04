@@ -45,6 +45,22 @@ class CatalogPayloadBuilder
      */
     public const DEFAULT_CURRENCY = 'EUR';
 
+    /**
+     * The attributes build() and Magento's price classes read off a product.
+     * A collection that loads products for build() selects exactly these, so
+     * a product it loads is sent as the product save sends it (PRO-3692):
+     * SpecialPrice checks the sale window and the payload's `on_sale_until`
+     * is `special_to_date`; the bundle price classes price a bundle as fixed
+     * or dynamic by `price_type`; the tax adjustment of a price amount reads
+     * `tax_class_id`.
+     */
+    public const PRODUCT_ATTRIBUTES = [
+        'name', 'status', 'visibility', 'price', 'special_price', 'special_from_date',
+        'special_to_date', 'price_type', 'tax_class_id',
+        'short_description', 'description', 'url_key', 'image',
+        'small_image', 'thumbnail', 'manufacturer',
+    ];
+
     /** The `category_path` of a product with no real category (§3 requires one). */
     private const PLACEHOLDER_CATEGORY = 'uncategorized';
 

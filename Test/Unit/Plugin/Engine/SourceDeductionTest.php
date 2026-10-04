@@ -31,14 +31,29 @@ class SourceDeductionTest extends TestCase
 
     public function testADeductionRequestIsReadThroughItsItems(): void
     {
-        $this->catalogIngest->expects(self::once())->method('enqueueSku')->with('TENT-1');
+        $this->catalogIngest->expects(self::once())->method('enqueueSkus')->with(['TENT-1']);
 
         $this->plugin()->afterExecute(new \stdClass(), null, $this->deductionRequest('TENT-1', 'TENT-1'));
     }
 
+    /**
+     * PRO-1967: a multi-line shipment is one call — one sku lookup and one
+     * insert inside the order transaction, not one product build per line.
+     */
+    public function testEveryLineOfAShipmentIsHandedOverInOneCall(): void
+    {
+        $this->catalogIngest->expects(self::once())->method('enqueueSkus')->with(['TENT-1', 'MUG-2', 'CAP-3']);
+
+        $this->plugin()->afterExecute(
+            new \stdClass(),
+            null,
+            $this->deductionRequest('TENT-1', 'MUG-2', 'TENT-1', 'CAP-3')
+        );
+    }
+
     public function testAnUnrecognisedPayloadQueuesNothing(): void
     {
-        $this->catalogIngest->expects(self::never())->method('enqueueSku');
+        $this->catalogIngest->expects(self::never())->method('enqueueSkus');
 
         $this->plugin()->afterExecute(new \stdClass(), null, 'nonsense');
     }

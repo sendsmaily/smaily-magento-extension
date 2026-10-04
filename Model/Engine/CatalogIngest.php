@@ -8,40 +8,56 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Engine;
 
-use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Catalog\Model\Product;
-use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Catalog\Model\ResourceModel\Product as ProductResource;
+use Magento\Catalog\Model\ResourceModel\Product\Collection;
+use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
+use Magento\Framework\Serialize\Serializer\Json;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
+use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Logger\Logger;
 
 /**
  * The single place a product turns into a catalog ingest row — live hooks,
  * the delete observer's soft tombstone and the backfill/nightly-resync
- * processor alike. Product save already holds the product; the stock hooks
- * only learn a product id (legacy stock item) or a sku (MSI source item), so
- * they load it at the canonical scope first.
+ * processor alike.
+ *
+ * Product save, the tombstone and the backfill pages already hold the
+ * product and queue its row at once. The stock hooks do not (PRO-1967): a
+ * stock write runs inside the order, shipment or import transaction, so they
+ * only record which products changed — a `catalog_changed` row holding the
+ * product id, nothing loaded or built — and the ingest flusher builds those
+ * rows in a batch each minute (buildChanged(): one product collection,
+ * one insert), so the row goes out in the same run as before.
  *
  * The engine-connected gate lives here, once, rather than in every caller.
  *
- * One Magento product save legitimately reaches three of those hooks — the
- * legacy stock item is written during the save, and MSI mirrors that onto its
- * source items — so a byte-identical row queued twice in a row within the same
- * request is collapsed (see $lastPayloadHash). That is not queue-wide dedupe:
- * two stock moves on one product inside a minute still queue two rows, which
- * is fine — rows are cheap, the flusher batches 100 at a time and the engine
- * dedupes on event_id.
+ * Duplicates collapse in two places, neither of them queue-wide dedupe:
+ * a byte-identical row queued twice in a row within one request (see
+ * $lastPayloadHash); and in buildChanged(), several markers for one product
+ * build one row, which is not queued when the product's newest unsent row is
+ * already that row — one product save reaches product save and the stock
+ * hooks, and queues one row, not two.
  */
 class CatalogIngest
 {
+    /** Queue domain of a "this product changed" marker; never sent. */
+    public const DOMAIN_CHANGED = 'catalog_changed';
+
+    /** Markers built per flusher run: the catalog domain's send batch. */
+    private const BUILD_BATCH = 100;
+
     /** Hash of the row queued most recently in this request. */
     private ?int $lastPayloadHash = null;
 
     public function __construct(
         private readonly Settings $settings,
-        private readonly ProductRepositoryInterface $productRepository,
+        private readonly ProductCollectionFactory $productCollectionFactory,
+        private readonly ProductResource $productResource,
         private readonly CatalogPayloadBuilder $payloadBuilder,
         private readonly IngestQueue $ingestQueue,
+        private readonly Json $serializer,
         private readonly Logger $logger
     ) {
     }
@@ -68,38 +84,111 @@ class CatalogIngest
         return $this->enqueue($product, true);
     }
 
+    /**
+     * Record that the product's stock changed; buildChanged() queues its row.
+     */
     public function enqueueProductId(int $productId): bool
     {
-        return $productId > 0 && $this->enqueueLoaded(
-            fn (int $storeId): mixed => $this->productRepository->getById($productId, false, $storeId)
-        );
-    }
-
-    public function enqueueSku(string $sku): bool
-    {
-        return trim($sku) !== '' && $this->enqueueLoaded(
-            fn (int $storeId): mixed => $this->productRepository->get($sku, false, $storeId)
-        );
+        return $productId > 0 && $this->settings->isConnected() && $this->markChanged([$productId]);
     }
 
     /**
-     * Load the product at the canonical scope, then queue its row.
+     * Record that these products' stock changed: one sku lookup, one insert,
+     * however many skus. An unknown sku is skipped.
      *
-     * @param callable(int): mixed $load the repository call to make
+     * @param string[] $skus
      */
-    private function enqueueLoaded(callable $load): bool
+    public function enqueueSkus(array $skus): bool
     {
-        if (!$this->settings->isConnected()) {
+        $skus = array_values(array_filter($skus, static fn (string $sku): bool => trim($sku) !== ''));
+        if (!$skus || !$this->settings->isConnected()) {
             return false;
         }
 
-        try {
-            $product = $load($this->payloadBuilder->canonicalStoreId());
-        } catch (NoSuchEntityException) {
+        return $this->markChanged(array_map('intval', $this->productResource->getProductsIdsBySkus($skus)));
+    }
+
+    /**
+     * Build the rows of the products the stock hooks marked changed — called
+     * by the ingest flusher before it sends the catalog batch. The products
+     * load as one collection, scoped and selected as the backfill page loads
+     * them; a product deleted since its marker is not there, and its marker
+     * is dropped (the delete observer already told the engine).
+     */
+    public function buildChanged(): void
+    {
+        $markers = $this->ingestQueue->claimBatch(self::DOMAIN_CHANGED, self::BUILD_BATCH);
+        if (!$markers) {
+            return;
+        }
+
+        $productIds = array_values(array_unique(array_map(
+            static fn (IngestEvent $marker): int => (int)$marker->getEntityId(),
+            $markers
+        )));
+        $unsent = $this->ingestQueue->undeliveredPayloads(
+            Client::DOMAIN_CATALOG,
+            array_map('strval', $productIds)
+        );
+
+        $rows = [];
+        foreach ($this->loadProducts($productIds) as $product) {
+            $item = $this->build($product, false);
+            $productId = (string)$product->getId();
+            if ($item === null || ($unsent[$productId] ?? null) === $this->serializer->serialize($item)) {
+                continue;
+            }
+            $rows[] = [
+                'payload' => $item,
+                'entity_id' => $productId,
+                'store_id' => $this->payloadBuilder->canonicalStoreId(),
+            ];
+        }
+
+        $this->ingestQueue->enqueueMany(Client::DOMAIN_CATALOG, $rows);
+        $this->ingestQueue->delete($markers);
+    }
+
+    /**
+     * @param int[] $productIds
+     */
+    private function markChanged(array $productIds): bool
+    {
+        if (!$productIds) {
             return false;
         }
 
-        return $product instanceof Product && $this->enqueueProduct($product);
+        $rows = [];
+        foreach (array_unique($productIds) as $productId) {
+            $rows[] = ['payload' => [], 'entity_id' => (string)$productId, 'store_id' => null];
+        }
+
+        return $this->ingestQueue->enqueueMany(self::DOMAIN_CHANGED, $rows) > 0;
+    }
+
+    /**
+     * The products as the backfill page loads them (EngineCatalogProcessor::
+     * loadPage() says why each call is there): the canonical store set
+     * before addUrlRewrite(), the builder's attributes, no website limit.
+     *
+     * @param int[] $productIds
+     * @return Product[]
+     */
+    private function loadProducts(array $productIds): array
+    {
+        $collection = $this->productCollectionFactory->create();
+        if (!$collection instanceof Collection) {
+            return [];
+        }
+        $collection->setStoreId($this->payloadBuilder->canonicalStoreId());
+        $collection->addAttributeToSelect(CatalogPayloadBuilder::PRODUCT_ATTRIBUTES);
+        $collection->addFieldToFilter('entity_id', ['in' => $productIds]);
+        $collection->addUrlRewrite();
+
+        return array_values(array_filter(
+            $collection->getItems(),
+            static fn ($product): bool => $product instanceof Product
+        ));
     }
 
     private function enqueue(Product $product, bool $forceTombstone): bool
@@ -108,16 +197,8 @@ class CatalogIngest
             return false;
         }
 
-        try {
-            $item = $forceTombstone || !$this->payloadBuilder->isIngestible($product)
-                ? $this->payloadBuilder->buildTombstone($product)
-                : $this->payloadBuilder->build($product);
-        } catch (\Throwable $exception) {
-            $this->logger->error('Catalog payload build failed', [
-                'product_id' => $product->getId(),
-                'error' => $exception->getMessage(),
-            ]);
-
+        $item = $this->build($product, $forceTombstone);
+        if ($item === null) {
             return false;
         }
 
@@ -135,5 +216,26 @@ class CatalogIngest
         );
 
         return true;
+    }
+
+    /**
+     * The product's row, or null when the build failed (logged).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function build(Product $product, bool $forceTombstone): ?array
+    {
+        try {
+            return $forceTombstone || !$this->payloadBuilder->isIngestible($product)
+                ? $this->payloadBuilder->buildTombstone($product)
+                : $this->payloadBuilder->build($product);
+        } catch (\Throwable $exception) {
+            $this->logger->error('Catalog payload build failed', [
+                'product_id' => $product->getId(),
+                'error' => $exception->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 }

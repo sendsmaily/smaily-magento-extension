@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Cron;
 
 use Magento\Framework\Serialize\Serializer\Json;
+use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
@@ -19,6 +20,10 @@ use Smaily\Connect\Model\Logger\Logger;
 
 /**
  * Drains the engine ingest queue, one batch per domain per run.
+ *
+ * Each run first builds the catalog rows of the products the stock hooks
+ * only marked changed (CatalogIngest::buildChanged(), PRO-1967), so they go
+ * out with this run's catalog batch.
  *
  * D6 responses are per-item: errors[].index maps back onto the batch rows,
  * so a 200 never marks the whole batch sent blindly (contract scar #5).
@@ -35,6 +40,7 @@ class FlushIngestQueue
     public function __construct(
         private readonly Settings $settings,
         private readonly IngestQueue $queue,
+        private readonly CatalogIngest $catalogIngest,
         private readonly Client $client,
         private readonly Json $serializer,
         private readonly Logger $logger
@@ -48,6 +54,15 @@ class FlushIngestQueue
         }
 
         $this->queue->requeueStale();
+        try {
+            $this->catalogIngest->buildChanged();
+        } catch (\Throwable $exception) {
+            // The other domains still go out; the claimed markers come back
+            // through requeueStale().
+            $this->logger->error('Catalog build of changed products failed', [
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
         foreach (array_keys(Client::DOMAIN_WRAPPERS) as $domain) {
             $this->flushDomain($domain);

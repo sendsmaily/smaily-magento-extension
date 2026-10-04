@@ -53,10 +53,11 @@ executed verification matrix (Luma / Hyvä / strict CSP — all pass) in
   keyed on `sku` per tenant, so a per-website answer has nowhere to go until
   each website has its own tenant (RFC Phase 4, gated on PRO-1459). The legacy
   `is_in_stock` flag, which MSI keeps synced, is the source until then.
-- Per-product dedupe of PENDING catalog ingest rows: a burst of stock moves on
-  one product inside a flush window queues one row each. `CatalogIngest` only
-  collapses identical rows within a single request; a queue-wide `UPDATE the
-  pending row` would need a read-before-write on the save path. Measure first.
+- Per-product dedupe of PENDING catalog ingest rows from product saves: since
+  PRO-1967 a burst of stock moves on one product inside a flush window builds
+  one row, but repeated product saves still queue one row each (they build at
+  once; `CatalogIngest` collapses identical rows only within a single
+  request). Measure first.
 - Subscriber full-sync safety net (daily) — reconcile + live events cover the
   standing flows; evaluate whether a periodic re-baseline
   (`GET contact.php?list=1`) is needed at scale.

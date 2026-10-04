@@ -28,29 +28,24 @@ class SourceItemsSaveTest extends TestCase
         $this->catalogIngest = $this->createMock(CatalogIngest::class);
     }
 
-    public function testEverySavedSkuIsQueuedOnce(): void
+    /**
+     * PRO-1967: a bulk save (an import, a Sources-grid mass action) is one
+     * call — one sku lookup and one multi-row insert, not a row per sku.
+     */
+    public function testEverySavedSkuIsHandedOverInOneCall(): void
     {
-        $queued = [];
-        $this->catalogIngest->method('enqueueSku')->willReturnCallback(
-            static function (string $sku) use (&$queued): bool {
-                $queued[] = $sku;
-
-                return true;
-            }
-        );
+        $this->catalogIngest->expects(self::once())->method('enqueueSkus')->with(['TENT-1', 'MUG-2']);
 
         $this->plugin()->afterExecute(
             new \stdClass(),
             null,
             [$this->sourceItem('TENT-1'), $this->sourceItem('MUG-2')]
         );
-
-        self::assertSame(['TENT-1', 'MUG-2'], $queued);
     }
 
     public function testTheSameSkuOnTwoSourcesCollapsesIntoOneRow(): void
     {
-        $this->catalogIngest->expects(self::once())->method('enqueueSku')->with('TENT-1');
+        $this->catalogIngest->expects(self::once())->method('enqueueSkus')->with(['TENT-1']);
 
         $this->plugin()->afterExecute(
             new \stdClass(),
@@ -61,7 +56,7 @@ class SourceItemsSaveTest extends TestCase
 
     public function testAnUnrecognisedPayloadQueuesNothing(): void
     {
-        $this->catalogIngest->expects(self::never())->method('enqueueSku');
+        $this->catalogIngest->expects(self::never())->method('enqueueSkus');
 
         $this->plugin()->afterExecute(new \stdClass(), null, 'nonsense');
     }

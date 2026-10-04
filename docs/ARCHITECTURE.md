@@ -86,12 +86,14 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
 
 ```
 Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1 min)──> engine
-       (domain: catalog | customers | orders | browse | catalog_remove)
+       (domain: catalog | customers | orders | browse | catalog_remove | catalog_changed)
 ```
 
 - One wire item per row; the row UUID doubles as the wire `event_id`, so
   engine-side transport dedup makes retries safe.
-- `Cron/FlushIngestQueue` sends one batch per domain per run (batch caps
+- `Cron/FlushIngestQueue` first builds the catalog rows of the products the
+  stock hooks marked changed (see Stock changes below), then sends one batch
+  per domain per run (batch caps
   100/100/50/100 per the contract) and maps the D6 response's
   `errors[].index` back onto individual rows — a 200 is never treated as
   all-or-nothing.
@@ -142,11 +144,50 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   install without the Inventory modules they are simply never wired and the
   legacy observer covers everything.
   `CatalogIngest` is also where the engine-connected gate is checked — once,
-  for every path including the delete tombstone and the backfill pages — and
-  where one product save's duplicate rows are collapsed: it legitimately
-  reaches three of the hooks, so a byte-identical row queued twice in a row
-  within one request is dropped. This is NOT queue-wide dedupe; two real stock
-  moves still queue two rows.
+  for every path including the delete tombstone and the backfill pages.
+- **Stock hooks record, the flusher builds (PRO-1967).** A stock write runs
+  inside the order, shipment, credit-memo or import transaction, so the three
+  stock hooks build nothing there: they queue one `catalog_changed` row per
+  product (payload `[]`, `entity_id` = the product id; a queue domain of its
+  own, never sent and never claimed by the catalog send). The legacy observer
+  knows the product id; the MSI plugins hand all of a write's unique skus to
+  `CatalogIngest::enqueueSkus()` — one `sku IN (...)` lookup
+  (`ProductResource::getProductsIdsBySkus()`) and one multi-row insert
+  (`IngestQueue::enqueueMany()`), so a 20-line shipment or a Sources-grid mass
+  action costs two queries, not 20 product builds. Each `FlushIngestQueue` run
+  starts with `CatalogIngest::buildChanged()`: it claims up to 100 markers,
+  loads their products as one collection — scoped and selected exactly as the
+  backfill page loads them (`CatalogPayloadBuilder::PRODUCT_ATTRIBUTES`; the
+  canonical store set before `addUrlRewrite()`) — builds each row through the
+  same `CatalogPayloadBuilder` (a tombstone for a product that left the
+  sellable set), queues the rows with one insert and deletes the markers. The
+  rows go out in the same run, so the ~1–2 min latency holds; the build reads
+  the committed state at flush time, so it can never be older than the change
+  that queued the marker. The rows are built in the cron context, as the
+  backfill and nightly re-sync rows are: what the builder reads off the
+  running context — the area in a placeholder `image_url`, the theme behind
+  an image's cache path, and, with Use Web Server Rewrites off, the script
+  name in `product_url` — now matches those rows, not what the store request
+  that changed the stock would have built. Category, parent and website lookups are memoized
+  across the batch; the frontend emulation for each product URL stays per
+  product and store (PRO-1458 — Magento allows one emulation level, so one
+  emulation per batch cannot serve a product priced on another website).
+  Markers are never collapsed at insert time: a marker skipped because one
+  for the product was already queued could be built before the skipping
+  transaction commits, losing its change. They collapse at build time
+  instead — several markers for one product build one row — and a built row
+  is not queued when the product's newest unsent catalog row (pending or
+  being sent) is that very row, which is what keeps a product save at one
+  row: it queues its row itself and reaches the stock hooks on the way. A
+  product deleted between marker and build is not in the collection; its
+  marker is dropped, since the delete observer already sent the §3b removal
+  (or, for a variant, its tombstone). Markers wait while sending is not
+  allowed; a build that throws is logged and the run still sends the other
+  domains, and its claimed markers (like those of a run that died) stay
+  `sending` until `requeueStale()` hands them back. Product save, the
+  delete tombstone and the backfill pages still build at once
+  (`enqueueProduct()`), where a byte-identical row queued twice in a row
+  within one request is dropped.
 - **`in_stock` source, deliberately the legacy flag (PRO-1951).** It is read
   from `CatalogInventory`'s `is_in_stock`, which MSI keeps synced, not from
   MSI's salable-per-website quantity. A catalog row is keyed on `sku` per
@@ -465,7 +506,7 @@ invoke `bin/magento cron:run` every minute.
 | Job | Schedule | Does |
 |---|---|---|
 | `smaily_flush_event_queue` | every minute | Drain marketing queue |
-| `smaily_flush_ingest_queue` | every minute | Drain engine queue (all domains) |
+| `smaily_flush_ingest_queue` | every minute | Build the rows of stock-changed products, then drain engine queue (all domains) |
 | `smaily_backfill_tick` | every minute | Advance the oldest active import one time-budgeted chunk |
 | `smaily_abandoned_cart` | every 5 min | Scan idle quotes, enqueue automations |
 | `smaily_contact_reconcile` | every 15 min | Smaily→Magento consent mirror |

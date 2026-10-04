@@ -19,7 +19,8 @@ use Smaily\Connect\Model\Queue\Handler\ProfilingConsentHandler;
  *
  * A terminal refusal is stored as `permanent_http_<code>: <server message>`
  * (Model\Queue\RetryPolicy) — the classification is ours, the sentence after
- * it is Smaily's own. The merchant is shown the server's sentence, redacted
+ * it is Smaily's own, except where the client words a refusal itself
+ * (rejected credentials, PRO-2508). The merchant is shown that sentence, redacted
  * exactly like the payload beside it; the classification stays for the
  * Details drawer, where the technical detail belongs. A retryable failure
  * carries no prefix and is shown as it is.

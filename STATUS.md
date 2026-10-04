@@ -5,7 +5,10 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-04 — 3.0.0-rc6 is released as a GitHub pre-release on
+_Last updated: 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
+land on v3: PRO-2508 (the Log's error column describes rejected Smaily
+credentials in the extension's own sentence, on purpose; docs only).
+Earlier the same day: 3.0.0-rc6 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc6),
 built by the release workflow (run 37228529206) from commit bb6831e; the ZIP
 and its .sha256 were checked after publishing (380 entries, `shasum -a 256 -c`
@@ -121,6 +124,21 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-2508 — rejected Smaily credentials keep the extension's sentence
+  in the Log (2026-10-04; docs + a code comment, no behaviour change, no
+  CHANGELOG bullet).** Owner decision 2026-10-04: a Smaily 401/403 keeps
+  "Smaily API credentials were rejected" instead of Smaily's body, because
+  it names what to fix; the body stays in the row's last API response for
+  the Details drawer. `SmailyClient` says so where the sentence replaces
+  the body; `FailureMessage`'s docblock, ARCHITECTURE (Sending again) and
+  USER_GUIDE (The log and troubleshooting) now say the error column shows
+  Smaily's or Campaign Intelligence's own words except for rejected
+  credentials. Checking the premise found two more Smaily answers that the
+  extension words itself, documented the same way: the package without API
+  access (PRO-3579) and a Smaily HTTP error with no error envelope (e.g.
+  404, shown as "Smaily API request failed with HTTP 404"; the body is
+  only in the drawer).
 
 - **PRO-3748 — the rc6 package installs on a clean store by the install
   guide (2026-10-04; docs only, no CHANGELOG bullet).** As PRO-3739 for
@@ -1997,7 +2015,7 @@ Earlier: 2026-09-11, 2026-09-10._
   notice under the bell to be read after the initial setup (PRO-3739) and
   for one catalog entry's image and product link opened from the engine
   (PRO-3731); (2) open queue: PRO-3746 (after the pilot), PRO-3747,
-  PRO-1958; the Event Log leftovers PRO-2508/2509/2510/2511; small
+  PRO-1958; the Event Log leftovers PRO-2509/2510/2511; small
   cleanups PRO-2475/1469/2514/2462; robustness PRO-1962/2465/2466/1961;
   (3) cross-repo asks: PRO-3740 (engine contract wording: §3/§3b still
   describe a periodic full re-sync), PRO-3743 (WooCommerce), PRO-3744

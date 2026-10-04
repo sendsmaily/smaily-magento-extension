@@ -466,7 +466,11 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   The grid's error column and the Details drawer both show the server's own
   message through `Model\Log\FailureMessage` (RetryPolicy's
   `permanent_http_<code>:` prefix stripped, `PayloadRedactor` applied); the
-  classification stays in the drawer.
+  classification stays in the drawer. Deliberate exception (PRO-2508): a
+  Smaily 401/403 stores the client's own sentence ("Smaily API credentials
+  were rejected") instead of Smaily's body, because it names what to fix;
+  the body stays in `last_response`. The package refusal and a Smaily HTTP
+  error without an error envelope are client sentences too.
 - **Retention:** sent 30 days, failed 90 days (`Cron/QueueJanitor`). The
   same job sweeps `smaily_abandoned_cart` (PRO-2469) — it owns the schedule
   and the window, while the SQL stays with the table's owner

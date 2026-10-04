@@ -200,6 +200,10 @@ class SmailyClient
                 // Wherever the refusal came from (the queue included), these
                 // credentials are no longer "Connected" (PRO-3560).
                 $this->verifiedCredentials->refuse($this->subdomain, $this->username, $this->password);
+                // Our own sentence instead of Smaily's body, on purpose: it
+                // names what to fix, and the Log's error column shows it
+                // where other refusals show the server's words. The body
+                // stays in the exchange, for the Details drawer (PRO-2508).
                 throw new AuthenticationException(__('Smaily API credentials were rejected'), $status, $exception);
             }
             throw new TransportException(

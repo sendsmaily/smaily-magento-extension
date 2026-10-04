@@ -952,8 +952,15 @@ card — you do not have to keep the page open:
   shows as a waiting *catalog_changed* row that names the product; within
   a minute it is replaced by the product's *catalog* row, one per product
   however many stock changes it had in that minute. The error
-  column shows what the other side actually said, not our internal name
-  for the failure. A Smaily delivery error reads in your admin language,
+  column shows Smaily's or Campaign Intelligence's own words, not our
+  internal name for the failure — except when Smaily rejected the API
+  credentials: then it says "Smaily API credentials were rejected", which
+  tells you what to fix. Two more Smaily answers are worded by the
+  extension too: a refusal because the account's package does not include
+  API access, and an HTTP error that carries no Smaily error code, shown
+  with its status ("Smaily API request failed with HTTP 404"). Details
+  shows what Smaily actually answered, under the last API response. A
+  Smaily delivery error reads in your admin language,
   whatever the language of the store that sent the row; the log file
   records it in English. Select failed rows and **Retry** — each row is routed
   back to its own queue; rows that cannot safely be sent again are left

@@ -6,7 +6,8 @@
 > and fix it.
 
 _Last updated: 2026-10-05 — PRO-3749 (a Smaily HTTP error shows Smaily's
-answer in the Log's error column). 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
+answer in the Log's error column), PRO-2465 (the GDPR command and the
+Campaign Intelligence automations form respect a refused account). 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
 land on v3: PRO-2508 (the Log's error column describes rejected Smaily
 credentials in the extension's own sentence, on purpose; docs only),
 PRO-2509 (the Log's Last Error filter matches the text the column shows),
@@ -136,6 +137,34 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-2465 — the GDPR command and the Campaign Intelligence automations
+  form respect a refused account (2026-10-05; CHANGELOG bullet under
+  "Changes since 3.0.0-rc6").** PRO-2451 remembers the engine's `403
+  tenant_inactive`; these two merchant-started surfaces still asked the
+  engine and showed its raw refusal. No new gate: both read
+  `Engine\Settings::isRefused()`. `smaily:gdpr export` prints the local
+  rows with `"engine": null` and "Campaign Intelligence data was not
+  exported: the Campaign Intelligence account is not active. Ask Smaily to
+  make the account active again, then run the command again." (exit 1);
+  `erase` runs the local erasure (PRO-2452) first as before, then "Local
+  data is erased, but Campaign Intelligence data was not: …" (exit 1), the
+  engine not asked. The console text is English, like the rest of the
+  command. The Automations tab's Campaign Intelligence block
+  (`config/engine-automations.phtml`) shows Settings > Intelligence's
+  banner title and message plus one new phrase (EN + ET) instead of the
+  triggers and the save button, and `AutomationsForm` does not load the
+  catalog or the stored config; `Automations\Save` answers that phrase
+  and calls nothing for a page opened before the refusal. Unit:
+  `GdprCommandTest` (new: refused erase and export, an active erase),
+  `AutomationsFormTest::testARefusedAccountIsNotAskedForItsAutomations`,
+  `SaveTest::testARefusedAccountSavesNothingAndSaysWhy` — red before the
+  change. Browser harness: `automations-save.html` reads the new
+  `automations-refused` page in both languages (banner, phrase, no
+  triggers, no save button; 6 checks, red without the template change).
+  `Save` gained a constructor argument: sandbox `setup:upgrade` +
+  `setup:di:compile` clean. USER_GUIDE ("If your Campaign Intelligence
+  account is deactivated"), TESTING ("Browser JS harnesses").
 
 - **PRO-3749 — a Smaily HTTP error shows Smaily's answer in the Log
   (2026-10-05; CHANGELOG bullet under "Changes since 3.0.0-rc6").** Owner

@@ -97,7 +97,9 @@ test mode shows Test mode with the box ticked again and the go-live note,
 and the result adds the note; a trigger the engine stored active shows
 Active without the note; a trigger left off stays Off; when the stored
 state could not be read, the result asks for a reload and the cards keep
-the page's state. `Test/Js/intelligence-connect.html` renders the
+the page's state; while Campaign Intelligence refuses the account, the tab
+says so and shows no triggers and no save button.
+`Test/Js/intelligence-connect.html` renders the
 Campaign Intelligence panel with its behaviour (`panel/intelligence.phtml`
 and `panel/panels-js.phtml`) as the initial setup's step and as the
 Settings tab, presses Connect with the requests answered by recorded

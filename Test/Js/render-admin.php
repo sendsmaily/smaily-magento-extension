@@ -121,53 +121,64 @@ $trigger = static fn (string $key, string $name, bool $testMode): array => [
     'test_mode' => $testMode,
     'test_emails' => '',
 ];
+$automationsViewModel = static fn (array $rows, bool $refused): object => new class ($rows, $refused) {
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @param bool $refused
+     */
+    public function __construct(private readonly array $rows, private readonly bool $refused)
+    {
+    }
+
+    /**
+     * @return bool
+     */
+    public function isEngineConnected(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isEngineRefused(): bool
+    {
+        return $this->refused;
+    }
+
+
+    /**
+     * @return null
+     */
+    public function getLoadError()
+    {
+        return null;
+    }
+
+    /**
+     * @return array<int, array{id: int, title: string}>
+     */
+    public function getWorkflows(): array
+    {
+        return [['id' => 101, 'title' => 'Replenishment'], ['id' => 102, 'title' => 'Thank you']];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getRows(): array
+    {
+        return $this->rows;
+    }
+};
 $pages = [
     'automations' => [
         'template' => $root . '/view/adminhtml/templates/config/engine-automations.phtml',
-        'viewModel' => new class ([
+        'viewModel' => $automationsViewModel([
             $trigger('replenish_due', 'Replenishment due', true),
             $trigger('post_purchase', 'Post-purchase', false),
             $trigger('winback_risk', 'Win-back', true),
-        ]) {
-            /**
-             * @param array<int, array<string, mixed>> $rows
-             */
-            public function __construct(private readonly array $rows)
-            {
-            }
-
-            /**
-             * @return bool
-             */
-            public function isEngineConnected(): bool
-            {
-                return true;
-            }
-
-            /**
-             * @return null
-             */
-            public function getLoadError()
-            {
-                return null;
-            }
-
-            /**
-             * @return array<int, array{id: int, title: string}>
-             */
-            public function getWorkflows(): array
-            {
-                return [['id' => 101, 'title' => 'Replenishment'], ['id' => 102, 'title' => 'Thank you']];
-            }
-
-            /**
-             * @return array<int, array<string, mixed>>
-             */
-            public function getRows(): array
-            {
-                return $this->rows;
-            }
-        },
+        ], false),
         'strings' => [
             'Off',
             'Test mode',
@@ -175,6 +186,16 @@ $pages = [
             'Saved.',
             'Saved. Reload the page to see the state of each trigger.',
             'Smaily switches real sends on after you confirm. Until then the trigger runs in test mode.',
+        ],
+    ],
+    // The same tab while Campaign Intelligence refuses the account (PRO-2465).
+    'automations-refused' => [
+        'template' => $root . '/view/adminhtml/templates/config/engine-automations.phtml',
+        'viewModel' => $automationsViewModel([], true),
+        'strings' => [
+            'Your Campaign Intelligence account is not active',
+            'Your Campaign Intelligence account is not active, so its automations cannot be read or saved.'
+                . ' Once Smaily tells you the account is active, press Check again under Settings > Intelligence.',
         ],
     ],
 ];

@@ -488,6 +488,7 @@
 "You are all set!","You are all set!"
 "You can find or create API credentials in Smaily under Preferences > API. The password is stored encrypted and never leaves your server.","You can find or create API credentials in Smaily under Preferences > API. The password is stored encrypted and never leaves your server."
 "Your Campaign Intelligence account is not active","Your Campaign Intelligence account is not active"
+"Your Campaign Intelligence account is not active, so its automations cannot be read or saved. Once Smaily tells you the account is active, press Check again under Settings > Intelligence.","Your Campaign Intelligence account is not active, so its automations cannot be read or saved. Once Smaily tells you the account is active, press Check again under Settings > Intelligence."
 "Your personalization preference has been saved.","Your personalization preference has been saved."
 "Your Smaily API credentials for this store.","Your Smaily API credentials for this store."
 "Your Smaily subdomain. For example, if your Smaily URL is https://demo.sendsmaily.net, enter ""demo"". Pasting the full URL also works.","Your Smaily subdomain. For example, if your Smaily URL is https://demo.sendsmaily.net, enter ""demo"". Pasting the full URL also works."

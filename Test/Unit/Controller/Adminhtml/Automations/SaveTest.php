@@ -21,6 +21,7 @@ use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
+use Smaily\Connect\Model\Engine\Settings;
 
 /**
  * PRO-3734: after a save, the Automations tab shows each trigger's state as
@@ -88,9 +89,36 @@ class SaveTest extends TestCase
     }
 
     /**
+     * PRO-2465: a save from a page opened before Campaign Intelligence
+     * refused the account (PRO-2451) does not reach the engine, and says why
+     * in the words of Settings > Intelligence instead of quoting the
+     * engine's 403.
+     */
+    public function testARefusedAccountSavesNothingAndSaysWhy(): void
+    {
+        $client = $this->createMock(Client::class);
+        $client->expects(self::never())->method('putAutomationsConfig');
+        $client->expects(self::never())->method('getAutomationsConfig');
+
+        $this->controller($client, ['replenish_due' => ['enabled' => '1', 'workflow_id' => '123']], true)->execute();
+
+        self::assertSame(
+            [
+                'saved' => false,
+                'errors' => [
+                    'Your Campaign Intelligence account is not active, so its automations cannot be read or saved.'
+                        . ' Once Smaily tells you the account is active, press Check again under'
+                        . ' Settings > Intelligence.',
+                ],
+            ],
+            $this->response
+        );
+    }
+
+    /**
      * @param array<string, array<string, string>> $triggers
      */
-    private function controller(Client $client, array $triggers): Save
+    private function controller(Client $client, array $triggers, bool $refused = false): Save
     {
         $request = $this->createMock(HttpRequest::class);
         $request->method('getParam')->with('triggers')->willReturn($triggers);
@@ -115,6 +143,9 @@ class SaveTest extends TestCase
         $smailyClientProvider = $this->createMock(SmailyClientProvider::class);
         $smailyClientProvider->method('forStore')->willReturn($smailyClient);
 
-        return new Save($context, $client, $smailyClientProvider, new ConfigRowNormalizer());
+        $settings = $this->createMock(Settings::class);
+        $settings->method('isRefused')->willReturn($refused);
+
+        return new Save($context, $client, $smailyClientProvider, new ConfigRowNormalizer(), $settings);
     }
 }

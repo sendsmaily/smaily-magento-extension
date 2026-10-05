@@ -55,6 +55,35 @@ class AutomationsFormTest extends TestCase
     }
 
     /**
+     * PRO-2465: while Campaign Intelligence refuses the account (contract §2
+     * `403 tenant_inactive`, remembered by PRO-2451), the Automations tab
+     * does not ask the engine for its automations; the page explains the
+     * refusal as Settings > Intelligence does, instead of a failed load.
+     */
+    public function testARefusedAccountIsNotAskedForItsAutomations(): void
+    {
+        $settings = $this->createMock(Settings::class);
+        $settings->method('isConnected')->willReturn(true);
+        $settings->method('isRefused')->willReturn(true);
+
+        $client = $this->createMock(Client::class);
+        $client->expects(self::never())->method('automationsCatalog');
+        $client->expects(self::never())->method('getAutomationsConfig');
+
+        $form = new AutomationsForm(
+            $settings,
+            $client,
+            $this->createMock(SmailyClientProvider::class),
+            $this->createMock(LocaleResolver::class)
+        );
+
+        self::assertTrue($form->isEngineConnected());
+        self::assertTrue($form->isEngineRefused());
+        self::assertNull($form->getLoadError());
+        self::assertSame([], $form->getRows());
+    }
+
+    /**
      * @return array<string, array{string, array<string, mixed>, string, string}>
      */
     public static function localeProvider(): array

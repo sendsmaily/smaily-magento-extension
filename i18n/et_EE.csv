@@ -488,6 +488,7 @@
 "You are all set!","Kõik on valmis!"
 "You can find or create API credentials in Smaily under Preferences > API. The password is stored encrypted and never leaves your server.","API kasutajaandmed leiad või lood Smailys menüüst Preferences > API. Parool salvestatakse krüpteeritult ega lahku kunagi sinu serverist."
 "Your Campaign Intelligence account is not active","Sinu Campaign Intelligence'i konto ei ole aktiivne"
+"Your Campaign Intelligence account is not active, so its automations cannot be read or saved. Once Smaily tells you the account is active, press Check again under Settings > Intelligence.","Sinu Campaign Intelligence'i konto ei ole aktiivne, seega selle automaatikaid ei saa lugeda ega salvestada. Kui Smaily on öelnud, et konto on aktiivne, vajuta „Kontrolli uuesti“ menüüs Seaded > Intelligence."
 "Your personalization preference has been saved.","Sinu personaliseerimise eelistus on salvestatud."
 "Your Smaily API credentials for this store.","Sinu Smaily API andmed selle poe jaoks."
 "Your Smaily subdomain. For example, if your Smaily URL is https://demo.sendsmaily.net, enter ""demo"". Pasting the full URL also works.","Sinu Smaily alamdomeen. Näiteks kui sinu Smaily URL on https://demo.sendsmaily.net, sisesta „demo“. Sobib ka täieliku URL-i kleepimine."

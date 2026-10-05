@@ -30,6 +30,15 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class GdprCommand extends Command
 {
+    /**
+     * Said instead of the engine's refusal while Campaign Intelligence
+     * refuses the account (contract §2 `403 tenant_inactive`, PRO-2451):
+     * the engine is not asked, the store's own data is still handled
+     * (PRO-2465).
+     */
+    private const ACCOUNT_NOT_ACTIVE = 'the Campaign Intelligence account is not active.'
+        . ' Ask Smaily to make the account active again, then run the command again.';
+
     public function __construct(
         private readonly Settings $settings,
         private readonly Client $client,
@@ -85,7 +94,9 @@ class GdprCommand extends Command
     {
         $engine = null;
         $failure = null;
-        if ($this->settings->isConnected()) {
+        if ($this->settings->isRefused()) {
+            $failure = 'Campaign Intelligence data was not exported: ' . self::ACCOUNT_NOT_ACTIVE;
+        } elseif ($this->settings->isConnected()) {
             try {
                 $engine = $this->client->customerExport($email);
             } catch (EngineException $exception) {
@@ -126,6 +137,15 @@ class GdprCommand extends Command
             $output->writeln('<comment>Campaign Intelligence is not connected; no engine data to erase.</comment>');
 
             return Command::SUCCESS;
+        }
+
+        if ($this->settings->isRefused()) {
+            $output->writeln(sprintf(
+                '<error>Local data is erased, but Campaign Intelligence data was not: %s</error>',
+                self::ACCOUNT_NOT_ACTIVE
+            ));
+
+            return Command::FAILURE;
         }
 
         try {

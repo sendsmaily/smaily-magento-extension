@@ -21,6 +21,7 @@ use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
+use Smaily\Connect\Model\Engine\Settings;
 
 /**
  * Persists engine automation configuration (contract §13). Every row carries
@@ -37,7 +38,8 @@ class Save extends Action implements HttpPostActionInterface
         Context $context,
         private readonly Client $client,
         private readonly SmailyClientProvider $smailyClientProvider,
-        private readonly ConfigRowNormalizer $normalizer
+        private readonly ConfigRowNormalizer $normalizer,
+        private readonly Settings $settings
     ) {
         parent::__construct($context);
     }
@@ -78,6 +80,19 @@ class Save extends Action implements HttpPostActionInterface
      */
     private function save(array &$errors, array &$savedKeys): bool
     {
+        // A page opened before Campaign Intelligence refused the account
+        // (PRO-2451): explain the refusal as Settings > Intelligence does
+        // instead of quoting the engine's 403 (PRO-2465).
+        if ($this->settings->isRefused()) {
+            $errors[] = (string)__(
+                'Your Campaign Intelligence account is not active, so its automations cannot be read or saved.'
+                . ' Once Smaily tells you the account is active, press Check again under Settings > Intelligence.'
+            );
+            $this->messageManager->addErrorMessage($errors[0]);
+
+            return false;
+        }
+
         // The currently loadable Smaily workflow ids — a saved id absent here
         // was not offered in the dropdown, so the normalizer must not treat an
         // empty single-mode post as a deliberate clear (PRO-1268).

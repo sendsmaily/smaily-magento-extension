@@ -831,6 +831,15 @@ retrying forever:
 - The Dashboard verdict names the deactivated account rather than
   reporting an outage, and an admin notification says the same. Waiting
   does not fix it — only Smaily can make the account active again.
+- **Settings > Automations** shows the same explanation in place of the
+  Campaign Intelligence automations, which cannot be read or saved while
+  the account is not active; your regular Smaily automations above them
+  are unaffected.
+- `bin/magento smaily:gdpr export|erase` still exports or erases the
+  store's own data for the address, and says that the Campaign
+  Intelligence data was not exported or erased because the account is not
+  active: ask Smaily to make the account active again, then run the
+  command again.
 
 Once Smaily tells you the account is active, press **Check again**. The
 health check asks the engine again on its own every 15 minutes, so sending

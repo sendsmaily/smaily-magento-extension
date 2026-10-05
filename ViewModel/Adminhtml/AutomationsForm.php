@@ -42,6 +42,15 @@ class AutomationsForm implements ArgumentInterface
         return $this->settings->isConnected();
     }
 
+    /**
+     * Campaign Intelligence refuses the account (PRO-2451): the page explains
+     * that instead of asking the engine (PRO-2465).
+     */
+    public function isEngineRefused(): bool
+    {
+        return $this->settings->isRefused();
+    }
+
     public function getLoadError(): ?string
     {
         $this->load();
@@ -155,7 +164,11 @@ class AutomationsForm implements ArgumentInterface
 
     private function load(): void
     {
-        if ($this->catalog !== null || $this->error !== null || !$this->isEngineConnected()) {
+        if ($this->catalog !== null
+            || $this->error !== null
+            || !$this->isEngineConnected()
+            || $this->isEngineRefused()
+        ) {
             return;
         }
 

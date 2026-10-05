@@ -25,6 +25,17 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
             <?= $escaper->escapeHtml(__('These engine-run automations (replenishment reminders, win-back and more) become available once Campaign Intelligence is connected.')) ?>
         </div>
     </div>
+<?php elseif ($viewModel->isEngineRefused()): ?>
+    <?php // Campaign Intelligence refuses the account (PRO-2451): explained as
+    // on Settings > Intelligence, and the engine is not asked (PRO-2465). ?>
+    <div class="smaily-banner smaily-banner--error" id="smaily-engine-automations-refused">
+        <span class="smaily-banner__icon">&#9888;</span>
+        <div class="smaily-banner__body">
+            <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('Your Campaign Intelligence account is not active')) ?></div>
+            <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Campaign Intelligence has stopped accepting data from this store, so product, customer and order data is no longer being sent and recommendations will go stale. Waiting will not fix it — the account has to be made active again on the Smaily side. Your Smaily email sending is unaffected; everything queued here waits and is sent once the account is active.')) ?></div>
+            <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Your Campaign Intelligence account is not active, so its automations cannot be read or saved. Once Smaily tells you the account is active, press Check again under Settings > Intelligence.')) ?></div>
+        </div>
+    </div>
 <?php else: ?>
     <?php $loadError = $viewModel->getLoadError(); ?>
     <?php if ($loadError !== null): ?>

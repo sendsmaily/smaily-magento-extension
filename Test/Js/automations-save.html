@@ -14,7 +14,8 @@
   Save endpoint's recorded answer — each saved trigger's state as the engine
   stored it (§12), or null when that read failed. Run it with bin/test-js.sh
   (it renders the pages first); the page ends with "RESULT: PASS" or
-  "RESULT: FAIL".
+  "RESULT: FAIL". The last scenario is the tab while Campaign Intelligence
+  refuses the account (PRO-2465): it explains that and offers no save.
 -->
 <html lang="en">
 <head>
@@ -22,6 +23,8 @@
     <title>automations save harness</title>
     <script src="build/automations.en_US.js"></script>
     <script src="build/automations.et_EE.js"></script>
+    <script src="build/automations-refused.en_US.js"></script>
+    <script src="build/automations-refused.et_EE.js"></script>
 </head>
 <body>
 <pre id="log"></pre>
@@ -185,9 +188,32 @@
         frame.remove();
     }
 
+    // The refused tab is rendered on the server and runs no script, so it
+    // is read as it is.
+    function refused(locale) {
+        var page = (window.smailyAdminPages || {})['automations-refused.' + locale],
+            doc = new DOMParser().parseFromString(page ? page.html : '', 'text/html'),
+            banner = doc.getElementById('smaily-engine-automations-refused'),
+            strings = page ? page.strings : {},
+            text = banner ? banner.textContent : '';
+
+        check(locale + ', account refused: the banner says the account is not active',
+            !!banner && banner.querySelector('.smaily-banner__title').textContent.trim()
+                === strings['Your Campaign Intelligence account is not active']);
+        check(locale + ', account refused: the banner says the automations cannot be read or saved',
+            text.indexOf(strings['Your Campaign Intelligence account is not active, so its automations cannot be'
+                + ' read or saved. Once Smaily tells you the account is active, press Check again under'
+                + ' Settings > Intelligence.']) !== -1);
+        check(locale + ', account refused: no triggers and no Save button',
+            !doc.getElementById('smaily-engine-automations-table')
+            && !doc.getElementById('smaily-engine-automations-save'));
+    }
+
     run('en_US').then(function () {
         return run('et_EE');
     }).then(function () {
+        refused('en_US');
+        refused('et_EE');
         document.getElementById('result').textContent = failures === 0 && passes > 0
             ? 'RESULT: PASS (' + passes + ' checks)'
             : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';

@@ -247,6 +247,12 @@ window.smailyPanelsInit = function ($) {
                 // the default fallback account — is the website's, the one
                 // an empty password now keeps (PRO-3690, PRO-3718).
                 boot.websiteAccount = {subdomain: data.subdomain, username: data.username};
+                // The Intelligence tab's separate-storefront hint follows the
+                // Storefront URL just saved; the Settings tabs switch without
+                // a reload (PRO-3747). The initial setup posts no URL.
+                if (typeof data.storefront_url === 'string') {
+                    $('#smaily-w-engine-storefront-hint').toggle(data.storefront_url.trim() === '');
+                }
                 (data.accounts || []).forEach(function (account) {
                     var $block = $('.smaily-ml-account[data-language=' + account.language + ']');
                     $block.data('saved-subdomain', account.subdomain)

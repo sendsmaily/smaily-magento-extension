@@ -673,8 +673,9 @@ says to finish the setup without connecting, enter the address under
 then connect under **Settings > Intelligence**; **Settings > Intelligence**
 says to set it under **Settings > Connection > Using a separate
 storefront?** first. With a Storefront URL saved, and once connected,
-neither says it. The note reads the value saved when the page opened: after
-saving the Storefront URL on **Settings > Connection**, reload the page.
+neither says it. Saving a Storefront URL on **Settings > Connection** hides
+the note on **Settings > Intelligence** at once, and clearing it and saving
+shows the note again; no reload is needed.
 
 The setup URL must be an https address on `intelligence.smaily.com`; a bare
 token is exchanged there too. Any other address is refused before anything is

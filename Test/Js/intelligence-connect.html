@@ -12,10 +12,11 @@
   panel/panels-js.phtml), rendered in en_US and et_EE by
   Test/Js/render-admin.php into Test/Js/build/ as the initial setup's step
   and as the Settings tab (each without and with a saved Storefront URL, for
-  the storefront hint of PRO-3745), run with jQuery from vendor/, one fresh frame per
+  the storefront hint of PRO-3745; on Settings a Connection save shows or
+  hides it without a reload, PRO-3747), run with jQuery from vendor/, one fresh frame per
   scenario. Stubbed: only the requests (fetch) — the Connect answers with
   the EngineExchange endpoint's answer, the import requests with the
-  BackfillState endpoint's. Run it with bin/test-js.sh (it renders the pages
+  BackfillState endpoint's, a Connection save with the SaveStep endpoint's. Run it with bin/test-js.sh (it renders the pages
   first); the page ends with "RESULT: PASS" or "RESULT: FAIL".
 -->
 <html lang="en">
@@ -95,6 +96,7 @@
             '  var body = JSON.parse(options.body || "{}");',
             '  window.requests.push({url: url, body: body});',
             '  var answer = url.indexOf("engineexchange") !== -1 ? window.answers.exchange',
+            '    : url.indexOf("savestep") !== -1 ? window.answers.save',
             '    : (body.action === "cancel" ? window.answers.cancel : window.answers.status);',
             '  return Promise.resolve(new Response(JSON.stringify(answer),',
             '    {headers: {"Content-Type": "application/json"}})); };',
@@ -121,7 +123,8 @@
             };
             frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs(answers)
                 + '</head><body>' + rendered.html
-                + '<script>window.smailyPanelsInit(window.jQuery).initAll();<\/script></body></html>';
+                + '<script>window.panels = window.smailyPanelsInit(window.jQuery); window.panels.initAll();<\/script>'
+                + '</body></html>';
             document.body.appendChild(frame);
         });
     }
@@ -138,6 +141,25 @@
             return wait(50).then(function () {
                 return frame;
             });
+        });
+    }
+
+    // Saves the Connection tab as Settings does (its own Save button,
+    // panels.saveStep('connect')), with this Storefront URL; the server
+    // accepts the save, or refuses it.
+    function saveConnection(frame, storefrontUrl, saved) {
+        frame.contentWindow.answers.save = saved === false
+            ? {saved: false, errors: [{field: 'storefront_url', message: 'Enter the storefront\'s address only.'}]}
+            : {saved: true, errors: [], verified: true, accountName: 'demo', storefrontUrlChanged: true};
+
+        return frame.contentWindow.panels.saveStep('connect', {
+            subdomain: 'demo',
+            username: 'api',
+            password: '',
+            multilingual_mode: 'single',
+            storefront_url: storefrontUrl
+        }).catch(function () {
+            return null;
         });
     }
 
@@ -205,7 +227,7 @@
         frame = await open('intelligence-setup-storefront.' + locale, {status: catalog('idle', 0)});
         check(locale + ', setup: with a Storefront URL, no storefront hint',
             visible(frame.contentDocument, 'smaily-w-engine-connect')
-            && !frame.contentDocument.getElementById('smaily-w-engine-storefront-hint'));
+            && !visible(frame.contentDocument, 'smaily-w-engine-storefront-hint'));
         frame.remove();
         frame = await open(settings, {status: catalog('idle', 0)});
         hint = frame.contentDocument.getElementById('smaily-w-engine-storefront-hint');
@@ -216,7 +238,26 @@
         frame = await open('intelligence-settings-storefront.' + locale, {status: catalog('idle', 0)});
         check(locale + ', settings: with a Storefront URL, no storefront hint',
             visible(frame.contentDocument, 'smaily-w-engine-connect')
-            && !frame.contentDocument.getElementById('smaily-w-engine-storefront-hint'));
+            && !visible(frame.contentDocument, 'smaily-w-engine-storefront-hint'));
+        // The Storefront URL cleared on the Connection tab and saved: the
+        // hint is back without a reload (PRO-3747).
+        await saveConnection(frame, '');
+        hint = frame.contentDocument.getElementById('smaily-w-engine-storefront-hint');
+        check(locale + ', settings: the Storefront URL cleared and saved, the storefront hint is shown again',
+            visible(frame.contentDocument, 'smaily-w-engine-storefront-hint')
+            && hint.textContent === strings[SETTINGS_STOREFRONT_HINT]);
+        frame.remove();
+
+        // A Storefront URL saved on the Connection tab hides the hint without
+        // a reload; a refused save leaves it as it was (PRO-3747).
+        frame = await open(settings, {status: catalog('idle', 0)});
+        await saveConnection(frame, 'https://shop.example.com', false);
+        check(locale + ', settings: a refused Connection save leaves the storefront hint',
+            visible(frame.contentDocument, 'smaily-w-engine-storefront-hint'));
+        await saveConnection(frame, 'https://shop.example.com');
+        check(locale + ', settings: a Storefront URL saved on the Connection tab hides the storefront hint',
+            visible(frame.contentDocument, 'smaily-w-engine-connect')
+            && !visible(frame.contentDocument, 'smaily-w-engine-storefront-hint'));
         frame.remove();
 
         // Initial setup: a Connect that started the catalog import, held back

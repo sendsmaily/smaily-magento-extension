@@ -7,6 +7,7 @@ The package version is currently `3.0.0-rc7` — the seventh release-candidate c
 **Changes since 3.0.0-rc7**
 
 - Products deleted with Magento's import — **System > Data Transfer > Import** with the **Delete** behaviour, or a tool that runs Magento's import — are removed from Campaign Intelligence, as a product deleted in the admin is: in the Log, a *catalog_remove* row per product, and for a variant of a configurable product a *catalog* row that marks it out of stock. Before, the import sent nothing, so Campaign Intelligence kept recommending the deleted products, and a catalog import did not remove them. A product deleted straight in the database, or by a tool that bypasses Magento's import, still sends nothing; the user guide says how to take such a product out of the recommendations.
+- The separate-storefront note on **Settings > Intelligence** ("Using a separate storefront? Set its Storefront URL under Settings > Connection …") follows the Storefront URL without a reload: saving a Storefront URL on **Settings > Connection** hides it, and clearing the Storefront URL and saving shows it again. Before, the note stayed until the page was reloaded, although the Storefront URL was saved.
 
 **Changes since 3.0.0-rc6**
 

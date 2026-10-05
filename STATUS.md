@@ -5,7 +5,9 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-05 — after rc7, PRO-1958 (the integration tests'
+_Last updated: 2026-10-05 — after rc7, PRO-3747 (the separate-storefront
+hint on Settings > Intelligence follows a Connection save without a
+reload; unreleased); before it PRO-1958 (the integration tests'
 cart and cart-address tables are Magento's own, nothing merchant-visible);
 before it PRO-3768 (products deleted by
 Magento's product import with the Delete behaviour get the engine removal a
@@ -185,6 +187,27 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3747 — the separate-storefront hint on Settings > Intelligence
+  follows a Connection save (2026-10-05; unreleased, after rc7).** The hint
+  of PRO-3745 was rendered server-side only when no Storefront URL was
+  saved, so after saving one on the Connection tab the Intelligence tab
+  (the tabs switch without a reload) still showed it, and a page loaded
+  with a URL had no hint to show after clearing it. Now
+  `panel/intelligence.phtml` always draws it in the disconnected block,
+  `display:none` while a Storefront URL is saved, and
+  `panels.saveStep('connect')` (`panel/panels-js.phtml`) — the save the
+  Connection tab's **Save Connection** runs — shows or hides it by the
+  `storefront_url` it posted, once the server accepted the save (a refused
+  save changes nothing). The initial setup posts no Storefront URL, so its
+  note stays as drawn. No new string, no server change. Browser
+  `Test/Js/intelligence-connect.html` 41 → 47 checks (Settings: a saved
+  URL hides the hint, a cleared one shows it again, a refused save leaves
+  it; the "with a Storefront URL" checks now read "not visible", since the
+  hint is drawn hidden); red without the panels-js change (4 checks) and
+  without the always-drawn hint (2 checks). USER_GUIDE (Connecting: no
+  reload), PILOT_CHECKLIST §2 (no reload), ARCHITECTURE, TESTING,
+  CHANGELOG.
 
 - **PRO-1958 (narrowed 2026-10-04) — the integration tests' cart tables
   carry Magento's real columns (2026-10-05; tests only, no CHANGELOG
@@ -2645,9 +2668,9 @@ Earlier: 2026-09-11, 2026-09-10._
   and price in the engine; PILOT_CHECKLIST §2 also asks for the setup
   notice under the bell to be read after the initial setup (PRO-3739) and
   for one catalog entry's image and product link opened from the engine
-  (PRO-3731); (2) open queue: PRO-3747, PRO-3753, PRO-3767
-  (awaits an owner decision), PRO-3746 (after the pilot); PRO-3768
-  (unreleased) and PRO-1958 are done since; (3) cross-repo
+  (PRO-3731); (2) open queue: PRO-3753, PRO-3767
+  (awaits an owner decision), PRO-3746 (after the pilot); PRO-3768 and
+  PRO-3747 (both unreleased) and PRO-1958 are done since; (3) cross-repo
   asks: PRO-3743 (WooCommerce), PRO-3744 (Shopify),
   PRO-3750, PRO-3751; (4) Erkki: the engine pilot decisions (PRO-3600);
   HC Pro (legacy 2.x upgrade, 4 websites, one Smaily account), awaiting

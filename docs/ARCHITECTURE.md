@@ -438,9 +438,12 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   set the Storefront URL first, or hold the import back (PRO-3745). The
   setup step says to finish without connecting; Settings > Intelligence,
   which has its own Connect, points to the Connection tab. The note sits
-  in the disconnected block, so it goes once connected; it is rendered
-  server-side, so a Storefront URL saved on the Connection tab hides it
-  after a reload.
+  in the disconnected block, so it goes once connected. It is always
+  drawn there, hidden while a Storefront URL is saved, and a successful
+  Connection save shows or hides it by the Storefront URL it posted
+  (`panels.saveStep('connect')` in `panel/panels-js.phtml`, PRO-3747): the
+  Settings tabs switch without a reload. The initial setup posts no
+  Storefront URL, so its note stays as drawn.
 
 ### Queue semantics (both queues)
 

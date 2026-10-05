@@ -20,6 +20,7 @@ use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\Handler\ProfilingConsentHandler;
+use Smaily\Connect\Model\Queue\Pending;
 use Smaily\Connect\Model\Queue\Skipped;
 
 class ProfilingConsentHandlerTest extends TestCase
@@ -27,6 +28,7 @@ class ProfilingConsentHandlerTest extends TestCase
     private Settings&MockObject $settings;
     private Client&MockObject $client;
     private ProfilingOptOuts&MockObject $optOuts;
+    private bool $refused = false;
 
     /** @var array<int, array<string, mixed>> */
     private array $payloads = [];
@@ -38,8 +40,10 @@ class ProfilingConsentHandlerTest extends TestCase
     {
         $this->payloads = [];
         $this->recorded = [];
+        $this->refused = false;
         $this->settings = $this->createMock(Settings::class);
         $this->settings->method('isConnected')->willReturn(true);
+        $this->settings->method('isRefused')->willReturnCallback(fn (): bool => $this->refused);
         $this->client = $this->createMock(Client::class);
         $this->optOuts = $this->createMock(ProfilingOptOuts::class);
     }
@@ -92,7 +96,10 @@ class ProfilingConsentHandlerTest extends TestCase
         $results = $this->handle(1, ['email' => 'person@example.com', 'opt_out' => true,
             'opted_out_at' => '2026-09-21T14:13:20Z']);
 
-        self::assertSame([1 => 'Engine request failed with HTTP 503 after retries'], $results);
+        self::assertInstanceOf(\Throwable::class, $results[1]);
+        $failure = Failure::of($results[1]);
+        self::assertFalse($failure->permanent);
+        self::assertSame('Engine request failed with HTTP 503 after retries', $failure->reason);
     }
 
     public function testAnAddressTheEngineDoesNotKnowHasNothingToExclude(): void
@@ -124,26 +131,71 @@ class ProfilingConsentHandlerTest extends TestCase
         self::assertSame([[$exchange['request'], $exchange['response']]], $this->recorded);
     }
 
-    public function testOtherRefusalsAreReported(): void
+    /**
+     * PRO-3752: a choice the engine refuses (a 4xx other than 404) can never
+     * succeed, so it fails on the first attempt with the engine's reason.
+     */
+    public function testAChoiceTheEngineRefusesFailsOnTheFirstAttemptWithItsReason(): void
     {
         $this->optOuts->method('moment')->willReturn(1790000000);
         $this->client->method('customerOptOut')
-            ->willThrowException(new EngineRequestException('Engine request failed with HTTP 422', 422));
+            ->willThrowException(new EngineRequestException('Engine request failed with HTTP 422: invalid email', 422));
 
         $results = $this->handle(1, ['email' => 'person@example.com', 'opt_out' => true,
             'opted_out_at' => '2026-09-21T14:13:20Z']);
 
-        self::assertSame([1 => 'Engine request failed with HTTP 422'], $results);
+        self::assertInstanceOf(\Throwable::class, $results[1]);
+        self::assertEquals(
+            Failure::permanent('permanent_http_422: Engine request failed with HTTP 422: invalid email'),
+            Failure::of($results[1])
+        );
     }
 
-    public function testNothingIsSentWhileTheAccountIsRefused(): void
+    /**
+     * PRO-3752: while Campaign Intelligence refuses the account (contract §2
+     * `403 tenant_inactive`, PRO-2451), a choice is left pending as it was —
+     * no call, no attempt spent — and the handler says the queue should not
+     * claim its rows, as the identity merges wait (PRO-2466).
+     */
+    public function testWhileTheAccountIsRefusedTheChoiceIsLeftPending(): void
     {
-        $this->settings->method('sendingBlockedReason')->willReturn('Campaign Intelligence account is not active');
+        $this->refused = true;
         $this->client->expects(self::never())->method('customerOptOut');
 
         $results = $this->handle(1, ['email' => 'person@example.com', 'opt_out' => true]);
 
-        self::assertSame([1 => 'Campaign Intelligence account is not active'], $results);
+        self::assertEquals([1 => new Pending()], $results);
+        self::assertTrue($this->handler()->isPaused());
+        $this->refused = false;
+        self::assertFalse($this->handler()->isPaused());
+    }
+
+    /**
+     * PRO-3752: the choice that meets the refusal is not this row's fault
+     * either: it waits too, instead of failing as a 4xx.
+     */
+    public function testTheChoiceThatMeetsTheRefusalIsLeftPending(): void
+    {
+        $this->optOuts->method('moment')->willReturn(1790000000);
+        $this->client->method('customerOptOut')->willReturnCallback(function (): array {
+            $this->refused = true;
+            throw new EngineRequestException('Engine request failed with HTTP 403: tenant_inactive', 403);
+        });
+
+        $results = $this->handle(1, ['email' => 'person@example.com', 'opt_out' => true,
+            'opted_out_at' => '2026-09-21T14:13:20Z']);
+
+        self::assertEquals([1 => new Pending()], $results);
+    }
+
+    public function testNothingIsSentWhileCampaignIntelligenceIsNotConnected(): void
+    {
+        $this->settings->method('sendingBlockedReason')->willReturn('Campaign Intelligence is not connected');
+        $this->client->expects(self::never())->method('customerOptOut');
+
+        $results = $this->handle(1, ['email' => 'person@example.com', 'opt_out' => true]);
+
+        self::assertSame([1 => 'Campaign Intelligence is not connected'], $results);
     }
 
     /**
@@ -179,14 +231,17 @@ class ProfilingConsentHandlerTest extends TestCase
             }
         );
 
-        $handler = new ProfilingConsentHandler(
+        return $this->handler($eventQueue)->handle([$event]);
+    }
+
+    private function handler(?EventQueue $eventQueue = null): ProfilingConsentHandler
+    {
+        return new ProfilingConsentHandler(
             $this->settings,
             $this->client,
-            $eventQueue,
+            $eventQueue ?? $this->createMock(EventQueue::class),
             $this->optOuts,
             $this->createMock(Logger::class)
         );
-
-        return $handler->handle([$event]);
     }
 }

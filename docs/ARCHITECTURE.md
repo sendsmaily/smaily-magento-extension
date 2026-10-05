@@ -938,7 +938,13 @@ or a subscription Smaily's consent mirror writes counts too.
   `Queue\Skipped` (read as Skipped in the Log), so an older answer never
   undoes a newer one at the engine. A §10 404 (the engine
   holds nothing for that address) also closes the row — there is nothing to
-  exclude.
+  exclude. Any other engine 4xx is handed on whole, so `Queue\Failure`
+  fails the row on the first attempt as `permanent_http_<code>` (PRO-3752).
+  While Campaign Intelligence refuses the account the rows wait exactly as
+  the identity merges below do (a `PausableEventHandlerInterface`, not
+  claimed; a row that meets the refusal mid-run answered `Queue\Pending`),
+  and the match against the record on delivery keeps the newest choice
+  winning however many waited.
 - **Identity merge.** `Queue\Handler\IdentityMergeHandler` asks
   `isAllowed()` (at the customer's store view, whose Smaily account holds
   the contact) before each merge; an opted-out shopper's row is closed

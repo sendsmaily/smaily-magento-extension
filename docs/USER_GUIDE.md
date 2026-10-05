@@ -824,6 +824,13 @@ retrying forever:
   events, no historical imports.
 - Nothing is lost. Everything already queued stays queued, untouched, and
   goes out in order once the account is active again.
+- A shopper's personalization choice made meanwhile — an opt-out of
+  personalized recommendations, or opting back in, for example by
+  unsubscribing from or subscribing again to your newsletter — waits in the
+  queue too and reaches Campaign Intelligence once the account is active
+  again. When the shopper changed their mind meanwhile, the engine gets
+  the newest choice: an older choice that differs from it is not sent and
+  reads Skipped in the **Log**.
 - **Settings > Intelligence** says the account is not active, links to your
   Smaily account and offers **Check again**. The engine-bound historical
   imports are unavailable meanwhile; the contact import on the
@@ -1090,6 +1097,10 @@ card — you do not have to keep the page open:
   subscribes anyone — kept by the store itself, and enforced by the engine. It reaches Campaign Intelligence
   as a queued delivery (type `engine.profiling_consent` in the **Log**), so
   an engine outage only delays it: it is retried like every other delivery.
+  While the Campaign Intelligence account is deactivated, it waits and is
+  sent once the account is active again. A choice Campaign Intelligence
+  refuses as invalid cannot succeed by sending it again, so it fails at
+  once in the **Log** with the engine's answer.
   A delivery that waits while the shopper changes their mind is not sent —
   only the newest choice reaches the engine. The store's own record of an
   opt-out holds even when Smaily cannot be reached or a write to Smaily

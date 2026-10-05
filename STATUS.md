@@ -10,7 +10,9 @@ answer in the Log's error column), PRO-2465 (the GDPR command and the
 Campaign Intelligence automations form respect a refused account), PRO-1961
 (one seam for terminal failures in the marketing queue), PRO-2466
 (identity-merge rows wait while the account is refused), PRO-1962 (a
-Smaily "invalid data" envelope fails on the first attempt). 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
+Smaily "invalid data" envelope fails on the first attempt), PRO-3752 (a
+shopper's profiling choice waits while the account is refused; an engine
+refusal of it fails on the first attempt). 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
 land on v3: PRO-2508 (the Log's error column describes rejected Smaily
 credentials in the extension's own sentence, on purpose; docs only),
 PRO-2509 (the Log's Last Error filter matches the text the column shows),
@@ -141,6 +143,35 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3752 — a shopper's profiling choice waits while Campaign
+  Intelligence refuses the account (2026-10-05; owner-approved design;
+  CHANGELOG bullet under "Changes since 3.0.0-rc6").** Under the
+  remembered `403 tenant_inactive` each `engine.profiling_consent` row
+  failed with "Campaign Intelligence account is not active" and burned its
+  five attempts, so the choice could be lost although the admin banner
+  promises everything queued waits; and a 4xx refusal of a choice was
+  retried five times. Same mechanism as PRO-2466, nothing new:
+  `ProfilingConsentHandler` is a `PausableEventHandlerInterface`
+  (`isPaused()` = `Settings::isRefused()`, so its rows are not claimed),
+  answers `Queue\Pending` while refused and for the call whose 403 records
+  the refusal; any other engine exception is handed on whole, so
+  `Failure::of()` fails a 4xx (other than 404) on the first attempt as
+  `permanent_http_<code>: <engine message>` and an outage keeps the ladder
+  (the reason text is unchanged). 404 unchanged: contract §10 says the
+  engine holds no such customer, so there is nothing to exclude and the
+  row closes as delivered. The newest-wins rule (PRO-3578) is the existing
+  match against `ProfilingOptOuts` on delivery, so it holds however many
+  choices waited. Unit (`ProfilingConsentHandlerTest`: refused → Pending
+  and paused, the call that meets the refusal → Pending, a 422 →
+  permanent with the engine's reason, an outage → temporary) and
+  integration (`ProfilingConsentDeliveryTest`, real DB and cron: refused →
+  pending, unclaimed, attempts 0, no error, no call; active again → sent;
+  opt-out then opt-in waiting → only the opt-in sent, the opt-out Skipped;
+  a 422 → failed on attempt 1 with `permanent_http_422`) — red before. No
+  DI change. USER_GUIDE (the deactivated-account section and the
+  personalization-consent bullet), ARCHITECTURE (profiling consent
+  delivery).
+
 - **PRO-1962 — a Smaily "invalid data" envelope fails on the first
   attempt (2026-10-05; CHANGELOG bullet under "Changes since
   3.0.0-rc6").** HTTP 200 with body code 203 walked the five-attempt
@@ -189,10 +220,9 @@ Earlier: 2026-09-11, 2026-09-10._
   `FlushEventQueueTest` (Pending released, paused types not claimed) — red
   before. Integration (`FlushEventQueueTest`, real DB): while refused the
   merge row stays pending, unclaimed, attempts 0, no error, while the
-  contact sync beside it is sent; a Pending row goes back as it was. Not
-  done: the profiling-consent rows (PRO-3578) still fail under a refusal
-  the same way (FOLLOW-UP for the orchestrator). ARCHITECTURE (identity
-  merge).
+  contact sync beside it is sent; a Pending row goes back as it was. The
+  profiling-consent rows (PRO-3578) wait the same way since PRO-3752.
+  ARCHITECTURE (identity merge).
 
 - **PRO-1961 — one seam for terminal failures in the marketing event
   queue (2026-10-05; CHANGELOG bullet under "Changes since 3.0.0-rc6").**
@@ -2336,7 +2366,7 @@ Earlier: 2026-09-11, 2026-09-10._
   for one catalog entry's image and product link opened from the engine
   (PRO-3731); (2) open queue: PRO-3746 (after the pilot), PRO-3747,
   PRO-1958; small
-  cleanup PRO-2462, PRO-2475, PRO-1469, PRO-2514 done; robustness PRO-3749, PRO-1962, PRO-2465, PRO-2466, PRO-1961 done;
+  cleanup PRO-2462, PRO-2475, PRO-1469, PRO-2514 done; robustness PRO-3749, PRO-1962, PRO-2465, PRO-2466, PRO-1961, PRO-3752 done;
   (3) cross-repo asks: PRO-3740 (engine contract wording: §3/§3b still
   describe a periodic full re-sync), PRO-3743 (WooCommerce), PRO-3744
   (Shopify); (4) Erkki: the engine pilot decisions (PRO-3600); HC Pro

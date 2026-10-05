@@ -13,6 +13,7 @@ use Smaily\Connect\Cron\FlushEventQueue;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
@@ -44,6 +45,10 @@ class ProfilingConsentDeliveryTest extends IntegrationTestCase
 
     private int $engineFailuresLeft = 0;
 
+    private ?\Throwable $engineRefusal = null;
+
+    private bool $refused = false;
+
     private Settings&MockObject $settings;
     private ProfilingOptOuts&MockObject $optOuts;
 
@@ -53,6 +58,7 @@ class ProfilingConsentDeliveryTest extends IntegrationTestCase
 
         $this->settings = $this->createMock(Settings::class);
         $this->settings->method('isConnected')->willReturn(true);
+        $this->settings->method('isRefused')->willReturnCallback(fn (): bool => $this->refused);
 
         $this->optOuts = $this->createMock(ProfilingOptOuts::class);
         $this->optOuts->method('moment')->willReturnCallback(
@@ -117,6 +123,77 @@ class ProfilingConsentDeliveryTest extends IntegrationTestCase
     }
 
     /**
+     * PRO-3752: while Campaign Intelligence refuses the account, the choice
+     * waits — not claimed, no attempt spent, nothing written on it — and is
+     * sent once the account is active again.
+     */
+    public function testAChoiceWaitsWhileTheAccountIsRefusedAndIsSentOnceItIsActive(): void
+    {
+        $this->refused = true;
+        $this->consent()->setAllowed('person@example.com', false, 0);
+
+        $this->runCron();
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_PENDING, $row['status']);
+        self::assertSame('0', (string)$row['attempts']);
+        self::assertNull($row['claim_token'], 'Never claimed');
+        self::assertNull($row['last_error']);
+        self::assertNull($row['next_retry_at']);
+        self::assertSame([], $this->engineCalls);
+
+        $this->refused = false;
+        $this->runCron();
+
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_SENT, $row['status']);
+        self::assertNull($row['last_error']);
+        self::assertSame([['person@example.com', true]], $this->engineCalls);
+    }
+
+    /**
+     * PRO-3752 with PRO-3578: of two choices that waited for one shopper,
+     * only the newest reaches the engine once the account is active again.
+     */
+    public function testOfTwoWaitingChoicesTheNewestWinsOnDelivery(): void
+    {
+        $this->refused = true;
+        $this->consent()->setAllowed('person@example.com', false, 0);
+        $this->consent()->setAllowed('person@example.com', true, 0);
+        $this->runCron();
+        self::assertSame(
+            [Event::STATUS_PENDING, Event::STATUS_PENDING],
+            array_column($this->fetchAll(EventResource::TABLE_NAME), 'status')
+        );
+
+        $this->refused = false;
+        $this->runCron();
+
+        [$optOut, $optIn] = $this->fetchAll(EventResource::TABLE_NAME);
+        self::assertSame(ProfilingConsentHandler::SKIPPED_REPLACED, $optOut['last_error']);
+        self::assertSame(Event::STATUS_SENT, $optIn['status']);
+        self::assertNull($optIn['last_error']);
+        self::assertSame([['person@example.com', false]], $this->engineCalls, 'The older opt-out is never sent');
+    }
+
+    /**
+     * PRO-3752: a choice the engine refuses as invalid can never succeed, so
+     * it fails on the first attempt with the engine's reason.
+     */
+    public function testAChoiceTheEngineRefusesFailsOnTheFirstAttempt(): void
+    {
+        $this->engineRefusal = new EngineRequestException('Engine request failed with HTTP 422: invalid email', 422);
+        $this->consent()->setAllowed('person@example.com', false, 0);
+
+        $this->runCron();
+
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_FAILED, $row['status']);
+        self::assertSame('1', (string)$row['attempts'], 'The other four attempts are not spent');
+        self::assertNull($row['next_retry_at']);
+        self::assertSame('permanent_http_422: Engine request failed with HTTP 422: invalid email', $row['last_error']);
+    }
+
+    /**
      * PRO-3594 criterion 1: profiling stopped only by the unsubscribe starts
      * again when the shopper subscribes again, and the engine hears it.
      */
@@ -173,6 +250,9 @@ class ProfilingConsentDeliveryTest extends IntegrationTestCase
         $client->method('customerOptOut')->willReturnCallback(
             function (string $email, bool $optOut): array {
                 $this->engineCalls[] = [$email, $optOut];
+                if ($this->engineRefusal !== null) {
+                    throw $this->engineRefusal;
+                }
                 if ($this->engineFailuresLeft > 0) {
                     $this->engineFailuresLeft--;
                     throw new EngineTransportException('Engine request failed with HTTP 503 after retries');

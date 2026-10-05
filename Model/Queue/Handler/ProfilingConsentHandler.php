@@ -8,7 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Queue\Handler;
 
-use Smaily\Connect\Api\Queue\EventHandlerInterface;
+use Smaily\Connect\Api\Queue\PausableEventHandlerInterface;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
@@ -17,6 +17,7 @@ use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\Failure;
+use Smaily\Connect\Model\Queue\Pending;
 use Smaily\Connect\Model\Queue\Skipped;
 
 /**
@@ -30,8 +31,14 @@ use Smaily\Connect\Model\Queue\Skipped;
  * never undo a newer one at the engine. The newer choice has a row of its
  * own. Such a row is closed as Skipped with the reason, never as delivered
  * (PRO-3634).
+ *
+ * While Campaign Intelligence refuses the account (PRO-2451) the choices
+ * wait, as the identity merges do (PRO-2466, PRO-3752): the queue does not
+ * claim them (isPaused()), and a row that meets the refusal goes back as it
+ * was. Once the account is active again they are sent, and the check above
+ * still lets only the shopper's newest choice through.
  */
-class ProfilingConsentHandler implements EventHandlerInterface
+class ProfilingConsentHandler implements PausableEventHandlerInterface
 {
     public const SKIPPED_REPLACED = 'Skipped: the shopper has since changed their personalization preference,'
         . ' and the newer preference is sent in its own row. Nothing was sent.';
@@ -55,7 +62,12 @@ class ProfilingConsentHandler implements EventHandlerInterface
         $results = [];
         foreach ($events as $event) {
             $id = (int)$event->getId();
-            // Asked per row: a refusal (a 403 on one row) stops the rest.
+            // Asked per row: a refusal (a 403 on one row) stops the rest,
+            // and the rows wait for the account (PRO-3752).
+            if ($this->settings->isRefused()) {
+                $results[$id] = new Pending();
+                continue;
+            }
             $blocked = $this->settings->sendingBlockedReason();
             if ($blocked !== null) {
                 $results[$id] = $blocked;
@@ -83,9 +95,17 @@ class ProfilingConsentHandler implements EventHandlerInterface
             } catch (EngineRequestException $exception) {
                 // §10: 404 = the engine holds nothing for this address, so
                 // there is nothing to exclude (a newsletter-only guest).
-                $results[$id] = $exception->getHttpStatus() === 404 ? true : $exception->getMessage();
+                // Any other 4xx refuses this choice and stops on the first
+                // attempt (PRO-1961); the account refusal (contract §2 `403
+                // tenant_inactive`) is not this row's fault: it waits.
+                $results[$id] = match (true) {
+                    $exception->getHttpStatus() === 404 => true,
+                    $this->settings->isRefused() => new Pending(),
+                    default => $exception,
+                };
             } catch (EngineException $exception) {
-                $results[$id] = $exception->getMessage();
+                // An outage takes the retry ladder (PRO-1961).
+                $results[$id] = $exception;
             }
 
             $exchange = $this->client->lastExchange();
@@ -95,5 +115,14 @@ class ProfilingConsentHandler implements EventHandlerInterface
         }
 
         return $results;
+    }
+
+    /**
+     * While Campaign Intelligence refuses the account, the rows wait
+     * unclaimed (PRO-3752).
+     */
+    public function isPaused(): bool
+    {
+        return $this->settings->isRefused();
     }
 }

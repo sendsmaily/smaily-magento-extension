@@ -23,6 +23,20 @@ setup tokens in this file, in Linear or in chat either.
 Agree with the merchant beforehand: which payment method the test order
 uses, and that you cancel or refund it afterwards.
 
+## Pilot-day order
+
+The first pilot store runs the steps in this order:
+
+1. Connect the Smaily account and choose the consent contact mode
+   (**Subscribers only (consent)**) — §1.
+2. Set the **Storefront URL** under **Settings > Connection** before
+   connecting Campaign Intelligence — §2.
+3. Connect Campaign Intelligence; connecting starts the catalog import — §2.
+4. Start the customer history import (and the order history import, if
+   wanted) — §2, **Historical imports to Campaign Intelligence**.
+5. The engine operator switches the 25% holdout on before activation — §2.
+   This is an engine-side step: Smaily Connect has no control for it.
+
 ## 0. Pre-flight
 
 | What to do | Where to look / what good looks like |
@@ -40,7 +54,7 @@ uses, and that you cancel or refund it afterwards.
 |---|---|
 | Open **Marketing > Smaily Connect**. | A fresh install lands on **Initial setup**, step bar: **Connect, Contacts, Automations, Intelligence, Overview**. |
 | **Connect** step: fill **Subdomain**, **API username**, **API password**; press **Test connection**. | "Connected!" and a green status with the account name; **Continue** goes to **Contacts**. A failure shows the Smaily-side reason — fix the credentials, do not continue. |
-| **Contacts** step: keep **Sync contacts to Smaily** on, mode **Subscribers only (consent)** unless the merchant decided otherwise; keep **Show a newsletter checkbox at checkout** on. **Continue**. | The step saves ("Saving…" then the next step). |
+| **Contacts** step: keep **Sync contacts to Smaily** on, mode **Subscribers only (consent)** — the pilot store's decided mode; keep **Show a newsletter checkbox at checkout** on. **Continue**. | The step saves ("Saving…" then the next step). |
 | **Automations** step: map **Abandoned cart** to the merchant's Smaily workflow and tick **Enabled** (needed for §5). Map **Welcome** / **First order** only if the merchant has those workflows. **Wait (minutes)** stays at **30** unless the merchant asked otherwise. | Workflow dropdowns list the Smaily account's workflows (**Refresh workflows** if one is missing). |
 
 ## 2. Engine setup exchange (Intelligence step)
@@ -71,7 +85,8 @@ Intelligence step:
 | Open the admin notifications (the bell at the top of the admin page). | "Smaily Connect is ready to set up" is no longer listed as unread — finishing the initial setup marks it as read. |
 | On the server: `bin/magento smaily:engine:ping`. | `Connected. Tenant: …, engine version: …, ping: {…}`. "Ping failed: …" is red — see §9. |
 | Dashboard. | Connection strip: **Smaily** and **Campaign Intelligence** both **Connected**; **Browse tracking** shows **Script live on storefront**. |
-| **Settings > Intelligence** → **Historical imports to Campaign Intelligence**: the Catalog card (started by connecting, unless held back). Decide with the engine side whether the existing tenant needs the store's customer and order history. If it does: **Start import** on the Customers and Orders cards (a held-back catalog: **Run again** on the Catalog card when it should go). | Live sync covers changes from now on only. Each card shows *Running* with "n of total" under its progress bar and ends *Done* — "Done, n of total synced." — one chunk per cron minute. A held-back Catalog card shows *Canceled*. |
+| **Settings > Intelligence** → **Historical imports to Campaign Intelligence**: the Catalog card (started by connecting, unless held back). **Start import** on the Customers card; **Start import** on the Orders card too if the store's order history is wanted (a held-back catalog: **Run again** on the Catalog card when it should go). | Live sync covers changes from now on only. Each card shows *Running* with "n of total" under its progress bar and ends *Done* — "Done, n of total synced." — one chunk per cron minute. A held-back Catalog card shows *Canceled*. |
+| After the Customers import ends *Done*, and before the engine side activates the store: the engine operator switches the holdout on — 25% of customers. | An engine-side step: Smaily Connect has no control for the holdout. The engine side confirms the holdout is on before activation; note it in PRO-2474. |
 | Once the catalog has entries in the engine (the Catalog import, or a product saved since connecting): in the engine tenant, open one catalog entry's image link and its product link. | Both open on the storefront: the image shows, the product page loads. |
 
 ## 3. Contact sync (one test subscriber)

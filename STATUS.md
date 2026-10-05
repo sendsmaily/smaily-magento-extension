@@ -5,7 +5,34 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-05 — PRO-3765 (a profiling-consent queue row's
+_Last updated: 2026-10-05 — 3.0.0-rc7 is prepared, not published (the
+owner decided today that the pilot store, which has a separate (headless)
+storefront, installs rc7 on pilot day 2026-10-09, so that PRO-3760's
+consent fix is in it): the version is `3.0.0-rc7` (composer.json,
+`ModuleInfo::VERSION`, the ModuleVersion docblock, the upstream proposal;
+composer.lock content-hash refreshed, no dependency change), and
+CHANGELOG's "Changes since 3.0.0-rc6" list is the rc7 list, its bullets
+now in the order the changes landed, as in the earlier lists. Everything
+merchant-visible since rc6 is in it: PRO-2509 (the Log's Last Error
+filter matches the text the column shows), PRO-2511 (Details on a
+delivered automation row reads as delivered), PRO-2510 (Retry over
+**Select all** works 1,000 rows at a time), PRO-3749 (a Smaily HTTP error
+shows Smaily's answer in the Log's error column), PRO-2465 (while the
+account is refused, the Automations tab explains it and the GDPR command
+handles the store's own data), PRO-1961 (a row that can never be
+delivered fails at once), PRO-2466 (the links of browsing to accounts
+wait while the account is refused), PRO-1962 (Smaily's "invalid data",
+code 203, fails at once), PRO-3752 (a shopper's personalization choice
+waits while the account is refused), PRO-3760 (an opt-out made before the
+engine knew the shopper reaches it once it does) and PRO-3765 (a consent
+row's entity is the shopper's keyed hash; the Log shows its first 12
+characters). PRO-2508, PRO-2475, PRO-1469, PRO-2514, PRO-2462, the admin
+browser-test renderer fix and the simplification pass change nothing a
+merchant sees, so they have no bullet. rc7 is prepared in the version-cut
+commit on top of cfa6544; the ZIP builds and verifies locally from it. It
+awaits publishing as a GitHub pre-release on the fork (as rc1 to rc6); the
+pilot installs rc7.
+Earlier 2026-10-05 — PRO-3765 (a profiling-consent queue row's
 entity is the shopper's keyed hash, not the address); before it PRO-3760 (an opt-out the engine did not keep
 is sent again once the engine confirms a customer or an order of the
 shopper); earlier the same day PRO-3749 (a Smaily HTTP error shows Smaily's
@@ -37,8 +64,7 @@ and its .sha256 were checked after publishing (380 entries, `shasum -a 256 -c`
 OK, sha256 3c048a8b7e5eb9bddeb5…, composer.json inside says 3.0.0-rc6); the
 CI and Contract staleness workflows are green on bb6831e. The rc6 ZIP from
 the release installs on a clean store by docs/INSTALLING.md as written
-(PRO-3748, below). The pilot installs rc6 on pilot day 2026-10-09 (owner
-decision today: the pilot store has a separate (headless) storefront). The
+(PRO-3748, below). The
 version is
 `3.0.0-rc6` (composer.json, `ModuleInfo::VERSION`, the ModuleVersion
 docblock, the upstream proposal; composer.lock content-hash refreshed, no
@@ -2407,40 +2433,48 @@ Earlier: 2026-09-11, 2026-09-10._
   in-process instance — nothing stored). Fixes PRO-3603 findings 1, 5
   and 6.
 
-- **Next session opens here (2026-10-04).** 3.0.0-rc6 is out (header)
-  and its ZIP installs on a clean store by the guide (PRO-3748) —
-  **the pilot installs rc6 on 09.10** (owner decision 2026-10-04), following
-  PILOT_CHECKLIST.md in the headless order: the Storefront URL first
-  (Finish the initial setup without connecting, Settings > Connection >
-  Using a separate storefront?), then connect under Settings >
-  Intelligence; connecting starts the catalog import, so if it was
-  connected first, press **Hold back the import** and **Run again** once
-  the Storefront URL is saved. Done 2026-10-04, in rc5: PRO-3559, PRO-2477,
-  PRO-3713, PRO-1967 + its simplification pass, PRO-3731, PRO-3732,
-  PRO-3730, PRO-3734. Done 2026-10-04 after rc5, all in rc6: PRO-3735 (CI
-  PHP 8.1 syntax check), PRO-3733 (CLI site address), PRO-3729 and
-  PRO-3737 (target spec wording), PRO-3736 (admin browser harness),
-  PRO-3739 (rc5 clean install by the guide passed; one wording fix),
-  PRO-3738 (CI runs the browser harnesses), PRO-1960 (abandoned-cart
-  reminders built once per store; behaviour-neutral), PRO-1968 (nightly
-  catalog re-sync removed: the full catalog at connect, then changes; an
-  import by hand after changes made outside Magento), PRO-1969 (no catalog
-  import while disconnected), PRO-3742 (nor customers or orders imports),
-  PRO-3741 (connecting starts the catalog import, with a Hold back),
-  PRO-3745 (separate-storefront note on the setup step and on Settings >
-  Intelligence), the simplification passes (behaviour-neutral); PRO-1954
-  closed, PRO-1958 narrowed; rc6 released, PRO-3748 (rc6 clean install by
-  the guide passed; no guide change). Done 2026-10-02/03: headless storefronts +
-  the Storefront URL (PRO-3614/3660), browse consent as in Woo and per
-  website (PRO-3664/3724), hardening (PRO-3625/3573), guest email on the
-  standard checkout + one reminder per address a day + erase stops
-  reminders + busy stores (PRO-3693/3711), the 2.x upgrade decisions
-  (PRO-3661/3681), catalog import per website with save-path prices
-  (PRO-2506/3692), variants take the parent's category (PRO-3714/3715),
-  seven per-language account fixes (PRO-3683/3690/3699/3717/3718/3719),
-  contract 1.8.2 (PRO-3654); rc2, rc3, rc4 released; rc5 and rc6 released
-  2026-10-04. Next, in order: (1) pilot day 09.10 — the pilot installs
-  rc6; Erkki passes the storefront hand-off in
+- **Next session opens here (2026-10-05).** 3.0.0-rc7 is prepared
+  (header) and awaits publishing as a GitHub pre-release on the fork;
+  **the pilot installs rc7 on 09.10** (owner decision 2026-10-05, so that
+  PRO-3760's consent fix is in it; rc6 stays the newest published build
+  until then), following PILOT_CHECKLIST.md in the headless order: the
+  Storefront URL first (Finish the initial setup without connecting,
+  Settings > Connection > Using a separate storefront?), then connect
+  under Settings > Intelligence; connecting starts the catalog import, so
+  if it was connected first, press **Hold back the import** and **Run
+  again** once the Storefront URL is saved. Done since rc6, all in rc7:
+  PRO-2508 (rejected Smaily credentials keep the extension's own sentence
+  in the Log, on purpose; docs only), PRO-2509 (the Log's Last Error
+  filter matches what the column shows), PRO-2511 (Details on a delivered
+  automation row reads as delivered), PRO-2510 (Select-all Retry in
+  batches of 1,000 on large Logs), the tooling cleanups PRO-2475,
+  PRO-1469, PRO-2514, PRO-2462 and the admin browser-test renderer fix
+  (behaviour-neutral), PRO-3749 (Smaily's answer in the Log's error
+  column), PRO-2465 (a refused account: the GDPR command handles the
+  store's own data, the Automations tab explains the refusal), PRO-1961
+  (a row that can never be delivered fails at once), PRO-2466 (browse
+  links wait while the account is refused), PRO-1962 (Smaily code 203
+  fails at once), PRO-3752 (a shopper's personalization choice waits while
+  the account is refused), the simplification pass (behaviour-neutral),
+  PRO-3760 (an opt-out reaches the engine once the engine knows the
+  shopper), PRO-3765 (consent rows hold the shopper's keyed hash; the Log
+  shows its first 12 characters); filed: PRO-3753, PRO-3767. Done
+  2026-10-04: rc5 (PRO-3559, PRO-2477, PRO-3713, PRO-1967, PRO-3731,
+  PRO-3732, PRO-3730, PRO-3734) and rc6 (PRO-3733, PRO-1968, PRO-3741,
+  PRO-3745, PRO-1969, PRO-3742, and the behaviour-neutral PRO-3735,
+  PRO-3729, PRO-3737, PRO-3736, PRO-3738, PRO-3739, PRO-1960), both
+  released; PRO-3748 (rc6 clean install by the guide passed; no guide
+  change); PRO-1954 closed, PRO-1958 narrowed. Done 2026-10-02/03:
+  headless storefronts + the Storefront URL (PRO-3614/3660), browse
+  consent as in Woo and per website (PRO-3664/3724), hardening
+  (PRO-3625/3573), guest email on the standard checkout + one reminder per
+  address a day + erase stops reminders + busy stores (PRO-3693/3711), the
+  2.x upgrade decisions (PRO-3661/3681), catalog import per website with
+  save-path prices (PRO-2506/3692), variants take the parent's category
+  (PRO-3714/3715), seven per-language account fixes
+  (PRO-3683/3690/3699/3717/3718/3719), contract 1.8.2 (PRO-3654); rc1 to
+  rc4 released. Next, in order: (1) pilot day 09.10 — the pilot installs
+  rc7; Erkki passes the storefront hand-off in
   docs/HEADLESS_STOREFRONTS.md to the storefront team (keep the query
   string on the `/<url_key>.html` redirect), sets the Storefront URL
   before connecting, walks PILOT_CHECKLIST.md; human acceptance of
@@ -2449,23 +2483,24 @@ Earlier: 2026-09-11, 2026-09-10._
   and price in the engine; PILOT_CHECKLIST §2 also asks for the setup
   notice under the bell to be read after the initial setup (PRO-3739) and
   for one catalog entry's image and product link opened from the engine
-  (PRO-3731); (2) open queue: PRO-3746 (after the pilot), PRO-3747,
-  PRO-1958; small
-  cleanup PRO-2462, PRO-2475, PRO-1469, PRO-2514 done; robustness PRO-3749, PRO-1962, PRO-2465, PRO-2466, PRO-1961, PRO-3752 done;
-  (3) cross-repo asks: PRO-3740 (engine contract wording: §3/§3b still
-  describe a periodic full re-sync), PRO-3743 (WooCommerce), PRO-3744
-  (Shopify); (4) Erkki: the engine pilot decisions (PRO-3600); HC Pro
-  (legacy 2.x upgrade, 4 websites, one Smaily account), awaiting the
-  owner: the UPGRADING checklist (PRO-3661), the Mageplaza live checks
+  (PRO-3731); (2) open queue: PRO-1958, PRO-3747, PRO-3753, PRO-3767
+  (awaits an owner decision), PRO-3746 (after the pilot); (3) cross-repo
+  asks: PRO-3740 (engine contract wording: §3/§3b still describe a
+  periodic full re-sync), PRO-3743 (WooCommerce), PRO-3744 (Shopify),
+  PRO-3750, PRO-3751; (4) Erkki: the engine pilot decisions (PRO-3600);
+  HC Pro (legacy 2.x upgrade, 4 websites, one Smaily account), awaiting
+  the owner: the UPGRADING checklist (PRO-3661), the Mageplaza live checks
   (PRO-3663), the other-abandoned-cart-senders check (PRO-3665), the
   Campaign Intelligence questions (spike PRO-3662); Erkki still proofreads
-  the Estonian strings added 2026-10-02/04, incl. PRO-3734's go-live note,
-  the term "päästik", and PRO-3741's and PRO-3745's notices; (5) open
-  backlog: PRO-3675 (live Hyvä check), PRO-1198 (Smaily hand-over);
-  PRO-1357 is closed (2026-10-04). The Automations tab intro stays as it
-  is (owner decision 2026-10-04, PRO-3729). Sandbox: remove finished agent
-  worktrees under `.claude/worktrees` before any sandbox
-  `setup:di:compile`.
+  the Estonian strings added 2026-10-02/05, incl. PRO-3734's go-live note,
+  the term "päästik", PRO-3741's and PRO-3745's notices, PRO-3749's error
+  sentence and PRO-2465's Automations-tab sentence; a product question:
+  the My Account > Personalization page is hidden while the account is
+  refused — whether it should stay so; (5) open backlog: PRO-3675 (live
+  Hyvä check), PRO-1198 (Smaily hand-over); PRO-1357 is closed
+  (2026-10-04). The Automations tab intro stays as it is (owner decision
+  2026-10-04, PRO-3729). Sandbox: remove finished agent worktrees under
+  `.claude/worktrees` before any sandbox `setup:di:compile`.
 
 - **PRO-3603 done — final clean-install pass of the release ZIP
   (2026-10-02).** On fresh sandbox volumes, without the working-tree
@@ -5364,7 +5399,8 @@ Earlier: 2026-09-11, 2026-09-10._
   merchant recovery).
 
 **All 6 v3 phases implemented** (~110 files) on branch `v3`, version
-**3.0.0-rc6 — GitHub pre-release on the fork** (the newest). Current truth:
+**3.0.0-rc7 — unreleased** (3.0.0-rc6 is the newest GitHub pre-release
+on the fork). Current truth:
 
 - **PRO-1391 final-polish done — four refinements on Settings > Connection
   after Erkki's side-by-side review of the PRO-1391 visual-fidelity pass.**

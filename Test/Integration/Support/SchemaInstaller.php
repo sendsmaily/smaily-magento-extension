@@ -22,6 +22,9 @@ use Magento\Framework\DB\Adapter\AdapterInterface;
  */
 class SchemaInstaller
 {
+    /** Magento_Quote's declarative schema, the source of the cart mirrors. */
+    private const QUOTE_SCHEMA = 'vendor/magento/module-quote/etc/db_schema.xml';
+
     public function __construct(
         private readonly AdapterInterface $connection
     ) {
@@ -68,48 +71,34 @@ class SchemaInstaller
     }
 
     /**
-     * Minimal mirror of the core quote table, for the tests that join or
-     * patch it. The legacy reminder_date/is_sent columns are part of the
-     * stub because the 2.8.x schema patch exists to drop them, and that
-     * patch reads store_id too. customer_id, is_active and items_count are
-     * what the guest-cart email capture checks; updated_at is the
-     * abandoned-cart scan's idle window.
+     * The core quote table as Magento ships it — every column and index of
+     * Magento_Quote's db_schema.xml (PRO-1958), so a column a join makes
+     * ambiguous on a real store is ambiguous here too. Columns other modules
+     * add to the table (Magento_GiftMessage's gift_message_id, ...) are not
+     * part of it.
      */
     public function createQuote(): void
     {
-        $this->connection->query('DROP TABLE IF EXISTS `quote`');
+        $this->createMagentoTable(self::QUOTE_SCHEMA, 'quote');
+    }
+
+    /**
+     * The 2.8.x module's reminder_date/is_sent columns on quote, which the
+     * legacy-columns schema patch exists to move and drop.
+     */
+    public function addLegacyQuoteColumns(): void
+    {
         $this->connection->query(
-            'CREATE TABLE `quote` ('
-            . ' `entity_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,'
-            . ' `store_id` SMALLINT UNSIGNED NOT NULL DEFAULT 0,'
-            . ' `customer_id` INT UNSIGNED NULL,'
-            . ' `is_active` SMALLINT UNSIGNED NULL DEFAULT 1,'
-            . ' `items_count` INT UNSIGNED NULL DEFAULT 0,'
-            . ' `customer_email` VARCHAR(255) NULL,'
-            . ' `updated_at` TIMESTAMP NULL,'
-            . ' `reminder_date` TIMESTAMP NULL,'
-            . ' `is_sent` SMALLINT NULL,'
-            . ' PRIMARY KEY (`entity_id`)'
-            . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+            'ALTER TABLE `quote` ADD `reminder_date` TIMESTAMP NULL, ADD `is_sent` SMALLINT NULL'
         );
     }
 
     /**
-     * Minimal mirror of the core quote_address table — the columns the
-     * erasure reads to find the carts that hold an address.
+     * The core quote_address table as Magento ships it (see createQuote()).
      */
     public function createQuoteAddress(): void
     {
-        $this->connection->query('DROP TABLE IF EXISTS `quote_address`');
-        $this->connection->query(
-            'CREATE TABLE `quote_address` ('
-            . ' `address_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,'
-            . ' `quote_id` INT UNSIGNED NOT NULL DEFAULT 0,'
-            . ' `address_type` VARCHAR(10) NULL,'
-            . ' `email` VARCHAR(255) NULL,'
-            . ' PRIMARY KEY (`address_id`)'
-            . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
-        );
+        $this->createMagentoTable(self::QUOTE_SCHEMA, 'quote_address');
     }
 
     /**
@@ -218,15 +207,43 @@ class SchemaInstaller
     }
 
     /**
+     * Drop and create one table of a Magento module's db_schema.xml (path
+     * relative to the package root) — without its foreign keys, whose
+     * referenced tables (store, ...) the harness does not have.
+     */
+    private function createMagentoTable(string $dbSchemaXmlPath, string $name): void
+    {
+        $schema = simplexml_load_file(dirname(__DIR__, 3) . '/' . $dbSchemaXmlPath);
+        if ($schema === false) {
+            throw new \RuntimeException('Unable to parse ' . $dbSchemaXmlPath);
+        }
+
+        foreach ($schema->table as $table) {
+            if ((string)$table['name'] === $name) {
+                $this->connection->query('DROP TABLE IF EXISTS ' . $this->connection->quoteIdentifier($name));
+                $this->connection->query($this->tableDdl($table, true));
+
+                return;
+            }
+        }
+
+        throw new \RuntimeException(sprintf('No table "%s" in %s', $name, $dbSchemaXmlPath));
+    }
+
+    /**
      * Render one declarative <table> node as CREATE TABLE DDL.
      */
-    private function tableDdl(\SimpleXMLElement $table): string
+    private function tableDdl(\SimpleXMLElement $table, bool $withoutForeignKeys = false): string
     {
         $parts = [];
         foreach ($table->column as $column) {
             $parts[] = $this->columnDdl($column);
         }
         foreach ($table->constraint as $constraint) {
+            $xsi = $constraint->attributes('http://www.w3.org/2001/XMLSchema-instance');
+            if ($withoutForeignKeys && (string)($xsi['type'] ?? '') === 'foreign') {
+                continue;
+            }
             $parts[] = $this->constraintDdl($constraint);
         }
         foreach ($table->index as $index) {
@@ -284,6 +301,10 @@ class SchemaInstaller
                 return 'MEDIUMTEXT';
             case 'timestamp':
                 return 'TIMESTAMP';
+            case 'datetime':
+                return 'DATETIME';
+            case 'decimal':
+                return sprintf('DECIMAL(%d,%d)', (int)$column['precision'], (int)$column['scale']);
             case 'boolean':
                 return 'TINYINT(1)';
             default:

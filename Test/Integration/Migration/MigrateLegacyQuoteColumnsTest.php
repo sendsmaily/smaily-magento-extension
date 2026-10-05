@@ -29,6 +29,7 @@ class MigrateLegacyQuoteColumnsTest extends IntegrationTestCase
 
         $this->schema = new SchemaInstaller($this->connection);
         $this->schema->createQuote();
+        $this->schema->addLegacyQuoteColumns();
         $this->connection->query(
             'CREATE TABLE IF NOT EXISTS `smaily_customer_sync` (`id` INT NOT NULL, PRIMARY KEY (`id`))'
         );

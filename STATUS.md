@@ -5,7 +5,9 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-05 — after rc7, PRO-3768 (products deleted by
+_Last updated: 2026-10-05 — after rc7, PRO-1958 (the integration tests'
+cart and cart-address tables are Magento's own, nothing merchant-visible);
+before it PRO-3768 (products deleted by
 Magento's product import with the Delete behaviour get the engine removal a
 product delete gives them; unreleased, CHANGELOG's "Changes since
 3.0.0-rc7" is open). Earlier the same day: 3.0.0-rc7 is released as a GitHub pre-release on
@@ -183,6 +185,28 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-1958 (narrowed 2026-10-04) — the integration tests' cart tables
+  carry Magento's real columns (2026-10-05; tests only, no CHANGELOG
+  bullet).** `SchemaInstaller::createQuote()` / `createQuoteAddress()`
+  now build `quote` (49 columns) and `quote_address` (62 columns) from
+  `vendor/magento/module-quote/etc/db_schema.xml` — every column and
+  index as shipped (`QUOTE_CUSTOMER_ID_STORE_ID_IS_ACTIVE`,
+  `QUOTE_STORE_ID_UPDATED_AT`, `QUOTE_ADDRESS_QUOTE_ID`), no foreign keys
+  (the `store` table is not in the harness); the translator learned
+  `decimal` and `datetime`. Columns other modules add (GiftMessage's
+  `gift_message_id`) are not mirrored. The 2.8.x `reminder_date` /
+  `is_sent` columns moved out of the quote mirror into
+  `addLegacyQuoteColumns()`, which only the legacy-columns patch test
+  calls. **It bites:** with a temporary unqualified
+  `addFieldToFilter('customer_id', …)` in the cron's quote select, all 7
+  `AbandonedCartTest` tests fail with MySQL 1052 "Column 'customer_id' in
+  where clause is ambiguous"; on the old minimal mirrors the same change
+  passed 7/7 (reverted). The cron's own filters are all qualified
+  (`main_table.…`); `updated_at`, `created_at` and `store_id` were
+  already ambiguous through the cart-state join. Full integration suite
+  green on the real mirrors (no test needed a change beyond the legacy
+  columns).
 
 - **PRO-3768 — products deleted by a product import reach the engine
   (2026-10-05; unreleased, after rc7).** Magento's product import with the
@@ -2621,9 +2645,9 @@ Earlier: 2026-09-11, 2026-09-10._
   and price in the engine; PILOT_CHECKLIST §2 also asks for the setup
   notice under the bell to be read after the initial setup (PRO-3739) and
   for one catalog entry's image and product link opened from the engine
-  (PRO-3731); (2) open queue: PRO-1958, PRO-3747, PRO-3753, PRO-3767
-  (awaits an owner decision), PRO-3746 (after the pilot); PRO-3768 is
-  done since (unreleased); (3) cross-repo
+  (PRO-3731); (2) open queue: PRO-3747, PRO-3753, PRO-3767
+  (awaits an owner decision), PRO-3746 (after the pilot); PRO-3768
+  (unreleased) and PRO-1958 are done since; (3) cross-repo
   asks: PRO-3743 (WooCommerce), PRO-3744 (Shopify),
   PRO-3750, PRO-3751; (4) Erkki: the engine pilot decisions (PRO-3600);
   HC Pro (legacy 2.x upgrade, 4 websites, one Smaily account), awaiting

@@ -499,6 +499,11 @@
         check('and stops its loader', page.component.isLoading() === false);
     }
 
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping while the scripts load
+    // until the result is written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
     // One script at a time: an anonymous define() takes the pending name.
     [
         ['Magento_Checkout/js/view/form/element/email',
@@ -518,6 +523,8 @@
             : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
     }).catch(function (error) {
         document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }).then(function () {
+        clearInterval(keepAlive);
     });
 </script>
 </body>

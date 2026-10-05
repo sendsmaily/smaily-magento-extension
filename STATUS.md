@@ -197,6 +197,35 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3780 — the checkout email-field browser test always writes its
+  result (2026-10-05; tooling, no CHANGELOG bullet).** `RESULT: FAIL (no
+  result)` means Chrome printed nothing at all, not a page cut short (a
+  cut-short page prints `RESULT: RUNNING`, as in PRO-3738). Repro before:
+  macOS Google Chrome, `Test/Js/email-mixin.html` in 6–10 parallel loops,
+  3 of 990 runs printed nothing, each Chrome killed (exit 137, no stderr;
+  the one timed run died in under a second, i.e. at start-up, before the
+  page ran); 30 of 30 sequential runs green; Linux (Debian Chromium 154,
+  throwaway php:8.3-cli container) 0 of 190 (sequential, 3 parallel loops,
+  CPU burners). Not the virtual-time cause of PRO-3738: a probe read
+  virtual time at the start of the checks at 110–650 ms, never the end of
+  the budget. Fix: `bin/test-js.sh` starts a browser that printed nothing
+  again, up to three starts, and logs each restart; a page that printed
+  anything is never run again (fake browser killed once per page → all 4
+  pages green, exit 0; killed every start → 4 × `RESULT: FAIL (no
+  result)`, exit 1). And the two pages that waited on script or frame
+  loads with no timer pending (`email-mixin.html`, `automations-save.html`)
+  now keep the 10 ms interval too, so every page does (TESTING.md rule).
+  After: `bin/test-js.sh` 20 of 20 full runs green on macOS and on Linux
+  (email field 23 checks each run, no restart needed); 10 parallel loops on
+  macOS, 400 of 400 email-field runs green (no Chrome killed this time, so the restart
+  was exercised by the fake browser only).
+  Seen on the way, not fixed: with 8 Chromes at once on macOS,
+  `tracker-consent.html` printed `RESULT: RUNNING` in 5 of 200 runs even
+  with its interval (hypothesis: the budget runs out while frames load
+  slowly);
+  sequential runs and CI run one Chrome at a time. TESTING.md ("Browser JS
+  harnesses"), CLAUDE.md gates.
+
 - **PRO-3767 — a contact row's entity is never cut (2026-10-05;
   unreleased, after rc7; owner decision 2026-10-05: keep the address,
   stop it from being cut; no schema change).** `contact.sync` and

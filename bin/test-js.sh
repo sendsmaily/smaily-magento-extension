@@ -31,10 +31,17 @@ php "$root/Test/Js/render-admin.php"
 status=0
 failed=""
 for page in "$root"/Test/Js/*.html; do
-    # Virtual time runs the checkout's typing pauses without waiting for them.
-    output="$("$chrome" --headless=new --disable-gpu --no-sandbox \
-        --virtual-time-budget=120000 --dump-dom "file://$page" 2>/dev/null || true)"
     name="${page#"$root"/}"
+    # Virtual time runs the checkout's typing pauses without waiting for them.
+    # A browser that prints nothing at all never ran the page (seen on macOS:
+    # Chrome killed at start-up, exit 137, PRO-3780), so it is started again,
+    # up to three starts; a page that printed anything is never run again.
+    for attempt in 1 2 3; do
+        output="$("$chrome" --headless=new --disable-gpu --no-sandbox \
+            --virtual-time-budget=120000 --dump-dom "file://$page" 2>/dev/null || true)"
+        [[ -z "$output" ]] || break
+        echo "($name: the browser printed nothing, start $attempt of 3)" >&2
+    done
     log="$(sed -n '/<pre id="log">/,/<\/pre>/p' <<<"$output" | sed -e 's/<[^>]*>//g' -e '/^$/d')"
     echo "== $name"
     [[ -z "$log" ]] || echo "$log"

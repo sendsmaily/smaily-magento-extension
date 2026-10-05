@@ -87,9 +87,11 @@ start one.
     mysql:8.4` + `SMAILY_IT_DB_PORT=3316`, see TESTING.md); NEVER point
     `SMAILY_IT_DB_*` at the sandbox DB — the suite drops/recreates tables.
   - `bin/test-js.sh` — the browser harnesses in headless Chrome. Chrome's
-    virtual time jumps to the end of its budget when no timer is pending, so a
-    page that waits on frames or promises keeps a short interval running
+    virtual time jumps to the end of its budget when no timer is pending, so
+    every page keeps a short interval running until its result is written
     (Linux Chrome cut `tracker-consent.html` short without one; TESTING.md).
+    A Chrome that prints nothing (killed at start-up on macOS, exit 137) is
+    started again, up to three starts (PRO-3780).
 - **Local PHP 8.5 accepts syntax PHP 8.1 rejects** (DNF types such as
   `(A&B)|null` are 8.2+, `new Foo()->bar()` without wrapping parens is
   8.4+), and neither phpstan (even with `phpVersion: 80100`) nor phpcs

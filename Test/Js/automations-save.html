@@ -209,6 +209,11 @@
             && !doc.getElementById('smaily-engine-automations-save'));
     }
 
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping while the frames load
+    // until the result is written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
     run('en_US').then(function () {
         return run('et_EE');
     }).then(function () {
@@ -219,6 +224,8 @@
             : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
     }).catch(function (error) {
         document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }).then(function () {
+        clearInterval(keepAlive);
     });
 </script>
 </body>

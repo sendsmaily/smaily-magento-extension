@@ -125,9 +125,14 @@ CI runs `bin/test-js.sh` on every push and pull request (the `browser` job:
 PHP 8.3, an install from `composer.lock`, the Google Chrome the runner image
 ships); a failed check fails the job, and the end of its log names the page
 and the check. The pages run on Chrome's virtual time, which jumps to the end
-of its budget whenever no timer is pending — even while a frame loads — so a
-page that waits on frames or promises keeps a short interval running until
-its result is written (see `Test/Js/tracker-consent.html`).
+of its budget whenever no timer is pending — even while a frame or a script
+loads — so every page keeps a short interval running from its first script
+until its result is written (`var keepAlive = setInterval(function () {},
+10);`, cleared after the result; a new page does the same). A browser that
+prints nothing at all never ran the page (on macOS Chrome is now and then
+killed as it starts, exit 137), so the script starts it again, up to three
+starts, and says so in the log; a page that printed anything is never run
+again, and three empty starts read `RESULT: FAIL (no result)`.
 
 ## Integration tests (real MySQL)
 

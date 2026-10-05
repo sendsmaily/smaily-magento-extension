@@ -363,6 +363,7 @@
 "Smaily API credentials are not configured (store scope: %1)","Smaily API kasutajaandmed on seadistamata (poe skoop: %1)"
 "Smaily API credentials were rejected","Smaily lükkas API kasutajaandmed tagasi"
 "Smaily API request failed with HTTP %1","Smaily API päring ebaõnnestus (HTTP %1)"
+"Smaily API request failed with HTTP %1: %2","Smaily API päring ebaõnnestus (HTTP %1): %2"
 "Smaily API request failed: %1","Smaily API päring ebaõnnestus: %1"
 "Smaily API returned a malformed response body","Smaily API tagastas vigase vastuse"
 "Smaily API returned code %1: %2","Smaily API tagastas koodi %1: %2"

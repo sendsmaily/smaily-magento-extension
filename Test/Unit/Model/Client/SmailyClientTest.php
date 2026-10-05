@@ -120,8 +120,13 @@ class SmailyClientTest extends TestCase
         return [
             'HTTP refusal' => [
                 new Response(404, [], 'Not found'),
-                'Smaily API request failed with HTTP 404',
-                'Smaily API päring ebaõnnestus (HTTP 404)',
+                'Smaily API request failed with HTTP 404: Not found',
+                'Smaily API päring ebaõnnestus (HTTP 404): Not found',
+            ],
+            'HTTP refusal without an answer' => [
+                new Response(400, [], ''),
+                'Smaily API request failed with HTTP 400',
+                'Smaily API päring ebaõnnestus (HTTP 400)',
             ],
             'credentials refused' => [
                 new Response(401, [], 'Unauthorized'),
@@ -177,6 +182,52 @@ class SmailyClientTest extends TestCase
         } catch (TransportException $exception) {
             self::assertStringStartsWith('Smaily API päring ebaõnnestus: cURL error 28', $exception->getMessage());
             self::assertStringStartsWith('Smaily API request failed: cURL error 28', $exception->getSourceMessage());
+        }
+    }
+
+    /**
+     * PRO-3749: an HTTP error that is not a credential or package refusal
+     * names Smaily's answer after the status, as the engine client does:
+     * the envelope's message when the answer is JSON, else its text without
+     * markup, both cut to a length the Log's error column can show.
+     *
+     * @return array<string, array{0: Response, 1: string}>
+     */
+    public static function httpErrorAnswers(): array
+    {
+        return [
+            'JSON envelope' => [
+                new Response(400, [], '{"code": 205, "message": "Unknown field: birthday"}'),
+                'Smaily API request failed with HTTP 400: Unknown field: birthday',
+            ],
+            'HTML error page' => [
+                new Response(404, [], "<html><head><title>404 Not Found</title></head>\n<body>  nginx </body></html>"),
+                'Smaily API request failed with HTTP 404: 404 Not Found nginx',
+            ],
+            'JSON without a message' => [
+                new Response(400, [], '{"code": 205, "api_key": "s3cr3t"}'),
+                'Smaily API request failed with HTTP 400',
+            ],
+            'long answer' => [
+                new Response(400, [], str_repeat('a', 600)),
+                'Smaily API request failed with HTTP 400: ' . str_repeat('a', 500) . '…',
+            ],
+        ];
+    }
+
+    /**
+     * @dataProvider httpErrorAnswers
+     */
+    public function testAnHttpErrorNamesSmailysAnswer(Response $response, string $expected): void
+    {
+        $client = $this->createClient([$response]);
+
+        try {
+            $client->post(SmailyClient::ENDPOINT_CONTACT, []);
+            self::fail('Expected a TransportException');
+        } catch (TransportException $exception) {
+            self::assertSame($expected, $exception->getSourceMessage());
+            self::assertSame($response->getStatusCode(), $exception->getHttpStatus());
         }
     }
 

@@ -5,7 +5,8 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
+_Last updated: 2026-10-05 — PRO-3749 (a Smaily HTTP error shows Smaily's
+answer in the Log's error column). 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
 land on v3: PRO-2508 (the Log's error column describes rejected Smaily
 credentials in the extension's own sentence, on purpose; docs only),
 PRO-2509 (the Log's Last Error filter matches the text the column shows),
@@ -135,6 +136,28 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3749 — a Smaily HTTP error shows Smaily's answer in the Log
+  (2026-10-05; CHANGELOG bullet under "Changes since 3.0.0-rc6").** Owner
+  decision 2026-10-04. `SmailyClient` words an HTTP error that is neither
+  a credential refusal (401/403) nor the package refusal (code 227) as
+  "Smaily API request failed with HTTP %1: %2" (EN + ET, "Smaily API päring
+  ebaõnnestus (HTTP %1): %2"), the engine client's format: %2 is the JSON
+  envelope's `message`, else the body's text without markup and with its
+  whitespace collapsed, cut to 500 characters plus "…". A JSON answer
+  without a `message`, or an empty body, keeps the plain "…with HTTP %1"
+  (the body stays whole in `last_response` for Details). The Log shows it
+  through `FailureMessage` like every other answer (the PayloadRedactor
+  pass, the admin-language translation; the new phrase sits before the
+  plain one in `FailureMessage::TRANSLATED`, whose pattern would match it
+  too), and the log file masks addresses in it as before. Rejected
+  credentials keep "Smaily API credentials were rejected". Unit:
+  `SmailyClientTest::testAnHttpErrorNamesSmailysAnswer` (JSON envelope,
+  HTML page, JSON without message, a 600-character answer) and the
+  Estonian-store cases, `FailureMessageTest` (stored refusal with an
+  answer, the error filter's patterns) — red before the change.
+  USER_GUIDE (the error column: two exceptions now — rejected credentials
+  and the package refusal), ARCHITECTURE (the Log paragraph).
 
 - **The admin browser-test renderer stops when it cannot write its output
   (2026-10-04; PRO-3738 follow-up, no issue; tooling, no CHANGELOG

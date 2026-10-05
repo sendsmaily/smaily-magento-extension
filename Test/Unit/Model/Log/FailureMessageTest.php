@@ -72,6 +72,11 @@ class FailureMessageTest extends TestCase
                 'permanent_http_404: Smaily API request failed with HTTP 404',
                 'Smaily API päring ebaõnnestus (HTTP 404)',
             ],
+            // PRO-3749: Smaily's answer after the status, kept as it is.
+            'refusal with an answer' => [
+                'permanent_http_400: Smaily API request failed with HTTP 400: Field birthday: not a date',
+                'Smaily API päring ebaõnnestus (HTTP 400): Field birthday: not a date',
+            ],
             'error envelope' => [
                 'Smaily API returned code 203: Invalid data',
                 'Smaily API tagastas koodi 203: Invalid data',
@@ -198,7 +203,7 @@ class FailureMessageTest extends TestCase
             $this->failureMessage->storedPatternsShowing('KASUTAJAANDMED')
         );
         self::assertSame(
-            ['Smaily API request failed with HTTP %'],
+            ['Smaily API request failed with HTTP %: %', 'Smaily API request failed with HTTP %'],
             $this->failureMessage->storedPatternsShowing('päring ebaõnnestus (HTTP')
         );
     }

@@ -44,6 +44,8 @@ class FailureMessage
         'Smaily refused the request because this account\'s package does not include API access.'
             . ' Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all.',
         'Smaily API credentials were rejected',
+        // Before the one without the answer, whose pattern would match it too.
+        'Smaily API request failed with HTTP %1: %2',
         'Smaily API request failed with HTTP %1',
         'Smaily API request failed: %1',
         'Smaily API returned a malformed response body',

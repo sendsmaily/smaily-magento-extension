@@ -363,6 +363,7 @@
 "Smaily API credentials are not configured (store scope: %1)","Smaily API credentials are not configured (store scope: %1)"
 "Smaily API credentials were rejected","Smaily API credentials were rejected"
 "Smaily API request failed with HTTP %1","Smaily API request failed with HTTP %1"
+"Smaily API request failed with HTTP %1: %2","Smaily API request failed with HTTP %1: %2"
 "Smaily API request failed: %1","Smaily API request failed: %1"
 "Smaily API returned a malformed response body","Smaily API returned a malformed response body"
 "Smaily API returned code %1: %2","Smaily API returned code %1: %2"

@@ -955,11 +955,12 @@ card — you do not have to keep the page open:
   column shows Smaily's or Campaign Intelligence's own words, not our
   internal name for the failure — except when Smaily rejected the API
   credentials: then it says "Smaily API credentials were rejected", which
-  tells you what to fix. Two more Smaily answers are worded by the
+  tells you what to fix. One more Smaily answer is worded by the
   extension too: a refusal because the account's package does not include
-  API access, and an HTTP error that carries no Smaily error code, shown
-  with its status ("Smaily API request failed with HTTP 404"). Details
-  shows what Smaily actually answered, under the last API response. A
+  API access. Any other HTTP error from Smaily shows its status before
+  Smaily's answer ("Smaily API request failed with HTTP 404: Not Found");
+  a long answer is cut after 500 characters. Details shows what Smaily
+  actually answered, in full, under the last API response. A
   Smaily delivery error reads in your admin language,
   whatever the language of the store that sent the row; the log file
   records it in English. The column's filter finds a row by the words the

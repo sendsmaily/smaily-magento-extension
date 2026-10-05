@@ -478,8 +478,13 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   classification stays in the drawer. Deliberate exception (PRO-2508): a
   Smaily 401/403 stores the client's own sentence ("Smaily API credentials
   were rejected") instead of Smaily's body, because it names what to fix;
-  the body stays in `last_response`. The package refusal and a Smaily HTTP
-  error without an error envelope are client sentences too. The grid's
+  the body stays in `last_response`. The package refusal is a client
+  sentence too. Any other Smaily HTTP error quotes Smaily's answer after
+  the status, as the engine client does (PRO-3749): "Smaily API request
+  failed with HTTP <code>: <answer>", the answer being the JSON envelope's
+  `message`, else the body's text without markup, cut to 500 characters;
+  a JSON answer without a `message`, or an empty one, leaves the status
+  alone. The grid's
   text filter on that column matches the shown text, not the stored value
   (PRO-2509): `Log\Collection::addFieldToFilter()` strips the same prefix
   in SQL, adds a LIKE per client message whose translation in the admin's

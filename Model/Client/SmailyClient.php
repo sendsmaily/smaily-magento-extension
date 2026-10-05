@@ -50,6 +50,11 @@ class SmailyClient
     private const TIMEOUT_SECONDS = 30;
     private const CONNECT_TIMEOUT_SECONDS = 10;
 
+    /**
+     * The most of Smaily's answer an HTTP error message quotes (PRO-3749).
+     */
+    private const MAX_ANSWER_LENGTH = 500;
+
     private ?HttpClient $httpClient = null;
 
     /**
@@ -206,8 +211,13 @@ class SmailyClient
                 // stays in the exchange, for the Details drawer (PRO-2508).
                 throw new AuthenticationException(__('Smaily API credentials were rejected'), $status, $exception);
             }
+            // Smaily's answer goes with the status, as the engine client's
+            // does, so the Log's error column says what Smaily said (PRO-3749).
+            $answer = $this->answerOf($exception->getResponse());
             throw new TransportException(
-                __('Smaily API request failed with HTTP %1', $status),
+                $answer === ''
+                    ? __('Smaily API request failed with HTTP %1', $status)
+                    : __('Smaily API request failed with HTTP %1: %2', $status, $answer),
                 $status,
                 $exception,
                 $this->retryAfterSeconds($exception->getResponse())
@@ -264,6 +274,27 @@ class SmailyClient
         return is_array($decoded)
             && isset($decoded['code'])
             && (int)$decoded['code'] === PlanBlockedException::SMAILY_CODE;
+    }
+
+    /**
+     * What Smaily answered with an HTTP error, in one line: the envelope's
+     * message when the answer is JSON, else its text without markup (an HTML
+     * error page), cut to MAX_ANSWER_LENGTH. '' when there is nothing to
+     * quote — a JSON answer without a message included, which stays whole
+     * in the exchange for the Details drawer.
+     */
+    private function answerOf(ResponseInterface $response): string
+    {
+        $body = (string)$response->getBody();
+        $decoded = json_decode($body, true);
+        if (is_array($decoded)) {
+            $body = isset($decoded['message']) && is_scalar($decoded['message']) ? (string)$decoded['message'] : '';
+        }
+        $answer = trim((string)preg_replace('/\s+/u', ' ', strip_tags($body)));
+
+        return mb_strlen($answer) > self::MAX_ANSWER_LENGTH
+            ? mb_substr($answer, 0, self::MAX_ANSWER_LENGTH) . '…'
+            : $answer;
     }
 
     /**

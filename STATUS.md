@@ -5,7 +5,10 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-05 — after rc7, PRO-3747 (the separate-storefront
+_Last updated: 2026-10-05 — after rc7, PRO-3753 part (a) (a group of
+contact syncs, or a contacts-import page, that Smaily answers with 203 is
+sent again one contact per request, so only the refused contact fails;
+unreleased); before it PRO-3747 (the separate-storefront
 hint on Settings > Intelligence follows a Connection save without a
 reload; unreleased); before it PRO-1958 (the integration tests'
 cart and cart-address tables are Magento's own, nothing merchant-visible);
@@ -187,6 +190,35 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3753 (a) — a 203 on a group of contacts is sent again one contact
+  per request (2026-10-05; unreleased, after rc7; owner decision
+  2026-10-05).** Smaily answers one `{code, message}` per request, never
+  per contact, so one invalid contact in a store view's `contact.sync`
+  group (`Queue\Handler\ContactSyncHandler`, up to the flush's 200-row
+  batch) failed every row of it with `permanent_envelope_203` (PRO-1962).
+  Now `ContactSyncHandler::deliver()` posts the group, and on an
+  `ApiException` with code 203 for more than one contact posts each
+  contact again alone, in the same run, through the same client; each
+  row's result, `sent_payload` and `last_response` come from its own
+  request. A single contact's 203 stays permanent at once (not sent
+  again); any other failure of the group (another envelope code, HTTP
+  error, network) stays the group's, as before. **The contacts backfill had
+  the same group-fails-together behaviour** (`Backfill\ContactsProcessor`,
+  one post per store view of a 500-contact page, all counted failed on
+  any exception): it gets the same fallback (`post()`), so only the
+  refused contacts count as failed. Cost: 1 + group size requests, only on
+  a 203. WooCommerce posts one contact per request, so the outcome is now
+  the same. **Evidence:** integration (real handler and SmailyClient, HTTP
+  faked): a group of 5 with one invalid → 6 requests (the group, then each
+  alone), 4 rows sent, the refused row failed after 1 attempt with
+  `permanent_envelope_203: Smaily API returned code 203: Invalid email`
+  and its own payload and answer; a group answered with code 216 → 1
+  request, all 5 pending on the ladder; a single-contact 203 → 1 request.
+  Unit: a backfill page of 5 with one invalid → 6 posts, progress 4 sent,
+  1 failed; another code → 1 post, 2 failed. Both new group tests fail
+  without the change. No new string, no DI change. Docs: ARCHITECTURE
+  (the request cost), USER_GUIDE (Log; Historical import), CHANGELOG.
 
 - **PRO-3747 — the separate-storefront hint on Settings > Intelligence
   follows a Connection save (2026-10-05; unreleased, after rc7).** The hint

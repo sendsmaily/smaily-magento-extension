@@ -311,6 +311,7 @@ class FlushEventQueueTest extends IntegrationTestCase
             new Response(200, [], '{"code":203,"message":"Invalid data"}'),
         ])]);
 
+        self::assertCount(1, $this->requests, 'A single contact is not sent again');
         $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
         self::assertSame(Event::STATUS_FAILED, $row['status']);
         self::assertSame('1', (string)$row['attempts'], 'The other four attempts are not spent');
@@ -320,6 +321,68 @@ class FlushEventQueueTest extends IntegrationTestCase
             ['http_status' => 200, 'body' => ['code' => 203, 'message' => 'Invalid data']],
             json_decode((string)$row['last_response'], true)
         );
+    }
+
+    /**
+     * PRO-3753: Smaily answers one code per request, so a 203 on a group of
+     * contacts goes again one contact per request in the same run: the
+     * valid contacts sync, only the refused one fails with Smaily's answer.
+     */
+    public function testAnInvalidDataEnvelopeOnAGroupSendsEachContactAlone(): void
+    {
+        $this->enqueueContacts(5);
+
+        $this->runCron(['contact.sync' => $this->realContactSync([
+            new Response(200, [], '{"code":203,"message":"Invalid data"}'),
+            new Response(200, [], '{"code":101,"message":"OK"}'),
+            new Response(200, [], '{"code":101,"message":"OK"}'),
+            new Response(200, [], '{"code":203,"message":"Invalid email"}'),
+            new Response(200, [], '{"code":101,"message":"OK"}'),
+            new Response(200, [], '{"code":101,"message":"OK"}'),
+        ])]);
+
+        self::assertCount(6, $this->requests, 'The group, then each of its five contacts alone');
+        self::assertSame($this->contacts(1, 2, 3, 4, 5), $this->postedBody(0));
+        foreach ([1, 2, 3, 4, 5] as $n) {
+            self::assertSame($this->contacts($n), $this->postedBody($n));
+        }
+
+        $rows = array_column($this->fetchAll(EventResource::TABLE_NAME), null, 'event_uuid');
+        foreach (['f-c1', 'f-c2', 'f-c4', 'f-c5'] as $uuid) {
+            self::assertSame(Event::STATUS_SENT, $rows[$uuid]['status'], $uuid);
+            self::assertNull($rows[$uuid]['last_error']);
+            self::assertSame(
+                ['http_status' => 200, 'body' => ['code' => 101, 'message' => 'OK']],
+                json_decode((string)$rows[$uuid]['last_response'], true)
+            );
+        }
+        $refused = $rows['f-c3'];
+        self::assertSame(Event::STATUS_FAILED, $refused['status']);
+        self::assertSame('1', (string)$refused['attempts']);
+        self::assertNull($refused['next_retry_at']);
+        self::assertSame('permanent_envelope_203: Smaily API returned code 203: Invalid email', $refused['last_error']);
+        self::assertSame($this->contacts(3), json_decode((string)$refused['sent_payload'], true));
+        self::assertSame(
+            ['http_status' => 200, 'body' => ['code' => 203, 'message' => 'Invalid email']],
+            json_decode((string)$refused['last_response'], true)
+        );
+    }
+
+    public function testAnotherErrorEnvelopeOnAGroupKeepsTheGroupOnTheLadder(): void
+    {
+        $this->enqueueContacts(5);
+
+        $this->runCron(['contact.sync' => $this->realContactSync([
+            new Response(200, [], '{"code":216,"message":"Unknown error"}'),
+        ])]);
+
+        self::assertCount(1, $this->requests, 'Only a 203 sends the contacts alone');
+        foreach ($this->fetchAll(EventResource::TABLE_NAME) as $row) {
+            self::assertSame(Event::STATUS_PENDING, $row['status']);
+            self::assertSame('1', (string)$row['attempts']);
+            self::assertSame($this->clockDate(EventQueue::BACKOFF_SECONDS[0]), $row['next_retry_at']);
+            self::assertSame('Smaily API returned code 216: Unknown error', $row['last_error']);
+        }
     }
 
     public function testAnotherErrorEnvelopeKeepsTheLadder(): void
@@ -592,6 +655,30 @@ class FlushEventQueueTest extends IntegrationTestCase
             0,
             $uuid
         );
+    }
+
+    private function enqueueContacts(int $count): void
+    {
+        for ($n = 1; $n <= $count; $n++) {
+            $payload = ['store_id' => 0, 'contact' => $this->contacts($n)[0]];
+            $this->queue->enqueue('contact.sync', $payload, null, 0, 'f-c' . $n);
+        }
+    }
+
+    /**
+     * @return list<array{email: string}>
+     */
+    private function contacts(int ...$numbers): array
+    {
+        return array_map(static fn (int $n): array => ['email' => 'u' . $n . '@example.invalid'], $numbers);
+    }
+
+    /**
+     * @return mixed the JSON body of the request the fake transport received at $index
+     */
+    private function postedBody(int $index): mixed
+    {
+        return json_decode((string)$this->requests[$index]['request']->getBody(), true);
     }
 
     /**

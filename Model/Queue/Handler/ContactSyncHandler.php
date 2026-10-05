@@ -23,8 +23,10 @@ use Smaily\Connect\Model\Queue\Skipped;
 /**
  * Delivers queued contact.sync events as batched POST /api/contact.php
  * upserts, grouped by store view so per-language Smaily accounts
- * (multilingual mode A) hit the right account. An abandoned-cart purchase
- * marker is posted only after a read finds the contact in Smaily (PRO-3619).
+ * (multilingual mode A) hit the right account; a group Smaily refuses as
+ * invalid data goes again one contact per request (PRO-3753). An
+ * abandoned-cart purchase marker is posted only after a read finds the
+ * contact in Smaily (PRO-3619).
  *
  * Event payload shape: {store_id: int, contact: {email, ...}}.
  */
@@ -67,33 +69,63 @@ class ContactSyncHandler implements EventHandlerInterface
         }
 
         foreach ($byStore as $storeId => $rows) {
-            $contacts = array_column($rows, 'contact');
-            $client = null;
-            try {
-                $client = $this->clientProvider->forStore($storeId ?: null);
-                $client->post(SmailyClient::ENDPOINT_CONTACT, $contacts);
-                $error = null;
-            } catch (SmailyClientException $exception) {
-                // Handed on whole: only the exception carries the HTTP status
-                // and Retry-After the queue classifies on (Failure::of()).
-                $error = $exception;
-                $this->logger->info('Contact sync batch failed', [
+            $results += $this->deliver($storeId, $rows);
+        }
+
+        return $results;
+    }
+
+    /**
+     * Post one store's contacts in one request, and each row's result. Smaily
+     * answers one code per request, never per contact, so when it refuses a
+     * group of contacts as invalid data (203) the contacts go again one at a
+     * time in the same run: the valid ones sync and only the refused one
+     * fails, with Smaily's answer (PRO-3753; WooCommerce posts one contact
+     * per request). Any other failure stays the group's.
+     *
+     * @param list<array{event: Event, contact: array<string, mixed>}> $rows
+     * @return array<int, true|SmailyClientException>
+     */
+    private function deliver(int $storeId, array $rows, ?SmailyClient $client = null): array
+    {
+        try {
+            $client ??= $this->clientProvider->forStore($storeId ?: null);
+            $client->post(SmailyClient::ENDPOINT_CONTACT, array_column($rows, 'contact'));
+            $error = null;
+        } catch (SmailyClientException $exception) {
+            if (count($rows) > 1 && $exception instanceof ApiException
+                && $exception->getSmailyCode() === ApiException::CODE_INVALID_DATA
+            ) {
+                $this->logger->info('Contact sync batch refused as invalid data; sending each contact alone', [
                     'store_id' => $storeId,
                     'count' => count($rows),
-                    'error' => $exception->getSourceMessage(),
                 ]);
-            }
-
-            $exchange = $client?->lastExchange();
-            foreach ($rows as $row) {
-                /** @var Event $event */
-                $event = $row['event'];
-                $results[(int)$event->getId()] = $error ?? true;
-                if ($exchange !== null) {
-                    // The row's own part of the batch body — never the other
-                    // contacts posted with it — and the reply to the batch.
-                    $this->eventQueue->recordExchange($event, [$row['contact']], $exchange['response']);
+                $results = [];
+                foreach ($rows as $row) {
+                    $results += $this->deliver($storeId, [$row], $client);
                 }
+
+                return $results;
+            }
+            // Handed on whole: only the exception carries the HTTP status
+            // and Retry-After the queue classifies on (Failure::of()).
+            $error = $exception;
+            $this->logger->info('Contact sync batch failed', [
+                'store_id' => $storeId,
+                'count' => count($rows),
+                'error' => $exception->getSourceMessage(),
+            ]);
+        }
+
+        $results = [];
+        $exchange = $client?->lastExchange();
+        foreach ($rows as $row) {
+            $event = $row['event'];
+            $results[(int)$event->getId()] = $error ?? true;
+            if ($exchange !== null) {
+                // The row's own part of the request body — never the other
+                // contacts posted with it — and the reply to that request.
+                $this->eventQueue->recordExchange($event, [$row['contact']], $exchange['response']);
             }
         }
 

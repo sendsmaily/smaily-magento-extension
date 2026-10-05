@@ -902,6 +902,9 @@ traffic:
   confirmation email. A customer who unsubscribed in the store goes as
   unsubscribed. Guest-order emails are not imported. The estimate above the **Start import** button counts these
   contacts for the mode picked on the panel.
+  When Smaily answers a chunk with "invalid data", the import sends that
+  chunk's contacts again one at a time, so only the contacts Smaily
+  refuses count as failed and the others are imported.
   The import obeys that website's **Sync contacts to Smaily**
   switch exactly like the live syncs do: with the switch off the import
   button is disabled and says so, and an import started any other way
@@ -1061,7 +1064,11 @@ card — you do not have to keep the page open:
   refusal in the last error, so the failed count tells you now instead of
   six hours later. So is a row the extension itself can never send (its
   data is incomplete, or no part of the extension handles it); Details
-  says it stopped after 1 of 5 attempts. When Smaily asks the store to slow down, the row waits
+  says it stopped after 1 of 5 attempts. Smaily answers a group of contact syncs as
+  a whole, so when it answers "invalid data" for a group, the extension
+  sends that group's contacts again one at a time in the same run: the
+  other contacts sync, and only the contact Smaily refused fails, with
+  Smaily's answer. When Smaily asks the store to slow down, the row waits
   exactly as long as it asked before the next attempt.
 - An admin notification appears when the engine has been unreachable for
   over an hour, or when many events failed within 24 hours.

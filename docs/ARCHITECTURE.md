@@ -480,6 +480,21 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   purchase-marker check itself (PRO-3619), and no other code is known to be
   final. The list is `ApiException::PERMANENT_CODES`; adding a code there
   is the whole change.
+- **A 203 on a group of contacts (PRO-3753).** Smaily answers one
+  `{code, message}` per request, never per contact, so one invalid contact
+  makes it refuse the whole group. When a `contact.sync` group (one store
+  view's rows of a flush, up to the 200-row batch) or a contacts-import
+  page (up to 500 per store view, `Backfill\ContactsProcessor`) is
+  answered with 203, each of its contacts is posted again alone in the
+  same run, through the same client: the valid ones sync, and only the
+  refused one fails (`permanent_envelope_203`, Smaily's answer as its last
+  response; the import counts it as failed). WooCommerce posts one contact
+  per request, so the outcome is the same. A single contact's 203 is not
+  sent again, and any other failure of the group stays the group's.
+  **Request cost:** 1 + the group's size requests, only on a 203; every
+  other outcome is one request per group, as before. An import page split
+  this way can run past the tick's 20-second budget, which is checked
+  between pages.
 - **Claiming:** rows are claimed with a per-worker `claim_token`; only rows
   the worker actually won are processed, so concurrent flushes (manual cron,
   multi-node) can never double-send. Rows stuck in `sending` (killed

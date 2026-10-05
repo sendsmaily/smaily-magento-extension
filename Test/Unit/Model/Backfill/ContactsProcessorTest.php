@@ -18,6 +18,7 @@ use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Backfill\ContactsProcessor;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
+use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
@@ -162,6 +163,61 @@ class ContactsProcessorTest extends TestCase
 
         $this->createProcessor($jobManager, $audience, $clientProvider, true, SyncMode::MODE_LEGITIMATE_INTEREST)
             ->process($job);
+    }
+
+    /**
+     * PRO-3753: a page Smaily refuses as invalid data (203) goes again one
+     * contact per request, so only the refused contact counts as failed.
+     */
+    public function testAnInvalidDataRefusalOfAPageSendsEachContactAlone(): void
+    {
+        $posted = [];
+        $client = $this->createMock(SmailyClient::class);
+        $client->expects(self::exactly(6))->method('post')
+            ->willReturnCallback(function (string $endpoint, array $contacts) use (&$posted): array {
+                $posted[] = array_column($contacts, 'email');
+                if (count($contacts) > 1 || $contacts[0]['email'] === 'u3@example.invalid') {
+                    throw new ApiException('Smaily API returned code 203: Invalid data', 203);
+                }
+
+                return [];
+            });
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->expects(self::once())->method('forStore')->with(5)->willReturn($client);
+
+        $audience = $this->createAudience(SyncMode::MODE_CONSENT, 5);
+        $page = array_map(fn (int $n): array => $this->row(70 + $n, 'u' . $n . '@example.invalid', true), range(1, 5));
+        $audience->method('subscriberPage')->willReturnOnConsecutiveCalls($page, []);
+
+        $jobManager = $this->createMock(JobManager::class);
+        $jobManager->expects(self::once())->method('recordProgress')->with(self::anything(), 4, 1, '75');
+
+        $this->createProcessor($jobManager, $audience, $clientProvider, true, SyncMode::MODE_CONSENT)
+            ->process($this->createJob(null, ['0', '75']));
+
+        $emails = array_map(static fn (int $n): string => 'u' . $n . '@example.invalid', range(1, 5));
+        self::assertSame([$emails, ...array_map(static fn (string $email): array => [$email], $emails)], $posted);
+    }
+
+    public function testAnotherRefusalOfAPageFailsThePageInOneRequest(): void
+    {
+        $client = $this->createMock(SmailyClient::class);
+        $client->expects(self::once())->method('post')
+            ->willThrowException(new ApiException('Smaily API returned code 216: Unknown error', 216));
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->method('forStore')->willReturn($client);
+
+        $audience = $this->createAudience(SyncMode::MODE_CONSENT, 2);
+        $audience->method('subscriberPage')->willReturnOnConsecutiveCalls([
+            $this->row(71, 'u1@example.invalid', true),
+            $this->row(72, 'u2@example.invalid', true),
+        ], []);
+
+        $jobManager = $this->createMock(JobManager::class);
+        $jobManager->expects(self::once())->method('recordProgress')->with(self::anything(), 0, 2, '72');
+
+        $this->createProcessor($jobManager, $audience, $clientProvider, true, SyncMode::MODE_CONSENT)
+            ->process($this->createJob(null, ['0', '72']));
     }
 
     public function testCheckoutOptInOnlySendsNobodyAndReportsAZeroTotal(): void

@@ -11,6 +11,7 @@ namespace Smaily\Connect\Model\Backfill;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Framework\Api\SearchCriteriaBuilder;
+use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
@@ -169,20 +170,48 @@ class ContactsProcessor implements ProcessorInterface
         $processed = 0;
         $failed = 0;
         foreach ($byStore as $storeId => $contacts) {
-            try {
-                $this->clientProvider->forStore($storeId)->post(SmailyClient::ENDPOINT_CONTACT, $contacts);
-                $processed += count($contacts);
-            } catch (SmailyClientException $exception) {
-                $failed += count($contacts);
-                $this->logger->error('Contacts backfill batch failed', [
-                    'store_id' => $storeId,
-                    'count' => count($contacts),
-                    'error' => $exception->getMessage(),
-                ]);
-            }
+            $sent = $this->post($storeId, $contacts);
+            $processed += $sent;
+            $failed += count($contacts) - $sent;
         }
 
         return [$processed, $failed];
+    }
+
+    /**
+     * Post one store's contacts in one request; how many of them Smaily
+     * took. A group Smaily refuses as invalid data (203) goes again one
+     * contact per request, so only the refused contact counts as failed
+     * (PRO-3753, as the queued contact sync).
+     *
+     * @param list<array<string, mixed>> $contacts
+     */
+    private function post(int $storeId, array $contacts, ?SmailyClient $client = null): int
+    {
+        try {
+            $client ??= $this->clientProvider->forStore($storeId);
+            $client->post(SmailyClient::ENDPOINT_CONTACT, $contacts);
+
+            return count($contacts);
+        } catch (SmailyClientException $exception) {
+            if (count($contacts) > 1 && $exception instanceof ApiException
+                && $exception->getSmailyCode() === ApiException::CODE_INVALID_DATA
+            ) {
+                $sent = 0;
+                foreach ($contacts as $contact) {
+                    $sent += $this->post($storeId, [$contact], $client);
+                }
+
+                return $sent;
+            }
+            $this->logger->error('Contacts backfill batch failed', [
+                'store_id' => $storeId,
+                'count' => count($contacts),
+                'error' => $exception->getMessage(),
+            ]);
+
+            return 0;
+        }
     }
 
     /**

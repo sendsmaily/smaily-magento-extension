@@ -17,6 +17,7 @@ use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Privacy\ProfilingConsent;
 
 /**
  * Drains the engine ingest queue, one batch per domain per run.
@@ -30,6 +31,10 @@ use Smaily\Connect\Model\Logger\Logger;
  * Transport failures (429 after retries, 5xx, network) reschedule the batch
  * with backoff; per-item validation errors are terminal for that row.
  *
+ * A customer or an order the engine confirmed has its shopper's stored
+ * profiling opt-out sent again (PRO-3760): the engine kept no opt-out made
+ * before it knew the shopper, and customer and order data carry no consent.
+ *
  * The catalog_remove domain (§3b product-level removal, PRO-1231) is NOT
  * D6 and gets its own flush path: on a 2xx every batched id was applied —
  * an id in `not_found` is a contract-defined success ("already removed, or
@@ -37,11 +42,21 @@ use Smaily\Connect\Model\Logger\Logger;
  */
 class FlushIngestQueue
 {
+    /**
+     * The item field that names the shopper, for the domains whose
+     * confirmation sends a stored opt-out again (PRO-3760).
+     */
+    private const SHOPPER_EMAIL_FIELDS = [
+        Client::DOMAIN_CUSTOMERS => 'email',
+        Client::DOMAIN_ORDERS => 'customer_email',
+    ];
+
     public function __construct(
         private readonly Settings $settings,
         private readonly IngestQueue $queue,
         private readonly CatalogIngest $catalogIngest,
         private readonly Client $client,
+        private readonly ProfilingConsent $profilingConsent,
         private readonly Json $serializer,
         private readonly Logger $logger
     ) {
@@ -120,7 +135,7 @@ class FlushIngestQueue
         }
 
         $this->recordBatchExchange($domain, $events, $items);
-        $this->applyD6Response($domain, $events, $response);
+        $this->applyD6Response($domain, $events, $items, $response);
     }
 
     /**
@@ -265,9 +280,10 @@ class FlushIngestQueue
 
     /**
      * @param IngestEvent[] $events indexed 0..n-1 in send order
+     * @param array<int, array<string, mixed>> $items the same indexes
      * @param array<string, mixed> $response
      */
-    private function applyD6Response(string $domain, array $events, array $response): void
+    private function applyD6Response(string $domain, array $events, array $items, array $response): void
     {
         $errorsByIndex = [];
         foreach ((array)($response['errors'] ?? []) as $error) {
@@ -280,6 +296,8 @@ class FlushIngestQueue
             }
         }
 
+        $emailField = self::SHOPPER_EMAIL_FIELDS[$domain] ?? null;
+        $confirmedEmails = [];
         foreach ($events as $index => $event) {
             if (isset($errorsByIndex[$index])) {
                 // Per-item validation error: terminal, the data won't improve
@@ -287,7 +305,13 @@ class FlushIngestQueue
                 $this->queue->markFailed($event, $errorsByIndex[$index], true);
             } else {
                 $this->queue->markSent($event);
+                if ($emailField !== null) {
+                    $confirmedEmails[] = (string)($items[$index][$emailField] ?? '');
+                }
             }
+        }
+        if ($confirmedEmails) {
+            $this->profilingConsent->resendOptOuts($confirmedEmails);
         }
 
         if ($errorsByIndex) {

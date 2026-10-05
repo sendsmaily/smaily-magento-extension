@@ -934,7 +934,7 @@ or a subscription Smaily's consent mirror writes counts too.
   recorded as a mirror (moment 0, so any dated opt-in is newer) and queued
   for the engine on the read that finds it (a My Account visit, or the
   identity merge at login). The rule throughout: every change to the record
-  queues one engine row, and nothing else does.
+  queues one engine row, and only the replay below queues another.
 - **Delivery** is `Queue\Handler\ProfilingConsentHandler`, on the normal
   retry ladder, behind the same sending gate as the identity merge. A row is
   sent only while it still matches the record: a retry or a Send again of a
@@ -942,13 +942,32 @@ or a subscription Smaily's consent mirror writes counts too.
   `Queue\Skipped` (read as Skipped in the Log), so an older answer never
   undoes a newer one at the engine. A §10 404 (the engine
   holds nothing for that address) also closes the row — there is nothing to
-  exclude. Any other engine 4xx is handed on whole, so `Queue\Failure`
+  exclude yet; the replay below sends the opt-out again once there is. Any other engine 4xx is handed on whole, so `Queue\Failure`
   fails the row on the first attempt as `permanent_http_<code>` (PRO-3752).
   While Campaign Intelligence refuses the account the rows wait exactly as
   the identity merges below do (a `PausableEventHandlerInterface`, not
   claimed; a row that meets the refusal mid-run answered `Queue\Pending`),
   and the match against the record on delivery keeps the newest choice
   winning however many waited.
+- **An opt-out the engine did not keep** (PRO-3760, Erkki 2026-10-05). The
+  engine keeps a §10 opt-out only for a shopper it holds, and customer
+  and order data carry no consent (§4, §5), so an opt-out made before the
+  engine knew the shopper (a newsletter-only guest: the 404 above) would
+  not hold once a later order (§5 creates the customer), a customer save or
+  the customer/order history import creates them. So `Cron\FlushIngestQueue`,
+  where the engine's D6 answer marks each customer and order row delivered,
+  hands the addresses of the rows the engine confirmed (processed or
+  deduplicated, not a per-item error) to `ProfilingConsent::resendOptOuts()`,
+  once per batch. That reads the record once for the whole batch
+  (`ProfilingOptOuts::moments()`) and queues an opt-out row with the stored
+  moment (a mirror's 0: the moment of sending) through the same
+  `queueForEngine()`, so the newest-choice match on delivery and the wait
+  for a refused account apply to it. A shopper with no opt-out gets
+  nothing. One already waiting (`EventQueue::waitingProfilingOptOuts()`: an
+  opt-out row pending, in its backoff or being sent) gets no second row, so
+  many orders make one; once that row is delivered, the next confirmation
+  queues one again, which the engine takes as a no-op. The row is queued
+  only after the engine confirmed the shopper, so it finds them.
 - **Identity merge.** `Queue\Handler\IdentityMergeHandler` asks
   `isAllowed()` (at the customer's store view, whose Smaily account holds
   the contact) before each merge; an opted-out shopper's row is closed

@@ -91,7 +91,9 @@ class ProfilingConsentHandler implements PausableEventHandlerInterface
                 $results[$id] = true;
             } catch (EngineRequestException $exception) {
                 // §10: 404 = the engine holds nothing for this address, so
-                // there is nothing to exclude (a newsletter-only guest).
+                // there is nothing to exclude (a newsletter-only guest); the
+                // opt-out is sent again once the engine confirms a customer
+                // or an order of the shopper (PRO-3760).
                 // Any other 4xx refuses this choice and stops on the first
                 // attempt (PRO-1961); the account refusal (contract §2 `403
                 // tenant_inactive`) is not this row's fault: it waits.

@@ -269,6 +269,44 @@ class ProfilingConsent
         $this->remember($email, '1');
     }
 
+    /**
+     * The engine confirmed a customer or an order for these shoppers
+     * (PRO-3760). The engine keeps an opt-out only for a shopper it holds,
+     * and answers an opt-out for anyone else with "not found", so an opt-out
+     * made before the engine knew the shopper did not stay there; customer
+     * and order data carry no consent. The store's opt-out of each one who
+     * opted out is queued again with its moment, through the same queue
+     * row, so the newest choice still wins at delivery. Not for a shopper
+     * whose opt-out already waits in the queue: many orders make one row.
+     *
+     * @param string[] $emails
+     */
+    public function resendOptOuts(array $emails): void
+    {
+        $emails = array_values(array_unique(array_filter(array_map(
+            static fn (string $email): string => strtolower(trim($email)),
+            $emails
+        ))));
+        if (!$emails) {
+            return;
+        }
+
+        $moments = $this->optOuts->moments($emails);
+        $waiting = $this->eventQueue->waitingProfilingOptOuts(array_keys($moments));
+        foreach ($moments as $email => $moment) {
+            if (in_array($email, $waiting, true)) {
+                continue;
+            }
+            // A mirror of an opt-out read back from Smaily has no moment of
+            // its own (0): it goes with the moment of sending, as it did.
+            $this->queueForEngine(
+                (string)$email,
+                true,
+                gmdate(self::TIMESTAMP_FORMAT, $moment > 0 ? $moment : $this->dateTime->gmtTimestamp())
+            );
+        }
+    }
+
     private function cacheKey(string $email): string
     {
         return self::CACHE_PREFIX . $this->optOuts->addressKey($email);

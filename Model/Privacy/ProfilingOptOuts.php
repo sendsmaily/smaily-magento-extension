@@ -61,10 +61,28 @@ class ProfilingOptOuts
      */
     public function moment(string $email): ?int
     {
-        $entry = $this->entry($email);
-        $moment = is_array($entry) ? ($entry['at'] ?? null) : $entry;
+        return $this->momentOf($this->entry($this->all(), $email));
+    }
 
-        return is_int($moment) ? $moment : null;
+    /**
+     * The moments of the store's opt-outs for those of these addresses it
+     * holds one for, from one read of the record (PRO-3760).
+     *
+     * @param string[] $emails
+     * @return array<string, int> moment by address
+     */
+    public function moments(array $emails): array
+    {
+        $optOuts = $this->all();
+        $moments = [];
+        foreach ($emails as $email) {
+            $moment = $this->momentOf($this->entry($optOuts, $email));
+            if ($moment !== null) {
+                $moments[$email] = $moment;
+            }
+        }
+
+        return $moments;
     }
 
     /**
@@ -72,7 +90,7 @@ class ProfilingOptOuts
      */
     public function isByUnsubscribe(string $email): bool
     {
-        $entry = $this->entry($email);
+        $entry = $this->entry($this->all(), $email);
 
         return is_array($entry) && ($entry['by'] ?? null) === self::BY_UNSUBSCRIBE;
     }
@@ -134,11 +152,12 @@ class ProfilingOptOuts
     }
 
     /**
-     * The address's entry under any of its keys, or null.
+     * The address's entry in the record under any of its keys, or null.
+     *
+     * @param array<string, mixed> $optOuts
      */
-    private function entry(string $email): mixed
+    private function entry(array $optOuts, string $email): mixed
     {
-        $optOuts = $this->all();
         foreach ($this->keys($email) as $key) {
             if (array_key_exists($key, $optOuts)) {
                 return $optOuts[$key];
@@ -146,6 +165,17 @@ class ProfilingOptOuts
         }
 
         return null;
+    }
+
+    /**
+     * An entry's moment: a plain moment, or the one an unsubscribe entry
+     * carries; null for no entry.
+     */
+    private function momentOf(mixed $entry): ?int
+    {
+        $moment = is_array($entry) ? ($entry['at'] ?? null) : $entry;
+
+        return is_int($moment) ? $moment : null;
     }
 
     /**

@@ -1102,7 +1102,17 @@ card — you do not have to keep the page open:
   refuses as invalid cannot succeed by sending it again, so it fails at
   once in the **Log** with the engine's answer.
   A delivery that waits while the shopper changes their mind is not sent —
-  only the newest choice reaches the engine. The store's own record of an
+  only the newest choice reaches the engine. Campaign Intelligence keeps an
+  opt-out only for a shopper it already knows: an opt-out made before that
+  (for example by a guest who only subscribed to the newsletter) closes as
+  delivered in the **Log**, with nothing to exclude yet. The store keeps
+  the opt-out, and when Campaign Intelligence later confirms a customer or
+  an order of that shopper — from an order, a customer account save, or the
+  customer or order import — the opt-out is sent again as a new
+  `engine.profiling_consent` row, so the shopper is not personalized once
+  Campaign Intelligence knows them. A shopper who opted back in meanwhile,
+  or never opted out, gets no such row, and a shopper with many orders gets
+  one waiting row, not one per order. The store's own record of an
   opt-out holds even when Smaily cannot be reached or a write to Smaily
   failed; an older "yes" on the Smaily contact never overrides a newer "no"
   made in the store (the store writes its "no" back to the contact instead).

@@ -5,7 +5,9 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-05 — PRO-3749 (a Smaily HTTP error shows Smaily's
+_Last updated: 2026-10-05 — PRO-3760 (an opt-out the engine did not keep
+is sent again once the engine confirms a customer or an order of the
+shopper); earlier the same day PRO-3749 (a Smaily HTTP error shows Smaily's
 answer in the Log's error column), PRO-2465 (the GDPR command and the
 Campaign Intelligence automations form respect a refused account), PRO-1961
 (one seam for terminal failures in the marketing queue), PRO-2466
@@ -143,6 +145,35 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3760 — an opt-out made before the engine knew the shopper reaches
+  the engine once it does (2026-10-05; owner decision 2026-10-05, no
+  contract change; CHANGELOG bullet under "Changes since 3.0.0-rc6").** The
+  engine answers a §10 opt-out for a shopper it does not hold with 404 (a
+  newsletter-only guest), the handler closes the row as delivered, and §4/§5
+  carry no consent, so a later order, customer save or history import
+  created the shopper at the engine without the opt-out.
+  `Cron\FlushIngestQueue::applyD6Response()` now hands the addresses of the
+  customer (`email`) and order (`customer_email`) rows the engine confirmed
+  (no per-item error) to `ProfilingConsent::resendOptOuts()`, once per
+  batch: one read of the record (`ProfilingOptOuts::moments()`), one query
+  for opt-outs already waiting (`EventQueue::waitingProfilingOptOuts()`:
+  pending incl. backoff, or sending), then the existing `queueForEngine()`
+  with the stored moment (a mirror's 0 → now). Dedup = skip when an
+  opt-out row already waits (no deterministic uuid: a delivered replay does
+  not block a later one, which the engine takes as a no-op). The handler's
+  404 → delivered is unchanged; newest-wins at delivery and the
+  refused-account wait apply as they are. Unit (moments in one read; the
+  selection: opted out → queued with its moment, not opted out → nothing,
+  mirror → now, waiting → nothing, duplicates → one; the flusher passes
+  only confirmed customer/order addresses, never catalog) and integration
+  (`ProfilingOptOutReplayTest`, real DB, real flag record, both crons, a
+  fake engine that keeps an opt-out only for a shopper it holds: order and
+  customer confirmed → the engine holds the opt-out; not opted out →
+  nothing; opted in again → nothing; three orders and a customer over two
+  flushes → one waiting row) — the positive ones and the dedup red before.
+  No DI change (constructor arg only; `setup:di:compile` green).
+  ARCHITECTURE (profiling consent), USER_GUIDE (personalization consent).
 
 - **Simplification pass, behaviour-neutral (2026-10-05)**, over PRO-2509,
   PRO-2510, PRO-3749, PRO-2465, PRO-1961, PRO-2466, PRO-1962 and PRO-3752.

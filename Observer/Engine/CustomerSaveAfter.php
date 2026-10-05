@@ -19,7 +19,8 @@ use Smaily\Connect\Model\Engine\Settings;
 /**
  * Customer ingest on profile create/update. Separate from Smaily marketing
  * sync: the engine gets every registered customer (no consent fields on the
- * wire) and honours profiling opt-outs engine-side.
+ * wire); once it confirms one, the flush sends the shopper's stored
+ * profiling opt-out again (Cron\FlushIngestQueue, PRO-3760).
  */
 class CustomerSaveAfter implements ObserverInterface
 {

@@ -20,6 +20,7 @@ use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Privacy\ProfilingConsent;
 
 class FlushIngestQueueTest extends TestCase
 {
@@ -27,6 +28,7 @@ class FlushIngestQueueTest extends TestCase
     private Client&MockObject $client;
     private Settings&MockObject $settings;
     private CatalogIngest&MockObject $catalogIngest;
+    private ProfilingConsent&MockObject $profilingConsent;
 
     /** @var array<int, array<string, mixed>> payloads by event id (decodePayload stub) */
     private array $payloads = [];
@@ -38,6 +40,7 @@ class FlushIngestQueueTest extends TestCase
         $this->settings = $this->createMock(Settings::class);
         $this->settings->method('isSendingAllowed')->willReturn(true);
         $this->catalogIngest = $this->createMock(CatalogIngest::class);
+        $this->profilingConsent = $this->createMock(ProfilingConsent::class);
         $this->queue->method('decodePayload')->willReturnCallback(
             fn (IngestEvent $event): array => $this->payloads[(int)$event->getId()] ?? ['sku' => 'X']
         );
@@ -160,6 +163,7 @@ class FlushIngestQueueTest extends TestCase
             $this->queue,
             $this->catalogIngest,
             $this->client,
+            $this->profilingConsent,
             new Json(),
             $this->createMock(Logger::class)
         ))->execute();
@@ -293,6 +297,46 @@ class FlushIngestQueueTest extends TestCase
     }
 
     /**
+     * PRO-3760: the shoppers of the customers and orders the engine
+     * confirmed — not of a row it refused, nor of a catalog row — have
+     * their stored opt-out sent again, one call per batch.
+     */
+    public function testTheShoppersOfConfirmedCustomersAndOrdersHaveTheirOptOutsSentAgain(): void
+    {
+        $this->payloads = [
+            21 => ['email' => 'u1@example.invalid'],
+            22 => ['email' => 'u2@example.invalid'],
+            23 => ['email' => 'u3@example.invalid'],
+            31 => ['external_order_id' => '100', 'customer_email' => 'u4@example.invalid'],
+        ];
+        $this->stubClaims([
+            Client::DOMAIN_CATALOG => [$this->createEvent(11)],
+            Client::DOMAIN_CUSTOMERS => [
+                $this->createEvent(21, Client::DOMAIN_CUSTOMERS),
+                $this->createEvent(22, Client::DOMAIN_CUSTOMERS),
+                $this->createEvent(23, Client::DOMAIN_CUSTOMERS),
+            ],
+            Client::DOMAIN_ORDERS => [$this->createEvent(31, Client::DOMAIN_ORDERS)],
+        ]);
+        $this->client->method('ingest')->willReturnCallback(
+            static fn (string $domain): array => $domain === Client::DOMAIN_CUSTOMERS
+                ? ['processed' => 1, 'deduplicated' => 1, 'errors' => [['index' => 1, 'field' => 'email']]]
+                : ['processed' => 1, 'deduplicated' => 0, 'errors' => []]
+        );
+
+        $resent = [];
+        $this->profilingConsent->method('resendOptOuts')->willReturnCallback(
+            static function (array $emails) use (&$resent): void {
+                $resent[] = $emails;
+            }
+        );
+
+        $this->createCron()->execute();
+
+        self::assertSame([['u1@example.invalid', 'u3@example.invalid'], ['u4@example.invalid']], $resent);
+    }
+
+    /**
      * @param array<string, IngestEvent[]> $byDomain
      */
     private function stubClaims(array $byDomain): void
@@ -309,6 +353,7 @@ class FlushIngestQueueTest extends TestCase
             $this->queue,
             $this->catalogIngest,
             $this->client,
+            $this->profilingConsent,
             new Json(),
             $this->createMock(Logger::class)
         );

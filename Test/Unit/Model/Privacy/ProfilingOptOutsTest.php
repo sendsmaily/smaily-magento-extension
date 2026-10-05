@@ -83,6 +83,46 @@ class ProfilingOptOutsTest extends TestCase
         self::assertSame(0, $this->optOuts->moment('person@example.com'));
     }
 
+    /**
+     * PRO-3760: the opt-outs of a batch of addresses are read in one go —
+     * one read of the record — under any of their keys.
+     */
+    public function testTheOptOutsOfManyAddressesAreReadInOneGo(): void
+    {
+        $this->optOuts->record('u1@example.invalid', 1790000000);
+        $this->optOuts->record('u2@example.invalid', 0);
+        $this->optOuts->record('u3@example.invalid', 1790000001, true);
+        $this->flags[ProfilingOptOuts::FLAG_CODE][sha1('u4@example.invalid')] = 1790000002;
+
+        $reads = 0;
+        $flagManager = $this->createMock(FlagManager::class);
+        $flagManager->method('getFlagData')->willReturnCallback(function (string $code) use (&$reads): mixed {
+            $reads++;
+
+            return $this->flags[$code] ?? null;
+        });
+        $deploymentConfig = $this->createMock(DeploymentConfig::class);
+        $deploymentConfig->method('get')->willReturn(self::CRYPT_KEY);
+        $optOuts = new ProfilingOptOuts($flagManager, $this->createMock(LockManagerInterface::class), $deploymentConfig);
+
+        self::assertSame(
+            [
+                'u1@example.invalid' => 1790000000,
+                'u2@example.invalid' => 0,
+                'u3@example.invalid' => 1790000001,
+                'u4@example.invalid' => 1790000002,
+            ],
+            $optOuts->moments([
+                'u1@example.invalid',
+                'u2@example.invalid',
+                'u3@example.invalid',
+                'u4@example.invalid',
+                'u5@example.invalid',
+            ])
+        );
+        self::assertSame(1, $reads);
+    }
+
     public function testAnOptOutMadeByUnsubscribingIsKeptAsSuch(): void
     {
         $this->optOuts->record('person@example.com', 1790000000, true);

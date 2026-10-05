@@ -42,6 +42,9 @@ class ProfilingConsentTest extends TestCase
 
     private int $smailyReads = 0;
 
+    /** @var string[] addresses with a profiling opt-out already waiting in the queue */
+    private array $waitingOptOuts = [];
+
     /** @var array<string, string> */
     private array $cache = [];
 
@@ -538,6 +541,62 @@ class ProfilingConsentTest extends TestCase
         self::assertFalse($consent->knownPreference('person@example.com', 1));
     }
 
+    /**
+     * PRO-3760: the engine confirmed a customer or an order for these
+     * shoppers; the store's opt-out of each one who opted out is sent again,
+     * with the moment the store holds.
+     */
+    public function testAnOptOutIsSentAgainWhenTheEngineConfirmsTheShopper(): void
+    {
+        $this->records['u1@example.invalid'] = self::NOW - 3600;
+
+        $this->consent()->resendOptOuts(['U1@Example.invalid ', 'u2@example.invalid']);
+
+        self::assertSame([[
+            'event_type' => EventType::ENGINE_PROFILING_CONSENT,
+            'payload' => [
+                'email' => 'u1@example.invalid',
+                'opt_out' => true,
+                'opted_out_at' => gmdate('Y-m-d\TH:i:s\Z', self::NOW - 3600),
+            ],
+            'entity_id' => 'u1@example.invalid',
+        ]], $this->enqueued);
+    }
+
+    public function testAShopperWhoDidNotOptOutGetsNoConsentCall(): void
+    {
+        $this->consent()->resendOptOuts(['u2@example.invalid', '']);
+
+        self::assertSame([], $this->enqueued);
+    }
+
+    /**
+     * A mirror of an opt-out read back from Smaily has no moment of its own
+     * (0): it is sent with the moment of sending, as when it was mirrored.
+     */
+    public function testAMirroredOptOutIsSentAgainWithTheMomentOfSending(): void
+    {
+        $this->records['u1@example.invalid'] = 0;
+
+        $this->consent()->resendOptOuts(['u1@example.invalid']);
+
+        self::assertSame(self::NOW_Z, $this->enqueued[0]['payload']['opted_out_at']);
+    }
+
+    /**
+     * A shopper with many orders gets one waiting opt-out, not one per order.
+     */
+    public function testAnOptOutAlreadyWaitingIsNotQueuedAgain(): void
+    {
+        $this->records['u1@example.invalid'] = self::NOW - 3600;
+        $this->records['u2@example.invalid'] = self::NOW - 7200;
+        $this->waitingOptOuts = ['u2@example.invalid'];
+
+        $this->consent()->resendOptOuts(['u1@example.invalid', 'u1@example.invalid', 'u2@example.invalid']);
+
+        self::assertSame(['u1@example.invalid'], array_column($this->enqueued, 'entity_id'));
+    }
+
     private function consent(): ProfilingConsent
     {
         $provider = $this->createMock(SmailyClientProvider::class);
@@ -551,8 +610,14 @@ class ProfilingConsentTest extends TestCase
                 return true;
             }
         );
+        $eventQueue->method('waitingProfilingOptOuts')->willReturnCallback(
+            fn (array $emails): array => array_values(array_intersect($emails, $this->waitingOptOuts))
+        );
 
         $optOuts = $this->createMock(ProfilingOptOuts::class);
+        $optOuts->method('moments')->willReturnCallback(
+            fn (array $emails): array => array_intersect_key($this->records, array_flip($emails))
+        );
         $optOuts->method('moment')->willReturnCallback(
             fn (string $email): ?int => $this->records[$email] ?? null
         );

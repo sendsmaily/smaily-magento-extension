@@ -491,6 +491,39 @@ class EventQueue
     }
 
     /**
+     * Which of these addresses already have a profiling opt-out waiting for
+     * the engine (PRO-3760): a consent row carrying an opt-out, pending —
+     * a retry in its backoff too — or being sent. One query.
+     *
+     * @param string[] $emails
+     * @return string[]
+     */
+    public function waitingProfilingOptOuts(array $emails): array
+    {
+        if (!$emails) {
+            return [];
+        }
+
+        $connection = $this->resourceConnection->getConnection();
+        $rows = $connection->fetchAll(
+            $connection->select()
+                ->from($this->resourceConnection->getTableName(EventResource::TABLE_NAME), ['entity_id', 'payload'])
+                ->where('event_type = ?', EventType::ENGINE_PROFILING_CONSENT)
+                ->where('entity_id IN (?)', array_values($emails))
+                ->where('status IN (?)', [Event::STATUS_PENDING, Event::STATUS_SENDING])
+        );
+
+        $waiting = [];
+        foreach ($rows as $row) {
+            if (($this->payloadDecoder->decode((string)$row['payload'])['opt_out'] ?? false) === true) {
+                $waiting[(string)$row['entity_id']] = true;
+            }
+        }
+
+        return array_keys($waiting);
+    }
+
+    /**
      * Decode an event payload.
      *
      * @return array<int|string, mixed>

@@ -177,5 +177,6 @@ is written in English.
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385
-  canceled, PRO-3680 done); 2026-10-04: 0 open (PRO-1357 closed). Dates: none yet (2026-10-02 —
+  canceled, PRO-3680 done); 2026-10-04: 0 open (PRO-1357 closed);
+  2026-10-05: 0 open. Dates: none yet (2026-10-02 —
   not asked; PRO-2456 is placed before the rc1 tag).

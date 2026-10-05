@@ -163,7 +163,10 @@ heavy for a single module's CI. Module tables are installed by translating
 ## Sandbox (manual / end-to-end)
 
 A Docker Magento 2.4.8-p4 with sample data, the module mounted at
-`app/code/Smaily/Connect`:
+`app/code/Smaily/Connect`. The sample catalog installs (about 2,000
+products, their categories and the sample CMS pages), but the product image
+files do not: the image takes the sample data from `magento2-sample-data`,
+which carries no media, so the products' image files are missing.
 
 ```bash
 docker compose up -d

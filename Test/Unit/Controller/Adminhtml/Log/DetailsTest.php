@@ -18,7 +18,10 @@ use Magento\Framework\UrlInterface;
 use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\LayoutInterface;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Api\Queue\EventHandlerInterface;
+use Smaily\Connect\Api\Queue\PausableEventHandlerInterface;
 use Smaily\Connect\Controller\Adminhtml\Log\Details;
+use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Log\AttemptHistory;
 use Smaily\Connect\Model\Log\FailureMessage;
 use Smaily\Connect\Model\Log\PayloadRedactor;
@@ -26,6 +29,7 @@ use Smaily\Connect\Model\Log\QueueRowLoader;
 use Smaily\Connect\Model\Log\Resend;
 use Smaily\Connect\Model\Log\ResendGuard;
 use Smaily\Connect\Model\Log\StatusPill;
+use Smaily\Connect\Model\Queue\HandlerPool;
 use Smaily\Connect\Model\Queue\PayloadDecoder;
 use Smaily\Connect\Ui\Component\QueueStatusOptions;
 
@@ -38,6 +42,9 @@ class DetailsTest extends TestCase
 {
     /** @var array<string, mixed> */
     private array $blockData = [];
+
+    /** Whether Campaign Intelligence refuses the account in render(). */
+    private bool $refused = false;
 
     public function testAFailedRowTheGuardClearsOffersSendAgain(): void
     {
@@ -111,6 +118,35 @@ class DetailsTest extends TestCase
 
         $this->render($this->failedRow(), '');
         self::assertSame('jane@example.com', $this->blockData['entity']);
+    }
+
+    /**
+     * PRO-3753: while the account is refused, a pending engine-bound row is
+     * not sent at the next flush — an ingest row, or a row of a paused
+     * marketing handler — so Details says it waits for the account.
+     */
+    public function testAPendingEngineBoundRowWaitsForTheAccountWhileItIsRefused(): void
+    {
+        $this->refused = true;
+        $pending = ['status' => 'pending', 'attempts' => '0'];
+
+        $this->render(['source' => 'intelligence', 'type' => 'catalog'] + $pending + $this->failedRow(), '');
+        self::assertTrue($this->blockData['waits_for_account']);
+
+        $this->render(['type' => 'engine.profiling_consent'] + $pending + $this->failedRow(), '');
+        self::assertTrue($this->blockData['waits_for_account']);
+
+        $this->render($pending + $this->failedRow(), '');
+        self::assertFalse($this->blockData['waits_for_account'], 'A contact sync is sent meanwhile');
+
+        $this->render(['source' => 'intelligence', 'type' => 'catalog'] + $this->failedRow(), '');
+        self::assertFalse($this->blockData['waits_for_account'], 'A failed row waits for nothing');
+
+        $this->refused = false;
+        $this->render(['source' => 'intelligence', 'type' => 'catalog'] + $pending + $this->failedRow(), '');
+        self::assertFalse($this->blockData['waits_for_account']);
+        $this->render(['type' => 'engine.profiling_consent'] + $pending + $this->failedRow(), '');
+        self::assertFalse($this->blockData['waits_for_account']);
     }
 
     public function testAMissingRowOffersNothing(): void
@@ -192,6 +228,15 @@ class DetailsTest extends TestCase
             fn (string $route, array $params) => 'https://admin.test/' . $route . '/log_id/' . $params['log_id'] . '/'
         );
 
+        $engineSettings = $this->createMock(EngineSettings::class);
+        $engineSettings->method('isRefused')->willReturn($this->refused);
+        $paused = $this->createMock(PausableEventHandlerInterface::class);
+        $paused->method('isPaused')->willReturn($this->refused);
+        $handlerPool = new HandlerPool([
+            'contact.sync' => $this->createMock(EventHandlerInterface::class),
+            'engine.profiling_consent' => $paused,
+        ]);
+
         (new Details(
             $context,
             $rawFactory,
@@ -205,7 +250,9 @@ class DetailsTest extends TestCase
             new QueueStatusOptions(),
             new AttemptHistory(),
             new StatusPill(),
-            $url
+            $url,
+            $handlerPool,
+            $engineSettings
         ))->execute();
     }
 }

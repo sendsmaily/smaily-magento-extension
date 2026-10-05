@@ -42,6 +42,8 @@ $statusPill = (string)$block->getData('status_pill');
 $history = (array)$block->getData('history');
 /** @var string|null $resendUrl set only for a row the guard clears (PRO-2454) */
 $resendUrl = $block->getData('resend_url');
+// A pending row that is not sent until Campaign Intelligence is active again (PRO-3753).
+$waitsForAccount = (bool)$block->getData('waits_for_account');
 
 if (!$row) {
     ?>
@@ -80,6 +82,8 @@ if ($refusal !== null) {
     $retryText = __('Stopped after %1 of %2 attempts — retrying could not change the outcome, so this row will NOT retry on its own. Fix the cause shown below, then select it in the log and press Retry.', $attempts, $maxAttempts);
 } elseif ($status === 'failed') {
     $retryText = __('All %1 automatic attempts are used up — this row will NOT retry on its own. Select it in the log and press Retry to queue it again.', $maxAttempts);
+} elseif ($waitsForAccount) {
+    $retryText = __('Waiting for your Campaign Intelligence account to be active again; this row is sent then.');
 } elseif (!empty($row['next_retry_at'])) {
     $retryText = __('Next automatic retry: %1 (attempt %2 of %3).', $block->formatDate((string)$row['next_retry_at'], \IntlDateFormatter::MEDIUM, true), $attempts + 1, $maxAttempts);
 } else {

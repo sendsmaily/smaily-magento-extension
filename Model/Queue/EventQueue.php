@@ -22,9 +22,10 @@ use Smaily\Connect\Model\ResourceModel\Queue\Event\CollectionFactory;
 /**
  * Durable, idempotent queue for outbound Smaily marketing events.
  *
- * Retry semantics mirror the WooCommerce plugin: exponential backoff of
- * 60s, 5m, 15m, 1h, 6h with at most 5 attempts, after which a row is
- * parked as failed for manual retry from the admin event log. Which
+ * Retry semantics mirror the WooCommerce plugin: at most 5 attempts, the
+ * next one 60s, 5m, 15m, 1h after a failure (about 81 minutes in all),
+ * after which a row is parked as failed for manual retry from the admin
+ * event log. The last step, 6h, only caps a Retry-After. Which
  * failures earn a retry at all is Model\Queue\Failure's call.
  */
 class EventQueue

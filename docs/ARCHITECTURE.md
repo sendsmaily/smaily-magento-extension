@@ -447,8 +447,11 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
 
 ### Queue semantics (both queues)
 
-- **Retry policy:** backoff 60 s / 5 min / 15 min / 1 h / 6 h, max 5
-  attempts, then parked as `failed` for manual retry from the admin Log.
+- **Retry policy:** max 5 attempts, the next one 60 s / 5 min / 15 min /
+  1 h after a failure (`BACKOFF_SECONDS`; the fifth failure parks the row,
+  so a row's attempts span about 81 minutes and the last step, 6 h, is
+  never waited), then parked as `failed` for manual retry from the admin
+  Log.
   Only failures that can plausibly pass later get those attempts: a
   permanent refusal (4xx other than 429) stops on the first one, parked as
   `failed` with a `permanent_http_<code>` reason. A 429 is parked for the
@@ -1048,7 +1051,12 @@ or a subscription Smaily's consent mirror writes counts too.
   refusal mid-run is answered `Queue\Pending` and given back as it was
   (`EventQueue::release()`: pending, unclaimed, no attempt spent). Not
   claiming them, rather than claiming and releasing, keeps a long refusal's
-  backlog from filling every batch ahead of the contact syncs.
+  backlog from filling every batch ahead of the contact syncs. The Log's
+  Details reads the same two facts (`Controller\Adminhtml\Log\Details::
+  waitsForAccount()`, PRO-3753): a pending ingest row while the account is
+  refused, or a pending row of a type `pausedEventTypes()` names, says it
+  waits for the account to be active again, not for the next flush or
+  retry.
 
 ## Admin UI
 

@@ -29,7 +29,7 @@ use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
  *    handler takes). The row is parked as failed on the first attempt.
  *  - TEMPORARY: anything else — a 429 (spaced by Smaily's Retry-After when
  *    it sent one), a 5xx, a network failure, any other error envelope —
- *    keeps the ladder (1m, 5m, 15m, 1h, 6h, then failed).
+ *    keeps the ladder (1m, 5m, 15m, 1h, then failed: about 81 minutes).
  *
  * The clients type a failure when they throw it (RequestRefusedException,
  * EngineRequestException, ApiException's code), so this class only reads

@@ -5,7 +5,10 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-05 — after rc7, PRO-3753 part (a) (a group of
+_Last updated: 2026-10-05 — after rc7, PRO-3753 parts (b) and (c)
+(Details on an engine-bound row waiting for a deactivated Campaign
+Intelligence account says so; the five-attempt retry window is about 81
+minutes, not six hours, in the docs); before it PRO-3753 part (a) (a group of
 contact syncs, or a contacts-import page, that Smaily answers with 203 is
 sent again one contact per request, so only the refused contact fails;
 unreleased); before it PRO-3747 (the separate-storefront
@@ -190,6 +193,37 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3753 (b) + (c) — Details on a row waiting for the Campaign
+  Intelligence account; the retry window is about 81 minutes (2026-10-05;
+  unreleased, after rc7).** (b) While the account is refused, a pending
+  engine ingest row (not claimed, `Cron\FlushIngestQueue`) and a pending
+  row of a paused marketing handler (`engine.identity_merge`,
+  `engine.profiling_consent`; PRO-2466/PRO-3752) read "Waiting for the
+  next queue flush (runs every minute)." in Details — or the next retry's
+  time, for a row that had failed before — although neither is sent until
+  the account is active again. The line is built in
+  `view/adminhtml/templates/log/details.phtml`; now
+  `Controller\Adminhtml\Log\Details::waitsForAccount()` (pending, and
+  `Engine\Settings::isRefused()` for an ingest row or the type in
+  `HandlerPool::pausedEventTypes()` for a marketing row — the facts the
+  flushers use) sets `waits_for_account`, and the template says "Waiting
+  for your Campaign Intelligence account to be active again; this row is
+  sent then." (EN + ET), ahead of the next-retry and next-flush lines. A
+  contact sync or automation row is unchanged. Unit `DetailsTest` (refused:
+  an ingest row and a consent row wait, a contact sync and a failed row do
+  not; not refused: nothing waits); the template branch was checked by a
+  scratch render (flag on: the new line; off: the flush line). DI changed
+  (two constructor arguments); sandbox `setup:upgrade &&
+  setup:di:compile` OK. (c) The ladder is `BACKOFF_SECONDS = [60, 300,
+  900, 3600, 21600]` with `MAX_ATTEMPTS = 5`; the fifth failure parks the
+  row before a fifth wait, so the attempts span 60 + 300 + 900 + 3600 s =
+  4860 s, about 81 minutes; 21600 s only caps a Retry-After in the
+  marketing queue. "Six hours" / "1 min → 6 h" are corrected in the
+  CHANGELOG 3.0.0 list (the PRO-1800 bullet), USER_GUIDE (Log),
+  PILOT_CHECKLIST §9, ARCHITECTURE (retry policy), the PRO-1800 entry
+  below, and the `EventQueue` / `Failure` docblocks. Docs: USER_GUIDE
+  (deactivated account; Details), ARCHITECTURE, CHANGELOG.
 
 - **PRO-3753 (a) — a 203 on a group of contacts is sent again one contact
   per request (2026-10-05; unreleased, after rc7; owner decision
@@ -4530,7 +4564,10 @@ Earlier: 2026-09-11, 2026-09-10._
   `SmailyClientException` took the same road: `MAX_ATTEMPTS = 5` on the
   `[60,300,900,3600,21600]` ladder, whatever the HTTP status said. A revoked
   credential, a deleted workflow or a rejected address was therefore re-POSTed
-  five times across six hours before the merchant's failed count noticed it,
+  five times across about 81 minutes (60 + 300 + 900 + 3600 s; the fifth
+  failure parks the row, so the 21600 s step is never waited — "six hours"
+  here was wrong, corrected 2026-10-05, PRO-3753) before the merchant's
+  failed count noticed it,
   and a 429 ignored the slow-down Smaily explicitly asked for.
   Now, in one place — the new `Model\Queue\RetryPolicy`, injected into
   `Cron\FlushEventQueue`:

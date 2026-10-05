@@ -150,7 +150,8 @@ is sent at all (User Guide, *Connecting your cookie consent tool*).
 2. Wrong credentials, a deleted workflow or a rejected address fail at
    once and are not retried — fix the cause, then **Send again** on the row
    (or select rows and **Retry**). Network or server errors retry by
-   themselves (1 min → 6 h, 5 attempts).
+   themselves (1 min, 5 min, 15 min, then 1 h: 5 attempts over about 81
+   minutes).
 3. More detail: on the server, `bin/magento config:set
    smaily_connect/logging/verbosity debug`, then read
    `var/log/smaily_connect.log`. Set it back afterwards with the same

@@ -824,7 +824,9 @@ retrying forever:
 - Nothing more is sent — no catalog, customer or order data, no browse
   events, no historical imports.
 - Nothing is lost. Everything already queued stays queued, untouched, and
-  goes out in order once the account is active again.
+  goes out in order once the account is active again. **Details** on such
+  a row in the **Log** says it waits for the Campaign Intelligence account
+  to be active again.
 - A shopper's personalization choice made meanwhile — an opt-out of
   personalized recommendations, or opting back in, for example by
   unsubscribing from or subscribing again to your newsletter — waits in the
@@ -1037,7 +1039,8 @@ card — you do not have to keep the page open:
   listed without a time or an error, and the panel says so. Below it: the
   payload exactly as it was (or will be) sent, the attempt count, when the
   next automatic retry happens (or an honest "this row will not retry on
-  its own"), the last error — with our internal failure class beside it —
+  its own", or, while the Campaign Intelligence account is deactivated,
+  that a row bound for it waits for the account), the last error — with our internal failure class beside it —
   and the last API response: the HTTP status and what Smaily or Campaign
   Intelligence answered. A row that went out with others in one request
   shows only its own part of it. A retry keeps the evidence of the attempt
@@ -1055,14 +1058,15 @@ card — you do not have to keep the page open:
 - When deliveries failed in the last 24 hours, a banner above the grid
   says so and links straight to the grid pre-filtered to failed rows; the
   dashboard's failed-deliveries tile links to the same view.
-- Deliveries retry automatically with backoff (1 min → 6 h, 5 attempts)
-  before parking as *failed* for manual retry. A delivery that was refused
+- Deliveries retry automatically with backoff (1 min, 5 min, 15 min,
+  then 1 h: 5 attempts over about 81 minutes) before parking as *failed*
+  for manual retry. A delivery that was refused
   outright — wrong credentials, a deleted workflow, a rejected address,
   data Smaily answers is invalid, a link of browsing to a customer that
   Campaign Intelligence refused — is
   not retried at all: it is marked *failed* immediately, with the
   refusal in the last error, so the failed count tells you now instead of
-  six hours later. So is a row the extension itself can never send (its
+  about 81 minutes later. So is a row the extension itself can never send (its
   data is incomplete, or no part of the extension handles it); Details
   says it stopped after 1 of 5 attempts. Smaily answers a group of contact syncs as
   a whole, so when it answers "invalid data" for a group, the extension

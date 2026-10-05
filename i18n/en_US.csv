@@ -475,6 +475,7 @@
 "Wait (minutes)","Wait (minutes)"
 "Waiting","Waiting"
 "Waiting for the next queue flush (runs every minute).","Waiting for the next queue flush (runs every minute)."
+"Waiting for your Campaign Intelligence account to be active again; this row is sent then.","Waiting for your Campaign Intelligence account to be active again; this row is sent then."
 "Want a different workflow per language? Pick a per-language mode on the Connection panel.","Want a different workflow per language? Pick a per-language mode on the Connection panel."
 "We could not load your personalization preference right now. Please try again later.","We could not load your personalization preference right now. Please try again later."
 "We use your shopping activity to personalize product recommendations in our newsletters. You can opt out at any time; newsletters will then show generic content.","We use your shopping activity to personalize product recommendations in our newsletters. You can opt out at any time; newsletters will then show generic content."

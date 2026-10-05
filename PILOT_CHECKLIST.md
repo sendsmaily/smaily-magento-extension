@@ -45,7 +45,10 @@ row). The steps run in this order:
    product link and image link open on the storefront).
 5. Once the check passes, switch contact sync on in the consent mode:
    **Settings > Contacts** → tick **Sync contacts to Smaily**, check that
-   **Subscribers only (consent)** is selected → **Save Contacts**.
+   **Subscribers only (consent)** is selected → **Save Contacts**. Then
+   switch the abandoned-cart reminder on: **Settings > Automations** → tick
+   **Enabled** on **Abandoned cart** (its workflow is mapped in the initial
+   setup, §1) → **Save Automations**.
 6. Start the customer history import (and the order history import, if
    wanted) — §2, **Historical imports to Campaign Intelligence**.
 7. The engine operator switches the 25% holdout on before activation — §2.
@@ -69,7 +72,7 @@ row). The steps run in this order:
 | Open **Marketing > Smaily Connect**. | A fresh install lands on **Initial setup**, step bar: **Connect, Contacts, Automations, Intelligence, Overview**. |
 | **Connect** step: fill **Subdomain**, **API username**, **API password**; press **Test connection**. | "Connected!" and a green status with the account name; **Continue** goes to **Contacts**. A failure shows the Smaily-side reason — fix the credentials, do not continue. |
 | **Contacts** step: mode **Subscribers only (consent)** — the pilot store's decided mode; keep **Show a newsletter checkbox at checkout** on. **Continue**. | The step saves ("Saving…" then the next step). Saving switches contact sync on — the initial setup has no off switch. On a separate storefront, switch it off under **Settings > Contacts** right after the setup (Pilot-day order, step 1). |
-| **Automations** step: map **Abandoned cart** to the merchant's Smaily workflow and tick **Enabled** (needed for §5). Map **Welcome** / **First order** only if the merchant has those workflows. **Wait (minutes)** stays at **30** unless the merchant asked otherwise. | Workflow dropdowns list the Smaily account's workflows (**Refresh workflows** if one is missing). |
+| **Automations** step: map **Abandoned cart** to the merchant's Smaily workflow and tick **Enabled** (needed for §5). On a separate storefront, leave **Enabled** unticked here: it goes on under **Settings > Automations** together with contact sync, once the product-link check passes (Pilot-day order, step 5). Map **Welcome** / **First order** only if the merchant has those workflows. **Wait (minutes)** stays at **30** unless the merchant asked otherwise. | Workflow dropdowns list the Smaily account's workflows (**Refresh workflows** if one is missing). |
 
 ## 2. Engine setup exchange (Intelligence step)
 

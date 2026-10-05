@@ -11,6 +11,7 @@ namespace Smaily\Connect\Model\Privacy;
 use Magento\Framework\App\ResourceConnection;
 use Smaily\Connect\Cron\QueueJanitor;
 use Smaily\Connect\Model\AbandonedCart\StateManager;
+use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
@@ -105,7 +106,7 @@ class LocalEraser
         private readonly ResourceConnection $resourceConnection,
         private readonly PayloadAnonymizer $anonymizer,
         private readonly StateManager $cartState,
-        private readonly ProfilingOptOuts $optOuts
+        private readonly ContactEntity $contactEntity
     ) {
     }
 
@@ -249,9 +250,8 @@ class LocalEraser
         $columns = array_merge(self::SCANNED_COLUMNS, [self::TYPE_COLUMNS[$table]]);
         // A profiling-consent row's entity is the keyed hash (PRO-3765), and
         // so is a contact-sync or automation row's for an address longer
-        // than the column (Queue\ContactEntity, PRO-3767); any other row's,
-        // the plain address.
-        $entities = [$email, $this->optOuts->addressKey($email)];
+        // than the column (PRO-3767); any other row's, the plain address.
+        $entities = $this->contactEntity->forms($email);
 
         $lastId = 0;
         while (true) {

@@ -68,16 +68,18 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   the purchase marker's "a reminder went out" check, which match the full
   address, missed that contact's rows. Now such an address is stored as
   the keyed hash the profiling-consent rows use
-  (`ProfilingOptOuts::addressKey()` of the trimmed, lower-case address; 64
+  (`Model\Privacy\AddressKey::of()` of the trimmed, lower-case address; 64
   hex characters). `Model\Queue\ContactEntity::of()` is the one rule, and
   `ContactSync\SyncDispatcher` — the only writer of these rows and the
   only caller of `cancelPendingAutomation()` / `hasDeliveredAutomation()` —
   passes every entity through it. The other readers compare stored values
   with stored values (`ResendGuard`'s "a later message of this kind
   already reached this contact", `Log\Resend` copying the entity), and
-  `LocalEraser` already matches the address and its keyed hash. The Log,
+  `LocalEraser` already matches the address and its keyed hash
+  (`ContactEntity::forms()`). The Log,
   Details and the Dashboard show such an entity by its first 12 characters
-  (`Log\EntityLabel`, as for a consent row); Details shows the address in
+  (`Log\EntityLabel`, by `ContactEntity::isHash()`, as for a consent row);
+  Details shows the address in
   the payload. No schema change; a row queued before keeps its cut
   address until retention removes it.
 - Automation routing (`Model/Automation/Router`, Woo `Multilingual\Router`
@@ -133,7 +135,8 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   v1.6.0; omitted otherwise), so the engine derives nothing from the
   placeholder slug.
 - **Product delete** (`Observer/Engine/ProductDeleteBefore`): a
-  parent/standalone hard-delete enqueues one `catalog_remove` row; the
+  parent/standalone hard-delete enqueues one `catalog_remove` row
+  (`CatalogIngest::enqueueRemovals()`, the one builder of that row); the
   flusher drains those through its own non-D6 path to
   `POST /api/v1/ingest/catalog/remove` (contract §3b — the engine
   tombstones every row matching `tags.product_id`; `not_found` in the
@@ -151,17 +154,23 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   `ids_to_delete`. `Model/Engine/ProductImportDelete` gives those products
   the removal above: `Observer/Engine/ProductImportBunchDelete` (on the
   `commit_before` event, so the rows commit or roll back with the delete)
-  queues a `catalog_remove` row per product (one insert), and for a
-  configurable child the per-SKU tombstone instead. The child's parent
+  queues a `catalog_remove` row per product (one insert,
+  `CatalogIngest::enqueueRemovals()`), and for a configurable child the
+  per-SKU tombstone instead. The child's parent
   link (`catalog_product_super_link`, cascaded) and its row data are gone
   by then, so `Plugin/Engine/ProductImportBunch` — an after-plugin on
   `ImportExport\Model\ResourceModel\Import\Data::getNextUniqueBunch()`,
   the bunch read right before the DELETE — finds the bunch's configurable
-  children and builds their tombstones then
+  children (`ParentProductResolver::configurableChildIds()`, one query for
+  the bunch) and builds their tombstones then
   (`CatalogIngest::buildTombstones()`, one collection;
   `enqueueBuilt()` queues them). Both hooks act only when the import data
   source says `catalog_product` + `delete`: Replace deletes through the
-  same code but creates the products again at once. No ImportExport type
+  same code but creates the products again at once. Every product import
+  reads its bunches through the plugin, so that answer
+  (`ProductImportDelete::isProductDelete()`, two reads of
+  `importexport_importdata`) is kept for the bunch iteration and asked
+  again once the data source has read its last bunch. No ImportExport type
   is named (the module is removable), as with the MSI plugins. A tool
   that writes the catalog tables itself, or a direct database delete,
   still sends nothing; the user guide says how to take such a product out
@@ -508,8 +517,8 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   makes it refuse the whole group. When a `contact.sync` group (one store
   view's rows of a flush, up to the 200-row batch) or a contacts-import
   page (up to 500 per store view, `Backfill\ContactsProcessor`) is
-  answered with 203, each of its contacts is posted again alone in the
-  same run, through the same client: the valid ones sync, and only the
+  answered with 203 (`ApiException::isInvalidData()`), each of its
+  contacts is posted again alone in the same run, through the same client: the valid ones sync, and only the
   refused one fails (`permanent_envelope_203`, Smaily's answer as its last
   response; the import counts it as failed). WooCommerce posts one contact
   per request, so the outcome is the same. A single contact's 203 is not
@@ -986,8 +995,10 @@ or a subscription Smaily's consent mirror writes counts too.
   (`Model\Privacy\ProfilingOptOuts`) and onto the marketing event queue as
   an `engine.profiling_consent` row for the engine's §10 opt-out endpoint.
   A failed Smaily write does not stop the other two. The row's `entity_id`
-  is the record's keyed hash of the address (`ProfilingOptOuts::addressKey()`,
-  64 hex characters), never the address (PRO-3765): the address is in the
+  is the keyed hash of the address the record is written under
+  (`Model\Privacy\AddressKey`: HMAC-SHA256 with the installation crypt key
+  of the trimmed, lower-case address, the crypt key parsed once per
+  instance; 64 hex characters), never the address (PRO-3765): the address is in the
   payload the engine needs and nowhere else on the row, and the hash always
   fits the 64-character column, where a longer address was cut. A row
   queued before carries the plain address; it is not rewritten (no data
@@ -1045,11 +1056,14 @@ or a subscription Smaily's consent mirror writes counts too.
   engine knew the shopper (a newsletter-only guest: the 404 above) would
   not hold once a later order (§5 creates the customer), a customer save or
   the customer/order history import creates them. So `Cron\FlushIngestQueue`,
-  where the engine's D6 answer marks each customer and order row delivered,
-  hands the addresses of the rows the engine confirmed (processed or
-  deduplicated, not a per-item error) to `ProfilingConsent::resendOptOuts()`,
-  once per batch. That reads the record once for the whole batch
-  (`ProfilingOptOuts::moments()`) and queues an opt-out row with the stored
+  where the engine's D6 answer marks each row delivered, hands the items the
+  engine confirmed (processed or deduplicated, not a per-item error) to
+  `Model\Privacy\OptOutReplay::afterConfirmed()`, once per batch; that
+  knows which field names the shopper in a customer and in an order item
+  and passes their addresses to `ProfilingConsent::resendOptOuts()`. That
+  reads the record once for the whole batch (`ProfilingOptOuts::moments()`,
+  which hands back each address's key with its moment, so each address is
+  hashed once) and queues an opt-out row with the stored
   moment (a mirror's 0: the moment of sending) through the same
   `queueForEngine()`, so the newest-choice match on delivery and the wait
   for a refused account apply to it. A shopper with no opt-out gets
@@ -1073,8 +1087,8 @@ or a subscription Smaily's consent mirror writes counts too.
   (`EventQueue::release()`: pending, unclaimed, no attempt spent). Not
   claiming them, rather than claiming and releasing, keeps a long refusal's
   backlog from filling every batch ahead of the contact syncs. The Log's
-  Details reads the same two facts (`Controller\Adminhtml\Log\Details::
-  waitsForAccount()`, PRO-3753): a pending ingest row while the account is
+  Details reads the same two facts (`Model\Log\AccountWait::waits()`,
+  PRO-3753): a pending ingest row while the account is
   refused, or a pending row of a type `pausedEventTypes()` names, says it
   waits for the account to be active again, not for the next flush or
   retry.

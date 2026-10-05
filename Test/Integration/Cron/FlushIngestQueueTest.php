@@ -18,7 +18,7 @@ use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
-use Smaily\Connect\Model\Privacy\ProfilingConsent;
+use Smaily\Connect\Model\Privacy\OptOutReplay;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 
@@ -324,7 +324,7 @@ class FlushIngestQueueTest extends IntegrationTestCase
             $this->queue,
             $this->createMock(CatalogIngest::class),
             $client,
-            $this->createMock(ProfilingConsent::class),
+            $this->createMock(OptOutReplay::class),
             $serializer,
             $logger
         );

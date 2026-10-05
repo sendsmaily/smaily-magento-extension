@@ -106,6 +106,31 @@ class ParentProductResolverTest extends TestCase
     }
 
     /**
+     * PRO-3768: a Delete bunch's configurable children come from one query
+     * for the whole bunch, and the answers are memoized as one lookup each
+     * would have left them.
+     */
+    public function testConfigurableChildrenOfManyProductsComeFromOneQuery(): void
+    {
+        $resolver = $this->createResolver(false);
+        $pairsQueries = 0;
+        $this->connection->method('fetchPairs')->willReturnCallback(
+            static function () use (&$pairsQueries): array {
+                $pairsQueries++;
+
+                return ['11' => '10', '12' => '10'];
+            }
+        );
+
+        self::assertSame([11, 12], $resolver->configurableChildIds([10, 11, 0, 12, 20, 11]));
+        self::assertSame([11], $resolver->configurableChildIds([11, 20]));
+        self::assertSame('10', $resolver->productIdOf(12));
+        self::assertSame('20', $resolver->productIdOf(20));
+        self::assertSame(1, $pairsQueries);
+        self::assertSame(0, $this->lookups, 'No per-product lookup');
+    }
+
+    /**
      * @param string|false $fetchOneResult parent entity id or false (no row)
      * @param string[] $categoryIds what the category-product query answers
      */
@@ -116,7 +141,7 @@ class ParentProductResolverTest extends TestCase
         $whereProductId = null;
 
         $select = $this->createMock(Select::class);
-        foreach (['from', 'join', 'order', 'limit'] as $method) {
+        foreach (['from', 'join', 'order', 'limit', 'group'] as $method) {
             $select->method($method)->willReturnSelf();
         }
         $select->method('where')->willReturnCallback(

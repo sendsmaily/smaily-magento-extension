@@ -22,6 +22,7 @@ use Smaily\Connect\Api\Queue\EventHandlerInterface;
 use Smaily\Connect\Api\Queue\PausableEventHandlerInterface;
 use Smaily\Connect\Controller\Adminhtml\Log\Details;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
+use Smaily\Connect\Model\Log\AccountWait;
 use Smaily\Connect\Model\Log\AttemptHistory;
 use Smaily\Connect\Model\Log\FailureMessage;
 use Smaily\Connect\Model\Log\PayloadRedactor;
@@ -251,8 +252,7 @@ class DetailsTest extends TestCase
             new AttemptHistory(),
             new StatusPill(),
             $url,
-            $handlerPool,
-            $engineSettings
+            new AccountWait($handlerPool, $engineSettings)
         ))->execute();
     }
 }

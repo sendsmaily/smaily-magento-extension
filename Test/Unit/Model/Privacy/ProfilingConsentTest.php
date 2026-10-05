@@ -18,8 +18,10 @@ use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Privacy\AddressKey;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
+use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 
@@ -638,9 +640,14 @@ class ProfilingConsentTest extends TestCase
         );
 
         $optOuts = $this->createMock(ProfilingOptOuts::class);
-        $optOuts->method('moments')->willReturnCallback(
-            fn (array $emails): array => array_intersect_key($this->records, array_flip($emails))
-        );
+        $optOuts->method('moments')->willReturnCallback(function (array $emails): array {
+            $moments = [];
+            foreach (array_intersect_key($this->records, array_flip($emails)) as $email => $moment) {
+                $moments[$email] = ['moment' => $moment, 'key' => self::keyedHash((string)$email)];
+            }
+
+            return $moments;
+        });
         $optOuts->method('moment')->willReturnCallback(
             fn (string $email): ?int => $this->records[$email] ?? null
         );
@@ -656,7 +663,8 @@ class ProfilingConsentTest extends TestCase
         $optOuts->method('isByUnsubscribe')->willReturnCallback(
             fn (string $email): bool => isset($this->records[$email]) && ($this->byUnsubscribe[$email] ?? false)
         );
-        $optOuts->method('addressKey')->willReturnCallback(
+        $addressKey = $this->createMock(AddressKey::class);
+        $addressKey->method('of')->willReturnCallback(
             static fn (string $email): string => self::keyedHash($email)
         );
 
@@ -681,6 +689,8 @@ class ProfilingConsentTest extends TestCase
             $this->engineSettings,
             $eventQueue,
             $optOuts,
+            $addressKey,
+            new ContactEntity($addressKey),
             $cache,
             $dateTime,
             $this->createMock(Logger::class)

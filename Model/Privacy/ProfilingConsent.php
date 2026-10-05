@@ -16,6 +16,7 @@ use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 
@@ -36,7 +37,7 @@ use Smaily\Connect\Model\Queue\EventType;
  * A read resolves the Smaily contact against the store's record, and the
  * newest choice wins (Woo PRO-3191/3192/3434): only an opt-in on the contact
  * stamped after the store's opt-out lifts it. Reads are cached for a day, under
- * the opt-out record's keyed hash of the address (PRO-3575); when
+ * the address's keyed hash (AddressKey, PRO-3575); when
  * Smaily cannot be read the store's record decides, and a shopper it holds
  * no opt-out for is profiled (fail open, the Woo posture).
  */
@@ -66,6 +67,8 @@ class ProfilingConsent
         private readonly Settings $engineSettings,
         private readonly EventQueue $eventQueue,
         private readonly ProfilingOptOuts $optOuts,
+        private readonly AddressKey $addressKey,
+        private readonly ContactEntity $contactEntity,
         private readonly CacheInterface $cache,
         private readonly DateTime $dateTime,
         private readonly Logger $logger
@@ -77,7 +80,7 @@ class ProfilingConsent
      */
     public function isAllowed(string $email, int|string|null $storeId = null): bool
     {
-        $email = strtolower(trim($email));
+        $email = AddressKey::normalise($email);
         if ($email === '') {
             return true;
         }
@@ -145,7 +148,7 @@ class ProfilingConsent
      */
     public function knownPreference(string $email, int|string|null $storeId = null): ?bool
     {
-        $email = strtolower(trim($email));
+        $email = AddressKey::normalise($email);
         if ($email === '') {
             return null;
         }
@@ -204,7 +207,7 @@ class ProfilingConsent
      */
     public function setAllowed(string $email, bool $allowed, int|string|null $storeId = null): void
     {
-        $email = strtolower(trim($email));
+        $email = AddressKey::normalise($email);
         if ($email === '') {
             return;
         }
@@ -235,7 +238,7 @@ class ProfilingConsent
      */
     public function optOutOnUnsubscribe(string $email): void
     {
-        $email = strtolower(trim($email));
+        $email = AddressKey::normalise($email);
         if ($email === '') {
             return;
         }
@@ -259,7 +262,7 @@ class ProfilingConsent
      */
     public function optInOnResubscribe(string $email): void
     {
-        $email = strtolower(trim($email));
+        $email = AddressKey::normalise($email);
         if ($email === '' || !$this->optOuts->isByUnsubscribe($email)) {
             return;
         }
@@ -284,21 +287,22 @@ class ProfilingConsent
     public function resendOptOuts(array $emails): void
     {
         $emails = array_values(array_unique(array_filter(array_map(
-            static fn (string $email): string => strtolower(trim($email)),
+            [AddressKey::class, 'normalise'],
             $emails
         ))));
         if (!$emails) {
             return;
         }
 
+        // Each address is hashed once: moments() hands back its key.
         $moments = $this->optOuts->moments($emails);
         $entities = [];
-        foreach (array_keys($moments) as $email) {
+        foreach ($moments as $email => $optOut) {
             // A row queued before PRO-3765 carries the plain address.
-            $entities[$email] = [$this->optOuts->addressKey((string)$email), (string)$email];
+            $entities[$email] = $this->contactEntity->forms((string)$email, $optOut['key']);
         }
         $waiting = $this->eventQueue->waitingProfilingOptOuts(array_merge(...array_values($entities)));
-        foreach ($moments as $email => $moment) {
+        foreach ($moments as $email => ['moment' => $moment, 'key' => $key]) {
             if (array_intersect($entities[$email], $waiting)) {
                 continue;
             }
@@ -307,14 +311,15 @@ class ProfilingConsent
             $this->queueForEngine(
                 (string)$email,
                 true,
-                gmdate(self::TIMESTAMP_FORMAT, $moment > 0 ? $moment : $this->dateTime->gmtTimestamp())
+                gmdate(self::TIMESTAMP_FORMAT, $moment > 0 ? $moment : $this->dateTime->gmtTimestamp()),
+                $key
             );
         }
     }
 
     private function cacheKey(string $email): string
     {
-        return self::CACHE_PREFIX . $this->optOuts->addressKey($email);
+        return self::CACHE_PREFIX . $this->addressKey->of($email);
     }
 
     /**
@@ -339,7 +344,7 @@ class ProfilingConsent
         }
         $this->cache->save(
             $fields === null ? '0' : '1',
-            self::CONTACT_CACHE_PREFIX . $this->optOuts->addressKey($email),
+            self::CONTACT_CACHE_PREFIX . $this->addressKey->of($email),
             [],
             self::CACHE_TTL_SECONDS
         );
@@ -353,7 +358,7 @@ class ProfilingConsent
      */
     private function hasContact(string $email, int|string|null $storeId): bool
     {
-        $known = $this->cache->load(self::CONTACT_CACHE_PREFIX . $this->optOuts->addressKey($email));
+        $known = $this->cache->load(self::CONTACT_CACHE_PREFIX . $this->addressKey->of($email));
         if ($known !== false) {
             return $known === '1';
         }
@@ -400,12 +405,13 @@ class ProfilingConsent
      * The engine hears a choice through the queue — retried and logged like
      * every other delivery. isConnected() is the gate for paths that only
      * enqueue; the handler asks the sending gate. The row's entity is the
-     * opt-out record's keyed hash of the address, never the address
-     * (PRO-3765): it always fits the column, so the waiting check finds a
-     * long address too, and only the payload the engine needs names the
-     * shopper.
+     * address's keyed hash (AddressKey), never the address (PRO-3765): it
+     * always fits the column, so the waiting check finds a long address
+     * too, and only the payload the engine needs names the shopper.
+     *
+     * @param string|null $key the address's keyed hash, when the caller holds it
      */
-    private function queueForEngine(string $email, bool $optOut, string $timestamp): void
+    private function queueForEngine(string $email, bool $optOut, string $timestamp, ?string $key = null): void
     {
         if (!$this->engineSettings->isConnected()) {
             return;
@@ -415,6 +421,10 @@ class ProfilingConsent
         if ($optOut) {
             $payload['opted_out_at'] = $timestamp;
         }
-        $this->eventQueue->enqueue(EventType::ENGINE_PROFILING_CONSENT, $payload, $this->optOuts->addressKey($email));
+        $this->eventQueue->enqueue(
+            EventType::ENGINE_PROFILING_CONSENT,
+            $payload,
+            $key ?? $this->addressKey->of($email)
+        );
     }
 }

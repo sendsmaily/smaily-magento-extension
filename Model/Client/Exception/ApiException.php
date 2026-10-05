@@ -57,6 +57,16 @@ class ApiException extends SmailyClientException
     }
 
     /**
+     * Whether Smaily answered "invalid data" (203): for a group of contacts,
+     * one code for the whole request, so the group goes again one contact
+     * per request (PRO-3753).
+     */
+    public function isInvalidData(): bool
+    {
+        return $this->smailyCode === self::CODE_INVALID_DATA;
+    }
+
+    /**
      * Full decoded response body.
      *
      * @return array<string, mixed>

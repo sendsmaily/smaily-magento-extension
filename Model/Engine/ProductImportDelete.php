@@ -10,7 +10,6 @@ namespace Smaily\Connect\Model\Engine;
 
 use Magento\Catalog\Model\ResourceModel\Product as ProductResource;
 use Smaily\Connect\Model\Engine\Payload\ParentProductResolver;
-use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 
 /**
  * Engine removal for products deleted by Magento's product import with the
@@ -33,7 +32,10 @@ use Smaily\Connect\Model\Engine\Queue\IngestQueue;
  *   transaction, so the rows are queued exactly when the delete commits.
  *
  * Only the Delete behaviour: Replace also deletes through the same code,
- * but it creates the products again at once, so they are not gone.
+ * but it creates the products again at once, so they are not gone. Whether
+ * an import is one is read from the import's table once per bunch
+ * iteration (every product import reads its bunches through the hook, an
+ * Append import too), not on every bunch read and delete.
  * No Magento_ImportExport type is named here (the module can be removed):
  * the import's data source is read by duck typing.
  */
@@ -49,12 +51,19 @@ class ProductImportDelete
      */
     private array $tombstones = [];
 
+    /**
+     * isProductDelete()'s answers for the bunch iteration being read, by
+     * data source and import ids.
+     *
+     * @var array<string, bool>
+     */
+    private array $productDeletes = [];
+
     public function __construct(
         private readonly Settings $settings,
         private readonly ProductResource $productResource,
         private readonly ParentProductResolver $parentProductResolver,
-        private readonly CatalogIngest $catalogIngest,
-        private readonly IngestQueue $ingestQueue
+        private readonly CatalogIngest $catalogIngest
     ) {
     }
 
@@ -73,8 +82,20 @@ class ProductImportDelete
             return false;
         }
 
-        return $dataSource->getEntityTypeCode($ids) === self::ENTITY_PRODUCT
+        // The data source reads no ids and an empty list alike: the whole table.
+        $key = spl_object_id($dataSource) . '|' . json_encode($ids ?: null);
+
+        return $this->productDeletes[$key] ??= $dataSource->getEntityTypeCode($ids) === self::ENTITY_PRODUCT
             && $dataSource->getBehavior($ids) === self::BEHAVIOR_DELETE;
+    }
+
+    /**
+     * The import read past its last bunch: the next read starts another
+     * iteration, maybe of another import, so isProductDelete() asks again.
+     */
+    public function endOfBunches(): void
+    {
+        $this->productDeletes = [];
     }
 
     /**
@@ -93,14 +114,10 @@ class ProductImportDelete
             }
         }
 
-        $childIds = [];
-        foreach ($skus ? $this->productResource->getProductsIdsBySkus(array_unique($skus)) : [] as $productId) {
-            if ($this->parentProductResolver->isConfigurableChild((int)$productId)) {
-                $childIds[] = (int)$productId;
-            }
-        }
-
-        $this->tombstones = $this->catalogIngest->buildTombstones($childIds);
+        $productIds = $skus ? $this->productResource->getProductsIdsBySkus(array_unique($skus)) : [];
+        $this->tombstones = $this->catalogIngest->buildTombstones(
+            $this->parentProductResolver->configurableChildIds(array_map('intval', array_values($productIds)))
+        );
     }
 
     /**
@@ -120,12 +137,11 @@ class ProductImportDelete
                 $tombstones[$productId] = $this->tombstones[$productId];
                 continue;
             }
-            $key = (string)$productId;
-            $removals[] = ['payload' => ['product_id' => $key], 'entity_id' => $key, 'store_id' => null];
+            $removals[] = $productId;
         }
         $this->tombstones = [];
 
         $this->catalogIngest->enqueueBuilt($tombstones);
-        $this->ingestQueue->enqueueMany(Client::DOMAIN_CATALOG_REMOVE, $removals);
+        $this->catalogIngest->enqueueRemovals($removals);
     }
 }

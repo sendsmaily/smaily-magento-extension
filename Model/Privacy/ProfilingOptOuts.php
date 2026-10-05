@@ -8,20 +8,18 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Privacy;
 
-use Magento\Framework\App\DeploymentConfig;
-use Magento\Framework\Config\ConfigOptionsListConstants;
 use Magento\Framework\FlagManager;
 use Magento\Framework\Lock\LockManagerInterface;
 
 /**
  * The store's durable record of profiling opt-outs (PRO-3578, Woo
  * PRO-1194/PRO-3191/PRO-3192 parity): one flag row holding a map of a keyed
- * hash of the address (HMAC-SHA256 with the installation crypt key) to the
- * opt-out's moment. Only opt-outs are kept — the model
+ * hash of the address (AddressKey: HMAC-SHA256 with the installation crypt
+ * key) to the opt-out's moment. Only opt-outs are kept — the model
  * is opt-out, default-on, so an opt-in is the absence of an entry, and the
  * map stays as large as the number of people who said no, not the contact
- * base. The address itself is never stored. Addresses arrive normalised
- * (lower case, trimmed): ProfilingConsent is the one place that does it.
+ * base. The address itself is never stored; AddressKey normalises it (lower
+ * case, trimmed) before keying it.
  *
  * The moment is the Unix time the store made the opt-out (My Account, an
  * unsubscribe, or the store writing the opt-out to the Smaily contact), or
@@ -51,7 +49,7 @@ class ProfilingOptOuts
     public function __construct(
         private readonly FlagManager $flagManager,
         private readonly LockManagerInterface $lockManager,
-        private readonly DeploymentConfig $deploymentConfig
+        private readonly AddressKey $addressKey
     ) {
     }
 
@@ -61,24 +59,26 @@ class ProfilingOptOuts
      */
     public function moment(string $email): ?int
     {
-        return $this->momentOf($this->entry($this->all(), $email));
+        return $this->momentOf($this->entry($this->all(), $this->addressKey->keys($email)));
     }
 
     /**
      * The moments of the store's opt-outs for those of these addresses it
-     * holds one for, from one read of the record (PRO-3760).
+     * holds one for, from one read of the record (PRO-3760), each with the
+     * address's current key, so a caller does not hash the address again.
      *
      * @param string[] $emails
-     * @return array<string, int> moment by address
+     * @return array<string, array{moment: int, key: string}> by address
      */
     public function moments(array $emails): array
     {
         $optOuts = $this->all();
         $moments = [];
         foreach ($emails as $email) {
-            $moment = $this->momentOf($this->entry($optOuts, $email));
+            $keys = $this->addressKey->keys($email);
+            $moment = $this->momentOf($this->entry($optOuts, $keys));
             if ($moment !== null) {
-                $moments[$email] = $moment;
+                $moments[$email] = ['moment' => $moment, 'key' => $keys[0]];
             }
         }
 
@@ -90,7 +90,7 @@ class ProfilingOptOuts
      */
     public function isByUnsubscribe(string $email): bool
     {
-        $entry = $this->entry($this->all(), $email);
+        $entry = $this->entry($this->all(), $this->addressKey->keys($email));
 
         return is_array($entry) && ($entry['by'] ?? null) === self::BY_UNSUBSCRIBE;
     }
@@ -98,7 +98,7 @@ class ProfilingOptOuts
     public function record(string $email, int $moment, bool $byUnsubscribe = false): void
     {
         $entry = $byUnsubscribe ? ['at' => $moment, 'by' => self::BY_UNSUBSCRIBE] : $moment;
-        $keys = $this->keys($email);
+        $keys = $this->addressKey->keys($email);
         $this->change(static function (array $optOuts) use ($keys, $entry): array {
             $optOuts = array_diff_key($optOuts, array_flip($keys));
             $optOuts[$keys[0]] = $entry;
@@ -109,21 +109,10 @@ class ProfilingOptOuts
 
     public function forget(string $email): void
     {
-        $keys = $this->keys($email);
+        $keys = $this->addressKey->keys($email);
         $this->change(static function (array $optOuts) use ($keys): array {
             return array_diff_key($optOuts, array_flip($keys));
         });
-    }
-
-    /**
-     * The address's current key, keyed with the store's secret — the one its
-     * entry is written under, and the one ProfilingConsent keeps its cache
-     * entries under, so no cache key carries a plain hash of the address
-     * (PRO-3575).
-     */
-    public function addressKey(string $email): string
-    {
-        return $this->keys($email)[0];
     }
 
     /**
@@ -155,10 +144,11 @@ class ProfilingOptOuts
      * The address's entry in the record under any of its keys, or null.
      *
      * @param array<string, mixed> $optOuts
+     * @param string[] $keys the address's keys (AddressKey::keys())
      */
-    private function entry(array $optOuts, string $email): mixed
+    private function entry(array $optOuts, array $keys): mixed
     {
-        foreach ($this->keys($email) as $key) {
+        foreach ($keys as $key) {
             if (array_key_exists($key, $optOuts)) {
                 return $optOuts[$key];
             }
@@ -176,27 +166,5 @@ class ProfilingOptOuts
         $moment = is_array($entry) ? ($entry['at'] ?? null) : $entry;
 
         return is_int($moment) ? $moment : null;
-    }
-
-    /**
-     * The keys an address's entry may be stored under: the current form
-     * first (HMAC with the newest crypt key), then the earlier crypt keys,
-     * then the plain sha1 of the record's first form.
-     *
-     * @return string[]
-     */
-    private function keys(string $email): array
-    {
-        $raw = (string)$this->deploymentConfig->get(ConfigOptionsListConstants::CONFIG_PATH_CRYPT_KEY);
-        // Multiple keys are newline-separated after a key rotation, newest last.
-        $cryptKeys = array_reverse(array_values(array_filter(array_map('trim', explode("\n", $raw)))));
-
-        $keys = [];
-        foreach ($cryptKeys as $cryptKey) {
-            $keys[] = hash_hmac('sha256', 'smaily-profiling-optout|' . $email, $cryptKey);
-        }
-        $keys[] = sha1($email);
-
-        return $keys;
     }
 }

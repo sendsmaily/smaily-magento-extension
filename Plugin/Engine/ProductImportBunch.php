@@ -34,9 +34,9 @@ class ProductImportBunch
      */
     public function afterGetNextUniqueBunch(object $subject, mixed $result, mixed $ids = null): mixed
     {
-        if (is_array($result)
-            && $this->productImportDelete->isProductDelete($subject, is_array($ids) ? $ids : null)
-        ) {
+        if (!is_array($result)) {
+            $this->productImportDelete->endOfBunches();
+        } elseif ($this->productImportDelete->isProductDelete($subject, is_array($ids) ? $ids : null)) {
             $this->productImportDelete->prepare($result);
         }
 

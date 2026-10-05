@@ -12,9 +12,7 @@ use Magento\Catalog\Model\Product;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Smaily\Connect\Model\Engine\CatalogIngest;
-use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Payload\ParentProductResolver;
-use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
 
 /**
@@ -41,7 +39,6 @@ class ProductDeleteBefore implements ObserverInterface
     public function __construct(
         private readonly Settings $settings,
         private readonly ParentProductResolver $parentProductResolver,
-        private readonly IngestQueue $ingestQueue,
         private readonly CatalogIngest $catalogIngest
     ) {
     }
@@ -72,10 +69,6 @@ class ProductDeleteBefore implements ObserverInterface
             return;
         }
 
-        $this->ingestQueue->enqueue(
-            Client::DOMAIN_CATALOG_REMOVE,
-            ['product_id' => (string)$productId],
-            (string)$productId
-        );
+        $this->catalogIngest->enqueueRemovals([$productId]);
     }
 }

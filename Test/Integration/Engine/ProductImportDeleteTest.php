@@ -229,8 +229,7 @@ class ProductImportDeleteTest extends IntegrationTestCase
                 $payloadBuilder,
                 $ingestQueue,
                 $this->createMock(Logger::class)
-            ),
-            $ingestQueue
+            )
         );
     }
 

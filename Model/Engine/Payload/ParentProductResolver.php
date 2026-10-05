@@ -76,6 +76,32 @@ class ParentProductResolver
     }
 
     /**
+     * Those of these products that are configurable children, from one
+     * query for all of them (a product import's Delete bunch, PRO-3768) —
+     * the same rule as isConfigurableChild(), whose memo it fills, so a
+     * later productIdOf() of any of them reads no row.
+     *
+     * @param int[] $entityIds
+     * @return int[]
+     */
+    public function configurableChildIds(array $entityIds): array
+    {
+        $entityIds = array_values(array_unique(array_filter(
+            array_map('intval', $entityIds),
+            static fn (int $id): bool => $id > 0
+        )));
+        $unresolved = array_values(array_filter($entityIds, fn (int $id): bool => !isset($this->resolved[$id])));
+        if ($unresolved) {
+            $parents = $this->parentEntityIds($unresolved);
+            foreach ($unresolved as $entityId) {
+                $this->resolved[$entityId] = (string)($parents[$entityId] ?? $entityId);
+            }
+        }
+
+        return array_values(array_filter($entityIds, fn (int $id): bool => $this->isConfigurableChild($id)));
+    }
+
+    /**
      * The category ids of a configurable child's parent product, or [] when
      * the product is not a configurable child (PRO-3714: a variant without
      * categories of its own is sent with its parent's category).
@@ -107,6 +133,40 @@ class ParentProductResolver
         }
 
         return $this->parentCategoryIds[$parentId];
+    }
+
+    /**
+     * parentEntityId() for many products in one query: child entity id =>
+     * its lowest parent entity id, for the children only.
+     *
+     * @param int[] $childIds
+     * @return array<int, int>
+     */
+    private function parentEntityIds(array $childIds): array
+    {
+        try {
+            $linkField = $this->metadataPool->getMetadata(ProductInterface::class)->getLinkField();
+            $connection = $this->resourceConnection->getConnection();
+            $select = $connection->select()
+                ->from(['link' => $this->resourceConnection->getTableName(self::SUPER_LINK_TABLE)], ['product_id'])
+                ->join(
+                    ['parent' => $this->resourceConnection->getTableName(self::PRODUCT_ENTITY_TABLE)],
+                    'parent.' . $linkField . ' = link.parent_id',
+                    ['parent_id' => new \Zend_Db_Expr('MIN(parent.entity_id)')]
+                )
+                ->where('link.product_id IN (?)', $childIds)
+                ->group('link.product_id');
+            $parents = [];
+            foreach ($connection->fetchPairs($select) as $childId => $parentId) {
+                if ((int)$parentId > 0) {
+                    $parents[(int)$childId] = (int)$parentId;
+                }
+            }
+
+            return $parents;
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     /**

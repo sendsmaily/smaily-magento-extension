@@ -8,8 +8,9 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Unit\Model\Queue;
 
+use Magento\Framework\App\DeploymentConfig;
 use PHPUnit\Framework\TestCase;
-use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
+use Smaily\Connect\Model\Privacy\AddressKey;
 use Smaily\Connect\Model\Queue\ContactEntity;
 
 /**
@@ -21,9 +22,9 @@ class ContactEntityTest extends TestCase
 {
     public function testAnAddressThatFitsIsTheEntity(): void
     {
-        $optOuts = $this->createMock(ProfilingOptOuts::class);
-        $optOuts->expects(self::never())->method('addressKey');
-        $entity = new ContactEntity($optOuts);
+        $addressKey = $this->createMock(AddressKey::class);
+        $addressKey->expects(self::never())->method('of');
+        $entity = new ContactEntity($addressKey);
 
         $fits = str_repeat('a', 64 - strlen('@example.invalid')) . '@example.invalid';
         self::assertSame('U1@example.invalid', $entity->of('U1@example.invalid'));
@@ -33,11 +34,43 @@ class ContactEntityTest extends TestCase
     public function testALongerAddressIsItsKeyedHash(): void
     {
         $long = 'U1-' . str_repeat('a', 70) . '@example.invalid';
-        $optOuts = $this->createMock(ProfilingOptOuts::class);
-        $optOuts->expects(self::once())->method('addressKey')
-            ->with(strtolower($long))
-            ->willReturn(str_repeat('f', 64));
+        $addressKey = $this->addressKey();
 
-        self::assertSame(str_repeat('f', 64), (new ContactEntity($optOuts))->of(' ' . $long));
+        $entity = (new ContactEntity($addressKey))->of(' ' . $long);
+
+        self::assertSame($addressKey->of(strtolower($long)), $entity);
+        self::assertTrue(ContactEntity::isHash($entity));
+    }
+
+    /**
+     * The GDPR erasure and the consent replay match a contact's rows by
+     * every form the entity may take: the keyed hash and the address.
+     */
+    public function testAContactsRowsAreMatchedByTheHashAndTheAddress(): void
+    {
+        $addressKey = $this->addressKey();
+        $entity = new ContactEntity($addressKey);
+
+        self::assertSame(
+            [$addressKey->of('u1@example.invalid'), 'u1@example.invalid'],
+            $entity->forms('u1@example.invalid')
+        );
+        self::assertSame(['k', 'u1@example.invalid'], $entity->forms('u1@example.invalid', 'k'));
+    }
+
+    public function testOnlyA64HexEntityIsAHash(): void
+    {
+        self::assertTrue(ContactEntity::isHash(str_repeat('0f', 32)));
+        self::assertFalse(ContactEntity::isHash(str_repeat('0F', 32)));
+        self::assertFalse(ContactEntity::isHash(str_repeat('f', 63)));
+        self::assertFalse(ContactEntity::isHash('u1@example.invalid'));
+    }
+
+    private function addressKey(): AddressKey
+    {
+        $deploymentConfig = $this->createMock(DeploymentConfig::class);
+        $deploymentConfig->method('get')->willReturn('unit-test-crypt-key');
+
+        return new AddressKey($deploymentConfig);
     }
 }

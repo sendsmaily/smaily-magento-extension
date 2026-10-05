@@ -18,8 +18,8 @@ use Smaily\Connect\Model\Logger\Logger;
 
 /**
  * The single place a product turns into a catalog ingest row — live hooks,
- * the delete observers' soft tombstones and the catalog import processor
- * alike.
+ * the delete observers' soft tombstones and §3b removals, and the catalog
+ * import processor alike.
  *
  * Product save, the tombstone and the backfill pages already hold the
  * product and queue its row at once. The stock hooks do not (PRO-1967): a
@@ -29,7 +29,8 @@ use Smaily\Connect\Model\Logger\Logger;
  * rows in a batch each minute (buildChanged(): one product collection,
  * one insert), so the row goes out in the same run as before.
  *
- * The engine-connected gate lives here, once, rather than in every caller.
+ * The engine-connected gate lives here, once, rather than in every caller;
+ * the delete paths ask it before they build anything, so their callers hold it.
  *
  * Duplicates collapse in two places, neither of them queue-wide dedupe:
  * a byte-identical row queued twice in a row within one request (see
@@ -86,14 +87,15 @@ class CatalogIngest
      * Build these products' tombstone rows now, for a delete that removes
      * the products before any event sees it (a product import's Delete,
      * PRO-3768); enqueueBuilt() queues them once the delete happens. The
-     * products load as one collection, as in buildChanged().
+     * products load as one collection, as in buildChanged(). The caller
+     * holds the engine-connected gate (ProductImportDelete::isProductDelete()).
      *
      * @param int[] $productIds
      * @return array<int, array<string, mixed>> product id => row (a failed build is left out, logged)
      */
     public function buildTombstones(array $productIds): array
     {
-        if (!$productIds || !$this->settings->isConnected()) {
+        if (!$productIds) {
             return [];
         }
 
@@ -109,9 +111,9 @@ class CatalogIngest
     }
 
     /**
-     * Queue rows buildTombstones() built.
+     * Queue rows buildTombstones() or buildChanged() built.
      *
-     * @param array<int, array<string, mixed>> $rows product id => row
+     * @param array<int|string, array<string, mixed>> $rows product id => row
      */
     public function enqueueBuilt(array $rows): void
     {
@@ -122,6 +124,27 @@ class CatalogIngest
                 $this->payloadBuilder->canonicalStoreId()
             );
         }
+    }
+
+    /**
+     * Queue the §3b product-level removal of these products (contract §3b,
+     * PRO-1231): one catalog_remove row per product, carrying the raw entity
+     * id — the `tags.product_id` the catalog sync emits. For a product
+     * deleted in the admin (ProductDeleteBefore) and by a product import's
+     * Delete (ProductImportDelete); never for a configurable child, whose
+     * parent lives on. The caller holds the engine-connected gate.
+     *
+     * @param int[] $productIds
+     */
+    public function enqueueRemovals(array $productIds): void
+    {
+        $rows = [];
+        foreach ($productIds as $productId) {
+            $key = (string)$productId;
+            $rows[] = ['payload' => ['product_id' => $key], 'entity_id' => $key, 'store_id' => null];
+        }
+
+        $this->ingestQueue->enqueueMany(Client::DOMAIN_CATALOG_REMOVE, $rows);
     }
 
     /**
@@ -169,7 +192,6 @@ class CatalogIngest
             static fn (IngestEvent $marker): int => (int)$marker->getEntityId(),
             $markers
         )));
-        $storeId = $this->payloadBuilder->canonicalStoreId();
 
         $payloads = [];
         foreach ($this->loadProducts($productIds) as $product) {
@@ -179,7 +201,7 @@ class CatalogIngest
             }
         }
 
-        $this->ingestQueue->enqueueChangedPayloads(Client::DOMAIN_CATALOG, $payloads, $storeId);
+        $this->enqueueBuilt($payloads);
         $this->ingestQueue->delete($markers);
     }
 

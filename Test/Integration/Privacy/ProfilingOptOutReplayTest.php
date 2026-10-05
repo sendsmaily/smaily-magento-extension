@@ -19,6 +19,8 @@ use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Privacy\AddressKey;
+use Smaily\Connect\Model\Privacy\OptOutReplay;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
 use Smaily\Connect\Model\Queue\Event;
@@ -220,7 +222,7 @@ class ProfilingOptOutReplayTest extends IntegrationTestCase
             'One opt-out waits, however many orders were confirmed'
         );
         self::assertSame(
-            [$this->optOuts->addressKey($email), $this->optOuts->addressKey($email)],
+            [$this->addressKey($email), $this->addressKey($email)],
             array_column($rows, 'entity_id')
         );
 
@@ -281,6 +283,14 @@ class ProfilingOptOutReplayTest extends IntegrationTestCase
         return $consent;
     }
 
+    private function addressKey(string $email): string
+    {
+        /** @var AddressKey $addressKey */
+        $addressKey = $this->objectManager->create(AddressKey::class);
+
+        return $addressKey->of($email);
+    }
+
     private function flushIngest(): void
     {
         /** @var FlushIngestQueue $cron */
@@ -289,7 +299,7 @@ class ProfilingOptOutReplayTest extends IntegrationTestCase
             'queue' => $this->ingestQueue,
             'catalogIngest' => $this->createMock(CatalogIngest::class),
             'client' => $this->client,
-            'profilingConsent' => $this->consent(),
+            'optOutReplay' => new OptOutReplay($this->consent()),
         ]);
         $cron->execute();
     }

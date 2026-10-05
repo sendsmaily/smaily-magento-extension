@@ -16,10 +16,8 @@ use Magento\ImportExport\Model\ResourceModel\Import\Data as DataSource;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\CatalogIngest;
-use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Payload\ParentProductResolver;
 use Smaily\Connect\Model\Engine\ProductImportDelete;
-use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Observer\Engine\ProductImportBunchDelete;
 use Smaily\Connect\Plugin\Engine\ProductImportBunch;
@@ -38,7 +36,6 @@ class ProductImportDeleteTest extends TestCase
     private ProductResource&MockObject $productResource;
     private ParentProductResolver&MockObject $parentResolver;
     private CatalogIngest&MockObject $catalogIngest;
-    private IngestQueue&MockObject $queue;
 
     protected function setUp(): void
     {
@@ -47,7 +44,6 @@ class ProductImportDeleteTest extends TestCase
         $this->productResource = $this->createMock(ProductResource::class);
         $this->parentResolver = $this->createMock(ParentProductResolver::class);
         $this->catalogIngest = $this->createMock(CatalogIngest::class);
-        $this->queue = $this->createMock(IngestQueue::class);
     }
 
     public function testADeletedChildGetsItsTombstoneAndTheOthersSection3b(): void
@@ -55,16 +51,12 @@ class ProductImportDeleteTest extends TestCase
         $this->productResource->method('getProductsIdsBySkus')
             ->with(['TENT', 'TENT-RED', 'LAMP'])
             ->willReturn(['TENT' => '10', 'TENT-RED' => '11', 'LAMP' => '20']);
-        $this->parentResolver->method('isConfigurableChild')
-            ->willReturnCallback(static fn (int $id): bool => $id === 11);
+        $this->parentResolver->method('configurableChildIds')->with([10, 11, 20])->willReturn([11]);
         $tombstone = ['sku' => 'TENT-RED', 'in_stock' => false];
         $this->catalogIngest->expects(self::once())->method('buildTombstones')->with([11])
             ->willReturn([11 => $tombstone]);
         $this->catalogIngest->expects(self::once())->method('enqueueBuilt')->with([11 => $tombstone]);
-        $this->queue->expects(self::once())->method('enqueueMany')->with(Client::DOMAIN_CATALOG_REMOVE, [
-            ['payload' => ['product_id' => '10'], 'entity_id' => '10', 'store_id' => null],
-            ['payload' => ['product_id' => '20'], 'entity_id' => '20', 'store_id' => null],
-        ]);
+        $this->catalogIngest->expects(self::once())->method('enqueueRemovals')->with([10, 20]);
 
         $deletes = $this->deletes();
         $plugin = new ProductImportBunch($deletes);
@@ -80,7 +72,7 @@ class ProductImportDeleteTest extends TestCase
     public function testTheTombstonesOfOneBunchAreNotKeptForTheNext(): void
     {
         $this->productResource->method('getProductsIdsBySkus')->willReturn(['TENT-RED' => '11']);
-        $this->parentResolver->method('isConfigurableChild')->willReturn(true);
+        $this->parentResolver->method('configurableChildIds')->willReturn([11]);
         $this->catalogIngest->method('buildTombstones')->willReturn([11 => ['sku' => 'TENT-RED']]);
         $queued = [];
         $this->catalogIngest->method('enqueueBuilt')->willReturnCallback(
@@ -101,7 +93,7 @@ class ProductImportDeleteTest extends TestCase
     {
         $this->productResource->expects(self::never())->method('getProductsIdsBySkus');
         $this->catalogIngest->expects(self::never())->method('enqueueBuilt');
-        $this->queue->expects(self::never())->method('enqueueMany');
+        $this->catalogIngest->expects(self::never())->method('enqueueRemovals');
 
         $deletes = $this->deletes();
         (new ProductImportBunch($deletes))
@@ -126,10 +118,29 @@ class ProductImportDeleteTest extends TestCase
             $settings,
             $this->productResource,
             $this->parentResolver,
-            $this->catalogIngest,
-            $this->queue
+            $this->catalogIngest
         );
         self::assertFalse($deletes->isProductDelete($dataSource, null));
+    }
+
+    /**
+     * The import's table is read once per bunch iteration — not on every
+     * bunch read and delete — and again for the next iteration.
+     */
+    public function testTheImportIsAskedOncePerBunchIteration(): void
+    {
+        $dataSource = $this->createMock(DataSource::class);
+        $dataSource->expects(self::exactly(2))->method('getEntityTypeCode')->willReturn('catalog_product');
+        $dataSource->expects(self::exactly(2))->method('getBehavior')->willReturn('append');
+
+        $deletes = $this->deletes();
+        $plugin = new ProductImportBunch($deletes);
+        $plugin->afterGetNextUniqueBunch($dataSource, [['sku' => 'TENT']], [5]);
+        $plugin->afterGetNextUniqueBunch($dataSource, [['sku' => 'LAMP']], [5]);
+        (new ProductImportBunchDelete($deletes))->execute($this->bunchDeleted($dataSource, [10]));
+        $plugin->afterGetNextUniqueBunch($dataSource, null, [5]);
+
+        $plugin->afterGetNextUniqueBunch($dataSource, [['sku' => 'TENT']], [5]);
     }
 
     private function deletes(): ProductImportDelete
@@ -138,8 +149,7 @@ class ProductImportDeleteTest extends TestCase
             $this->settings,
             $this->productResource,
             $this->parentResolver,
-            $this->catalogIngest,
-            $this->queue
+            $this->catalogIngest
         );
     }
 

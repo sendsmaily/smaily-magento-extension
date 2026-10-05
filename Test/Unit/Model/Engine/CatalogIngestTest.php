@@ -179,7 +179,6 @@ class CatalogIngestTest extends TestCase
         self::assertFalse($ingest->enqueueTombstone($this->product(8)));
         self::assertFalse($ingest->markProductChanged(8));
         self::assertFalse($ingest->markSkusChanged(['TENT']));
-        self::assertSame([], $ingest->buildTombstones([8]));
     }
 
     public function testNoChangedProductsMeansNoProductLoad(): void
@@ -229,7 +228,7 @@ class CatalogIngestTest extends TestCase
         $markers = [$this->marker(1, '7')];
         $this->queue->method('claimBatch')->willReturn($markers);
         $this->collectionFactory->method('create')->willReturn($this->collection([]));
-        $this->queue->expects(self::once())->method('enqueueChangedPayloads')->with(Client::DOMAIN_CATALOG, [], 1);
+        $this->queue->expects(self::never())->method('enqueueChangedPayloads');
         $this->queue->expects(self::once())->method('delete')->with($markers);
 
         $this->ingest()->buildChanged();
@@ -309,6 +308,20 @@ class CatalogIngestTest extends TestCase
         $ingest = $this->ingest();
         self::assertSame([], $ingest->buildTombstones([]));
         $ingest->enqueueBuilt([]);
+    }
+
+    /**
+     * §3b (PRO-1231): one catalog_remove row per product, carrying the raw
+     * entity id, for the admin delete and the import's Delete alike.
+     */
+    public function testRemovalsAreQueuedAsOneSection3bRowPerProduct(): void
+    {
+        $this->queue->expects(self::once())->method('enqueueMany')->with(Client::DOMAIN_CATALOG_REMOVE, [
+            ['payload' => ['product_id' => '42'], 'entity_id' => '42', 'store_id' => null],
+            ['payload' => ['product_id' => '43'], 'entity_id' => '43', 'store_id' => null],
+        ]);
+
+        $this->ingest()->enqueueRemovals([42, 43]);
     }
 
     private function ingest(

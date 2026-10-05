@@ -93,9 +93,7 @@ class ContactSyncHandler implements EventHandlerInterface
             $client->post(SmailyClient::ENDPOINT_CONTACT, array_column($rows, 'contact'));
             $error = null;
         } catch (SmailyClientException $exception) {
-            if (count($rows) > 1 && $exception instanceof ApiException
-                && $exception->getSmailyCode() === ApiException::CODE_INVALID_DATA
-            ) {
+            if (count($rows) > 1 && $exception instanceof ApiException && $exception->isInvalidData()) {
                 $this->logger->info('Contact sync batch refused as invalid data; sending each contact alone', [
                     'store_id' => $storeId,
                     'count' => count($rows),

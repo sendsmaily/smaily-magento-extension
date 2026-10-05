@@ -5,7 +5,9 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-05 — after rc7, PRO-3767 (a contact sync or
+_Last updated: 2026-10-05 — after rc7, a behaviour-neutral simplification
+pass over PRO-3760, PRO-3765, PRO-3768, PRO-3753 and PRO-3767; before it
+PRO-3767 (a contact sync or
 automation row of an address longer than the 64-character entity column
 stores the contact's keyed hash, not a cut address; unreleased); before it
 PRO-3753 parts (b) and (c)
@@ -196,6 +198,46 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **Simplification pass, behaviour-neutral (2026-10-05)**, over PRO-3760,
+  PRO-3765, PRO-3768, PRO-3753 (a) and (b) and PRO-3767. The keyed hash of
+  an address is one class, `Model\Privacy\AddressKey` (`of()`, `keys()`,
+  the crypt key parsed once per instance, the trim + lower case inside;
+  `ProfilingOptOuts`, `ContactEntity`, `ProfilingConsent` and `LocalEraser`
+  take it, `ProfilingOptOuts::addressKey()` is gone). Its output is
+  byte-identical: unit `AddressKeyTest` pins the HMAC and sha1 keys of a
+  placeholder address, with one and with two crypt keys, and of a long
+  mixed-case address, computed with the code before the change.
+  `ContactEntity::forms()` is the hash + address pair the erasure and the
+  consent replay match, `ContactEntity::isHash()` the 64-hex test the Log's
+  `EntityLabel` uses; `ProfilingOptOuts::moments()` returns each address's
+  key with its moment, so the replay hashes an address once per batch. The
+  replay's domain-to-shopper-field map left `Cron\FlushIngestQueue` for
+  `Model\Privacy\OptOutReplay::afterConfirmed()` (the flusher hands over
+  the confirmed items); Details' "waits for the Campaign Intelligence
+  account" rule is `Model\Log\AccountWait::waits()`.
+  `ApiException::isInvalidData()` is the 203 group-split test of the
+  contact sync and the contacts import (two loops, kept apart).
+  `CatalogIngest::enqueueRemovals()` builds the §3b `catalog_remove` row
+  for the admin delete and the import's Delete; `buildChanged()` queues
+  through `enqueueBuilt()`; `buildTombstones()` drops its unreachable
+  connected check (its one caller asked it first). The import's Delete asks
+  `importexport_importdata` for entity and behaviour once per bunch
+  iteration instead of on every bunch read and delete
+  (`ProductImportDelete::endOfBunches()` at the read past the last bunch),
+  and finds a bunch's configurable children with one query
+  (`ParentProductResolver::configurableChildIds()`: the super link joined
+  to the parent, lowest parent per child, as the per-product lookup — whose
+  memo it fills). Kept: `ProfilingConsent` still normalises the address at
+  each public entry point (now `AddressKey::normalise()`): the normalised
+  address is also what it sends to Smaily and the engine and what its
+  empty-address guard checks, so dropping it would change the wire.
+  Evidence: unit, phpcs, phpstan, integration (MySQL 8.4 on 3316; the
+  replay, contact-entity, GDPR erasure and CSV-delete tests unchanged in
+  their assertions), browser harnesses, PHP 8.1 lint; DI changed
+  (ProfilingOptOuts, ContactEntity, ProfilingConsent, LocalEraser,
+  ProductImportDelete, ProductDeleteBefore, FlushIngestQueue, Log Details);
+  sandbox `setup:upgrade && setup:di:compile` OK. Docs: ARCHITECTURE.
 
 - **PRO-3780 — the checkout email-field browser test always writes its
   result (2026-10-05; tooling, no CHANGELOG bullet).** `RESULT: FAIL (no

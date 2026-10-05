@@ -20,6 +20,7 @@ use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Privacy\OptOutReplay;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 
 class FlushIngestQueueTest extends TestCase
@@ -163,7 +164,7 @@ class FlushIngestQueueTest extends TestCase
             $this->queue,
             $this->catalogIngest,
             $this->client,
-            $this->profilingConsent,
+            new OptOutReplay($this->profilingConsent),
             new Json(),
             $this->createMock(Logger::class)
         ))->execute();
@@ -353,7 +354,7 @@ class FlushIngestQueueTest extends TestCase
             $this->queue,
             $this->catalogIngest,
             $this->client,
-            $this->profilingConsent,
+            new OptOutReplay($this->profilingConsent),
             new Json(),
             $this->createMock(Logger::class)
         );

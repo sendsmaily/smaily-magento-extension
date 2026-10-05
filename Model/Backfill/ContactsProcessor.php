@@ -194,9 +194,7 @@ class ContactsProcessor implements ProcessorInterface
 
             return count($contacts);
         } catch (SmailyClientException $exception) {
-            if (count($contacts) > 1 && $exception instanceof ApiException
-                && $exception->getSmailyCode() === ApiException::CODE_INVALID_DATA
-            ) {
+            if (count($contacts) > 1 && $exception instanceof ApiException && $exception->isInvalidData()) {
                 $sent = 0;
                 foreach ($contacts as $contact) {
                     $sent += $this->post($storeId, [$contact], $client);

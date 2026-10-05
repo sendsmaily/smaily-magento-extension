@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Log;
 
+use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\EventType;
 
 /**
@@ -38,7 +39,7 @@ class EntityLabel
      */
     public static function forDisplay(string $type, string $entityId): string
     {
-        if (!in_array($type, self::HASHED_TYPES, true) || preg_match('/^[0-9a-f]{64}$/', $entityId) !== 1) {
+        if (!in_array($type, self::HASHED_TYPES, true) || !ContactEntity::isHash($entityId)) {
             return $entityId;
         }
 

@@ -12,6 +12,7 @@ use Magento\Framework\App\DeploymentConfig;
 use Magento\Framework\FlagManager;
 use Magento\Framework\Lock\LockManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\Privacy\AddressKey;
 use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
 
 class ProfilingOptOutsTest extends TestCase
@@ -58,10 +59,15 @@ class ProfilingOptOutsTest extends TestCase
             return true;
         });
 
+        return new ProfilingOptOuts($flagManager, $lockManager, $this->addressKey($cryptKey));
+    }
+
+    private function addressKey(string $cryptKey): AddressKey
+    {
         $deploymentConfig = $this->createMock(DeploymentConfig::class);
         $deploymentConfig->method('get')->willReturn($cryptKey);
 
-        return new ProfilingOptOuts($flagManager, $lockManager, $deploymentConfig);
+        return new AddressKey($deploymentConfig);
     }
 
     public function testAnAddressWithoutAnOptOutHasNoMoment(): void
@@ -101,10 +107,16 @@ class ProfilingOptOutsTest extends TestCase
 
             return $this->flags[$code] ?? null;
         });
-        $deploymentConfig = $this->createMock(DeploymentConfig::class);
-        $deploymentConfig->method('get')->willReturn(self::CRYPT_KEY);
-        $optOuts = new ProfilingOptOuts($flagManager, $this->createMock(LockManagerInterface::class), $deploymentConfig);
+        $addressKey = $this->addressKey(self::CRYPT_KEY);
+        $optOuts = new ProfilingOptOuts($flagManager, $this->createMock(LockManagerInterface::class), $addressKey);
 
+        $moments = $optOuts->moments([
+            'u1@example.invalid',
+            'u2@example.invalid',
+            'u3@example.invalid',
+            'u4@example.invalid',
+            'u5@example.invalid',
+        ]);
         self::assertSame(
             [
                 'u1@example.invalid' => 1790000000,
@@ -112,14 +124,12 @@ class ProfilingOptOutsTest extends TestCase
                 'u3@example.invalid' => 1790000001,
                 'u4@example.invalid' => 1790000002,
             ],
-            $optOuts->moments([
-                'u1@example.invalid',
-                'u2@example.invalid',
-                'u3@example.invalid',
-                'u4@example.invalid',
-                'u5@example.invalid',
-            ])
+            array_map(static fn (array $optOut): int => $optOut['moment'], $moments)
         );
+        // Each comes with the address's current key, so it is hashed once.
+        foreach ($moments as $email => $optOut) {
+            self::assertSame($addressKey->of($email), $optOut['key']);
+        }
         self::assertSame(1, $reads);
     }
 
@@ -174,10 +184,10 @@ class ProfilingOptOutsTest extends TestCase
     {
         $this->optOuts->record('person@example.com', 1790000000);
 
-        $key = $this->optOuts->addressKey('person@example.com');
+        $key = $this->addressKey(self::CRYPT_KEY)->of('person@example.com');
         self::assertSame([$key], array_keys($this->flags[ProfilingOptOuts::FLAG_CODE]));
         self::assertNotSame(sha1('person@example.com'), $key);
-        self::assertNotSame($key, $this->optOuts('another-store-key')->addressKey('person@example.com'));
+        self::assertNotSame($key, $this->addressKey('another-store-key')->of('person@example.com'));
     }
 
     public function testAWriteMovesAnEntryKeptUnderThePlainHashToTheKeyedForm(): void

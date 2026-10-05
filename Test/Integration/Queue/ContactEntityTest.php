@@ -8,7 +8,6 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Queue;
 
-use Magento\Framework\Lock\LockManagerInterface;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Automation\Trigger;
@@ -18,7 +17,7 @@ use Smaily\Connect\Model\Log\ResendGuard;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
 use Smaily\Connect\Model\Privacy\Erasure;
 use Smaily\Connect\Model\Privacy\LocalEraser;
-use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
+use Smaily\Connect\Model\Privacy\AddressKey;
 use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
@@ -37,7 +36,7 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  */
 class ContactEntityTest extends IntegrationTestCase
 {
-    private ProfilingOptOuts $optOuts;
+    private AddressKey $addressKey;
     private SyncDispatcher $dispatcher;
     private string $longAddress;
 
@@ -45,9 +44,7 @@ class ContactEntityTest extends IntegrationTestCase
     {
         parent::setUp();
         $this->longAddress = 'u1-' . str_repeat('a', 70) . '@example.invalid';
-        $this->optOuts = $this->objectManager->create(ProfilingOptOuts::class, [
-            'lockManager' => $this->createMock(LockManagerInterface::class),
-        ]);
+        $this->addressKey = $this->objectManager->create(AddressKey::class);
 
         $payloadBuilder = $this->createMock(SubscriberPayloadBuilder::class);
         $payloadBuilder->method('build')->willReturnCallback(static fn (string $email): array => ['email' => $email]);
@@ -60,7 +57,7 @@ class ContactEntityTest extends IntegrationTestCase
             $this->createMock(LanguageResolver::class),
             $storeManager,
             $this->objectManager->create(EventQueue::class),
-            new ContactEntity($this->optOuts)
+            new ContactEntity($this->addressKey)
         );
     }
 
@@ -72,7 +69,7 @@ class ContactEntityTest extends IntegrationTestCase
         $rows = $this->fetchAll(EventResource::TABLE_NAME);
         self::assertCount(2, $rows);
         foreach ($rows as $row) {
-            self::assertSame($this->optOuts->addressKey($this->longAddress), $row['entity_id'], $row['event_type']);
+            self::assertSame($this->addressKey->of($this->longAddress), $row['entity_id'], $row['event_type']);
             self::assertStringContainsString($this->longAddress, (string)$row['payload'], 'Details shows the address');
         }
     }
@@ -98,7 +95,7 @@ class ContactEntityTest extends IntegrationTestCase
         $rows = $this->fetchAll(EventResource::TABLE_NAME);
         self::assertCount(2, $rows);
         self::assertSame(EventType::CONTACT_SYNC, $rows[1]['event_type']);
-        self::assertSame($this->optOuts->addressKey($this->longAddress), $rows[1]['entity_id']);
+        self::assertSame($this->addressKey->of($this->longAddress), $rows[1]['entity_id']);
     }
 
     public function testALaterDeliveredReminderOfALongAddressBlocksSendingTheFailedOneAgain(): void
@@ -134,7 +131,7 @@ class ContactEntityTest extends IntegrationTestCase
         $schema->createQuote();
         $schema->createQuoteAddress();
         /** @var LocalEraser $eraser */
-        $eraser = $this->objectManager->create(LocalEraser::class, ['optOuts' => $this->optOuts]);
+        $eraser = $this->objectManager->create(LocalEraser::class);
         try {
             $counts = $eraser->erase(strtoupper($this->longAddress));
         } finally {

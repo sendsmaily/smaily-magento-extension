@@ -16,7 +16,7 @@ use Magento\Framework\Controller\Result\Raw;
 use Magento\Framework\Controller\Result\RawFactory;
 use Magento\Framework\UrlInterface;
 use Magento\Framework\View\LayoutInterface;
-use Smaily\Connect\Model\Engine\Settings as EngineSettings;
+use Smaily\Connect\Model\Log\AccountWait;
 use Smaily\Connect\Model\Log\AttemptHistory;
 use Smaily\Connect\Model\Log\EntityLabel;
 use Smaily\Connect\Model\Log\FailureMessage;
@@ -26,9 +26,7 @@ use Smaily\Connect\Model\Log\Resend;
 use Smaily\Connect\Model\Log\ResendGuard;
 use Smaily\Connect\Model\Log\StatusPill;
 use Smaily\Connect\Model\Queue\Event;
-use Smaily\Connect\Model\Queue\HandlerPool;
 use Smaily\Connect\Model\Queue\PayloadDecoder;
-use Smaily\Connect\Model\ResourceModel\Log\Collection;
 use Smaily\Connect\Ui\Component\QueueStatusOptions;
 
 /**
@@ -61,8 +59,7 @@ class Details extends Action implements HttpGetActionInterface
         private readonly AttemptHistory $attemptHistory,
         private readonly StatusPill $statusPill,
         private readonly UrlInterface $urlBuilder,
-        private readonly HandlerPool $handlerPool,
-        private readonly EngineSettings $engineSettings
+        private readonly AccountWait $accountWait
     ) {
         parent::__construct($context);
     }
@@ -111,7 +108,7 @@ class Details extends Action implements HttpGetActionInterface
             'failure_class' => $this->failureMessage->failureClass($lastError),
             'status_pill' => $this->statusPill->variant((string)($row['status'] ?? '')),
             'history' => $this->attemptHistory->entries($row),
-            'waits_for_account' => $this->waitsForAccount($row),
+            'waits_for_account' => $this->accountWait->waits($row),
             // The same rule as the grid's "Send again" action (LogActions):
             // only a row the guard asked about AND cleared.
             'resend_url' => $row && $reason === ''
@@ -120,24 +117,5 @@ class Details extends Action implements HttpGetActionInterface
         ]]);
 
         return $result->setContents($block->toHtml());
-    }
-
-    /**
-     * Whether a pending row waits for the Campaign Intelligence account to
-     * be active again: an engine ingest row while the account is refused
-     * (PRO-2451), or a row of a marketing handler paused meanwhile
-     * (PRO-2466, PRO-3752). Neither is sent at the next flush.
-     *
-     * @param array<string, mixed> $row
-     */
-    private function waitsForAccount(array $row): bool
-    {
-        if (($row['status'] ?? '') !== Event::STATUS_PENDING) {
-            return false;
-        }
-
-        return ($row['source'] ?? '') === Collection::SOURCE_INTELLIGENCE
-            ? $this->engineSettings->isRefused()
-            : in_array((string)($row['type'] ?? ''), $this->handlerPool->pausedEventTypes(), true);
     }
 }

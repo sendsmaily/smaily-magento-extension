@@ -535,8 +535,9 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   (`pending`, `sending`) is DELETED, a row that is over (`sent`, `failed`)
   is ANONYMIZED in place — `entity_id`, `payload`, `sent_payload`,
   `last_response` and `last_error` become one placeholder, keys and
-  structure kept, so the merchant keeps the record of the send. Rows are
-  matched by DECODING the stored JSON (`Model\Privacy\PayloadAnonymizer`),
+  structure kept, so the merchant keeps the record of the send. A row is
+  matched by its `entity_id` (the address, or for a profiling-consent row
+  the opt-out record's keyed hash of it — PRO-3765) or by DECODING the stored JSON (`Model\Privacy\PayloadAnonymizer`),
   never by searching its raw text: `json_encode` escapes a non-ASCII
   address, which a substring search would miss. The walk reads a narrow
   column list in 1000-row chunks and deletes or anonymizes each chunk's
@@ -907,7 +908,19 @@ or a subscription Smaily's consent mirror writes counts too.
   `smaily_rec_profiling_ts`, Z-suffixed), into the store's own record
   (`Model\Privacy\ProfilingOptOuts`) and onto the marketing event queue as
   an `engine.profiling_consent` row for the engine's §10 opt-out endpoint.
-  A failed Smaily write does not stop the other two.
+  A failed Smaily write does not stop the other two. The row's `entity_id`
+  is the record's keyed hash of the address (`ProfilingOptOuts::addressKey()`,
+  64 hex characters), never the address (PRO-3765): the address is in the
+  payload the engine needs and nowhere else on the row, and the hash always
+  fits the 64-character column, where a longer address was cut. A row
+  queued before carries the plain address; it is not rewritten (no data
+  patch) — a pending one drains within the retry window, a terminal one
+  goes with the janitor's retention — and every reader below matches both
+  forms, which also covers a **Send again** of such a row (`Log\Resend`
+  copies the entity). The Log grid (`Ui\Component\LogEntityColumn`), the
+  Details panel and the Dashboard's recent activity show the hash by its
+  first 12 characters (`Log\EntityLabel`); the grid's Entity filter finds
+  the row by them, as they are part of the stored value.
 - **The store's record** is one flag row, `smaily_connect_profiling_optouts`:
   a map of a keyed hash of the address (HMAC-SHA256 with the installation
   crypt key) to the opt-out's moment (Unix time), held under a named lock
@@ -964,7 +977,8 @@ or a subscription Smaily's consent mirror writes counts too.
   `queueForEngine()`, so the newest-choice match on delivery and the wait
   for a refused account apply to it. A shopper with no opt-out gets
   nothing. One already waiting (`EventQueue::waitingProfilingOptOuts()`: an
-  opt-out row pending, in its backoff or being sent) gets no second row, so
+  opt-out row pending, in its backoff or being sent, found by the keyed hash
+  or the plain address of a row queued before) gets no second row, so
   many orders make one; once that row is delivered, the next confirmation
   queues one again, which the engine takes as a no-op. The row is queued
   only after the engine confirmed the shopper, so it finds them.

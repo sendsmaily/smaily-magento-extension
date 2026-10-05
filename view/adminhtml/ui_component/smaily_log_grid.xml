@@ -81,7 +81,7 @@
                 <label translate="true">Type</label>
             </settings>
         </column>
-        <column name="entity_id" sortOrder="30">
+        <column name="entity_id" class="Smaily\Connect\Ui\Component\LogEntityColumn" sortOrder="30">
             <settings>
                 <filter>text</filter>
                 <label translate="true">Entity</label>

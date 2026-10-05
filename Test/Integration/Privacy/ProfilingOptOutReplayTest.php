@@ -197,6 +197,57 @@ class ProfilingOptOutReplayTest extends IntegrationTestCase
     }
 
     /**
+     * PRO-3765: the consent row's entity is the shopper's keyed hash, which
+     * always fits the 64-character column, so an address longer than that
+     * is found waiting too — and the address is stored only in the payload.
+     */
+    public function testALongAddressMakesOneWaitingOptOutHoweverManyOrders(): void
+    {
+        $email = str_repeat('l', 70) . '@example.invalid';
+        $this->consent()->setAllowed($email, false, 0);
+        $this->flushConsent();
+
+        $this->ingestQueue->enqueue(Client::DOMAIN_ORDERS, $this->order('100', $email), '100');
+        $this->ingestQueue->enqueue(Client::DOMAIN_ORDERS, $this->order('101', $email), '101');
+        $this->flushIngest();
+        $this->ingestQueue->enqueue(Client::DOMAIN_ORDERS, $this->order('102', $email), '102');
+        $this->flushIngest();
+
+        $rows = $this->consentRows();
+        self::assertSame(
+            [Event::STATUS_SENT, Event::STATUS_PENDING],
+            array_column($rows, 'status'),
+            'One opt-out waits, however many orders were confirmed'
+        );
+        self::assertSame(
+            [$this->optOuts->addressKey($email), $this->optOuts->addressKey($email)],
+            array_column($rows, 'entity_id')
+        );
+
+        $this->flushConsent();
+        self::assertSame([$email => true], $this->engineOptOuts);
+    }
+
+    /**
+     * A consent row queued before PRO-3765 carries the plain address; while
+     * it waits, a confirmed order queues no second one.
+     */
+    public function testAnOptOutQueuedBeforeWithThePlainAddressStillCountsAsWaiting(): void
+    {
+        $this->consent()->setAllowed('u1@example.invalid', false, 0);
+        $this->connection->update(
+            EventResource::TABLE_NAME,
+            ['entity_id' => 'u1@example.invalid'],
+            ['event_type = ?' => EventType::ENGINE_PROFILING_CONSENT]
+        );
+
+        $this->ingestQueue->enqueue(Client::DOMAIN_ORDERS, $this->order('100', 'u1@example.invalid'), '100');
+        $this->flushIngest();
+
+        self::assertSame(['u1@example.invalid'], array_column($this->consentRows(), 'entity_id'));
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function order(string $id, string $email): array

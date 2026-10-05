@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Privacy;
 
+use Magento\Framework\Lock\LockManagerInterface;
 use Smaily\Connect\Console\Command\GdprCommand;
 use Smaily\Connect\Model\AbandonedCart\StateManager;
 use Smaily\Connect\Model\Engine\Client;
@@ -17,6 +18,7 @@ use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Privacy\Erasure;
 use Smaily\Connect\Model\Privacy\LocalEraser;
+use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
@@ -50,6 +52,7 @@ class GdprEraseTest extends IntegrationTestCase
     private IngestQueue $ingestQueue;
     private StateManager $stateManager;
     private LocalEraser $eraser;
+    private ProfilingOptOuts $optOuts;
 
     protected function setUp(): void
     {
@@ -57,7 +60,10 @@ class GdprEraseTest extends IntegrationTestCase
         $this->eventQueue = $this->objectManager->create(EventQueue::class);
         $this->ingestQueue = $this->objectManager->create(IngestQueue::class);
         $this->stateManager = $this->objectManager->create(StateManager::class);
-        $this->eraser = $this->objectManager->create(LocalEraser::class);
+        $this->optOuts = $this->objectManager->create(ProfilingOptOuts::class, [
+            'lockManager' => $this->createMock(LockManagerInterface::class),
+        ]);
+        $this->eraser = $this->objectManager->create(LocalEraser::class, ['optOuts' => $this->optOuts]);
 
         $schema = new SchemaInstaller($this->connection);
         $schema->createQuote();
@@ -292,6 +298,44 @@ class GdprEraseTest extends IntegrationTestCase
         );
         self::assertCount(1, $decoded['local'][self::ENGINE_LABEL]);
         self::assertCount(1, $decoded['local'][self::CART_LABEL]);
+    }
+
+    /**
+     * PRO-3765: a profiling-consent row's entity is the shopper's keyed hash
+     * — a row queued before, the plain address. The erasure finds both
+     * forms, by the entity as well as by the payload.
+     */
+    public function testErasureFindsTheProfilingConsentRowsByKeyedHashAndByThePlainAddress(): void
+    {
+        $optOuts = $this->optOuts;
+        $key = $optOuts->addressKey(self::SUBJECT);
+        $optOut = ['email' => self::SUBJECT, 'opt_out' => true, 'opted_out_at' => '2026-10-05T10:00:00Z'];
+        $this->eventQueue->enqueue(EventType::ENGINE_PROFILING_CONSENT, $optOut, $key, 0, 'consent-pending');
+        $this->eventQueue->enqueue(EventType::ENGINE_PROFILING_CONSENT, $optOut, $key, 0, 'consent-sent');
+        $this->eventQueue->enqueue(EventType::ENGINE_PROFILING_CONSENT, $optOut, self::SUBJECT, 0, 'consent-legacy');
+        // Only the entity names the shopper here.
+        $this->eventQueue->enqueue(EventType::ENGINE_PROFILING_CONSENT, [], $key, 0, 'consent-entity-only');
+        $this->eventQueue->enqueue(
+            EventType::ENGINE_PROFILING_CONSENT,
+            ['email' => self::BYSTANDER, 'opt_out' => true],
+            $optOuts->addressKey(self::BYSTANDER),
+            0,
+            'consent-other'
+        );
+        $this->markRow(EventResource::TABLE_NAME, 'consent-sent', ['status' => Event::STATUS_SENT]);
+        $this->markRow(EventResource::TABLE_NAME, 'consent-entity-only', ['status' => Event::STATUS_FAILED]);
+
+        self::assertSame(
+            ['removed' => 2, 'anonymised' => 2],
+            $this->eraser->erase(self::SUBJECT)[self::QUEUE_LABEL]
+        );
+
+        $events = array_column($this->fetchAll(EventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(['consent-sent', 'consent-entity-only', 'consent-other'], array_keys($events));
+        self::assertSame(Erasure::PLACEHOLDER, $events['consent-sent']['entity_id']);
+        self::assertStringNotContainsString(self::SUBJECT, (string)$events['consent-sent']['payload']);
+        self::assertSame(Erasure::PLACEHOLDER, $events['consent-entity-only']['entity_id']);
+        self::assertSame($optOuts->addressKey(self::BYSTANDER), $events['consent-other']['entity_id']);
     }
 
     public function testAnAnonymisedRowIsNeverRevivedByRetry(): void

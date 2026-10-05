@@ -5,7 +5,8 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-05 — PRO-3760 (an opt-out the engine did not keep
+_Last updated: 2026-10-05 — PRO-3765 (a profiling-consent queue row's
+entity is the shopper's keyed hash, not the address); before it PRO-3760 (an opt-out the engine did not keep
 is sent again once the engine confirms a customer or an order of the
 shopper); earlier the same day PRO-3749 (a Smaily HTTP error shows Smaily's
 answer in the Log's error column), PRO-2465 (the GDPR command and the
@@ -145,6 +146,35 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3765 — a profiling-consent queue row's entity is the shopper's
+  keyed hash, not the address (2026-10-05; owner approved 2026-10-05, ships
+  in rc7; no schema change; CHANGELOG bullet under "Changes since
+  3.0.0-rc6").** Found in PRO-3760: `queueForEngine()` stored the plain
+  address in the 64-character `entity_id`, so a longer address was cut,
+  `waitingProfilingOptOuts()` never matched it and each confirmation queued
+  one more opt-out (delivery was right — it reads the payload). The entity
+  is now `ProfilingOptOuts::addressKey()` (the opt-out record's HMAC, 64
+  hex). Readers checked: `resendOptOuts()`/`waitingProfilingOptOuts()`
+  (asks for the hash and the plain address); `LocalEraser` (matches the
+  entity against the address and its hash, besides the payload, as before;
+  now takes `ProfilingOptOuts`); the Log grid, Details and the Dashboard's
+  recent activity (`Log\EntityLabel`: a consent row's 64-hex entity shows
+  as its first 12 characters + "…", which the grid's Entity filter finds;
+  before, the address); the handler's newest-wins check and the PRO-3752
+  pause read the payload / the type, unchanged; `Log\Resend` copies the
+  entity as is. Transition: (a), no data patch — a legacy row drains within
+  the retry window or goes with the janitor's retention, and both forms
+  stay matched (also covers a Send again of an old failed row). Unit
+  (`EntityLabelTest`, `LogEntityColumnTest`, Details, consent: hash entity,
+  long address, waiting by hash and by plain) and integration (long
+  address + three orders → one waiting row, entity = hash; a legacy
+  plain-address row counts as waiting; erasure removes/anonymises consent
+  rows by hash, by plain address and by the entity alone, the bystander's
+  untouched; Dashboard shows the short form) — the long-address and
+  erasure ones red before. DI: `LocalEraser` constructor; sandbox
+  `setup:upgrade && setup:di:compile` green. ARCHITECTURE (profiling
+  consent, erasure), USER_GUIDE (personalization consent).
 
 - **PRO-3760 — an opt-out made before the engine knew the shopper reaches
   the engine once it does (2026-10-05; owner decision 2026-10-05, no

@@ -21,6 +21,8 @@
 
 /** @var array<string, mixed> $row */
 $row = (array)$block->getData('row');
+// The Entity as the grid shows it (PRO-3765).
+$entity = (string)$block->getData('entity');
 /** @var \Smaily\Connect\Model\Log\PayloadRedactor $redactor */
 $redactor = $block->getData('redactor');
 /** @var array<int|string, mixed> $decodedPayload */
@@ -145,9 +147,9 @@ $formatDate = static fn (string $date): string => (string)$block->formatDate($da
     <dl class="smaily-log-details__summary">
         <dt><?= $escaper->escapeHtml(__('Source')) ?></dt>
         <dd><?= $escaper->escapeHtml((string)($sourceLabels[$row['source']] ?? $row['source'])) ?></dd>
-        <?php if (!empty($row['entity_id'])): ?>
+        <?php if ($entity !== ''): ?>
         <dt><?= $escaper->escapeHtml(__('Entity')) ?></dt>
-        <dd><?= $escaper->escapeHtml((string)$row['entity_id']) ?></dd>
+        <dd><?= $escaper->escapeHtml($entity) ?></dd>
         <?php endif; ?>
         <dt><?= $escaper->escapeHtml(__('Attempts')) ?></dt>
         <dd><?= $escaper->escapeHtml(__('%1 of %2', $attempts, $maxAttempts)) ?></dd>

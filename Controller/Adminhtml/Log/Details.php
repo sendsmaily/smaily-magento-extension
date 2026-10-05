@@ -17,6 +17,7 @@ use Magento\Framework\Controller\Result\RawFactory;
 use Magento\Framework\UrlInterface;
 use Magento\Framework\View\LayoutInterface;
 use Smaily\Connect\Model\Log\AttemptHistory;
+use Smaily\Connect\Model\Log\EntityLabel;
 use Smaily\Connect\Model\Log\FailureMessage;
 use Smaily\Connect\Model\Log\PayloadRedactor;
 use Smaily\Connect\Model\Log\QueueRowLoader;
@@ -87,6 +88,7 @@ class Details extends Action implements HttpGetActionInterface
         $block = $this->layout->createBlock(Template::class, '', ['data' => [
             'template' => 'Smaily_Connect::log/details.phtml',
             'row' => $row,
+            'entity' => EntityLabel::forDisplay((string)($row['type'] ?? ''), (string)($row['entity_id'] ?? '')),
             'redactor' => $this->redactor,
             'payload' => $payload,
             'status_labels' => array_column($this->statusOptions->toOptionArray(), 'label', 'value'),

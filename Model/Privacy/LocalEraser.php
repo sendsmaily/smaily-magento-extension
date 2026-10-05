@@ -32,7 +32,8 @@ use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
  *   the merchant's own record that they messaged this person. The row keeps
  *   its id, type, status, attempts and timestamps and loses everything that
  *   points at the person: `entity_id` (which for a contact.sync or an
- *   automation row IS the address, and is the Log grid's Entity column),
+ *   automation row IS the address, for a profiling-consent row the opt-out
+ *   record's keyed hash of it, and is the Log grid's Entity column),
  *   the queued payload, the payload as sent, the last response and the last
  *   error.
  * - **An abandoned-cart row is ALWAYS anonymised**, whatever its status
@@ -102,7 +103,8 @@ class LocalEraser
     public function __construct(
         private readonly ResourceConnection $resourceConnection,
         private readonly PayloadAnonymizer $anonymizer,
-        private readonly StateManager $cartState
+        private readonly StateManager $cartState,
+        private readonly ProfilingOptOuts $optOuts
     ) {
     }
 
@@ -244,6 +246,9 @@ class LocalEraser
         $connection = $this->resourceConnection->getConnection();
         $tableName = $this->resourceConnection->getTableName($table);
         $columns = array_merge(self::SCANNED_COLUMNS, [self::TYPE_COLUMNS[$table]]);
+        // A profiling-consent row's entity is the keyed hash (PRO-3765); one
+        // queued before it, the plain address.
+        $entities = [$email, $this->optOuts->addressKey($email)];
 
         $lastId = 0;
         while (true) {
@@ -260,7 +265,7 @@ class LocalEraser
             $matched = [];
             foreach ($rows as $row) {
                 $lastId = (int)$row['id'];
-                $decoded = $this->matchRow($row, $email);
+                $decoded = $this->matchRow($row, $email, $entities);
                 if ($decoded !== null) {
                     $matched[] = [$row, $decoded];
                 }
@@ -277,11 +282,12 @@ class LocalEraser
      * the match and feeds the redaction.
      *
      * @param array<string, mixed> $row
+     * @param string[] $entities the entity values that point at this contact
      * @return array<string, array<int|string, mixed>|null>|null
      */
-    private function matchRow(array $row, string $email): ?array
+    private function matchRow(array $row, string $email, array $entities): ?array
     {
-        $matched = strtolower(trim((string)$this->column($row, 'entity_id'))) === $email;
+        $matched = in_array(strtolower(trim((string)$this->column($row, 'entity_id'))), $entities, true);
 
         $decoded = [];
         foreach (self::MATCHED_COLUMNS as $column) {

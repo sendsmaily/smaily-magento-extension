@@ -292,9 +292,14 @@ class ProfilingConsent
         }
 
         $moments = $this->optOuts->moments($emails);
-        $waiting = $this->eventQueue->waitingProfilingOptOuts(array_keys($moments));
+        $entities = [];
+        foreach (array_keys($moments) as $email) {
+            // A row queued before PRO-3765 carries the plain address.
+            $entities[$email] = [$this->optOuts->addressKey((string)$email), (string)$email];
+        }
+        $waiting = $this->eventQueue->waitingProfilingOptOuts(array_merge(...array_values($entities)));
         foreach ($moments as $email => $moment) {
-            if (in_array($email, $waiting, true)) {
+            if (array_intersect($entities[$email], $waiting)) {
                 continue;
             }
             // A mirror of an opt-out read back from Smaily has no moment of
@@ -394,7 +399,11 @@ class ProfilingConsent
     /**
      * The engine hears a choice through the queue — retried and logged like
      * every other delivery. isConnected() is the gate for paths that only
-     * enqueue; the handler asks the sending gate.
+     * enqueue; the handler asks the sending gate. The row's entity is the
+     * opt-out record's keyed hash of the address, never the address
+     * (PRO-3765): it always fits the column, so the waiting check finds a
+     * long address too, and only the payload the engine needs names the
+     * shopper.
      */
     private function queueForEngine(string $email, bool $optOut, string $timestamp): void
     {
@@ -406,6 +415,6 @@ class ProfilingConsent
         if ($optOut) {
             $payload['opted_out_at'] = $timestamp;
         }
-        $this->eventQueue->enqueue(EventType::ENGINE_PROFILING_CONSENT, $payload, $email);
+        $this->eventQueue->enqueue(EventType::ENGINE_PROFILING_CONSENT, $payload, $this->optOuts->addressKey($email));
     }
 }

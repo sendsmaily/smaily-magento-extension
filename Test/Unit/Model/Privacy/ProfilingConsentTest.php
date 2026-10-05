@@ -42,7 +42,7 @@ class ProfilingConsentTest extends TestCase
 
     private int $smailyReads = 0;
 
-    /** @var string[] addresses with a profiling opt-out already waiting in the queue */
+    /** @var string[] consent-row entities with a profiling opt-out already waiting in the queue */
     private array $waitingOptOuts = [];
 
     /** @var array<string, string> */
@@ -83,7 +83,7 @@ class ProfilingConsentTest extends TestCase
         self::assertSame([[
             'event_type' => EventType::ENGINE_PROFILING_CONSENT,
             'payload' => ['email' => 'person@example.com', 'opt_out' => true, 'opted_out_at' => self::NOW_Z],
-            'entity_id' => 'person@example.com',
+            'entity_id' => self::keyedHash('person@example.com'),
         ]], $this->enqueued);
     }
 
@@ -374,7 +374,7 @@ class ProfilingConsentTest extends TestCase
         self::assertSame([[
             'event_type' => EventType::ENGINE_PROFILING_CONSENT,
             'payload' => ['email' => 'person@example.com', 'opt_out' => true, 'opted_out_at' => self::NOW_Z],
-            'entity_id' => 'person@example.com',
+            'entity_id' => self::keyedHash('person@example.com'),
         ]], $this->enqueued);
         self::assertSame([], $this->smailyWrites);
     }
@@ -415,7 +415,7 @@ class ProfilingConsentTest extends TestCase
         self::assertSame([[
             'event_type' => EventType::ENGINE_PROFILING_CONSENT,
             'payload' => ['email' => 'person@example.com', 'opt_out' => false],
-            'entity_id' => 'person@example.com',
+            'entity_id' => self::keyedHash('person@example.com'),
         ]], $this->enqueued, 'The engine hears the opt-in on the queue');
         self::assertTrue($consent->isAllowed('person@example.com', 1));
     }
@@ -559,7 +559,7 @@ class ProfilingConsentTest extends TestCase
                 'opt_out' => true,
                 'opted_out_at' => gmdate('Y-m-d\TH:i:s\Z', self::NOW - 3600),
             ],
-            'entity_id' => 'u1@example.invalid',
+            'entity_id' => self::keyedHash('u1@example.invalid'),
         ]], $this->enqueued);
     }
 
@@ -585,16 +585,39 @@ class ProfilingConsentTest extends TestCase
 
     /**
      * A shopper with many orders gets one waiting opt-out, not one per order.
+     * The waiting row is found by its keyed hash (PRO-3765), or by the plain
+     * address of a row queued before.
      */
     public function testAnOptOutAlreadyWaitingIsNotQueuedAgain(): void
     {
         $this->records['u1@example.invalid'] = self::NOW - 3600;
         $this->records['u2@example.invalid'] = self::NOW - 7200;
-        $this->waitingOptOuts = ['u2@example.invalid'];
+        $this->records['u3@example.invalid'] = self::NOW - 7200;
+        $this->waitingOptOuts = [self::keyedHash('u2@example.invalid'), 'u3@example.invalid'];
 
-        $this->consent()->resendOptOuts(['u1@example.invalid', 'u1@example.invalid', 'u2@example.invalid']);
+        $this->consent()->resendOptOuts(
+            ['u1@example.invalid', 'u1@example.invalid', 'u2@example.invalid', 'u3@example.invalid']
+        );
 
-        self::assertSame(['u1@example.invalid'], array_column($this->enqueued, 'entity_id'));
+        self::assertSame([self::keyedHash('u1@example.invalid')], array_column($this->enqueued, 'entity_id'));
+    }
+
+    /**
+     * PRO-3765: the row's entity is the keyed hash, so an address longer
+     * than the 64-character entity column is found waiting too, and no
+     * consent row stores the address outside its payload.
+     */
+    public function testALongAddressIsQueuedUnderItsKeyedHash(): void
+    {
+        $email = str_repeat('a', 70) . '@example.invalid';
+        $consent = $this->consent();
+        $consent->setAllowed($email, false, 1);
+        $this->waitingOptOuts = array_column($this->enqueued, 'entity_id');
+
+        $consent->resendOptOuts([$email]);
+
+        self::assertSame([self::keyedHash($email)], array_column($this->enqueued, 'entity_id'));
+        self::assertSame($email, $this->enqueued[0]['payload']['email']);
     }
 
     private function consent(): ProfilingConsent
@@ -611,7 +634,7 @@ class ProfilingConsentTest extends TestCase
             }
         );
         $eventQueue->method('waitingProfilingOptOuts')->willReturnCallback(
-            fn (array $emails): array => array_values(array_intersect($emails, $this->waitingOptOuts))
+            fn (array $entityIds): array => array_values(array_intersect($entityIds, $this->waitingOptOuts))
         );
 
         $optOuts = $this->createMock(ProfilingOptOuts::class);

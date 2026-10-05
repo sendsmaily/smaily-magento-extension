@@ -127,6 +127,31 @@ class DashboardStatsTest extends IntegrationTestCase
     }
 
     /**
+     * PRO-3765: a profiling-consent row's Entity is the shopper's keyed
+     * hash, shown short as in the Log; a contact sync's as stored.
+     */
+    public function testRecentActivityShowsAConsentRowsEntityAsTheLogDoes(): void
+    {
+        $today = $this->clockDate();
+        $hash = hash_hmac('sha256', 'u1@example.invalid', 'integration-test-key');
+
+        $this->smailyRow('pending', $today, 0, [
+            'event_type' => EventType::ENGINE_PROFILING_CONSENT,
+            'entity_id' => $hash,
+        ]);
+        $this->smailyRow('pending', $today);
+
+        $entities = array_column(
+            $this->objectManager->create(DashboardStats::class)->recentActivity(),
+            'entity_id',
+            'type'
+        );
+
+        self::assertSame(substr($hash, 0, 12) . '…', $entities[EventType::ENGINE_PROFILING_CONSENT]);
+        self::assertSame('test@example.com', $entities['contact.sync']);
+    }
+
+    /**
      * @param array<string, mixed> $extra
      */
     private function smailyRow(string $status, string $createdAt, int $attempts = 0, array $extra = []): void

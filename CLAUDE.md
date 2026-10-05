@@ -104,7 +104,9 @@ style (str_replace, never sprintf).
   is bind-mounted as the module; `vendor/` inside the container is shadowed by
   an anonymous volume (dev deps never leak into the Magento autoloader).
   `bin/magento setup:upgrade && setup:di:compile` in the container is the
-  DI-correctness gate (see TESTING.md).
+  DI-correctness gate (see TESTING.md). After a constructor change the
+  first `setup:upgrade` can fail with "Too few arguments" from the stale
+  compiled DI; run `setup:di:compile`, then both again.
 - Release ZIP is built by `.github/workflows/release.yaml` on a published
   GitHub release.
 

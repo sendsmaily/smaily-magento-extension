@@ -1097,6 +1097,11 @@ card — you do not have to keep the page open:
   subscribes anyone — kept by the store itself, and enforced by the engine. It reaches Campaign Intelligence
   as a queued delivery (type `engine.profiling_consent` in the **Log**), so
   an engine outage only delays it: it is retried like every other delivery.
+  Such a row does not keep the shopper's address beside the data it sends:
+  its Entity is a keyed hash of the address, which the **Log** and the
+  Dashboard show by its first 12 characters (the Entity filter finds the
+  row by them); **Details** shows the address in the payload. A row queued
+  by an earlier release candidate shows the address as its Entity.
   While the Campaign Intelligence account is deactivated, it waits and is
   sent once the account is active again. A choice Campaign Intelligence
   refuses as invalid cannot succeed by sending it again, so it fails at

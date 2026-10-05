@@ -99,6 +99,20 @@ class DetailsTest extends TestCase
         self::assertSame('withdrawn sentence', (string)$this->blockData['refusal']);
     }
 
+    /**
+     * PRO-3765: a profiling-consent row's Entity is the shopper's keyed
+     * hash, shown short as in the grid; any other Entity as stored.
+     */
+    public function testTheEntityReadsAsTheGridShowsIt(): void
+    {
+        $hash = hash_hmac('sha256', 'u1@example.invalid', 'unit-test-crypt-key');
+        $this->render(['type' => 'engine.profiling_consent', 'entity_id' => $hash] + $this->failedRow(), '');
+        self::assertSame(substr($hash, 0, 12) . '…', $this->blockData['entity']);
+
+        $this->render($this->failedRow(), '');
+        self::assertSame('jane@example.com', $this->blockData['entity']);
+    }
+
     public function testAMissingRowOffersNothing(): void
     {
         $this->render(null, '');

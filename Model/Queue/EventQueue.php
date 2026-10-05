@@ -491,16 +491,19 @@ class EventQueue
     }
 
     /**
-     * Which of these addresses already have a profiling opt-out waiting for
-     * the engine (PRO-3760): a consent row carrying an opt-out, pending —
-     * a retry in its backoff too — or being sent. One query.
+     * Which of these consent-row entities already have a profiling opt-out
+     * waiting for the engine (PRO-3760): a consent row carrying an opt-out,
+     * pending — a retry in its backoff too — or being sent. One query. The
+     * entity is the opt-out record's keyed hash of the address (PRO-3765);
+     * ProfilingConsent asks for the plain address too, the form of a row
+     * queued before.
      *
-     * @param string[] $emails
-     * @return string[]
+     * @param string[] $entityIds
+     * @return string[] the entities among them that wait
      */
-    public function waitingProfilingOptOuts(array $emails): array
+    public function waitingProfilingOptOuts(array $entityIds): array
     {
-        if (!$emails) {
+        if (!$entityIds) {
             return [];
         }
 
@@ -509,7 +512,7 @@ class EventQueue
             $connection->select()
                 ->from($this->resourceConnection->getTableName(EventResource::TABLE_NAME), ['entity_id', 'payload'])
                 ->where('event_type = ?', EventType::ENGINE_PROFILING_CONSENT)
-                ->where('entity_id IN (?)', array_values($emails))
+                ->where('entity_id IN (?)', array_values($entityIds))
                 ->where('status IN (?)', [Event::STATUS_PENDING, Event::STATUS_SENDING])
         );
 

@@ -30,9 +30,11 @@ use Smaily\Connect\Model\StorefrontScript;
  *
  * Product details are NOT selectable: every product field rides every
  * reminder, and every one of the ten slots is written on every send (unused
- * ones empty). Smaily leaves an absent field intact and overwrites an empty
- * one, so writing the full matrix is what clears the previous, larger cart
- * from the contact. Templates decide what to render.
+ * ones empty), and so is over_10_products ("true" for a cart of more than
+ * ten lines, empty otherwise; PRO-1957). Smaily leaves an absent field
+ * intact and overwrites an empty one, so writing the full matrix is what
+ * clears the previous, larger cart from the contact. Templates decide what
+ * to render.
  */
 class PayloadBuilder
 {
@@ -202,7 +204,7 @@ class PayloadBuilder
      */
     private function productFields(array $items, array $details): array
     {
-        $fields = $this->blankSlots();
+        $fields = $this->blankSlots() + ['over_10_products' => ''];
 
         $slot = 0;
         foreach ($items as $item) {

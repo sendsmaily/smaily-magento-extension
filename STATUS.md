@@ -5,7 +5,9 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-05 — after rc7, a behaviour-neutral simplification
+_Last updated: 2026-10-05 — after rc7, PRO-1957 (the abandoned-cart
+reminder writes `over_10_products` on every send, empty for 10 products or
+fewer; unreleased); before it a behaviour-neutral simplification
 pass over PRO-3760, PRO-3765, PRO-3768, PRO-3753 and PRO-3767; before it
 PRO-3767 (a contact sync or
 automation row of an address longer than the 64-character entity column
@@ -198,6 +200,23 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-1957 — the abandoned-cart `over_10_products` field no longer
+  lingers from a larger cart (2026-10-05; unreleased, after rc7;
+  orchestrator decision 2026-10-05, reversible).** The field was written
+  only for a cart of more than 10 lines and was not part of the
+  always-written prefill PRO-1760 gave the product slots, so after a large
+  cart the Smaily contact kept `true` and a later reminder for a small cart
+  still carried it. `AbandonedCart\PayloadBuilder::productFields()` now
+  prefills it with `''` beside the ten blank slots (the slots' own empty
+  value) and sets `'true'` past the tenth line, as before. Smaily keeps an
+  absent field and overwrites an empty one, so the next smaller cart's
+  reminder clears it. **Evidence:** unit `PayloadBuilderTest`: an 11-line
+  cart → `true`, then a 1-line cart → `''` (key present), a 10-line cart →
+  `''`, an empty cart → `''`; red without the change (the small cart had no
+  key). No DI change. Docs: USER_GUIDE (abandoned-cart template fields),
+  CHANGELOG ("Changes since 3.0.0-rc7"). Woo and Shopify counterparts
+  (same rule) are for the orchestrator to file.
 
 - **Simplification pass, behaviour-neutral (2026-10-05)**, over PRO-3760,
   PRO-3765, PRO-3768, PRO-3753 (a) and (b) and PRO-3767. The keyed hash of

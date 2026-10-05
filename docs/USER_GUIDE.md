@@ -521,11 +521,13 @@ setup step 3) says the same.
 The automation receives up to 10 products as numbered fields
 (`product_name_1`, `product_sku_1`, `product_quantity_1`, `product_price_1`
 (incl. tax), `product_base_price_1`, `product_description_1`,
-`product_image_url_1`, … plus `over_10_products` when the cart is bigger).
-There is nothing to configure: every product field is always sent, and all
-ten slots are sent on every reminder — the ones the cart does not use are
-sent empty, which is what clears a previous, larger cart from the contact.
-Your Smaily template decides which of them to show.
+`product_image_url_1`, …) and `over_10_products`, which is `true` when the
+cart holds more than 10 products and empty otherwise. There is nothing to
+configure: every product field is always sent, and all ten slots and
+`over_10_products` are sent on every reminder — the slots the cart does not
+use are sent empty, and so is `over_10_products` for a cart of 10 products or
+fewer, which is what clears a previous, larger cart from the contact. Your
+Smaily template decides which of them to show.
 
 `{{abandoned_cart_url}}` is a secure recovery link that restores the exact
 cart when clicked (a signed link; carts belonging to a registered customer

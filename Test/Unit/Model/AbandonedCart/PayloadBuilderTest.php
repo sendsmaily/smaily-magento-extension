@@ -89,6 +89,37 @@ class PayloadBuilderTest extends TestCase
                 self::assertSame('', $address[sprintf('product_%s_%d', $field, $slot)]);
             }
         }
+        self::assertSame('', $address['over_10_products']);
+    }
+
+    /**
+     * PRO-1957: the over-10 flag is written on every reminder — "true" for a
+     * cart of more than ten lines, empty otherwise — as the product slots
+     * are, so a smaller cart's reminder clears a larger cart's flag from the
+     * Smaily contact (Smaily keeps an absent field and overwrites an empty
+     * one).
+     */
+    public function testALargerCartsOver10FlagIsClearedByTheNextSmallerCartsReminder(): void
+    {
+        $large = [];
+        for ($line = 1; $line <= 11; $line++) {
+            $large[] = $this->item('Product ' . $line, 'TENT-1', 1.0, 10.0);
+        }
+        $builder = $this->builder();
+
+        $first = $builder->buildAll(1, [$this->quote('u1@example.invalid', null, null, $large, 101)])[101];
+        $second = $builder->buildAll(1, [$this->quote('u1@example.invalid', null, null, [
+            $this->item('Tent', 'TENT-1', 1.0, 149.0),
+        ], 102)])[102];
+        $exactlyTen = $builder->buildAll(1, [
+            $this->quote('u1@example.invalid', null, null, array_slice($large, 0, 10), 103),
+        ])[103];
+
+        self::assertSame('true', $first['over_10_products']);
+        self::assertSame('Product 10', $first['product_name_10']);
+        self::assertArrayHasKey('over_10_products', $second);
+        self::assertSame('', $second['over_10_products']);
+        self::assertSame('', $exactlyTen['over_10_products']);
     }
 
     /** Why the unused slots are sent empty rather than omitted: PayloadBuilder's class docblock. */
@@ -110,7 +141,7 @@ class PayloadBuilderTest extends TestCase
         self::assertSame('', $address['product_sku_10']);
         // Nothing resolved the product, so those fields keep their prefill.
         self::assertSame('', $address['product_description_1']);
-        self::assertArrayNotHasKey('over_10_products', $address);
+        self::assertSame('', $address['over_10_products']);
     }
 
     /**

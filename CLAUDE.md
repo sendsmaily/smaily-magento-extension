@@ -171,7 +171,7 @@ is written in English.
   2026-10-03 4/5 (rc4 released; only the pilot install is left);
   2026-10-04 4/5 (rc5 released; only the pilot install is left), later
   the same day 4/5 (rc6 released; only the pilot install is left);
-  2026-10-05 4/5 (rc7 prepared; only the pilot install is left).
+  2026-10-05 4/5 (rc7 released; only the pilot install is left).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

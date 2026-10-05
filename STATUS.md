@@ -5,10 +5,16 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-05 — 3.0.0-rc7 is prepared, not published (the
-owner decided today that the pilot store, which has a separate (headless)
-storefront, installs rc7 on pilot day 2026-10-09, so that PRO-3760's
-consent fix is in it): the version is `3.0.0-rc7` (composer.json,
+_Last updated: 2026-10-05 — 3.0.0-rc7 is released as a GitHub pre-release on
+the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc7),
+built by the release workflow (run 37284996851) from commit 8fcfe7f; the ZIP
+and its .sha256 were checked after publishing (386 entries, `shasum -a 256 -c`
+OK, sha256 b6aeeda1ca95206fb9cb…, composer.json inside says 3.0.0-rc7); the
+CI and Contract staleness workflows are green on 8fcfe7f. The rc7 ZIP from
+the release installs on a clean store by docs/INSTALLING.md as written
+(PRO-3769, below). The pilot installs rc7 on pilot day 2026-10-09 (owner
+decision today: the pilot store has a separate (headless) storefront, and
+PRO-3760's consent fix is in rc7). The version is `3.0.0-rc7` (composer.json,
 `ModuleInfo::VERSION`, the ModuleVersion docblock, the upstream proposal;
 composer.lock content-hash refreshed, no dependency change), and
 CHANGELOG's "Changes since 3.0.0-rc6" list is the rc7 list, its bullets
@@ -31,12 +37,9 @@ lifecycle; a bullet as the rc3 list had for 1.8.2). PRO-2508, PRO-2475,
 PRO-1469, PRO-2514, PRO-2462, the admin
 browser-test renderer fix and the simplification pass change nothing a
 merchant sees, so they have no bullet. The version cut is c9fb29f (on top
-of cfa6544; the ZIP built and verified locally from it); the engine
-contract 1.8.3 sync commit sits on top of it, so rc7 is now prepared on
-top of the sync commit and the release is built from that commit (the
-Contract staleness job was red on c9fb29f, as engine main moved to
-v1.8.3 the same day). It awaits publishing as a GitHub pre-release on the
-fork (as rc1 to rc6); the pilot installs rc7.
+of cfa6544); the engine contract 1.8.3 sync commit 8fcfe7f sits on top of
+it, and the release is built from that commit (the Contract staleness job
+was red on c9fb29f, as engine main moved to v1.8.3 the same day).
 Earlier 2026-10-05 — PRO-3765 (a profiling-consent queue row's
 entity is the shopper's keyed hash, not the address); before it PRO-3760 (an opt-out the engine did not keep
 is sent again once the engine confirms a customer or an order of the
@@ -177,6 +180,45 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3769 — the rc7 package installs on a clean store by the install
+  guide (2026-10-05; docs only, no CHANGELOG bullet).** As PRO-3748 for
+  rc6: the ZIP and its .sha256 were downloaded from the 3.0.0-rc7 GitHub
+  release (`shasum -a 256 -c` OK on macOS, `sha256sum -c` OK in the
+  container; 386 entries, composer.json 3.0.0-rc7) and installed into a
+  real `app/code` on a fresh Magento 2.4.8-p4 (PHP 8.3) without sample
+  data, in production mode, on a separate temporary compose project (own
+  name, containers, volumes, ports; sandbox image; no working-tree mount —
+  the sandbox stayed untouched and Up with the same container IDs),
+  following `docs/INSTALLING.md` step by step: extract (the guide's
+  `mkdir -p` creates `app/code`), the production sequence with
+  `setup:static-content:deploy en_US et_EE`, `crontab -l` / `cron:install`
+  (the cron package installed in the temporary container first), module
+  enabled, six `smaily_*` tables, the "ready to set up" notice under the
+  bell, four menu entries. All seven `smaily_*` cron jobs finished
+  `success` without a Smaily or engine connection (the daily janitor and
+  the 5- and 15-minute jobs queued by hand); no `exception.log`, no
+  `var/report`, no Smaily_Connect line in `system.log`. Initial setup
+  opens from every module page; step 1 refuses Continue without a tested
+  connection; the Campaign Intelligence step renders the
+  separate-storefront hint. Dashboard, Settings (all five tabs;
+  Intelligence with its hint) and Log (empty, so no Details to open) were
+  opened with `setup_completed` set in the database: no console errors,
+  Not connected everywhere, no browser request left the store.
+  `smaily:gdpr` without a connection (placeholder address
+  u1@example.invalid): `export` prints `engine: null` and the three empty
+  local sets, exit 0; `erase` without `--force` asks for it, exit 1;
+  `erase --force` prints the three local lines and "Campaign Intelligence
+  is not connected; no engine data to erase.", exit 0 — rc7's eraser
+  (it now takes `ProfilingOptOuts`, PRO-3765) resolves in the compiled DI.
+  PRO-1969/PRO-3742 hold: `smaily:backfill:start catalog|customers|orders`
+  prints the not-connected sentence and exits 1, the admin import
+  endpoint answers a catalog start with the same message, and no job or
+  queue row is written. The update section (fresh extraction, the step 3
+  commands, second `setup:upgrade`) passed; settings and tables kept, the
+  Dashboard opens, the group runs again with no failure. No guide step
+  needed a change. TESTING.md records the run. Stack removed afterwards
+  (`down -v`; no image pulled).
 
 - **PRO-3740 — engine contract synced v1.8.2 → v1.8.3 (2026-10-05, doc
   only, no sender change).** Byte-identical with engine main 867af45
@@ -2477,11 +2519,10 @@ Earlier: 2026-09-11, 2026-09-10._
   in-process instance — nothing stored). Fixes PRO-3603 findings 1, 5
   and 6.
 
-- **Next session opens here (2026-10-05).** 3.0.0-rc7 is prepared
-  (header) and awaits publishing as a GitHub pre-release on the fork;
+- **Next session opens here (2026-10-05).** 3.0.0-rc7 is out (header)
+  and its ZIP installs on a clean store by the guide (PRO-3769) —
   **the pilot installs rc7 on 09.10** (owner decision 2026-10-05, so that
-  PRO-3760's consent fix is in it; rc6 stays the newest published build
-  until then), following PILOT_CHECKLIST.md in the headless order: the
+  PRO-3760's consent fix is in it), following PILOT_CHECKLIST.md in the headless order: the
   Storefront URL first (Finish the initial setup without connecting,
   Settings > Connection > Using a separate storefront?), then connect
   under Settings > Intelligence; connecting starts the catalog import, so
@@ -2503,7 +2544,9 @@ Earlier: 2026-09-11, 2026-09-10._
   PRO-3760 (an opt-out reaches the engine once the engine knows the
   shopper), PRO-3765 (consent rows hold the shopper's keyed hash; the Log
   shows its first 12 characters), engine contract 1.8.3 (PRO-3740, the
-  catalog sync lifecycle; doc only); filed: PRO-3753, PRO-3767. Done
+  catalog sync lifecycle; doc only); filed: PRO-3753, PRO-3767, PRO-3768;
+  rc7 released, PRO-3769 (rc7 clean install by the guide passed; no guide
+  change). Done
   2026-10-04: rc5 (PRO-3559, PRO-2477, PRO-3713, PRO-1967, PRO-3731,
   PRO-3732, PRO-3730, PRO-3734) and rc6 (PRO-3733, PRO-1968, PRO-3741,
   PRO-3745, PRO-1969, PRO-3742, and the behaviour-neutral PRO-3735,
@@ -2529,7 +2572,8 @@ Earlier: 2026-09-11, 2026-09-10._
   notice under the bell to be read after the initial setup (PRO-3739) and
   for one catalog entry's image and product link opened from the engine
   (PRO-3731); (2) open queue: PRO-1958, PRO-3747, PRO-3753, PRO-3767
-  (awaits an owner decision), PRO-3746 (after the pilot); (3) cross-repo
+  (awaits an owner decision), PRO-3768 (a product deleted by a CSV import
+  stays recommendable in the engine), PRO-3746 (after the pilot); (3) cross-repo
   asks: PRO-3743 (WooCommerce), PRO-3744 (Shopify),
   PRO-3750, PRO-3751; (4) Erkki: the engine pilot decisions (PRO-3600);
   HC Pro (legacy 2.x upgrade, 4 websites, one Smaily account), awaiting
@@ -5443,8 +5487,7 @@ Earlier: 2026-09-11, 2026-09-10._
   merchant recovery).
 
 **All 6 v3 phases implemented** (~110 files) on branch `v3`, version
-**3.0.0-rc7 — unreleased** (3.0.0-rc6 is the newest GitHub pre-release
-on the fork). Current truth:
+**3.0.0-rc7 — GitHub pre-release on the fork** (the newest). Current truth:
 
 - **PRO-1391 final-polish done — four refinements on Settings > Connection
   after Erkki's side-by-side review of the PRO-1391 visual-fidelity pass.**

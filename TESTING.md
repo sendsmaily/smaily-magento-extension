@@ -419,7 +419,7 @@ and Log were opened by setting `smaily_connect/internal/setup_completed`
 for the website directly in the database, since step 1 of the initial
 setup needs a working Smaily connection.
 
-Latest run: 3.0.0-rc6 (the ZIP downloaded from the GitHub release) on
+Earlier run: 3.0.0-rc6 (the ZIP downloaded from the GitHub release) on
 Magento 2.4.8-p4 without sample data, 2026-10-04, in production mode, the
 same way as the rc5 run — steps 1–5 and the update section passed as
 written, with no guide change. All seven `smaily_*` cron jobs finished with
@@ -431,3 +431,18 @@ Campaign Intelligence is not connected, `bin/magento smaily:backfill:start
 catalog` (and `customers`, `orders`) prints "Campaign Intelligence is not
 connected, …" and exits 1, and the admin import endpoint answers a catalog
 start with the same message; neither writes a job or a queue row.
+
+Latest run: 3.0.0-rc7 (the ZIP downloaded from the GitHub release) on
+Magento 2.4.8-p4 without sample data, 2026-10-05, in production mode, the
+same way as the rc6 run — steps 1–5 and the update section passed as
+written, with no guide change. All seven `smaily_*` cron jobs finished with
+`success` (the daily janitor and the 5- and 15-minute jobs queued by
+hand), and nothing was written to `exception.log` or `var/report`. The
+initial setup's Campaign Intelligence step and Settings > Intelligence
+show the separate-storefront note. While Campaign Intelligence is not
+connected, `bin/magento smaily:backfill:start catalog` (and `customers`,
+`orders`) exits 1 with the not-connected message and the admin import
+endpoint refuses a catalog start, and `bin/magento smaily:gdpr export` and
+`erase --force` for a placeholder address (u1@example.invalid) handle the
+store's own data; `erase` says "Campaign Intelligence is not connected;
+no engine data to erase." for the engine half (exit 0).

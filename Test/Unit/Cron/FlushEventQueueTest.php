@@ -12,12 +12,14 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Api\Queue\EventHandlerInterface;
 use Smaily\Connect\Cron\FlushEventQueue;
+use Smaily\Connect\Model\Client\Exception\RequestRefusedException;
 use Smaily\Connect\Model\Client\Exception\TransportException;
+use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\HandlerPool;
-use Smaily\Connect\Model\Queue\RetryPolicy;
 use Smaily\Connect\Model\Queue\Skipped;
 use Smaily\Connect\Test\Unit\Support\StoreLocale;
 
@@ -39,18 +41,58 @@ class FlushEventQueueTest extends TestCase
         $this->createCron(new HandlerPool([]))->execute();
     }
 
+    /**
+     * PRO-1961: parked on the spot as what it is — a row no handler takes —
+     * with its real attempt count, not made to look like five used attempts.
+     */
     public function testMissingHandlerParksEventsPermanently(): void
     {
         $event = $this->createEvent(1, 'unknown.type');
         $this->eventQueue->method('claimBatch')->willReturn([$event]);
 
-        // Attempts are bumped so markFailed parks the row immediately.
-        $event->expects(self::once())->method('setData')
-            ->with('attempts', EventQueue::MAX_ATTEMPTS - 1);
+        $event->expects(self::never())->method('setData');
         $this->eventQueue->expects(self::once())->method('markFailed')
-            ->with($event, self::stringContains('unknown.type'));
+            ->with($event, 'No handler registered for "unknown.type"', null, null, null, true);
 
         $this->createCron(new HandlerPool([]))->execute();
+    }
+
+    /**
+     * PRO-1961: a handler's own verdict that a row can never be sent, and an
+     * engine refusal handed on whole, stop on the first attempt.
+     */
+    public function testAHandlerVerdictAndAnEngineRefusalStopOnTheFirstAttempt(): void
+    {
+        $malformed = $this->createEvent(1, 'identity.merge');
+        $refused = $this->createEvent(2, 'identity.merge');
+        $this->eventQueue->method('claimBatch')->willReturn([$malformed, $refused]);
+
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willReturn([
+            1 => Failure::permanent('Malformed identity merge payload'),
+            2 => new EngineRequestException('Engine request failed with HTTP 422: unknown session', 422),
+        ]);
+
+        $calls = [];
+        $this->eventQueue->method('markFailed')->willReturnCallback(
+            function (
+                Event $event,
+                string $error,
+                ?string $sentPayload,
+                ?string $response,
+                ?int $retryAfter,
+                bool $terminal
+            ) use (&$calls): void {
+                $calls[(int)$event->getId()] = [$error, $terminal];
+            }
+        );
+
+        $this->createCron(new HandlerPool(['identity.merge' => $handler]))->execute();
+
+        self::assertSame([
+            1 => ['Malformed identity merge payload', true],
+            2 => ['permanent_http_422: Engine request failed with HTTP 422: unknown session', true],
+        ], $calls);
     }
 
     public function testHandlerResultsAreMappedPerEvent(): void
@@ -90,7 +132,7 @@ class FlushEventQueueTest extends TestCase
         $this->eventQueue->method('claimBatch')->willReturn([$first, $second]);
 
         $handler = $this->createMock(EventHandlerInterface::class);
-        $handler->method('handle')->willThrowException(new TransportException('Gone', 404));
+        $handler->method('handle')->willThrowException(new RequestRefusedException('Gone', 404));
 
         $this->eventQueue->expects(self::exactly(2))->method('markFailed')
             ->with(self::anything(), self::stringContains('permanent_http_404'), null, null, null, true);
@@ -98,7 +140,7 @@ class FlushEventQueueTest extends TestCase
         $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
     }
 
-    public function testAPerEventRefusalIsClassifiedByTheRetryPolicy(): void
+    public function testAPerEventRefusalIsClassifiedWhereItWasThrown(): void
     {
         $refused = $this->createEvent(1, 'contact.sync');
         $slowedDown = $this->createEvent(2, 'contact.sync');
@@ -106,7 +148,7 @@ class FlushEventQueueTest extends TestCase
 
         $handler = $this->createMock(EventHandlerInterface::class);
         $handler->method('handle')->willReturn([
-            1 => new TransportException('Unprocessable', 422),
+            1 => new RequestRefusedException('Unprocessable', 422),
             2 => new TransportException('Slow down', 429, null, 90),
         ]);
 
@@ -203,8 +245,7 @@ class FlushEventQueueTest extends TestCase
         return new FlushEventQueue(
             $this->eventQueue,
             $pool,
-            $logger ?? $this->createMock(Logger::class),
-            new RetryPolicy($this->eventQueue)
+            $logger ?? $this->createMock(Logger::class)
         );
     }
 

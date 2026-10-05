@@ -413,9 +413,21 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   permanent refusal (4xx other than 429) stops on the first one, parked as
   `failed` with a `permanent_http_<code>` reason. A 429 is parked for the
   `Retry-After` the response asked for (delta-seconds form, capped at 6 h;
-  an HTTP-date falls back to the ladder step). `Model\Queue\RetryPolicy`
-  for the Smaily queue, `Engine\Client` + `Cron\FlushIngestQueue` for the
-  ingest queue.
+  an HTTP-date falls back to the ladder step). Both clients type the
+  failure where they throw it: the Smaily client a
+  `Client\Exception\RequestRefusedException` for a 4xx other than 429
+  (`AuthenticationException` and `PlanBlockedException` are kinds of it)
+  and a `TransportException` for a 429, a 5xx or a network failure; the
+  engine client an `EngineRequestException` or an
+  `EngineTransportException`. In the marketing queue, one seam applies the
+  verdict (PRO-1961): `Model\Queue\Failure::of()` reads the type of
+  whatever a handler hands back or throws — a Smaily refusal, an engine
+  refusal of an identity merge — and `Failure::permanent()` carries a
+  handler's own verdict that a row can never be sent (a malformed payload,
+  an event type no handler takes), parked on its first attempt with that
+  reason and its real attempt count. `Cron\FlushEventQueue` applies it
+  through `EventQueue::markFailed()`. `Engine\Client` +
+  `Cron\FlushIngestQueue` do the same for the ingest queue.
 - **Claiming:** rows are claimed with a per-worker `claim_token`; only rows
   the worker actually won are processed, so concurrent flushes (manual cron,
   multi-node) can never double-send. Rows stuck in `sending` (killed
@@ -473,7 +485,7 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   resend route read, so the label, the status filter and the drawer all read
   one value, and the flusher still sees the terminal `sent` row it wrote.
   The grid's error column and the Details drawer both show the server's own
-  message through `Model\Log\FailureMessage` (RetryPolicy's
+  message through `Model\Log\FailureMessage` (`Queue\Failure`'s
   `permanent_http_<code>:` prefix stripped, `PayloadRedactor` applied); the
   classification stays in the drawer. Deliberate exception (PRO-2508): a
   Smaily 401/403 stores the client's own sentence ("Smaily API credentials

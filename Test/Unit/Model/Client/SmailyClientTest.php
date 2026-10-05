@@ -20,6 +20,7 @@ use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
 use Smaily\Connect\Model\Client\Exception\InvalidSubdomainException;
 use Smaily\Connect\Model\Client\Exception\PlanBlockedException;
+use Smaily\Connect\Model\Client\Exception\RequestRefusedException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\Exception\TransportException;
 use Smaily\Connect\Model\Client\HttpClientFactory;
@@ -224,10 +225,53 @@ class SmailyClientTest extends TestCase
 
         try {
             $client->post(SmailyClient::ENDPOINT_CONTACT, []);
-            self::fail('Expected a TransportException');
-        } catch (TransportException $exception) {
+            self::fail('Expected a RequestRefusedException');
+        } catch (RequestRefusedException $exception) {
             self::assertSame($expected, $exception->getSourceMessage());
             self::assertSame($response->getStatusCode(), $exception->getHttpStatus());
+        }
+    }
+
+    /**
+     * PRO-1961: the client types the failure when it throws it, as the
+     * engine client does — a 4xx other than 429 is a refusal of this
+     * request, which retrying cannot change; a 429, a 5xx and a network
+     * failure are transport failures.
+     *
+     * @return array<string, array{0: Response, 1: class-string<SmailyClientException>, 2: bool}>
+     */
+    public static function httpErrorTypes(): array
+    {
+        return [
+            'bad request' => [new Response(400, [], ''), RequestRefusedException::class, true],
+            'not found' => [new Response(404, [], 'Not found'), RequestRefusedException::class, true],
+            'unprocessable' => [new Response(422, [], ''), RequestRefusedException::class, true],
+            'credentials refused' => [new Response(401, [], ''), AuthenticationException::class, true],
+            'package without API access' => [
+                new Response(403, [], '{"code":227,"message":"A paid package is required."}'),
+                PlanBlockedException::class,
+                true,
+            ],
+            'slow down' => [new Response(429, [], ''), TransportException::class, false],
+            'server error' => [new Response(503, [], ''), TransportException::class, false],
+        ];
+    }
+
+    /**
+     * @dataProvider httpErrorTypes
+     * @param class-string<SmailyClientException> $type
+     */
+    public function testAnHttpErrorIsTypedWhenItIsThrown(Response $response, string $type, bool $refusal): void
+    {
+        $client = $this->createClient([$response]);
+
+        try {
+            $client->post(SmailyClient::ENDPOINT_CONTACT, []);
+            self::fail('Expected a SmailyClientException');
+        } catch (SmailyClientException $exception) {
+            self::assertInstanceOf($type, $exception);
+            self::assertSame($refusal, $exception instanceof RequestRefusedException);
+            self::assertSame(!$refusal, $exception instanceof TransportException);
         }
     }
 

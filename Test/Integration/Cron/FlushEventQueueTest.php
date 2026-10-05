@@ -15,6 +15,7 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
+use Magento\Customer\Api\CustomerRepositoryInterface;
 use Smaily\Connect\Api\Queue\EventHandlerInterface;
 use Smaily\Connect\Cron\FlushEventQueue;
 use Smaily\Connect\Model\Automation\Router;
@@ -24,14 +25,19 @@ use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
+use Smaily\Connect\Model\Engine\Client as EngineClient;
+use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
+use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Log\QueueRowLoader;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
+use Smaily\Connect\Model\Privacy\ProfilingConsent;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
 use Smaily\Connect\Model\Queue\Handler\ContactSyncHandler;
+use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
 use Smaily\Connect\Model\Queue\HandlerPool;
 use Smaily\Connect\Model\ResourceModel\Log\Collection;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
@@ -127,7 +133,81 @@ class FlushEventQueueTest extends IntegrationTestCase
 
         $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
         self::assertSame(Event::STATUS_FAILED, $row['status'], 'Retrying cannot make a handler appear');
-        self::assertStringContainsString('No handler registered', (string)$row['last_error']);
+        self::assertSame('No handler registered for "unknown.event"', $row['last_error']);
+        self::assertSame('1', (string)$row['attempts'], 'PRO-1961: the one attempt made, not five');
+        self::assertNull($row['next_retry_at']);
+    }
+
+    /**
+     * PRO-1961: a payload the handler cannot send never improves on retry,
+     * so it fails on the first attempt and nothing is posted.
+     */
+    public function testAMalformedContactPayloadFailsOnTheFirstAttempt(): void
+    {
+        $this->queue->enqueue('contact.sync', ['store_id' => 0], null, 0, 'f-malformed');
+
+        $this->runCron(['contact.sync' => $this->realContactSync([])]);
+
+        self::assertSame([], $this->requests, 'Nothing was posted');
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_FAILED, $row['status']);
+        self::assertSame('1', (string)$row['attempts']);
+        self::assertNull($row['next_retry_at']);
+        self::assertSame('Malformed contact payload', $row['last_error']);
+    }
+
+    /**
+     * PRO-1961: an engine 4xx on an identity merge is a refusal of that
+     * payload — failed on the first attempt with the same named class as a
+     * Smaily refusal (PRO-1800), the engine's answer kept for Details.
+     */
+    public function testAnEngineRefusalOfAnIdentityMergeFailsOnTheFirstAttempt(): void
+    {
+        $this->queue->enqueue(
+            EventType::ENGINE_IDENTITY_MERGE,
+            ['customer_email' => 'a@example.com', 'customer_external_id' => '42', 'store_id' => 1],
+            '42',
+            1,
+            'f-merge-refused'
+        );
+
+        $this->runCron([EventType::ENGINE_IDENTITY_MERGE => $this->identityMerge(
+            new EngineRequestException('Engine request failed with HTTP 422: unknown session', 422)
+        )]);
+
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_FAILED, $row['status']);
+        self::assertSame('1', (string)$row['attempts'], 'The other four attempts are not spent');
+        self::assertNull($row['next_retry_at']);
+        self::assertSame(
+            'permanent_http_422: Engine request failed with HTTP 422: unknown session',
+            $row['last_error']
+        );
+        self::assertSame(
+            ['http_status' => 422, 'body' => ['error' => 'unknown_session']],
+            json_decode((string)$row['last_response'], true)
+        );
+    }
+
+    private function identityMerge(\Throwable $failure): IdentityMergeHandler
+    {
+        $settings = $this->createMock(EngineSettings::class);
+        $settings->method('isConnected')->willReturn(true);
+        $client = $this->createMock(EngineClient::class);
+        $client->method('identityMerge')->willThrowException($failure);
+        $client->method('lastExchange')->willReturn([
+            'request' => ['customer_email' => 'a@example.com'],
+            'response' => ['http_status' => 422, 'body' => ['error' => 'unknown_session']],
+        ]);
+        $consent = $this->createMock(ProfilingConsent::class);
+        $consent->method('isAllowed')->willReturn(true);
+
+        return $this->objectManager->create(IdentityMergeHandler::class, [
+            'settings' => $settings,
+            'client' => $client,
+            'profilingConsent' => $consent,
+            'customerRepository' => $this->createMock(CustomerRepositoryInterface::class),
+        ]);
     }
 
     public function testStaleClaimIsRecoveredAndDeliveredInTheSameRun(): void

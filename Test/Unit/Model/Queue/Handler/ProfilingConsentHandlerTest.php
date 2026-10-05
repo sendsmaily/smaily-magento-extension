@@ -18,6 +18,7 @@ use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\Handler\ProfilingConsentHandler;
 use Smaily\Connect\Model\Queue\Skipped;
 
@@ -145,16 +146,22 @@ class ProfilingConsentHandlerTest extends TestCase
         self::assertSame([1 => 'Campaign Intelligence account is not active'], $results);
     }
 
-    public function testAPayloadWithoutAnAddressIsReported(): void
+    /**
+     * PRO-1961: a payload without an address never improves on retry.
+     */
+    public function testAPayloadWithoutAnAddressFailsForGood(): void
     {
         $this->client->expects(self::never())->method('customerOptOut');
 
-        self::assertSame([1 => 'Malformed profiling consent payload'], $this->handle(1, ['opt_out' => true]));
+        self::assertEquals(
+            [1 => Failure::permanent('Malformed profiling consent payload')],
+            $this->handle(1, ['opt_out' => true])
+        );
     }
 
     /**
      * @param array<string, mixed> $payload
-     * @return array<int, true|string|\Smaily\Connect\Model\Client\Exception\SmailyClientException>
+     * @return array<int, mixed>
      */
     private function handle(int $id, array $payload): array
     {

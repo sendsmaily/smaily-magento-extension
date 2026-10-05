@@ -108,7 +108,7 @@ class Collection extends SearchResult
 
     /**
      * The error column's text filter matches what the column shows
-     * (PRO-2509), not the stored value: RetryPolicy's
+     * (PRO-2509), not the stored value: Model\Queue\Failure's
      * `permanent_http_<code>:` prefix is not searched, and a client message
      * shown translated is found by its translated words too (FailureMessage
      * strips and translates the same way for display). A stored error that

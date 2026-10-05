@@ -16,6 +16,7 @@ use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\Skipped;
 
 /**
@@ -71,7 +72,8 @@ class AutomationHandler implements EventHandlerInterface
             $trigger = (string)($payload['trigger_type'] ?? '');
             $address = $payload['address'] ?? null;
             if ($trigger === '' || !is_array($address) || empty($address['email'])) {
-                $results[$id] = 'Malformed automation payload';
+                // Terminal: a malformed payload never improves on retry.
+                $results[$id] = Failure::permanent('Malformed automation payload');
                 continue;
             }
 
@@ -110,7 +112,7 @@ class AutomationHandler implements EventHandlerInterface
                 $results[$id] = true;
             } catch (SmailyClientException $exception) {
                 // Handed on whole: only the exception carries the HTTP status
-                // and Retry-After the RetryPolicy classifies on.
+                // and Retry-After the queue classifies on (Failure::of()).
                 $results[$id] = $exception;
             }
 

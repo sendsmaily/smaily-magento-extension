@@ -16,6 +16,7 @@ use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\Skipped;
 
 /**
@@ -64,7 +65,8 @@ class ProfilingConsentHandler implements EventHandlerInterface
             $payload = $this->eventQueue->decodePayload($event);
             $email = (string)($payload['email'] ?? '');
             if ($email === '') {
-                $results[$id] = 'Malformed profiling consent payload';
+                // Terminal: a malformed payload never improves on retry.
+                $results[$id] = Failure::permanent('Malformed profiling consent payload');
                 continue;
             }
 

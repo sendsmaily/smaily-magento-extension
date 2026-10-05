@@ -25,7 +25,7 @@ use Smaily\Connect\Model\ResourceModel\Queue\Event\CollectionFactory;
  * Retry semantics mirror the WooCommerce plugin: exponential backoff of
  * 60s, 5m, 15m, 1h, 6h with at most 5 attempts, after which a row is
  * parked as failed for manual retry from the admin event log. Which
- * failures earn a retry at all is RetryPolicy's call.
+ * failures earn a retry at all is Model\Queue\Failure's call.
  */
 class EventQueue
 {
@@ -266,7 +266,7 @@ class EventQueue
      * attempts are exhausted.
      *
      * $terminal parks the row on the spot with its remaining attempts unspent:
-     * a refusal that no amount of retrying can change (RetryPolicy decides
+     * a refusal that no amount of retrying can change (Failure decides
      * which those are). The attempt that WAS refused is still counted.
      */
     public function markFailed(

@@ -74,7 +74,7 @@ if ($refusal !== null) {
     $retryText = __('A delivery attempt is in progress right now.');
 } elseif ($status === 'failed' && $attempts < $maxAttempts) {
     // Stopped early: the delivery was refused in a way retrying cannot
-    // change, so the remaining attempts were never spent (RetryPolicy).
+    // change, so the remaining attempts were never spent (Model\Queue\Failure).
     $retryText = __('Stopped after %1 of %2 attempts — retrying could not change the outcome, so this row will NOT retry on its own. Fix the cause shown below, then select it in the log and press Retry.', $attempts, $maxAttempts);
 } elseif ($status === 'failed') {
     $retryText = __('All %1 automatic attempts are used up — this row will NOT retry on its own. Select it in the log and press Retry to queue it again.', $maxAttempts);

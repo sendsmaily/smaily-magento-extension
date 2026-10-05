@@ -17,6 +17,7 @@ use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\Skipped;
 
 /**
@@ -51,7 +52,7 @@ class ContactSyncHandler implements EventHandlerInterface
             $contact = $payload['contact'] ?? null;
             if (!is_array($contact) || empty($contact['email'])) {
                 // Terminal: a malformed payload never improves on retry.
-                $results[(int)$event->getId()] = 'Malformed contact payload';
+                $results[(int)$event->getId()] = Failure::permanent('Malformed contact payload');
                 continue;
             }
             $storeId = (int)($payload['store_id'] ?? 0);
@@ -74,7 +75,7 @@ class ContactSyncHandler implements EventHandlerInterface
                 $error = null;
             } catch (SmailyClientException $exception) {
                 // Handed on whole: only the exception carries the HTTP status
-                // and Retry-After the RetryPolicy classifies on.
+                // and Retry-After the queue classifies on (Failure::of()).
                 $error = $exception;
                 $this->logger->info('Contact sync batch failed', [
                     'store_id' => $storeId,

@@ -12,8 +12,8 @@ use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\HandlerPool;
-use Smaily\Connect\Model\Queue\RetryPolicy;
 use Smaily\Connect\Model\Queue\Skipped;
 
 /**
@@ -27,8 +27,7 @@ class FlushEventQueue
     public function __construct(
         private readonly EventQueue $eventQueue,
         private readonly HandlerPool $handlerPool,
-        private readonly Logger $logger,
-        private readonly RetryPolicy $retryPolicy
+        private readonly Logger $logger
     ) {
     }
 
@@ -58,10 +57,10 @@ class FlushEventQueue
     {
         $handler = $this->handlerPool->get($eventType);
         if ($handler === null) {
+            // Retrying cannot make a handler appear (PRO-1961).
+            $failure = Failure::permanent(sprintf('No handler registered for "%s"', $eventType));
             foreach ($events as $event) {
-                // Park immediately: retrying cannot make a handler appear.
-                $event->setData('attempts', EventQueue::MAX_ATTEMPTS - 1);
-                $this->eventQueue->markFailed($event, sprintf('No handler registered for "%s"', $eventType));
+                $this->fail($event, $failure);
             }
 
             return;
@@ -70,8 +69,9 @@ class FlushEventQueue
         try {
             $results = $handler->handle($events);
         } catch (SmailyClientException $exception) {
+            $failure = Failure::of($exception);
             foreach ($events as $event) {
-                $this->retryPolicy->apply($event, $exception);
+                $this->fail($event, $failure);
             }
             $this->logger->info('Queue batch failed', [
                 'event_type' => $eventType,
@@ -88,12 +88,27 @@ class FlushEventQueue
                 $this->eventQueue->markSent($event);
             } elseif ($result instanceof Skipped) {
                 $this->eventQueue->markSkipped($event, $result->reason);
-            } elseif ($result instanceof SmailyClientException) {
-                // A refused send: the policy decides retry vs. stop for good.
-                $this->retryPolicy->apply($event, $result);
+            } elseif ($result instanceof Failure) {
+                $this->fail($event, $result);
+            } elseif ($result instanceof \Throwable) {
+                // A failed send handed on whole: its type says retry or stop.
+                $this->fail($event, Failure::of($result));
             } else {
                 $this->eventQueue->markFailed($event, (string)$result);
             }
         }
+    }
+
+    /**
+     * Park the row for good, or reschedule it, as the failure says.
+     */
+    private function fail(Event $event, Failure $failure): void
+    {
+        $this->eventQueue->markFailed(
+            $event,
+            $failure->reason,
+            retryAfter: $failure->retryAfter,
+            terminal: $failure->permanent
+        );
     }
 }

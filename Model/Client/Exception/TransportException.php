@@ -11,7 +11,9 @@ namespace Smaily\Connect\Model\Client\Exception;
 use Magento\Framework\Phrase;
 
 /**
- * Network-level or HTTP-level failure (timeouts, DNS, HTTP >= 400).
+ * A failure that may pass later: a network failure (timeouts, DNS), a
+ * malformed answer, an HTTP 429 or 5xx. A 4xx other than 429 is a
+ * RequestRefusedException instead (PRO-1961).
  */
 class TransportException extends SmailyClientException
 {
@@ -34,7 +36,7 @@ class TransportException extends SmailyClientException
 
     /**
      * Seconds Smaily asked the caller to wait (the Retry-After header on a
-     * 429), or null when it sent none. Read by the queue's RetryPolicy.
+     * 429), or null when it sent none. Read by the queue (Model\Queue\Failure).
      */
     public function getRetryAfter(): ?int
     {

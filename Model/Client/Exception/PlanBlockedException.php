@@ -15,7 +15,7 @@ namespace Smaily\Connect\Model\Client\Exception;
  * before it checks the credentials, so this is not an AuthenticationException:
  * the credentials are neither right nor wrong as far as anyone can tell.
  */
-class PlanBlockedException extends TransportException
+class PlanBlockedException extends RequestRefusedException
 {
     public const SMAILY_CODE = 227;
 }

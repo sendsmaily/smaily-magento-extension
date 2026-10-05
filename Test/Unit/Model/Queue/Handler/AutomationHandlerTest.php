@@ -18,6 +18,7 @@ use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
 use Smaily\Connect\Model\Queue\Skipped;
 
@@ -68,6 +69,30 @@ class AutomationHandlerTest extends TestCase
         self::assertSame([1 => true], $handler->handle([$event]));
         self::assertCount(1, $posted);
         self::assertFalse($posted[0]['force_opt_in']);
+    }
+
+    /**
+     * PRO-1961: a payload without a trigger or an address never improves on
+     * retry, so it fails for good and nothing is posted.
+     */
+    public function testAMalformedPayloadFailsForGood(): void
+    {
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->expects(self::never())->method('forStore');
+        $event = $this->createMock(Event::class);
+        $event->method('getId')->willReturn(1);
+        $eventQueue = $this->createMock(EventQueue::class);
+        $eventQueue->method('decodePayload')->willReturn(['trigger_type' => 'welcome']);
+
+        $handler = new AutomationHandler(
+            $clientProvider,
+            $this->createMock(Router::class),
+            $eventQueue,
+            $this->createMock(Logger::class),
+            $this->createMock(AccountResolver::class)
+        );
+
+        self::assertEquals([1 => Failure::permanent('Malformed automation payload')], $handler->handle([$event]));
     }
 
     /**

@@ -13,11 +13,11 @@ use Magento\Framework\Exception\LocalizedException;
 use Smaily\Connect\Api\Queue\EventHandlerInterface;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
-use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\Skipped;
 
 /**
@@ -61,7 +61,8 @@ class IdentityMergeHandler implements EventHandlerInterface
 
             $payload = $this->eventQueue->decodePayload($event);
             if (empty($payload['customer_email'])) {
-                $results[$id] = 'Malformed identity merge payload';
+                // Terminal: a malformed payload never improves on retry.
+                $results[$id] = Failure::permanent('Malformed identity merge payload');
                 continue;
             }
 
@@ -77,12 +78,12 @@ class IdentityMergeHandler implements EventHandlerInterface
             try {
                 $this->client->identityMerge($payload);
                 $results[$id] = true;
-            } catch (EngineRequestException $exception) {
-                // 4xx is terminal for this payload; report and stop retrying
-                // by letting the row exhaust naturally with the same message.
-                $results[$id] = $exception->getMessage();
             } catch (EngineException $exception) {
-                $results[$id] = $exception->getMessage();
+                // Handed on whole: a 4xx refuses this payload and stops on
+                // the first attempt, an outage takes the ladder (PRO-1961).
+                // The account refusal (contract §2 `403 tenant_inactive`) is
+                // not this row's fault, so it stays on the ladder.
+                $results[$id] = $this->settings->isRefused() ? $exception->getMessage() : $exception;
             }
 
             $exchange = $this->client->lastExchange();

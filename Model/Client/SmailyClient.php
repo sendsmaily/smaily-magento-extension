@@ -17,6 +17,7 @@ use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
 use Smaily\Connect\Model\Client\Exception\InvalidSubdomainException;
 use Smaily\Connect\Model\Client\Exception\PlanBlockedException;
+use Smaily\Connect\Model\Client\Exception\RequestRefusedException;
 use Smaily\Connect\Model\Client\Exception\TransportException;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\ModuleInfo;
@@ -89,7 +90,8 @@ class SmailyClient
      * @param array<int|string, mixed> $payload
      * @return array<int|string, mixed>
      * @throws ApiException on a non-101 response envelope
-     * @throws TransportException on an HTTP error status or a network failure
+     * @throws RequestRefusedException on an HTTP 4xx other than 429
+     * @throws TransportException on an HTTP 429 or 5xx or a network failure
      * @throws InvalidSubdomainException when the subdomain is not one plain label
      */
     public function post(string $endpoint, array $payload): array
@@ -214,10 +216,17 @@ class SmailyClient
             // Smaily's answer goes with the status, as the engine client's
             // does, so the Log's error column says what Smaily said (PRO-3749).
             $answer = $this->answerOf($exception->getResponse());
+            $message = $answer === ''
+                ? __('Smaily API request failed with HTTP %1', $status)
+                : __('Smaily API request failed with HTTP %1: %2', $status, $answer);
+            // Typed here, as the engine client types its failures: a 4xx
+            // other than 429 refuses this request, retrying cannot change
+            // it (PRO-1961); a 429 or a 5xx may pass later.
+            if ($status !== 429 && $status < 500) {
+                throw new RequestRefusedException($message, $status, $exception);
+            }
             throw new TransportException(
-                $answer === ''
-                    ? __('Smaily API request failed with HTTP %1', $status)
-                    : __('Smaily API request failed with HTTP %1: %2', $status, $answer),
+                $message,
                 $status,
                 $exception,
                 $this->retryAfterSeconds($exception->getResponse())

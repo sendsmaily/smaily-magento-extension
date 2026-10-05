@@ -7,7 +7,8 @@
 
 _Last updated: 2026-10-05 — PRO-3749 (a Smaily HTTP error shows Smaily's
 answer in the Log's error column), PRO-2465 (the GDPR command and the
-Campaign Intelligence automations form respect a refused account). 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
+Campaign Intelligence automations form respect a refused account), PRO-1961
+(one seam for terminal failures in the marketing queue). 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
 land on v3: PRO-2508 (the Log's error column describes rejected Smaily
 credentials in the extension's own sentence, on purpose; docs only),
 PRO-2509 (the Log's Last Error filter matches the text the column shows),
@@ -137,6 +138,52 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-1961 — one seam for terminal failures in the marketing event
+  queue (2026-10-05; CHANGELOG bullet under "Changes since 3.0.0-rc6").**
+  The issue's item 4 shape, judged proportionate: the clients type a
+  failure where they throw it, one value object applies the verdict, and
+  `Model\Queue\RetryPolicy` is gone. `SmailyClient` throws the new
+  `Client\Exception\RequestRefusedException` for an HTTP 4xx other than
+  429 (`AuthenticationException` and `PlanBlockedException` now extend it;
+  `TransportException` is left for 429, 5xx, network and a malformed body;
+  only RetryPolicy caught `TransportException`), as `Engine\Client`
+  already types `EngineRequestException`/`EngineTransportException`.
+  `Model\Queue\Failure` holds reason, permanent and Retry-After:
+  `Failure::of(\Throwable)` is the classification (RetryPolicy's, plus an
+  engine refusal → the same `permanent_http_<code>:` class),
+  `Failure::permanent()` a handler's own verdict. `Cron\FlushEventQueue`
+  applies a Failure, or a handed-on exception through `Failure::of()`,
+  with `EventQueue::markFailed(…, terminal:)` (no new writer: that is the
+  "markPermanentlyFailed()" the issue names). The handler contract
+  (`Api\Queue\EventHandlerInterface`) reads
+  `true|string|\Throwable|Failure|Skipped`. Item by item: (1)
+  `IdentityMergeHandler` hands the engine exception on, so a 4xx fails on
+  the first attempt as `permanent_http_<code>: Engine request failed with
+  HTTP …` and an outage keeps the ladder; a 403 that is the remembered
+  account refusal stays on the ladder for now (PRO-2466 next). (2) The
+  no-handler path parks with `Failure::permanent('No handler registered
+  for "<type>"')` and the true attempt count (1, not a faked 5). (3) The
+  four malformed-payload verdicts (contact, automation, identity merge,
+  profiling consent) are `Failure::permanent()`. RetryPolicy's per-batch
+  memo is dropped: the batch path classifies once, a per-row result costs
+  one sprintf. Log Details checked by rendering `log/details.phtml` for
+  both row kinds in en_US and et_EE: "Stopped after 1 of 5 attempts —
+  retrying could not change the outcome…" ("Peatus pärast 1 katset 5-st
+  …"), the engine refusal with "Failure class: permanent_http_422", the
+  no-handler and malformed rows without a class. Unit: `FailureTest`
+  (replaces RetryPolicyTest, plus the engine refusal and the handler
+  verdict), `SmailyClientTest::testAnHttpErrorIsTypedWhenItIsThrown`,
+  `FlushEventQueueTest` (no-handler, handler verdict + engine refusal),
+  `IdentityMergeHandlerTest` (refusal, outage, malformed),
+  `AutomationHandlerTest`/`ProfilingConsentHandlerTest` (malformed) — red
+  before. Integration (`FlushEventQueueTest`, real DB): no-handler row
+  attempts 1; a malformed contact payload fails on attempt 1 with nothing
+  posted; an identity merge refused with 422 fails on attempt 1 with the
+  named class and the engine's answer kept. `FlushEventQueue` lost a
+  constructor argument: sandbox `setup:upgrade` + `setup:di:compile`
+  clean. ARCHITECTURE ("Queue semantics"), USER_GUIDE (the Log's retry
+  bullet).
 
 - **PRO-2465 — the GDPR command and the Campaign Intelligence automations
   form respect a refused account (2026-10-05; CHANGELOG bullet under

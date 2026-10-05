@@ -14,11 +14,14 @@ use Magento\Framework\Exception\NoSuchEntityException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
+use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
 use Smaily\Connect\Model\Queue\Skipped;
 
@@ -105,8 +108,41 @@ class IdentityMergeHandlerTest extends TestCase
     }
 
     /**
+     * PRO-1961: a 4xx is a refusal of this payload, which retrying cannot
+     * change. Handed on whole, so the queue classifies it on the first
+     * attempt; an outage stays an outage.
+     */
+    public function testAnEngineRefusalIsHandedOnForTheQueueToClassify(): void
+    {
+        $refusal = new EngineRequestException('Engine request failed with HTTP 422: unknown session', 422);
+        $this->profilingConsent->method('isAllowed')->willReturn(true);
+        $this->client->method('identityMerge')->willThrowException($refusal);
+
+        self::assertSame([1 => $refusal], $this->handle(self::PAYLOAD));
+    }
+
+    public function testAnEngineOutageIsHandedOnForTheQueueToClassify(): void
+    {
+        $outage = new EngineTransportException('Engine request failed with HTTP 503 after retries', 503);
+        $this->profilingConsent->method('isAllowed')->willReturn(true);
+        $this->client->method('identityMerge')->willThrowException($outage);
+
+        self::assertSame([1 => $outage], $this->handle(self::PAYLOAD));
+    }
+
+    public function testAMalformedPayloadFailsForGood(): void
+    {
+        $this->client->expects(self::never())->method('identityMerge');
+
+        self::assertEquals(
+            [1 => Failure::permanent('Malformed identity merge payload')],
+            $this->handle(['customer_external_id' => '42'])
+        );
+    }
+
+    /**
      * @param array<string, string|int> $payload
-     * @return array<int, true|string|\Smaily\Connect\Model\Client\Exception\SmailyClientException>
+     * @return array<int, mixed>
      */
     private function handle(array $payload): array
     {

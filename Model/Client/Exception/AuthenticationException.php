@@ -11,6 +11,6 @@ namespace Smaily\Connect\Model\Client\Exception;
 /**
  * Invalid or missing Smaily API credentials (HTTP 401/403).
  */
-class AuthenticationException extends TransportException
+class AuthenticationException extends RequestRefusedException
 {
 }

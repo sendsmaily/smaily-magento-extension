@@ -60,7 +60,11 @@ secret `ENGINE_CONTRACT_READ_TOKEN` (fine-grained PAT, contents:read on the
 engine repo). A sync is NOT code-complete: after any wire-shape change, carry
 it through code + test fixtures in the same pass (Woo LESSONS §2.7 — the scar
 is real). Datetimes are Z-suffix only; engine URL placeholders are `{email}`
-style (str_replace, never sprintf).
+style (str_replace, never sprintf). There is no scheduled catalog re-sync
+(PRO-1968; contract v1.8.3 §3 *Catalog sync lifecycle*): a change that adds
+a catalog field, or corrects what one holds, reaches the rows already sent
+only through a catalog import, so its CHANGELOG bullet tells the merchant to
+start one.
 
 ## Build / test commands
 

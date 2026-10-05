@@ -26,12 +26,17 @@ code 203, fails at once), PRO-3752 (a shopper's personalization choice
 waits while the account is refused), PRO-3760 (an opt-out made before the
 engine knew the shopper reaches it once it does) and PRO-3765 (a consent
 row's entity is the shopper's keyed hash; the Log shows its first 12
-characters). PRO-2508, PRO-2475, PRO-1469, PRO-2514, PRO-2462, the admin
+characters), plus the engine contract 1.8.3 (PRO-3740, the catalog sync
+lifecycle; a bullet as the rc3 list had for 1.8.2). PRO-2508, PRO-2475,
+PRO-1469, PRO-2514, PRO-2462, the admin
 browser-test renderer fix and the simplification pass change nothing a
-merchant sees, so they have no bullet. rc7 is prepared in the version-cut
-commit on top of cfa6544; the ZIP builds and verifies locally from it. It
-awaits publishing as a GitHub pre-release on the fork (as rc1 to rc6); the
-pilot installs rc7.
+merchant sees, so they have no bullet. The version cut is c9fb29f (on top
+of cfa6544; the ZIP built and verified locally from it); the engine
+contract 1.8.3 sync commit sits on top of it, so rc7 is now prepared on
+top of the sync commit and the release is built from that commit (the
+Contract staleness job was red on c9fb29f, as engine main moved to
+v1.8.3 the same day). It awaits publishing as a GitHub pre-release on the
+fork (as rc1 to rc6); the pilot installs rc7.
 Earlier 2026-10-05 — PRO-3765 (a profiling-consent queue row's
 entity is the shopper's keyed hash, not the address); before it PRO-3760 (an opt-out the engine did not keep
 is sent again once the engine confirms a customer or an order of the
@@ -172,6 +177,43 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3740 — engine contract synced v1.8.2 → v1.8.3 (2026-10-05, doc
+  only, no sender change).** Byte-identical with engine main 867af45
+  (`ENGINE_CONTRACT_READ_TOKEN=… bin/check-contract-staleness.sh`, GitHub
+  API path: OK, md5 `c565c604…`; engine main has no newer contract
+  commit). PATCH bump: §3 now states the *Catalog sync lifecycle* — a full
+  import at setup, then changes (product save, stock change, archive as
+  `in_stock=false`, hard delete via §3b), each re-sending the whole row
+  (the UPSERT clears an optional field a row omits; only `tags` merges), a
+  full import by hand whenever the merchant starts one, no scheduled full
+  re-sync; what the engine re-derives itself; when a plugin full import is
+  required (a contract change that says so, a sender-side mapping fix,
+  lost change events); and the known gap that a lost change or delete is
+  not healed automatically. §3b is now "the only delete signal". This
+  resolves the PRO-1968 note below: the contract no longer calls a
+  periodic plugin re-sync the reconciler. Checked against the connector:
+  it matches — the full catalog at connect (PRO-3741), product save, the
+  stock markers and both delete paths send full rows
+  (`CatalogPayloadBuilder::build()`; `buildTombstone()` is the full row
+  with `in_stock: false`), the import by hand on the card or
+  `smaily:backfill:start catalog`, no scheduled re-sync (PRO-1968),
+  changes through the durable ingest queue with retries and failures in
+  the Log. **One gap, code (reported, not changed):** a product deleted
+  where `catalog_product_delete_before` does not fire — a CSV import's
+  delete (`CatalogImportExport\Model\Import\Product::_deleteProducts()`
+  deletes through `objectRelationProcessor`, with only the
+  `catalog_product_import_bunch_delete_*` events) or a direct database
+  delete — never reaches §3b and stays recommendable in the engine; a
+  catalog import does not remove it. A Story candidate (an observer on the
+  import's bunch delete). Docs: ARCHITECTURE (catalog lifecycle — the
+  contract now states it; whole rows; an import does not remove; a
+  release adding a catalog field tells the merchant to import), USER_GUIDE
+  (Historical import: the import does not remove products; a release note
+  may ask for an import), CHANGELOG (rc7 bullet, as rc3 had for 1.8.2; the
+  3.0.0 "Ships the … contract" line; the 3.0.0 stock-changes bullet no
+  longer promises the nightly re-sync PRO-1968 removed), UPSTREAM_PROPOSAL and ARCHITECTURE
+  cite v1.8.3, CLAUDE (the import-on-new-catalog-field gotcha).
 
 - **PRO-3765 — a profiling-consent queue row's entity is the shopper's
   keyed hash, not the address (2026-10-05; owner approved 2026-10-05, ships
@@ -860,10 +902,12 @@ Earlier: 2026-09-11, 2026-09-10._
   getPendingSchedules()`/`cleanupJobs()`), so a leftover
   `smaily_catalog_resync` row is never run and never breaks anything; it
   just stays. Sandbox after `setup:upgrade` + `setup:di:compile`: Magento's
-  cron config lists seven `smaily_*` jobs. **The engine contract §3
-  (lifecycle) and §3b still say the plugin's periodic full re-sync is the
-  reconciler**; the engine was asked to align it (Linear PRO-3740) — the
-  copy is not edited here. Docs: ARCHITECTURE (catalog lifecycle, cron
+  cron config lists seven `smaily_*` jobs. The engine contract §3
+  (lifecycle) and §3b then still said the plugin's periodic full re-sync
+  is the reconciler; the engine was asked to align it (Linear PRO-3740) —
+  **resolved 2026-10-05: contract v1.8.3 states the lifecycle** (full
+  import at setup, changes after, full import by hand, no scheduled
+  re-sync; see the PRO-3740 entry above). Docs: ARCHITECTURE (catalog lifecycle, cron
   table, the send-gate list), USER_GUIDE (Connecting step 3, What syncs,
   Historical import: start the catalog import by hand after ERP/CSV/
   direct-database changes), HEADLESS_STOREFRONTS, CHANGELOG; stale code
@@ -2458,7 +2502,8 @@ Earlier: 2026-09-11, 2026-09-10._
   the account is refused), the simplification pass (behaviour-neutral),
   PRO-3760 (an opt-out reaches the engine once the engine knows the
   shopper), PRO-3765 (consent rows hold the shopper's keyed hash; the Log
-  shows its first 12 characters); filed: PRO-3753, PRO-3767. Done
+  shows its first 12 characters), engine contract 1.8.3 (PRO-3740, the
+  catalog sync lifecycle; doc only); filed: PRO-3753, PRO-3767. Done
   2026-10-04: rc5 (PRO-3559, PRO-2477, PRO-3713, PRO-1967, PRO-3731,
   PRO-3732, PRO-3730, PRO-3734) and rc6 (PRO-3733, PRO-1968, PRO-3741,
   PRO-3745, PRO-1969, PRO-3742, and the behaviour-neutral PRO-3735,
@@ -2485,8 +2530,7 @@ Earlier: 2026-09-11, 2026-09-10._
   for one catalog entry's image and product link opened from the engine
   (PRO-3731); (2) open queue: PRO-1958, PRO-3747, PRO-3753, PRO-3767
   (awaits an owner decision), PRO-3746 (after the pilot); (3) cross-repo
-  asks: PRO-3740 (engine contract wording: §3/§3b still describe a
-  periodic full re-sync), PRO-3743 (WooCommerce), PRO-3744 (Shopify),
+  asks: PRO-3743 (WooCommerce), PRO-3744 (Shopify),
   PRO-3750, PRO-3751; (4) Erkki: the engine pilot decisions (PRO-3600);
   HC Pro (legacy 2.x upgrade, 4 websites, one Smaily account), awaiting
   the owner: the UPGRADING checklist (PRO-3661), the Mageplaza live checks

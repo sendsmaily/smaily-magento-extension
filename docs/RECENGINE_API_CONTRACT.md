@@ -1,8 +1,8 @@
 # Smaily Recommendation Engine — API Contract v1.8
 
-**Version**: 1.8.2
+**Version**: 1.8.3
 **Published**: 2026-05-19
-**Last updated**: 2026-10-02 (v1.8.2 — §6/§7: one customer per visitor token; a token already bound to a customer never binds to another. PATCH bump: no new endpoint, field or wire shape; nothing to change sender-side — PRO-3649)
+**Last updated**: 2026-10-05 (v1.8.3 — §3/§3b: catalog sync lifecycle. A full import at setup, changes after that, a full import by hand when the merchant starts one; no scheduled full re-sync. PATCH bump: no new endpoint, field or wire shape — PRO-3740)
 **Status**: Stable — basis for plugin implementation
 
 ---
@@ -650,7 +650,35 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 - **One row per canonical product — collapse translations.** Send exactly one catalog row per real, purchasable product. Do **NOT** send a separate row per language: a multilingual product (WPML/Polylang) must be a **single `sku`** whose translations are carried in the `{lang: value}` object form of `name` / `description` / `product_url` (see *Multilingual variant* above). Keep the `sku` identical across languages and across syncs. Emitting one row per translation creates duplicate SKUs that the engine **cannot** dedupe (there is no language tag or parent link), producing language-mixed recommendations.
 - **Parent product id — `tags.product_id`.** Alongside the variant-level `sku`, emit the platform **parent product id** as `tags.product_id` (Shopify `<product_id>`, Woo `<product_id>`). All variants of one product share one `tags.product_id`. The engine uses it for **product-level removal** (see [§3b](#3b-post-apiv1ingestcatalogremove)) and for **cross-variant grouping** — it groups catalog variants sharing a `tags.product_id` into one product family for cross-variant cadence and `sample_to_full` (live since PRO-1227). `sku` stays the variant-level key and `external_id` stays the variant id; only the grouping is by parent. Shopify and Woo emit it today; Magento rolls it in with its canonical-key work. Where a sender does not emit it, product-level removal is unavailable and cadence/grouping degrade to per-SKU for that sender (per-SKU `in_stock=false` still works).
 - **Real products only.** Do not send non-purchasable artifacts: language-switcher pseudo-products, gift cards, donation items, or virtual config entries. *(The engine additionally derives an internal `recommendable` flag at ingest to defensively exclude such items — see [Engine-internal fields](#engine-internal). The source should still not send them, to avoid catalog bloat.)*
-- **Lifecycle is UPSERT-only — no delete-by-absence; removal is soft, never a hard delete.** The engine UPSERTs by `sku` and never removes a `sku` merely because it stopped appearing in a sync. **Removal is explicit and always *soft*:** either re-send the product with `in_stock=false` (per-SKU), or call [`POST /api/v1/ingest/catalog/remove`](#3b-post-apiv1ingestcatalogremove) with the parent `product_id` to tombstone all of a product's SKUs at once (the path for a platform hard-delete, where the webhook gives only the product id). A tombstone sets `in_stock=false` + `recommendable=false` — it drops the product from every recommendation path but **keeps the row**. Catalog rows (like `orders` / `order_items`) are **retained as a learning corpus** and are **never hard-deleted** except on GDPR erasure or tenant offboarding; the engine offers no full-catalog replace/reconcile and does not delete by absence. A product-`delete` webhook is a **best-effort fast-path**; the **periodic full re-sync is the reconciler** that converges catalog state, so missed or out-of-order events self-heal on the next full push. **Consequence when changing the SKU scheme:** migrated old SKUs are **not** auto-removed — they linger as stale rows; orphan removal at a SKU-scheme migration is a **one-time manual purge** on the engine side, coordinated with the sender.
+- **Lifecycle is UPSERT-only — no delete-by-absence; removal is soft, never a hard delete.** The engine UPSERTs by `sku` and never removes a `sku` merely because it stopped appearing in a sync. **Removal is explicit and always *soft*:** either re-send the product with `in_stock=false` (per-SKU), or call [`POST /api/v1/ingest/catalog/remove`](#3b-post-apiv1ingestcatalogremove) with the parent `product_id` to tombstone all of a product's SKUs at once (the path for a platform hard-delete, where the webhook gives only the product id). A tombstone sets `in_stock=false` + `recommendable=false` — it drops the product from every recommendation path but **keeps the row**. Catalog rows (like `orders` / `order_items`) are **retained as a learning corpus** and are **never hard-deleted** except on GDPR erasure or tenant offboarding; the engine offers no full-catalog replace/reconcile and does not delete by absence. When to send what is the [catalog sync lifecycle](#catalog-sync-lifecycle) below. **Consequence when changing the SKU scheme:** migrated old SKUs are **not** auto-removed — they linger as stale rows; orphan removal at a SKU-scheme migration is a **one-time manual purge** on the engine side, coordinated with the sender.
+
+<a name="catalog-sync-lifecycle"></a>
+**Catalog sync lifecycle** (v1.8.3, PRO-3740):
+
+1. **Full import at setup.** After [setup exchange](#1-post-apisetupexchange), the sender sends the whole catalog once, in §3 batches.
+2. **Changes after that.** The sender then sends only what changes, when it changes:
+   - **Product save** (any field the sender maps) → re-send that product's rows via §3.
+   - **Stock change** → re-send the row via §3 with the new `in_stock`.
+   - **Archive / unpublish** → re-send the row via §3 with `in_stock=false`.
+   - **Platform hard delete** → [§3b](#3b-post-apiv1ingestcatalogremove) with the parent `product_id`.
+
+   **Send the whole row, not a patch.** The UPSERT replaces every sender-owned column with the value in the request, so an optional field that a change omits (`compare_price`, `description`, `image_url`, …) is cleared. Only `tags` is merged (keys the request does not set are kept).
+3. **Full import by hand.** The merchant can start a full import at any time. It uses the same §3 batches as the setup import and is safe to repeat (natural-key UPSERT, [Idempotency](#idempotency)). It does **not** remove products that are missing from it — the engine does not delete by absence.
+4. **No scheduled full re-sync.** The engine does not need a periodic full re-sync and does not expect one. A sender that still runs one causes no harm (the UPSERT is idempotent, and back-in-stock detection only reacts to a real stock transition), but it is not part of this contract.
+
+**What the engine reconciles itself.** Every engine-derived catalog value is computed from data the engine already stores on the row (`name`, `name_i18n`, `category_path`, `product_type`, `raw_attributes`, `tags`) or from other engine data. When the engine changes its own rules, it re-derives the values engine-side, from the stored rows. **No plugin re-sync is needed and the engine never asks for one for this reason.**
+- `recommendable` (see [Engine-internal fields](#engine-internal)) — computed on every upsert; after a classifier change the engine re-classifies stored rows with an engine-side backfill.
+- Slug / name tag derivation (`lib/ingest/attribute-mapping.ts`) — computed on every upsert; after a lexicon change the engine re-derives stored rows with an engine-side backfill.
+- Nightly AI tag sweep (`sweep-catalog-tags`) — classifies the tags the lexicon leaves unset. It marks each row with a tag version; when the engine raises that version, the sweep re-classifies every row once, by itself.
+- `popularity_score` — computed nightly from orders, not from the catalog sync.
+- Operator per-SKU recommendable override — engine-only; no sync touches it.
+
+**When a full import from the plugin is required.** Only when the engine needs data that it does not store:
+- A contract change that adds a catalog field, or changes what a field must hold. The changelog entry for that version says so explicitly (as the v1.4.0 entry did for the order gross-amount re-sync). Without such a note, no re-sync is needed after an engine release.
+- A sender-side mapping fix: the sender corrects what it sends (for example attribute labels instead of term ids). The corrected values exist only in the store.
+- After the sender knows that it lost change events (see the next paragraph).
+
+**Known gap: a lost change is not healed automatically.** Without a scheduled full re-sync, a change event that never reaches the engine (a failed webhook, a dropped queue item, an outage longer than the sender's retries) stays wrong until that product changes again or the merchant runs a full import. The engine cannot detect this today: it keeps no per-row last-sync time and does not compare its catalog with the store. Deletes are a special case that a full re-sync never covered either: a product missing from a full import is not removed, so a lost delete event stays unhealed until the sender sends §3b or an `in_stock=false` row for that product. Senders therefore **SHOULD** send change events from a durable queue with retries, and show the merchant when events fail, so that the merchant knows when to start a full import by hand.
 
 <a name="engine-internal"></a>
 **Engine-internal fields** (not part of the request — do not send): the engine derives some columns at ingest that senders never supply. Notably `recommendable` (boolean): the engine's **exclusion decision** (a per-store/business-model call the connector must NOT make). Derived primarily from the **`product_type` signal** (gift-card types → excluded), with `sku`/`category_path`/`name` heuristics as fallback (test artifacts `LIVE-*`/`live-test`, name-matched gift cards/donations). `is_virtual`/`is_downloadable` are **stored but do NOT auto-exclude** (digital-goods stores sell those). Recomputed on every upsert, so a corrected sync self-heals; tunable engine-side without redeploying connectors. Excluded products are never recommended via any path. **Division of labour: the connector sends structural signal; the engine owns the exclusion.**
@@ -744,7 +772,7 @@ Returned when every product carrying an `event_id` in the request was already pr
 - **All SKUs at once.** A product's variants share one `tags.product_id`, so one id removes the whole product.
 - **Idempotent.** Re-removing an already-removed product is a no-op. A product id matching no rows is counted in `not_found`, not an error.
 - **Effect on serving.** A tombstoned product is excluded from every recommendation path (hard-gate, tier-0, orchestrator); if it was in a customer's replenishment set, the `stock_status_change` trigger surfaces a substitute.
-- **Not authoritative on its own.** The delete event is a best-effort fast-path — keep sending the full catalog on your normal cadence; the periodic full re-sync is the reconciler (see [lifecycle](#catalog-identity)).
+- **The only delete signal.** The engine never deletes by absence, so this call (or an `in_stock=false` row via §3) is the only way it learns that a product is gone — a full import does not remove a product that is missing from it. Send it from a durable queue with retries; a lost delete event is not healed automatically (see [catalog sync lifecycle](#catalog-sync-lifecycle)).
 
 **Response 200 OK**:
 ```json
@@ -2062,6 +2090,13 @@ curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
 **v1.8.2 — clarification: §13 cannot switch real sends on** (no new endpoint, field, status or shape). PRO-3705, Erkki's decision 2026-10-02:
 - **The rule.** For the pilot, consent for engine-sent emails is the merchant's written yes plus a Smaily operator switching real sends on in the engine admin. A §13 row with `enabled: true` + `test_mode: false` is stored with `test_mode: true` unless the trigger already sends to real customers; the rest of the row is stored as sent and the response stays `200 {ok, upserted}`.
 - **What the plugin sees.** §12 returns the stored state, so after such a save the row reads `test_mode: true`. The plugin's UI should show the §12 state, not its own request.
+
+**v1.8.3** (2026-10-05) — **§3/§3b: catalog sync lifecycle**. PATCH bump per the [Versioning](#versioning) rule (no new endpoint, no new field, no shape change — the contract now states the sync pattern the plugins already follow). PRO-3740, Erkki's decision 2026-10-04:
+- **The gap.** §3 called a periodic full re-sync "the reconciler" and §3b said to keep sending the full catalog "on your normal cadence". The intended pattern is different, and the WooCommerce plugin already follows it; the Magento connector drops its extra nightly full re-sync (PRO-1968).
+- **The rule ([catalog sync lifecycle](#catalog-sync-lifecycle)).** A full import at setup; after that only changes (product save, stock change, archive, delete); a full import by hand whenever the merchant starts one. No scheduled full re-sync. A change re-sends the whole row, because the UPSERT clears an optional field that the request omits (only `tags` is merged) — this was already the engine's behavior, now stated.
+- **What the engine reconciles itself.** Every engine-derived value (`recommendable`, lexicon tags, AI-sweep tags, popularity) is re-derived engine-side from stored rows when the engine's own rules change. A plugin full import is required only for a contract change that says so, a sender-side mapping fix, or after lost change events.
+- **Known gap, stated honestly.** A lost change event (or a lost delete event, which a full re-sync never healed either) stays wrong until the product changes again or the merchant runs a full import; the engine cannot detect it today. Senders SHOULD queue change events durably with retries and show failures to the merchant.
+- **What the plugin does.** Nothing new if it already works this way. A sender that keeps a scheduled full re-sync is not wrong, but it can drop it.
 
 ### Appendix F: Migration notes
 

@@ -68,7 +68,7 @@ Rather than one monolithic review, we suggest four passes in this order — each
 independently checkable and front-loads the highest-risk surfaces:
 
 1. **Wire contract** — [`RECENGINE_API_CONTRACT.md`](RECENGINE_API_CONTRACT.md)
-   (v1.8.2, byte-synced across the Smaily connect repositories, drift guarded by a
+   (v1.8.3, byte-synced across the Smaily connect repositories, drift guarded by a
    daily CI workflow). This is the smallest artifact with the widest blast radius:
    it defines what the extension sends to Campaign Intelligence and is shared with
    the WooCommerce and Shopify connectors.
@@ -204,7 +204,7 @@ button, exactly as it does today for 2.8.x.
   Audit and the executed matrix are in [HYVA_SUPPORT.md](HYVA_SUPPORT.md).
   Classic Luma/Blank themes are fully covered.
 - **Campaign Intelligence dependency**: the extension builds against engine
-  contract v1.8.2; the engine repository is currently private, which is why the
+  contract v1.8.3; the engine repository is currently private, which is why the
   staleness check needs a read token. Everything engine-related is optional at
   runtime — a store that never connects the engine gets the full classic feature
   set with zero engine traffic.

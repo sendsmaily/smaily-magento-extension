@@ -268,8 +268,19 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   import` run, an ERP link or any other direct write to the catalog
   tables) reaches the engine with the product's next save or stock change,
   or with a catalog import the merchant starts by hand; the user guide
-  says so. The engine contract (§3, §3b) still describes a periodic full
-  re-sync by the plugin; the engine side was asked to align it (PRO-3740).
+  says so. The engine contract states this pattern (v1.8.3, §3 *Catalog
+  sync lifecycle* and §3b; PRO-3740): a full import at setup, then
+  changes, each re-sending the whole row (the engine's UPSERT clears an
+  optional field a row omits, so `CatalogPayloadBuilder::buildTombstone()`
+  is the full row with `in_stock: false`, never a patch); a full import
+  by hand whenever the merchant starts one; no scheduled full re-sync. A
+  catalog import does not remove a product that is missing from it — the
+  engine never deletes by absence, so the delete paths above are its only
+  delete signal, and a product deleted where no event sees it (a CSV
+  import's delete, a direct database delete) stays in the engine as it
+  was. A release that adds a catalog field, or corrects what one holds,
+  tells the merchant to start the catalog import by hand: no scheduled
+  re-sync carries it.
   On an upgrade, Magento ignores the removed job's leftover `cron_schedule`
   rows: it reads and prunes only the job codes its configuration lists.
 - **Order line `sku`.** A line is the parent order item (a configurable's
@@ -1112,7 +1123,7 @@ Initial setup, Settings, Log. Design rules:
 ## Wire contracts
 
 The authoritative engine contract is
-[RECENGINE_API_CONTRACT.md](RECENGINE_API_CONTRACT.md) (v1.8.2, byte-synced
+[RECENGINE_API_CONTRACT.md](RECENGINE_API_CONTRACT.md) (v1.8.3, byte-synced
 across the Smaily connect repositories). Load-bearing invariants
 implemented here:
 

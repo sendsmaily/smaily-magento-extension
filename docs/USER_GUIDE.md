@@ -919,7 +919,14 @@ traffic:
   Magento's own product save — an ERP or PIM link, a CSV or
   `bin/magento import` run, a direct database import — start the
   **Catalog** import by hand after such a change, so Campaign
-  Intelligence gets the new prices, stock and products.
+  Intelligence gets the new prices, stock and products. The import does
+  not remove products: Campaign Intelligence learns of a deletion only
+  from Magento's own product delete (in the admin or through the API). A
+  product deleted any other way — by a CSV import's delete, or straight
+  in the database — stays in Campaign Intelligence as it was, and a
+  catalog import does not change that. When a release note asks you to
+  start the catalog import (for example because Campaign Intelligence now
+  gets a new product detail), start it under **Settings > Intelligence**.
   The **Catalog**, **Customers** and **Orders** imports need a Campaign
   Intelligence connection. The import cards show only while Campaign
   Intelligence is connected; a **Start import** pressed on a page opened

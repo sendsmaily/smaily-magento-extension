@@ -5,7 +5,10 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-05 — after rc7, PRO-3753 parts (b) and (c)
+_Last updated: 2026-10-05 — after rc7, PRO-3767 (a contact sync or
+automation row of an address longer than the 64-character entity column
+stores the contact's keyed hash, not a cut address; unreleased); before it
+PRO-3753 parts (b) and (c)
 (Details on an engine-bound row waiting for a deactivated Campaign
 Intelligence account says so; the five-attempt retry window is about 81
 minutes, not six hours, in the docs); before it PRO-3753 part (a) (a group of
@@ -193,6 +196,45 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3767 — a contact row's entity is never cut (2026-10-05;
+  unreleased, after rc7; owner decision 2026-10-05: keep the address,
+  stop it from being cut; no schema change).** `contact.sync` and
+  `automation.trigger` rows stored the contact's plain address in the
+  64-character `smaily_event_queue.entity_id`; a longer one was cut
+  silently (`SET SQL_MODE=''` in Magento's adapter, verified in vendor).
+  The checks that match a contact's rows by the FULL address then missed:
+  a purchase did not withdraw the waiting abandoned-cart reminder
+  (`cancelPendingAutomation()`), and the purchase marker's "a reminder went
+  out" check (`hasDeliveredAutomation()`) found nothing, so no marker. Now
+  `Model\Queue\ContactEntity::of()` keeps an address that fits as it is
+  and stores a longer one as `ProfilingOptOuts::addressKey()` of the
+  trimmed, lower-case address (64 hex, as consent rows, PRO-3765).
+  `ContactSync\SyncDispatcher`, the only writer of these rows and the only
+  caller of the two checks, passes every entity through it. **Every reader
+  checked:** `ResendGuard` / `laterDeliveredOfSameTrigger()` and
+  `Log\Resend` compare or copy stored values (consistent by
+  construction); `LocalEraser` already matches `[address,
+  addressKey(address)]` and the payload; `Log\EntityLabel` (grid column,
+  Details, Dashboard) now shows a 64-hex entity of a contact-sync or
+  automation row by its first 12 characters, as for consent rows (an
+  address always has an "@", so it never reads as a hash); Details shows
+  the address in the payload. The abandoned-cart "one reminder per address
+  per 24 h" rule reads `smaily_abandoned_cart.email` (255 characters), not
+  the queue. No reader needed a schema change. Rows queued before keep the
+  cut address until retention (no data patch). **Evidence:** integration
+  `Queue/ContactEntityTest` on MySQL (real dispatcher, queue, guard,
+  eraser): an 89-character address → both rows' entity is its keyed hash,
+  the payload holds the address; the purchase withdraws the waiting
+  reminder; after a delivered reminder the marker is queued; a later
+  delivered reminder refuses Send again on the failed one (superseded);
+  the erasure removes the pending row and anonymises the sent one; an
+  ordinary address is stored as it is and the Log's Entity filter finds
+  its two rows. Without the dispatcher change the first three fail (the
+  guard and erasure tests pass either way: cut values equal each other,
+  and the erasure also matches the payload). Unit `ContactEntityTest`,
+  `EntityLabelTest`. DI changed (SyncDispatcher); sandbox `setup:upgrade
+  && setup:di:compile` OK. Docs: ARCHITECTURE, USER_GUIDE (Log), CHANGELOG.
 
 - **PRO-3753 (b) + (c) — Details on a row waiting for the Campaign
   Intelligence account; the retry window is about 81 minutes (2026-10-05;

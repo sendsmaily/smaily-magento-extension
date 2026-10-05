@@ -32,7 +32,8 @@ use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
  *   the merchant's own record that they messaged this person. The row keeps
  *   its id, type, status, attempts and timestamps and loses everything that
  *   points at the person: `entity_id` (which for a contact.sync or an
- *   automation row IS the address, for a profiling-consent row the opt-out
+ *   automation row IS the address — its keyed hash when the address is
+ *   longer than the column — for a profiling-consent row the opt-out
  *   record's keyed hash of it, and is the Log grid's Entity column),
  *   the queued payload, the payload as sent, the last response and the last
  *   error.
@@ -246,8 +247,10 @@ class LocalEraser
         $connection = $this->resourceConnection->getConnection();
         $tableName = $this->resourceConnection->getTableName($table);
         $columns = array_merge(self::SCANNED_COLUMNS, [self::TYPE_COLUMNS[$table]]);
-        // A profiling-consent row's entity is the keyed hash (PRO-3765); one
-        // queued before it, the plain address.
+        // A profiling-consent row's entity is the keyed hash (PRO-3765), and
+        // so is a contact-sync or automation row's for an address longer
+        // than the column (Queue\ContactEntity, PRO-3767); any other row's,
+        // the plain address.
         $entities = [$email, $this->optOuts->addressKey($email)];
 
         $lastId = 0;

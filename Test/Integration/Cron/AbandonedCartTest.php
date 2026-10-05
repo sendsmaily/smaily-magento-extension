@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Integration\Cron;
 
 use Magento\Framework\Data\Collection\EntityFactoryInterface;
+use Magento\Framework\Lock\LockManagerInterface;
 use Magento\Framework\Model\ResourceModel\Db\VersionControl\Snapshot;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\ResourceModel\Quote as QuoteResource;
@@ -28,6 +29,8 @@ use Smaily\Connect\Model\ContactSync\SyncDispatcher;
 use Smaily\Connect\Model\Log\QueueRowLoader;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
+use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
+use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\ResourceModel\Log\Collection;
@@ -268,7 +271,10 @@ class AbandonedCartTest extends IntegrationTestCase
             $this->createMock(SubscriberPayloadBuilder::class),
             $languages,
             $storeManager,
-            $this->objectManager->create(EventQueue::class)
+            $this->objectManager->create(EventQueue::class),
+            new ContactEntity($this->objectManager->create(ProfilingOptOuts::class, [
+                'lockManager' => $this->createMock(LockManagerInterface::class),
+            ]))
         );
 
         $payloadBuilder = $this->createMock(PayloadBuilder::class);

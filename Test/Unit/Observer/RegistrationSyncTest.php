@@ -26,6 +26,8 @@ use Smaily\Connect\Model\ContactSync\StorefrontSubscription;
 use Smaily\Connect\Model\ContactSync\SubscriberPayloadBuilder;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
+use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
+use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Observer\CustomerSaveAfter;
@@ -179,7 +181,8 @@ class RegistrationSyncTest extends TestCase
             $this->payloadBuilder(),
             $this->createMock(LanguageResolver::class),
             $storeManager,
-            $queue
+            $queue,
+            new ContactEntity($this->createMock(ProfilingOptOuts::class))
         );
     }
 

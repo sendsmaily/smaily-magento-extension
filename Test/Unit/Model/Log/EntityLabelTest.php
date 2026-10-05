@@ -14,7 +14,8 @@ use Smaily\Connect\Model\Queue\EventType;
 
 /**
  * PRO-3765: a profiling-consent row's Entity is the shopper's keyed hash,
- * shown short; every other Entity shows as stored.
+ * shown short; PRO-3767: so is a contact-sync or automation row's for an
+ * address longer than the column. Every other Entity shows as stored.
  */
 class EntityLabelTest extends TestCase
 {
@@ -26,6 +27,14 @@ class EntityLabelTest extends TestCase
             substr($hash, 0, 12) . '…',
             EntityLabel::forDisplay(EventType::ENGINE_PROFILING_CONSENT, $hash)
         );
+    }
+
+    public function testAContactRowOfALongAddressShowsTheShortFormOfItsKeyedHash(): void
+    {
+        $hash = hash_hmac('sha256', 'u1@example.invalid', 'unit-test-crypt-key');
+
+        self::assertSame(substr($hash, 0, 12) . '…', EntityLabel::forDisplay(EventType::CONTACT_SYNC, $hash));
+        self::assertSame(substr($hash, 0, 12) . '…', EntityLabel::forDisplay(EventType::AUTOMATION_TRIGGER, $hash));
     }
 
     /**
@@ -42,7 +51,7 @@ class EntityLabelTest extends TestCase
             ],
             'an erased consent row' => [EventType::ENGINE_PROFILING_CONSENT, '[erased]'],
             'a contact sync' => [EventType::CONTACT_SYNC, 'u1@example.invalid'],
-            'a hash-like entity of another type' => [EventType::CONTACT_SYNC, $hash],
+            'a hash-like entity of another type' => [EventType::ENGINE_IDENTITY_MERGE, $hash],
             'an engine row' => ['orders', '100000001'],
         ];
     }

@@ -13,12 +13,14 @@ use Magento\Framework\Exception\LocalizedException;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
+use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 
 /**
  * Builds payloads and enqueues contact-sync and automation events. The thin
  * observers delegate here so every dispatch path shares one payload shape.
+ * Their rows' entity is the contact's, by ContactEntity (PRO-3767).
  */
 class SyncDispatcher
 {
@@ -36,7 +38,8 @@ class SyncDispatcher
         private readonly SubscriberPayloadBuilder $payloadBuilder,
         private readonly LanguageResolver $languageResolver,
         private readonly StoreManagerInterface $storeManager,
-        private readonly EventQueue $eventQueue
+        private readonly EventQueue $eventQueue,
+        private readonly ContactEntity $contactEntity
     ) {
     }
 
@@ -85,7 +88,7 @@ class SyncDispatcher
         $this->eventQueue->enqueue(
             EventType::AUTOMATION_TRIGGER,
             $this->automationPayload($trigger, $storeId, $address),
-            (string)($address['email'] ?? ''),
+            $this->contactEntity->of((string)($address['email'] ?? '')),
             $this->websiteId($storeId)
         );
     }
@@ -103,7 +106,7 @@ class SyncDispatcher
             EventType::AUTOMATION_TRIGGER,
             $this->automationPayload($trigger, $storeId, $address),
             $reason,
-            (string)($address['email'] ?? ''),
+            $this->contactEntity->of((string)($address['email'] ?? '')),
             $this->websiteId($storeId)
         );
     }
@@ -153,8 +156,9 @@ class SyncDispatcher
      */
     public function dispatchCartPurchase(string $email, int $storeId, bool $unsubscribedInStore = false): void
     {
-        $this->eventQueue->cancelPendingAutomation(Trigger::ABANDONED_CART, $email);
-        if (!$this->eventQueue->hasDeliveredAutomation(Trigger::ABANDONED_CART, $email)) {
+        $entity = $this->contactEntity->of($email);
+        $this->eventQueue->cancelPendingAutomation(Trigger::ABANDONED_CART, $entity);
+        if (!$this->eventQueue->hasDeliveredAutomation(Trigger::ABANDONED_CART, $entity)) {
             return;
         }
 
@@ -178,7 +182,7 @@ class SyncDispatcher
         $this->eventQueue->enqueue(
             EventType::CONTACT_SYNC,
             ['store_id' => $storeId, 'contact' => $contact],
-            (string)($contact['email'] ?? ''),
+            $this->contactEntity->of((string)($contact['email'] ?? '')),
             $this->websiteId($storeId)
         );
     }

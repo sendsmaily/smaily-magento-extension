@@ -60,6 +60,26 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   `automation.trigger` (delivered one-by-one so a partial failure can never
   re-trigger an automation), `engine.identity_merge`,
   `engine.profiling_consent` (see Profiling consent below).
+- **A contact row's entity (PRO-3767).** A `contact.sync` or
+  `automation.trigger` row's `entity_id` is the contact's address, so the
+  Log's Entity filter finds it — when the address fits the 64-character
+  column. A longer address was cut silently (Magento's adapter runs with
+  `SQL_MODE ''`), so the purchase's withdrawal of a waiting reminder and
+  the purchase marker's "a reminder went out" check, which match the full
+  address, missed that contact's rows. Now such an address is stored as
+  the keyed hash the profiling-consent rows use
+  (`ProfilingOptOuts::addressKey()` of the trimmed, lower-case address; 64
+  hex characters). `Model\Queue\ContactEntity::of()` is the one rule, and
+  `ContactSync\SyncDispatcher` — the only writer of these rows and the
+  only caller of `cancelPendingAutomation()` / `hasDeliveredAutomation()` —
+  passes every entity through it. The other readers compare stored values
+  with stored values (`ResendGuard`'s "a later message of this kind
+  already reached this contact", `Log\Resend` copying the entity), and
+  `LocalEraser` already matches the address and its keyed hash. The Log,
+  Details and the Dashboard show such an entity by its first 12 characters
+  (`Log\EntityLabel`, as for a consent row); Details shows the address in
+  the payload. No schema change; a row queued before keeps its cut
+  address until retention removes it.
 - Automation routing (`Model/Automation/Router`, Woo `Multilingual\Router`
   parity): multilingual modes `single`/`c` use the config-default workflow;
   modes `a`/`b` resolve `smaily_automation_mapping` rows — the exact
@@ -592,8 +612,9 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   is ANONYMIZED in place — `entity_id`, `payload`, `sent_payload`,
   `last_response` and `last_error` become one placeholder, keys and
   structure kept, so the merchant keeps the record of the send. A row is
-  matched by its `entity_id` (the address, or for a profiling-consent row
-  the opt-out record's keyed hash of it — PRO-3765) or by DECODING the stored JSON (`Model\Privacy\PayloadAnonymizer`),
+  matched by its `entity_id` (the address, or for a profiling-consent row,
+  and a contact row of an address longer than the column, the opt-out
+  record's keyed hash of it — PRO-3765, PRO-3767) or by DECODING the stored JSON (`Model\Privacy\PayloadAnonymizer`),
   never by searching its raw text: `json_encode` escapes a non-ASCII
   address, which a substring search would miss. The walk reads a narrow
   column list in 1000-row chunks and deletes or anonymizes each chunk's

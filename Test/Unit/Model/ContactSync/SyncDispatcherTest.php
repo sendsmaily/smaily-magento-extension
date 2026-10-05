@@ -16,6 +16,8 @@ use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\ContactSync\SubscriberPayloadBuilder;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
+use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
+use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 
@@ -71,7 +73,8 @@ class SyncDispatcherTest extends TestCase
             $this->payloadBuilder,
             $languageResolver,
             $storeManager,
-            $eventQueue
+            $eventQueue,
+            new ContactEntity($this->createMock(ProfilingOptOuts::class))
         );
     }
 

@@ -983,7 +983,14 @@ card — you do not have to keep the page open:
   (catalog, customers, orders, browse events), told apart by the
   **Source** column, with status (a colored pill: amber while a row waits
   or is being sent, green when delivered, red when failed, gray when
-  withdrawn or skipped), attempts and the last error. A stock change
+  withdrawn or skipped), attempts and the last error. The **Entity** of a
+  contact sync or an automation row is the contact's email address, and
+  the Entity filter finds the contact's rows by it. An address longer than
+  64 characters is stored as a keyed hash of the address instead, so it is
+  never cut: the **Log** and the Dashboard show its first 12 characters
+  (the Entity filter finds the rows by them), and **Details** shows the
+  address in the payload. A row queued by an earlier release candidate
+  shows such an address cut after 64 characters. A stock change
   (a shipment, a credit memo, a Sources or Advanced Inventory edit) first
   shows as a waiting *catalog_changed* row that names the product; within
   a minute it is replaced by the product's *catalog* row, one per product

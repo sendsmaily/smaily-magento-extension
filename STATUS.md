@@ -9,7 +9,8 @@ _Last updated: 2026-10-05 — PRO-3749 (a Smaily HTTP error shows Smaily's
 answer in the Log's error column), PRO-2465 (the GDPR command and the
 Campaign Intelligence automations form respect a refused account), PRO-1961
 (one seam for terminal failures in the marketing queue), PRO-2466
-(identity-merge rows wait while the account is refused). 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
+(identity-merge rows wait while the account is refused), PRO-1962 (a
+Smaily "invalid data" envelope fails on the first attempt). 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
 land on v3: PRO-2508 (the Log's error column describes rejected Smaily
 credentials in the extension's own sentence, on purpose; docs only),
 PRO-2509 (the Log's Last Error filter matches the text the column shows),
@@ -139,6 +140,29 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-1962 — a Smaily "invalid data" envelope fails on the first
+  attempt (2026-10-05; CHANGELOG bullet under "Changes since
+  3.0.0-rc6").** HTTP 200 with body code 203 walked the five-attempt
+  ladder although identical data is rejected again. Orchestrator decision
+  (reversible): only 203 is permanent; every other non-success code keeps
+  today's ladder. Recorded in ARCHITECTURE ("Smaily envelope codes") as
+  the cross-platform canon proposal (Woo has the same gap; counterpart
+  issues are the orchestrator's to file). Built on the PRO-1961 seam:
+  `ApiException::PERMANENT_CODES` / `isPermanent()`, `Failure::of()` →
+  `permanent_envelope_<code>: <message>`; `FailureMessage`'s class
+  pattern and `Log\Collection`'s error filter (SQL REGEXP
+  `^permanent_(http|envelope)_[0-9]+:`) strip the new class as they strip
+  `permanent_http_`. Unit: `FailureTest` (203 permanent with its class,
+  216 keeps the ladder), `FailureMessageTest` (shown without the class,
+  class for the drawer) — red before. Integration with a faked transport
+  and the real contact-sync handler and Smaily client
+  (`FlushEventQueueTest`): `{"code":203}` → failed on attempt 1,
+  `permanent_envelope_203: Smaily API returned code 203: Invalid data`,
+  the answer kept; `{"code":216}` → pending on the ladder;
+  `ErrorFilterTest`: found by its words, not by "envelope". Note: a 203 on
+  a contact-sync batch fails every row of that batch at once (it did after
+  five tries before) — FOLLOW-UP. USER_GUIDE (the Log's retry bullet).
 
 - **PRO-2466 — identity-merge rows wait while Campaign Intelligence
   refuses the account (2026-10-05; CHANGELOG bullet under "Changes since
@@ -2312,7 +2336,7 @@ Earlier: 2026-09-11, 2026-09-10._
   for one catalog entry's image and product link opened from the engine
   (PRO-3731); (2) open queue: PRO-3746 (after the pilot), PRO-3747,
   PRO-1958; small
-  cleanup PRO-2462, PRO-2475, PRO-1469, PRO-2514 done; robustness PRO-1962/2465/2466/1961;
+  cleanup PRO-2462, PRO-2475, PRO-1469, PRO-2514 done; robustness PRO-3749, PRO-1962, PRO-2465, PRO-2466, PRO-1961 done;
   (3) cross-repo asks: PRO-3740 (engine contract wording: §3/§3b still
   describe a periodic full re-sync), PRO-3743 (WooCommerce), PRO-3744
   (Shopify); (4) Erkki: the engine pilot decisions (PRO-3600); HC Pro

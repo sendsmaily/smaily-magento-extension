@@ -18,6 +18,7 @@ use Smaily\Connect\Model\Queue\Handler\ProfilingConsentHandler;
  * What a failed row says to the merchant (PRO-2454).
  *
  * A terminal refusal is stored as `permanent_http_<code>: <server message>`
+ * (`permanent_envelope_<code>:` for a Smaily error envelope, PRO-1962)
  * (Model\Queue\Failure) — the classification is ours, the sentence after
  * it is Smaily's own, except where the client words a refusal itself
  * (rejected credentials, PRO-2508). The merchant is shown that sentence, redacted
@@ -64,7 +65,7 @@ class FailureMessage
      * What Model\Queue\Failure prepends to a refusal it parked on the spot. The Log
      * grid's error filter strips it the same way, in SQL (Log\Collection).
      */
-    private const CLASS_PATTERN = '/^(permanent_http_\d+):\s*/';
+    private const CLASS_PATTERN = '/^(permanent_(?:http|envelope)_\d+):\s*/';
 
     public function __construct(
         private readonly PayloadRedactor $redactor

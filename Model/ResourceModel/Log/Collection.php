@@ -109,8 +109,9 @@ class Collection extends SearchResult
     /**
      * The error column's text filter matches what the column shows
      * (PRO-2509), not the stored value: Model\Queue\Failure's
-     * `permanent_http_<code>:` prefix is not searched, and a client message
-     * shown translated is found by its translated words too (FailureMessage
+     * `permanent_http_<code>:` or `permanent_envelope_<code>:` prefix is not
+     * searched, and a client message shown translated is found by its
+     * translated words too (FailureMessage
      * strips and translates the same way for display). A stored error that
      * the column shows as redacted JSON is never matched, so the filter
      * cannot find a row by a secret the column hides.
@@ -129,7 +130,8 @@ class Collection extends SearchResult
         $like = (string)$condition['like'];
         // The grid's text filter sends "%<term>%" with % and _ escaped.
         $term = str_replace(['\\%', '\\_'], ['%', '_'], (string)preg_replace('/^%|%$/', '', $like));
-        $shown = 'CASE WHEN main_table.last_error REGEXP \'^permanent_http_[0-9]+:\' THEN TRIM(LEADING \' \''
+        $shown = 'CASE WHEN main_table.last_error REGEXP \'^permanent_(http|envelope)_[0-9]+:\''
+            . ' THEN TRIM(LEADING \' \''
             . ' FROM SUBSTRING(main_table.last_error, LOCATE(\':\', main_table.last_error) + 1))'
             . ' ELSE main_table.last_error END';
 

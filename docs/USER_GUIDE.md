@@ -1032,8 +1032,9 @@ card — you do not have to keep the page open:
   dashboard's failed-deliveries tile links to the same view.
 - Deliveries retry automatically with backoff (1 min → 6 h, 5 attempts)
   before parking as *failed* for manual retry. A delivery that was refused
-  outright — wrong credentials, a deleted workflow, a rejected address, a
-  link of browsing to a customer that Campaign Intelligence refused — is
+  outright — wrong credentials, a deleted workflow, a rejected address,
+  data Smaily answers is invalid, a link of browsing to a customer that
+  Campaign Intelligence refused — is
   not retried at all: it is marked *failed* immediately, with the
   refusal in the last error, so the failed count tells you now instead of
   six hours later. So is a row the extension itself can never send (its

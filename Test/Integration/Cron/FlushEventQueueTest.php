@@ -298,6 +298,44 @@ class FlushEventQueueTest extends IntegrationTestCase
         self::assertStringContainsString('permanent_http_404', (string)$row['last_error']);
     }
 
+    /**
+     * PRO-1962: Smaily answers HTTP 200 with the envelope code 203 "invalid
+     * data" — resending identical data can never succeed, so the row fails
+     * on the first attempt with a named class, Smaily's answer kept.
+     */
+    public function testAnInvalidDataEnvelopeIsRecordedFailedOnTheFirstAttempt(): void
+    {
+        $this->enqueueContact('f-invalid-data');
+
+        $this->runCron(['contact.sync' => $this->realContactSync([
+            new Response(200, [], '{"code":203,"message":"Invalid data"}'),
+        ])]);
+
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_FAILED, $row['status']);
+        self::assertSame('1', (string)$row['attempts'], 'The other four attempts are not spent');
+        self::assertNull($row['next_retry_at']);
+        self::assertSame('permanent_envelope_203: Smaily API returned code 203: Invalid data', $row['last_error']);
+        self::assertSame(
+            ['http_status' => 200, 'body' => ['code' => 203, 'message' => 'Invalid data']],
+            json_decode((string)$row['last_response'], true)
+        );
+    }
+
+    public function testAnotherErrorEnvelopeKeepsTheLadder(): void
+    {
+        $this->enqueueContact('f-other-envelope');
+
+        $this->runCron(['contact.sync' => $this->realContactSync([
+            new Response(200, [], '{"code":216,"message":"Unknown error"}'),
+        ])]);
+
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_PENDING, $row['status']);
+        self::assertSame($this->clockDate(EventQueue::BACKOFF_SECONDS[0]), $row['next_retry_at']);
+        self::assertSame('Smaily API returned code 216: Unknown error', $row['last_error']);
+    }
+
     public function testASlowDownParksTheRowForExactlyTheRequestedTime(): void
     {
         $this->enqueueContact('f-429');

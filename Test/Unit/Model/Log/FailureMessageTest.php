@@ -40,6 +40,18 @@ class FailureMessageTest extends TestCase
         );
     }
 
+    /**
+     * PRO-1962: a permanent envelope rejection reads as Smaily's answer, its
+     * class kept for the drawer.
+     */
+    public function testAnEnvelopeRejectionShowsTheAnswerAndKeepsItsClass(): void
+    {
+        $stored = 'permanent_envelope_203: Smaily API returned code 203: Invalid data';
+
+        self::assertSame('Smaily API returned code 203: Invalid data', $this->failureMessage->forDisplay($stored));
+        self::assertSame('permanent_envelope_203', $this->failureMessage->failureClass($stored));
+    }
+
     public function testRetryableFailuresKeepTheirWording(): void
     {
         self::assertSame(

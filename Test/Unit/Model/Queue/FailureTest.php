@@ -50,6 +50,19 @@ class FailureTest extends TestCase
     }
 
     /**
+     * PRO-1962: HTTP 200 with the envelope code 203 "invalid data" —
+     * resending identical data can never succeed, so it stops at once, with
+     * its own class.
+     */
+    public function testAnInvalidDataEnvelopeIsPermanent(): void
+    {
+        $failure = Failure::of(new ApiException('Smaily API returned code 203: Invalid data', 203));
+
+        self::assertTrue($failure->permanent);
+        self::assertSame('permanent_envelope_203: Smaily API returned code 203: Invalid data', $failure->reason);
+    }
+
+    /**
      * @dataProvider permanentRefusals
      */
     public function testARefusalRetryingCannotChangeIsPermanent(\Throwable $exception, string $reason): void
@@ -71,12 +84,8 @@ class FailureTest extends TestCase
             'slow down without a header' => [new TransportException('Slow down', 429), 'Slow down', null],
             'bad gateway' => [new TransportException('Bad gateway', 502), 'Bad gateway', null],
             'no status' => [new TransportException('Connection timed out'), 'Connection timed out', null],
-            // HTTP 200 with a non-101 body carries no HTTP status.
-            'error envelope' => [
-                new ApiException('Invalid data', ApiException::CODE_INVALID_DATA),
-                'Invalid data',
-                null,
-            ],
+            // PRO-1962: an envelope code other than 203 keeps today's ladder.
+            'other error envelope' => [new ApiException('Unknown error', 216), 'Unknown error', null],
             'missing credentials' => [
                 new SmailyClientException('Credentials are not configured'),
                 'Credentials are not configured',

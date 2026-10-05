@@ -22,6 +22,14 @@ class ApiException extends SmailyClientException
     public const CODE_EMAIL_NOT_FOUND = 206;
 
     /**
+     * The envelope codes that retrying the same request can never change
+     * (PRO-1962, the cross-platform canon proposal): 203 "invalid data" —
+     * identical data is rejected again. Every other non-success code keeps
+     * the retry ladder, as before.
+     */
+    private const PERMANENT_CODES = [self::CODE_INVALID_DATA];
+
+    /**
      * @param array<string, mixed> $response
      */
     public function __construct(
@@ -38,6 +46,14 @@ class ApiException extends SmailyClientException
     public function getSmailyCode(): int
     {
         return $this->smailyCode;
+    }
+
+    /**
+     * Whether Smaily rejected the request itself, so a retry cannot pass.
+     */
+    public function isPermanent(): bool
+    {
+        return in_array($this->smailyCode, self::PERMANENT_CODES, true);
     }
 
     /**

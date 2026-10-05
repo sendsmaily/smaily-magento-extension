@@ -428,6 +428,18 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   reason and its real attempt count. `Cron\FlushEventQueue` applies it
   through `EventQueue::markFailed()`. `Engine\Client` +
   `Cron\FlushIngestQueue` do the same for the ingest queue.
+- **Smaily envelope codes (PRO-1962; proposed as the cross-platform
+  canon for the WooCommerce and Shopify plugins).** Smaily can refuse a
+  request with HTTP 200 and a non-101 code in the body (an
+  `ApiException`). Code **203 "invalid data" is permanent**: identical
+  data is rejected again, so the row fails on its first attempt as
+  `permanent_envelope_203: <message>` (the Log strips the class from the
+  error column and its filter, as it strips `permanent_http_<code>:`, and
+  Details shows it as the failure class). **Every other non-success code
+  keeps the retry ladder**, as before: 206 "email not found" is read by the
+  purchase-marker check itself (PRO-3619), and no other code is known to be
+  final. The list is `ApiException::PERMANENT_CODES`; adding a code there
+  is the whole change.
 - **Claiming:** rows are claimed with a per-worker `claim_token`; only rows
   the worker actually won are processed, so concurrent flushes (manual cron,
   multi-node) can never double-send. Rows stuck in `sending` (killed

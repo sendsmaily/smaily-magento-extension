@@ -30,6 +30,7 @@ class ErrorFilterTest extends IntegrationTestCase
         $this->insert($smaily, 'event_type', 'permanent_http_401: Smaily API credentials were rejected');
         $this->insert($intelligence, 'domain', '{"api_key":"hunter2","message":"bad key"}');
         $this->insert($intelligence, 'domain', 'Engine request failed with HTTP 422: price: must be numeric');
+        $this->insert($smaily, 'event_type', 'permanent_envelope_203: Smaily API returned code 203: Invalid data');
     }
 
     protected function tearDown(): void
@@ -44,6 +45,16 @@ class ErrorFilterTest extends IntegrationTestCase
         self::assertSame([], $this->filtered('permanent'));
         self::assertSame([], $this->filtered('http_400'));
         self::assertSame([], $this->filtered('400: Address'));
+    }
+
+    /**
+     * PRO-1962: a permanent envelope rejection's class is not searched
+     * either.
+     */
+    public function testFindsAnEnvelopeRejectionByItsWordsAndNotByTheInternalPrefix(): void
+    {
+        self::assertSame(['smaily-4'], $this->filtered('returned code 203'));
+        self::assertSame([], $this->filtered('envelope'));
     }
 
     public function testFindsUnprefixedErrorsAsStored(): void

@@ -14,6 +14,7 @@ use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\HandlerPool;
+use Smaily\Connect\Model\Queue\Pending;
 use Smaily\Connect\Model\Queue\Skipped;
 
 /**
@@ -35,7 +36,7 @@ class FlushEventQueue
     {
         $this->eventQueue->requeueStale();
 
-        $events = $this->eventQueue->claimBatch(self::BATCH_SIZE);
+        $events = $this->eventQueue->claimBatch(self::BATCH_SIZE, $this->handlerPool->pausedEventTypes());
         if (!$events) {
             return;
         }
@@ -82,9 +83,12 @@ class FlushEventQueue
             return;
         }
 
+        $waiting = [];
         foreach ($events as $event) {
             $result = $results[(int)$event->getId()] ?? 'Handler returned no result for event';
-            if ($result === true) {
+            if ($result instanceof Pending) {
+                $waiting[] = $event;
+            } elseif ($result === true) {
                 $this->eventQueue->markSent($event);
             } elseif ($result instanceof Skipped) {
                 $this->eventQueue->markSkipped($event, $result->reason);
@@ -97,6 +101,7 @@ class FlushEventQueue
                 $this->eventQueue->markFailed($event, (string)$result);
             }
         }
+        $this->eventQueue->release($waiting);
     }
 
     /**

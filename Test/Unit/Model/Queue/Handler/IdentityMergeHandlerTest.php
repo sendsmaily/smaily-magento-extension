@@ -23,6 +23,7 @@ use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
+use Smaily\Connect\Model\Queue\Pending;
 use Smaily\Connect\Model\Queue\Skipped;
 
 class IdentityMergeHandlerTest extends TestCase
@@ -141,14 +142,44 @@ class IdentityMergeHandlerTest extends TestCase
     }
 
     /**
+     * PRO-2466: while Campaign Intelligence refuses the account (contract §2
+     * `403 tenant_inactive`, PRO-2451), a row is left pending as it was —
+     * no call, no attempt spent — and the handler says the queue should not
+     * claim its rows, as the engine ingest rows wait.
+     */
+    public function testWhileTheAccountIsRefusedTheRowIsLeftPending(): void
+    {
+        $this->client->expects(self::never())->method('identityMerge');
+        $refused = true;
+        $active = false;
+
+        self::assertEquals([1 => new Pending()], $this->handle(self::PAYLOAD, $refused));
+        self::assertTrue($this->handler($refused)->isPaused());
+        self::assertFalse($this->handler($active)->isPaused());
+    }
+
+    /**
+     * PRO-2466: the merge that meets the refusal is not this row's fault
+     * either: it waits too, instead of failing as a 4xx.
+     */
+    public function testTheMergeThatMeetsTheRefusalIsLeftPending(): void
+    {
+        $this->profilingConsent->method('isAllowed')->willReturn(true);
+        $refused = false;
+        $this->client->method('identityMerge')->willReturnCallback(static function () use (&$refused): array {
+            $refused = true;
+            throw new EngineRequestException('Engine request failed with HTTP 403: tenant_inactive', 403);
+        });
+
+        self::assertEquals([1 => new Pending()], $this->handle(self::PAYLOAD, $refused));
+    }
+
+    /**
      * @param array<string, string|int> $payload
      * @return array<int, mixed>
      */
-    private function handle(array $payload): array
+    private function handle(array $payload, bool &$refused = false): array
     {
-        $settings = $this->createMock(Settings::class);
-        $settings->method('isConnected')->willReturn(true);
-
         $event = $this->createMock(Event::class);
         $event->method('getId')->willReturn(1);
         $eventQueue = $this->createMock(EventQueue::class);
@@ -159,15 +190,24 @@ class IdentityMergeHandlerTest extends TestCase
             }
         );
 
-        $handler = new IdentityMergeHandler(
+        return $this->handler($refused, $eventQueue)->handle([$event]);
+    }
+
+    private function handler(bool &$refused, ?EventQueue $eventQueue = null): IdentityMergeHandler
+    {
+        $settings = $this->createMock(Settings::class);
+        $settings->method('isConnected')->willReturn(true);
+        $settings->method('isRefused')->willReturnCallback(static function () use (&$refused): bool {
+            return $refused;
+        });
+
+        return new IdentityMergeHandler(
             $settings,
             $this->client,
-            $eventQueue,
+            $eventQueue ?? $this->createMock(EventQueue::class),
             $this->profilingConsent,
             $this->customerRepository,
             $this->createMock(Logger::class)
         );
-
-        return $handler->handle([$event]);
     }
 }

@@ -133,11 +133,14 @@ class EventQueue
     }
 
     /**
-     * Claim due pending events for processing (marks them as sending).
+     * Claim due pending events for processing (marks them as sending). The
+     * rows of $exceptTypes are left alone: their handler cannot send now
+     * (PRO-2466).
      *
+     * @param string[] $exceptTypes
      * @return Event[]
      */
-    public function claimBatch(int $limit = 200): array
+    public function claimBatch(int $limit = 200, array $exceptTypes = []): array
     {
         $now = $this->dateTime->gmtDate();
         $collection = $this->collectionFactory->create();
@@ -148,6 +151,9 @@ class EventQueue
             ])
             ->setOrder('id', 'ASC')
             ->setPageSize($limit);
+        if ($exceptTypes !== []) {
+            $collection->addFieldToFilter('event_type', ['nin' => $exceptTypes]);
+        }
 
         $events = [];
         foreach ($collection->getItems() as $item) {
@@ -214,6 +220,30 @@ class EventQueue
                 ),
             ]
         );
+    }
+
+    /**
+     * Give claimed rows back as they were (PRO-2466): pending, unclaimed, no
+     * attempt spent — the handler may not send them now through no fault of
+     * theirs. What the handler set on the model is not saved.
+     *
+     * @param Event[] $events
+     */
+    public function release(array $events): void
+    {
+        if (!$events) {
+            return;
+        }
+
+        $connection = $this->resourceConnection->getConnection();
+        $connection->update(
+            $this->resourceConnection->getTableName(EventResource::TABLE_NAME),
+            ['status' => Event::STATUS_PENDING, 'claim_token' => null],
+            ['id IN (?)' => array_map(static fn (Event $event): int => (int)$event->getId(), $events)]
+        );
+        foreach ($events as $event) {
+            $event->setData('status', Event::STATUS_PENDING);
+        }
     }
 
     /**

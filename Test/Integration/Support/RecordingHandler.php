@@ -10,6 +10,9 @@ namespace Smaily\Connect\Test\Integration\Support;
 
 use Smaily\Connect\Api\Queue\EventHandlerInterface;
 use Smaily\Connect\Model\Queue\Event;
+use Smaily\Connect\Model\Queue\Failure;
+use Smaily\Connect\Model\Queue\Pending;
+use Smaily\Connect\Model\Queue\Skipped;
 
 /**
  * Scriptable queue event handler standing in for the real handlers (whose
@@ -19,7 +22,7 @@ use Smaily\Connect\Model\Queue\Event;
 class RecordingHandler implements EventHandlerInterface
 {
     /**
-     * @var callable(Event[]): array<int, true|string>
+     * @var callable(Event[]): array<int, true|string|\Throwable|Failure|Skipped|Pending>
      */
     private $responder;
 
@@ -29,7 +32,7 @@ class RecordingHandler implements EventHandlerInterface
     private $batches = [];
 
     /**
-     * @param callable(Event[]): array<int, true|string> $responder
+     * @param callable(Event[]): array<int, true|string|\Throwable|Failure|Skipped|Pending> $responder
      */
     public function __construct(callable $responder)
     {

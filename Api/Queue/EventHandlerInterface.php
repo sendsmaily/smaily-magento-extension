@@ -10,6 +10,7 @@ namespace Smaily\Connect\Api\Queue;
 
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\Failure;
+use Smaily\Connect\Model\Queue\Pending;
 use Smaily\Connect\Model\Queue\Skipped;
 
 /**
@@ -24,13 +25,15 @@ interface EventHandlerInterface
      * Process a batch of events.
      *
      * @param Event[] $events all of the same event type
-     * @return array<int, true|string|\Throwable|Failure|Skipped> map of
+     * @return array<int, true|string|\Throwable|Failure|Skipped|Pending> map of
      *         queue row ID to true on success, the client's exception itself
      *         for a failed send (its type says retry or stop, Failure::of()),
      *         a Failure for the handler's own verdict (Failure::permanent()
      *         for a row that can never be sent), Skipped for a row closed
-     *         without sending, or an error message for a failure that is
-     *         retryable but carries no response
+     *         without sending, Pending for a row to give back as it was
+     *         (it may not be sent now through no fault of its own), or an
+     *         error message for a failure that is retryable but carries no
+     *         response
      */
     public function handle(array $events): array;
 }

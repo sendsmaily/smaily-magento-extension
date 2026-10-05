@@ -39,6 +39,7 @@ use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
 use Smaily\Connect\Model\Queue\Handler\ContactSyncHandler;
 use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
 use Smaily\Connect\Model\Queue\HandlerPool;
+use Smaily\Connect\Model\Queue\Pending;
 use Smaily\Connect\Model\ResourceModel\Log\Collection;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
@@ -189,10 +190,66 @@ class FlushEventQueueTest extends IntegrationTestCase
         );
     }
 
-    private function identityMerge(\Throwable $failure): IdentityMergeHandler
+    /**
+     * PRO-2466: while Campaign Intelligence refuses the account, identity
+     * merge rows wait like the engine ingest rows: not claimed, no attempt
+     * spent, nothing written on them — and the contact sync beside them
+     * still goes out.
+     */
+    public function testIdentityMergeRowsWaitWhileTheAccountIsRefused(): void
+    {
+        $this->queue->enqueue(
+            EventType::ENGINE_IDENTITY_MERGE,
+            ['customer_email' => 'a@example.com', 'customer_external_id' => '42', 'store_id' => 1],
+            '42',
+            1,
+            'f-merge-waits'
+        );
+        $this->enqueueContact('f-contact-goes');
+
+        $this->runCron([
+            EventType::ENGINE_IDENTITY_MERGE => $this->identityMerge(new \LogicException('not called'), true),
+            'contact.sync' => $this->realContactSync([new Response(200, [], '{"code":101,"message":"OK"}')]),
+        ]);
+
+        $rows = array_column($this->fetchAll(EventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(Event::STATUS_SENT, $rows['f-contact-goes']['status']);
+        $merge = $rows['f-merge-waits'];
+        self::assertSame(Event::STATUS_PENDING, $merge['status']);
+        self::assertSame('0', (string)$merge['attempts']);
+        self::assertNull($merge['claim_token'], 'Never claimed');
+        self::assertNull($merge['last_error']);
+        self::assertNull($merge['next_retry_at']);
+    }
+
+    /**
+     * PRO-2466: a row a handler leaves pending mid-run (the merge that met
+     * the refusal) goes back as it was.
+     */
+    public function testARowLeftPendingGoesBackAsItWas(): void
+    {
+        $this->queue->enqueue('contact.sync', [], null, 0, 'f-left-pending');
+
+        $this->runCron(['contact.sync' => new RecordingHandler(
+            static fn (array $events): array => array_fill_keys(
+                array_map(static fn (Event $event): int => (int)$event->getId(), $events),
+                new Pending()
+            )
+        )]);
+
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_PENDING, $row['status']);
+        self::assertSame('0', (string)$row['attempts']);
+        self::assertNull($row['claim_token']);
+        self::assertNull($row['last_error']);
+        self::assertNull($row['next_retry_at']);
+    }
+
+    private function identityMerge(\Throwable $failure, bool $refused = false): IdentityMergeHandler
     {
         $settings = $this->createMock(EngineSettings::class);
         $settings->method('isConnected')->willReturn(true);
+        $settings->method('isRefused')->willReturn($refused);
         $client = $this->createMock(EngineClient::class);
         $client->method('identityMerge')->willThrowException($failure);
         $client->method('lastExchange')->willReturn([

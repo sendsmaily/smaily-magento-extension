@@ -11,6 +11,7 @@ namespace Smaily\Connect\Test\Unit\Cron;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Api\Queue\EventHandlerInterface;
+use Smaily\Connect\Api\Queue\PausableEventHandlerInterface;
 use Smaily\Connect\Cron\FlushEventQueue;
 use Smaily\Connect\Model\Client\Exception\RequestRefusedException;
 use Smaily\Connect\Model\Client\Exception\TransportException;
@@ -20,6 +21,7 @@ use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\HandlerPool;
+use Smaily\Connect\Model\Queue\Pending;
 use Smaily\Connect\Model\Queue\Skipped;
 use Smaily\Connect\Test\Unit\Support\StoreLocale;
 
@@ -191,6 +193,47 @@ class FlushEventQueueTest extends TestCase
         $this->eventQueue->expects(self::never())->method('markFailed');
 
         $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
+    }
+
+    /**
+     * PRO-2466: a row the handler leaves pending goes back as it was — no
+     * attempt spent, nothing recorded.
+     */
+    public function testARowLeftPendingIsReleasedAsItWas(): void
+    {
+        $waiting = $this->createEvent(1, 'engine.identity_merge');
+        $sent = $this->createEvent(2, 'engine.identity_merge');
+        $this->eventQueue->method('claimBatch')->willReturn([$waiting, $sent]);
+
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willReturn([1 => new Pending(), 2 => true]);
+
+        $this->eventQueue->expects(self::once())->method('release')->with([$waiting]);
+        $this->eventQueue->expects(self::once())->method('markSent')->with($sent);
+        $this->eventQueue->expects(self::never())->method('markFailed');
+
+        $this->createCron(new HandlerPool(['engine.identity_merge' => $handler]))->execute();
+    }
+
+    /**
+     * PRO-2466: the rows of a handler that cannot send now are not claimed,
+     * so they wait without crowding out the rows that can go.
+     */
+    public function testThePausedHandlersRowsAreNotClaimed(): void
+    {
+        $paused = $this->createMock(PausableEventHandlerInterface::class);
+        $paused->method('isPaused')->willReturn(true);
+        $active = $this->createMock(PausableEventHandlerInterface::class);
+        $active->method('isPaused')->willReturn(false);
+
+        $this->eventQueue->expects(self::once())->method('claimBatch')
+            ->with(200, ['engine.identity_merge'])->willReturn([]);
+
+        $this->createCron(new HandlerPool([
+            'contact.sync' => $this->createMock(EventHandlerInterface::class),
+            'engine.identity_merge' => $paused,
+            'engine.profiling_consent' => $active,
+        ]))->execute();
     }
 
     public function testMissingResultIsAFailure(): void

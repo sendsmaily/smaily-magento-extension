@@ -68,6 +68,9 @@ class Settings
      * Has the engine refused this account outright? Recorded by Engine\Client
      * on a `403 tenant_inactive`, cleared by the next authenticated call that
      * succeeds (the health-check ping, or the admin's "Check again").
+     * It can change within a request — an engine call records or clears it.
+     *
+     * @phpstan-impure
      */
     public function isRefused(): bool
     {

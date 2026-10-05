@@ -8,7 +8,8 @@
 _Last updated: 2026-10-05 — PRO-3749 (a Smaily HTTP error shows Smaily's
 answer in the Log's error column), PRO-2465 (the GDPR command and the
 Campaign Intelligence automations form respect a refused account), PRO-1961
-(one seam for terminal failures in the marketing queue). 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
+(one seam for terminal failures in the marketing queue), PRO-2466
+(identity-merge rows wait while the account is refused). 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
 land on v3: PRO-2508 (the Log's error column describes rejected Smaily
 credentials in the extension's own sentence, on purpose; docs only),
 PRO-2509 (the Log's Last Error filter matches the text the column shows),
@@ -138,6 +139,36 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-2466 — identity-merge rows wait while Campaign Intelligence
+  refuses the account (2026-10-05; CHANGELOG bullet under "Changes since
+  3.0.0-rc6").** They travel through the marketing queue, whose handlers
+  could only succeed or fail, so under the remembered `403
+  tenant_inactive` (PRO-2451) each failed with "Campaign Intelligence
+  account is not active" and burned its five attempts. Two parts, both
+  needed: (1) a "leave pending" outcome — `Model\Queue\Pending` in the
+  handler contract; `FlushEventQueue` gives such rows back with the new
+  `EventQueue::release()` (pending, claim token cleared, attempts, error,
+  retry time and exchange untouched — what the handler set on the model
+  is not saved), the shape of `IngestQueue::release()`;
+  `IdentityMergeHandler` answers it for every row while refused and for
+  the merge whose 403 records the refusal. (2) The rows are not claimed
+  while refused: the new `Api\Queue\PausableEventHandlerInterface`
+  (`isPaused()`), `HandlerPool::pausedEventTypes()`, and
+  `EventQueue::claimBatch($limit, $exceptTypes)`. Without (2), released
+  rows are re-claimed every minute oldest-first, so a refusal's backlog
+  of 200+ merges would fill every batch and stop the contact syncs.
+  `Engine\Settings::isRefused()` is marked `@phpstan-impure` (it changes
+  mid-request when an engine call records the refusal). Retry ladder
+  unchanged (PRO-1800). Unit: `IdentityMergeHandlerTest` (refused → Pending
+  and paused; the merge that meets the refusal → Pending),
+  `FlushEventQueueTest` (Pending released, paused types not claimed) — red
+  before. Integration (`FlushEventQueueTest`, real DB): while refused the
+  merge row stays pending, unclaimed, attempts 0, no error, while the
+  contact sync beside it is sent; a Pending row goes back as it was. Not
+  done: the profiling-consent rows (PRO-3578) still fail under a refusal
+  the same way (FOLLOW-UP for the orchestrator). ARCHITECTURE (identity
+  merge).
 
 - **PRO-1961 — one seam for terminal failures in the marketing event
   queue (2026-10-05; CHANGELOG bullet under "Changes since 3.0.0-rc6").**

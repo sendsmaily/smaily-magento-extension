@@ -931,7 +931,16 @@ or a subscription Smaily's consent mirror writes counts too.
   `isAllowed()` (at the customer's store view, whose Smaily account holds
   the contact) before each merge; an opted-out shopper's row is closed
   without a call as `Queue\Skipped`, so their browsing stays anonymous. Asked on the cron, not
-  in the login observer, so a login never waits on a Smaily read.
+  in the login observer, so a login never waits on a Smaily read. While
+  Campaign Intelligence refuses the account (PRO-2451) its rows wait, as
+  the ingest rows do (PRO-2466): the handler is an
+  `Api\Queue\PausableEventHandlerInterface`, so `FlushEventQueue` does
+  not claim its rows (`HandlerPool::pausedEventTypes()` →
+  `EventQueue::claimBatch(…, $exceptTypes)`), and a row that meets the
+  refusal mid-run is answered `Queue\Pending` and given back as it was
+  (`EventQueue::release()`: pending, unclaimed, no attempt spent). Not
+  claiming them, rather than claiming and releasing, keeps a long refusal's
+  backlog from filling every batch ahead of the contact syncs.
 
 ## Admin UI
 

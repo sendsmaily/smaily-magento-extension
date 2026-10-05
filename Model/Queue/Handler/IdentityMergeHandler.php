@@ -10,7 +10,7 @@ namespace Smaily\Connect\Model\Queue\Handler;
 
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Framework\Exception\LocalizedException;
-use Smaily\Connect\Api\Queue\EventHandlerInterface;
+use Smaily\Connect\Api\Queue\PausableEventHandlerInterface;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Settings;
@@ -18,6 +18,7 @@ use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\Failure;
+use Smaily\Connect\Model\Queue\Pending;
 use Smaily\Connect\Model\Queue\Skipped;
 
 /**
@@ -28,8 +29,12 @@ use Smaily\Connect\Model\Queue\Skipped;
  * address is the profiling they said no to. Asked here, on the cron, rather
  * than at login, so the login never waits on a Smaily read. Such a row is
  * closed as Skipped with the reason, never as delivered (PRO-3634).
+ *
+ * While Campaign Intelligence refuses the account (PRO-2451) the rows wait,
+ * as the engine ingest rows do (PRO-2466): the queue does not claim them
+ * (isPaused()), and a row that meets the refusal goes back as it was.
  */
-class IdentityMergeHandler implements EventHandlerInterface
+class IdentityMergeHandler implements PausableEventHandlerInterface
 {
     public const SKIPPED_OPTED_OUT = 'Skipped: the shopper opted out of personalized recommendations,'
         . ' so their browsing is not linked to their address. Nothing was sent.';
@@ -52,7 +57,12 @@ class IdentityMergeHandler implements EventHandlerInterface
         $results = [];
         foreach ($events as $event) {
             $id = (int)$event->getId();
-            // Asked per row: a refusal (a 403 on one row) stops the rest.
+            // Asked per row: a refusal (a 403 on one row) stops the rest,
+            // and the rows wait for the account (PRO-2466).
+            if ($this->settings->isRefused()) {
+                $results[$id] = new Pending();
+                continue;
+            }
             $blocked = $this->settings->sendingBlockedReason();
             if ($blocked !== null) {
                 $results[$id] = $blocked;
@@ -82,8 +92,8 @@ class IdentityMergeHandler implements EventHandlerInterface
                 // Handed on whole: a 4xx refuses this payload and stops on
                 // the first attempt, an outage takes the ladder (PRO-1961).
                 // The account refusal (contract §2 `403 tenant_inactive`) is
-                // not this row's fault, so it stays on the ladder.
-                $results[$id] = $this->settings->isRefused() ? $exception->getMessage() : $exception;
+                // not this row's fault: it waits (PRO-2466).
+                $results[$id] = $this->settings->isRefused() ? new Pending() : $exception;
             }
 
             $exchange = $this->client->lastExchange();
@@ -93,6 +103,15 @@ class IdentityMergeHandler implements EventHandlerInterface
         }
 
         return $results;
+    }
+
+    /**
+     * While Campaign Intelligence refuses the account, the rows wait
+     * unclaimed (PRO-2466).
+     */
+    public function isPaused(): bool
+    {
+        return $this->settings->isRefused();
     }
 
     /**

@@ -181,16 +181,17 @@ class SmailyClient
             $response = $this->getHttpClient()->request($method, $uri, $options);
         } catch (BadResponseException $exception) {
             $status = $exception->getResponse()->getStatusCode();
-            $this->lastExchange['response'] = ExchangeResponse::of(
-                $status,
-                (string)$exception->getResponse()->getBody()
-            );
+            // The answer is read and decoded once, for the exchange and for
+            // what the error says.
+            $body = (string)$exception->getResponse()->getBody();
+            $decoded = json_decode($body, true);
+            $this->lastExchange['response'] = ExchangeResponse::ofDecoded($status, $body, $decoded);
             $this->logger->error('Smaily API HTTP error', [
                 'method' => $method,
                 'endpoint' => $uri,
                 'status' => $status,
             ]);
-            if ($this->isPlanBlocked($exception->getResponse())) {
+            if ($this->isPlanBlocked($decoded)) {
                 // Smaily answers this before it checks the credentials: they
                 // are not refused, the package is (PRO-3579).
                 $this->verifiedCredentials->planBlocked($this->subdomain, $this->username, $this->password);
@@ -215,7 +216,7 @@ class SmailyClient
             }
             // Smaily's answer goes with the status, as the engine client's
             // does, so the Log's error column says what Smaily said (PRO-3749).
-            $answer = $this->answerOf($exception->getResponse());
+            $answer = $this->answerOf($body, $decoded);
             $message = $answer === ''
                 ? __('Smaily API request failed with HTTP %1', $status)
                 : __('Smaily API request failed with HTTP %1: %2', $status, $answer);
@@ -275,11 +276,11 @@ class SmailyClient
 
     /**
      * Smaily code 227 in an error response body: "A paid package is required".
+     *
+     * @param mixed $decoded the decoded body
      */
-    private function isPlanBlocked(ResponseInterface $response): bool
+    private function isPlanBlocked(mixed $decoded): bool
     {
-        $decoded = json_decode((string)$response->getBody(), true);
-
         return is_array($decoded)
             && isset($decoded['code'])
             && (int)$decoded['code'] === PlanBlockedException::SMAILY_CODE;
@@ -291,11 +292,11 @@ class SmailyClient
      * error page), cut to MAX_ANSWER_LENGTH. '' when there is nothing to
      * quote — a JSON answer without a message included, which stays whole
      * in the exchange for the Details drawer.
+     *
+     * @param mixed $decoded $body decoded
      */
-    private function answerOf(ResponseInterface $response): string
+    private function answerOf(string $body, mixed $decoded): string
     {
-        $body = (string)$response->getBody();
-        $decoded = json_decode($body, true);
         if (is_array($decoded)) {
             $body = isset($decoded['message']) && is_scalar($decoded['message']) ? (string)$decoded['message'] : '';
         }

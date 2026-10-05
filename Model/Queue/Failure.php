@@ -39,6 +39,15 @@ use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
  */
 class Failure
 {
+    /**
+     * The failure class a permanent refusal's reason starts with,
+     * `permanent_<http|envelope>_<code>`, followed by `: ` and the message.
+     * A regular expression body that PCRE and MySQL's REGEXP read alike: the
+     * Log strips the class for display (Model\Log\FailureMessage) and in its
+     * error filter (Log\Collection).
+     */
+    public const CLASS_REGEX = 'permanent_(http|envelope)_[0-9]+';
+
     private function __construct(
         public readonly string $reason,
         public readonly bool $permanent,
@@ -62,12 +71,20 @@ class Failure
     {
         $message = $failure instanceof SmailyClientException ? $failure->getSourceMessage() : $failure->getMessage();
         if ($failure instanceof RequestRefusedException || $failure instanceof EngineRequestException) {
-            return self::permanent(sprintf('permanent_http_%d: %s', $failure->getHttpStatus(), $message));
+            return self::refused('http', $failure->getHttpStatus(), $message);
         }
         if ($failure instanceof ApiException && $failure->isPermanent()) {
-            return self::permanent(sprintf('permanent_envelope_%d: %s', $failure->getSmailyCode(), $message));
+            return self::refused('envelope', $failure->getSmailyCode(), $message);
         }
 
         return new self($message, false, $failure instanceof TransportException ? $failure->getRetryAfter() : null);
+    }
+
+    /**
+     * A refusal parked on the spot, its reason prefixed with its class (CLASS_REGEX).
+     */
+    private static function refused(string $kind, int $code, string $message): self
+    {
+        return self::permanent(sprintf('permanent_%s_%d: %s', $kind, $code, $message));
     }
 }

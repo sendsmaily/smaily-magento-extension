@@ -12,6 +12,7 @@ use Smaily\Connect\Cron\AbandonedCart;
 use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
 use Smaily\Connect\Model\Queue\Handler\ContactSyncHandler;
 use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
+use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\Handler\ProfilingConsentHandler;
 
 /**
@@ -65,7 +66,15 @@ class FailureMessage
      * What Model\Queue\Failure prepends to a refusal it parked on the spot. The Log
      * grid's error filter strips it the same way, in SQL (Log\Collection).
      */
-    private const CLASS_PATTERN = '/^(permanent_(?:http|envelope)_\d+):\s*/';
+    private const CLASS_PATTERN = '/^(' . Failure::CLASS_REGEX . '):\s*/';
+
+    /**
+     * Each TRANSLATED source with the pattern that reads a stored message
+     * as it, and the SQL LIKE pattern that finds it stored, built once.
+     *
+     * @var array<string, array{0: string, 1: string}>|null
+     */
+    private ?array $sources = null;
 
     public function __construct(
         private readonly PayloadRedactor $redactor
@@ -108,17 +117,14 @@ class FailureMessage
     public function storedPatternsShowing(string $term): array
     {
         $patterns = [];
-        foreach ($term === '' ? [] : self::TRANSLATED as $source) {
+        foreach ($term === '' ? [] : $this->sources() as $source => [, $stored]) {
             $translated = (string)__($source);
             if ($translated === $source) {
                 continue;
             }
             foreach ((array)preg_split('/%\d+/', $translated) as $wording) {
                 if (mb_stripos((string)$wording, $term) !== false) {
-                    $patterns[] = implode('%', array_map(
-                        static fn ($part): string => addcslashes((string)$part, '%_\\'),
-                        (array)preg_split('/%\d+/', $source)
-                    ));
+                    $patterns[] = $stored;
                     break;
                 }
             }
@@ -129,13 +135,33 @@ class FailureMessage
 
     private function translate(string $message): string
     {
-        foreach (self::TRANSLATED as $source) {
-            $pattern = '/^' . preg_replace('/%\d+/', '(.*?)', preg_quote($source, '/')) . '$/su';
+        foreach ($this->sources() as $source => [$pattern]) {
             if (preg_match($pattern, $message, $matches)) {
                 return (string)__($source, ...array_slice($matches, 1));
             }
         }
 
         return $message;
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    private function sources(): array
+    {
+        if ($this->sources === null) {
+            $this->sources = [];
+            foreach (self::TRANSLATED as $source) {
+                $this->sources[$source] = [
+                    '/^' . preg_replace('/%\d+/', '(.*?)', preg_quote($source, '/')) . '$/su',
+                    implode('%', array_map(
+                        static fn ($part): string => addcslashes((string)$part, '%_\\'),
+                        (array)preg_split('/%\d+/', $source)
+                    )),
+                ];
+            }
+        }
+
+        return $this->sources;
     }
 }

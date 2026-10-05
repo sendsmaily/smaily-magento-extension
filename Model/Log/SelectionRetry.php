@@ -53,7 +53,7 @@ class SelectionRetry
             ->columns('log_id', 'main_table')
             ->where('main_table.status = ?', Event::STATUS_FAILED);
 
-        $totals = [0, 0];
+        $outcomes = [];
         $batches = [Collection::SOURCE_SMAILY => [], Collection::SOURCE_INTELLIGENCE => []];
         $statement = $selection->getConnection()->query($select);
         while (($logId = $statement->fetchColumn()) !== false) {
@@ -63,26 +63,25 @@ class SelectionRetry
             }
             $batches[$source][] = $id;
             if (count($batches[$source]) === self::BATCH_SIZE) {
-                $totals = $this->retryBatch($source, $batches[$source], $totals);
+                $outcomes[] = $this->retryBatch($source, $batches[$source]);
                 $batches[$source] = [];
             }
         }
         foreach ($batches as $source => $ids) {
-            $totals = $this->retryBatch($source, $ids, $totals);
+            $outcomes[] = $this->retryBatch($source, $ids);
         }
 
-        return $totals;
+        return [(int)array_sum(array_column($outcomes, 0)), (int)array_sum(array_column($outcomes, 1))];
     }
 
     /**
      * @param int[] $ids failed rows of one queue
-     * @param array{0: int, 1: int} $totals
-     * @return array{0: int, 1: int}
+     * @return array{0: int, 1: int} rows of the batch queued for retry, rows the guard refused
      */
-    private function retryBatch(string $source, array $ids, array $totals): array
+    private function retryBatch(string $source, array $ids): array
     {
         if (!$ids) {
-            return $totals;
+            return [0, 0];
         }
 
         $refused = $this->resendGuard->refusalReasons($source, $this->rowLoader->loadFailed($source, $ids));
@@ -91,6 +90,6 @@ class SelectionRetry
             ? $this->eventQueue->retry($retry)
             : $this->ingestQueue->retry($retry);
 
-        return [$totals[0] + $retried, $totals[1] + count($refused)];
+        return [$retried, count($refused)];
     }
 }

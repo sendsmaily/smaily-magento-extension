@@ -86,7 +86,8 @@ The admin screens that save through the browser are checked the same way,
 from their real templates. `Test/Js/render-admin.php` (run by
 `bin/test-js.sh` first) renders each template in en_US and et_EE as Magento
 does — Magento's Escaper, `__()` translated with `i18n/<locale>.csv`, a view
-model with fixed data — into `Test/Js/build/` (not committed; a file it
+model with fixed data, and a child template the template renders with
+`$block->fetchView()` — into `Test/Js/build/` (not committed; a file it
 cannot write stops the run, so no page reads an older build), and the page
 loads the result with jQuery from `vendor/` (the copy PHPUnit's coverage
 report ships; the module's dev install has no Magento `lib/web`).

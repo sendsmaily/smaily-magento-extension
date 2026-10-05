@@ -8,8 +8,6 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Client\Exception;
 
-use Magento\Framework\Phrase;
-
 /**
  * Smaily refused this request: an HTTP 4xx other than 429. Retrying the same
  * request cannot change the answer (revoked credentials, a deleted workflow,
@@ -19,19 +17,5 @@ use Magento\Framework\Phrase;
  */
 class RequestRefusedException extends SmailyClientException
 {
-    public function __construct(
-        string|Phrase $message,
-        private readonly int $httpStatus,
-        ?\Throwable $previous = null
-    ) {
-        parent::__construct($message, $httpStatus, $previous);
-    }
-
-    /**
-     * HTTP status code of the refusal.
-     */
-    public function getHttpStatus(): int
-    {
-        return $this->httpStatus;
-    }
+    use HttpStatusCode;
 }

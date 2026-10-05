@@ -31,9 +31,8 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
     <div class="smaily-banner smaily-banner--error" id="smaily-engine-automations-refused">
         <span class="smaily-banner__icon">&#9888;</span>
         <div class="smaily-banner__body">
-            <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('Your Campaign Intelligence account is not active')) ?></div>
-            <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Campaign Intelligence has stopped accepting data from this store, so product, customer and order data is no longer being sent and recommendations will go stale. Waiting will not fix it — the account has to be made active again on the Smaily side. Your Smaily email sending is unaffected; everything queued here waits and is sent once the account is active.')) ?></div>
-            <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Your Campaign Intelligence account is not active, so its automations cannot be read or saved. Once Smaily tells you the account is active, press Check again under Settings > Intelligence.')) ?></div>
+            <?= /* @noEscape */ $block->fetchView($block->getTemplateFile('Smaily_Connect::engine-refused-banner.phtml')) ?>
+            <div class="smaily-banner__message"><?= $escaper->escapeHtml(\Smaily\Connect\ViewModel\Adminhtml\AutomationsForm::refusedMessage()) ?></div>
         </div>
     </div>
 <?php else: ?>

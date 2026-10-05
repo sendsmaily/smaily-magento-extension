@@ -63,14 +63,11 @@ class ProfilingConsentHandler implements PausableEventHandlerInterface
         foreach ($events as $event) {
             $id = (int)$event->getId();
             // Asked per row: a refusal (a 403 on one row) stops the rest,
-            // and the rows wait for the account (PRO-3752).
-            if ($this->settings->isRefused()) {
-                $results[$id] = new Pending();
-                continue;
-            }
+            // and the rows wait for the account (PRO-3752); not connected, the
+            // row says why.
             $blocked = $this->settings->sendingBlockedReason();
             if ($blocked !== null) {
-                $results[$id] = $blocked;
+                $results[$id] = $this->settings->isRefused() ? new Pending() : $blocked;
                 continue;
             }
 

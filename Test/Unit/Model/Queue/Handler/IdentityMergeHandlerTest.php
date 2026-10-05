@@ -200,6 +200,9 @@ class IdentityMergeHandlerTest extends TestCase
         $settings->method('isRefused')->willReturnCallback(static function () use (&$refused): bool {
             return $refused;
         });
+        $settings->method('sendingBlockedReason')->willReturnCallback(static function () use (&$refused): ?string {
+            return $refused ? 'Campaign Intelligence account is not active' : null;
+        });
 
         return new IdentityMergeHandler(
             $settings,

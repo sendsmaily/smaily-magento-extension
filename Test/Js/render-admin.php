@@ -28,37 +28,6 @@ use Smaily\Connect\Test\Unit\Support\StoreLocale;
 $root = dirname(__DIR__, 2);
 require $root . '/vendor/autoload.php';
 
-/**
- * The template's $block: the view model, the block's other data and an admin URL.
- */
-$block = static fn (object $viewModel, array $data = []): object => new class ($viewModel, $data) {
-    /**
-     * @param object $viewModel
-     * @param array<string, mixed> $data
-     */
-    public function __construct(private readonly object $viewModel, private readonly array $data)
-    {
-    }
-
-    /**
-     * @param string $key
-     * @return mixed
-     */
-    public function getData(string $key)
-    {
-        return $key === 'view_model' ? $this->viewModel : ($this->data[$key] ?? null);
-    }
-
-    /**
-     * @param string $route
-     * @return string
-     */
-    public function getUrl(string $route): string
-    {
-        return 'https://store.example/admin/' . $route . '/';
-    }
-};
-
 // Magento's Escaper without an object manager: its two helpers set directly.
 $escaper = new Escaper();
 (new ReflectionProperty(Escaper::class, 'escaper'))->setValue($escaper, new ZendEscaper());
@@ -98,6 +67,67 @@ $escaper = new Escaper();
         throw new LogicException('The admin pages are rendered without inline translation.');
     }
 });
+
+/**
+ * The template's $block: the view model, the block's other data, an admin URL
+ * and a child template rendered the way Magento's Template block renders one.
+ */
+$block = static fn (object $viewModel, array $data = []): object => new class ($viewModel, $data, $escaper, $root) {
+    /**
+     * @param object $viewModel
+     * @param array<string, mixed> $data
+     * @param Escaper $escaper
+     * @param string $root
+     */
+    public function __construct(
+        private readonly object $viewModel,
+        private readonly array $data,
+        private readonly Escaper $escaper,
+        private readonly string $root
+    ) {
+    }
+
+    /**
+     * @param string $template a module template id, Smaily_Connect::<path>
+     * @return string
+     */
+    public function getTemplateFile(string $template): string
+    {
+        return $this->root . '/view/adminhtml/templates/' . explode('::', $template, 2)[1];
+    }
+
+    /**
+     * @param string $fileName
+     * @return string
+     */
+    public function fetchView(string $fileName): string
+    {
+        $block = $this;
+        $escaper = $this->escaper;
+        ob_start();
+        include $fileName;
+
+        return (string)ob_get_clean();
+    }
+
+    /**
+     * @param string $key
+     * @return mixed
+     */
+    public function getData(string $key)
+    {
+        return $key === 'view_model' ? $this->viewModel : ($this->data[$key] ?? null);
+    }
+
+    /**
+     * @param string $route
+     * @return string
+     */
+    public function getUrl(string $route): string
+    {
+        return 'https://store.example/admin/' . $route . '/';
+    }
+};
 
 /*
  * The Automations tab (view/adminhtml/templates/config/engine-automations.phtml)

@@ -207,19 +207,13 @@ class EventQueue
      */
     public function requeueStale(int $olderThanSeconds = 900): int
     {
-        $connection = $this->resourceConnection->getConnection();
-
-        return $connection->update(
-            $this->resourceConnection->getTableName(EventResource::TABLE_NAME),
-            ['status' => Event::STATUS_PENDING, 'claim_token' => null],
-            [
-                'status = ?' => Event::STATUS_SENDING,
-                'claimed_at < ?' => $this->dateTime->gmtDate(
-                    'Y-m-d H:i:s',
-                    $this->dateTime->gmtTimestamp() - $olderThanSeconds
-                ),
-            ]
-        );
+        return $this->unclaim([
+            'status = ?' => Event::STATUS_SENDING,
+            'claimed_at < ?' => $this->dateTime->gmtDate(
+                'Y-m-d H:i:s',
+                $this->dateTime->gmtTimestamp() - $olderThanSeconds
+            ),
+        ]);
     }
 
     /**
@@ -235,15 +229,25 @@ class EventQueue
             return;
         }
 
-        $connection = $this->resourceConnection->getConnection();
-        $connection->update(
-            $this->resourceConnection->getTableName(EventResource::TABLE_NAME),
-            ['status' => Event::STATUS_PENDING, 'claim_token' => null],
-            ['id IN (?)' => array_map(static fn (Event $event): int => (int)$event->getId(), $events)]
-        );
+        $this->unclaim(['id IN (?)' => array_map(static fn (Event $event): int => (int)$event->getId(), $events)]);
         foreach ($events as $event) {
             $event->setData('status', Event::STATUS_PENDING);
         }
+    }
+
+    /**
+     * Turn the rows $where names pending and unclaimed again.
+     *
+     * @param array<string, mixed> $where
+     * @return int rows changed
+     */
+    private function unclaim(array $where): int
+    {
+        return $this->resourceConnection->getConnection()->update(
+            $this->resourceConnection->getTableName(EventResource::TABLE_NAME),
+            ['status' => Event::STATUS_PENDING, 'claim_token' => null],
+            $where
+        );
     }
 
     /**

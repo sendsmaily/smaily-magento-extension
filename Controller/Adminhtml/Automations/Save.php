@@ -22,6 +22,7 @@ use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\ViewModel\Adminhtml\AutomationsForm;
 
 /**
  * Persists engine automation configuration (contract §13). Every row carries
@@ -84,10 +85,7 @@ class Save extends Action implements HttpPostActionInterface
         // (PRO-2451): explain the refusal as Settings > Intelligence does
         // instead of quoting the engine's 403 (PRO-2465).
         if ($this->settings->isRefused()) {
-            $errors[] = (string)__(
-                'Your Campaign Intelligence account is not active, so its automations cannot be read or saved.'
-                . ' Once Smaily tells you the account is active, press Check again under Settings > Intelligence.'
-            );
+            $errors[] = (string)AutomationsForm::refusedMessage();
             $this->messageManager->addErrorMessage($errors[0]);
 
             return false;

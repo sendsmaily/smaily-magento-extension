@@ -12,7 +12,8 @@ Campaign Intelligence automations form respect a refused account), PRO-1961
 (identity-merge rows wait while the account is refused), PRO-1962 (a
 Smaily "invalid data" envelope fails on the first attempt), PRO-3752 (a
 shopper's profiling choice waits while the account is refused; an engine
-refusal of it fails on the first attempt). 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
+refusal of it fails on the first attempt), then a behaviour-neutral
+simplification pass over them. 2026-10-04 — after rc6, the Event Log leftovers of PRO-2454
 land on v3: PRO-2508 (the Log's error column describes rejected Smaily
 credentials in the extension's own sentence, on purpose; docs only),
 PRO-2509 (the Log's Last Error filter matches the text the column shows),
@@ -142,6 +143,29 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **Simplification pass, behaviour-neutral (2026-10-05)**, over PRO-2509,
+  PRO-2510, PRO-3749, PRO-2465, PRO-1961, PRO-2466, PRO-1962 and PRO-3752.
+  `Queue\Failure::CLASS_REGEX` is the one shape of the
+  `permanent_<http|envelope>_<code>:` prefix (Failure writes it,
+  `Log\FailureMessage` and the Log filter's SQL REGEXP read it);
+  FailureMessage builds its translation patterns once per instance; the
+  Smaily client reads and decodes an HTTP error's body once
+  (`ExchangeResponse::ofDecoded()`); `SelectionRetry::retryBatch()` returns
+  its own counts; `AutomationsForm::refusedMessage()` is the Automations
+  tab's refused sentence for the tab and its save, and
+  `engine-refused-banner.phtml` the refused-account banner's title and
+  first line for Settings > Intelligence and the Automations tab; the
+  identity-merge and profiling-consent handlers ask
+  `sendingBlockedReason()` once per row; the Smaily client's HTTP
+  exceptions read their status from the code (`HttpStatusCode` trait);
+  `EventQueue::unclaim()` serves `release()` and `requeueStale()`. Left as
+  they were: the Log filter still writes its shown-error expression once
+  per LIKE (a derived-table column, measured on 200,000 rows, doubled every
+  unfiltered grid read and would have carried the unredacted error to the
+  browser); the mass retry still re-reads each batch through
+  `QueueRowLoader::loadFailed()` (its integration test records those
+  calls); the Dashboard keeps its verdict sentence (it has no banner).
 
 - **PRO-3752 — a shopper's profiling choice waits while Campaign
   Intelligence refuses the account (2026-10-05; owner-approved design;

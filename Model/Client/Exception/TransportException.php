@@ -17,21 +17,18 @@ use Magento\Framework\Phrase;
  */
 class TransportException extends SmailyClientException
 {
+    use HttpStatusCode;
+
+    /**
+     * @param int $httpStatus HTTP status code of the failed response, 0 for pure network failures
+     */
     public function __construct(
         string|Phrase $message,
-        private readonly int $httpStatus = 0,
+        int $httpStatus = 0,
         ?\Throwable $previous = null,
         private readonly ?int $retryAfter = null
     ) {
         parent::__construct($message, $httpStatus, $previous);
-    }
-
-    /**
-     * HTTP status code of the failed response, 0 for pure network failures.
-     */
-    public function getHttpStatus(): int
-    {
-        return $this->httpStatus;
     }
 
     /**

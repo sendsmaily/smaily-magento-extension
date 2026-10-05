@@ -1,0 +1,17 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * The title and the first line of the refused-account banner (PRO-2451):
+ * Campaign Intelligence refuses the account. Rendered inside the banner's
+ * body by Settings > Intelligence (panel/intelligence.phtml) and the
+ * Automations tab (config/engine-automations.phtml), which add their own
+ * lines after it.
+ *
+ * @var \Magento\Framework\View\Element\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+?>
+<div class="smaily-banner__title"><?= $escaper->escapeHtml(__('Your Campaign Intelligence account is not active')) ?></div>
+<div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Campaign Intelligence has stopped accepting data from this store, so product, customer and order data is no longer being sent and recommendations will go stale. Waiting will not fix it — the account has to be made active again on the Smaily side. Your Smaily email sending is unaffected; everything queued here waits and is sent once the account is active.')) ?></div>

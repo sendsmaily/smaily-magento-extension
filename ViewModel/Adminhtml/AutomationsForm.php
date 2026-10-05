@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\ViewModel\Adminhtml;
 
 use Magento\Framework\Locale\ResolverInterface as LocaleResolver;
+use Magento\Framework\Phrase;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
@@ -49,6 +50,18 @@ class AutomationsForm implements ArgumentInterface
     public function isEngineRefused(): bool
     {
         return $this->settings->isRefused();
+    }
+
+    /**
+     * What the tab says while the account is refused, and what a save then
+     * answers (Controller\Adminhtml\Automations\Save).
+     */
+    public static function refusedMessage(): Phrase
+    {
+        return __(
+            'Your Campaign Intelligence account is not active, so its automations cannot be read or saved.'
+            . ' Once Smaily tells you the account is active, press Check again under Settings > Intelligence.'
+        );
     }
 
     public function getLoadError(): ?string

@@ -303,10 +303,12 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   the engine-bound backfills at `Cron/BackfillTick`'s router,
   `Controller/Relay/Index`, `Queue\Handler\IdentityMergeHandler`,
   and `Queue\Handler\ProfilingConsentHandler`. The
-  paths that loop re-ask only its refusal half once connectedness is proved —
-  per domain in the flusher (so one refusal ends the run) and per row in the
-  merge and profiling-consent handlers — because that is the half a mid-run
-  403 can change.
+  paths that loop re-ask it as they go, because a mid-run 403 can change
+  its refusal half: the flusher only that half, per domain, once
+  connectedness is proved (so one refusal ends the run); the merge and
+  profiling-consent handlers per row (`Settings::sendingBlockedReason()`:
+  a refusal leaves the row `Queue\Pending`, not connected names the
+  reason).
   `isConnected()` stays the gate for everything that only enqueues, reads or
   displays, so live observers keep queueing and the store's history is intact
   when the account comes back. Rows a refusal met
@@ -498,7 +500,9 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   one value, and the flusher still sees the terminal `sent` row it wrote.
   The grid's error column and the Details drawer both show the server's own
   message through `Model\Log\FailureMessage` (`Queue\Failure`'s
-  `permanent_http_<code>:` prefix stripped, `PayloadRedactor` applied); the
+  `permanent_http_<code>:` prefix stripped — its shape is
+  `Failure::CLASS_REGEX`, which the SQL filter below reads too —
+  `PayloadRedactor` applied); the
   classification stays in the drawer. Deliberate exception (PRO-2508): a
   Smaily 401/403 stores the client's own sentence ("Smaily API credentials
   were rejected") instead of Smaily's body, because it names what to fix;

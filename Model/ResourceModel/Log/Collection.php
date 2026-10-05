@@ -18,6 +18,7 @@ use Psr\Log\LoggerInterface as Logger;
 use Smaily\Connect\Model\Log\FailureMessage;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 
@@ -130,7 +131,7 @@ class Collection extends SearchResult
         $like = (string)$condition['like'];
         // The grid's text filter sends "%<term>%" with % and _ escaped.
         $term = str_replace(['\\%', '\\_'], ['%', '_'], (string)preg_replace('/^%|%$/', '', $like));
-        $shown = 'CASE WHEN main_table.last_error REGEXP \'^permanent_(http|envelope)_[0-9]+:\''
+        $shown = 'CASE WHEN main_table.last_error REGEXP ' . $connection->quote('^' . Failure::CLASS_REGEX . ':')
             . ' THEN TRIM(LEADING \' \''
             . ' FROM SUBSTRING(main_table.last_error, LOCATE(\':\', main_table.last_error) + 1))'
             . ' ELSE main_table.last_error END';

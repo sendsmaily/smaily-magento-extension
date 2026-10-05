@@ -29,6 +29,7 @@ class ProfilingConsentHandlerTest extends TestCase
     private Client&MockObject $client;
     private ProfilingOptOuts&MockObject $optOuts;
     private bool $refused = false;
+    private ?string $notConnected = null;
 
     /** @var array<int, array<string, mixed>> */
     private array $payloads = [];
@@ -41,9 +42,11 @@ class ProfilingConsentHandlerTest extends TestCase
         $this->payloads = [];
         $this->recorded = [];
         $this->refused = false;
+        $this->notConnected = null;
         $this->settings = $this->createMock(Settings::class);
         $this->settings->method('isConnected')->willReturn(true);
         $this->settings->method('isRefused')->willReturnCallback(fn (): bool => $this->refused);
+        $this->settings->method('sendingBlockedReason')->willReturnCallback($this->sendingBlockedReason(...));
         $this->client = $this->createMock(Client::class);
         $this->optOuts = $this->createMock(ProfilingOptOuts::class);
     }
@@ -190,7 +193,7 @@ class ProfilingConsentHandlerTest extends TestCase
 
     public function testNothingIsSentWhileCampaignIntelligenceIsNotConnected(): void
     {
-        $this->settings->method('sendingBlockedReason')->willReturn('Campaign Intelligence is not connected');
+        $this->notConnected = 'Campaign Intelligence is not connected';
         $this->client->expects(self::never())->method('customerOptOut');
 
         $results = $this->handle(1, ['email' => 'person@example.com', 'opt_out' => true]);
@@ -243,5 +246,13 @@ class ProfilingConsentHandlerTest extends TestCase
             $this->optOuts,
             $this->createMock(Logger::class)
         );
+    }
+
+    /**
+     * Settings::sendingBlockedReason() for the state the test set.
+     */
+    private function sendingBlockedReason(): ?string
+    {
+        return $this->refused ? 'Campaign Intelligence account is not active' : $this->notConnected;
     }
 }

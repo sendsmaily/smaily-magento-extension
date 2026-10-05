@@ -23,8 +23,17 @@ class ExchangeResponse
      */
     public static function of(int $status, string $body): array
     {
-        $decoded = json_decode($body, true);
+        return self::ofDecoded($status, $body, json_decode($body, true));
+    }
 
+    /**
+     * The same for a body the caller has already decoded.
+     *
+     * @param mixed $decoded $body decoded
+     * @return array{http_status: int, body: mixed}
+     */
+    public static function ofDecoded(int $status, string $body, mixed $decoded): array
+    {
         return [
             'http_status' => $status,
             'body' => is_array($decoded) ? $decoded : mb_substr($body, 0, self::MAX_TEXT_LENGTH),

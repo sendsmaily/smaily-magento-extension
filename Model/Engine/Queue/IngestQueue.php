@@ -59,16 +59,55 @@ class IngestQueue
         ?int $storeId = null,
         ?string $eventUuid = null
     ): bool {
+        return $this->enqueueReturningId($domain, $payload, $entityId, $storeId, $eventUuid) !== null;
+    }
+
+    /**
+     * enqueue(), answering the new row's id (null when not queued), for a
+     * caller that may hand the row a newer payload later in the request
+     * (replacePendingPayload()).
+     *
+     * @param array<string, mixed> $payload
+     */
+    public function enqueueReturningId(
+        string $domain,
+        array $payload,
+        ?string $entityId = null,
+        ?int $storeId = null,
+        ?string $eventUuid = null
+    ): ?int {
         $event = $this->eventFactory->create();
         $event->addData($this->row($domain, $payload, $entityId, $storeId, $eventUuid));
 
         try {
             $this->eventResource->save($event);
         } catch (AlreadyExistsException) {
-            return false;
+            return null;
         }
 
-        return true;
+        return (int)$event->getId() ?: null;
+    }
+
+    /**
+     * Put a newer payload into a row queued earlier, instead of queuing a
+     * second row, while that row is still pending and was never tried: it
+     * has not reached the engine, so the engine gets only the newer payload
+     * (PRO-1955: one refund, one order row). False when the row is claimed,
+     * tried or gone — the caller queues a row of its own then.
+     *
+     * @param array<string, mixed> $payload
+     */
+    public function replacePendingPayload(int $id, array $payload): bool
+    {
+        return $this->resourceConnection->getConnection()->update(
+            $this->table(),
+            ['payload' => $this->serializer->serialize($payload)],
+            [
+                'id = ?' => $id,
+                'status = ?' => IngestEvent::STATUS_PENDING,
+                'attempts = ?' => 0,
+            ]
+        ) > 0;
     }
 
     /**

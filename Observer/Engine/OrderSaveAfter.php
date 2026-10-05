@@ -12,16 +12,17 @@ use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Sales\Model\Order;
 use Smaily\Connect\Model\Engine\AttributionManager;
-use Smaily\Connect\Model\Engine\Client;
-use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
-use Smaily\Connect\Model\Engine\Queue\IngestQueue;
+use Smaily\Connect\Model\Engine\OrderIngest;
 use Smaily\Connect\Model\Engine\Settings;
 
 /**
  * Order ingest on every order save whose state maps onto the engine enum, or
  * whose refunded total moved. Natural-key upsert engine-side
  * (external_order_id) makes repeated status saves safe; transient states
- * (hold, payment review) are skipped.
+ * (hold, payment review) are skipped. A new credit memo queues the order on
+ * its own save too (Plugin\Engine\CreditmemoSave, PRO-1955) — one that moves no
+ * money moves no refunded total — and OrderIngest makes one row of a
+ * refund's two saves.
  *
  * Recommendation attribution is captured here (not at place_after) because
  * the order entity_id only exists after the save; on the placement request
@@ -32,8 +33,7 @@ class OrderSaveAfter implements ObserverInterface
 {
     public function __construct(
         private readonly Settings $settings,
-        private readonly OrderPayloadBuilder $payloadBuilder,
-        private readonly IngestQueue $ingestQueue,
+        private readonly OrderIngest $orderIngest,
         private readonly AttributionManager $attributionManager
     ) {
     }
@@ -72,11 +72,6 @@ class OrderSaveAfter implements ObserverInterface
             return;
         }
 
-        $item = $this->payloadBuilder->build($order);
-        if ($item === null) {
-            return;
-        }
-
-        $this->ingestQueue->enqueue(Client::DOMAIN_ORDERS, $item, (string)$order->getIncrementId());
+        $this->orderIngest->enqueue($order);
     }
 }

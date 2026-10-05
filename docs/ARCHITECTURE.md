@@ -353,7 +353,28 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   neither reason field is sent, because Magento has no structured return
   taxonomy to map from. A partial credit memo leaves the order state alone,
   so `OrderSaveAfter`'s enqueue gate treats a moved `total_refunded` as a
-  change worth re-sending.
+  change worth re-sending. A credit memo that moves quantity and no money
+  (the return of a fully discounted line, or one with an adjustment that
+  cancels its money) moves neither, so the credit memo's own save queues
+  the order too (PRO-1955): `Plugin/Engine/CreditmemoSave`, an
+  after-plugin on the credit memo resource's `save()` — not the
+  `sales_order_creditmemo_save_after` event, which fires before the credit
+  memo's items, the rows the return is read from, are written — for a
+  credit memo created by that save (one loaded from the database carries
+  its original data). **One refund, one order row:** a refund saves the
+  credit memo and the order one after the other, and each queues the
+  order, in either order — the admin refund (`CreditmemoService`) saves the
+  credit memo first and closes a fully refunded order at the order save;
+  the REST refunds (`RefundOrder`, `RefundInvoice`) save the order first,
+  before the credit memo, so the row the order save queued carried no
+  `returned_at` until a later save. `Model\Engine\OrderIngest`, the one
+  place an order becomes an ingest row, collapses the two: the later build
+  replaces the payload of the row the earlier one queued while that row is
+  pending and untried (`IngestQueue::replacePendingPayload()`), and an
+  identical build queues nothing. Only builds next to each other for one
+  order, one of them a credit memo's, collapse; order saves without a
+  refund each queue their row, as before. The money gate stays: it is what
+  catches a refund's order save, which the collapse then folds in.
 - **A refused account stops every send path (PRO-2451).** Contract §2 answers
   `403 tenant_inactive` from every API-key-authenticated endpoint when the
   tenant is deactivated (operator suspension or a GDPR purge — the wire never

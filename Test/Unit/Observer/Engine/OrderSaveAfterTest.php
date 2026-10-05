@@ -15,6 +15,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\OrderIngest;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
@@ -39,7 +40,7 @@ class OrderSaveAfterTest extends TestCase
 
     public function testAPartialRefundEnqueuesEvenThoughTheStateDidNotMove(): void
     {
-        $this->queue->expects(self::once())->method('enqueue')
+        $this->queue->expects(self::once())->method('enqueueReturningId')
             ->with(Client::DOMAIN_ORDERS, ['external_order_id' => '100000042'], '100000042');
 
         $this->createObserver()->execute($this->observerFor($this->order(
@@ -52,7 +53,7 @@ class OrderSaveAfterTest extends TestCase
 
     public function testASaveThatChangesNeitherStateNorRefundedTotalIsANoOp(): void
     {
-        $this->queue->expects(self::never())->method('enqueue');
+        $this->queue->expects(self::never())->method('enqueueReturningId');
 
         $this->createObserver()->execute($this->observerFor($this->order(
             Order::STATE_PROCESSING,
@@ -64,7 +65,7 @@ class OrderSaveAfterTest extends TestCase
 
     public function testAStateChangeStillEnqueues(): void
     {
-        $this->queue->expects(self::once())->method('enqueue');
+        $this->queue->expects(self::once())->method('enqueueReturningId');
 
         $this->createObserver()->execute($this->observerFor($this->order(
             Order::STATE_PROCESSING,
@@ -81,8 +82,7 @@ class OrderSaveAfterTest extends TestCase
 
         return new OrderSaveAfter(
             $settings,
-            $this->payloadBuilder,
-            $this->queue,
+            new OrderIngest($this->payloadBuilder, $this->queue),
             $this->createMock(AttributionManager::class)
         );
     }

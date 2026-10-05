@@ -73,6 +73,15 @@
                 type="Smaily\Connect\Plugin\Engine\ProductImportBunch"/>
     </type>
 
+    <!-- A new credit memo → its order's ingest row (PRO-1955). On the
+         resource save, not the save_after event: that event fires before
+         the credit memo's items are written, and the return signal is read
+         from them. -->
+    <type name="Magento\Sales\Model\ResourceModel\Order\Creditmemo">
+        <plugin name="smaily_connect_engine_creditmemo_save"
+                type="Smaily\Connect\Plugin\Engine\CreditmemoSave"/>
+    </type>
+
     <!-- Backfill processors, keyed by "{job_type}:{target}". -->
     <type name="Smaily\Connect\Cron\BackfillTick">
         <arguments>

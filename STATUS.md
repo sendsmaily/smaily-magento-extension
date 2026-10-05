@@ -5,7 +5,9 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-05 — after rc7, PRO-1957 (the abandoned-cart
+_Last updated: 2026-10-05 — after rc7, PRO-1955 (a credit memo that moves
+no money queues its order with the return; one refund, one order row;
+unreleased); before it PRO-1957 (the abandoned-cart
 reminder writes `over_10_products` on every send, empty for 10 products or
 fewer; unreleased); before it a behaviour-neutral simplification
 pass over PRO-3760, PRO-3765, PRO-3768, PRO-3753 and PRO-3767; before it
@@ -200,6 +202,43 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-1955 — a zero-value credit memo queues its order (2026-10-05;
+  unreleased, after rc7).** `OrderSaveAfter` queued an order only when its
+  state or its `total_refunded` moved, but `items[].returned_at` comes from
+  the credit memos; a credit memo that moves quantity and no money moved
+  neither, so the return reached the engine only with a later, unrelated
+  save. Now `Plugin/Engine/CreditmemoSave` (after the credit memo
+  resource's `save()`; the `sales_order_creditmemo_save_after` event fires
+  before the memo's items are written — `VersionControl\AbstractDb::
+  processAfterSaves()`, verified in vendor) queues the order for a credit
+  memo created by that save (`getOrigData('entity_id') === null`).
+  **Dedupe (one refund → one order row):** the money gate stays; both
+  saves go through `Model\Engine\OrderIngest`, which collapses builds
+  next to each other for one order, one of them a credit memo's: an
+  identical build queues nothing, a different one replaces the payload of
+  the row the first queued while it is pending with 0 attempts
+  (`IngestQueue::replacePendingPayload()`), else (claimed meanwhile) a row
+  of its own. Order saves without a refund queue as before. Found on the
+  way (vendor read + sandbox): the REST refunds (`RefundOrder`,
+  `RefundInvoice`) save the order BEFORE the credit memo, so a REST refund's
+  order row had no `returned_at`; the credit memo's build now replaces it.
+  **Evidence:** sandbox, real credit memos through Magento's services
+  (`CreditmemoManagementInterface::refund()` offline,
+  `RefundOrderInterface::execute()` without notification), each in a
+  transaction rolled back (queue empty before and after; nothing flushed or
+  sent), on a complete sandbox order with one line: old code (HEAD
+  ecb8ae9, recompiled) → zero-value memo (grand total 0, `total_refunded`
+  null → 0, state unchanged): 0 rows; REST zero-value: 0 rows; REST full
+  refund: 1 row without `returned_at`. New code → zero-value: 1 row
+  `completed` with `returned_at`; REST zero-value: 1 row with
+  `returned_at`; money refund (state unchanged): 1 row; full refund
+  closing the order (admin and REST): 1 row `refunded` with `returned_at`.
+  Unit `OrderIngestTest` (both save orders, identical build, claimed row,
+  no-refund saves, another order), `CreditmemoSaveTest`,
+  `OrderSaveAfterTest`. DI changed (OrderSaveAfter, new plugin); sandbox
+  `setup:upgrade && setup:di:compile` OK. Docs: ARCHITECTURE, CHANGELOG
+  ("Changes since 3.0.0-rc7").
 
 - **PRO-1957 — the abandoned-cart `over_10_products` field no longer
   lingers from a larger cart (2026-10-05; unreleased, after rc7;

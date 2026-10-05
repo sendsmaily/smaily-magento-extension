@@ -27,6 +27,9 @@
     <event name="catalog_product_delete_before">
         <observer name="smaily_connect_engine_product_delete" instance="Smaily\Connect\Observer\Engine\ProductDeleteBefore"/>
     </event>
+    <event name="catalog_product_import_bunch_delete_commit_before">
+        <observer name="smaily_connect_engine_product_import_delete" instance="Smaily\Connect\Observer\Engine\ProductImportBunchDelete"/>
+    </event>
     <event name="customer_save_after_data_object">
         <observer name="smaily_connect_engine_customer_save" instance="Smaily\Connect\Observer\Engine\CustomerSaveAfter"/>
     </event>

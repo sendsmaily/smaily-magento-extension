@@ -65,6 +65,14 @@
                 sortOrder="100"/>
     </type>
 
+    <!-- Product import Delete → engine removal (PRO-3768): the bunch read is
+         the last moment before the import deletes the products. Optional
+         dependency, as the MSI plugins above. -->
+    <type name="Magento\ImportExport\Model\ResourceModel\Import\Data">
+        <plugin name="smaily_connect_engine_product_import_bunch"
+                type="Smaily\Connect\Plugin\Engine\ProductImportBunch"/>
+    </type>
+
     <!-- Backfill processors, keyed by "{job_type}:{target}". -->
     <type name="Smaily\Connect\Cron\BackfillTick">
         <arguments>

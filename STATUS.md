@@ -5,7 +5,10 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-05 — 3.0.0-rc7 is released as a GitHub pre-release on
+_Last updated: 2026-10-05 — after rc7, PRO-3768 (products deleted by
+Magento's product import with the Delete behaviour get the engine removal a
+product delete gives them; unreleased, CHANGELOG's "Changes since
+3.0.0-rc7" is open). Earlier the same day: 3.0.0-rc7 is released as a GitHub pre-release on
 the fork (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc7),
 built by the release workflow (run 37284996851) from commit 8fcfe7f; the ZIP
 and its .sha256 were checked after publishing (386 entries, `shasum -a 256 -c`
@@ -180,6 +183,53 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3768 — products deleted by a product import reach the engine
+  (2026-10-05; unreleased, after rc7).** Magento's product import with the
+  Delete behaviour (`Import\Product::_deleteProducts()`, verified in
+  2.4.8 vendor) deletes each bunch with one SQL DELETE and fires only
+  `catalog_product_import_bunch_delete_commit_before` (after the DELETE,
+  inside its transaction; `adapter`, `bunch`, `ids_to_delete`) and
+  `…_bunch_delete_after` — no `catalog_product_delete_before`, so nothing
+  was sent and the engine kept the products recommendable (the gap
+  PRO-3740 reported). Now `Observer/Engine/ProductImportBunchDelete` on
+  `commit_before` queues the removal `ProductDeleteBefore` queues: one
+  `catalog_remove` row per deleted product (one insert), and for a
+  configurable child the per-SKU tombstone instead. **Neither import event
+  has the products any more** (the brief assumed the `_before` one would):
+  the child's `catalog_product_super_link` row cascades away with the
+  DELETE, so `Plugin/Engine/ProductImportBunch` (after-plugin on
+  `ImportExport\Model\ResourceModel\Import\Data::getNextUniqueBunch()`,
+  the bunch read right before the DELETE) finds the bunch's configurable
+  children and builds their tombstones then
+  (`CatalogIngest::buildTombstones()`: one collection, forced
+  tombstones; `enqueueBuilt()` queues them in the delete's transaction).
+  Both hooks act only on `catalog_product` + `delete` in the import data
+  source — Replace runs the same delete and creates the products again
+  (new entity ids; unchanged: nothing is sent, as before). No wire change.
+  No ImportExport type named (optional dependency, as the MSI plugins).
+  **Evidence:** integration test on MySQL (the real `Import\Data` resource
+  model on an `importexport_importdata` mirror, a real DELETE in a
+  transaction with a cascading super-link FK, the real ingest queue): the
+  child gets its tombstone, the standalone product §3b, a rolled-back
+  delete and a Replace queue nothing; with the plugin's `prepare()` call
+  removed the test fails (the child gets §3b). **Sandbox** (engine
+  connected, nothing sent): a real `Magento\ImportExport\Model\Import`
+  Delete run of two throwaway products created by SQL inside one outer
+  transaction that was rolled back (indexers all on schedule, so the
+  import's reindex ran nothing): `deleted: 2`, queued `catalog`
+  `SMAILY-IT-VARIANT` `in_stock: false`, `tags.product_id` 68 (its
+  configurable parent) and `catalog_remove` 2052; after the rollback no
+  throwaway product and no queue row are left. A direct database delete,
+  or a third-party importer that writes the catalog tables itself, still
+  sends nothing (out of scope); the user guide now says how to take such a
+  product out of the recommendations: save a product with the same SKU
+  with **Enable Product** off (the save sends it as out of stock), then
+  delete it in the admin if wanted. No admin page or command removes a
+  product from the engine by itself (follow-up candidate). Sandbox
+  `setup:upgrade && setup:di:compile` OK. Docs: ARCHITECTURE (the import
+  delete path), USER_GUIDE (What syncs; Historical import), CHANGELOG
+  (opens "Changes since 3.0.0-rc7").
 
 - **PRO-3769 — the rc7 package installs on a clean store by the install
   guide (2026-10-05; docs only, no CHANGELOG bullet).** As PRO-3748 for
@@ -2572,8 +2622,8 @@ Earlier: 2026-09-11, 2026-09-10._
   notice under the bell to be read after the initial setup (PRO-3739) and
   for one catalog entry's image and product link opened from the engine
   (PRO-3731); (2) open queue: PRO-1958, PRO-3747, PRO-3753, PRO-3767
-  (awaits an owner decision), PRO-3768 (a product deleted by a CSV import
-  stays recommendable in the engine), PRO-3746 (after the pilot); (3) cross-repo
+  (awaits an owner decision), PRO-3746 (after the pilot); PRO-3768 is
+  done since (unreleased); (3) cross-repo
   asks: PRO-3743 (WooCommerce), PRO-3744 (Shopify),
   PRO-3750, PRO-3751; (4) Erkki: the engine pilot decisions (PRO-3600);
   HC Pro (legacy 2.x upgrade, 4 websites, one Smaily account), awaiting

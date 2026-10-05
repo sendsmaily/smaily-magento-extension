@@ -122,6 +122,30 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   and would tombstone the surviving parent/siblings. A merely
   disabled/hidden product flows through `ProductSaveAfter`'s soft
   tombstone, never §3b.
+- **Product import Delete (PRO-3768).** Magento's product import with the
+  Delete behaviour (`CatalogImportExport\Model\Import\Product::_deleteProducts()`)
+  deletes each bunch with one SQL DELETE and fires no
+  `catalog_product_delete_before` — only
+  `catalog_product_import_bunch_delete_commit_before` (after the DELETE,
+  inside its transaction) and `…_bunch_delete_after`, with the deleted
+  `ids_to_delete`. `Model/Engine/ProductImportDelete` gives those products
+  the removal above: `Observer/Engine/ProductImportBunchDelete` (on the
+  `commit_before` event, so the rows commit or roll back with the delete)
+  queues a `catalog_remove` row per product (one insert), and for a
+  configurable child the per-SKU tombstone instead. The child's parent
+  link (`catalog_product_super_link`, cascaded) and its row data are gone
+  by then, so `Plugin/Engine/ProductImportBunch` — an after-plugin on
+  `ImportExport\Model\ResourceModel\Import\Data::getNextUniqueBunch()`,
+  the bunch read right before the DELETE — finds the bunch's configurable
+  children and builds their tombstones then
+  (`CatalogIngest::buildTombstones()`, one collection;
+  `enqueueBuilt()` queues them). Both hooks act only when the import data
+  source says `catalog_product` + `delete`: Replace deletes through the
+  same code but creates the products again at once. No ImportExport type
+  is named (the module is removable), as with the MSI plugins. A tool
+  that writes the catalog tables itself, or a direct database delete,
+  still sends nothing; the user guide says how to take such a product out
+  of the recommendations (a product with the same SKU, saved disabled).
 - **Stock changes (PRO-1951).** `in_stock` is the one catalog field the store
   can move without a product save, and the engine's back-in-stock feature
   reads it, so four hooks feed catalog ingest, all funnelling through
@@ -276,9 +300,9 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   by hand whenever the merchant starts one; no scheduled full re-sync. A
   catalog import does not remove a product that is missing from it — the
   engine never deletes by absence, so the delete paths above are its only
-  delete signal, and a product deleted where no event sees it (a CSV
-  import's delete, a direct database delete) stays in the engine as it
-  was. A release that adds a catalog field, or corrects what one holds,
+  delete signal, and a product deleted where no event sees it (a direct
+  database delete, a tool that bypasses Magento's import) stays in the
+  engine as it was. A release that adds a catalog field, or corrects what one holds,
   tells the merchant to start the catalog import by hand: no scheduled
   re-sync carries it.
   On an upgrade, Magento ignores the removed job's leftover `cron_schedule`

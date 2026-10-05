@@ -18,7 +18,7 @@ use Smaily\Connect\Model\Logger\Logger;
 
 /**
  * The single place a product turns into a catalog ingest row — live hooks,
- * the delete observer's soft tombstone and the catalog import processor
+ * the delete observers' soft tombstones and the catalog import processor
  * alike.
  *
  * Product save, the tombstone and the backfill pages already hold the
@@ -80,6 +80,48 @@ class CatalogIngest
     public function enqueueTombstone(Product $product): bool
     {
         return $this->enqueue($product, true);
+    }
+
+    /**
+     * Build these products' tombstone rows now, for a delete that removes
+     * the products before any event sees it (a product import's Delete,
+     * PRO-3768); enqueueBuilt() queues them once the delete happens. The
+     * products load as one collection, as in buildChanged().
+     *
+     * @param int[] $productIds
+     * @return array<int, array<string, mixed>> product id => row (a failed build is left out, logged)
+     */
+    public function buildTombstones(array $productIds): array
+    {
+        if (!$productIds || !$this->settings->isConnected()) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($this->loadProducts($productIds) as $product) {
+            $item = $this->build($product, true);
+            if ($item !== null) {
+                $rows[(int)$product->getId()] = $item;
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Queue rows buildTombstones() built.
+     *
+     * @param array<int, array<string, mixed>> $rows product id => row
+     */
+    public function enqueueBuilt(array $rows): void
+    {
+        if ($rows) {
+            $this->ingestQueue->enqueueChangedPayloads(
+                Client::DOMAIN_CATALOG,
+                $rows,
+                $this->payloadBuilder->canonicalStoreId()
+            );
+        }
     }
 
     /**

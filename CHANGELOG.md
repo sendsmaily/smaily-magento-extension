@@ -4,6 +4,10 @@
 
 The package version is currently `3.0.0-rc7` — the seventh release-candidate cut of everything below. Release candidates are GitHub pre-releases for pilot stores; composer still resolves 2.8.1 as the newest stable release.
 
+**Changes since 3.0.0-rc7**
+
+- Products deleted with Magento's import — **System > Data Transfer > Import** with the **Delete** behaviour, or a tool that runs Magento's import — are removed from Campaign Intelligence, as a product deleted in the admin is: in the Log, a *catalog_remove* row per product, and for a variant of a configurable product a *catalog* row that marks it out of stock. Before, the import sent nothing, so Campaign Intelligence kept recommending the deleted products, and a catalog import did not remove them. A product deleted straight in the database, or by a tool that bypasses Magento's import, still sends nothing; the user guide says how to take such a product out of the recommendations.
+
 **Changes since 3.0.0-rc6**
 
 - The Log's **Last Error** filter finds rows by the text the column shows. Before, it searched the stored value: a refusal's internal failure class (`permanent_http_400: …`), which the column does not show, could be found, and an extension message shown in the admin's language (for example in Estonian) could not be found by the words on screen. An error that the column shows with its secrets redacted is not found by the hidden values.

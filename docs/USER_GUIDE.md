@@ -690,7 +690,7 @@ toggle; catalog, customer and order sync run automatically once connected.
 
 | Data | When |
 |---|---|
-| Catalog | On product save/delete (deletes become out-of-stock) and on every stock change — a shipment that sells the last unit, a credit memo that puts it back, an Advanced Inventory or Sources edit, an API stock update. The whole catalog goes once, with the catalog import; there is no periodic full re-sync. A change made outside Magento's own product save — an ERP link, a CSV or `bin/magento import` run, a direct database import — is not seen: start the catalog import by hand afterwards |
+| Catalog | On product save/delete (deletes become out-of-stock) and on every stock change — a shipment that sells the last unit, a credit memo that puts it back, an Advanced Inventory or Sources edit, an API stock update. Products deleted with Magento's import (**Delete** behaviour) are removed too. The whole catalog goes once, with the catalog import; there is no periodic full re-sync. A change made outside Magento's own product save — an ERP link, a CSV or `bin/magento import` run, a direct database import — is not seen: start the catalog import by hand afterwards |
 | Customers | On profile create/update (no consent fields — the engine is a separate lawful surface) |
 | Orders | On order placement, status changes, and refunds — a credit memo re-syncs the order, so a fully credited line is reported as returned and stops being recommended back to that customer (a partly credited line still counts as kept) |
 | Browse events | Product views, searches, cart adds, checkout — batched from the storefront (**Enable storefront browse tracking (product views, searches, cart activity)**, off by default — a separate, consent-gated toggle, not part of the always-on sync above) |
@@ -921,10 +921,17 @@ traffic:
   **Catalog** import by hand after such a change, so Campaign
   Intelligence gets the new prices, stock and products. The import does
   not remove products: Campaign Intelligence learns of a deletion only
-  from Magento's own product delete (in the admin or through the API). A
-  product deleted any other way — by a CSV import's delete, or straight
-  in the database — stays in Campaign Intelligence as it was, and a
-  catalog import does not change that. When a release note asks you to
+  from Magento — its own product delete (in the admin or through the
+  API) and its import with the **Delete** behaviour (**System > Data
+  Transfer > Import**, or a tool that runs Magento's import). A product
+  deleted any other way — straight in the database, or by a tool that
+  bypasses Magento's import — stays in Campaign Intelligence as it was, and a
+  catalog import does not change that. To take such a product out of the
+  recommendations, add a product with the same SKU in the admin with
+  **Enable Product** off and save it: Campaign Intelligence then has it
+  as out of stock. You can delete that product in the admin afterwards
+  as usual. The extension has no other way to remove a product from
+  Campaign Intelligence. When a release note asks you to
   start the catalog import (for example because Campaign Intelligence now
   gets a new product detail), start it under **Settings > Intelligence**.
   The **Catalog**, **Customers** and **Orders** imports need a Campaign

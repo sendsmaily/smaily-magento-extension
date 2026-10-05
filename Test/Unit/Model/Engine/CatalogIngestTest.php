@@ -172,12 +172,14 @@ class CatalogIngestTest extends TestCase
         $this->payloadBuilder->expects(self::never())->method('build');
         $this->queue->expects(self::never())->method('enqueue');
         $this->queue->expects(self::never())->method('enqueueMany');
+        $this->collectionFactory->expects(self::never())->method('create');
 
         $ingest = $this->ingest(null, null, $settings);
         self::assertFalse($ingest->enqueueProduct($this->product(8)));
         self::assertFalse($ingest->enqueueTombstone($this->product(8)));
         self::assertFalse($ingest->markProductChanged(8));
         self::assertFalse($ingest->markSkusChanged(['TENT']));
+        self::assertSame([], $ingest->buildTombstones([8]));
     }
 
     public function testNoChangedProductsMeansNoProductLoad(): void
@@ -270,6 +272,43 @@ class CatalogIngestTest extends TestCase
         $this->queue->expects(self::once())->method('delete');
 
         $this->ingest(null, $logger)->buildChanged();
+    }
+
+    /**
+     * PRO-3768: a product import's Delete builds the tombstones before the
+     * products are gone — one collection, forced tombstones (the products
+     * still look sellable), queued later as built.
+     */
+    public function testTombstonesAreBuiltAsOneBatchAndQueuedLater(): void
+    {
+        $collection = $this->collection([$this->product(8), $this->product(9)]);
+        $collection->expects(self::once())->method('addFieldToFilter')->with('entity_id', ['in' => [8, 9]]);
+        $this->collectionFactory->expects(self::once())->method('create')->willReturn($collection);
+        $this->payloadBuilder->expects(self::never())->method('build');
+        $this->payloadBuilder->method('buildTombstone')->willReturnCallback(
+            static fn (Product $product): array => ['sku' => 'SKU-' . $product->getId(), 'in_stock' => false]
+        );
+        $rows = [
+            8 => ['sku' => 'SKU-8', 'in_stock' => false],
+            9 => ['sku' => 'SKU-9', 'in_stock' => false],
+        ];
+        $this->queue->expects(self::once())->method('enqueueChangedPayloads')
+            ->with(Client::DOMAIN_CATALOG, $rows, 1);
+
+        $ingest = $this->ingest();
+        $built = $ingest->buildTombstones([8, 9]);
+        self::assertSame($rows, $built);
+        $ingest->enqueueBuilt($built);
+    }
+
+    public function testNoTombstonesMeansNoProductLoadAndNoInsert(): void
+    {
+        $this->collectionFactory->expects(self::never())->method('create');
+        $this->queue->expects(self::never())->method('enqueueChangedPayloads');
+
+        $ingest = $this->ingest();
+        self::assertSame([], $ingest->buildTombstones([]));
+        $ingest->enqueueBuilt([]);
     }
 
     private function ingest(

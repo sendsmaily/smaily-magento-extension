@@ -59,14 +59,11 @@ Landed after rc8: PRO-3930 (an order created in the admin's order screen
 carries no browser markers; reproduced on the sandbox first);
 PILOT_CHECKLIST's pilot-day order opens with switching off other Smaily
 subscriber/opt-out syncs when contact sync goes on (and HEADLESS_STOREFRONTS A3).
-**Queue:** the pilot installs rc8 once the store has upgraded (Erkki sets
-the date).
 **The move into `sendsmaily/smaily-magento-extension` is prepared
 (PRO-1198; owner decisions 2026-10-07: one squash-merged PR from the
 fork's `v3` into the official `master`, squash-only PRs there afterwards,
 no staged review, 2.8.x ends at its tags, release candidates tagged
-publicly, 3.0.0 after the pilot), on branch
-`worktree-agent-a413398f97a66ba10` for `v3`; it waits for Erkki's go to
+publicly, 3.0.0 after the pilot), on `v3`; it waits for Erkki's go to
 open the PR.** `v3` already descends from `upstream/master` (e2e5d45), so
 the merge is a no-op and the PR is conflict-free. The admin's User Guide
 links, README, INSTALLING, CONTRIBUTING, the PR template and
@@ -75,9 +72,11 @@ reach `master`", "Release cut" and the after-the-move checklist (the
 official repo needs the `ENGINE_CONTRACT_READ_TOKEN` secret first).
 **Queue:** Erkki's go → open and squash-merge the move PR → the
 after-the-move checklist (CLAUDE.md) → rc9 cut in the official repo;
-the pilot installs the newest release candidate once the store has
-upgraded (Erkki sets the date).
-Backlog: PRO-3790 (after the pilot), PRO-3746, PRO-3774._
+the pilot (the furniture store after its upgrade in the new year, or
+another store as early as next week; the milestone date was dropped
+2026-10-07) installs the newest release candidate.
+Backlog: PRO-3790 (after the pilot), PRO-3746, PRO-3921 (waits on the
+engine's answer, PRO-3941), PRO-3916 (waits on PRO-3919)._
 
 _Today in detail: PRO-3802 (the initial setup's Connect step
 takes the Storefront URL, saved before the Contacts step switches contact

@@ -7,6 +7,7 @@ The package version is currently `3.0.0-rc8` — the eighth release-candidate cu
 **Changes since 3.0.0-rc8**
 
 - An import that has stalled no longer holds up the imports queued behind it. A running import that nothing has moved for over an hour — for example one whose run fails on the same products every time — is set aside: the imports behind it run, its card keeps showing *Stalled* with **Run again** and **Cancel import**, and it is tried again whenever no other import is waiting. Before, every import queued behind it waited until you pressed **Run again** or **Cancel import** on its card.
+- An order created in the admin under **Sales > Orders > Create New Order** reaches Campaign Intelligence without the browsing and recommendation clicks of the admin's own browser, as an order placed with **Login as Customer** does. Before, on a store whose admin shares the storefront's address, the order could carry the session, visitor token, recommendation id and context of the admin's browser when that browser had visited the store. A shopper's own order carries them as before.
 
 **Changes since 3.0.0-rc7**
 

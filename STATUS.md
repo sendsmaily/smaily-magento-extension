@@ -55,6 +55,8 @@ Landed today after rc8 (CHANGELOG's "Changes since 3.0.0-rc8"): PRO-3927
 (the tick sets aside a running import nothing has moved for an hour and
 runs the imports queued behind it; the set-aside one stays *Stalled* on
 its card and is tried again when none waits).
+Landed after rc8: PRO-3930 (an order created in the admin's order screen
+carries no browser markers; reproduced on the sandbox first).
 **Queue:** the pilot installs rc8 once the store has upgraded (Erkki sets
 the date).
 Backlog: PRO-3790 (after the pilot), PRO-3746, PRO-3774._

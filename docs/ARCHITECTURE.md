@@ -1063,8 +1063,14 @@ name through the object manager only while Magento_LoginAsCustomer is
 enabled (`Module\Manager::isEnabled()`), because the module is optional
 (no composer or module.xml dependency). Nothing is stored, so the order
 goes to the engine without the four signals; a shopper's own order is
-stamped as before. An order created in the admin's own order screen is not
-covered.
+stamped as before. An order created in the admin's own order screen
+(`AdminOrder\Create`) is stamped with nothing too (PRO-3930): where the
+admin shares the storefront's host, the store's cookies (path `/`) reach
+admin requests, so they would be the admin's own browsing. The check is
+the request's area — any order saved in an `adminhtml` request is an
+admin's (`App\State::getAreaCode()`; no area set reads as not admin) — a
+property of the request that needs no admin-only session object.
+`saveForOrder()` asks one rule, `isPlacedByAdmin()`, for both cases.
 
 ### Browse tracking
 

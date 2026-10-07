@@ -1266,7 +1266,8 @@ Its own card then offers only **Cancel import**.
   admin's own, not the shopper's. An order the admin places that way
   reaches Campaign Intelligence without that browser's browsing or
   recommendation clicks, so the admin's clicks credit no recommendation
-  with it.
+  with it. An order created in the admin under **Sales > Orders > Create
+  New Order** reaches it the same way, without the admin's own browsing.
 - **Unsubscribing from marketing also stops profiling.** When Campaign
   Intelligence is connected, a newsletter unsubscribe — in the store, or in
   Smaily and mirrored back — also opts the shopper out of personalized

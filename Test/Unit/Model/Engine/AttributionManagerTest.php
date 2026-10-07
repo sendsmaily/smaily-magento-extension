@@ -8,8 +8,11 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Unit\Model\Engine;
 
+use Magento\Framework\App\Area;
 use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\App\State;
 use Magento\Framework\DB\Adapter\AdapterInterface;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\Framework\ObjectManagerInterface;
 use Magento\Framework\Stdlib\CookieManagerInterface;
@@ -21,7 +24,8 @@ use Smaily\Connect\Model\Engine\Settings;
  * The visitor-token cookie is read in either form the contract allows, an
  * engine `vt_` token or a store-created `vs_` token (PRO-3912); a value of
  * neither form reads as absent. An order an admin places with "Login as
- * Customer" is stamped with nothing (PRO-3925). Values are synthetic.
+ * Customer" (PRO-3925) or in the admin's order screen (PRO-3930) is stamped
+ * with nothing. Values are synthetic.
  */
 class AttributionManagerTest extends TestCase
 {
@@ -42,7 +46,8 @@ class AttributionManagerTest extends TestCase
             $cookieManager,
             $this->createMock(ResourceConnection::class),
             $this->createMock(ModuleManager::class),
-            $this->createMock(ObjectManagerInterface::class)
+            $this->createMock(ObjectManagerInterface::class),
+            $this->createMock(State::class)
         );
 
         self::assertSame($expected, $manager->readCookies()['visitor_token']);
@@ -94,14 +99,35 @@ class AttributionManagerTest extends TestCase
         $this->manager($connection, false, null)->saveForOrder(501);
     }
 
+    public function testAnOrderCreatedInTheAdminsOrderScreenIsStampedWithNothing(): void
+    {
+        $connection = $this->createMock(AdapterInterface::class);
+        $connection->expects(self::never())->method('insertOnDuplicate');
+
+        $this->manager($connection, false, null, Area::AREA_ADMINHTML)->saveForOrder(501);
+    }
+
+    public function testAnOrderSavedWithNoAreaSetIsStamped(): void
+    {
+        $connection = $this->createMock(AdapterInterface::class);
+        $connection->expects(self::once())->method('insertOnDuplicate');
+
+        $this->manager($connection, false, null, null)->saveForOrder(501);
+    }
+
     /**
      * @param AdapterInterface $connection
      * @param bool $moduleEnabled Magento_LoginAsCustomer
      * @param int|null $adminId what its API answers; null: never resolved
+     * @param string|null $area the request's area code; null: none set
      * @return AttributionManager
      */
-    private function manager(AdapterInterface $connection, bool $moduleEnabled, ?int $adminId): AttributionManager
-    {
+    private function manager(
+        AdapterInterface $connection,
+        bool $moduleEnabled,
+        ?int $adminId,
+        ?string $area = Area::AREA_FRONTEND
+    ): AttributionManager {
         $settings = $this->createMock(Settings::class);
         $settings->method('isConnected')->willReturn(true);
         $settings->method('getEngineConfig')->willReturn([]);
@@ -133,6 +159,13 @@ class AttributionManagerTest extends TestCase
                 ->willReturn($getAdminId);
         }
 
-        return new AttributionManager($settings, $cookieManager, $resource, $moduleManager, $objectManager);
+        $appState = $this->createMock(State::class);
+        if ($area === null) {
+            $appState->method('getAreaCode')->willThrowException(new LocalizedException(__('Area code is not set')));
+        } else {
+            $appState->method('getAreaCode')->willReturn($area);
+        }
+
+        return new AttributionManager($settings, $cookieManager, $resource, $moduleManager, $objectManager, $appState);
     }
 }

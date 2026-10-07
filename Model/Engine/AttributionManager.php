@@ -8,7 +8,10 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Engine;
 
+use Magento\Framework\App\Area;
 use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\App\State;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\Framework\ObjectManagerInterface;
 use Magento\Framework\Stdlib\CookieManagerInterface;
@@ -25,8 +28,10 @@ use Magento\Framework\Stdlib\CookieManagerInterface;
  * analytics consent (first-party functional cookie for the merchant's own
  * email click), matching the Woo/Shopify behavior.
  *
- * Nothing is stamped on an order an admin places with "Login as Customer":
- * the browser's cookies are then the admin's own.
+ * Nothing is stamped on an order an admin places, in the admin's order
+ * screen or with "Login as Customer": the browser's cookies are then the
+ * admin's own (the store's cookies, path `/`, also reach the admin when it
+ * shares the storefront's host).
  */
 class AttributionManager
 {
@@ -56,7 +61,8 @@ class AttributionManager
         private readonly CookieManagerInterface $cookieManager,
         private readonly ResourceConnection $resourceConnection,
         private readonly ModuleManager $moduleManager,
-        private readonly ObjectManagerInterface $objectManager
+        private readonly ObjectManagerInterface $objectManager,
+        private readonly State $appState
     ) {
     }
 
@@ -110,7 +116,7 @@ class AttributionManager
     /**
      * Stamp the current attribution cookies onto a placed order.
      *
-     * Not on an order an admin places with "Login as Customer".
+     * Not on an order an admin places.
      */
     public function saveForOrder(int $orderId): void
     {
@@ -119,7 +125,7 @@ class AttributionManager
         }
 
         $cookies = $this->readCookies();
-        if (!array_filter($cookies) || $this->isLoginAsCustomer()) {
+        if (!array_filter($cookies) || $this->isPlacedByAdmin()) {
             return;
         }
 
@@ -138,10 +144,20 @@ class AttributionManager
     }
 
     /**
-     * Whether an admin is logged in as the customer ("Login as Customer").
+     * Whether an admin places the order: in the admin's order screen (any
+     * order saved in an admin request, PRO-3930), or on the storefront while
+     * logged in as the customer ("Login as Customer", PRO-3925).
      */
-    private function isLoginAsCustomer(): bool
+    private function isPlacedByAdmin(): bool
     {
+        try {
+            $area = $this->appState->getAreaCode();
+        } catch (LocalizedException) {
+            $area = null; // No area set: not an admin request.
+        }
+        if ($area === Area::AREA_ADMINHTML) {
+            return true;
+        }
         if (!$this->moduleManager->isEnabled(self::LOGIN_AS_CUSTOMER_MODULE)) {
             return false;
         }

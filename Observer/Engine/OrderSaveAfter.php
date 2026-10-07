@@ -26,8 +26,9 @@ use Smaily\Connect\Model\Engine\Settings;
  *
  * Recommendation attribution is captured here (not at place_after) because
  * the order entity_id only exists after the save; on the placement request
- * the visitor's cookies are still present, elsewhere (admin, cron) they are
- * simply absent and the capture is a no-op.
+ * the visitor's cookies are still present. An admin request carries the
+ * store's cookies too when the admin shares the storefront's host (path
+ * `/`), so AttributionManager stamps nothing on an order an admin places.
  */
 class OrderSaveAfter implements ObserverInterface
 {

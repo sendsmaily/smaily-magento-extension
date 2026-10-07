@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!-- Tailwind-styled variant of the personalization opt-out form. The base
+     template is functionally fine under Hyvä (plain HTML form, no JS) but
+     uses Luma CSS classes (fieldset/legend/actions-toolbar) that Hyvä does
+     not style. -->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceBlock name="smaily.privacy.form"
+                        template="Hyva_SmailyConnect::privacy/form.phtml"/>
+    </body>
+</page>

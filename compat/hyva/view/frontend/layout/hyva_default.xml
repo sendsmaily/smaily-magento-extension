@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!-- `hyva_`-prefixed handles load only when a Hyvä theme is active, AFTER
+     the base handle — so these referenceBlocks swap the Luma/RequireJS
+     templates for the framework-free Hyvä variants without touching the
+     base module. On the Luma-fallback checkout pages Hyvä switches the
+     design theme back to a Luma-based one, so hyva_* handles (correctly)
+     do not apply there. -->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceBlock name="smaily.connect.attribution"
+                        template="Hyva_SmailyConnect::engine/attribution.phtml"/>
+        <referenceBlock name="smaily.connect.tracker"
+                        template="Hyva_SmailyConnect::engine/tracker.phtml"/>
+    </body>
+</page>

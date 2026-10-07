@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="before.body.end">
+            <block class="Magento\Framework\View\Element\Template"
+                   name="smaily.connect.context"
+                   template="Smaily_Connect::engine/context/product.phtml"
+                   before="smaily.connect.tracker">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\ProductContext</argument>
+                </arguments>
+            </block>
+        </referenceContainer>
+    </body>
+</page>

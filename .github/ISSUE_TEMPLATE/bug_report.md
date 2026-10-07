@@ -29,7 +29,7 @@ If applicable, add screenshots to help explain your problem.
 Add the Magento version you are currently using.
 
 **Module version**
-Add the Smaily for Magento 2 module version you are currently using.
+Add the Smaily Connect module version you are currently using.
 
 **Additional context**
 Add any other context about the problem here.

@@ -1,7 +1,7 @@
 {
     "name": "smaily/smailyformagento",
-    "description": "Smaily extension for Magento 2",
-    "version": "2.8.1",
+    "description": "Smaily Connect for Magento 2 — newsletter sync, marketing automations, abandoned cart, RSS product feeds and Campaign Intelligence",
+    "version": "3.0.0-rc8",
     "type": "magento2-module",
     "license": "GPL-3.0-only",
     "authors": [
@@ -16,12 +16,64 @@
         "email": "support@smaily.com",
         "issues": "https://github.com/sendsmaily/smaily-magento-extension/issues"
     },
+    "require": {
+        "php": "~8.1.0 || ~8.2.0 || ~8.3.0 || ~8.4.0",
+        "ext-json": "*",
+        "guzzlehttp/guzzle": "^7.4",
+        "magento/framework": "^103.0.4",
+        "magento/module-backend": "^102.0",
+        "magento/module-catalog": "^104.0",
+        "magento/module-catalog-inventory": "^100.4",
+        "magento/module-checkout": "^100.4",
+        "magento/module-config": "^101.2",
+        "magento/module-cookie": "^100.4",
+        "magento/module-customer": "^103.0",
+        "magento/module-newsletter": "^100.4",
+        "magento/module-quote": "^101.2",
+        "magento/module-sales": "^103.0",
+        "magento/module-store": "^101.1",
+        "magento/module-ui": "^101.2"
+    },
+    "suggest": {
+        "magento/module-inventory-api": "Campaign Intelligence re-syncs a product when a Multi-Source Inventory source item is saved (plugin on SourceItemsSaveInterface); without MSI the legacy stock observer covers it.",
+        "magento/module-inventory-source-deduction-api": "Campaign Intelligence re-syncs a product when a shipment deducts stock or a credit memo returns it under MSI (plugin on SourceDeductionServiceInterface); without MSI the legacy stock observer covers it."
+    },
+    "require-dev": {
+        "bitexpert/phpstan-magento": "^0.43.0",
+        "magento/magento-coding-standard": "*",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^1.10 || ^2.0 <2.2.6",
+        "phpunit/phpunit": "^9.6 || ^10.5"
+    },
     "autoload": {
         "files": [
             "registration.php"
         ],
         "psr-4": {
-            "Smaily\\SmailyForMagento\\": ""
+            "Smaily\\Connect\\": ""
         }
-    }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Smaily\\Connect\\Test\\": "Test/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "platform": {
+            "php": "8.1.0"
+        },
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "magento/composer-dependency-version-audit-plugin": true,
+            "php-http/discovery": true,
+            "mage-os/composer-dependency-version-audit-plugin": true,
+            "phpstan/extension-installer": true
+        }
+    },
+    "repositories": [{
+        "name": "mage-os",
+        "type": "composer",
+        "url": "https://mirror.mage-os.org/"
+    }]
 }

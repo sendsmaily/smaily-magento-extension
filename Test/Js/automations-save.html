@@ -1,0 +1,232 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the Automations tab's save result (PRO-3734, PRO-3736):
+  the real template (view/adminhtml/templates/config/engine-automations.phtml),
+  rendered in en_US and et_EE by Test/Js/render-admin.php into Test/Js/build/,
+  runs with its own inline script and jQuery from vendor/, one fresh frame per
+  scenario. Stubbed: only the save request (fetch), which answers with the
+  Save endpoint's recorded answer — each saved trigger's state as the engine
+  stored it (§12), or null when that read failed. Run it with bin/test-js.sh
+  (it renders the pages first); the page ends with "RESULT: PASS" or
+  "RESULT: FAIL". The last scenario is the tab while Campaign Intelligence
+  refuses the account (PRO-2465): it explains that and offers no save.
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>automations save harness</title>
+    <script src="build/automations.en_US.js"></script>
+    <script src="build/automations.et_EE.js"></script>
+    <script src="build/automations-refused.en_US.js"></script>
+    <script src="build/automations-refused.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var NOTE = 'Smaily switches real sends on after you confirm. Until then the trigger runs in test mode.';
+    var failures = 0;
+    var passes = 0;
+
+    // The Save endpoint's answers (Controller/Adminhtml/Automations/Save) to
+    // the request below. Replenishment due asked for real sends and the
+    // engine kept it in test mode; Post-purchase already sent to real
+    // customers, so the engine stored it active; Win-back stays off.
+    var ANSWERS = {
+        stored: {
+            saved: true,
+            errors: [],
+            states: {
+                replenish_due: {enabled: true, test_mode: true},
+                post_purchase: {enabled: true, test_mode: false},
+                winback_risk: {enabled: false, test_mode: true}
+            }
+        },
+        readFailed: {saved: true, errors: [], states: null}
+    };
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    // Runs in the frame before the page: the admin's form key, the save
+    // request answered with the recorded answer, and Magento's require()
+    // as far as the template uses it.
+    function stubs(answer) {
+        return [
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.requests = [];',
+            'window.fetch = function (url, options) {',
+            '  window.requests.push({url: url, body: options.body});',
+            '  return Promise.resolve(new Response(' + JSON.stringify(JSON.stringify(answer)) + ',',
+            '    {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>',
+            '<script>window.require = function (deps, callback) { callback(window.jQuery); };<\/script>'
+        ].join('\n');
+    }
+
+    // Opens the tab, asks for real sends on Replenishment due and switches
+    // Post-purchase on, saves, and returns the frame once the answer is shown.
+    function save(locale, answer) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                page = (window.smailyAdminPages || {})['automations.' + locale];
+
+            if (!page) {
+                reject(new Error('Test/Js/build/automations.' + locale
+                    + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.onload = function () {
+                var doc = frame.contentDocument;
+
+                try {
+                    card(doc, 'replenish_due', 'enabled').checked = true;
+                    card(doc, 'replenish_due', 'test_mode').checked = false;
+                    card(doc, 'replenish_due', 'workflow_id').value = '101';
+                    card(doc, 'post_purchase', 'enabled').checked = true;
+                    card(doc, 'post_purchase', 'workflow_id').value = '102';
+                    doc.getElementById('smaily-engine-automations-save').click();
+                } catch (error) {
+                    reject(error);
+
+                    return;
+                }
+                setTimeout(function () {
+                    resolve(frame);
+                }, 50);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs(answer)
+                + '</head><body>' + page.html + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function card(doc, key, field) {
+        var element = doc.querySelector('.smaily-engine-trigger[data-trigger="' + key + '"]');
+
+        return field ? element.querySelector('[data-field="' + field + '"]') : element;
+    }
+
+    // One card against the state it should show: the pill, the border class,
+    // both checkboxes and the go-live note.
+    function shows(label, doc, key, strings, mode, enabled, testMode) {
+        var element = card(doc, key),
+            pill = element.querySelector('.smaily-pill'),
+            names = {off: 'Off', test: 'Test mode', active: 'Active'};
+
+        check(label + ': the pill says ' + strings[names[mode]],
+            pill.textContent.trim() === strings[names[mode]]
+            && pill.classList.contains('smaily-pill--' + mode)
+            && element.classList.contains('is-' + mode));
+        check(label + ': Enabled is ' + (enabled ? 'ticked' : 'not ticked'),
+            card(doc, key, 'enabled').checked === enabled);
+        check(label + ': Test mode is ' + (testMode ? 'ticked' : 'not ticked'),
+            card(doc, key, 'test_mode').checked === testMode);
+        check(label + ': the go-live note is ' + (mode === 'active' ? 'hidden' : 'shown'),
+            element.querySelector('.smaily-engine-trigger__hint').hidden === (mode === 'active'));
+    }
+
+    function result(doc) {
+        return doc.getElementById('smaily-engine-automations-result').textContent;
+    }
+
+    async function run(locale) {
+        var strings = window.smailyAdminPages['automations.' + locale].strings,
+            frame,
+            doc,
+            body;
+
+        log('# ' + locale);
+        if (locale !== 'en_US') {
+            check(locale + ': the page is translated', strings['Test mode'] !== 'Test mode');
+        }
+
+        frame = await save(locale, ANSWERS.stored);
+        doc = frame.contentDocument;
+        body = frame.contentWindow.requests.length === 1 ? frame.contentWindow.requests[0].body : '';
+        check(locale + ': the save asks for real sends on Replenishment due',
+            body.indexOf(encodeURIComponent('triggers[replenish_due][enabled]') + '=1') !== -1
+            && body.indexOf(encodeURIComponent('triggers[replenish_due][test_mode]')) === -1);
+        shows(locale + ', Replenishment due kept in test mode', doc, 'replenish_due', strings,
+            'test', true, true);
+        shows(locale + ', Post-purchase stored active', doc, 'post_purchase', strings,
+            'active', true, false);
+        shows(locale + ', Win-back left off', doc, 'winback_risk', strings, 'off', false, true);
+        check(locale + ': the result says saved, with the go-live note',
+            result(doc) === strings['Saved.'] + ' ' + strings[NOTE]);
+        frame.remove();
+
+        frame = await save(locale, ANSWERS.readFailed);
+        doc = frame.contentDocument;
+        check(locale + ', stored state not readable: the result asks for a reload',
+            result(doc) === strings['Saved. Reload the page to see the state of each trigger.']);
+        shows(locale + ', stored state not readable: Replenishment due keeps the page\'s state', doc,
+            'replenish_due', strings, 'off', true, false);
+        frame.remove();
+    }
+
+    // The refused tab is rendered on the server and runs no script, so it
+    // is read as it is.
+    function refused(locale) {
+        var page = (window.smailyAdminPages || {})['automations-refused.' + locale],
+            doc = new DOMParser().parseFromString(page ? page.html : '', 'text/html'),
+            banner = doc.getElementById('smaily-engine-automations-refused'),
+            strings = page ? page.strings : {},
+            text = banner ? banner.textContent : '';
+
+        check(locale + ', account refused: the banner says the account is not active',
+            !!banner && banner.querySelector('.smaily-banner__title').textContent.trim()
+                === strings['Your Campaign Intelligence account is not active']);
+        check(locale + ', account refused: the banner says the automations cannot be read or saved',
+            text.indexOf(strings['Your Campaign Intelligence account is not active, so its automations cannot be'
+                + ' read or saved. Once Smaily tells you the account is active, press Check again under'
+                + ' Settings > Intelligence.']) !== -1);
+        check(locale + ', account refused: no triggers and no Save button',
+            !doc.getElementById('smaily-engine-automations-table')
+            && !doc.getElementById('smaily-engine-automations-save'));
+    }
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping while the frames load
+    // until the result is written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    run('en_US').then(function () {
+        return run('et_EE');
+    }).then(function () {
+        refused('en_US');
+        refused('et_EE');
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    }).catch(function (error) {
+        document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }).then(function () {
+        clearInterval(keepAlive);
+    });
+</script>
+</body>
+</html>

@@ -1,11 +1,36 @@
 <?xml version="1.0"?>
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Cron:etc/crontab.xsd">
-    <group id="default">
-        <job name="smaily_abandoned_cart" instance="Smaily\SmailyForMagento\Cron\AbandonedCart" method="execute">
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Cron:etc/crontab.xsd">
+    <group id="smaily_connect">
+        <job name="smaily_flush_event_queue" instance="Smaily\Connect\Cron\FlushEventQueue" method="execute">
+            <schedule>* * * * *</schedule>
+        </job>
+        <job name="smaily_queue_janitor" instance="Smaily\Connect\Cron\QueueJanitor" method="execute">
+            <schedule>20 2 * * *</schedule>
+        </job>
+        <job name="smaily_contact_reconcile" instance="Smaily\Connect\Cron\ContactReconcile" method="execute">
+            <schedule>*/15 * * * *</schedule>
+        </job>
+        <job name="smaily_abandoned_cart" instance="Smaily\Connect\Cron\AbandonedCart" method="execute">
             <schedule>*/5 * * * *</schedule>
         </job>
-        <job name="smaily_subscriber_sync" instance="Smaily\SmailyForMagento\Cron\SubscribersSync" method="execute">
-            <config_path>crontab/default/jobs/smaily_subscriber_sync/schedule/cron_expr</config_path>
+        <job name="smaily_backfill_tick" instance="Smaily\Connect\Cron\BackfillTick" method="execute">
+            <schedule>* * * * *</schedule>
+        </job>
+        <job name="smaily_flush_ingest_queue" instance="Smaily\Connect\Cron\FlushIngestQueue" method="execute">
+            <schedule>* * * * *</schedule>
+        </job>
+        <job name="smaily_health_check" instance="Smaily\Connect\Cron\HealthCheck" method="execute">
+            <schedule>*/15 * * * *</schedule>
+        </job>
+        <job name="smaily_catalog_manifest" instance="Smaily\Connect\Cron\SendCatalogManifest" method="execute">
+            <schedule>30 3 * * *</schedule>
         </job>
     </group>
 </config>

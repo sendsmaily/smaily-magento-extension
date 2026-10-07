@@ -1,10 +1,19 @@
 <?xml version="1.0"?>
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Acl/etc/acl.xsd">
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Acl/etc/acl.xsd">
     <acl>
         <resources>
             <resource id="Magento_Backend::admin">
-                <resource id="Smaily_SmailyForMagento::smaily" title="Smaily" translate="title" sortOrder="40">
-                    <resource id="Smaily_SmailyForMagento::access" title="Access" translate="title" sortOrder="10" />
+                <resource id="Smaily_Connect::connect" title="Smaily Connect" sortOrder="100">
+                    <resource id="Smaily_Connect::config" title="Settings" sortOrder="10"/>
+                    <resource id="Smaily_Connect::event_log" title="Log" sortOrder="20"/>
+                    <resource id="Smaily_Connect::automations" title="Intelligence Automations" sortOrder="30"/>
                 </resource>
             </resource>
         </resources>

@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  push:
+    branches: [v3, master]
+  pull_request:
+
+jobs:
+  lint:
+    name: PHP 8.1 syntax (every PHP and PHTML file)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.1'
+          coverage: none
+
+      - name: php -l every file outside vendor/
+        run: bash bin/lint-php.sh
+
+  unit:
+    name: Unit tests (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.1', '8.3']
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: bcmath, gd, intl, pdo_mysql, soap, xsl, zip
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Run unit tests
+        run: vendor/bin/phpunit --testsuite unit
+
+  integration:
+    name: Integration tests (MySQL)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: smaily_connect_it
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, gd, intl, pdo_mysql, soap, sodium, xsl, zip
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Run integration tests
+        run: vendor/bin/phpunit -c phpunit.integration.xml.dist
+        env:
+          SMAILY_IT_DB_HOST: 127.0.0.1
+          SMAILY_IT_DB_PORT: '3306'
+          SMAILY_IT_DB_USER: root
+          SMAILY_IT_DB_PASSWORD: root
+          SMAILY_IT_DB_NAME: smaily_connect_it
+
+  static:
+    name: Static analysis (phpcs + phpstan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, gd, intl, pdo_mysql, soap, xsl, zip
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: phpcs (Magento2 standard)
+        run: vendor/bin/phpcs
+
+      - name: phpstan
+        run: vendor/bin/phpstan analyse --no-progress
+
+  browser:
+    name: Browser tests (headless Chrome)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, gd, intl, pdo_mysql, soap, xsl, zip
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      # The runner image ships Google Chrome; bin/test-js.sh names each failed
+      # page and check at the end of its output.
+      - name: Run the browser harnesses (Test/Js)
+        run: |
+          google-chrome --version
+          bash bin/test-js.sh
+        env:
+          CHROME: google-chrome
+
+  package:
+    name: Release package (build + verify)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Build and verify the release ZIP
+        run: bash bin/verify-release-zip.sh smaily-connect-magento2.zip
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: release-zip
+          path: |
+            smaily-connect-magento2.zip
+            smaily-connect-magento2.zip.sha256
+          retention-days: 5

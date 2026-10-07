@@ -1,14 +1,174 @@
 <?xml version="1.0"?>
-<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
-  <table name="quote" resource="default">
-    <column xsi:type="datetime" name="reminder_date" on_update="false" nullable="true" comment="Reminder Date"/>
-    <column xsi:type="boolean" name="is_sent" nullable="true" comment="Email sent"/>
-  </table>
-  <table name="smaily_customer_sync" resource="default" engine="innodb" comment="smaily_customer_sync">
-    <column xsi:type="int" name="id" padding="10" unsigned="true" nullable="false" identity="true" comment="ID"/>
-    <column xsi:type="timestamp" name="last_update_at" on_update="false" nullable="true" comment="Last update time"/>
-    <constraint xsi:type="primary" referenceId="PRIMARY">
-      <column name="id"/>
-    </constraint>
-  </table>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+
+    <!-- Durable outbound queue for Smaily marketing API events (contact.sync, automation triggers). -->
+    <table name="smaily_event_queue" resource="default" engine="innodb" comment="Smaily Connect Marketing Event Queue">
+        <column xsi:type="int" name="id" unsigned="true" nullable="false" identity="true" comment="Queue Row ID"/>
+        <column xsi:type="varchar" name="event_type" nullable="false" length="64" comment="Event Type"/>
+        <column xsi:type="varchar" name="entity_id" nullable="true" length="64" comment="Source Entity ID"/>
+        <column xsi:type="varchar" name="event_uuid" nullable="false" length="36" comment="Idempotency UUID"/>
+        <column xsi:type="smallint" name="website_id" unsigned="true" nullable="false" default="0" comment="Website ID"/>
+        <column xsi:type="mediumtext" name="payload" nullable="false" comment="Event Payload JSON"/>
+        <column xsi:type="varchar" name="status" nullable="false" length="16" default="pending" comment="pending|sending|sent|failed"/>
+        <column xsi:type="smallint" name="attempts" unsigned="true" nullable="false" default="0" comment="Delivery Attempts"/>
+        <column xsi:type="varchar" name="claim_token" nullable="true" length="36" comment="Flush Worker Claim Token"/>
+        <column xsi:type="timestamp" name="claimed_at" on_update="false" nullable="true" comment="Claimed At"/>
+        <column xsi:type="timestamp" name="next_retry_at" on_update="false" nullable="true" comment="Next Retry At"/>
+        <column xsi:type="text" name="last_error" nullable="true" comment="Last Error Message"/>
+        <column xsi:type="mediumtext" name="sent_payload" nullable="true" comment="Payload As Sent"/>
+        <column xsi:type="mediumtext" name="last_response" nullable="true" comment="Last API Response"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" on_update="true" nullable="false" default="CURRENT_TIMESTAMP" comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="SMAILY_EVENT_QUEUE_EVENT_UUID">
+            <column name="event_uuid"/>
+        </constraint>
+        <index referenceId="SMAILY_EVENT_QUEUE_STATUS_NEXT_RETRY_AT" indexType="btree">
+            <column name="status"/>
+            <column name="next_retry_at"/>
+        </index>
+        <index referenceId="SMAILY_EVENT_QUEUE_CREATED_AT" indexType="btree">
+            <column name="created_at"/>
+        </index>
+        <!-- One contact's pending rows of one automation trigger: the lookup
+             EventQueue::cancelPendingAutomation() runs on every order. -->
+        <index referenceId="SMAILY_EVENT_QUEUE_ENTITY_ID_EVENT_TYPE_STATUS" indexType="btree">
+            <column name="entity_id"/>
+            <column name="event_type"/>
+            <column name="status"/>
+        </index>
+    </table>
+
+    <!-- Durable outbound queue for Campaign Intelligence engine ingest (catalog|customers|orders|browse|catalog_remove). -->
+    <table name="smaily_ingest_queue" resource="default" engine="innodb" comment="Smaily Connect Engine Ingest Queue">
+        <column xsi:type="int" name="id" unsigned="true" nullable="false" identity="true" comment="Queue Row ID"/>
+        <column xsi:type="varchar" name="domain" nullable="false" length="16" comment="catalog|customers|orders|browse|catalog_remove"/>
+        <column xsi:type="varchar" name="entity_id" nullable="true" length="64" comment="Source Entity ID"/>
+        <column xsi:type="varchar" name="event_uuid" nullable="false" length="36" comment="Idempotency UUID (wire event_id)"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="true" comment="Store View ID (i18n context)"/>
+        <column xsi:type="mediumtext" name="payload" nullable="false" comment="Wire Payload JSON"/>
+        <column xsi:type="varchar" name="status" nullable="false" length="16" default="pending" comment="pending|sending|sent|failed"/>
+        <column xsi:type="smallint" name="attempts" unsigned="true" nullable="false" default="0" comment="Delivery Attempts"/>
+        <column xsi:type="varchar" name="claim_token" nullable="true" length="36" comment="Flush Worker Claim Token"/>
+        <column xsi:type="timestamp" name="claimed_at" on_update="false" nullable="true" comment="Claimed At"/>
+        <column xsi:type="timestamp" name="next_retry_at" on_update="false" nullable="true" comment="Next Retry At"/>
+        <column xsi:type="text" name="last_error" nullable="true" comment="Last Error Message"/>
+        <column xsi:type="mediumtext" name="sent_payload" nullable="true" comment="Payload As Sent"/>
+        <column xsi:type="mediumtext" name="last_response" nullable="true" comment="Last API Response"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" on_update="true" nullable="false" default="CURRENT_TIMESTAMP" comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="SMAILY_INGEST_QUEUE_EVENT_UUID">
+            <column name="event_uuid"/>
+        </constraint>
+        <index referenceId="SMAILY_INGEST_QUEUE_DOMAIN_STATUS_NEXT_RETRY_AT" indexType="btree">
+            <column name="domain"/>
+            <column name="status"/>
+            <column name="next_retry_at"/>
+        </index>
+        <index referenceId="SMAILY_INGEST_QUEUE_CREATED_AT" indexType="btree">
+            <column name="created_at"/>
+        </index>
+    </table>
+
+    <!-- Abandoned cart tracking state; replaces the legacy reminder_date/is_sent columns on the core quote table. -->
+    <table name="smaily_abandoned_cart" resource="checkout" engine="innodb" comment="Smaily Connect Abandoned Cart State">
+        <column xsi:type="int" name="id" unsigned="true" nullable="false" identity="true" comment="Row ID"/>
+        <column xsi:type="int" name="quote_id" unsigned="true" nullable="false" comment="Quote ID"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" default="0" comment="Store View ID"/>
+        <column xsi:type="varchar" name="email" nullable="true" length="255" comment="Customer Email"/>
+        <column xsi:type="varchar" name="status" nullable="false" length="16" default="open" comment="open|mailed|completed|expired|erased|skipped"/>
+        <column xsi:type="boolean" name="newsletter_optin" nullable="false" default="false" comment="Checkout Newsletter Opt-In"/>
+        <column xsi:type="timestamp" name="abandoned_at" on_update="false" nullable="true" comment="Marked Abandoned At"/>
+        <column xsi:type="timestamp" name="mail_sent_at" on_update="false" nullable="true" comment="Automation Triggered At"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" on_update="true" nullable="false" default="CURRENT_TIMESTAMP" comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="SMAILY_ABANDONED_CART_QUOTE_ID">
+            <column name="quote_id"/>
+        </constraint>
+        <index referenceId="SMAILY_ABANDONED_CART_STATUS_UPDATED_AT" indexType="btree">
+            <column name="status"/>
+            <column name="updated_at"/>
+        </index>
+    </table>
+
+    <!-- Automation workflow routing: (website, trigger, language, account) -> Smaily workflow. -->
+    <table name="smaily_automation_mapping" resource="default" engine="innodb" comment="Smaily Connect Automation Workflow Mapping">
+        <column xsi:type="int" name="id" unsigned="true" nullable="false" identity="true" comment="Row ID"/>
+        <column xsi:type="smallint" name="website_id" unsigned="true" nullable="false" default="0" comment="Website ID"/>
+        <column xsi:type="varchar" name="trigger_type" nullable="false" length="32" comment="welcome|first_order|abandoned_cart|..."/>
+        <column xsi:type="varchar" name="language" nullable="false" length="8" default="default" comment="ISO 639-1 Language Or default"/>
+        <column xsi:type="varchar" name="account_key" nullable="false" length="32" default="default" comment="Smaily Account Key (multilingual mode A)"/>
+        <column xsi:type="int" name="workflow_id" unsigned="true" nullable="false" comment="Smaily Automation Workflow ID"/>
+        <column xsi:type="boolean" name="is_default_fallback" nullable="false" default="false" comment="Is Default Fallback Row"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" on_update="true" nullable="false" default="CURRENT_TIMESTAMP" comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="SMAILY_AUTOMATION_MAPPING_SCOPE_TRIGGER_LANGUAGE_ACCOUNT">
+            <column name="website_id"/>
+            <column name="trigger_type"/>
+            <column name="language"/>
+            <column name="account_key"/>
+        </constraint>
+    </table>
+
+    <!-- Chunked historical import jobs (Smaily contacts, engine catalog/customers/orders). -->
+    <table name="smaily_backfill_job" resource="default" engine="innodb" comment="Smaily Connect Backfill Job">
+        <column xsi:type="int" name="id" unsigned="true" nullable="false" identity="true" comment="Job ID"/>
+        <column xsi:type="varchar" name="job_type" nullable="false" length="32" comment="contacts|catalog|customers|orders"/>
+        <column xsi:type="varchar" name="target" nullable="false" length="16" comment="smaily|engine"/>
+        <column xsi:type="smallint" name="website_id" unsigned="true" nullable="false" default="0" comment="Website ID"/>
+        <column xsi:type="varchar" name="status" nullable="false" length="16" default="pending" comment="pending|running|completed|failed|cancelled"/>
+        <column xsi:type="int" name="total_count" unsigned="true" nullable="true" comment="Total Items"/>
+        <column xsi:type="int" name="processed_count" unsigned="true" nullable="false" default="0" comment="Processed Items"/>
+        <column xsi:type="int" name="failed_count" unsigned="true" nullable="false" default="0" comment="Failed Items"/>
+        <column xsi:type="varchar" name="cursor_value" nullable="true" length="255" comment="Resume Cursor"/>
+        <column xsi:type="text" name="error_message" nullable="true" comment="Failure Reason"/>
+        <column xsi:type="timestamp" name="started_at" on_update="false" nullable="true" comment="Started At"/>
+        <column xsi:type="timestamp" name="completed_at" on_update="false" nullable="true" comment="Completed At"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" on_update="true" nullable="false" default="CURRENT_TIMESTAMP" comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <index referenceId="SMAILY_BACKFILL_JOB_STATUS" indexType="btree">
+            <column name="status"/>
+        </index>
+    </table>
+
+    <!-- Recommendation attribution captured at order placement (no columns added to sales_order). -->
+    <table name="smaily_order_attribution" resource="sales" engine="innodb" comment="Smaily Connect Order Attribution">
+        <column xsi:type="int" name="id" unsigned="true" nullable="false" identity="true" comment="Row ID"/>
+        <column xsi:type="int" name="order_id" unsigned="true" nullable="false" comment="Order ID"/>
+        <column xsi:type="varchar" name="rec_id" nullable="true" length="64" comment="Recommendation ID (smaily_rec)"/>
+        <column xsi:type="varchar" name="visitor_token" nullable="true" length="64" comment="Visitor Token (smaily_vt)"/>
+        <column xsi:type="varchar" name="rec_ctx" nullable="true" length="255" comment="Recommendation Context"/>
+        <column xsi:type="varchar" name="anon_session_id" nullable="true" length="64" comment="Anonymous Session ID"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="SMAILY_ORDER_ATTRIBUTION_ORDER_ID">
+            <column name="order_id"/>
+        </constraint>
+    </table>
+
+    <!-- Smaily->Magento reconcile echo suppression is handled in-process by
+         Model\ContactSync\ReconcileGuard; no mirror table is needed. -->
 </schema>

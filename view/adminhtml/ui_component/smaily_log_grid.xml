@@ -1,0 +1,135 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<listing xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+    <argument name="data" xsi:type="array">
+        <item name="js_config" xsi:type="array">
+            <item name="provider" xsi:type="string">smaily_log_grid.smaily_log_grid_data_source</item>
+        </item>
+    </argument>
+    <settings>
+        <spinner>smaily_log_columns</spinner>
+        <deps>
+            <dep>smaily_log_grid.smaily_log_grid_data_source</dep>
+        </deps>
+    </settings>
+    <dataSource name="smaily_log_grid_data_source" component="Magento_Ui/js/grid/provider">
+        <settings>
+            <!-- The client-side grid data storage keys rows by entity_id
+                 unless told otherwise; this listing is a union of the two
+                 queue tables keyed by the synthetic composite log_id (and
+                 the rows carry an unrelated entity_id payload column), so
+                 without this the grid renders colliding, duplicated rows. -->
+            <storageConfig>
+                <param name="indexField" xsi:type="string">log_id</param>
+            </storageConfig>
+            <updateUrl path="mui/index/render"/>
+        </settings>
+        <aclResource>Smaily_Connect::event_log</aclResource>
+        <dataProvider class="Magento\Framework\View\Element\UiComponent\DataProvider\DataProvider"
+                      name="smaily_log_grid_data_source">
+            <settings>
+                <requestFieldName>log_id</requestFieldName>
+                <primaryFieldName>log_id</primaryFieldName>
+            </settings>
+        </dataProvider>
+    </dataSource>
+    <listingToolbar name="listing_top">
+        <settings>
+            <sticky>true</sticky>
+        </settings>
+        <bookmark name="bookmarks"/>
+        <columnsControls name="columns_controls"/>
+        <filters name="listing_filters"/>
+        <massaction name="listing_massaction">
+            <action name="retry">
+                <settings>
+                    <confirm>
+                        <message translate="true">Retry the selected failed events?</message>
+                        <title translate="true">Retry events</title>
+                    </confirm>
+                    <url path="smaily_connect/log/massRetry"/>
+                    <type>retry</type>
+                    <label translate="true">Retry</label>
+                </settings>
+            </action>
+        </massaction>
+        <paging name="listing_paging"/>
+    </listingToolbar>
+    <columns name="smaily_log_columns">
+        <selectionsColumn name="ids">
+            <settings>
+                <indexField>log_id</indexField>
+            </settings>
+        </selectionsColumn>
+        <column name="source" component="Magento_Ui/js/grid/columns/select" sortOrder="10">
+            <settings>
+                <filter>select</filter>
+                <options class="Smaily\Connect\Ui\Component\LogSourceOptions"/>
+                <dataType>select</dataType>
+                <label translate="true">Source</label>
+            </settings>
+        </column>
+        <column name="type" sortOrder="20">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Type</label>
+            </settings>
+        </column>
+        <column name="entity_id" class="Smaily\Connect\Ui\Component\LogEntityColumn" sortOrder="30">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Entity</label>
+            </settings>
+        </column>
+        <column name="status" class="Smaily\Connect\Ui\Component\LogStatusColumn"
+                component="Smaily_Connect/js/grid/columns/status-pill" sortOrder="40">
+            <settings>
+                <filter>select</filter>
+                <options class="Smaily\Connect\Ui\Component\QueueStatusOptions"/>
+                <dataType>select</dataType>
+                <label translate="true">Status</label>
+            </settings>
+        </column>
+        <column name="attempts" sortOrder="50">
+            <settings>
+                <label translate="true">Attempts</label>
+            </settings>
+        </column>
+        <column name="last_error" class="Smaily\Connect\Ui\Component\LogErrorColumn" sortOrder="60">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Last Error</label>
+            </settings>
+        </column>
+        <column name="created_at" class="Magento\Ui\Component\Listing\Columns\Date"
+                component="Magento_Ui/js/grid/columns/date" sortOrder="70">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <sorting>desc</sorting>
+                <label translate="true">Created</label>
+            </settings>
+        </column>
+        <column name="updated_at" class="Magento\Ui\Component\Listing\Columns\Date"
+                component="Magento_Ui/js/grid/columns/date" sortOrder="80">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Updated</label>
+            </settings>
+        </column>
+        <actionsColumn name="actions" class="Smaily\Connect\Ui\Component\LogActions"
+                       component="Smaily_Connect/js/grid/columns/log-actions" sortOrder="90">
+            <settings>
+                <indexField>log_id</indexField>
+                <label translate="true">Actions</label>
+            </settings>
+        </actionsColumn>
+    </columns>
+</listing>

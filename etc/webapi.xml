@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Webapi:etc/webapi.xsd">
+    <!-- The checkout email field puts a guest's typed email on the guest cart
+         (masked id, as Magento's own guest-carts routes). -->
+    <route url="/V1/smaily-connect/guest-carts/:cartId/email" method="POST">
+        <service class="Smaily\Connect\Api\GuestCartEmailInterface" method="set"/>
+        <resources>
+            <resource ref="anonymous"/>
+        </resources>
+    </route>
+</routes>

@@ -1,0 +1,23 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Applies grid filters passed in the page URL (?filters[status]=failed) to
+ * the unified log grid — same mechanism the core CMS/product grids use, so
+ * the failed-deliveries banner and the dashboard tile can deep-link to a
+ * pre-filtered view.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+?>
+<script type="text/x-magento-init">
+    {
+        "*": {
+            "Magento_Ui/js/grid/url-filter-applier": {
+                "listingNamespace": "<?= $escaper->escapeJs((string)$block->getData('listing_namespace')) ?>"
+            }
+        }
+    }
+</script>

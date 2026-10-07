@@ -1,0 +1,188 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Subscribers panel — shared by the setup wizard (step 2) and the Settings
+ * page (Subscribers tab). The Settings context adds the master sync toggle
+ * the wizard implies. The contacts import (backfill) lives here on both
+ * surfaces; behavior lives in panel/panels-js.phtml.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
+$viewModel = $block->getData('view_model');
+$isSettings = $block->getData('context') === 'settings';
+$totals = $viewModel->getStoreTotals();
+// The import obeys this website's subscriber-sync switch exactly like the
+// live paths do (PRO-1764), so with the switch off the control is disabled
+// and says why instead of quoting numbers it will not send. Settings renders
+// the switch itself, so panels-js.phtml owns that state live there (boot JSON
+// at init, then every change) and this render must not second-guess it; the
+// wizard renders no switch, its handler early-returns, so the wizard is the
+// only context that answers server-side.
+$syncEnabled = $isSettings || $viewModel->isSyncEnabled();
+
+// Optional contact fields, server-rendered (same values the system.xml
+// multiselect edits).
+$syncFieldLabels = [
+    'first_name' => __('First name'),
+    'last_name' => __('Last name'),
+    'prefix' => __('Name prefix'),
+    'user_phone' => __('Phone'),
+    'user_gender' => __('Gender'),
+    'birthday' => __('Date of birth'),
+    'customer_id' => __('Customer ID'),
+    'customer_group' => __('Customer group'),
+    'subscription_type' => __('Subscription type'),
+];
+$selectedSyncFields = $viewModel->getSelectedSyncFields();
+?>
+<div class="smaily-card">
+    <?php // Settings has its own "Contacts" heading + description above the card
+    // (settings/index.phtml); the wizard puts the step title above the card
+    // (wizard/index.phtml, PRO-3561). ?>
+    <?php if ($isSettings): ?>
+    <div class="smaily-inline-toggle">
+        <label><input type="checkbox" id="smaily-w-sync-enabled"/>
+            <?= $escaper->escapeHtml(__('Sync contacts to Smaily')) ?></label>
+    </div>
+    <?php endif; ?>
+    <div id="smaily-w-subscribers-body">
+        <?php // "Change it later in Settings > Contacts" only helps in the setup. ?>
+        <p><?= $escaper->escapeHtml($isSettings
+            ? __('This is a lawful-basis choice. Pick the preset that matches how you have asked your customers for permission.')
+            : __('This is a lawful-basis choice. Pick the preset that matches how you have asked your customers for permission — you can change it later in Settings > Contacts.')) ?></p>
+        <?php
+        $subscriberModes = [
+            'consent' => [
+                'title' => __('Subscribers only (consent)'),
+                'desc' => __('Only customers who opted into the newsletter are synced. Unsubscribes in Smaily are mirrored back to Magento automatically (two-way sync).'),
+                'recommended' => true,
+            ],
+            'legitimate_interest' => [
+                'title' => __('All customers (legitimate interest)'),
+                'desc' => __('Every registered customer is synced; anyone who has not unsubscribed can receive your emails (soft opt-in). Soft opt-in allows marketing emails only about products similar to those the customer bought, and the customer must have had a clear way to refuse at purchase. Every email needs an unsubscribe link. You are responsible for the legal basis.'),
+                'recommended' => false,
+            ],
+            'checkout_optin' => [
+                'title' => __('Checkout opt-in only'),
+                'desc' => __('Nobody is synced automatically — only shoppers who tick the newsletter checkbox at checkout.'),
+                'recommended' => false,
+            ],
+        ];
+        ?>
+        <div id="smaily-w-mode-group">
+        <?php foreach ($subscriberModes as $modeValue => $card): ?>
+        <label class="smaily-choice<?= $modeValue === 'consent' ? ' is-selected' : '' ?>">
+            <input class="smaily-choice__input" type="radio" name="smaily-w-mode"
+                   value="<?= $escaper->escapeHtmlAttr($modeValue) ?>" <?= $modeValue === 'consent' ? 'checked' : '' ?>/>
+            <span class="smaily-choice__radio"></span>
+            <span class="smaily-choice__body">
+                <span class="smaily-choice__title-row">
+                    <span class="smaily-choice__title"><?= $escaper->escapeHtml($card['title']) ?></span>
+                    <?php if ($card['recommended']): ?>
+                        <span class="smaily-choice__badge"><?= $escaper->escapeHtml(__('Recommended')) ?></span>
+                    <?php endif; ?>
+                </span>
+                <span class="smaily-choice__desc"><?= $escaper->escapeHtml($card['desc']) ?></span>
+            </span>
+        </label>
+        <?php endforeach; ?>
+        </div>
+
+        <div class="smaily-field" style="margin-top:2rem;">
+            <label><?= $escaper->escapeHtml(__('Extra fields to sync with each contact')) ?></label>
+            <div id="smaily-w-fields">
+                <?php foreach ($syncFieldLabels as $fieldValue => $fieldLabel): ?>
+                <label>
+                    <input type="checkbox"
+                           value="<?= $escaper->escapeHtmlAttr($fieldValue) ?>"
+                           <?= in_array($fieldValue, $selectedSyncFields, true) ? 'checked' : '' ?>/>
+                    <?= $escaper->escapeHtml($fieldLabel) ?>
+                </label>
+                <?php endforeach; ?>
+            </div>
+            <p class="note"><?= $escaper->escapeHtml(__('Empty values are never sent, so existing Smaily data is not wiped.')) ?></p>
+        </div>
+        <?php // Orphan field (PRO-1397): native-config-only until now, real control added here.
+        // include_guests has no save-time mode dependency (only sync_enabled, handled
+        // above) — it takes effect only under legitimate interest, a read-time rule
+        // in Observer\OrderPlaced (PRO-3606), not a save-time UI constraint. ?>
+        <?php if ($isSettings): ?>
+        <div class="smaily-inline-toggle">
+            <label><input type="checkbox" id="smaily-w-include-guests"/>
+                <?= $escaper->escapeHtml(__('Include guest order emails')) ?></label>
+            <p class="note"><?= $escaper->escapeHtml(__('Also sync emails from guest orders without the checkout newsletter opt-in. Applies only in the All customers (legitimate interest) mode; in the other modes a guest is synced only after ticking the checkout newsletter checkbox.')) ?></p>
+        </div>
+        <?php endif; ?>
+        <div class="smaily-inline-toggle">
+            <label><input type="checkbox" id="smaily-w-checkout-optin" checked/>
+                <?= $escaper->escapeHtml(__('Show a newsletter checkbox at checkout')) ?></label>
+        </div>
+        <div class="smaily-inline-toggle">
+            <label><input type="checkbox" id="smaily-w-suppress" checked/>
+                <?= $escaper->escapeHtml(__('Let Smaily send the opt-in confirmation emails (suppresses Magento\'s own)')) ?></label>
+        </div>
+    </div>
+
+    <?php
+    // Magento's __() has no plural forms, so each count picks its own
+    // singular or plural phrase ("1 order", not "1 orders").
+    $storeCounts = [];
+    foreach ([
+        'orders' => [__('%1 order', $totals['orders']), __('%1 orders', $totals['orders'])],
+        'products' => [__('%1 product', $totals['products']), __('%1 products', $totals['products'])],
+    ] as $countKey => $countPhrases) {
+        $storeCounts[] = (string)$countPhrases[(int)$totals[$countKey] === 1 ? 0 : 1];
+    }
+    // The contact count is the audience the import sends under each
+    // contact-sync mode (PRO-3582): the sentence for the saved mode renders,
+    // and panels-js.phtml swaps in the one for the mode picked on the panel.
+    $importEstimates = [];
+    foreach ($viewModel->getContactImportCounts() as $countMode => $contactCount) {
+        $contactPhrase = $contactCount === 1
+            ? __('%1 contact to import', $contactCount)
+            : __('%1 contacts to import', $contactCount);
+        $importEstimates[$countMode] = (string)__(
+            'Your store has %1, %2 and %3. The import runs in the background, a chunk per minute, and never slows the storefront down.',
+            (string)$contactPhrase,
+            ...$storeCounts
+        );
+    }
+    $savedSyncMode = $viewModel->getSyncMode();
+    ?>
+    <?php // Pack "Backfill" card (PRO-3564): header with the state pill, the
+    // progress bar with "X of Y" and the percentage, the body line (the
+    // estimate before and during an import, the outcome after it), then the
+    // controls under a divider. panels-js.phtml renders the six states. ?>
+    <div class="smaily-card smaily-backfill-card" data-job-type="contacts" data-state="idle">
+        <div class="smaily-backfill-card__head">
+            <strong class="smaily-backfill-card__title"><?= $escaper->escapeHtml(__('Initial contact import')) ?></strong>
+            <span class="smaily-pill smaily-backfill-card__pill" style="display:none;"><span class="smaily-pill__dot"></span><span class="smaily-backfill-card__pill-text"></span></span>
+        </div>
+        <div class="smaily-backfill-card__progress" style="display:none;">
+            <div class="smaily-progress" id="smaily-w-backfill-bar">
+                <div class="smaily-progress__track"><div class="smaily-progress__fill"></div></div>
+            </div>
+            <div class="smaily-backfill-card__count"><span class="smaily-backfill-card__done"></span><span class="smaily-backfill-card__pct"></span></div>
+        </div>
+        <div class="smaily-backfill-card__intro">
+            <p class="note" id="smaily-w-backfill-estimate"<?php foreach ($importEstimates as $countMode => $estimate): ?> data-estimate-<?= $escaper->escapeHtmlAttr($countMode) ?>="<?= $escaper->escapeHtmlAttr($estimate) ?>"<?php endforeach; ?><?= $syncEnabled ? '' : ' style="display:none;"' ?>><?= $escaper->escapeHtml($importEstimates[$savedSyncMode] ?? '') ?></p>
+        </div>
+        <p class="note" id="smaily-w-backfill-off"<?= $syncEnabled ? ' style="display:none;"' : '' ?>><?= $escaper->escapeHtml(__('Contact synchronization is off for this website, so an import would send nothing. Turn it on and save to import.')) ?></p>
+        <div class="smaily-backfill-verdict" style="display:none;"><span class="smaily-backfill-verdict__icon"></span><span class="smaily-backfill-verdict__text"></span></div>
+        <div class="smaily-backfill-card__link" style="display:none;"></div>
+        <div class="smaily-backfill-card__controls">
+            <button type="button" class="action-primary smaily-backfill-card__start" id="smaily-w-backfill"<?= $syncEnabled ? '' : ' disabled' ?>>
+                <span><?= $escaper->escapeHtml(__('Start import')) ?></span>
+            </button>
+            <button type="button" class="action-secondary smaily-backfill-card__cancel" id="smaily-w-backfill-cancel" style="display:none;">
+                <span><?= $escaper->escapeHtml(__('Cancel import')) ?></span>
+            </button>
+            <span class="smaily-result" id="smaily-w-backfill-result"></span>
+        </div>
+    </div>
+</div>

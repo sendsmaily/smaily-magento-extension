@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <head>
+        <css src="Smaily_Connect::css/smaily-admin.css"/>
+    </head>
+    <body>
+        <referenceContainer name="content">
+            <block class="Magento\Backend\Block\Template"
+                   name="smaily.settings"
+                   template="Smaily_Connect::settings/index.phtml">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\WizardData</argument>
+                </arguments>
+                <block class="Magento\Backend\Block\Template"
+                       name="smaily.panel.connection" as="panel.connection"
+                       template="Smaily_Connect::panel/connection.phtml">
+                    <arguments>
+                        <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\WizardData</argument>
+                        <argument name="context" xsi:type="string">settings</argument>
+                    </arguments>
+                </block>
+                <block class="Magento\Backend\Block\Template"
+                       name="smaily.panel.subscribers" as="panel.subscribers"
+                       template="Smaily_Connect::panel/subscribers.phtml">
+                    <arguments>
+                        <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\WizardData</argument>
+                        <argument name="context" xsi:type="string">settings</argument>
+                    </arguments>
+                </block>
+                <block class="Magento\Backend\Block\Template"
+                       name="smaily.panel.automations" as="panel.automations"
+                       template="Smaily_Connect::panel/automations.phtml">
+                    <arguments>
+                        <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\WizardData</argument>
+                    </arguments>
+                </block>
+                <block class="Magento\Backend\Block\Template"
+                       name="smaily.engine.automations" as="engine.automations"
+                       template="Smaily_Connect::config/engine-automations.phtml">
+                    <arguments>
+                        <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\AutomationsForm</argument>
+                    </arguments>
+                </block>
+                <block class="Magento\Backend\Block\Template"
+                       name="smaily.panel.intelligence" as="panel.intelligence"
+                       template="Smaily_Connect::panel/intelligence.phtml">
+                    <arguments>
+                        <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\WizardData</argument>
+                        <argument name="context" xsi:type="string">settings</argument>
+                    </arguments>
+                </block>
+                <block class="Magento\Backend\Block\Template"
+                       name="smaily.panel.rss" as="panel.rss"
+                       template="Smaily_Connect::panel/rss.phtml">
+                    <block class="Smaily\Connect\Block\Adminhtml\Config\RssUrlBuilder"
+                           name="smaily.panel.rss.builder" as="rss.builder"
+                           template="Smaily_Connect::config/rss-builder.phtml"/>
+                </block>
+                <block class="Magento\Backend\Block\Template"
+                       name="smaily.panel.js" as="panel.js"
+                       template="Smaily_Connect::panel/panels-js.phtml">
+                    <arguments>
+                        <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\WizardData</argument>
+                    </arguments>
+                </block>
+            </block>
+        </referenceContainer>
+    </body>
+</page>

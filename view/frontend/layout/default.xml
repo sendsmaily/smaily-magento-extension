@@ -1,23 +1,28 @@
 <?xml version="1.0"?>
-<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <body>
-        <referenceContainer name="footer">
-            <referenceBlock name="form.subscribe">
-                <container name="smaily.smailyformagento.captcha" label="Newsletter subscribe form CAPTCHA" htmlTag="div" htmlId="smaily-smailyformagento-captcha">
-                    <block class="Smaily\SmailyForMagento\Block\Captcha" name="smaily.smailyformagento.magento_captcha" ifconfig="smaily/subscribe/enableCaptcha">
-                        <action method="setFormId">
-                            <argument name="formId" xsi:type="string">smaily_captcha</argument>
-                        </action>
-                        <action method="setImgWidth">
-                            <argument name="width" xsi:type="string">230</argument>
-                        </action>
-                        <action method="setImgHeight">
-                            <argument name="width" xsi:type="string">50</argument>
-                        </action>
-                    </block>
-                    <block class="Smaily\SmailyForMagento\Block\ReCaptcha" name="smaily.smailyformagento.google_captcha" template="Smaily_SmailyForMagento::optin/recaptcha.phtml" ifconfig="smaily/subscribe/enableCaptcha" />
-                </container>
-            </referenceBlock>
+        <referenceContainer name="before.body.end">
+            <block class="Magento\Framework\View\Element\Template"
+                   name="smaily.connect.attribution"
+                   template="Smaily_Connect::engine/attribution.phtml">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\EngineState</argument>
+                </arguments>
+            </block>
+            <block class="Magento\Framework\View\Element\Template"
+                   name="smaily.connect.tracker"
+                   template="Smaily_Connect::engine/tracker.phtml">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\EngineState</argument>
+                </arguments>
+            </block>
         </referenceContainer>
     </body>
 </page>

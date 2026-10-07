@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <!-- Registers this module's templates with `bin/magento hyva:config:generate`
+         (app/etc/hyva-themes.json) so the theme's Tailwind build scans them
+         for CSS classes. Canonical Hyvä pattern:
+         https://docs.hyva.io/hyva-themes/working-with-tailwindcss/registering-a-module-for-tailwind-compilation.html -->
+    <event name="hyva_config_generate_before">
+        <observer name="hyva_smaily_connect_register_hyva_config"
+                  instance="Hyva\SmailyConnect\Observer\RegisterModuleForHyvaConfig"/>
+    </event>
+</config>

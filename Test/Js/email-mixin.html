@@ -1,0 +1,531 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for view/frontend/web/js/view/form/element/email-mixin.js
+  (PRO-3693). It loads Magento's own checkout email component and url-builder
+  from vendor/, applies the mixin the way view/frontend/requirejs-config.js
+  declares it, and stubs the rest of the checkout (uiComponent, ko, jQuery's
+  validation, the customer and quote models, mage/storage). Run it with
+  bin/test-js.sh; the page ends with "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>email-mixin harness</title>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var MASKED_ID = 'hTx9bQ2mVd3kP0aLzR7sYw4nC1eF6gJ8';
+    var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
+    var factories = {};
+    var pendingName = null;
+    var failures = 0;
+    var passes = 0;
+
+    // A minimal AMD define(): an anonymous module takes the name it is loaded under.
+    function define(name, deps, factory) {
+        if (typeof name !== 'string') {
+            factory = deps;
+            deps = name;
+            name = pendingName;
+        }
+        if (typeof deps === 'function') {
+            factory = deps;
+            deps = [];
+        }
+        factories[name] = {deps: deps, factory: factory};
+    }
+    define.amd = {};
+
+    function loadScript(name, src) {
+        return new Promise(function (resolve, reject) {
+            var script = document.createElement('script');
+
+            pendingName = name;
+            script.src = src;
+            script.onload = function () {
+                pendingName = null;
+                resolve();
+            };
+            script.onerror = function () {
+                reject(new Error('cannot load ' + src));
+            };
+            document.head.appendChild(script);
+        });
+    }
+
+    // Instantiates a module and its dependencies in one fresh registry, then
+    // applies the mixins requirejs-config.js declares for it, as Magento does.
+    function instantiate(registry, name) {
+        var def, module, mixins;
+
+        if (Object.prototype.hasOwnProperty.call(registry, name)) {
+            return registry[name];
+        }
+        def = factories[name];
+        if (!def) {
+            throw new Error('no module ' + name);
+        }
+        module = def.factory.apply(null, def.deps.map(function (dep) {
+            return instantiate(registry, dep);
+        }));
+        mixins = (config.config.mixins || {})[name] || {};
+        Object.keys(mixins).forEach(function (mixinName) {
+            if (mixins[mixinName]) {
+                module = instantiate(registry, mixinName)(module);
+            }
+        });
+        registry[name] = module;
+
+        return module;
+    }
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    function makeKo() {
+        return {
+            observable: function (value) {
+                var subscribers = [];
+
+                function observable(next) {
+                    if (arguments.length) {
+                        if (next !== value) {
+                            value = next;
+                            subscribers.slice().forEach(function (fn) {
+                                fn(value);
+                            });
+                        }
+
+                        return observable;
+                    }
+
+                    return value;
+                }
+                observable.subscribe = function (fn) {
+                    subscribers.push(fn);
+                };
+
+                return observable;
+            }
+        };
+    }
+
+    // uiComponent as far as the email component uses it: defaults, observe(),
+    // listens and _super.
+    function makeUiComponent(ko) {
+        function wrap(parentFn, fn) {
+            return function () {
+                var previous = this._super,
+                    result;
+
+                this._super = parentFn || function () {
+                    return this;
+                };
+                try {
+                    result = fn.apply(this, arguments);
+                } finally {
+                    this._super = previous;
+                }
+
+                return result;
+            };
+        }
+
+        function extendFrom(Parent) {
+            return function (props) {
+                function Child() {
+                    this.initialize();
+                }
+                Child.prototype = Object.create(Parent.prototype);
+                Child.prototype.constructor = Child;
+                Child.defaults = Object.assign({}, Parent.defaults, props.defaults || {});
+                Object.keys(props).forEach(function (key) {
+                    if (key !== 'defaults') {
+                        Child.prototype[key] = typeof props[key] === 'function'
+                            ? wrap(Parent.prototype[key], props[key])
+                            : props[key];
+                    }
+                });
+                Child.extend = extendFrom(Child);
+
+                return Child;
+            };
+        }
+
+        function Base() {}
+        Base.defaults = {};
+        Base.prototype.initialize = function () {
+            this.initConfig();
+            this.initObservable();
+            this.initLinks();
+
+            return this;
+        };
+        Base.prototype.initConfig = function () {
+            var defaults = this.constructor.defaults;
+
+            Object.keys(defaults).forEach(function (key) {
+                if (['listens', 'ignoreTmpls', 'template'].indexOf(key) === -1) {
+                    this[key] = defaults[key];
+                }
+            }, this);
+
+            return this;
+        };
+        Base.prototype.initObservable = function () {
+            return this;
+        };
+        Base.prototype.observe = function (names) {
+            names.forEach(function (name) {
+                this[name] = ko.observable(this[name]);
+            }, this);
+
+            return this;
+        };
+        Base.prototype.initLinks = function () {
+            var listens = this.constructor.defaults.listens || {};
+
+            Object.keys(listens).forEach(function (property) {
+                this[property].subscribe(this[listens[property]].bind(this));
+            }, this);
+
+            return this;
+        };
+        Base.extend = extendFrom(Base);
+
+        return Base;
+    }
+
+    function makeDeferred() {
+        var state = 'pending',
+            callbacks = {done: [], fail: [], always: []},
+            deferred;
+
+        function settle(next, list) {
+            if (state === 'pending') {
+                state = next;
+                callbacks[list].concat(callbacks.always).forEach(function (fn) {
+                    fn();
+                });
+            }
+
+            return deferred;
+        }
+
+        function on(list, when) {
+            return function (fn) {
+                if (state === 'pending') {
+                    callbacks[list].push(fn);
+                } else if (when === null || state === when) {
+                    fn();
+                }
+
+                return deferred;
+            };
+        }
+
+        deferred = {
+            readyState: 4,
+            resolve: function () {
+                return settle('resolved', 'done');
+            },
+            reject: function () {
+                return settle('rejected', 'fail');
+            },
+            done: on('done', 'resolved'),
+            fail: on('fail', 'rejected'),
+            always: on('always', null),
+            abort: function () {}
+        };
+
+        return deferred;
+    }
+
+    // jQuery as far as the email component uses it; the login form's
+    // validation answers with an email check on the field's current value.
+    function makeJquery(state) {
+        function isValid() {
+            return EMAIL_RE.test(state.component ? state.component.email() || '' : '');
+        }
+
+        function $() {
+            var api = {
+                validation: function () {
+                    return api;
+                },
+                validate: function () {
+                    return {
+                        check: isValid
+                    };
+                },
+                valid: isValid,
+                is: function () {
+                    return true;
+                },
+                removeAttr: function () {
+                    return api;
+                },
+                removeClass: function () {
+                    return api;
+                },
+                parent: function () {
+                    return api;
+                },
+                find: function () {
+                    return api;
+                },
+                remove: function () {
+                    return api;
+                }
+            };
+
+            return api;
+        }
+        $.Deferred = makeDeferred;
+        $.when = function (deferred) {
+            return deferred;
+        };
+        $.each = function (list, fn) {
+            list.forEach(function (value, index) {
+                fn(index, value);
+            });
+        };
+        $.inArray = function (value, list) {
+            return list.indexOf(value);
+        };
+
+        return $;
+    }
+
+    // One fresh checkout page: every stub and both real modules instantiated anew.
+    function checkoutPage(options) {
+        var state = {posts: [], availabilityChecks: [], component: null},
+            ko = makeKo(),
+            storageData = {
+                validated: options.storedValidatedEmail || '',
+                input: options.storedValidatedEmail || '',
+                checked: ''
+            },
+            registry = {},
+            Email;
+
+        registry.jquery = makeJquery(state);
+        registry.ko = ko;
+        registry.uiComponent = makeUiComponent(ko);
+        registry['mage/validation'] = {};
+        registry['Magento_Customer/js/model/customer'] = {isLoggedIn: ko.observable(!!options.loggedIn)};
+        registry['Magento_Customer/js/action/check-email-availability'] = function (deferred, email) {
+            state.availabilityChecks.push(email);
+            if (options.emailHasAccount) {
+                deferred.reject();
+            } else {
+                deferred.resolve();
+            }
+
+            return makeDeferred();
+        };
+        registry['Magento_Customer/js/action/login'] = function () {};
+        registry['Magento_Checkout/js/model/full-screen-loader'] = {
+            startLoader: function () {},
+            stopLoader: function () {}
+        };
+        registry['Magento_Checkout/js/model/quote'] = {
+            guestEmail: null,
+            getQuoteId: function () {
+                return options.loggedIn ? '42' : MASKED_ID;
+            }
+        };
+        registry['Magento_Checkout/js/checkout-data'] = {
+            getValidatedEmailValue: function () {
+                return storageData.validated;
+            },
+            setValidatedEmailValue: function (value) {
+                storageData.validated = value;
+            },
+            getInputFieldEmailValue: function () {
+                return storageData.input;
+            },
+            setInputFieldEmailValue: function (value) {
+                storageData.input = value;
+            },
+            getCheckedEmailValue: function () {
+                return storageData.checked;
+            },
+            setCheckedEmailValue: function (value) {
+                storageData.checked = value;
+            }
+        };
+        registry['mage/storage'] = {
+            post: function (url, data, global) {
+                var request = makeDeferred();
+
+                state.posts.push({url: url, data: data, global: global});
+                if (options.postFails) {
+                    request.reject();
+                } else {
+                    request.resolve();
+                }
+
+                return request;
+            }
+        };
+
+        window.checkoutConfig = {
+            storeCode: 'default',
+            forgotPasswordUrl: '',
+            validatedEmailValue: '',
+            smailyGuestCartEmail: !options.abandonedCartOff
+        };
+        Email = instantiate(registry, 'Magento_Checkout/js/view/form/element/email');
+        state.Email = Email;
+        state.component = new Email();
+
+        return state;
+    }
+
+    // A shopper types one character at a time, faster than Magento's pause.
+    async function type(component, text) {
+        var i;
+
+        for (i = 1; i <= text.length; i++) {
+            component.email(text.slice(0, i));
+            await wait(150);
+        }
+    }
+
+    async function settle(component) {
+        await wait(component.checkDelay + 500);
+    }
+
+    async function run() {
+        var page, comp, expectedUrl, second;
+
+        expectedUrl = 'rest/default/V1/smaily-connect/guest-carts/' + MASKED_ID + '/email';
+
+        log('# a guest types an address');
+        page = checkoutPage({});
+        comp = page.component;
+        await type(comp, 'guest@exa');
+        await settle(comp);
+        check('an incomplete address sends nothing', page.posts.length === 0);
+        check('Magento did not check it either', page.availabilityChecks.length === 0);
+        await type(comp, 'guest@example.com'.slice(0));
+        check('nothing is sent while the shopper types', page.posts.length === 0);
+        await settle(comp);
+        check('one request once the address is valid', page.posts.length === 1);
+        check('to the guest cart by its masked id', page.posts[0] && page.posts[0].url === expectedUrl);
+        check('carrying the address', page.posts[0] && page.posts[0].data === '{"email":"guest@example.com"}');
+        check('without global ajax handlers', page.posts[0] && page.posts[0].global === false);
+        check('Magento\'s own check still ran', page.availabilityChecks.join() === 'guest@example.com');
+
+        log('# the same address again, then another, then the first again');
+        comp.emailFocused(true);
+        comp.emailFocused(false);
+        await settle(comp);
+        check('leaving the field sends nothing more', page.posts.length === 1);
+        comp.email('guest@example.co');
+        comp.email('guest@example.com');
+        await settle(comp);
+        check('retyping the same address sends nothing more', page.posts.length === 1);
+        comp.email('');
+        await type(comp, 'other@example.com');
+        await settle(comp);
+        check('a changed address is sent', page.posts.length === 2
+            && page.posts[1].data === '{"email":"other@example.com"}');
+        comp.email('guest@example.com');
+        await settle(comp);
+        check('changing back is sent, so the cart has the address the field holds', page.posts.length === 3
+            && page.posts[2].data === '{"email":"guest@example.com"}');
+        comp.email('not an address');
+        await settle(comp);
+        check('an invalid value sends nothing', page.posts.length === 3);
+
+        log('# a signed-in customer');
+        page = checkoutPage({loggedIn: true});
+        await type(page.component, 'customer@example.com');
+        await settle(page.component);
+        check('a signed-in customer sends nothing', page.posts.length === 0);
+
+        log('# the field opens with an address Magento validated earlier');
+        page = checkoutPage({storedValidatedEmail: 'returning@example.com'});
+        check('the stored address is sent at once', page.posts.length === 1
+            && page.posts[0].data === '{"email":"returning@example.com"}');
+        second = new page.Email();
+        check('a second email field on the page does not send it again', page.posts.length === 1 && !!second);
+        page = checkoutPage({storedValidatedEmail: 'returning@example.com', loggedIn: true});
+        check('nor for a signed-in customer', page.posts.length === 0);
+
+        log('# the abandoned-cart automation is off for the website');
+        page = checkoutPage({abandonedCartOff: true, storedValidatedEmail: 'returning@example.com'});
+        check('the stored address is not sent', page.posts.length === 0);
+        await type(page.component, 'guest@example.com');
+        await settle(page.component);
+        check('a typed address is not sent', page.posts.length === 0);
+        check('Magento\'s own check still runs', page.availabilityChecks.join() === 'guest@example.com');
+
+        log('# the address has an account and the request fails');
+        page = checkoutPage({emailHasAccount: true, postFails: true});
+        await type(page.component, 'member@example.com');
+        await settle(page.component);
+        check('the address is sent', page.posts.length === 1);
+        check('Magento still offers the password field', page.component.isPasswordVisible() === true);
+        check('and stops its loader', page.component.isLoading() === false);
+    }
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping while the scripts load
+    // until the result is written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    // One script at a time: an anonymous define() takes the pending name.
+    [
+        ['Magento_Checkout/js/view/form/element/email',
+            '../../vendor/magento/module-checkout/view/frontend/web/js/view/form/element/email.js'],
+        ['Magento_Checkout/js/model/url-builder',
+            '../../vendor/magento/module-checkout/view/frontend/web/js/model/url-builder.js'],
+        ['Smaily_Connect/js/view/form/element/email-mixin',
+            '../../view/frontend/web/js/view/form/element/email-mixin.js'],
+        ['requirejs-config', '../../view/frontend/requirejs-config.js']
+    ].reduce(function (chain, script) {
+        return chain.then(function () {
+            return loadScript(script[0], script[1]);
+        });
+    }, Promise.resolve()).then(run).then(function () {
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    }).catch(function (error) {
+        document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }).then(function () {
+        clearInterval(keepAlive);
+    });
+</script>
+</body>
+</html>

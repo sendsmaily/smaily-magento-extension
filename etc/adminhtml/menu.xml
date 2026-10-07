@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <add id="Smaily_Connect::connect" title="Smaily Connect" module="Smaily_Connect"
+             sortOrder="70" parent="Magento_Backend::marketing"
+             resource="Smaily_Connect::connect"/>
+        <!-- Not "::dashboard": the menu renders the id's tail as the CSS class
+             (item-dashboard), and Magento's own menu stylesheet puts its
+             Dashboard icon glyph before any .item-dashboard link, which shows
+             as a missing-glyph box in a sub-menu. -->
+        <add id="Smaily_Connect::connect_dashboard" title="Dashboard" module="Smaily_Connect"
+             sortOrder="10" parent="Smaily_Connect::connect"
+             action="smaily_connect/dashboard" resource="Smaily_Connect::connect"/>
+        <add id="Smaily_Connect::wizard" title="Initial setup" module="Smaily_Connect"
+             sortOrder="20" parent="Smaily_Connect::connect"
+             action="smaily_connect/wizard" resource="Smaily_Connect::config"/>
+        <add id="Smaily_Connect::settings" title="Settings" module="Smaily_Connect"
+             sortOrder="30" parent="Smaily_Connect::connect"
+             action="smaily_connect/settings" resource="Smaily_Connect::config"/>
+        <add id="Smaily_Connect::log" title="Log" module="Smaily_Connect"
+             sortOrder="40" parent="Smaily_Connect::connect"
+             action="smaily_connect/log" resource="Smaily_Connect::event_log"/>
+    </menu>
+</config>

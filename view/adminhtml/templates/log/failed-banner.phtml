@@ -1,0 +1,33 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Failed-deliveries banner above the unified log grid. Renders nothing at
+ * zero failures; otherwise one sentence with a link to this same grid
+ * pre-filtered to status=failed (applied by the url-filter-applier block).
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\Adminhtml\LogHealth $viewModel */
+$viewModel = $block->getData('view_model');
+$failed = $viewModel->getFailedLast24h();
+if ($failed < 1) {
+    return;
+}
+
+$failedUrl = $block->getUrl('smaily_connect/log', ['_query' => ['filters' => ['status' => 'failed']]]);
+?>
+<div class="smaily-banner smaily-banner--warning smaily-log-failed-banner">
+    <span class="smaily-banner__icon">&#9888;</span>
+    <div class="smaily-banner__body">
+        <?php // Magento's __() has no plural forms: one phrase per number. ?>
+        <div class="smaily-banner__title"><?= $escaper->escapeHtml($failed === 1
+            ? __('%1 event failed in the last 24 hours', $failed)
+            : __('%1 events failed in the last 24 hours', $failed)) ?></div>
+        <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Most retry automatically with backoff; anything still failed can be retried manually from the grid.')) ?></div>
+    </div>
+    <a class="smaily-banner__action" href="<?= $escaper->escapeUrl($failedUrl) ?>"><?= $escaper->escapeHtml(__('Show failed (24h)')) ?></a>
+</div>

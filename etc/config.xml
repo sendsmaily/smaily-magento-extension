@@ -1,25 +1,44 @@
 <?xml version="1.0"?>
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
-   <default>
-       <customer>
-           <captcha>
-               <forms>user_forgotpassword,user_login,smaily_captcha</forms>
-               <shown_to_logged_in_user>
-                   <smaily_captcha>1</smaily_captcha>
-               </shown_to_logged_in_user>
-               <always_for>
-                   <smaily_captcha>1</smaily_captcha>
-               </always_for>
-           </captcha>
-       </customer>
-       <captcha translate="label">
-           <frontend>
-               <areas>
-                   <smaily_captcha>
-                       <label>Newsletter form</label>
-                   </smaily_captcha>
-               </areas>
-           </frontend>
-       </captcha>
-   </default>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <smaily_connect>
+            <connection>
+                <subdomain/>
+                <username/>
+                <password/>
+                <multilingual_mode>single</multilingual_mode>
+            </connection>
+            <subscribers>
+                <sync_enabled>1</sync_enabled>
+                <sync_mode>consent</sync_mode>
+                <sync_fields>first_name,last_name,prefix,user_phone,user_gender,birthday,customer_id,customer_group,subscription_type</sync_fields>
+                <include_guests>0</include_guests>
+                <checkout_optin_enabled>1</checkout_optin_enabled>
+                <suppress_optin_emails>1</suppress_optin_emails>
+            </subscribers>
+            <automations>
+                <welcome_enabled>0</welcome_enabled>
+                <first_order_enabled>0</first_order_enabled>
+                <abandoned_enabled>0</abandoned_enabled>
+                <abandoned_cutoff>30</abandoned_cutoff>
+            </automations>
+            <rss>
+                <enabled>1</enabled>
+            </rss>
+            <intelligence>
+                <connected>0</connected>
+                <browse_tracking>0</browse_tracking>
+            </intelligence>
+            <logging>
+                <verbosity>error</verbosity>
+            </logging>
+        </smaily_connect>
+    </default>
 </config>

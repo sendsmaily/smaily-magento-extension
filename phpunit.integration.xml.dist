@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Integration suite: real MySQL required (SMAILY_IT_DB_* env vars,
+    see TESTING.md). Separate config because the bootstrap boots a
+    database-backed object graph the unit suite must not depend on.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         bootstrap="Test/Integration/bootstrap.php"
+         colors="true"
+         cacheResultFile="var/.phpunit.integration.result.cache">
+    <testsuites>
+        <testsuite name="integration">
+            <directory>Test/Integration</directory>
+            <exclude>Test/Integration/Support</exclude>
+        </testsuite>
+    </testsuites>
+</phpunit>

@@ -1,0 +1,47 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * @var \Magento\Framework\View\Element\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\PrivacyForm $viewModel */
+$viewModel = $block->getData('view_model');
+// True / false only when the store knows the shopper's choice; null when
+// Smaily could not be read and the store holds no opt-out (PRO-3591).
+$known = $viewModel->getKnownPreference();
+?>
+<form action="<?= $escaper->escapeUrl($block->getUrl('smaily/privacy/save')) ?>" method="post">
+    <?= $block->getBlockHtml('formkey') ?>
+    <fieldset class="fieldset">
+        <legend class="legend"><span><?= $escaper->escapeHtml(__('Personalized Recommendations')) ?></span></legend>
+        <p><?= $escaper->escapeHtml(__('We use your shopping activity to personalize product recommendations in our newsletters. You can opt out at any time; newsletters will then show generic content.')) ?></p>
+        <?php if ($known === null): ?>
+            <p><?= $escaper->escapeHtml(__('We could not load your personalization preference right now. Please try again later.')) ?></p>
+        <?php else: ?>
+            <div class="field choice">
+                <input type="checkbox"
+                       id="smaily-profiling-allowed"
+                       name="profiling_allowed"
+                       value="1"
+                       class="checkbox"
+                       <?= $known ? 'checked' : '' ?>/>
+                <label class="label" for="smaily-profiling-allowed">
+                    <span><?= $escaper->escapeHtml(__('Allow personalized recommendations')) ?></span>
+                </label>
+            </div>
+        <?php endif; ?>
+    </fieldset>
+    <div class="actions-toolbar">
+        <div class="primary">
+            <?php /* Without the checkbox the form posts no profiling_allowed, which Save reads as an opt-out. */ ?>
+            <button type="submit" class="action save primary">
+                <span><?= $escaper->escapeHtml($known === null
+                    ? __('Opt out of personalized recommendations')
+                    : __('Save Preference')) ?></span>
+            </button>
+        </div>
+    </div>
+</form>

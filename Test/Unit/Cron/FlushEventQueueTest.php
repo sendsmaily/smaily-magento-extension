@@ -1,0 +1,303 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+
+declare(strict_types=1);
+
+namespace Smaily\Connect\Test\Unit\Cron;
+
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Api\Queue\EventHandlerInterface;
+use Smaily\Connect\Api\Queue\PausableEventHandlerInterface;
+use Smaily\Connect\Cron\FlushEventQueue;
+use Smaily\Connect\Model\Client\Exception\RequestRefusedException;
+use Smaily\Connect\Model\Client\Exception\TransportException;
+use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
+use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Queue\Event;
+use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\Failure;
+use Smaily\Connect\Model\Queue\HandlerPool;
+use Smaily\Connect\Model\Queue\Pending;
+use Smaily\Connect\Model\Queue\Skipped;
+use Smaily\Connect\Test\Unit\Support\StoreLocale;
+
+class FlushEventQueueTest extends TestCase
+{
+    private EventQueue&MockObject $eventQueue;
+
+    protected function setUp(): void
+    {
+        $this->eventQueue = $this->createMock(EventQueue::class);
+    }
+
+    public function testNoEventsIsANoOp(): void
+    {
+        $this->eventQueue->method('claimBatch')->willReturn([]);
+        $this->eventQueue->expects(self::never())->method('markSent');
+        $this->eventQueue->expects(self::never())->method('markFailed');
+
+        $this->createCron(new HandlerPool([]))->execute();
+    }
+
+    /**
+     * PRO-1961: parked on the spot as what it is — a row no handler takes —
+     * with its real attempt count, not made to look like five used attempts.
+     */
+    public function testMissingHandlerParksEventsPermanently(): void
+    {
+        $event = $this->createEvent(1, 'unknown.type');
+        $this->eventQueue->method('claimBatch')->willReturn([$event]);
+
+        $event->expects(self::never())->method('setData');
+        $this->eventQueue->expects(self::once())->method('markFailed')
+            ->with($event, 'No handler registered for "unknown.type"', null, null, null, true);
+
+        $this->createCron(new HandlerPool([]))->execute();
+    }
+
+    /**
+     * PRO-1961: a handler's own verdict that a row can never be sent, and an
+     * engine refusal handed on whole, stop on the first attempt.
+     */
+    public function testAHandlerVerdictAndAnEngineRefusalStopOnTheFirstAttempt(): void
+    {
+        $malformed = $this->createEvent(1, 'identity.merge');
+        $refused = $this->createEvent(2, 'identity.merge');
+        $this->eventQueue->method('claimBatch')->willReturn([$malformed, $refused]);
+
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willReturn([
+            1 => Failure::permanent('Malformed identity merge payload'),
+            2 => new EngineRequestException('Engine request failed with HTTP 422: unknown session', 422),
+        ]);
+
+        $calls = [];
+        $this->eventQueue->method('markFailed')->willReturnCallback(
+            function (
+                Event $event,
+                string $error,
+                ?string $sentPayload,
+                ?string $response,
+                ?int $retryAfter,
+                bool $terminal
+            ) use (&$calls): void {
+                $calls[(int)$event->getId()] = [$error, $terminal];
+            }
+        );
+
+        $this->createCron(new HandlerPool(['identity.merge' => $handler]))->execute();
+
+        self::assertSame([
+            1 => ['Malformed identity merge payload', true],
+            2 => ['permanent_http_422: Engine request failed with HTTP 422: unknown session', true],
+        ], $calls);
+    }
+
+    public function testHandlerResultsAreMappedPerEvent(): void
+    {
+        $ok = $this->createEvent(1, 'contact.sync');
+        $bad = $this->createEvent(2, 'contact.sync');
+        $this->eventQueue->method('claimBatch')->willReturn([$ok, $bad]);
+
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willReturn([1 => true, 2 => 'invalid email']);
+
+        $this->eventQueue->expects(self::once())->method('markSent')->with($ok);
+        $this->eventQueue->expects(self::once())->method('markFailed')->with($bad, 'invalid email');
+
+        $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
+    }
+
+    public function testTransportFailureReschedulesWholeBatch(): void
+    {
+        $first = $this->createEvent(1, 'contact.sync');
+        $second = $this->createEvent(2, 'contact.sync');
+        $this->eventQueue->method('claimBatch')->willReturn([$first, $second]);
+
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willThrowException(new TransportException('API down', 503));
+
+        $this->eventQueue->expects(self::exactly(2))->method('markFailed');
+        $this->eventQueue->expects(self::never())->method('markSent');
+
+        $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
+    }
+
+    public function testPermanentRefusalParksTheWholeBatchAtOnce(): void
+    {
+        $first = $this->createEvent(1, 'contact.sync');
+        $second = $this->createEvent(2, 'contact.sync');
+        $this->eventQueue->method('claimBatch')->willReturn([$first, $second]);
+
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willThrowException(new RequestRefusedException('Gone', 404));
+
+        $this->eventQueue->expects(self::exactly(2))->method('markFailed')
+            ->with(self::anything(), self::stringContains('permanent_http_404'), null, null, null, true);
+
+        $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
+    }
+
+    public function testAPerEventRefusalIsClassifiedWhereItWasThrown(): void
+    {
+        $refused = $this->createEvent(1, 'contact.sync');
+        $slowedDown = $this->createEvent(2, 'contact.sync');
+        $this->eventQueue->method('claimBatch')->willReturn([$refused, $slowedDown]);
+
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willReturn([
+            1 => new RequestRefusedException('Unprocessable', 422),
+            2 => new TransportException('Slow down', 429, null, 90),
+        ]);
+
+        $calls = [];
+        $this->eventQueue->method('markFailed')->willReturnCallback(
+            function (
+                Event $event,
+                string $error,
+                ?string $sentPayload,
+                ?string $response,
+                ?int $retryAfter,
+                bool $terminal
+            ) use (&$calls): void {
+                $calls[(int)$event->getId()] = [$error, $retryAfter, $terminal];
+            }
+        );
+
+        $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
+
+        self::assertStringContainsString('permanent_http_422', $calls[1][0]);
+        self::assertTrue($calls[1][2], 'A 422 is parked on the spot');
+        self::assertSame(['Slow down', 90, false], $calls[2]);
+    }
+
+    /**
+     * PRO-3619: a row the handler skipped is closed for good with its
+     * reason — not delivered, not failed, nothing left to retry.
+     */
+    public function testASkippedRowIsClosedWithItsReason(): void
+    {
+        $event = $this->createEvent(3, 'contact.sync');
+        $this->eventQueue->method('claimBatch')->willReturn([$event]);
+
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willReturn([3 => new Skipped('Smaily does not have this contact')]);
+
+        $this->eventQueue->expects(self::once())->method('markSkipped')
+            ->with($event, 'Smaily does not have this contact');
+        $this->eventQueue->expects(self::never())->method('markSent');
+        $this->eventQueue->expects(self::never())->method('markFailed');
+
+        $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
+    }
+
+    /**
+     * PRO-2466: a row the handler leaves pending goes back as it was — no
+     * attempt spent, nothing recorded.
+     */
+    public function testARowLeftPendingIsReleasedAsItWas(): void
+    {
+        $waiting = $this->createEvent(1, 'engine.identity_merge');
+        $sent = $this->createEvent(2, 'engine.identity_merge');
+        $this->eventQueue->method('claimBatch')->willReturn([$waiting, $sent]);
+
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willReturn([1 => new Pending(), 2 => true]);
+
+        $this->eventQueue->expects(self::once())->method('release')->with([$waiting]);
+        $this->eventQueue->expects(self::once())->method('markSent')->with($sent);
+        $this->eventQueue->expects(self::never())->method('markFailed');
+
+        $this->createCron(new HandlerPool(['engine.identity_merge' => $handler]))->execute();
+    }
+
+    /**
+     * PRO-2466: the rows of a handler that cannot send now are not claimed,
+     * so they wait without crowding out the rows that can go.
+     */
+    public function testThePausedHandlersRowsAreNotClaimed(): void
+    {
+        $paused = $this->createMock(PausableEventHandlerInterface::class);
+        $paused->method('isPaused')->willReturn(true);
+        $active = $this->createMock(PausableEventHandlerInterface::class);
+        $active->method('isPaused')->willReturn(false);
+
+        $this->eventQueue->expects(self::once())->method('claimBatch')
+            ->with(200, ['engine.identity_merge'])->willReturn([]);
+
+        $this->createCron(new HandlerPool([
+            'contact.sync' => $this->createMock(EventHandlerInterface::class),
+            'engine.identity_merge' => $paused,
+            'engine.profiling_consent' => $active,
+        ]))->execute();
+    }
+
+    public function testMissingResultIsAFailure(): void
+    {
+        $event = $this->createEvent(5, 'contact.sync');
+        $this->eventQueue->method('claimBatch')->willReturn([$event]);
+
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willReturn([]);
+
+        $this->eventQueue->expects(self::once())->method('markFailed')
+            ->with($event, self::stringContains('no result'));
+
+        $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
+    }
+
+    public function testHandlerPoolRejectsInvalidHandlers(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        new HandlerPool(['contact.sync' => new \stdClass()]); // @phpstan-ignore argument.type
+    }
+
+    /**
+     * PRO-3628: the log file records a batch failure in English, whatever
+     * the store's language.
+     */
+    public function testTheLogFileRecordsABatchFailureInEnglish(): void
+    {
+        StoreLocale::use('et_EE');
+        $this->eventQueue->method('claimBatch')->willReturn([$this->createEvent(1, 'contact.sync')]);
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willThrowException(
+            new TransportException(__('Smaily API request failed with HTTP %1', 503), 503)
+        );
+        $logger = $this->createMock(Logger::class);
+        $logger->expects(self::once())->method('info')
+            ->with('Queue batch failed', self::callback(
+                static fn (array $context): bool => $context['error'] === 'Smaily API request failed with HTTP 503'
+            ));
+
+        $this->createCron(new HandlerPool(['contact.sync' => $handler]), $logger)->execute();
+    }
+
+    protected function tearDown(): void
+    {
+        StoreLocale::reset();
+    }
+
+    private function createCron(HandlerPool $pool, ?Logger $logger = null): FlushEventQueue
+    {
+        return new FlushEventQueue(
+            $this->eventQueue,
+            $pool,
+            $logger ?? $this->createMock(Logger::class)
+        );
+    }
+
+    private function createEvent(int $id, string $eventType): Event&MockObject
+    {
+        $event = $this->createMock(Event::class);
+        $event->method('getId')->willReturn($id);
+        $event->method('getEventType')->willReturn($eventType);
+
+        return $event;
+    }
+}

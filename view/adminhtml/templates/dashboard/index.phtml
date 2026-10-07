@@ -1,0 +1,256 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Operational dashboard — the Smaily Connect landing page. Every number is
+ * a real local queue query (see Model\Adminhtml\DashboardStats); the health
+ * verdict reuses the HealthCheck cron's state so this page and the admin
+ * notifications always agree. Operational data only — no marketing metrics.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\Adminhtml\DashboardData $viewModel */
+$viewModel = $block->getData('view_model');
+
+$verdict = $viewModel->getVerdict();
+$failed = $viewModel->getFailedLast24h();
+$engineRefused = $viewModel->isEngineRefused();
+$engineDown = $viewModel->isEngineDown();
+// No nightly product list for several nights in a row, and why (PRO-3914).
+$unsentProductList = $viewModel->getUnsentProductList();
+// Smaily refuses every request because the package has no API access
+// (code 227, PRO-3579): not connected, but not the credentials' fault.
+$smailyPlanBlocked = $viewModel->isSmailyPlanBlocked();
+
+$urls = [
+    'wizard' => $block->getUrl('smaily_connect/wizard'),
+    'settings' => $block->getUrl('smaily_connect/settings'),
+    'log' => $block->getUrl('smaily_connect/log'),
+    'logFailed' => $block->getUrl('smaily_connect/log', ['_query' => ['filters' => ['status' => 'failed']]]),
+];
+
+$sourceLabels = [
+    'smaily' => __('Smaily'),
+    'intelligence' => __('Campaign Intelligence'),
+];
+
+// One-sentence health verdict, by priority: incomplete > Smaily not
+// connected > account not active > failures > engine unreachable > no
+// nightly product list > all good.
+// Smaily credentials that Smaily has not accepted (PRO-3560) and a
+// deactivated Campaign Intelligence account (PRO-2451) outrank the rest
+// because they explain them. Kicker is the short role label above it.
+if ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_INCOMPLETE) {
+    $verdictKicker = __('Setup incomplete');
+    $verdictText = __('Setup is not finished yet — complete the initial setup to start syncing.');
+} elseif ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_DISCONNECTED) {
+    $verdictKicker = __('Not connected');
+    $verdictText = $smailyPlanBlocked
+        ? __('Smaily is refusing every request because this account\'s package does not include API access. Contact sync and email automations stay stopped until the account is on a package that includes it — waiting will not restore them, and the credentials cannot be checked until then.')
+        : __('The Smaily credentials are missing or Smaily has not accepted them — check them in Settings > Connection and test the connection.');
+} elseif ($engineRefused) {
+    $verdictKicker = __('Needs attention');
+    $verdictText = __('Campaign Intelligence has stopped accepting data from this store, so product, customer and order data is no longer being sent and recommendations will go stale. Waiting will not fix it — the account has to be made active again on the Smaily side. Your Smaily email sending is unaffected; everything queued here waits and is sent once the account is active.');
+} elseif ($failed > 0) {
+    $verdictKicker = __('Needs attention');
+    $verdictText = $failed === 1
+        ? __('Smaily Connect is running, but %1 delivery failed in the last 24 hours.', $failed)
+        : __('Smaily Connect is running, but %1 deliveries failed in the last 24 hours.', $failed);
+} elseif ($engineDown) {
+    $verdictKicker = __('Needs attention');
+    $verdictText = __('Smaily Connect is running, but Campaign Intelligence is currently unreachable — data is queued locally and will sync when it recovers.');
+} elseif ($unsentProductList !== null) {
+    $verdictKicker = __('Needs attention');
+    $verdictText = __('Smaily Connect is running, but no nightly product list has gone to Campaign Intelligence for %1 nights.', $unsentProductList['nights']);
+} else {
+    $verdictKicker = __('All systems normal');
+    $verdictText = __('Everything is running — deliveries to Smaily are flowing normally.');
+}
+
+// Connection strip: [label, sub-line, is-on, pill variant, pill label].
+// The engine row's three strings come from one state (see the view model).
+$engineState = $viewModel->getEngineStateLabels();
+$connections = [
+    [
+        __('Smaily'),
+        $viewModel->isSmailyConnected()
+            ? __('Connected (%1)', $viewModel->getSmailySubdomain())
+            : ($smailyPlanBlocked ? __('Package does not include API access') : __('Credentials missing or invalid')),
+        $viewModel->isSmailyConnected(),
+        $viewModel->isSmailyConnected() ? 'active' : 'failed',
+        $viewModel->isSmailyConnected() ? __('Connected') : __('Not connected'),
+    ],
+    [
+        __('Campaign Intelligence'),
+        $engineState['sub'],
+        $viewModel->isEngineConnected() && !$engineRefused,
+        $engineState['variant'],
+        $engineState['label'],
+    ],
+    [
+        __('Browse tracking'),
+        // Magento's own pages carry the script; a separate storefront sends
+        // the events itself (PRO-3918).
+        $viewModel->isBrowseTrackingEnabled()
+            ? ($viewModel->hasSeparateStorefront()
+                ? __('Your separate storefront must send the events itself')
+                : __('Script live on storefront'))
+            : __('Disabled'),
+        $viewModel->isBrowseTrackingEnabled(),
+        $viewModel->isBrowseTrackingEnabled() ? 'active' : 'off',
+        $viewModel->isBrowseTrackingEnabled() ? __('On') : __('Off'),
+    ],
+];
+?>
+<?php
+// Failed deliveries are the verdict's subject unless setup or the Smaily
+// connection outranks them: then the pack's degraded state — a warning
+// banner above the verdict and a danger "Review failures" button (PRO-3568).
+$bannersSuppressed = $verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_INCOMPLETE
+    || $verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_DISCONNECTED;
+$showFailures = $failed > 0 && !$bannersSuppressed;
+?>
+<div id="smaily-dashboard" class="smaily-ui smaily-dashboard">
+    <?php if ($showFailures): ?>
+    <div class="smaily-banner smaily-banner--warning smaily-dashboard-banner" role="status">
+        <span class="smaily-banner__icon">&#9888;</span>
+        <div class="smaily-banner__body">
+            <?php // Magento's __() has no plural forms: one phrase per number. ?>
+            <div class="smaily-banner__title"><?= $escaper->escapeHtml($failed === 1
+                ? __('%1 event failed in the last 24 hours', $failed)
+                : __('%1 events failed in the last 24 hours', $failed)) ?></div>
+        </div>
+        <a class="smaily-banner__action" href="<?= $escaper->escapeUrl($urls['logFailed']) ?>"><?= $escaper->escapeHtml(__('Review failures')) ?></a>
+    </div>
+    <?php endif; ?>
+    <?php // Shown whatever outranks it in the verdict, with the last night's reason (PRO-3914). ?>
+    <?php if ($unsentProductList !== null && !$bannersSuppressed): ?>
+    <div class="smaily-banner smaily-banner--warning smaily-dashboard-banner" id="smaily-dashboard-unsent-product-list" role="status">
+        <span class="smaily-banner__icon">&#9888;</span>
+        <div class="smaily-banner__body">
+            <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('No nightly product list has gone to Campaign Intelligence for %1 nights', $unsentProductList['nights'])) ?></div>
+            <div class="smaily-banner__message"><?= $escaper->escapeHtml($unsentProductList['reason']) ?></div>
+        </div>
+    </div>
+    <?php endif; ?>
+    <div class="smaily-verdict smaily-verdict-<?= $escaper->escapeHtmlAttr($verdict) ?>">
+        <span class="smaily-verdict-dot"></span>
+        <div class="smaily-verdict-body">
+            <div class="smaily-verdict-kicker"><?= $escaper->escapeHtml($verdictKicker) ?></div>
+            <div class="smaily-verdict-text"><?= $escaper->escapeHtml($verdictText) ?></div>
+        </div>
+        <?php if ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_INCOMPLETE): ?>
+            <a class="action-primary smaily-verdict-action" href="<?= $escaper->escapeUrl($urls['wizard']) ?>">
+                <span><?= $escaper->escapeHtml(__('Resume setup')) ?></span></a>
+        <?php elseif ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_DISCONNECTED): ?>
+            <a class="action-primary smaily-verdict-action" href="<?= $escaper->escapeUrl($urls['settings']) ?>">
+                <span><?= $escaper->escapeHtml(__('Open Connection settings')) ?></span></a>
+        <?php elseif ($showFailures): ?>
+            <a class="action-primary smaily-verdict-action smaily-verdict-action--danger" href="<?= $escaper->escapeUrl($urls['logFailed']) ?>">
+                <span><?= $escaper->escapeHtml(__('Review failures')) ?></span></a>
+        <?php elseif ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_OK): ?>
+            <?php // Healthy: nothing needs action, so the way to the Log is secondary (pack). ?>
+            <a class="action-secondary smaily-verdict-action" href="<?= $escaper->escapeUrl($urls['log']) ?>">
+                <span><?= $escaper->escapeHtml(__('View full log')) ?></span></a>
+        <?php endif; ?>
+    </div>
+
+    <div class="smaily-connections">
+        <?php foreach ($connections as [$label, $sub, $isOn, $pillVariant, $pillLabel]): ?>
+        <?php // Pack connection card: the dot in its own column beside label, sub-line and pill (PRO-3568). ?>
+        <div class="smaily-connection <?= $isOn ? 'is-on' : 'is-off' ?>">
+            <span class="smaily-dot"></span>
+            <div class="smaily-connection-body">
+                <div class="smaily-connection-label"><?= $escaper->escapeHtml($label) ?></div>
+                <div class="smaily-connection-sub"><?= $escaper->escapeHtml($sub) ?></div>
+                <span class="smaily-pill smaily-pill--<?= $escaper->escapeHtmlAttr($pillVariant) ?>">
+                    <span class="smaily-pill__dot"></span><?= $escaper->escapeHtml($pillLabel) ?>
+                </span>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+
+    <div class="smaily-tiles">
+        <div class="smaily-tile">
+            <div class="smaily-tile__label-row"><span class="smaily-tile__label"><?= $escaper->escapeHtml(__('Contact syncs')) ?></span></div>
+            <span class="smaily-tile__value"><?= (int)$viewModel->getContactSyncsDelivered() ?></span>
+            <span class="smaily-tile__caption"><?= $escaper->escapeHtml(__('delivered, last 30 days')) ?></span>
+        </div>
+        <?php if ($viewModel->isEngineConnected()): ?>
+        <div class="smaily-tile">
+            <div class="smaily-tile__label-row"><span class="smaily-tile__label"><?= $escaper->escapeHtml(__('Catalog items')) ?></span></div>
+            <span class="smaily-tile__value"><?= (int)$viewModel->getCatalogItemsDelivered() ?></span>
+            <span class="smaily-tile__caption"><?= $escaper->escapeHtml(__('delivered, last 30 days')) ?></span>
+        </div>
+        <?php endif; ?>
+        <div class="smaily-tile">
+            <div class="smaily-tile__label-row"><span class="smaily-tile__label"><?= $escaper->escapeHtml(__('Queued today')) ?></span></div>
+            <span class="smaily-tile__value"><?= (int)$viewModel->getQueuedToday() ?></span>
+            <span class="smaily-tile__caption"><?= $escaper->escapeHtml(__('events waiting to send')) ?></span>
+        </div>
+        <div class="smaily-tile <?= $failed > 0 ? 'smaily-tile--attention' : '' ?>">
+            <div class="smaily-tile__label-row">
+                <span class="smaily-tile__label"><?= $escaper->escapeHtml(__('Failed')) ?></span>
+                <?php if ($failed > 0): ?><span class="smaily-tile__badge"><?= $escaper->escapeHtml(__('Attention')) ?></span><?php endif; ?>
+            </div>
+            <span class="smaily-tile__value"><?= (int)$failed ?></span>
+            <?php if ($failed > 0): ?>
+                <a class="smaily-tile__caption smaily-tile-link" href="<?= $escaper->escapeUrl($urls['logFailed']) ?>"><?= $escaper->escapeHtml(__('View failed deliveries')) ?></a>
+            <?php else: ?>
+                <span class="smaily-tile__caption"><?= $escaper->escapeHtml(__('last 24 hours')) ?></span>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="smaily-columns">
+        <div class="smaily-card smaily-activity">
+            <div class="smaily-activity-head">
+                <h2><?= $escaper->escapeHtml(__('Recent activity')) ?></h2>
+                <a href="<?= $escaper->escapeUrl($urls['log']) ?>"><?= $escaper->escapeHtml(__('View full log')) ?></a>
+            </div>
+            <?php $activity = $viewModel->getRecentActivity(10); ?>
+            <?php if (!$activity): ?>
+                <p class="smaily-empty"><?= $escaper->escapeHtml(__('No deliveries yet. Once contacts, orders or catalog changes start flowing, the latest queue rows show up here.')) ?></p>
+            <?php else: ?>
+                <div class="admin__table-wrapper">
+                    <table class="admin__table-secondary">
+                        <thead>
+                            <tr>
+                                <th><?= $escaper->escapeHtml(__('Source')) ?></th>
+                                <th><?= $escaper->escapeHtml(__('Type')) ?></th>
+                                <th><?= $escaper->escapeHtml(__('Entity')) ?></th>
+                                <th><?= $escaper->escapeHtml(__('Status')) ?></th>
+                                <th><?= $escaper->escapeHtml(__('Updated')) ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($activity as $row): ?>
+                            <tr>
+                                <td><?= $escaper->escapeHtml($sourceLabels[$row['source']] ?? $row['source']) ?></td>
+                                <td><code><?= $escaper->escapeHtml($row['type']) ?></code></td>
+                                <td><?= $escaper->escapeHtml($row['entity_id']) ?></td>
+                                <?php // Label and pill as the Log shows the status, Skipped and Withdrawn included (PRO-3642). ?>
+                                <td><span class="smaily-pill smaily-pill--<?= $escaper->escapeHtmlAttr($row['status_pill']) ?>"><span class="smaily-pill__dot"></span><?= $escaper->escapeHtml((string)$row['status_label']) ?></span></td>
+                                <td><?= $escaper->escapeHtml($block->formatDate($row['updated_at'], \IntlDateFormatter::MEDIUM, true)) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <div class="smaily-card smaily-quick-links">
+            <h2><?= $escaper->escapeHtml(__('Quick links')) ?></h2>
+            <ul>
+                <li><a href="<?= $escaper->escapeUrl($urls['settings']) ?>"><?= $escaper->escapeHtml(__('Settings')) ?></a><span class="smaily-quick-links__desc"><?= $escaper->escapeHtml(__('connection, contacts, automations, Intelligence and RSS in one tabbed page')) ?></span></li>
+                <li><a href="<?= $escaper->escapeUrl($urls['log']) ?>"><?= $escaper->escapeHtml(__('Log')) ?></a><span class="smaily-quick-links__desc"><?= $escaper->escapeHtml(__('every delivery with retry for failed rows')) ?></span></li>
+                <li><a href="<?= $escaper->escapeUrl($urls['wizard']) ?>"><?= $escaper->escapeHtml(__('Initial setup')) ?></a><span class="smaily-quick-links__desc"><?= $escaper->escapeHtml(__('re-run the guided setup at any time; your settings are kept')) ?></span></li>
+            </ul>
+        </div>
+    </div>
+</div>

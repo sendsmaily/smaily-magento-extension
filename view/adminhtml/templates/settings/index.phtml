@@ -1,0 +1,245 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Tabbed settings page: the wizard's step content (shared panel partials
+ * under view/adminhtml/templates/panel/) as always-available tabs, plus the
+ * Settings-only RSS tab. Tabs are deep-linkable (?tab=connection|
+ * subscribers|automations|intelligence|rss); every tab saves via AJAX to
+ * the shared savestep endpoint — the same config paths declared in
+ * `etc/adminhtml/system.xml` (kept for storage/encryption; the native
+ * Stores > Configuration > Smaily section is hidden, this page is the only
+ * editing surface).
+ *
+ * On a 2+-website install, an explicit website selector (own chrome, not
+ * Magento's native store-switcher — RFC_MULTI_WEBSITE.md §2) sits next to
+ * the tab strip, persisted as `?website=<id>`: every save/prefill path
+ * already reads its target website through `Model\Adminhtml\WebsiteContext`,
+ * so switching the selector and reloading is the entire mechanism.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
+$viewModel = $block->getData('view_model');
+$hasMultipleWebsites = $viewModel->hasMultipleWebsites();
+$websiteOptions = $viewModel->getWebsiteOptions();
+$selectedWebsiteId = $viewModel->getSelectedWebsiteId();
+
+$tabs = [
+    'connection' => __('Connection'),
+    'subscribers' => __('Contacts'),
+    'automations' => __('Automations'),
+    'intelligence' => __('Intelligence'),
+    'rss' => __('RSS'),
+];
+?>
+<div id="smaily-settings" class="smaily-ui smaily-settings">
+    <div class="smaily-settings-header">
+        <ul class="smaily-tabs">
+            <?php foreach ($tabs as $tabId => $tabLabel): ?>
+            <li data-tab="<?= $escaper->escapeHtmlAttr($tabId) ?>"><?= $escaper->escapeHtml($tabLabel) ?></li>
+            <?php endforeach; ?>
+        </ul>
+        <?php if ($hasMultipleWebsites): ?>
+        <div class="smaily-website-select" id="smaily-website-select">
+            <label for="smaily-website-select-input"><?= $escaper->escapeHtml(__('Website')) ?></label>
+            <select id="smaily-website-select-input">
+                <?php foreach ($websiteOptions as $websiteId => $websiteName): ?>
+                <option value="<?= (int)$websiteId ?>" <?= $websiteId === $selectedWebsiteId ? 'selected' : '' ?>>
+                    <?= $escaper->escapeHtml($websiteName) ?>
+                </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php endif; ?>
+    </div>
+    <div class="smaily-tab-panel" data-tab="connection">
+        <h3><?= $escaper->escapeHtml(__('Connection')) ?></h3>
+        <p class="smaily-tab-desc"><?= $escaper->escapeHtml(__('Your Smaily API credentials for this store.')) ?></p>
+        <?= $block->getChildHtml('panel.connection') ?>
+        <div class="smaily-tab-footer">
+            <button type="button" class="action-secondary" id="smaily-w-test">
+                <span><?= $escaper->escapeHtml(__('Test connection')) ?></span>
+            </button>
+            <button type="button" class="action-primary" id="smaily-w-connection-save">
+                <span><?= $escaper->escapeHtml(__('Save Connection')) ?></span>
+            </button>
+            <span class="smaily-result" id="smaily-w-test-result"></span>
+        </div>
+    </div>
+    <div class="smaily-tab-panel" data-tab="subscribers">
+        <h3><?= $escaper->escapeHtml(__('Contacts')) ?></h3>
+        <p class="smaily-tab-desc"><?= $escaper->escapeHtml(__('Synchronization settings')) ?></p>
+        <?= $block->getChildHtml('panel.subscribers') ?>
+        <div class="smaily-tab-footer">
+            <button type="button" class="action-primary" id="smaily-w-subscribers-save">
+                <span><?= $escaper->escapeHtml(__('Save Contacts')) ?></span>
+            </button>
+            <span class="smaily-result" id="smaily-w-subscribers-result"></span>
+        </div>
+    </div>
+    <div class="smaily-tab-panel" data-tab="automations">
+        <h3><?= $escaper->escapeHtml(__('Automations')) ?></h3>
+        <p class="smaily-tab-desc"><?= $escaper->escapeHtml(__('How store events and Campaign Intelligence triggers fire Smaily workflows.')) ?></p>
+        <?= $block->getChildHtml('panel.automations') ?>
+        <div class="smaily-tab-footer">
+            <button type="button" class="action-primary" id="smaily-w-automations-save">
+                <span><?= $escaper->escapeHtml(__('Save Automations')) ?></span>
+            </button>
+            <span class="smaily-result" id="smaily-w-automations-result"></span>
+        </div>
+        <div class="smaily-card">
+            <?= $block->getChildHtml('engine.automations') ?>
+        </div>
+    </div>
+    <div class="smaily-tab-panel" data-tab="intelligence">
+        <h3><?= $escaper->escapeHtml(__('Campaign Intelligence')) ?></h3>
+        <p class="smaily-tab-desc"><?= $escaper->escapeHtml(__('Your store’s connection to Campaign Intelligence, storefront browse tracking and historical imports.')) ?></p>
+        <?= $block->getChildHtml('panel.intelligence') ?>
+        <?php // Only a connected engine leaves something to save here (browse
+        // tracking); before that, Connect is the tab's only action (PRO-3567).
+        // engineConnected() in panels-js.phtml shows the footer together with
+        // the connected section, at load and right after a Connect. ?>
+        <div class="smaily-tab-footer" id="smaily-w-intelligence-footer" style="display:none;">
+            <button type="button" class="action-primary" id="smaily-w-intelligence-save">
+                <span><?= $escaper->escapeHtml(__('Save')) ?></span>
+            </button>
+            <span class="smaily-result" id="smaily-w-intelligence-result"></span>
+        </div>
+    </div>
+    <div class="smaily-tab-panel" data-tab="rss">
+        <h3><?= $escaper->escapeHtml(__('Product RSS feed')) ?></h3>
+        <p class="smaily-tab-desc"><?= $escaper->escapeHtml(__('A product feed for the RSS block of the Smaily template editor. Optional query parameters filter by category and control the amount and order of products.')) ?></p>
+        <?= $block->getChildHtml('panel.rss') ?>
+        <div class="smaily-tab-footer">
+            <button type="button" class="action-primary" id="smaily-w-rss-save">
+                <span><?= $escaper->escapeHtml(__('Save')) ?></span>
+            </button>
+            <span class="smaily-result" id="smaily-w-rss-result"></span>
+        </div>
+    </div>
+</div>
+
+<?= $block->getChildHtml('panel.js') ?>
+<script>
+require(['jquery'], function ($) {
+    'use strict';
+
+    var panels = window.smailyPanelsInit($);
+    // Strings are translated server-side — see panel/panels-js.phtml.
+
+    // tab id -> savestep step name.
+    var steps = {
+        connection: 'connect',
+        subscribers: 'subscribers',
+        automations: 'automations',
+        intelligence: 'intelligence',
+        rss: 'rss'
+    };
+    var active = 'connection';
+    var workflowsLoaded = false;
+
+    function activate(tab, updateUrl) {
+        if (!steps[tab]) {
+            tab = 'connection';
+        }
+        active = tab;
+        $('.smaily-tabs li').each(function () {
+            $(this).toggleClass('active', $(this).data('tab') === tab);
+        });
+        $('.smaily-tab-panel').removeClass('active')
+            .filter('[data-tab=' + tab + ']').addClass('active');
+        if (tab === 'automations' && !workflowsLoaded) {
+            workflowsLoaded = true;
+            // A workflow-list error shows beside the tab's Save (PRO-3641).
+            panels.loadWorkflows('#smaily-w-automations-result');
+        }
+        if (updateUrl && window.history && window.history.replaceState) {
+            var url = new URL(window.location.href);
+            url.searchParams.set('tab', tab);
+            window.history.replaceState(null, '', url.toString());
+        }
+    }
+
+    panels.initAll();
+
+    // Website selector (RFC_MULTI_WEBSITE.md §2): reloads the page with
+    // ?website=<id>, keeping the current tab — every save/prefill path reads
+    // its target website server-side, so a plain reload is the whole
+    // mechanism, no client-side state to carry.
+    $('#smaily-website-select-input').on('change', function () {
+        var url = new URL(window.location.href);
+        url.searchParams.set('website', $(this).val());
+        url.searchParams.set('tab', active);
+        window.location.href = url.toString();
+    });
+
+    $('.smaily-tabs').on('click', 'li', function () {
+        activate($(this).data('tab'), true);
+    });
+
+    // Shared by every tab's own Save button — the same per-tab AJAX save,
+    // each with its own status. Every tab has its own footer, so there is no
+    // page-wide Save (PRO-3641). A failed save shows the error banner above
+    // the tab's form and marks the field that caused it; the status beside
+    // the button says the save failed (PRO-3562).
+    function saveTab($button, step, resultSelector) {
+        var $panel = $('.smaily-tab-panel.active');
+        $button.prop('disabled', true);
+        panels.clearFormErrors($panel);
+        panels.result(resultSelector, '<?= $escaper->escapeJs(__('Saving…')) ?>', true);
+        new Promise(function (resolve) { resolve(panels.collect[step]()); })
+            .then(function (data) { return panels.saveStep(step, data); })
+            .then(function (response) {
+                // A changed storefront address reaches Campaign Intelligence
+                // with the next catalog import (PRO-3660).
+                panels.result(resultSelector, response && response.storefrontUrlChanged
+                    ? '<?= $escaper->escapeJs(__('Saved. Run the catalog import again under Intelligence > Historical imports, so that Campaign Intelligence gets the new product links.')) ?>'
+                    : '<?= $escaper->escapeJs(__('Saved.')) ?>', true);
+            })
+            .catch(function (error) {
+                panels.showFormErrors($panel, error);
+                panels.result(resultSelector, '<?= $escaper->escapeJs(__('Saving failed.')) ?>', false);
+            })
+            .finally(function () {
+                $button.prop('disabled', false);
+            });
+    }
+
+    $('#smaily-w-connection-save').on('click', function () {
+        saveTab($(this), 'connect', '#smaily-w-test-result');
+    });
+
+    $('#smaily-w-subscribers-save').on('click', function () {
+        saveTab($(this), 'subscribers', '#smaily-w-subscribers-result');
+    });
+
+    $('#smaily-w-automations-save').on('click', function () {
+        saveTab($(this), 'automations', '#smaily-w-automations-result');
+    });
+
+    $('#smaily-w-rss-save').on('click', function () {
+        saveTab($(this), 'rss', '#smaily-w-rss-result');
+    });
+
+    $('#smaily-w-intelligence-save').on('click', function () {
+        saveTab($(this), 'intelligence', '#smaily-w-intelligence-result');
+    });
+
+    // Live reactivity across tabs: edited credentials re-render the
+    // dependent workflow dropdowns (Automations tab) without saving.
+    var credentialTimer = null;
+    $('#smaily-w-subdomain, #smaily-w-username, #smaily-w-password').on('input', function () {
+        clearTimeout(credentialTimer);
+        credentialTimer = setTimeout(function () {
+            workflowsLoaded = true;
+            panels.loadWorkflows(null);
+        }, 1200);
+    });
+
+    activate(new URLSearchParams(window.location.search).get('tab') || 'connection', false);
+});
+</script>

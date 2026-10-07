@@ -1,0 +1,160 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Store-event automations panel — shared by the setup wizard (step 3) and the
+ * Settings page (Automations tab, where the engine-run automations block
+ * renders below it). Behavior lives in panel/panels-js.phtml.
+ *
+ * Each trigger is a card (name + run-mode pill + description + right-aligned
+ * control row), not a dense checkbox+dropdown table (PRO-1357 finding #9). The
+ * workflow select is disabled while the trigger is off; the pill follows the
+ * enable toggle live.
+ *
+ * In multilingual modes A/B a per-language workflow mapping editor renders
+ * below the trigger cards: one table per trigger with a workflow select per
+ * language and a default-fallback radio (Woo parity). The editor shows/hides
+ * live when the mode cards on the Connection panel change.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
+$viewModel = $block->getData('view_model');
+$isMultilingual = $viewModel->isMultilingual();
+$languages = $viewModel->getDetectedLanguages();
+$mode = $viewModel->getMultilingualMode();
+$savedMappings = $viewModel->getSavedMappings();
+$showMapping = $isMultilingual && ($mode === 'a' || $mode === 'b');
+
+$triggers = [
+    'welcome' => __('Welcome'),
+    'first_order' => __('First order'),
+    'abandoned_cart' => __('Abandoned cart'),
+];
+
+// Store-event trigger cards. The id slug differs from the trigger key
+// (first_order -> firstorder, abandoned_cart -> abandoned) to match the
+// element ids panel/panels-js.phtml already binds; names reuse $triggers.
+$storeTriggers = [
+    ['id' => 'welcome', 'name' => $triggers['welcome'], 'desc' => __('Fires when a shopper subscribes to the newsletter in your store.')],
+    ['id' => 'firstorder', 'name' => $triggers['first_order'], 'desc' => __('Fires on a customer\'s first purchase.')],
+    ['id' => 'abandoned', 'name' => $triggers['abandoned_cart'], 'desc' => __('Fires when a cart is left behind.'), 'abandoned' => true],
+];
+?>
+<div class="smaily-card">
+    <?php // The initial setup shows this title above the card (wizard/index.phtml, PRO-3561). ?>
+    <?php if ($block->getData('context') !== 'wizard'): ?>
+    <h2><?= $escaper->escapeHtml(__('Map store events to Smaily automations')) ?></h2>
+    <?php endif; ?>
+    <p><?= $escaper->escapeHtml(__('Each event triggers the Smaily automation workflow you pick. The lists below come live from your Smaily account — create the workflows there first if they are missing, then press Refresh.')) ?>
+       <button type="button" class="action-tertiary" id="smaily-w-refresh-workflows"><span><?= $escaper->escapeHtml(__('Refresh workflows')) ?></span></button>
+    </p>
+
+    <div class="smaily-engine-triggers smaily-store-triggers">
+        <?php foreach ($storeTriggers as $trigger): ?>
+        <?php $id = $escaper->escapeHtmlAttr($trigger['id']); ?>
+        <div class="smaily-engine-trigger smaily-store-trigger is-off">
+            <div class="smaily-engine-trigger__top">
+                <div class="smaily-engine-trigger__head">
+                    <div class="smaily-engine-trigger__name-row">
+                        <span class="smaily-engine-trigger__name"><?= $escaper->escapeHtml($trigger['name']) ?></span>
+                        <span class="smaily-pill smaily-pill--off smaily-store-pill"><span class="smaily-pill__dot"></span><span class="smaily-store-pill__text"><?= $escaper->escapeHtml(__('Off')) ?></span></span>
+                    </div>
+                    <div class="smaily-engine-trigger__desc"><?= $escaper->escapeHtml($trigger['desc']) ?></div>
+                    <div class="smaily-engine-trigger__controls smaily-store-trigger__enable">
+                        <span class="smaily-engine-trigger__ctrl"><label><input type="checkbox" id="smaily-w-<?= /* @noEscape */ $id ?>-enabled"/> <?= $escaper->escapeHtml(__('Enabled')) ?></label></span>
+                    </div>
+                </div>
+                <div class="smaily-engine-trigger__controls">
+                    <label class="smaily-engine-trigger__ctrl">
+                        <span><?= $escaper->escapeHtml(__('Smaily Workflow')) ?></span>
+                        <select id="smaily-w-<?= /* @noEscape */ $id ?>-workflow" class="smaily-w-workflow"></select>
+                    </label>
+                    <?php if (!empty($trigger['abandoned'])): ?>
+                    <label class="smaily-engine-trigger__ctrl">
+                        <span><?= $escaper->escapeHtml(__('Wait (minutes)')) ?></span>
+                        <input type="number" id="smaily-w-cutoff" min="10" max="1440" value="30"/>
+                    </label>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+
+    <p class="note"><?= $escaper->escapeHtml(__('How long a cart must be inactive before it counts as abandoned. Minimum 10 minutes. Carts older than 24 hours are never mailed.')) ?></p>
+    <p class="note"><?= $escaper->escapeHtml(__('If another tool also sends abandoned-cart emails (for example an extension such as Mageplaza SMTP or Avada Email Marketing, or Adobe Commerce\'s own email reminder rules), switch those emails off there, so a shopper does not get two reminders for one cart.')) ?></p>
+    <p class="note"><?= $escaper->escapeHtml(__('The automation receives the cart contents (up to 10 products) and a recovery link that restores the exact cart.')) ?>
+    <?php if ($isMultilingual): ?>
+        <span id="smaily-ml-mapping-off" <?= $showMapping ? 'style="display:none;"' : '' ?>>
+            <?= $escaper->escapeHtml(__('Want a different workflow per language? Pick a per-language mode on the Connection panel.')) ?>
+        </span>
+    <?php endif; ?>
+    </p>
+</div>
+
+<?php if ($isMultilingual): ?>
+<div class="smaily-card" id="smaily-ml-mapping" <?= $showMapping ? '' : 'style="display:none;"' ?>>
+    <h2><?= $escaper->escapeHtml(__('Per-language workflows')) ?></h2>
+    <p class="note smaily-ml-hint-a" <?= $mode === 'a' ? '' : 'style="display:none;"' ?>>
+        <?= $escaper->escapeHtml(__('Each language row lists the workflows of that language\'s own Smaily account (Connection panel) and fires through it.')) ?>
+    </p>
+    <p class="note smaily-ml-hint-b" <?= $mode === 'b' ? '' : 'style="display:none;"' ?>>
+        <?= $escaper->escapeHtml(__('All languages share one Smaily account; each language fires its own workflow from the list.')) ?>
+    </p>
+    <p class="note"><?= $escaper->escapeHtml(__('The default fallback handles contacts whose language is not mapped. Leave it on "None" to fall back to the default workflow above.')) ?></p>
+
+    <?php foreach ($triggers as $triggerType => $triggerLabel): ?>
+    <div class="smaily-field smaily-ml-trigger" data-trigger="<?= $escaper->escapeHtmlAttr($triggerType) ?>">
+        <label><?= $escaper->escapeHtml($triggerLabel) ?></label>
+        <table class="smaily-ml-table">
+            <thead>
+                <tr>
+                    <th><?= $escaper->escapeHtml(__('Language')) ?></th>
+                    <th><?= $escaper->escapeHtml(__('Workflow')) ?></th>
+                    <th><?= $escaper->escapeHtml(__('Default fallback')) ?></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php $savedFallback = ''; ?>
+                <?php foreach ($languages as $language): ?>
+                <?php
+                $saved = $savedMappings[$triggerType . '|' . $language] ?? null;
+                if ($saved !== null && $saved['isDefaultFallback']) {
+                    $savedFallback = $language;
+                }
+                ?>
+                <tr>
+                    <td><?= $escaper->escapeHtml(strtoupper($language)) ?></td>
+                    <td>
+                        <select class="smaily-ml-workflow"
+                                data-trigger="<?= $escaper->escapeHtmlAttr($triggerType) ?>"
+                                data-language="<?= $escaper->escapeHtmlAttr($language) ?>"
+                                data-saved="<?= $escaper->escapeHtmlAttr((string)($saved['workflowId'] ?? '')) ?>"></select>
+                    </td>
+                    <td>
+                        <input type="radio"
+                               name="smaily-ml-fallback-<?= $escaper->escapeHtmlAttr($triggerType) ?>"
+                               value="<?= $escaper->escapeHtmlAttr($language) ?>"
+                               <?= ($savedMappings[$triggerType . '|' . $language]['isDefaultFallback'] ?? false) ? 'checked' : '' ?>/>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                <tr>
+                    <td colspan="2" class="smaily-ml-none"><?= $escaper->escapeHtml(__('None (use the default workflow above)')) ?></td>
+                    <td>
+                        <input type="radio"
+                               name="smaily-ml-fallback-<?= $escaper->escapeHtmlAttr($triggerType) ?>"
+                               value=""
+                               <?= $savedFallback === '' ? 'checked' : '' ?>/>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <?php endforeach; ?>
+</div>
+<?php endif; ?>

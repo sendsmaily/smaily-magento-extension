@@ -1,0 +1,35 @@
+{
+    "name": "smaily/module-connect-hyva",
+    "description": "Hyvä theme compatibility for Smaily Connect (Smaily_Connect): framework-free browse tracker and attribution scripts, Tailwind storefront templates",
+    "version": "1.0.0-alpha1",
+    "type": "magento2-module",
+    "license": "GPL-3.0-only",
+    "authors": [
+        {
+            "name": "Smaily",
+            "email": "info@smaily.com",
+            "homepage": "https://smaily.com",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "email": "support@smaily.com"
+    },
+    "require": {
+        "php": "~8.1.0 || ~8.2.0 || ~8.3.0 || ~8.4.0",
+        "hyva-themes/magento2-theme-module": "^1.3",
+        "magento/framework": "^103.0.4",
+        "smaily/smailyformagento": "^3.0"
+    },
+    "autoload": {
+        "files": [
+            "registration.php"
+        ],
+        "psr-4": {
+            "Hyva\\SmailyConnect\\": ""
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

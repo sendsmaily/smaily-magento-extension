@@ -1,0 +1,62 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Tailwind-styled variant of the personalization opt-out form. Same
+ * behaviour and the exact same translated phrases as the base template
+ * (Smaily_Connect::privacy/form.phtml) — only the CSS classes differ,
+ * because Hyvä does not style Luma's fieldset/legend/actions-toolbar
+ * markup. Uses Hyvä's stock `btn btn-primary` + `form-checkbox` classes.
+ *
+ * Verified on Hyvä 1.5.2: after `hyva:config:generate` + Tailwind rebuild
+ * the classes survive the content scan (this module registers itself for
+ * it — see Observer/RegisterModuleForHyvaConfig.php) and the form renders
+ * fully styled.
+ *
+ * @var \Magento\Framework\View\Element\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\PrivacyForm $viewModel */
+$viewModel = $block->getData('view_model');
+// True / false only when the store knows the shopper's choice; null when
+// Smaily could not be read and the store holds no opt-out (PRO-3591).
+$known = $viewModel->getKnownPreference();
+?>
+<form action="<?= $escaper->escapeUrl($block->getUrl('smaily/privacy/save')) ?>" method="post" class="w-full">
+    <?= $block->getBlockHtml('formkey') ?>
+    <fieldset class="card p-6 mb-6">
+        <legend class="text-xl font-medium mb-4">
+            <span><?= $escaper->escapeHtml(__('Personalized Recommendations')) ?></span>
+        </legend>
+        <p class="mb-4 text-gray-700">
+            <?= $escaper->escapeHtml(__('We use your shopping activity to personalize product recommendations in our newsletters. You can opt out at any time; newsletters will then show generic content.')) ?>
+        </p>
+        <?php if ($known === null): ?>
+            <p class="text-gray-700">
+                <?= $escaper->escapeHtml(__('We could not load your personalization preference right now. Please try again later.')) ?>
+            </p>
+        <?php else: ?>
+            <div class="flex items-center gap-2">
+                <input type="checkbox"
+                       id="smaily-profiling-allowed"
+                       name="profiling_allowed"
+                       value="1"
+                       class="form-checkbox"
+                       <?= $known ? 'checked' : '' ?>/>
+                <label class="cursor-pointer select-none" for="smaily-profiling-allowed">
+                    <span><?= $escaper->escapeHtml(__('Allow personalized recommendations')) ?></span>
+                </label>
+            </div>
+        <?php endif; ?>
+    </fieldset>
+    <div>
+        <?php /* Without the checkbox the form posts no profiling_allowed, which Save reads as an opt-out. */ ?>
+        <button type="submit" class="btn btn-primary">
+            <span><?= $escaper->escapeHtml($known === null
+                ? __('Opt out of personalized recommendations')
+                : __('Save Preference')) ?></span>
+        </button>
+    </div>
+</form>

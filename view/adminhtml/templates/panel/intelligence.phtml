@@ -1,0 +1,179 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Campaign Intelligence panel — shared by the setup wizard (step 4) and the
+ * Settings page (Intelligence tab). The Settings context adds the engine
+ * historical imports (catalog / customers / orders). Catalog/customer/order
+ * sync itself has no on/off toggle — connecting the engine syncs everything
+ * (target-spec §4.2 decision 4). Behavior lives in panel/panels-js.phtml.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
+$viewModel = $block->getData('view_model');
+$isSettings = $block->getData('context') === 'settings';
+// Campaign Intelligence has refused this account outright (contract §2
+// `403 tenant_inactive`, PRO-2451). Rendered server-side because the state
+// IS server state: nothing is sent, so the panel says so plainly, the
+// engine-bound imports are not offered, and the only two things that help
+// — Smaily reactivating the account, and a re-check afterwards — are here.
+$isRefused = $viewModel->isEngineRefused();
+?>
+<div class="smaily-card">
+    <?php // The title sits above the card: the step title in the initial setup
+    // (wizard/index.phtml, PRO-3561), the tab title on Settings
+    // (settings/index.phtml, PRO-3567). ?>
+    <?php // Marketing's introduction (GMS-11), word for word as in the WooCommerce and Shopify plugins.
+    // The setup step always shows it; Settings only until the engine is
+    // connected, as WooCommerce does — engineConnected() in panels-js hides
+    // the Settings copy, also right after a Connect (PRO-3583). ?>
+    <div<?= $isSettings ? ' id="smaily-w-engine-intro"' : '' ?>>
+        <p><?= $escaper->escapeHtml(__('Campaign Intelligence uses your store’s product, customer and order data to create personalized product recommendations for Smaily campaigns and automations. This helps you send more relevant emails with less manual work.')) ?></p>
+        <p><?= $escaper->escapeHtml(__('Campaign Intelligence is an optional paid add-on (€250/month), added to your regular Smaily monthly payment. Contact Smaily to activate it, or set it up later.')) ?></p>
+    </div>
+    <div id="smaily-w-engine-disconnected">
+        <div class="smaily-field">
+            <label for="smaily-w-setup-url"><?= $escaper->escapeHtml(__('Setup URL or token from Smaily')) ?></label>
+            <input type="text" id="smaily-w-setup-url" placeholder="https://intelligence.smaily.com/setup/…"/>
+            <p class="note"><?= $escaper->escapeHtml(__('The one-time token is exchanged immediately and never stored.')) ?></p>
+            <?php // Connecting starts the catalog import (PRO-3741), with the
+            // product links of the website's Storefront URL, so while none is
+            // saved for the selected website the panel says to set it first or
+            // hold the import back (PRO-3745). The setup step points back to
+            // its Connect step, which has the field (PRO-3802); Settings >
+            // Intelligence points to the Connection tab. Inside the
+            // disconnected block, so it is gone once connected. Always drawn,
+            // hidden while a Storefront URL is saved: a Connection save shows
+            // or hides it without a reload, as the Settings tabs and the setup
+            // steps switch without one (PRO-3747, panels-js saveStep()). ?>
+            <p class="note" id="smaily-w-engine-storefront-hint"<?= $viewModel->getSavedStorefrontUrl() === '' ? '' : ' style="display:none;"' ?>><?= $escaper->escapeHtml($isSettings
+                ? __('Using a separate storefront? Set its Storefront URL under Settings > Connection > Using a separate storefront? before you connect, so that the catalog import sends the storefront\'s product links. Or connect now and press Hold back the import.')
+                : __('Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: go back to the Connect step, open Using a separate storefront? and enter the address as Storefront URL. Or connect now and press Hold back the import.')) ?></p>
+        </div>
+        <button type="button" class="action-secondary" id="smaily-w-engine-connect">
+            <span><?= $escaper->escapeHtml(__('Connect')) ?></span>
+        </button>
+        <span class="smaily-result" id="smaily-w-engine-result"></span>
+    </div>
+    <div id="smaily-w-engine-connected" style="display:none;">
+        <?php if ($isRefused): ?>
+        <div class="smaily-banner smaily-banner--error">
+            <span class="smaily-banner__icon">&#9888;</span>
+            <div class="smaily-banner__body">
+                <?= /* @noEscape */ $block->fetchView($block->getTemplateFile('Smaily_Connect::engine-refused-banner.phtml')) ?>
+                <div class="smaily-banner__message">
+                    <button type="button" class="action-secondary" id="smaily-w-engine-recheck">
+                        <span><?= $escaper->escapeHtml(__('Check again')) ?></span>
+                    </button>
+                    <span class="smaily-result" id="smaily-w-engine-recheck-result"></span>
+                </div>
+                <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Once Smaily tells you the account is active, press Check again — sending resumes on the next cron run.')) ?></div>
+            </div>
+            <a class="smaily-banner__action" href="<?= $escaper->escapeUrl($viewModel->getSmailyAccountUrl()) ?>" target="_blank"><?= $escaper->escapeHtml(__('Open your Smaily account')) ?></a>
+        </div>
+        <?php else: ?>
+        <?php // Pack Banner component, success level (not Magento's message box). ?>
+        <div class="smaily-banner smaily-banner--success" role="status">
+            <span class="smaily-banner__icon"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="8" cy="8" r="7.2" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".9"/>
+                <path d="M5 8.5l2 2 4-4.5" stroke="currentColor" stroke-width="1.8" fill="none"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+            </svg></span>
+            <div class="smaily-banner__body">
+                <div class="smaily-banner__message" id="smaily-w-engine-status"></div>
+            </div>
+        </div>
+        <?php endif; ?>
+        <?php // A Connect starts the catalog import (PRO-3741); panels-js shows
+        // this banner when it did, and Hold back cancels that import. ?>
+        <div class="smaily-banner smaily-banner--info" id="smaily-w-engine-catalog-import" role="status" style="display:none;">
+            <div class="smaily-banner__body">
+                <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('The catalog import has started')) ?></div>
+                <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Your whole catalog goes to Campaign Intelligence once, in the background, from the next cron run (usually within a minute). To hold it back, press Hold back the import before then: nothing is sent, and you can start the import later under Marketing > Smaily Connect > Settings > Intelligence.')) ?></div>
+                <div class="smaily-banner__message">
+                    <button type="button" class="action-secondary" id="smaily-w-engine-catalog-holdback">
+                        <span><?= $escaper->escapeHtml(__('Hold back the import')) ?></span>
+                    </button>
+                    <span class="smaily-result" id="smaily-w-engine-catalog-holdback-result"></span>
+                </div>
+            </div>
+        </div>
+        <?php if (!$isSettings): ?>
+        <p><?= $escaper->escapeHtml(__('Catalog, customer and order sync started automatically. Connecting also starts the catalog import, which sends your whole catalog once. Customer and order history can be imported, and the catalog import run again, any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?></p>
+        <?php endif; ?>
+        <div class="smaily-inline-toggle">
+            <label><input type="checkbox" id="smaily-w-browse"/>
+                <?= $escaper->escapeHtml(__('Enable storefront browse tracking (product views, searches, cart activity)')) ?></label>
+            <p class="note"><?= $escaper->escapeHtml(__('Off by default. Events flow through your own server, so the API key never reaches the browser.')) ?></p>
+            <?php // Where the tracker's consent comes from (PRO-3664). Without
+            // Magento's cookie restriction mode the server cannot see a
+            // consent source, so the note recommends one, as Cron\HealthCheck's
+            // notice does; %1–%4 open and close the two links. With a
+            // Storefront URL saved the separate storefront sends the events
+            // and its own consent banner decides (PRO-3918). Both notes are
+            // drawn, one hidden: a Connection save switches them without a
+            // reload, as it does the storefront hint (PRO-3924, panels-js
+            // saveStep()). ?>
+            <?php $consentHidden = ' style="display:none;"'; ?>
+            <?php $separateStorefront = $viewModel->getSavedStorefrontUrl() !== ''; ?>
+            <p class="note" id="smaily-w-browse-consent-storefront"<?= /* @noEscape */ $separateStorefront ? '' : $consentHidden ?>><?= $escaper->escapeHtml(__('Your separate storefront sends the browse events itself, so its own cookie consent banner decides when they are sent.')) ?></p>
+            <?php if ($viewModel->isCookieRestrictionOnEverywhere()): ?>
+            <p class="note" id="smaily-w-browse-consent"<?= /* @noEscape */ $separateStorefront ? $consentHidden : '' ?>><?= $escaper->escapeHtml(__('Consent comes from Magento’s cookie notice: browse events are sent only after the visitor allows cookies.')) ?></p>
+            <?php else: ?>
+            <p class="note" id="smaily-w-browse-consent"<?= /* @noEscape */ $separateStorefront ? $consentHidden : '' ?>><?= /* @noEscape */ strtr(
+                $escaper->escapeHtml(__('Browse tracking sends nothing until a consent source is connected: switch on %1Magento’s cookie restriction mode%2, or %3connect your own cookie consent tool%4.')),
+                [
+                    '%1' => '<a href="' . $escaper->escapeUrl($block->getUrl('adminhtml/system_config/edit', ['section' => 'web'])) . '">',
+                    '%2' => '</a>',
+                    '%3' => '<a href="' . $escaper->escapeUrl($viewModel->getConsentGuideUrl()) . '" target="_blank">',
+                    '%4' => '</a>',
+                ]
+            ) ?></p>
+            <?php endif; ?>
+        </div>
+        <?php if ($isSettings): ?>
+        <?php // One pack "Backfill" card per import (PRO-3564); panels-js.phtml renders the states. ?>
+        <div class="smaily-backfill-imports">
+            <strong class="smaily-backfill-imports__title"><?= $escaper->escapeHtml(__('Historical imports to Campaign Intelligence')) ?></strong>
+            <p class="note"><?= $escaper->escapeHtml($isRefused
+                ? __('Imports are unavailable while the account is not active — there is nowhere to send the data. They come back as soon as the account does.')
+                : __('Send your existing data to the engine in the background — one chunk per cron minute. Imports are resumable and safe to re-run: deliveries are deduplicated on the receiving side.')) ?></p>
+            <?php if (!$isRefused): ?>
+            <?php foreach ([
+                'catalog' => __('Catalog'),
+                'customers' => __('Customers'),
+                'orders' => __('Orders'),
+            ] as $jobType => $label): ?>
+            <div class="smaily-card smaily-backfill-card" data-job-type="<?= $escaper->escapeHtmlAttr($jobType) ?>" data-state="idle">
+                <div class="smaily-backfill-card__head">
+                    <strong class="smaily-backfill-card__title"><?= $escaper->escapeHtml($label) ?></strong>
+                    <span class="smaily-pill smaily-backfill-card__pill" style="display:none;"><span class="smaily-pill__dot"></span><span class="smaily-backfill-card__pill-text"></span></span>
+                </div>
+                <div class="smaily-backfill-card__progress" style="display:none;">
+                    <div class="smaily-progress">
+                        <div class="smaily-progress__track"><div class="smaily-progress__fill"></div></div>
+                    </div>
+                    <div class="smaily-backfill-card__count"><span class="smaily-backfill-card__done"></span><span class="smaily-backfill-card__pct"></span></div>
+                </div>
+                <div class="smaily-backfill-verdict" style="display:none;"><span class="smaily-backfill-verdict__icon"></span><span class="smaily-backfill-verdict__text"></span></div>
+                <div class="smaily-backfill-card__link" style="display:none;"></div>
+                <div class="smaily-backfill-card__controls">
+                    <button type="button" class="action-primary smaily-backfill-card__start">
+                        <span><?= $escaper->escapeHtml(__('Start import')) ?></span>
+                    </button>
+                    <button type="button" class="action-secondary smaily-backfill-card__cancel" style="display:none;">
+                        <span><?= $escaper->escapeHtml(__('Cancel import')) ?></span>
+                    </button>
+                    <span class="smaily-result"></span>
+                </div>
+            </div>
+            <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>

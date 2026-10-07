@@ -1,0 +1,23 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Product RSS feed panel (Settings page only): the enable toggle plus the
+ * live feed URL builder (the same block system config embeds). The tab's
+ * title, description and footer live in settings/index.phtml, like every
+ * other tab's.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+?>
+<div class="smaily-card">
+    <div class="smaily-inline-toggle">
+        <label><input type="checkbox" id="smaily-w-rss-enabled"/>
+            <?= $escaper->escapeHtml(__('Enable the product RSS feed')) ?></label>
+    </div>
+    <div id="smaily-w-rss-builder-wrap">
+        <?= $block->getChildHtml('rss.builder') ?>
+    </div>
+</div>

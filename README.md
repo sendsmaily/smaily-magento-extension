@@ -1,135 +1,104 @@
-Smaily email marketing and automation extension for Magento.
+# Smaily Connect for Magento 2
 
-Automatically synchronize newsletter subscribers to a Smaily subscribers list, generate RSS-feed based on products for easy template import and send new newsletter subscribers directly to Smaily.
+[![CI](https://github.com/sendsmaily/smaily-magento-extension/actions/workflows/ci.yaml/badge.svg?branch=master)](https://github.com/sendsmaily/smaily-magento-extension/actions/workflows/ci.yaml)
+
+[Smaily](https://smaily.com) email marketing, automations and Campaign
+Intelligence for Magento 2, Adobe Commerce and Mage-OS. Feature-aligned
+with the Smaily Connect plugins for WooCommerce and Shopify.
 
 ## Features
 
-### Magento Newsletter Subscribers
-
-- Add subscribers to Smaily subscribers list;
-- Trigger all opt-in or a specific automation workflow;
-- Magento built in subscribe newsletter form sends subscribers directly to Smaily;
-- Magento built-in CAPTCHA and Google reCAPTCHA support.
-
-### Magento Products RSS-feed
-
-- Generate default RSS-feed with 50 latest products for easy import to Smaily template;
-- Option to customize generated RSS-feed based on product categories;
-- Option to limit generated RSS-feed products amount with preferred value.
-
-### Two-way synchronization between Smaily and Magento
-
-- Get unsubscribers from Smaily unsubscribed list;
-- Collect new user data for subscribed users;
-- Generate data log for each update.
-
-### Abandoned cart notification
-
-- Automatically notify customers about their abandoned cart;
-- Send abandoned cart information to Smaily for easy use on templates.
+- **Contact synchronization** — near-real-time, two-way: new contacts
+  flow to Smaily instantly; unsubscribes in Smaily mirror back to Magento.
+- **Contact sync modes** — lawful-basis presets: subscribers only (consent,
+  default), all customers (legitimate interest), or checkout opt-in only.
+- **Marketing automations** — welcome, first order and abandoned cart
+  events trigger your Smaily workflows, with per-language routing for
+  multilingual stores.
+- **Abandoned cart** — configurable cutoff, rich product payloads and a
+  secure recovery link that restores the exact cart.
+- **Checkout opt-in** — a newsletter checkbox in the checkout payment step
+  (guests and customers, double opt-in respected).
+- **Product RSS feed** — for the Smaily template editor, with category,
+  limit and sort parameters and storefront-accurate pricing.
+- **Campaign Intelligence** *(optional)* — catalog, customer, order and
+  browse data power personalized recommendations, attribution and
+  engine-run automations (replenishment, win-back, …).
+- **Operational visibility** — durable delivery queues with automatic
+  retries, admin event logs with one-click retry, health notices, and
+  chunked historical imports that never block live traffic.
+- **Privacy-first** — encrypted credentials, GDPR export/erase tooling and
+  a shopper personalization opt-out page.
+- **Translated** — ships with English and Estonian (`et_EE`) translation
+  packs for the admin and the storefront.
 
 ## Requirements
 
-This extension is built for Magento 2.3 and newer.
-
-Check specific PHP, web server, database, etc requirements for your preferred Magento version from [Magento technology stack requirements](https://devdocs.magento.com/guides/v2.0/install-gde/system-requirements-tech.html).
-
-## Documentation & Support
-
-Online documentation and code samples are available via our [Help Center](https://smaily.com/help/user-manual/integrations-et/smaily-for-magento-2/).
-
-## Contribute
-
-All development for Smaily for Magento is [handled via GitHub](https://github.com/sendsmaily/smaily-magento-extension). Opening new issues and submitting pull requests are welcome.
+- Magento Open Source / Adobe Commerce **2.4.4+** or Mage-OS
+- PHP **8.1 – 8.4**
+- A working Magento cron (ideally every minute)
 
 ## Installation
 
-Make sure you have Magento 2.3 (or newer) installed.
+```bash
+composer require smaily/smailyformagento
+bin/magento module:enable Smaily_Connect
+bin/magento setup:upgrade
+```
 
-### Installing via Composer (recommended)
+Manual install: extract the release ZIP to `app/code/Smaily/Connect` and
+run the same commands. Each release also carries a `.sha256` file next to
+the ZIP — `sha256sum -c smaily-connect-magento2.zip.sha256` confirms you
+downloaded the archive we built.
 
-In Magento's root directory run:
+**Upgrading from 2.8.x?** It's seamless — settings migrate automatically.
+See [UPGRADING.md](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/UPGRADING.md).
 
-    $ composer require smaily/smailyformagento:version
+## Documentation
 
-### Manual installation
+| | |
+|---|---|
+| [User Guide](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/USER_GUIDE.md) | Setup, every setting explained, CLI reference, FAQ |
+| [Installing from the ZIP](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/INSTALLING.md) | Manual install without composer: verify, extract, set up, update, remove |
+| [Upgrading](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/UPGRADING.md) | Migrating from Smaily for Magento 2.8.x |
+| [Architecture](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/ARCHITECTURE.md) | How the module works inside (for developers) |
+| [Hyvä Support](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/HYVA_SUPPORT.md) | Hyvä theme compatibility: audit, compat module, verification results |
+| [Headless Storefronts](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/HEADLESS_STOREFRONTS.md) | What works with a separate storefront application, and what its team must add |
+| [Testing](https://github.com/sendsmaily/smaily-magento-extension/blob/master/TESTING.md) | Test suites, sandbox, upgrade verification |
+| [Contributing](https://github.com/sendsmaily/smaily-magento-extension/blob/master/CONTRIBUTING.md) | Development environment and quality gates |
+| [Backlog](https://github.com/sendsmaily/smaily-magento-extension/blob/master/BACKLOG.md) | Known deferred work |
 
-1. Download ZIP-file from [Magento Marketplace](https://marketplace.magento.com) or repository's [releases](https://github.com/sendsmaily/smaily-magento-extension/releases) section;
-2. Extract downloaded ZIP-file to your Magento's `app/code/Smaily/SmailyForMagento` directory.
+## Quick start
 
-### After installation
+1. **Run the wizard:** Marketing > Smaily Connect opens the guided setup
+   on a fresh install — connect your Smaily account, choose your audience,
+   map automations and (optionally) Campaign Intelligence in five steps.
+2. **Everything after that:** Marketing > Smaily Connect > **Dashboard**
+   (health and activity at a glance), **Settings** (the same options as
+   always-available tabs, including historical imports) and **Log** (every
+   delivery, with retry).
 
-Ensure Smaily for Magento is enabled:
+Everything is configured on the module's own pages — there is no separate
+Stores > Configuration entry. Installs with more than one website get an
+explicit website selector on Settings (and a website-picker step in the
+wizard) so each website keeps its own connection and settings.
 
-    $ php bin/magento module:status Smaily_SmailyForMagento
+## Development
 
-> You should see "Module is enabled".
+```bash
+composer install          # Magento packages via the Mage-OS mirror
+vendor/bin/phpunit --testsuite unit
+vendor/bin/phpcs
+vendor/bin/phpstan analyse
+vendor/bin/phpunit -c phpunit.integration.xml.dist  # needs MySQL, see TESTING.md
 
-If extension is disabled, you can enable it by running:
+docker compose up -d      # Magento 2.4.8 sandbox on http://localhost:8080
+```
 
-    $ php bin/magento module:enable Smaily_SmailyForMagento
+## License
 
-Ensure Magento extension updates are applied:
+GPL-3.0 — see [LICENSE.txt](LICENSE.txt).
 
-    $ php bin/magento setup:upgrade
-
-## Usage
-
-1. Go to `Stores` → `Configuration` → `Smaily email marketing and automation` → and click `Module Configuration`;
-2. Open `General Settings` section;
-3. Insert your Smaily API credentials and press `Save Config` to get started;
-4. Under `Newsletter subscription form` section select if you like to send newsletters subscribers to Smaily on sign-up;
-5. Under `Subscribers synchronization` section you can enable automatic newsletter subscribers syncronization, configure synchronized fields, synchronization frequency and last synchronization datetime;
-6. Under `Abandoned Cart` section you can enable automatic reminder emails for abandoned carts, configure abandoned cart automation, fields and delay time;
-7. That's it, your Magento store is now integrated with Smaily!
-
-## Frequently Asked Questions
-
-### Where I can find data-log for CRON?
-
-CRON update data-log is stored in the `var/log/` folder of Magento store. Newsletter subscribers synchronization log is saved in `smly_customer_cron.log` file and Abandoned Cart log is stored in `smly_cart_cron.log`.
-
-### How can I filter RSS-feed output by category and limit results?
-
-You can access RSS feed by visiting ulr `store_url/smaily/rss/feed` and you can add parameters (category and limit) by appending them to URL separated with slashes. For example `store_url/smaily/rss/feed/category/bikes/limit/10`. Regular RSS-feed shows 50 last products.
-
-### How can I access additional Abandoned cart parameters in Smaily template editor?
-
-Here is a list of all the parameters available in Smaily email templating engine:
-
-- Customer first name: `{{ first_name }}`;
-- Customer last name: `{{ last_name }}`;
-- Store view: `{{ store }}`;
-- Store group: `{{ store_group }}`;
-- Website: `{{ store_website }}`.
-- Is abandoned cart: `{{ is_abandoned_cart }}`;
-
-Up to 10 products can be received in Smaily templating engine. You can refrence each product with number 1-10 behind parameter name:
-
-- Product name: `{{ product_name_[1-10] }}`;
-
-- Product description: `{{ product_description_[1-10] }}`;
-
-- Product image URL: `{{ product_image_url_[1-10] }}`;
-
-- Product SKU: `{{ product_sku_[1-10] }}`;
-
-- Product quantity: `{{ product_quantity_[1-10] }}`;
-
-- Product price: `{{ product_price_[1-10] }}`;
-
-Product price is the end price that the customer sees in the cart. If you have a special price set for the product, it will be shown here. This price also includes taxes and discounts.
-
-- Product base price: `{{ product_base_price_[1-10] }}`.
-
-Product base price is the price that is set in the product edit page. This price also includes taxes but no discounts.
-
-Also you can determine if customer had more than 10 items in cart:
-
-- More than 10 items: `{{ over_10_products }}`.
-
-## Troubleshooting
-
-### Regular export fails to run
-
-Usually a good place to start would be to check Magento CRON's Schedule Ahead for value. We have found that value of 60 works the best, if you are running daily exports.
+Legacy note: the 2.8.x extension (`Smaily_SmailyForMagento`) is no longer
+developed. Its releases stay available under their tags, the last one
+[`2.8.1`](https://github.com/sendsmaily/smaily-magento-extension/tree/2.8.1).

@@ -1,0 +1,130 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Live feed URL builder for the Product RSS Feed config group: builds the
+ * URL client-side from the picked options and offers one-click copy. The
+ * option set mirrors Controller/Rss/Feed.php (category, limit, sort, order).
+ *
+ * @var \Smaily\Connect\Block\Adminhtml\Config\RssUrlBuilder $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+?>
+<div id="smaily-rss-builder">
+    <div class="smaily-rss-builder__grid">
+        <label class="smaily-rss-builder__field">
+            <span><?= $escaper->escapeHtml(__('Category ID (optional)')) ?></span>
+            <input type="number" id="smaily-rss-category" min="1"
+                   placeholder="<?= $escaper->escapeHtmlAttr(__('All products')) ?>"/>
+        </label>
+        <label class="smaily-rss-builder__field">
+            <span><?= $escaper->escapeHtml(__('Number of products (1-250)')) ?></span>
+            <input type="number" id="smaily-rss-limit" min="1" max="250" value="50"/>
+        </label>
+        <label class="smaily-rss-builder__field">
+            <span><?= $escaper->escapeHtml(__('Sort by')) ?></span>
+            <select id="smaily-rss-sort">
+                <option value="created_at"><?= $escaper->escapeHtml(__('Date created')) ?></option>
+                <option value="updated_at"><?= $escaper->escapeHtml(__('Date updated')) ?></option>
+                <option value="name"><?= $escaper->escapeHtml(__('Product name')) ?></option>
+                <option value="price"><?= $escaper->escapeHtml(__('Price')) ?></option>
+            </select>
+        </label>
+        <label class="smaily-rss-builder__field">
+            <span><?= $escaper->escapeHtml(__('Sort order')) ?></span>
+            <select id="smaily-rss-order">
+                <option value="desc"><?= $escaper->escapeHtml(__('Descending')) ?></option>
+                <option value="asc"><?= $escaper->escapeHtml(__('Ascending')) ?></option>
+            </select>
+        </label>
+    </div>
+    <label class="smaily-rss-builder__label" for="smaily-rss-url"><?= $escaper->escapeHtml(__('Feed URL')) ?></label>
+    <div class="smaily-rss-builder__url">
+        <input type="text" id="smaily-rss-url" readonly onclick="this.select();"/>
+        <button type="button" id="smaily-rss-copy" class="action-secondary">
+            <span><?= $escaper->escapeHtml(__('Copy')) ?></span>
+        </button>
+    </div>
+    <p class="note">
+        <span id="smaily-rss-copy-result"></span>
+        <?= $escaper->escapeHtml(__(
+            'Paste this URL into the RSS block of the Smaily template editor.'
+            . ' Category IDs are shown in Catalog > Categories.'
+        )) ?>
+    </p>
+</div>
+<script>
+require(['jquery'], function ($) {
+    'use strict';
+    // Strings are translated server-side with __(): $t() inside phtml inline
+    // scripts is never collected into js-translation.json.
+
+    var baseUrl = '<?= $escaper->escapeJs($block->getFeedBaseUrl()) ?>';
+
+    function buildUrl() {
+        var params = [],
+            category = $('#smaily-rss-category').val(),
+            limit = parseInt($('#smaily-rss-limit').val(), 10),
+            sort = $('#smaily-rss-sort').val(),
+            order = $('#smaily-rss-order').val();
+
+        // Defaults (limit 50, sort created_at, order desc) are omitted so the
+        // simplest feed stays the bare endpoint URL.
+        if (category) {
+            params.push('category=' + encodeURIComponent(category));
+        }
+        if (limit && limit !== 50) {
+            params.push('limit=' + Math.min(250, Math.max(1, limit)));
+        }
+        if (sort !== 'created_at') {
+            params.push('sort=' + encodeURIComponent(sort));
+        }
+        if (order !== 'desc') {
+            params.push('order=' + encodeURIComponent(order));
+        }
+
+        $('#smaily-rss-url').val(baseUrl + (params.length ? '?' + params.join('&') : ''));
+        $('#smaily-rss-copy-result').text('');
+    }
+
+    function copied(ok) {
+        $('#smaily-rss-copy-result')
+            .text(ok
+                ? '<?= $escaper->escapeJs(__('Copied to the clipboard.')) ?>'
+                : '<?= $escaper->escapeJs(__('Copying failed — select the URL and copy it manually.')) ?>')
+            .css('color', ok ? '#006400' : '#e22626');
+    }
+
+    $('#smaily-rss-builder').on('input change', 'input, select', buildUrl);
+    $('#smaily-rss-copy').on('click', function () {
+        var url = $('#smaily-rss-url').val();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(function () {
+                copied(true);
+            }, function () {
+                copied(fallbackCopy());
+            });
+        } else {
+            copied(fallbackCopy());
+        }
+    });
+
+    /**
+     * execCommand fallback for non-secure contexts (plain-http admin), where
+     * navigator.clipboard is unavailable.
+     */
+    function fallbackCopy() {
+        var input = document.getElementById('smaily-rss-url');
+        input.select();
+        input.setSelectionRange(0, input.value.length);
+        try {
+            return document.execCommand('copy');
+        } catch (e) {
+            return false;
+        }
+    }
+
+    buildUrl();
+});
+</script>

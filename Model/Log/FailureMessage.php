@@ -1,0 +1,170 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+
+declare(strict_types=1);
+
+namespace Smaily\Connect\Model\Log;
+
+use Smaily\Connect\Cron\AbandonedCart;
+use Smaily\Connect\Model\Engine\CatalogManifest;
+use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
+use Smaily\Connect\Model\Queue\Handler\ContactSyncHandler;
+use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
+use Smaily\Connect\Model\Queue\Failure;
+use Smaily\Connect\Model\Queue\Handler\ProfilingConsentHandler;
+
+/**
+ * What a failed row says to the merchant (PRO-2454).
+ *
+ * A terminal refusal is stored as `permanent_http_<code>: <server message>`
+ * (`permanent_envelope_<code>:` for a Smaily error envelope, PRO-1962)
+ * (Model\Queue\Failure) — the classification is ours, the sentence after
+ * it is Smaily's own, except where the client words a refusal itself
+ * (rejected credentials, PRO-2508). The merchant is shown that sentence, redacted
+ * exactly like the payload beside it; the classification stays for the
+ * Details drawer, where the technical detail belongs. A retryable failure
+ * carries no prefix and is shown as it is.
+ *
+ * The client's own messages are stored as English source text, whatever the
+ * store's language (PRO-3628), and are translated here, in the admin's
+ * language, when the row is shown. A row stored in another language before
+ * that, or a message that is not one of ours, is shown as stored.
+ */
+class FailureMessage
+{
+    /**
+     * The client messages a queue row can store, as written in __() in
+     * Model\Client\SmailyClient, SmailyClientProvider and
+     * Exception\InvalidSubdomainException. A message added there that the
+     * queue can store is added here too, or it is shown in English. The
+     * reason a handler closes a row without sending it is stored the same
+     * way, and is read here too.
+     */
+    public const TRANSLATED = [
+        'Smaily refused the request because this account\'s package does not include API access.'
+            . ' Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all.',
+        'Smaily API credentials were rejected',
+        // Before the one without the answer, whose pattern would match it too.
+        'Smaily API request failed with HTTP %1: %2',
+        'Smaily API request failed with HTTP %1',
+        'Smaily API request failed: %1',
+        'Smaily API returned a malformed response body',
+        'Smaily API returned code %1: %2',
+        'Smaily API credentials are not configured (store scope: %1)',
+        'The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.',
+        // Not errors: the reasons a row was closed without sending (PRO-3619, PRO-3634, PRO-3693).
+        ContactSyncHandler::SKIPPED_NOT_A_CONTACT,
+        AutomationHandler::SKIPPED_NO_WORKFLOW,
+        ProfilingConsentHandler::SKIPPED_REPLACED,
+        IdentityMergeHandler::SKIPPED_OPTED_OUT,
+        AbandonedCart::SKIPPED_RECENTLY_REMINDED,
+        // Why a nightly catalog manifest was not sent (PRO-3854).
+        CatalogManifest::TOO_MANY_PRODUCTS,
+    ];
+
+    /**
+     * What Model\Queue\Failure prepends to a refusal it parked on the spot. The Log
+     * grid's error filter strips it the same way, in SQL (Log\Collection).
+     */
+    private const CLASS_PATTERN = '/^(' . Failure::CLASS_REGEX . '):\s*/';
+
+    /**
+     * Each TRANSLATED source with the pattern that reads a stored message
+     * as it, and the SQL LIKE pattern that finds it stored, built once.
+     *
+     * @var array<string, array{0: string, 1: string}>|null
+     */
+    private ?array $sources = null;
+
+    public function __construct(
+        private readonly PayloadRedactor $redactor
+    ) {
+    }
+
+    /**
+     * The merchant-facing wording of a stored `last_error`: the server's own
+     * message where there is one, in the admin's language where it is one of
+     * ours, with secrets hidden.
+     */
+    public function forDisplay(?string $lastError): string
+    {
+        return $this->redactor->redact(
+            $this->translate((string)preg_replace(self::CLASS_PATTERN, '', trim((string)$lastError)))
+        );
+    }
+
+    /**
+     * The internal failure class of a stored `last_error`, or '' when the
+     * failure was not classified as permanent.
+     */
+    public function failureClass(?string $lastError): string
+    {
+        preg_match(self::CLASS_PATTERN, trim((string)$lastError), $matches);
+
+        return $matches[1] ?? '';
+    }
+
+    /**
+     * The stored client messages that the admin reads with $term in them
+     * because they are shown translated (PRO-2509): one SQL LIKE pattern per
+     * message whose translation has $term in its own wording, the values
+     * filled into it matching anything. The grid's error filter matches
+     * these besides the stored text itself, so the admin finds a row by the
+     * words the column shows.
+     *
+     * @return string[]
+     */
+    public function storedPatternsShowing(string $term): array
+    {
+        $patterns = [];
+        foreach ($term === '' ? [] : $this->sources() as $source => [, $stored]) {
+            $translated = (string)__($source);
+            if ($translated === $source) {
+                continue;
+            }
+            foreach ((array)preg_split('/%\d+/', $translated) as $wording) {
+                if (mb_stripos((string)$wording, $term) !== false) {
+                    $patterns[] = $stored;
+                    break;
+                }
+            }
+        }
+
+        return $patterns;
+    }
+
+    private function translate(string $message): string
+    {
+        foreach ($this->sources() as $source => [$pattern]) {
+            if (preg_match($pattern, $message, $matches)) {
+                return (string)__($source, ...array_slice($matches, 1));
+            }
+        }
+
+        return $message;
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    private function sources(): array
+    {
+        if ($this->sources === null) {
+            $this->sources = [];
+            foreach (self::TRANSLATED as $source) {
+                $this->sources[$source] = [
+                    '/^' . preg_replace('/%\d+/', '(.*?)', preg_quote($source, '/')) . '$/su',
+                    implode('%', array_map(
+                        static fn ($part): string => addcslashes((string)$part, '%_\\'),
+                        (array)preg_split('/%\d+/', $source)
+                    )),
+                ];
+            }
+        }
+
+        return $this->sources;
+    }
+}

@@ -1,0 +1,22 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * @var \Magento\Framework\View\Element\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\EngineState $viewModel */
+$viewModel = $block->getData('view_model');
+if (!$viewModel->isAttributionActive()) {
+    return;
+}
+?>
+<script type="text/x-magento-init">
+{
+    "*": {
+        "Smaily_Connect/js/attribution": <?= /* @noEscape */ $viewModel->getAttributionConfigJson() ?>
+    }
+}
+</script>

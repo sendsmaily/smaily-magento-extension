@@ -1,0 +1,327 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Native 5-step initial setup: Connect -> Contacts -> Automations ->
+ * Intelligence -> Overview. The step content is the shared panel partials
+ * (view/adminhtml/templates/panel/) also rendered by the Settings page;
+ * every step saves via AJAX into the same system config paths declared in
+ * `etc/adminhtml/system.xml` (kept for storage/encryption; the native
+ * Stores > Configuration > Smaily section is hidden) — the wizard is a
+ * guided view over one source of truth. Steps 2+ unlock once the Smaily
+ * connection is verified (same gating as the Woo/Shopify plugins).
+ *
+ * On a 2+-website install, a website-chooser card renders BEFORE the normal
+ * step rail whenever the request hasn't already named a website
+ * (RFC_MULTI_WEBSITE.md §2): picking one reloads the page with
+ * `?website=<id>`, which is the same mechanism the Settings selector uses —
+ * every step from then on saves/prefills against that website's scope with
+ * no further plumbing.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
+$viewModel = $block->getData('view_model');
+$showChooser = $viewModel->hasMultipleWebsites() && !$viewModel->hasSelectedWebsite();
+$websiteOptions = $viewModel->getWebsiteOptions();
+
+// Hosted on GitHub for now — update this URL once a hosted docs site exists.
+$userGuideUrl = 'https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/USER_GUIDE.md';
+
+// Carries the website this run just configured through to Settings/Log so a
+// multi-website merchant lands back on the same website, not silently the
+// installation's default one.
+$websiteQuery = $viewModel->getWebsiteQuery();
+$settingsUrl = $block->getUrl('smaily_connect/settings', $websiteQuery);
+$dashboardUrl = $block->getUrl('smaily_connect/dashboard', $websiteQuery);
+$logUrl = $block->getUrl('smaily_connect/log', $websiteQuery);
+
+// Step N of 5 + the step title above each step's content, as the pack draws
+// them (PRO-3561). The panels below carry no title of their own here.
+$stepTitles = [
+    1 => __('Connect your Smaily account'),
+    2 => __('Contact synchronization to Smaily'),
+    3 => __('Map store events to Smaily automations'),
+    4 => __('Campaign Intelligence (optional)'),
+    5 => __('You are all set!'),
+];
+// A finished setup reopens on a read-only summary of the connection, with a
+// Completed marker and "Edit credentials" (PRO-3563, the pack's
+// completed-revisit frame); rendered server-side so the form never flashes.
+$setupCompleted = $viewModel->isSetupCompleted();
+// The step the page opens on and the furthest step reached, from the server,
+// so the right step, rail and footer are drawn before the script runs and
+// the page does not jump (PRO-2456). The script starts from the same two.
+$startStep = $viewModel->getStartStep();
+$reachedStep = $viewModel->getReachedStep();
+$panelClass = static function (int $stepNo) use ($startStep): string {
+    return 'smaily-step-panel' . ($stepNo === $startStep ? ' active' : '');
+};
+$completedPill = '<span class="smaily-pill smaily-pill--active" id="smaily-w-completed-pill">'
+    . '<span class="smaily-pill__dot"></span>' . $escaper->escapeHtml(__('Completed')) . '</span>';
+$stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $stepTitles): string {
+    return '<div class="smaily-step-head">'
+        . '<div class="smaily-step-kicker-row"><span class="smaily-step-kicker">'
+        . $escaper->escapeHtml(__('Step %1 of %2', $stepNo, count($stepTitles)))
+        . '</span>' . $marker . '</div>'
+        . '<h3 class="smaily-step-title">' . $escaper->escapeHtml($stepTitles[$stepNo]) . '</h3>'
+        . '</div>';
+};
+?>
+<div id="smaily-wizard" class="smaily-ui smaily-wizard">
+    <!-- Styles live in view/adminhtml/web/css/smaily-admin.css (loaded via the wizard layout XML). -->
+    <?php if ($showChooser): ?>
+    <div class="smaily-card" id="smaily-wizard-website-chooser">
+        <h2><?= $escaper->escapeHtml(__('Which website are you setting up?')) ?></h2>
+        <p><?= $escaper->escapeHtml(__('This install has more than one website. Pick the one to connect — you can run the initial setup again for each of the others.')) ?></p>
+        <div class="smaily-field">
+            <label for="smaily-wizard-website-input"><?= $escaper->escapeHtml(__('Website')) ?></label>
+            <select id="smaily-wizard-website-input">
+                <?php foreach ($websiteOptions as $websiteId => $websiteName): ?>
+                <option value="<?= (int)$websiteId ?>"><?= $escaper->escapeHtml($websiteName) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="smaily-footer">
+            <div>
+                <button type="button" class="action-primary" id="smaily-wizard-website-continue">
+                    <span><?= $escaper->escapeHtml(__('Continue')) ?></span>
+                </button>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+    <div id="smaily-wizard-main"<?= $showChooser ? ' style="display:none"' : '' ?>>
+    <?php // Each rail step carries the pack's short line under its name (the
+    // WooCommerce plugin's step descriptions); the rail shows it, the narrow
+    // strip across the top does not. ?>
+    <ul class="smaily-steps">
+        <?php foreach ([
+            1 => [__('Connect'), __('Set up Smaily account connections')],
+            2 => [__('Contacts'), __('Synchronization settings')],
+            3 => [__('Automations'), __('Setting up triggers for automations')],
+            4 => [__('Intelligence'), __('Create a connection with Campaign Intelligence (optional)')],
+            5 => [__('Overview'), __('Summary and last check')],
+        ] as $stepNo => [$stepLabel, $stepSub]): ?>
+        <?php $stepState = $stepNo === $startStep ? 'active' : ($stepNo <= $reachedStep ? 'done' : ''); ?>
+        <li data-step="<?= (int)$stepNo ?>"<?= $stepState !== '' ? ' class="' . $escaper->escapeHtmlAttr($stepState) . '"' : '' ?>>
+            <span class="smaily-step-index"><span class="smaily-step-num"><?= (int)$stepNo ?></span></span><span class="smaily-step-text"><span class="smaily-step-name"><?= $escaper->escapeHtml($stepLabel) ?></span><span class="smaily-step-sub"><?= $escaper->escapeHtml($stepSub) ?></span></span>
+        </li>
+        <?php endforeach; ?>
+    </ul>
+
+    <div class="<?= /* @noEscape */ $panelClass(1) ?>" data-step="1">
+        <?= /* @noEscape */ $stepHead(1, $setupCompleted ? $completedPill : '') ?>
+        <?php if ($setupCompleted): ?>
+        <?php
+        $verified = $viewModel->isSmailyVerified();
+        $savedSubdomain = $viewModel->getSavedSubdomain();
+        $savedUsername = $viewModel->getSavedUsername();
+        $savedStorefrontUrl = $viewModel->getSavedStorefrontUrl();
+        ?>
+        <div class="smaily-setup-summary" id="smaily-w-summary">
+            <div class="smaily-setup-summary__row">
+                <span class="smaily-setup-summary__label"><?= $escaper->escapeHtml(__('Subdomain')) ?></span>
+                <code class="smaily-setup-summary__value"><?= $escaper->escapeHtml($savedSubdomain !== '' ? $savedSubdomain . '.sendsmaily.net' : '—') ?></code>
+            </div>
+            <div class="smaily-setup-summary__row">
+                <span class="smaily-setup-summary__label"><?= $escaper->escapeHtml(__('API username')) ?></span>
+                <span class="smaily-setup-summary__value"><?= $escaper->escapeHtml($savedUsername !== '' ? $savedUsername : '—') ?></span>
+            </div>
+            <?php if ($savedStorefrontUrl !== ''): ?>
+            <div class="smaily-setup-summary__row" id="smaily-w-summary-storefront">
+                <span class="smaily-setup-summary__label"><?= $escaper->escapeHtml(__('Storefront URL')) ?></span>
+                <code class="smaily-setup-summary__value"><?= $escaper->escapeHtml($savedStorefrontUrl) ?></code>
+            </div>
+            <?php endif; ?>
+            <div class="smaily-setup-summary__row">
+                <span class="smaily-setup-summary__label"><?= $escaper->escapeHtml(__('Status')) ?></span>
+                <span class="smaily-pill smaily-pill--<?= $verified ? 'active' : 'off' ?>">
+                    <span class="smaily-pill__dot"></span><?= $escaper->escapeHtml($verified ? __('Connected') : __('Not connected')) ?>
+                </span>
+            </div>
+        </div>
+        <?php endif; ?>
+        <div id="smaily-w-connect-form"<?= $setupCompleted ? ' style="display:none"' : '' ?>><?= $block->getChildHtml('panel.connection') ?></div>
+    </div>
+    <div class="<?= /* @noEscape */ $panelClass(2) ?>" data-step="2"><?= /* @noEscape */ $stepHead(2) ?><?= $block->getChildHtml('panel.subscribers') ?></div>
+    <div class="<?= /* @noEscape */ $panelClass(3) ?>" data-step="3"><?= /* @noEscape */ $stepHead(3) ?><?= $block->getChildHtml('panel.automations') ?></div>
+    <div class="<?= /* @noEscape */ $panelClass(4) ?>" data-step="4"><?= /* @noEscape */ $stepHead(4) ?><?= $block->getChildHtml('panel.intelligence') ?></div>
+
+    <!-- Step 5: Overview (wizard-only) -->
+    <div class="<?= /* @noEscape */ $panelClass(5) ?>" data-step="5">
+        <?= /* @noEscape */ $stepHead(5) ?>
+        <div class="smaily-card">
+            <?php // One of the two shows: Smaily accepted the saved credentials (PRO-3560) or not. ?>
+            <p id="smaily-w-overview-connected"><?= $escaper->escapeHtml(__('Smaily Connect is now syncing in near-real-time. Here is where everything lives from now on:')) ?></p>
+            <p id="smaily-w-overview-not-connected" style="display:none"><?= $escaper->escapeHtml(__('Syncing starts once Smaily accepts the credentials — check them in Settings > Connection and test the connection. Here is where everything lives from now on:')) ?></p>
+            <ul class="smaily-overview-links">
+                <li><a href="<?= $escaper->escapeUrl($settingsUrl) ?>"><?= $escaper->escapeHtml(__('Settings')) ?></a> — <?= $escaper->escapeHtml(__('every setting from the initial setup as always-available tabs, including the historical imports and the RSS feed URL builder')) ?></li>
+                <li><a href="<?= $escaper->escapeUrl($logUrl) ?>"><?= $escaper->escapeHtml(__('Log')) ?></a> — <?= $escaper->escapeHtml(__('every delivery to Smaily and Campaign Intelligence with retry; check here first if something seems off')) ?></li>
+                <li><?= $escaper->escapeHtml(__('Product RSS feed for the Smaily template editor:')) ?> <code><?= $escaper->escapeHtml($block->getBaseUrl() . 'smaily/rss/feed') ?></code><br/>
+                    <span class="note"><?= $escaper->escapeHtml(__('Need a category-filtered or sorted feed? Use the URL builder under Settings > RSS.')) ?>
+                        <a href="<?= $escaper->escapeUrl($block->getUrl('smaily_connect/settings', array_replace_recursive($websiteQuery, ['_query' => ['tab' => 'rss']]))) ?>"><?= $escaper->escapeHtml(__('Open the URL builder')) ?></a></span></li>
+                <li><a href="<?= $escaper->escapeUrl($userGuideUrl) ?>" target="_blank" rel="noopener noreferrer"><?= $escaper->escapeHtml(__('User Guide')) ?></a> — <?= $escaper->escapeHtml(__('the full merchant documentation: every feature, setting and troubleshooting steps')) ?></li>
+            </ul>
+            <p class="note"><?= $escaper->escapeHtml(__('Tip: make sure the Magento cron runs every minute — deliveries are queued and flushed by the smaily_connect cron group.')) ?></p>
+        </div>
+        <?php // The step footer (Back/Continue) is hidden here; this one moves
+        // the merchant on: the Dashboard first, Settings as the alternative. ?>
+        <div class="smaily-footer smaily-overview-footer">
+            <div>
+                <a class="action-secondary" href="<?= $escaper->escapeUrl($settingsUrl) ?>">
+                    <span><?= $escaper->escapeHtml(__('Open Settings')) ?></span>
+                </a>
+                <a class="action-primary" href="<?= $escaper->escapeUrl($dashboardUrl) ?>">
+                    <span><?= $escaper->escapeHtml(__('Go to Dashboard')) ?></span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="smaily-footer">
+        <button type="button" class="action-secondary" id="smaily-w-back"<?= $startStep === 1 ? ' style="display:none"' : '' ?>><span><?= $escaper->escapeHtml(__('Back')) ?></span></button>
+        <div>
+            <?php if ($setupCompleted): ?>
+            <button type="button" class="action-secondary" id="smaily-w-edit-credentials"><span><?= $escaper->escapeHtml(__('Edit credentials')) ?></span></button>
+            <?php endif; ?>
+            <span class="smaily-result" id="smaily-w-save-result"></span>
+            <button type="button" class="action-primary" id="smaily-w-next"><span><?= $escaper->escapeHtml(__('Continue')) ?></span></button>
+        </div>
+    </div>
+    </div>
+</div>
+
+<?= $block->getChildHtml('panel.js') ?>
+<script>
+require(['jquery'], function ($) {
+    'use strict';
+
+    var panels = window.smailyPanelsInit($);
+    // Strings are translated server-side — see panel/panels-js.phtml.
+
+    // Website chooser (RFC_MULTI_WEBSITE.md §2, 2+-website installs only):
+    // reloads with ?website=<id>, same mechanism as the Settings selector.
+    $('#smaily-wizard-website-continue').on('click', function () {
+        var url = new URL(window.location.href);
+        url.searchParams.set('website', $('#smaily-wizard-website-input').val());
+        window.location.href = url.toString();
+    });
+    //
+    // step = the step currently shown; maxStep = the furthest step ever
+    // reached (from the saved config on load, then per-step saves). The
+    // stepper derives "done" (unlocked, clickable) from maxStep, so going
+    // Back never re-locks steps that were already completed.
+    var step = <?= (int)$startStep ?>, maxStep = <?= (int)$reachedStep ?>;
+    // Whether Smaily accepted the saved credentials (PRO-3560): from the page
+    // load, then from the finish step's answer.
+    var verified = !!panels.boot.verified;
+    // A finished setup opens on the connection summary (PRO-3563) until
+    // "Edit credentials" returns the form.
+    var summary = $('#smaily-w-summary').length > 0;
+
+    function render() {
+        $('.smaily-steps li').each(function () {
+            var s = $(this).data('step');
+            $(this).toggleClass('active', s === step).toggleClass('done', s !== step && s <= maxStep);
+        });
+        $('.smaily-step-panel').removeClass('active');
+        $('.smaily-step-panel[data-step=' + step + ']').addClass('active');
+        $('#smaily-w-overview-connected').toggle(verified);
+        $('#smaily-w-overview-not-connected').toggle(!verified);
+        $('#smaily-w-back').toggle(step > 1 && step < 5);
+        $('#smaily-w-next').toggle(step < 5);
+        // Overview has no step actions: drop the footer (and its divider).
+        $('#smaily-wizard-main > .smaily-footer').toggle(step < 5);
+        $('#smaily-w-next span').text(step === 4
+            ? '<?= $escaper->escapeJs(__('Finish')) ?>'
+            : '<?= $escaper->escapeJs(__('Continue')) ?>');
+        $('#smaily-w-summary').toggle(summary);
+        $('#smaily-w-connect-form').toggle(!summary);
+        $('#smaily-w-edit-credentials').toggle(summary && step === 1);
+        $('#smaily-w-save-result').text('');
+        panels.clearFormErrors($('#smaily-wizard-main'));
+        window.scrollTo(0, 0);
+    }
+
+    /** Wraps a (possibly throwing) collector into a promise chain. */
+    function save(name, collector) {
+        return new Promise(function (resolve) { resolve(collector()); })
+            .then(function (data) { return panels.saveStep(name, data); });
+    }
+
+    var stepSavers = {
+        // The summary saves nothing: Continue only moves on.
+        1: function () { return summary ? Promise.resolve() : save('connect', panels.collect.connect); },
+        2: function () { return save('subscribers', panels.collect.subscribers); },
+        3: function () { return save('automations', panels.collect.automations); },
+        4: function () {
+            return save('intelligence', panels.collect.intelligence).then(function () {
+                return panels.saveStep('finish', {});
+            }).then(function (response) {
+                verified = !!response.verified;
+            });
+        }
+    };
+
+    panels.initAll();
+
+    $('#smaily-w-next').on('click', function () {
+        var $button = $(this).prop('disabled', true);
+        var $panel = $('.smaily-step-panel[data-step=' + step + ']');
+        panels.clearFormErrors($panel);
+        panels.result('#smaily-w-save-result', '<?= $escaper->escapeJs(__('Saving…')) ?>', true);
+        stepSavers[step]().then(function (response) {
+            // A changed Storefront URL reaches a connected Campaign
+            // Intelligence only with the next catalog import: the step the
+            // setup moves on to says so beside its Continue, in the words of
+            // Settings > Connection (PRO-3913).
+            var reimport = !!(response && response.storefrontUrlChanged) && panels.isIntelligenceConnected();
+            panels.result('#smaily-w-save-result', '', true);
+            step += 1;
+            maxStep = Math.max(maxStep, step);
+            if (step === 3) {
+                panels.loadWorkflows('#smaily-w-save-result');
+            }
+            render();
+            if (reimport) {
+                panels.result('#smaily-w-save-result', '<?= $escaper->escapeJs(__('Saved. Run the catalog import again under Intelligence > Historical imports, so that Campaign Intelligence gets the new product links.')) ?>', true);
+            }
+        }).catch(function (error) {
+            // Banner above the step's form + the field that caused it (PRO-3562).
+            panels.showFormErrors($panel, error);
+            panels.result('#smaily-w-save-result', '<?= $escaper->escapeJs(__('Saving failed.')) ?>', false);
+        }).finally(function () {
+            $button.prop('disabled', false);
+        });
+    });
+    $('#smaily-w-edit-credentials').on('click', function () {
+        summary = false;
+        render();
+        $('#smaily-w-subdomain').trigger('focus');
+    });
+    $('#smaily-w-back').on('click', function () {
+        step = Math.max(1, step - 1);
+        render();
+    });
+    $('.smaily-steps').on('click', 'li.done', function () {
+        step = $(this).data('step');
+        if (step === 3) {
+            panels.loadWorkflows('#smaily-w-save-result');
+        }
+        render();
+    });
+
+    // The start step and the furthest step reached come from the server
+    // (WizardData::getStartStep() / getReachedStep()), which drew them: a
+    // finished setup opens on the connection summary with every step
+    // unlocked, filled-in credentials open an unfinished setup on Contacts.
+    if (step === 3) {
+        panels.loadWorkflows('#smaily-w-save-result');
+    }
+    render();
+});
+</script>

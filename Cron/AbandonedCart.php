@@ -1,403 +1,257 @@
 <?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
 
-namespace Smaily\SmailyForMagento\Cron;
+declare(strict_types=1);
 
-use Smaily\SmailyForMagento\Helper\Config;
-use Smaily\SmailyForMagento\Helper\Data;
-use Smaily\SmailyForMagento\Model\HTTP\ClientException;
+namespace Smaily\Connect\Cron;
 
+use Magento\Quote\Model\Quote;
+use Magento\Quote\Model\ResourceModel\Quote\Collection as QuoteCollection;
+use Magento\Quote\Model\ResourceModel\Quote\CollectionFactory as QuoteCollectionFactory;
+use Magento\Store\Model\App\Emulation;
+use Magento\Store\Model\StoreManagerInterface;
+use Magento\Framework\App\Area;
+use Magento\Framework\Stdlib\DateTime\DateTime;
+use Smaily\Connect\Model\AbandonedCart\PayloadBuilder;
+use Smaily\Connect\Model\AbandonedCart\StateManager;
+use Smaily\Connect\Model\Automation\Trigger;
+use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\ContactSync\SyncDispatcher;
+use Smaily\Connect\Model\Logger\Logger;
+
+/**
+ * Detects abandoned quotes and enqueues abandoned cart automation events.
+ *
+ * Scans the native quote table (is_active, items, email) — Magento already
+ * tracks cart state, so no checkout webhooks or extra tracking are needed.
+ * A quote is a candidate when idle past the configured cutoff but younger
+ * than MAX_AGE (24h backlog guard shared with the Woo/Shopify plugins:
+ * a long-broken cron must not blast stale reminders on recovery). Send
+ * state lives in the smaily_abandoned_cart side table; delivery, retries
+ * and the event log come from the queue.
+ *
+ * One address gets at most one reminder per REMINDER_INTERVAL, whatever
+ * number of carts carry it (PRO-3693): a cart whose address had a reminder
+ * for another cart in that time is closed as skipped, in the side table and
+ * as a skipped row in the Log.
+ */
 class AbandonedCart
 {
-    const BATCH_SIZE = 100;
-    const FIELDS_PREFIX_MAPPING = [
-        'base_price' => 'product_base_price',
-        'description' => 'product_description',
-        'image_url' => 'product_image_url',
-        'name' => 'product_name',
-        'price' => 'product_price',
-        'qty' => 'product_quantity',
-        'sku' => 'product_sku',
-    ];
+    public const SKIPPED_RECENTLY_REMINDED = 'Skipped: this address already got an abandoned-cart reminder'
+        . ' for another cart in the last 24 hours. Nothing was sent.';
 
-    protected $dateTime;
-    protected $escaper;
-    protected $imageHelperFactory;
-    protected $logger;
-    protected $pricingHelper;
-    protected $productFactory;
-    protected $quoteCollection;
-    protected $quoteRepository;
-    protected $resourceConnection;
-    protected $searchCriteriaBuilder;
-    protected $sortOrderBuilder;
-    protected $storeManager;
-    protected $taxCalculation;
+    private const MAX_AGE_SECONDS = 86400;
+    private const REMINDER_INTERVAL_SECONDS = 86400;
+    private const BATCH_SIZE = 100;
 
-    protected $config;
-    protected $dataHelper;
-
-    /**
-     * Class constructor.
-     *
-     * @access public
-     * @return void
-     */
     public function __construct(
-        \Magento\Catalog\Helper\ImageFactory $imageHelperFactory,
-        \Magento\Catalog\Model\ProductFactory $productFactory,
-        \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder,
-        \Magento\Framework\Api\SortOrderBuilder $sortOrderBuilder,
-        \Magento\Framework\App\ResourceConnection $resourceConnection,
-        \Magento\Framework\Escaper $escaper,
-        \Magento\Framework\Pricing\Helper\Data $pricingHelper,
-        \Magento\Framework\Stdlib\DateTime\DateTime $dateTime,
-        \Magento\Quote\Model\QuoteRepository $quoteRepository,
-        \Magento\Quote\Model\ResourceModel\Quote\Collection $quoteCollection,
-        \Magento\Store\Model\StoreManagerInterface $storeManager,
-        \Magento\Tax\Model\Calculation $taxCalculation,
-        \Psr\Log\LoggerInterface $logger,
-        Config $config,
-        Data $dataHelper
+        private readonly StoreManagerInterface $storeManager,
+        private readonly Config $config,
+        private readonly QuoteCollectionFactory $quoteCollectionFactory,
+        private readonly StateManager $stateManager,
+        private readonly PayloadBuilder $payloadBuilder,
+        private readonly SyncDispatcher $dispatcher,
+        private readonly Emulation $emulation,
+        private readonly DateTime $dateTime,
+        private readonly Logger $logger
     ) {
-        $this->dateTime = $dateTime;
-        $this->escaper = $escaper;
-        $this->imageHelperFactory = $imageHelperFactory;
-        $this->logger = $logger;
-        $this->pricingHelper = $pricingHelper;
-        $this->productFactory = $productFactory;
-        $this->quoteCollection = $quoteCollection;
-        $this->quoteRepository = $quoteRepository;
-        $this->resourceConnection = $resourceConnection
-            ->getConnection(\Magento\Framework\App\ResourceConnection::DEFAULT_CONNECTION);
-        $this->searchCriteriaBuilder = $searchCriteriaBuilder;
-        $this->sortOrderBuilder = $sortOrderBuilder;
-        $this->storeManager = $storeManager;
-        $this->taxCalculation = $taxCalculation;
-
-        $this->config = $config;
-        $this->dataHelper = $dataHelper;
     }
 
-    /**
-     * Run Abandoned Cart CRON job.
-     *
-     * @access public
-     * @return void
-     */
-    public function execute()
+    public function execute(): void
     {
-        $websites = $this->storeManager->getWebsites();
-
-        $this->logger->info('Starting Abandoned Cart CRON job...');
-
-        foreach ($websites as $website) {
-            if ($this->config->isEnabled($website) === false ||
-                $this->config->isAbandonedCartCronEnabled($website) === false
-            ) {
-                $this->logger->debug('CRON is disabled for website:', [
-                    'id' => $website->getId(),
-                    'name' => $website->getName(),
-                    'code' => $website->getCode(),
-                ]);
+        foreach ($this->storeManager->getWebsites() as $website) {
+            if (!$website instanceof \Magento\Store\Model\Website) {
+                continue;
+            }
+            $websiteId = (int)$website->getId();
+            if (!$this->config->isAbandonedCartEnabled($websiteId)) {
                 continue;
             }
 
-            // Trigger Abandoned Cart automation workflows.
-            $this->triggerAbandonedCarts($website);
-        }
-
-        $this->logger->info('Finished Abandoned Cart CRON job');
-    }
-
-    /**
-     * Trigger Abandoned Cart automation workflows in Smaily.
-     *
-     * @param \Magento\Store\Api\Data\WebsiteInterface $website
-     * @access protected
-     * @return void
-     */
-    protected function triggerAbandonedCarts(\Magento\Store\Api\Data\WebsiteInterface $website)
-    {
-        $storeIds = $website->getStoreIds();
-        $tz = new \DateTimeZone('UTC');
-
-        $this->logger->info('Triggering Smaily Abandoned Cart automation workflows...', [
-            'batch_size' => self::BATCH_SIZE,
-            'website' => [
-                'code' => $website->getCode(),
-                'id' => $website->getId(),
-                'name' => $website->getName(),
-            ],
-        ]);
-
-        // Determine cart abandon time.
-        $nowAt = new \DateTimeImmutable('now', $tz);
-        $nowAt = $nowAt->setTime((int) $nowAt->format('H'), (int) $nowAt->format('i'));
-
-        $abandonInterval = $this->config->getAbadonedCartAbandonInterval($website);
-        $nextAbandonAt = $nowAt->add($abandonInterval);
-
-        // Compile abandoned carts base query.
-        //
-        // Note! Using collection querying does not work, because it resets the page number if you are trying
-        // to get items from outside the range of maximum number of items.
-        $select = $this->resourceConnection
-            ->select()
-            ->from(
-                ['main_table' => $this->quoteCollection->getMainTable()],
-                ['entity_id', 'reminder_date']
-            )
-            ->where('main_table.store_id IN (?)', $storeIds)
-            ->where('main_table.is_active = ?', 1)
-            ->where('main_table.items_count > ?', 0)
-            ->where('main_table.customer_email IS NOT NULL')
-            ->where('main_table.is_sent IS NULL')
-            ->order('main_table.entity_id ASC');
-
-        $offset = 0;
-        while (true) {
-            $select->limit(self::BATCH_SIZE, $offset * self::BATCH_SIZE);
-
-            $this->logger->debug('Fetching quotes at offset: ' . $offset);
-
-            $quotes = $this->resourceConnection->fetchAll($select);
-            if (empty($quotes)) {
-                $this->logger->debug('No quotes found at offset, breaking loop');
-                break;
+            $storeIds = array_map('intval', $website->getStoreIds());
+            if (!$storeIds || !$this->config->isConnected((int)$website->getDefaultStore()?->getId())) {
+                continue;
             }
 
-            // Collect quotes to postpone or trigger abandoned cart automation for.
-            $quoteIdsToTrigger = [];
-            $quoteIdsToPostpone = [];
-            foreach ($quotes as $quote) {
-                $quoteId = (int) $quote['entity_id'];
-                $abandonAt = $quote['reminder_date'] !== null
-                    ? new \DateTimeImmutable($quote['reminder_date'], $tz)
-                    : null;
-
-                if ($abandonAt === null) {
-                    $quoteIdsToPostpone[] = $quoteId;
-                } elseif ($abandonAt <= $nowAt) {
-                    $quoteIdsToTrigger[] = $quoteId;
-                }
-            }
-
-            // Update postponed abandoned cart(s).
-            $this->postponeAbandonedCarts($quoteIdsToPostpone, $nextAbandonAt);
-
-            // Trigger automation workflow.
-            $this->triggerAutomationWorkflows($quoteIdsToTrigger, $website);
-
-            $offset++;
+            $this->processWebsite($websiteId, $storeIds);
         }
     }
 
     /**
-     * Postpone abandoned carts.
-     *
-     * @param array $ids
-     * @param \DateTimeImmutable $abandonAt
-     * @access protected
-     * @return void
+     * @param int[] $storeIds
      */
-    protected function postponeAbandonedCarts(array $ids, \DateTimeImmutable $abandonAt)
+    private function processWebsite(int $websiteId, array $storeIds): void
     {
-        if (empty($ids)) {
-            return;
-        }
-
-        $this->logger->debug('Postponing Abandoned Carts until ' . $abandonAt->format(\DateTime::ATOM), $ids);
-
-        $this->resourceConnection->update(
-            $this->quoteCollection->getMainTable(),
-            ['reminder_date' => $this->dateTime->gmtDate(null, $abandonAt)],
-            ['entity_id IN (?)' => $ids]
+        $now = $this->dateTime->gmtTimestamp();
+        $idleSince = $this->dateTime->gmtDate(
+            'Y-m-d H:i:s',
+            $now - $this->config->getAbandonedCutoffMinutes($websiteId) * 60
         );
-    }
+        $maxAge = $this->dateTime->gmtDate('Y-m-d H:i:s', $now - self::MAX_AGE_SECONDS);
 
-    /**
-     * Trigger abandoned cart automation workflows in Smaily.
-     *
-     * @param array $ids
-     * @param int $workflowId
-     * @param array $fields
-     * @access protected
-     * @return void
-     */
-    protected function triggerAutomationWorkflows(array $ids, \Magento\Store\Api\Data\WebsiteInterface $website)
-    {
-        if (empty($ids)) {
+        $collection = $this->quoteCollectionFactory->create();
+        // Every filter column is qualified: requireAnyEmail() joins
+        // quote_address, which shares column names with quote (updated_at,
+        // created_at, customer_id, ...) — an unqualified filter is ambiguous
+        // SQL and MySQL rejects the whole SELECT.
+        $collection->addFieldToFilter('main_table.is_active', ['eq' => 1])
+            ->addFieldToFilter('main_table.items_count', ['gt' => 0])
+            ->addFieldToFilter('main_table.store_id', ['in' => $storeIds])
+            ->addFieldToFilter('main_table.updated_at', ['from' => $maxAge, 'to' => $idleSince])
+            ->setPageSize(self::BATCH_SIZE);
+        // Oldest cart id first, as an expression (PRO-3730): ordered by the
+        // bare column, MySQL walks the primary key in id order from the
+        // store's first cart once more than a few thousand carts changed in
+        // the window — on a store that keeps old carts, the whole table
+        // (3M rows, ~1.8 s per website per run). An expression cannot be read
+        // from an index, so MySQL reads only the window through Magento's
+        // store_id/updated_at index and sorts it. Same order, same carts.
+        $collection->getSelect()->order(new \Zend_Db_Expr('main_table.entity_id + 0 ASC'));
+
+        // Magento fills quote.customer_email only once payment info is
+        // submitted; on its own checkout the checkout email field puts a
+        // guest's typed email there earlier (GuestCartEmail, PRO-3693). Other
+        // checkouts may keep it on the quote address (billing, then shipping)
+        // only, so widen the selection to any quote carrying an email in
+        // EITHER place (PayloadBuilder resolves the recipient with the same
+        // fallback order). PRO-1275.
+        $this->requireAnyEmail($collection);
+        // A handled cart (terminal tracker row: mailed, skipped, erased, ...)
+        // can stay active and idle; left out in SQL, so handled carts never
+        // take the page's places from newer carts (PRO-3711).
+        $this->stateManager->excludeHandled($collection->getSelect(), 'main_table.entity_id');
+
+        $candidates = [];
+        foreach ($collection->getItems() as $quote) {
+            if ($quote instanceof Quote) {
+                $candidates[] = $quote;
+            }
+        }
+        if (!$candidates) {
             return;
         }
 
-        $fields = $this->config->getAbandonedCartFields($website);
-        $smailyApiClient = $this->dataHelper->getSmailyApiClient($website);
-        $workflowId = $this->config->getAbandonedCartAutomationId($website);
+        // The addresses reminded in the last 24 hours, read once; a reminder
+        // this run enqueues joins them, so two carts of one address in one
+        // run get one reminder.
+        $reminded = $this->stateManager->addressesRemindedSince(
+            $this->dateTime->gmtDate('Y-m-d H:i:s', $now - self::REMINDER_INTERVAL_SECONDS)
+        );
+        $trackedAddresses = $this->stateManager->trackedAddresses(
+            array_map(static fn (Quote $quote): int => (int)$quote->getId(), $candidates)
+        );
 
-        $this->logger->debug('Triggering Abandoned Carts', [
-            'fields' => $fields,
-            'ids' => $ids,
-            'workflow_id' => $workflowId,
-        ]);
+        $addresses = $this->buildAddresses($candidates);
+        $mailed = 0;
+        foreach ($candidates as $quote) {
+            $quoteId = (int)$quote->getId();
+            $storeId = (int)$quote->getStoreId();
+            $address = $addresses[$quoteId];
 
-        // Fetch quotes.
-        $quotes = $this->quoteCollection
-            ->clear()
-            ->addFieldToFilter('entity_id', ['in' => $ids])
-            ->addFieldToFilter('is_active', ['eq' => 1])
-            ->load();
+            if (($address['email'] ?? '') === '') {
+                continue;
+            }
 
-        foreach ($quotes as $quote) {
-            $store = $quote->getStore();
-            $storeGroup = $store !== null ? $store->getGroup() : null;
+            if (isset($reminded[strtolower((string)$address['email'])])) {
+                $this->stateManager->markSkipped($quoteId, $storeId, $address['email']);
+                $this->dispatcher->recordSkippedAutomation(
+                    Trigger::ABANDONED_CART,
+                    $storeId,
+                    $address,
+                    self::SKIPPED_RECENTLY_REMINDED
+                );
+                continue;
+            }
 
-            $cart = [
-                'email' => $quote->getCustomerEmail(),
-                'store' => $store !== null ? $store->getName() : '',
-                'store_group' => $storeGroup !== null ? $storeGroup->getName() : '',
-                'store_website' => $website->getName(),
-            ];
+            // Mark first, dispatch second: if we crash in between, the shopper
+            // misses one reminder instead of receiving a duplicate.
+            $this->stateManager->markMailed($quoteId, $storeId, $address['email']);
+            $remindedAddress = $trackedAddresses[$quoteId] ?? strtolower((string)$address['email']);
+            if ($remindedAddress !== '') {
+                $reminded[$remindedAddress] = true;
+            }
+            $this->dispatcher->dispatchAutomation(Trigger::ABANDONED_CART, $storeId, $address);
+            $mailed++;
+        }
 
-            $this->logger->debug('Triggering Abandoned Cart for quote', [
-                'quote_id' => $quote->getId(),
+        if ($mailed > 0) {
+            $this->logger->info('Abandoned cart automations enqueued', [
+                'website_id' => $websiteId,
+                'count' => $mailed,
             ]);
-
-            // Collect quote information.
-            if (in_array('first_name', $fields, true)) {
-                $cart['first_name'] = (string) $quote->getCustomerFirstname();
-            }
-            if (in_array('last_name', $fields, true)) {
-                $cart['last_name'] = (string) $quote->getCustomerLastname();
-            }
-
-            // Collect product information.
-            $visibleItems = $quote->getAllVisibleItems();
-            for ($i = 0; $i < 10; $i++) {
-                $item = isset($visibleItems[$i]) ? $visibleItems[$i] : null;
-                $productsIndex = $i + 1;
-
-                $cart = array_merge($cart, $this->buildCartPayload($fields, $productsIndex));
-
-                // Skip invalid items.
-                if ($item === null) {
-                    continue;
-                }
-
-                $product = $this->productFactory->create()->load($item->getProductId());
-
-                if (in_array('name', $fields, true)) {
-                    $cart['product_name_' . $productsIndex] = $item->getName();
-                }
-                if (in_array('description', $fields, true)) {
-                    $cart['product_description_' . $productsIndex] = $this->escaper
-                        ->escapeHtml($product->getDescription());
-                }
-                if (in_array('image_url', $fields, true)) {
-                    $cart['product_image_url_' . $productsIndex] = $this->imageHelperFactory
-                        ->create()
-                        ->init($product, 'thumbnail')
-                        ->setImageFile($product->getThumbnail())
-                        ->resize(346)
-                        ->getUrl();
-                }
-                if (in_array('sku', $fields, true)) {
-                    $cart['product_sku_' . $productsIndex] = $item->getSku();
-                }
-                if (in_array('qty', $fields, true)) {
-                    $cart['product_quantity_' . $productsIndex] = $this->dataHelper
-                        ->stripTrailingZeroes($item->getQty());
-                }
-                if (in_array('price', $fields, true)) {
-                    $cart['product_price_' . $productsIndex] = $this->pricingHelper
-                        ->currencyByStore($item->getPriceInclTax(), $quote->getStore(), true, false);
-                }
-                if (in_array('base_price', $fields, true)) {
-                    # The base_price is considered as the product original price not the quote item price.
-                    # Quote item may have a discount and special price applied. The base price should
-                    # reflect the original product price without any discounts.
-                    $productItem = $item->getProduct();
-                    $taxRequest = $this->taxCalculation->getRateRequest(
-                        $quote->getShippingAddress(),
-                        $quote->getBillingAddress(),
-                        $quote->getCustomerTaxClassId(),
-                        $quote->getStore(),
-                    );
-                    $taxRequest->setProductClassId($productItem->getTaxClassId());
-                    $taxRate = $this->taxCalculation->getRate($taxRequest);
-                    $priceExclTax = $productItem->getPrice();
-                    $taxAmount = $this->taxCalculation->calcTaxAmount(
-                        $priceExclTax,
-                        $taxRate,
-                    );
-                    $originalPriceInclTax = $priceExclTax + $taxAmount;
-
-                    $cart['product_base_price_' . $productsIndex] = $this->pricingHelper
-                        ->currencyByStore($originalPriceInclTax, $quote->getStore(), true, false);
-                }
-            }
-
-            $cart['over_10_products'] = $quote->getItemsCount() > 10 ? 'true' : 'false';
-
-            // Push payload to Smaily.
-            // Note! This is done one-by-one to avoid potential issues with sending abandoned cart
-            // messages to recipients over-and-over.
-            $payload = [
-                'addresses' => [$cart],
-                'autoresponder' => $workflowId,
-                'force_opt_in' => false,
-                'is_abandoned_cart' => 'true',
-            ];
-
-            try {
-                $response = $smailyApiClient->post('/api/autoresponder.php', $payload);
-
-                if ((int) $response['code'] === 203) {
-                    // Ignoring responses with code 203 - Invalid data submitted, because most likely
-                    // it is due to the email address of the quote being invalid.
-                    $this->logger->warning('Invalid data to send abandoned cart. Skipping...', ['payload' => $payload]);
-                } elseif ((int) $response['code'] !== 101) {
-                    throw new ClientException('Smaily API responded with: ' . json_encode($response));
-                }
-            } catch (\Exception $e) {
-                $this->logger->error($e->getMessage(), ['payload' => $payload]);
-
-                // Re-throw exception.
-                throw $e;
-            }
-
-            // Mark quote as sent.
-            $this->resourceConnection->update(
-                $this->quoteCollection->getMainTable(),
-                ['is_sent' => 1],
-                ['entity_id = ?' => $quote->getId()]
-            );
         }
     }
 
     /**
-     * Helper method to compile cart payload of selected fields.
+     * Each candidate's reminder address, by quote id: one frontend emulation
+     * and one batch build per store (PRO-1960). The reminder rules above still
+     * weigh the carts oldest id first, whatever their store.
      *
-     * @param array $fields
-     * @param int $index
-     * @return array
+     * @param Quote[] $candidates
+     * @return array<int, array<string, string>>
      */
-    protected function buildCartPayload(array $fields, $index)
+    private function buildAddresses(array $candidates): array
     {
-        $payload = [];
-
-        if (empty($fields)) {
-            return $payload;
+        $byStore = [];
+        foreach ($candidates as $quote) {
+            $byStore[(int)$quote->getStoreId()][] = $quote;
         }
 
-        foreach ($fields as $source) {
-            if (!array_key_exists($source, self::FIELDS_PREFIX_MAPPING)) {
-                continue;
+        $addresses = [];
+        foreach ($byStore as $storeId => $quotes) {
+            $this->emulation->startEnvironmentEmulation($storeId, Area::AREA_FRONTEND, true);
+            try {
+                $addresses += $this->payloadBuilder->buildAll($storeId, $quotes);
+            } finally {
+                $this->emulation->stopEnvironmentEmulation();
             }
-
-            $target = self::FIELDS_PREFIX_MAPPING[$source] . '_' . $index;
-            $payload[$target] = '';
         }
 
-        return $payload;
+        return $addresses;
+    }
+
+    /**
+     * Restricts the collection to quotes that carry an email in ANY of the
+     * three places Magento may hold it — quote.customer_email, the billing
+     * address, or the shipping address — via LEFT JOINs (at most one billing
+     * and one shipping row per quote, so page-size counting is preserved). The
+     * empty-string guards matter: an in-progress checkout leaves blank address
+     * rows before the email field is filled.
+     *
+     * @param QuoteCollection $collection
+     */
+    private function requireAnyEmail(QuoteCollection $collection): void
+    {
+        $select = $collection->getSelect();
+        $connection = $collection->getConnection();
+        $addressTable = $collection->getTable('quote_address');
+
+        $select->joinLeft(
+            ['smaily_billing_addr' => $addressTable],
+            $connection->quoteInto(
+                'smaily_billing_addr.quote_id = main_table.entity_id'
+                . ' AND smaily_billing_addr.address_type = ?',
+                'billing'
+            ),
+            []
+        );
+        $select->joinLeft(
+            ['smaily_shipping_addr' => $addressTable],
+            $connection->quoteInto(
+                'smaily_shipping_addr.quote_id = main_table.entity_id'
+                . ' AND smaily_shipping_addr.address_type = ?',
+                'shipping'
+            ),
+            []
+        );
+
+        $select->where(
+            "(main_table.customer_email IS NOT NULL AND main_table.customer_email != '')"
+            . " OR (smaily_billing_addr.email IS NOT NULL AND smaily_billing_addr.email != '')"
+            . " OR (smaily_shipping_addr.email IS NOT NULL AND smaily_shipping_addr.email != '')"
+        );
     }
 }

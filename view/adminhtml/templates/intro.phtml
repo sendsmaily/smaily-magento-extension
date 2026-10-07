@@ -1,0 +1,24 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Shared page intro: a short "what is this page and when do I need it"
+ * block above admin grids.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+// Translated here at render time, NOT via translate="true" in the layout
+// XML: string arguments are evaluated once and frozen into the layout cache,
+// and the admin layout cache key does not include the per-user interface
+// locale — the first admin to render the page would pin its language.
+$text = (string)$block->getData('intro_text');
+if ($text === '') {
+    return;
+}
+?>
+<div class="message message-info" style="margin-bottom: 2rem;">
+    <?= $escaper->escapeHtml(__($text)) ?>
+</div>

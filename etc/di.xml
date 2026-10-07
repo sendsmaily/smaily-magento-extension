@@ -1,64 +1,122 @@
 <?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:noNamespaceSchemaLocation="../../../../../lib/internal/Magento/Framework/ObjectManager/etc/config.xsd">
-    <!-- Intercept Newsletter Subscription form -->
-    <type name="Magento\Newsletter\Block\Subscribe">
-        <plugin name="Smaily_SmailyForMagento_Plugin_OptIn_Form" type="Smaily\SmailyForMagento\Plugin\OptIn\Form" />
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <preference for="Smaily\Connect\Model\Engine\SleeperInterface" type="Smaily\Connect\Model\Engine\Sleeper"/>
+    <preference for="Smaily\Connect\Api\GuestCartEmailInterface" type="Smaily\Connect\Model\AbandonedCart\GuestCartEmail"/>
+
+    <!-- Dedicated log channel: var/log/smaily_connect.log -->
+    <virtualType name="Smaily\Connect\Logger\Handler" type="Magento\Framework\Logger\Handler\Base">
+        <arguments>
+            <argument name="fileName" xsi:type="string">/var/log/smaily_connect.log</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="Smaily\Connect\Logger" type="Monolog\Logger">
+        <arguments>
+            <argument name="name" xsi:type="string">smaily_connect</argument>
+            <argument name="handlers" xsi:type="array">
+                <item name="system" xsi:type="object">Smaily\Connect\Logger\Handler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Smaily\Connect\Model\Logger\Logger">
+        <arguments>
+            <argument name="logger" xsi:type="object">Smaily\Connect\Logger</argument>
+        </arguments>
     </type>
 
-    <!-- Intercept Newsletter Subscriber opt-in -->
-    <type name="Magento\Newsletter\Controller\Subscriber\NewAction">
-        <plugin name="Smaily_SmailyForMagento_Plugin_Captcha" type="Smaily\SmailyForMagento\Plugin\Captcha" />
+    <!-- Marketing event queue handlers, keyed by event type
+         (see Cron\FlushEventQueue). -->
+    <type name="Smaily\Connect\Model\Queue\HandlerPool">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="contact.sync" xsi:type="object">Smaily\Connect\Model\Queue\Handler\ContactSyncHandler</item>
+                <item name="automation.trigger" xsi:type="object">Smaily\Connect\Model\Queue\Handler\AutomationHandler</item>
+                <item name="engine.identity_merge" xsi:type="object">Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler</item>
+                <item name="engine.profiling_consent" xsi:type="object">Smaily\Connect\Model\Queue\Handler\ProfilingConsentHandler</item>
+            </argument>
+        </arguments>
     </type>
+
+    <!-- Newsletter email suppression (Smaily automations own opt-in emails). -->
     <type name="Magento\Newsletter\Model\Subscriber">
-        <plugin name="Smaily_SmailyForMagento_Plugin_OptIn" type="Smaily\SmailyForMagento\Plugin\OptIn" />
+        <plugin name="smaily_connect_suppress_newsletter_emails" type="Smaily\Connect\Plugin\SuppressNewsletterEmails"/>
     </type>
 
-    <!-- Intercept module configuration save -->
-    <type name="Magento\Config\Model\Config">
-        <plugin name="Smaily_SmailyForMagento_Plugin_SaveConfig" type="Smaily\SmailyForMagento\Plugin\SaveConfig" />
+    <!-- MSI stock changes → catalog ingest, one thin plugin per seam.
+         Optional dependency: if the Magento_Inventory* modules are absent
+         these types do not exist, the plugin is never wired and nothing else
+         notices. sortOrder puts us behind MSI's own legacy-stock sync in the
+         after-chain. -->
+    <type name="Magento\InventoryApi\Api\SourceItemsSaveInterface">
+        <plugin name="smaily_connect_engine_source_items_save"
+                type="Smaily\Connect\Plugin\Engine\SourceItemsSave"
+                sortOrder="100"/>
+    </type>
+    <type name="Magento\InventorySourceDeductionApi\Model\SourceDeductionServiceInterface">
+        <plugin name="smaily_connect_engine_source_deduction"
+                type="Smaily\Connect\Plugin\Engine\SourceDeduction"
+                sortOrder="100"/>
     </type>
 
-    <!-- Set CRON loggers -->
-    <type name="Smaily\SmailyForMagento\Cron\AbandonedCart">
-        <arguments>
-            <argument name="logger" xsi:type="object">Smaily\SmailyForMagento\Logger\Cron\AbandonedCart</argument>
-        </arguments>
-    </type>
-    <type name="Smaily\SmailyForMagento\Cron\SubscribersSync">
-        <arguments>
-            <argument name="logger" xsi:type="object">Smaily\SmailyForMagento\Logger\Cron\SubscribersSync</argument>
-        </arguments>
+    <!-- Product import Delete → engine removal (PRO-3768): the bunch read is
+         the last moment before the import deletes the products. Optional
+         dependency, as the MSI plugins above. -->
+    <type name="Magento\ImportExport\Model\ResourceModel\Import\Data">
+        <plugin name="smaily_connect_engine_product_import_bunch"
+                type="Smaily\Connect\Plugin\Engine\ProductImportBunch"/>
     </type>
 
-    <!-- Setup CRON log handlers -->
-    <type name="Smaily\SmailyForMagento\Model\Logger\Handler\Cron">
-        <arguments>
-            <argument name="filesystem" xsi:type="object">Magento\Framework\Filesystem\Driver\File</argument>
-        </arguments>
+    <!-- A new credit memo → its order's ingest row (PRO-1955). On the
+         resource save, not the save_after event: that event fires before
+         the credit memo's items are written, and the return signal is read
+         from them. -->
+    <type name="Magento\Sales\Model\ResourceModel\Order\Creditmemo">
+        <plugin name="smaily_connect_engine_creditmemo_save"
+                type="Smaily\Connect\Plugin\Engine\CreditmemoSave"/>
     </type>
-    <virtualType name="Smaily\SmailyForMagento\Model\Logger\Handler\Cron\AbandonedCart" type="Smaily\SmailyForMagento\Model\Logger\Handler\Cron">
+
+    <!-- Backfill processors, keyed by "{job_type}:{target}". -->
+    <type name="Smaily\Connect\Cron\BackfillTick">
         <arguments>
-            <argument name="fileName" xsi:type="string">var/log/smly_cart_cron.log</argument>
-        </arguments>
-    </virtualType>
-    <virtualType name="Smaily\SmailyForMagento\Model\Logger\Handler\Cron\SubscribersSync" type="Smaily\SmailyForMagento\Model\Logger\Handler\Cron">
-        <arguments>
-            <argument name="fileName" xsi:type="string">var/log/smly_customer_cron.log</argument>
-        </arguments>
-    </virtualType>
-    <virtualType name="Smaily\SmailyForMagento\Logger\Cron\AbandonedCart" type="Magento\Framework\Logger\Monolog">
-        <arguments>
-            <argument name="handlers" xsi:type="array">
-                <item name="debug" xsi:type="object">Smaily\SmailyForMagento\Model\Logger\Handler\Cron\AbandonedCart</item>
+            <argument name="processors" xsi:type="array">
+                <item name="contacts:smaily" xsi:type="object">Smaily\Connect\Model\Backfill\ContactsProcessor</item>
+                <item name="catalog:engine" xsi:type="object">Smaily\Connect\Model\Backfill\EngineCatalogProcessor</item>
+                <item name="customers:engine" xsi:type="object">Smaily\Connect\Model\Backfill\EngineCustomersProcessor</item>
+                <item name="orders:engine" xsi:type="object">Smaily\Connect\Model\Backfill\EngineOrdersProcessor</item>
             </argument>
         </arguments>
-    </virtualType>
-    <virtualType name="Smaily\SmailyForMagento\Logger\Cron\SubscribersSync" type="Magento\Framework\Logger\Monolog">
+    </type>
+
+    <!-- CLI commands. -->
+    <type name="Magento\Framework\Console\CommandListInterface">
         <arguments>
-            <argument name="handlers" xsi:type="array">
-                <item name="debug" xsi:type="object">Smaily\SmailyForMagento\Model\Logger\Handler\Cron\SubscribersSync</item>
+            <argument name="commands" xsi:type="array">
+                <item name="smaily_backfill_start" xsi:type="object">Smaily\Connect\Console\Command\BackfillStartCommand</item>
+                <item name="smaily_backfill_status" xsi:type="object">Smaily\Connect\Console\Command\BackfillStatusCommand</item>
+                <item name="smaily_engine_ping" xsi:type="object">Smaily\Connect\Console\Command\EnginePingCommand</item>
+                <item name="smaily_engine_disconnect" xsi:type="object">Smaily\Connect\Console\Command\EngineDisconnectCommand</item>
+                <item name="smaily_gdpr" xsi:type="object">Smaily\Connect\Console\Command\GdprCommand</item>
             </argument>
         </arguments>
-    </virtualType>
+    </type>
+
+    <!-- The Smaily API password and the Campaign Intelligence API key are
+         secrets: app:config:dump leaves them out of app/etc/config.php (they
+         stay in the database), so their ciphertext never lands in a file that
+         is committed with the code. -->
+    <type name="Magento\Config\Model\Config\TypePool">
+        <arguments>
+            <argument name="sensitive" xsi:type="array">
+                <item name="smaily_connect/connection/password" xsi:type="string">1</item>
+                <item name="smaily_connect/intelligence/api_key" xsi:type="string">1</item>
+            </argument>
+        </arguments>
+    </type>
 </config>

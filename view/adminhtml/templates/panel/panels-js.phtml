@@ -1,0 +1,1112 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Shared behavior for the step/tab panels — included by BOTH the setup
+ * wizard and the Settings page, so the two surfaces run the same code
+ * instead of copies. Defines window.smailyPanelsInit synchronously (no
+ * dependencies); the page script passes jQuery in and receives the API:
+ *
+ *   var panels = window.smailyPanelsInit($);
+ *   panels.initAll();               // prefill + wire whatever panels exist
+ *   panels.collect.connect();       // per-panel save payloads
+ *   panels.saveStep(name, data);    // POST to the shared savestep endpoint
+ *
+ * Strings are translated server-side: Magento's js-translation.json
+ * dictionary is built from .js and .html files only — $t() inside a phtml
+ * inline script never gets collected, so it would always render English.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
+$viewModel = $block->getData('view_model');
+// Connection/Subscribers/Automations are website-scoped (RFC_MULTI_WEBSITE.md
+// §2): every AJAX call those tabs make carries the currently selected website
+// so Model\Adminhtml\WebsiteContext resolves the same target the page was
+// rendered with, no further plumbing. Intelligence/backfill stay installation-
+// wide in this phase (Phase 4/5), so their URLs are left as-is.
+$websiteQuery = $viewModel->getWebsiteQuery();
+$urls = [
+    'test' => $block->getUrl('smaily_connect/api/testsmaily', $websiteQuery),
+    'workflows' => $block->getUrl('smaily_connect/api/workflows', $websiteQuery),
+    'saveStep' => $block->getUrl('smaily_connect/api/savestep', $websiteQuery),
+    'engineExchange' => $block->getUrl('smaily_connect/api/engineexchange'),
+    'enginePing' => $block->getUrl('smaily_connect/api/engineping'),
+    'backfill' => $block->getUrl('smaily_connect/api/backfillstate'),
+    'logFailed' => $block->getUrl('smaily_connect/log', ['_query' => ['filters' => ['status' => 'failed']]]),
+];
+?>
+<script>
+window.smailyPanelsInit = function ($) {
+    'use strict';
+
+    var boot = <?= /* @noEscape */ $viewModel->getBootJson() ?>;
+    var urls = <?= /* @noEscape */ json_encode(array_map('strval', $urls)) ?>;
+    var connected = boot.connected;
+    // Campaign Intelligence connected: from the page load, then from a
+    // Connect (engineConnected()).
+    var intelligenceConnected = false;
+    var mlLanguages = (boot.multilingual || {}).languages || [];
+    var isMultilingual = mlLanguages.length > 1;
+    var mlModeCurrent = isMultilingual ? (boot.connection.multilingualMode || 'single') : 'single';
+    var mlModeSaved = mlModeCurrent;
+    var mlSwitchConfirmed = false;
+
+    function post(url, data) {
+        // Some URLs (Connection/Subscribers/Automations, RFC_MULTI_WEBSITE.md
+        // §2) already carry a ?website=<id> query string baked in server-side
+        // — append with & instead of a second ? so form_key still parses.
+        var separator = url.indexOf('?') === -1 ? '?' : '&';
+        return fetch(url + separator + 'form_key=' + encodeURIComponent(window.FORM_KEY), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+            body: JSON.stringify(data || {})
+        }).then(function (r) { return r.json(); });
+    }
+
+    // Shared AJAX status channel, rendered with the Stage A inline-status
+    // vocabulary (CSS-only glyphs). State is inferred so no call site changes:
+    // in-progress copy carries an ellipsis (spinner), ok = check, error = error
+    // glyph, empty = idle/hidden. The .ok/.err classes are kept for any legacy
+    // hook, but the color now comes from the inline-status roles.
+    function result(selector, text, ok, link) {
+        var $el = $(selector);
+        text = text || '';
+        var working = text.indexOf('…') !== -1; // ellipsis = still working
+        var state = text === '' ? 'idle' : (working ? 'working' : (ok ? 'saved' : 'error'));
+        $el.empty()
+            .removeClass('ok err is-idle is-working is-saved is-error')
+            .addClass('smaily-inline-status')
+            .addClass(ok ? 'ok' : 'err')
+            .addClass('is-' + state);
+        if (text !== '') {
+            if (state === 'working') {
+                $el.append($('<span></span>').addClass('smaily-inline-status__spinner'));
+            } else if (state === 'saved') {
+                $el.append($('<span></span>').addClass('smaily-inline-status__check'));
+            } else if (state === 'error') {
+                $el.append($('<span></span>').addClass('smaily-inline-status__error').text('!'));
+            }
+            $el.append($('<span></span>').text(text));
+        }
+        if (link) {
+            $el.append(' ').append($('<a></a>').attr('href', link.href).text(link.label));
+        }
+    }
+
+    // Settings > Connection status line (PRO-3570): rendered server-side
+    // from the saved state, then set to the answer of each check that asked
+    // Smaily — Test connection, or a connection save.
+    function setConnectionStatus(verified, accountName) {
+        $('#smaily-w-connection-pill').toggleClass('smaily-pill--active', verified)
+            .toggleClass('smaily-pill--off', !verified);
+        $('#smaily-w-connection-pill-text').text(verified
+            ? '<?= $escaper->escapeJs(__('Connected')) ?>'
+            : '<?= $escaper->escapeJs(__('Not connected')) ?>');
+        $('#smaily-w-connection-account').text(verified && accountName
+            ? '<?= $escaper->escapeJs(__('as "%1"')) ?>'.replace('%1', accountName)
+            : '');
+    }
+
+    // --- Form errors (PRO-3562, the pack's two-layer error model) -----------
+    // A failed save shows an error banner above the form and marks the field
+    // that caused it (danger styling + the message under it). An error
+    // carries {field, message} entries — from the save endpoint or from the
+    // checks before it; "accounts.<language>.<field>" names a per-language
+    // account's field. Editing a marked field removes its mark.
+    function formError(message, fields) {
+        var error = new Error(message);
+        error.errors = (fields || []).map(function (field) {
+            return {field: field, message: message};
+        });
+        return error;
+    }
+
+    // A failed Test connection answer as a form error: the test endpoint
+    // names the fields at fault like the save endpoint does; a per-language
+    // account block prefixes them with its "accounts.<language>." key.
+    function testError(data, prefix) {
+        var error = new Error(data.error || '<?= $escaper->escapeJs(__('Connection failed.')) ?>');
+        error.errors = (data.errors || []).map(function (entry) {
+            return {field: prefix + entry.field, message: entry.message};
+        });
+        return error;
+    }
+
+    function fieldInput(key) {
+        var plain = {
+            subdomain: '#smaily-w-subdomain',
+            username: '#smaily-w-username',
+            password: '#smaily-w-password',
+            storefront_url: '#smaily-w-storefront-url'
+        };
+        var account = /^accounts\.([a-z]{2,3})\.(subdomain|username|password)$/.exec(String(key || ''));
+        if (plain[key]) {
+            return $(plain[key]);
+        }
+        if (account) {
+            return $('.smaily-ml-account[data-language=' + account[1] + '] .smaily-ml-' + account[2]);
+        }
+        return $();
+    }
+
+    function clearFieldError($input) {
+        var $scope = $input.closest('.smaily-step-panel, .smaily-tab-panel');
+        $input.removeClass('is-invalid').removeAttr('aria-invalid');
+        $input.closest('.smaily-field').find('.smaily-field-error').remove();
+        // A banner that only summarised field errors goes with the last mark.
+        if (!$scope.find('.is-invalid').length) {
+            $scope.find('.smaily-form-banner[data-fields-only=1]').remove();
+        }
+    }
+
+    function clearFormErrors($scope) {
+        $scope.find('.smaily-form-banner').remove();
+        $scope.find('.smaily-field-error').remove();
+        $scope.find('.is-invalid').removeClass('is-invalid').removeAttr('aria-invalid');
+    }
+
+    function showFormErrors($scope, error) {
+        var errors = (error && error.errors && error.errors.length)
+            ? error.errors
+            : [{field: '', message: (error && error.message) || '<?= $escaper->escapeJs(__('Saving failed.')) ?>'}];
+        var messages = [];
+        var placed = [];
+        var fieldsOnly = true;
+        clearFormErrors($scope);
+        errors.forEach(function (entry) {
+            var $input = fieldInput(entry.field).filter(':visible').first();
+            if (messages.indexOf(entry.message) === -1) {
+                messages.push(entry.message);
+            }
+            // The message goes under the first field it names.
+            if ($input.length && placed.indexOf(entry.message) === -1) {
+                placed.push(entry.message);
+                var $anchor = $input.closest('.smaily-subdomain-row');
+                ($anchor.length ? $anchor : $input).after(
+                    $('<p class="smaily-field-error"></p>').text(entry.message)
+                );
+            }
+            if (!$input.length) {
+                fieldsOnly = false;
+                return;
+            }
+            $input.addClass('is-invalid').attr('aria-invalid', 'true')
+                .one('input change', function () {
+                    clearFieldError($(this));
+                });
+        });
+        var $banner = $('<div class="smaily-banner smaily-banner--error smaily-form-banner" role="alert"></div>')
+            .attr('data-fields-only', fieldsOnly ? '1' : '0')
+            .append($('<span class="smaily-banner__icon">&#9888;</span>'))
+            .append($('<div class="smaily-banner__body"></div>').append(
+                $('<div class="smaily-banner__message"></div>').text(messages.join(' '))
+            ));
+        var $after = $scope.children('.smaily-step-head, .smaily-tab-desc').first();
+        if ($after.length) {
+            $after.after($banner);
+        } else {
+            $scope.prepend($banner);
+        }
+    }
+
+    function credentials() {
+        return {
+            subdomain: $('#smaily-w-subdomain').val(),
+            username: $('#smaily-w-username').val(),
+            password: $('#smaily-w-password').val(),
+            // Falls back to the saved credentials of the selected website's
+            // own store scope whenever the password field is left blank (see
+            // Controller\Adminhtml\Api\Workflows/TestSmaily) — keeps the
+            // workflow list / Test connection scoped to whichever website the
+            // Settings selector currently targets.
+            store_id: boot.storeId
+        };
+    }
+
+    function saveStep(name, data) {
+        return post(urls.saveStep, {step: name, data: data}).then(function (response) {
+            if (!response.saved) {
+                var message = (response.errors || []).map(function (e) { return e.message; }).join(' ');
+                var error = new Error(message || '<?= $escaper->escapeJs(__('Saving failed.')) ?>');
+                error.errors = response.errors || [];
+                throw error;
+            }
+            if (name === 'connect' && typeof response.verified === 'boolean') {
+                setConnectionStatus(response.verified, response.accountName);
+            }
+            if (name === 'connect' && data) {
+                // The saved multilingual state is the new baseline: switching
+                // away again warns again, and saved account blocks may now
+                // rely on their stored passwords.
+                mlModeCurrent = data.multilingual_mode || mlModeCurrent;
+                mlModeSaved = mlModeCurrent;
+                mlSwitchConfirmed = false;
+                // The top-level account just saved — the single account or
+                // the default fallback account — is the website's, the one
+                // an empty password now keeps (PRO-3690, PRO-3718).
+                boot.websiteAccount = {subdomain: data.subdomain, username: data.username};
+                // The Intelligence tab's or step's separate-storefront hint,
+                // and the consent note under browse tracking, follow the
+                // Storefront URL just saved; the Settings tabs and the setup
+                // steps switch without a reload (PRO-3747, PRO-3802,
+                // PRO-3924).
+                if (typeof data.storefront_url === 'string') {
+                    $('#smaily-w-engine-storefront-hint').toggle(data.storefront_url.trim() === '');
+                    $('#smaily-w-browse-consent').toggle(data.storefront_url.trim() === '');
+                    $('#smaily-w-browse-consent-storefront').toggle(data.storefront_url.trim() !== '');
+                }
+                (data.accounts || []).forEach(function (account) {
+                    var $block = $('.smaily-ml-account[data-language=' + account.language + ']');
+                    $block.data('saved-subdomain', account.subdomain)
+                        .data('saved-username', account.username);
+                    if (account.password) {
+                        $block.data('has-password', 1);
+                        $block.find('.smaily-ml-password').val('');
+                    }
+                });
+            }
+            return response;
+        });
+    }
+
+    // A saved workflow id absent from the freshly loaded Smaily list gets no
+    // option of its own, so it would render blank and post empty. Re-add it as
+    // a labelled, selected option so the binding stays visible and survives the
+    // save (server-side preserve backs this up) — PRO-1286, mirroring the
+    // engine-automations block.
+    function keptOption(id) {
+        return new Option(
+            '<?= $escaper->escapeJs(__('Workflow #%1 (not in your Smaily list — kept)')) ?>'
+                .replace('%1', id),
+            id
+        );
+    }
+
+    function fillOptions($select, workflows, current) {
+        current = String(current || '');
+        var found = false;
+        $select.empty().append(new Option('<?= $escaper->escapeJs(__('-- Not Selected --')) ?>', ''));
+        (workflows || []).forEach(function (w) {
+            $select.append(new Option(w.name + ' (' + w.id + ')', w.id));
+            if (String(w.id) === current) {
+                found = true;
+            }
+        });
+        if (current !== '' && !found) {
+            $select.append(keptOption(current));
+        }
+        $select.val(current);
+    }
+
+    function fillWorkflows(workflows) {
+        $('.smaily-w-workflow').each(function () {
+            var $select = $(this);
+            fillOptions($select, workflows, $select.val() || $select.data('saved') || '');
+        });
+    }
+
+    function loadWorkflows(resultSelector) {
+        loadMappingWorkflows();
+        return post(urls.workflows, credentials()).then(function (data) {
+            fillWorkflows(data.workflows);
+            if (data.error && resultSelector) {
+                result(resultSelector, data.error, false);
+            }
+        });
+    }
+
+    // --- Multilingual routing (mode cards + mode A/B sections) --------------
+    function currentMlMode() {
+        if (!isMultilingual) {
+            return 'single';
+        }
+        return $('input[name=smaily-w-mlmode]:checked').val() || mlModeCurrent;
+    }
+
+    function applyMlMode(mode) {
+        var modeA = isMultilingual && mode === 'a';
+        var mapping = isMultilingual && (mode === 'a' || mode === 'b');
+        $('#smaily-w-default-account').toggle(!modeA);
+        $('#smaily-w-accounts').toggle(modeA);
+        $('#smaily-ml-mapping').toggle(mapping);
+        $('#smaily-ml-mapping-off').toggle(isMultilingual && !mapping);
+        $('#smaily-ml-mapping .smaily-ml-hint-a').toggle(mode === 'a');
+        $('#smaily-ml-mapping .smaily-ml-hint-b').toggle(mode === 'b');
+        $('#smaily-ml-modes .smaily-choice').removeClass('is-selected');
+        $('input[name=smaily-w-mlmode][value=' + mode + ']').closest('.smaily-choice').addClass('is-selected');
+    }
+
+    function mlAccountFields($block) {
+        return {
+            language: String($block.data('language')),
+            subdomain: $block.find('.smaily-ml-subdomain').val(),
+            username: $block.find('.smaily-ml-username').val(),
+            password: $block.find('.smaily-ml-password').val()
+        };
+    }
+
+    // Whether typed credentials name another account than the one the form
+    // was drawn with (PRO-3690): an empty password keeps the saved one only
+    // for that account. The subdomain is compared in any case.
+    function accountChanged(fields, savedSubdomain, savedUsername) {
+        return String(fields.subdomain || '').trim().toLowerCase()
+                !== String(savedSubdomain || '').trim().toLowerCase()
+            || String(fields.username || '').trim() !== String(savedUsername || '').trim();
+    }
+
+    /**
+     * Credentials payload for testing / listing workflows of a per-language
+     * account: typed values win; an untouched block with a saved password
+     * falls back to the saved store-view credentials (store_id); null when
+     * the block cannot be exercised without a password.
+     */
+    function mlAccountRequestCreds($block) {
+        var fields = mlAccountFields($block);
+        if (fields.password) {
+            return {subdomain: fields.subdomain, username: fields.username, password: fields.password};
+        }
+        var unchanged = fields.subdomain === String($block.data('saved-subdomain') || '')
+            && fields.username === String($block.data('saved-username') || '');
+        if (unchanged && $block.data('has-password')) {
+            return {store_id: $block.data('store-id')};
+        }
+        return null;
+    }
+
+    function fillMappingSelects($selects, workflows) {
+        $selects.each(function () {
+            var $select = $(this);
+            fillOptions($select, workflows, $select.val() || $select.data('saved') || '');
+        });
+    }
+
+    /**
+     * Re-renders the per-language mapping dropdowns live: mode B lists the
+     * default account's workflows everywhere; mode A lists each language
+     * account's own workflows in that language's rows.
+     */
+    function loadMappingWorkflows() {
+        var mode = currentMlMode();
+        if (!isMultilingual || (mode !== 'a' && mode !== 'b')) {
+            return;
+        }
+        if (mode === 'b') {
+            post(urls.workflows, credentials()).then(function (data) {
+                fillMappingSelects($('.smaily-ml-workflow'), data.workflows);
+            });
+            return;
+        }
+        mlLanguages.forEach(function (language) {
+            var $block = $('.smaily-ml-account[data-language=' + language + ']');
+            var $selects = $('.smaily-ml-workflow[data-language=' + language + ']');
+            var creds = mlAccountRequestCreds($block);
+            if (!creds) {
+                fillMappingSelects($selects, []);
+                return;
+            }
+            post(urls.workflows, creds).then(function (data) {
+                fillMappingSelects($selects, data.workflows || []);
+            });
+        });
+    }
+
+    // --- Backfill progress polling (contacts + engine imports) -------------
+    // Terminal outcomes are honest (Shopify-parity copy): "Done, X of Y
+    // synced" when everything landed; "N failed — view in the Log" when
+    // individual rows failed (queue rows still pending retry are NOT
+    // failed); "Stopped before an error" when the job itself aborted;
+    // "Cancelled" after an admin cancel; "Stalled" for a queued or running
+    // import nothing has moved for an hour (PRO-3915), naming the import it
+    // waits behind when that is another one (PRO-3923). The last outcome +
+    // timestamp persist server-side and re-render on every page load.
+    var backfillTimers = {};
+
+    function withDate(text, data) {
+        return data.finished_at ? text + ' (' + data.finished_at + ')' : text;
+    }
+
+    function scheduleNextPoll(jobType, ui) {
+        backfillTimers[jobType] = setTimeout(function () {
+            pollBackfill(jobType, ui, 'status');
+        }, 4000);
+    }
+
+    // The parts of one Backfill card (PRO-3564, pack "Backfill" frames).
+    function backfillUi($card) {
+        return {
+            card: $card,
+            pill: $card.find('.smaily-backfill-card__pill'),
+            progress: $card.find('.smaily-backfill-card__progress'),
+            bar: $card.find('.smaily-progress'),
+            done: $card.find('.smaily-backfill-card__done'),
+            pct: $card.find('.smaily-backfill-card__pct'),
+            verdict: $card.find('.smaily-backfill-verdict'),
+            link: $card.find('.smaily-backfill-card__link'),
+            start: $card.find('.smaily-backfill-card__start'),
+            cancel: $card.find('.smaily-backfill-card__cancel'),
+            result: $card.find('.smaily-result')
+        };
+    }
+
+    // Drives the Stage A .smaily-progress component: width lives on __fill,
+    // the state class picks the color (running = striped accent; done/failed/
+    // stopped recolor and stop animating). Under the bar: "X of Y" and the
+    // percentage.
+    function setProgress(ui, data, percent, state) {
+        var pct = Math.max(0, Math.min(100, parseInt(percent, 10) || 0));
+        ui.progress.show();
+        ui.bar.removeClass('is-running is-done is-failed is-stopped')
+            .addClass('is-' + state)
+            .find('.smaily-progress__fill').css('width', pct + '%');
+        ui.done.text('<?= $escaper->escapeJs(__('%1 of %2')) ?>'
+            .replace('%1', data.processed).replace('%2', data.total || '?'));
+        ui.pct.text(pct + '%');
+    }
+
+    // One state per render, as the pack draws them: idle (no pill, no bar,
+    // Start import as the primary action), queued and running (only Cancel),
+    // and the four outcomes (pill, bar, the outcome line, Run again).
+    var backfillStates = {
+        pending: {pill: 'pending', label: '<?= $escaper->escapeJs(__('Pending')) ?>'},
+        running: {pill: 'pending', label: '<?= $escaper->escapeJs(__('Running')) ?>'},
+        done: {pill: 'sent', label: '<?= $escaper->escapeJs(__('Done')) ?>', icon: '✓'},
+        failures: {pill: 'sent', label: '<?= $escaper->escapeJs(__('Done')) ?>', icon: '!'},
+        stopped: {pill: 'failed', label: '<?= $escaper->escapeJs(__('Stopped')) ?>', icon: '×', primary: true},
+        stalled: {pill: 'failed', label: '<?= $escaper->escapeJs(__('Stalled')) ?>', icon: '!', primary: true},
+        cancelled: {pill: 'off', label: '<?= $escaper->escapeJs(__('Canceled')) ?>', icon: '—', primary: true}
+    };
+
+    // Where each import's card is, for a stalled import that waits behind
+    // another one (`blocked_by`, PRO-3923).
+    var backfillCards = {
+        contacts: '<?= $escaper->escapeJs(__('Contacts')) ?> > <?= $escaper->escapeJs(__('Initial contact import')) ?>',
+        catalog: '<?= $escaper->escapeJs(__('Intelligence')) ?> > <?= $escaper->escapeJs(__('Catalog')) ?>',
+        customers: '<?= $escaper->escapeJs(__('Intelligence')) ?> > <?= $escaper->escapeJs(__('Customers')) ?>',
+        orders: '<?= $escaper->escapeJs(__('Intelligence')) ?> > <?= $escaper->escapeJs(__('Orders')) ?>'
+    };
+
+    function backfillState(data) {
+        // Run again starts a fresh import; the server cancels this one first.
+        if (data.stalled) {
+            return 'stalled';
+        }
+        if (data.status === 'completed') {
+            return data.failed ? 'failures' : 'done';
+        }
+        if (data.status === 'failed') {
+            return 'stopped';
+        }
+        return backfillStates[data.status] ? data.status : 'idle';
+    }
+
+    function renderBackfill(jobType, data, ui) {
+        var state = backfillState(data);
+        var look = backfillStates[state] || {};
+        var finished = !!look.icon;
+        // Run again here would only queue it behind the same import again.
+        var blocked = state === 'stalled' && !!backfillCards[data.blocked_by];
+        var text = '';
+        ui.card.attr('data-state', state).toggleClass('is-finished', finished);
+        ui.pill.toggle(state !== 'idle')
+            .removeClass('smaily-pill--pending smaily-pill--sent smaily-pill--failed smaily-pill--off')
+            .addClass(look.pill ? 'smaily-pill--' + look.pill : '')
+            .find('.smaily-backfill-card__pill-text').text(look.label || '');
+        ui.cancel.toggle(state === 'pending' || state === 'running' || state === 'stalled');
+        ui.start.toggle((state === 'idle' || finished) && !blocked)
+            .toggleClass('action-primary', state === 'idle' || !!look.primary)
+            .toggleClass('action-secondary', finished && !look.primary)
+            .find('span').text(finished
+                ? '<?= $escaper->escapeJs(__('Run again')) ?>'
+                : '<?= $escaper->escapeJs(__('Start import')) ?>');
+        ui.link.hide().empty();
+        if (!finished) {
+            ui.verdict.hide();
+        }
+        if (state === 'idle') {
+            // Queued, running and the outcomes come from the server; idle
+            // shows nothing that suggests an import (PRO-1357 #7/#8).
+            ui.progress.hide();
+            result(ui.result, '');
+            return;
+        }
+        if (state === 'pending') {
+            // Queued, but the cron tick hasn't picked it up yet — no page has
+            // been processed, so a "0 / ?" progress bar would just look stuck.
+            // Reassure instead of showing fake progress; Cancel stays available.
+            ui.progress.hide();
+            result(ui.result,
+                '<?= $escaper->escapeJs(__('Queued — the import starts on the next scheduled run…')) ?>', true);
+            scheduleNextPoll(jobType, ui);
+            return;
+        }
+        if (state === 'running') {
+            setProgress(ui, data, data.percent, 'running');
+            result(ui.result, '<?= $escaper->escapeJs(__('Importing…')) ?>', true);
+            scheduleNextPoll(jobType, ui);
+            return;
+        }
+        result(ui.result, '');
+        if (state === 'done') {
+            setProgress(ui, data, 100, 'done');
+            text = '<?= $escaper->escapeJs(__('Done, %1 of %2 synced.')) ?>'
+                .replace('%1', data.processed).replace('%2', data.total || data.processed);
+        } else if (state === 'failures') {
+            setProgress(ui, data, data.percent, 'failed');
+            text = '<?= $escaper->escapeJs(__('Done, %1 of %2 synced — %3 failed.')) ?>'
+                .replace('%1', data.processed)
+                .replace('%2', data.total || data.processed + data.failed)
+                .replace('%3', data.failed);
+            ui.link.append($('<a></a>').attr('href', urls.logFailed)
+                .text('<?= $escaper->escapeJs(__('View them in the Log')) ?>')).show();
+        } else if (blocked) {
+            setProgress(ui, data, data.percent, 'failed');
+            text = '<?= $escaper->escapeJs(__('Stalled — this import waits behind another import that nothing has moved for over an hour: Settings > %1. Cancel that import, or press Run again on its card, and this one follows.')) ?>'
+                .replace('%1', backfillCards[data.blocked_by]);
+        } else if (state === 'stalled') {
+            setProgress(ui, data, data.percent, 'failed');
+            text = '<?= $escaper->escapeJs(__('Stalled — nothing has moved this import for over an hour; %1 of %2 synced so far. Press Run again to start a fresh import. If it stalls again, check that Magento\'s cron runs.')) ?>'
+                .replace('%1', data.processed).replace('%2', data.total || '?');
+        } else if (state === 'stopped') {
+            setProgress(ui, data, data.percent, 'failed');
+            text = '<?= $escaper->escapeJs(__('Stopped before an error — %1 of %2 synced so far. Press the import button to run it again.')) ?>'
+                .replace('%1', data.processed).replace('%2', data.total || '?');
+            if (data.error) {
+                text += ' ' + data.error;
+            }
+        } else {
+            setProgress(ui, data, data.percent, 'stopped');
+            text = '<?= $escaper->escapeJs(__('Canceled — %1 of %2 synced. Starting again begins a fresh import.')) ?>'
+                .replace('%1', data.processed).replace('%2', data.total || '?');
+        }
+        ui.verdict.attr('data-state', state).show();
+        ui.verdict.find('.smaily-backfill-verdict__icon').text(look.icon);
+        ui.verdict.find('.smaily-backfill-verdict__text').text(withDate(text, data));
+    }
+
+    function pollBackfill(jobType, ui, action) {
+        post(urls.backfill, {job_type: jobType, action: action}).then(function (data) {
+            renderBackfill(jobType, data, ui);
+            // A start the server refused says why (PRO-1969, PRO-3742: the
+            // engine imports need a Campaign Intelligence connection).
+            if (data.message) {
+                result(ui.result, data.message, false);
+            }
+        });
+    }
+
+    function startBackfill(jobType, ui) {
+        clearTimeout(backfillTimers[jobType]);
+        pollBackfill(jobType, ui, 'start');
+    }
+
+    function cancelBackfill(jobType, ui) {
+        clearTimeout(backfillTimers[jobType]);
+        result(ui.result, '<?= $escaper->escapeJs(__('Canceling…')) ?>', true);
+        pollBackfill(jobType, ui, 'cancel');
+    }
+
+    // The Catalog card on Settings > Intelligence follows a Connect and a
+    // Hold back (PRO-3741); the setup step has no card. The Hold back's
+    // cancel answers with the import's state, which the card renders as is;
+    // after a Connect the card asks for it.
+    function refreshCatalogCard(data) {
+        var $card = $('.smaily-backfill-card[data-job-type="catalog"]');
+        if ($card.length) {
+            clearTimeout(backfillTimers.catalog);
+            if (data) {
+                renderBackfill('catalog', data, backfillUi($card));
+            } else {
+                pollBackfill('catalog', backfillUi($card), 'status');
+            }
+        }
+    }
+
+    function engineConnected(tenantName, engineVersion) {
+        intelligenceConnected = true;
+        $('#smaily-w-engine-disconnected').hide();
+        // Settings only: the setup step renders the introduction without this id.
+        $('#smaily-w-engine-intro').hide();
+        $('#smaily-w-engine-connected').show();
+        // Settings only: browse tracking is the tab's one thing to save (PRO-3567).
+        $('#smaily-w-intelligence-footer').show();
+        $('#smaily-w-engine-status').text(
+            '<?= $escaper->escapeJs(__('Connected: %1 (engine %2)')) ?>'
+                .replace('%1', tenantName).replace('%2', engineVersion)
+        );
+    }
+
+    // --- Live reactivity within panels --------------------------------------
+    function reactAutomationRow(checkboxSelector, selectSelector) {
+        var apply = function () {
+            var $cb = $(checkboxSelector);
+            var on = $cb.is(':checked');
+            $(selectSelector).prop('disabled', !on);
+            // Card + run-mode pill follow the enable toggle (store-event cards).
+            var $card = $cb.closest('.smaily-store-trigger');
+            if ($card.length) {
+                $card.toggleClass('is-active', on).toggleClass('is-off', !on);
+                $card.find('.smaily-store-pill')
+                    .toggleClass('smaily-pill--active', on).toggleClass('smaily-pill--off', !on)
+                    .find('.smaily-store-pill__text')
+                    .text(on ? '<?= $escaper->escapeJs(__('Active')) ?>' : '<?= $escaper->escapeJs(__('Off')) ?>');
+            }
+        };
+        $(document).on('change', checkboxSelector, apply);
+        apply();
+    }
+
+    function reactSubscribersEnabled() {
+        if (!$('#smaily-w-sync-enabled').length) {
+            return;
+        }
+        var apply = function () {
+            var on = $('#smaily-w-sync-enabled').is(':checked');
+            $('#smaily-w-subscribers-body').toggleClass('smaily-muted', !on)
+                .find('input').prop('disabled', !on);
+            // The contacts import obeys the same switch (PRO-1764): with it
+            // off the control says so instead of quoting an estimate. Cancel
+            // stays available so a job already running can still be stopped.
+            $('#smaily-w-backfill').prop('disabled', !on);
+            $('#smaily-w-backfill-estimate').toggle(on);
+            $('#smaily-w-backfill-off').toggle(!on);
+        };
+        $(document).on('change', '#smaily-w-sync-enabled', apply);
+        apply();
+    }
+
+    function reactRssEnabled() {
+        if (!$('#smaily-w-rss-enabled').length) {
+            return;
+        }
+        var apply = function () {
+            $('#smaily-w-rss-builder-wrap').toggle($('#smaily-w-rss-enabled').is(':checked'));
+        };
+        $(document).on('change', '#smaily-w-rss-enabled', apply);
+        apply();
+    }
+
+    // --- Prefill from the saved settings ------------------------------------
+    function initAll() {
+        // Connection.
+        $('#smaily-w-subdomain').val(boot.connection.subdomain);
+        $('#smaily-w-username').val(boot.connection.username);
+        if (boot.connection.hasPassword) {
+            $('#smaily-w-password-note').show();
+        }
+        // "Connected" only when Smaily accepted the saved credentials at the
+        // last real check (PRO-3560) — filled-in fields alone are not enough.
+        if (boot.verified) {
+            result('#smaily-w-test-result', '<?= $escaper->escapeJs(__('Connected with the saved credentials.')) ?>', true);
+        } else if (boot.planBlocked) {
+            // Smaily's last answer: the package has no API access (code 227,
+            // PRO-3579) — not a verdict on the credentials.
+            result('#smaily-w-test-result', '<?= $escaper->escapeJs(__('Smaily refused the request because this account\'s package does not include API access. Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all.')) ?>', false);
+        }
+
+        // Subscribers (sync-field checkboxes are server-rendered).
+        $('#smaily-w-sync-enabled').prop('checked', boot.subscribers.syncEnabled);
+        $('input[name=smaily-w-mode][value=' + boot.subscribers.syncMode + ']').prop('checked', true);
+        $('#smaily-w-checkout-optin').prop('checked', boot.subscribers.checkoutOptin);
+        $('#smaily-w-suppress').prop('checked', boot.subscribers.suppressOptinEmails);
+        $('#smaily-w-include-guests').prop('checked', boot.subscribers.includeGuests);
+
+        // Automations.
+        $('#smaily-w-welcome-enabled').prop('checked', boot.automations.welcomeEnabled);
+        $('#smaily-w-firstorder-enabled').prop('checked', boot.automations.firstOrderEnabled);
+        $('#smaily-w-abandoned-enabled').prop('checked', boot.automations.abandonedEnabled);
+        $('#smaily-w-cutoff').val(boot.automations.abandonedCutoff);
+        $('#smaily-w-welcome-workflow').data('saved', boot.automations.welcomeWorkflow);
+        $('#smaily-w-firstorder-workflow').data('saved', boot.automations.firstOrderWorkflow);
+        $('#smaily-w-abandoned-workflow').data('saved', boot.automations.abandonedWorkflow);
+
+        // Intelligence.
+        if (boot.intelligence.connected) {
+            engineConnected(boot.intelligence.tenantName, boot.intelligence.engineVersion);
+            $('#smaily-w-browse').prop('checked', boot.intelligence.browseTracking);
+        }
+
+        // RSS (Settings only).
+        $('#smaily-w-rss-enabled').prop('checked', boot.rss.enabled);
+
+        // Radio-card highlight (scoped to the lawful-basis cards so it never
+        // clears the multilingual mode cards' selection).
+        $(document).on('change', 'input[name=smaily-w-mode]', function () {
+            $('input[name=smaily-w-mode]').closest('.smaily-choice').removeClass('is-selected');
+            $(this).closest('.smaily-choice').addClass('is-selected');
+            // The import estimate counts this mode's audience (PRO-3582).
+            var $estimate = $('#smaily-w-backfill-estimate');
+            var estimate = $estimate.attr('data-estimate-' + $(this).val());
+            if (estimate) {
+                $estimate.text(estimate);
+            }
+        });
+        $('input[name=smaily-w-mode]:checked').trigger('change');
+
+        // Live reactivity: dependent fields follow their controlling toggle.
+        reactAutomationRow('#smaily-w-welcome-enabled', '#smaily-w-welcome-workflow');
+        reactAutomationRow('#smaily-w-firstorder-enabled', '#smaily-w-firstorder-workflow');
+        reactAutomationRow('#smaily-w-abandoned-enabled', '#smaily-w-abandoned-workflow, #smaily-w-cutoff');
+        reactSubscribersEnabled();
+        reactRssEnabled();
+
+        // Multilingual mode cards: live re-render of the dependent sections,
+        // with a confirm before leaving a SAVED mode that carries
+        // per-language configuration (the switch removes mode-A store-view
+        // credentials on save and stops using the workflow mappings).
+        // Unsaved exploration between the cards never asks.
+        applyMlMode(mlModeCurrent);
+        $(document).on('change', 'input[name=smaily-w-mlmode]', function () {
+            var next = $(this).val();
+            var leavingConfigured = (mlModeSaved === 'a' || mlModeSaved === 'b') && next !== mlModeSaved;
+            if (leavingConfigured && !mlSwitchConfirmed) {
+                var message = '<?= $escaper->escapeJs(__('Switching the multilingual mode changes how contacts and automations are routed. Per-language accounts and workflow mappings that no longer apply stop being used (per-store-view credentials are removed on save). Continue?')) ?>';
+                if (!window.confirm(message)) {
+                    $('input[name=smaily-w-mlmode][value=' + mlModeCurrent + ']').prop('checked', true);
+                    return;
+                }
+                mlSwitchConfirmed = true;
+            }
+            mlModeCurrent = next;
+            applyMlMode(next);
+            loadMappingWorkflows();
+        });
+
+        // Per-language account connection tests (mode A).
+        $(document).on('click', '.smaily-ml-test', function () {
+            var $block = $(this).closest('.smaily-ml-account');
+            var $panel = $block.closest('.smaily-step-panel, .smaily-tab-panel');
+            var $result = $block.find('.smaily-result');
+            var language = String($block.data('language'));
+            var creds = mlAccountRequestCreds($block);
+            clearFormErrors($panel);
+            if (!creds) {
+                showFormErrors($panel, formError(
+                    '<?= $escaper->escapeJs(__('Enter the password for this account first.')) ?>',
+                    ['accounts.' + language + '.password']
+                ));
+                result($result, '<?= $escaper->escapeJs(__('Connection failed.')) ?>', false);
+                return;
+            }
+            result($result, '<?= $escaper->escapeJs(__('Testing…')) ?>', true);
+            post(urls.test, creds).then(function (data) {
+                if (data.connected) {
+                    result($result, '<?= $escaper->escapeJs(__('Connected!')) ?>', true);
+                    loadMappingWorkflows();
+                    return;
+                }
+                showFormErrors($panel, testError(data, 'accounts.' + language + '.'));
+                result($result, '<?= $escaper->escapeJs(__('Connection failed.')) ?>', false);
+            });
+        });
+
+        // Edited per-language credentials re-render that account's workflow
+        // dropdowns without saving (same idiom as the default credentials).
+        var mlCredentialTimer = null;
+        $(document).on('input', '.smaily-ml-account input', function () {
+            clearTimeout(mlCredentialTimer);
+            mlCredentialTimer = setTimeout(loadMappingWorkflows, 1200);
+        });
+
+        // Connection test. A failed test is shown like a failed save
+        // (PRO-3641): the error banner above the form, the field at fault
+        // marked, and the status beside the button says the test failed.
+        $('#smaily-w-test').on('click', function () {
+            var $panel = $(this).closest('.smaily-step-panel, .smaily-tab-panel');
+            clearFormErrors($panel);
+            result('#smaily-w-test-result', '<?= $escaper->escapeJs(__('Testing…')) ?>', true);
+            post(urls.test, credentials()).then(function (data) {
+                connected = !!data.connected;
+                if (data.checked) {
+                    setConnectionStatus(!!data.connected, data.accountName);
+                }
+                if (data.connected) {
+                    result(
+                        '#smaily-w-test-result',
+                        '<?= $escaper->escapeJs(__('Connected! Continue to the next step.')) ?>',
+                        true
+                    );
+                    // Changed credentials re-render the dependent workflow
+                    // dropdowns without saving anything.
+                    loadWorkflows(null);
+                    return;
+                }
+                showFormErrors($panel, testError(data, ''));
+                result('#smaily-w-test-result', '<?= $escaper->escapeJs(__('Connection failed.')) ?>', false);
+            });
+        });
+
+        // Imports: contacts (wizard step 2 + Settings > Contacts) and the
+        // engine imports (Settings > Intelligence), one Backfill card each.
+        $('.smaily-backfill-card[data-job-type]').each(function () {
+            var ui = backfillUi($(this)),
+                jobType = String($(this).data('job-type'));
+            ui.start.on('click', function () {
+                startBackfill(jobType, ui);
+            });
+            ui.cancel.on('click', function () {
+                cancelBackfill(jobType, ui);
+            });
+            // Persisted last-run outcome (and live progress of a job that
+            // is already running) renders without pressing anything.
+            pollBackfill(jobType, ui, 'status');
+        });
+
+        // Workflow refresh. A list that cannot be loaded says why where the
+        // page's other workflow-list errors show (PRO-3641): beside Save
+        // Automations in Settings, beside the step's buttons in the setup.
+        $('#smaily-w-refresh-workflows').on('click', function () {
+            var target = $('#smaily-w-automations-result').length
+                ? '#smaily-w-automations-result'
+                : '#smaily-w-save-result';
+            result(target, '');
+            loadWorkflows(target);
+        });
+
+        // "Check again" on the deactivated-account panel (PRO-2451): the one
+        // request a refused account still makes — a direct question deserves
+        // the engine's direct answer, and it is neither scheduled nor
+        // repeated. A success clears the remembered refusal server-side, so
+        // the page is reloaded to render the state that is now true.
+        $('#smaily-w-engine-recheck').on('click', function () {
+            result('#smaily-w-engine-recheck-result', '<?= $escaper->escapeJs(__('Checking…')) ?>', true);
+            post(urls.enginePing, {}).then(function (data) {
+                if (data.ok) {
+                    window.location.reload();
+                } else {
+                    result('#smaily-w-engine-recheck-result',
+                        data.message || '<?= $escaper->escapeJs(__('Could not reach Campaign Intelligence.')) ?>',
+                        false);
+                }
+            });
+        });
+
+        // Hold back the catalog import a Connect started (PRO-3741): the
+        // card's own cancel. While the import waits for its first cron run
+        // nothing has been sent; canceled later, the products it already
+        // queued are still sent and the rest are not.
+        $('#smaily-w-engine-catalog-holdback').on('click', function () {
+            var $button = $(this).prop('disabled', true);
+            result('#smaily-w-engine-catalog-holdback-result', '<?= $escaper->escapeJs(__('Canceling…')) ?>', true);
+            post(urls.backfill, {job_type: 'catalog', action: 'cancel'}).then(function (data) {
+                var text = '<?= $escaper->escapeJs(__('The catalog import had already finished, so there was nothing left to hold back.')) ?>';
+                if (data.status === 'cancelled') {
+                    text = data.processed > 0
+                        ? '<?= $escaper->escapeJs(__('Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?>'
+                            .replace('%1', data.processed)
+                        : '<?= $escaper->escapeJs(__('Held back: the catalog import is canceled. Start it any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?>';
+                }
+                $button.hide();
+                result('#smaily-w-engine-catalog-holdback-result', text, true);
+                refreshCatalogCard(data);
+            });
+        });
+
+        // Engine connect.
+        $('#smaily-w-engine-connect').on('click', function () {
+            result('#smaily-w-engine-result', '<?= $escaper->escapeJs(__('Connecting…')) ?>', true);
+            post(urls.engineExchange, {setup_url: $('#smaily-w-setup-url').val()}).then(function (data) {
+                if (data.connected) {
+                    engineConnected(data.tenantName, data.engineVersion);
+                    if (data.catalogImportStarted) {
+                        $('#smaily-w-engine-catalog-import').show();
+                        refreshCatalogCard();
+                    }
+                } else {
+                    result('#smaily-w-engine-result',
+                        data.message || '<?= $escaper->escapeJs(__('Connection failed.')) ?>', false);
+                }
+            });
+        });
+    }
+
+    // The Storefront URL field (PRO-3660), on Settings > Connection and in
+    // the initial setup's Connect step (PRO-3802); a page without the field
+    // posts no key and leaves the saved value as is.
+    function withStorefrontUrl(data) {
+        var $field = $('#smaily-w-storefront-url');
+        if ($field.length) {
+            data.storefront_url = String($field.val() || '');
+        }
+        return data;
+    }
+
+    // --- Per-panel save payloads (shared savestep endpoint) -----------------
+    var collect = {
+        connect: function () {
+            var mode = currentMlMode();
+            if (isMultilingual && mode === 'a') {
+                var accounts = [];
+                $('.smaily-ml-account').each(function () {
+                    var fields = mlAccountFields($(this));
+                    var prefix = 'accounts.' + fields.language + '.';
+                    if (!fields.subdomain || !fields.username) {
+                        throw formError(
+                            '<?= $escaper->escapeJs(__('Fill in the subdomain and username of the %1 account.')) ?>'
+                                .replace('%1', fields.language.toUpperCase()),
+                            ['subdomain', 'username'].filter(function (key) {
+                                return !fields[key];
+                            }).map(function (key) {
+                                return prefix + key;
+                            })
+                        );
+                    }
+                    if (!fields.password && !$(this).data('has-password')) {
+                        throw formError(
+                            '<?= $escaper->escapeJs(__('Enter the password of the %1 account.')) ?>'
+                                .replace('%1', fields.language.toUpperCase()),
+                            [prefix + 'password']
+                        );
+                    }
+                    if (!fields.password && accountChanged(
+                        fields,
+                        $(this).data('saved-subdomain'),
+                        $(this).data('saved-username')
+                    )) {
+                        throw formError(
+                            '<?= $escaper->escapeJs(__('The subdomain or username of the %1 account changed — enter its password.')) ?>'
+                                .replace('%1', fields.language.toUpperCase()),
+                            [prefix + 'password']
+                        );
+                    }
+                    accounts.push(fields);
+                });
+                var fallback = $('input[name=smaily-w-fallback]:checked').val();
+                var fallbackAccount = null;
+                accounts.forEach(function (account) {
+                    if (account.language === fallback) {
+                        fallbackAccount = account;
+                    }
+                });
+                if (!fallback || !fallbackAccount) {
+                    throw new Error('<?= $escaper->escapeJs(__('Pick the default fallback account.')) ?>');
+                }
+                // The fallback account is saved for the website: another
+                // account than the website's needs its password, as on the
+                // server (PRO-3718).
+                if (!fallbackAccount.password && accountChanged(
+                    fallbackAccount,
+                    boot.websiteAccount.subdomain,
+                    boot.websiteAccount.username
+                )) {
+                    throw formError(
+                        '<?= $escaper->escapeJs(__('Enter the password of the %1 account so it can take over as the default fallback.')) ?>'
+                            .replace('%1', fallback.toUpperCase()),
+                        ['accounts.' + fallback + '.password']
+                    );
+                }
+                return withStorefrontUrl({
+                    // The fallback account's credentials double as the
+                    // default-scope credentials (any unmatched scope uses
+                    // them), Woo mode-A parity.
+                    subdomain: fallbackAccount.subdomain,
+                    username: fallbackAccount.username,
+                    password: fallbackAccount.password,
+                    multilingual_mode: mode,
+                    fallback_language: fallback,
+                    accounts: accounts
+                });
+            }
+            var creds = credentials();
+            if (!connected && (!creds.subdomain || !creds.username || !creds.password)) {
+                throw formError(
+                    '<?= $escaper->escapeJs(__('Fill in the credentials and press Test connection first.')) ?>',
+                    ['subdomain', 'username', 'password'].filter(function (key) {
+                        return !creds[key];
+                    })
+                );
+            }
+            if (!creds.password && accountChanged(creds, boot.websiteAccount.subdomain, boot.websiteAccount.username)) {
+                throw formError(
+                    '<?= $escaper->escapeJs(__('The subdomain or username changed — enter the password of this account.')) ?>',
+                    ['password']
+                );
+            }
+            return withStorefrontUrl({
+                subdomain: creds.subdomain,
+                username: creds.username,
+                password: creds.password,
+                multilingual_mode: mode
+            });
+        },
+        subscribers: function () {
+            var data = {
+                sync_enabled: $('#smaily-w-sync-enabled').length
+                    ? $('#smaily-w-sync-enabled').is(':checked')
+                    : true,
+                sync_mode: $('input[name=smaily-w-mode]:checked').val(),
+                sync_fields: $('#smaily-w-fields input:checked').map(function () { return $(this).val(); }).get(),
+                checkout_optin_enabled: $('#smaily-w-checkout-optin').is(':checked'),
+                suppress_optin_emails: $('#smaily-w-suppress').is(':checked')
+            };
+            // Settings-only controls (not rendered in the wizard) — omit the
+            // keys entirely there so the wizard's save never touches them.
+            var $includeGuests = $('#smaily-w-include-guests');
+            if ($includeGuests.length) {
+                data.include_guests = $includeGuests.is(':checked');
+            }
+            return data;
+        },
+        automations: function () {
+            var data = {
+                welcome_enabled: $('#smaily-w-welcome-enabled').is(':checked'),
+                welcome_workflow: $('#smaily-w-welcome-workflow').val(),
+                first_order_enabled: $('#smaily-w-firstorder-enabled').is(':checked'),
+                first_order_workflow: $('#smaily-w-firstorder-workflow').val(),
+                abandoned_enabled: $('#smaily-w-abandoned-enabled').is(':checked'),
+                abandoned_workflow: $('#smaily-w-abandoned-workflow').val(),
+                abandoned_cutoff: parseInt($('#smaily-w-cutoff').val(), 10) || 30
+            };
+            var mode = currentMlMode();
+            if (isMultilingual && (mode === 'a' || mode === 'b')) {
+                // The full desired mapping state: cleared selects post no
+                // row, which deletes theirs server-side.
+                var mappings = [];
+                $('.smaily-ml-workflow').each(function () {
+                    var workflowId = $(this).val();
+                    if (!workflowId) {
+                        return;
+                    }
+                    var trigger = String($(this).data('trigger'));
+                    var language = String($(this).data('language'));
+                    mappings.push({
+                        trigger_type: trigger,
+                        language: language,
+                        account_key: mode === 'a' ? language : 'default',
+                        workflow_id: parseInt(workflowId, 10),
+                        is_default_fallback:
+                            $('input[name=smaily-ml-fallback-' + trigger + ']:checked').val() === language
+                    });
+                });
+                data.mappings = mappings;
+            }
+            return data;
+        },
+        intelligence: function () {
+            return {browse_tracking: $('#smaily-w-browse').is(':checked')};
+        },
+        rss: function () {
+            return {rss_enabled: $('#smaily-w-rss-enabled').is(':checked')};
+        }
+    };
+
+    return {
+        boot: boot,
+        post: post,
+        result: result,
+        credentials: credentials,
+        saveStep: saveStep,
+        showFormErrors: showFormErrors,
+        clearFormErrors: clearFormErrors,
+        loadWorkflows: loadWorkflows,
+        initAll: initAll,
+        collect: collect,
+        isConnected: function () { return connected; },
+        isIntelligenceConnected: function () { return intelligenceConnected; }
+    };
+};
+</script>

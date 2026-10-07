@@ -1,132 +1,224 @@
 <?xml version="1.0"?>
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
-  <system>
-    <tab id="smaily_smailyformagento" translate="label" sortOrder="500">
-      <label>Smaily Email Marketing and Automation</label>
-    </tab>
-    <section id="smaily" translate="label" sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="0">
-      <class>separator-top</class>
-      <label>Module Configuration</label>
-      <tab>smaily_smailyformagento</tab>
-      <resource>Smaily_SmailyForMagento::access</resource>
-      <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
-        <label>General Settings</label>
-        <field id="enable" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>Enable Module</label>
-          <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-        </field>
-        <field id="subdomain" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>Subdomain</label>
-          <backend_model>Smaily\SmailyForMagento\Model\Config\Backend\Subdomain</backend_model>
-          <validate>required-entry</validate>
-          <comment><![CDATA[For example "demo" from https://demo.sendsmaily.net/]]></comment>
-        </field>
-        <field id="username" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>API Username</label>
-          <validate>required-entry</validate>
-        </field>
-        <field id="password" translate="label" type="password" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>API Password</label>
-          <validate>required-entry</validate>
-          <comment><![CDATA[<a href="https://smaily.com/help/api/general/create-api-user/" target="_blank">How to create API credentials?</a>]]></comment>
-        </field>
-      </group>
-      <group id="subscribe" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
-        <label>Newsletter Subscription Form</label>
-        <field id="enableNewsletterSubscriptions" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>Enable Subscribers Collection</label>
-          <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-          <comment><![CDATA[Send subscribers from newsletter form directly to Smaily.<br><strong>Note!</strong> This disables Magento's confirmation success and unsubscribe email sending.]]></comment>
-        </field>
-        <field id="workflowId" translate="label" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>Autoresponder ID</label>
-          <source_model>Smaily\SmailyForMagento\Model\Config\Source\OptIn\Workflows</source_model>
-          <depends>
-            <field id="enableNewsletterSubscriptions">1</field>
-          </depends>
-          <comment><![CDATA[<a href="https://smaily.com/help/user-manual/automations/automation-workflows/" target="_blank">How to set up an autoresponder for confirmation emails?</a>]]></comment>
-        </field>
-        <field id="enableCaptcha" translate="label" type="select" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>Enable CAPTCHA</label>
-          <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-          <comment><![CDATA[We advice you to use CAPTCHA. This will block bots from polluting your newsletter database.<br><strong>This CAPTCHA works with Magento Newsletter module. If you are using custom solution, this setting may intervene with subscriber collection!</stong>]]></comment>
-          <depends>
-            <field id="enableNewsletterSubscriptions">1</field>
-          </depends>
-        </field>
-        <field id="captchaType" translate="label" sortOrder="40" type="select" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>CAPTCHA Type</label>
-          <source_model>Smaily\SmailyForMagento\Model\Config\Source\CaptchaType</source_model>
-          <depends>
-            <field id="enableNewsletterSubscriptions">1</field>
-            <field id="enableCaptcha">1</field>
-          </depends>
-        </field>
-        <field id="captchaApiKey" translate="label" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>Google API Key</label>
-          <comment><![CDATA[Create new site settings <a href="https://www.google.com/recaptcha/admin/create" target="_blank"> from here</a>.]]></comment>
-          <depends>
-            <field id="captchaType">google_captcha</field>
-            <field id="enableCaptcha">1</field>
-            <field id="enableNewsletterSubscriptions">1</field>
-          </depends>
-          <validate>required-entry</validate>
-        </field>
-        <field id="captchaApiSecret" translate="label comment" type="text" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>Google API Secret Key</label>
-          <depends>
-            <field id="captchaType">google_captcha</field>
-            <field id="enableCaptcha">1</field>
-            <field id="enableNewsletterSubscriptions">1</field>
-          </depends>
-          <validate>required-entry</validate>
-        </field>
-      </group>
-      <group id="sync" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
-        <label>Subscribers Syncronization</label>
-        <field id="enableCronSync" translate="label" type="select" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>Enable Syncronization</label>
-          <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-        </field>
-        <field id="fields" translate="label" type="multiselect" sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>Syncronize Additional Fields</label>
-          <source_model>Smaily\SmailyForMagento\Model\Config\Source\SubscribersSync\Fields</source_model>
-          <comment><![CDATA[Select fields you wish to synchronize along with subscription data. Subscriber's email, name, store, store group and website fields are always synchronized]]></comment>
-        </field>
-        <field id="frequency" translate="label" type="select" sortOrder="90" showInDefault="1" showInWebsite="0" showInStore="0">
-          <label>Frequency</label>
-          <source_model>Smaily\SmailyForMagento\Model\Config\Source\SubscribersSync\Frequency</source_model>
-        </field>
-        <field id="lastSyncedAt" translate="label" type="date" sortOrder="95" showInDefault="0" showInWebsite="1" showInStore="0">
-          <can_be_empty>1</can_be_empty>
-          <label>Last synchronized at</label>
-          <frontend_model>\Smaily\SmailyForMagento\Block\Adminhtml\Form\Field\Datetime</frontend_model>
-          <backend_model>\Smaily\SmailyForMagento\Model\Config\Backend\UTCTime</backend_model>
-          <comment><![CDATA[Value presents the synchronization changes range starting datetime (range ends always with CRON run datetime). Time is in the website's configured timezone.<br><strong>Note!</strong> To synchronize all Newsletter Subscribers, empty the value.]]></comment>
-        </field>
-      </group>
-      <group id="abandoned" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
-        <label>Abandoned Cart</label>
-        <field id="enableAbandonedCart" translate="label" type="select" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>Enable Abandoned Cart</label>
-          <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-        </field>
-        <field id="autoresponderId" translate="label" type="select" sortOrder="110" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>Autoresponder ID</label>
-          <source_model>Smaily\SmailyForMagento\Model\Config\Source\AbandonedCart\Workflows</source_model>
-          <comment><![CDATA[<a href="https://smaily.com/help/user-manual/automations/automation-workflows/" target="_blank">How to set up an autoresponder for confirmation emails?</a>]]></comment>
-        </field>
-        <field id="syncTime" translate="label" type="select" sortOrder="120" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>Trigger Abandoned Cart Automation</label>
-          <source_model>Smaily\SmailyForMagento\Model\Config\Source\AbandonedCart\Interval</source_model>
-          <comment><![CDATA[This is the time after cart is considered abandoned!]]></comment>
-        </field>
-        <field id="productfields" translate="label" type="multiselect" sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="0">
-          <label>Add Template Parameters</label>
-          <source_model>Smaily\SmailyForMagento\Model\Config\Source\AbandonedCart\Fields</source_model>
-          <comment><![CDATA[You can use those parameters in Smaily template to personalize abandoned cart reminder emails!]]></comment>
-        </field>
-      </group>
-    </section>
-  </system>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <tab id="smaily" translate="label" sortOrder="400">
+            <label>Smaily</label>
+        </tab>
+        <!--
+            Merchant documentation (user guide) for this section:
+            https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/USER_GUIDE.md
+            (hosted on GitHub for now — update the URL here, in the setup
+            wizard Done step and in Model/Adminhtml/SetupNotice.php, keeping
+            the old address in SetupNotice::PREVIOUS_URLS, once a hosted docs
+            site exists).
+
+            Native surface removal (PRO-1461, resolves PRO-1369's config-
+            architecture decision 3, docs/ADMIN_UI_TARGET_SPEC.md §4): this
+            section is deliberately hidden from Stores > Configuration —
+            showInDefault/showInWebsite/showInStore are "0" below so it never
+            appears in the native left nav for ANY admin, regardless of ACL
+            (a role with "All" resources still bypasses missing/denied ACL
+            resources, so hiding it that way alone would not work). Every
+            group/field below is otherwise UNCHANGED and must stay that way:
+            core_config_data storage, encrypted backend models
+            (`Backend\Subdomain`, core's `Backend\Encrypted`) and CLI
+            `bin/magento config:set`/`config:show` (which resolve fields by
+            walking this same structure) all keep working — only the native
+            FORM rendering is turned off. The module's own Settings/Wizard
+            pages are the sole editing surface; they read/write these same
+            paths directly via WriterInterface/ScopeConfigInterface, never
+            through this native form.
+        -->
+        <section id="smaily_connect" translate="label" type="text" sortOrder="10"
+                 showInDefault="0" showInWebsite="0" showInStore="0">
+            <label>Smaily Connect</label>
+            <tab>smaily</tab>
+            <resource>Smaily_Connect::config</resource>
+            <group id="connection" translate="label comment" type="text" sortOrder="10"
+                   showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>API Connection</label>
+                <comment>Connect your Smaily account. You can find API credentials in Smaily under Preferences &gt; API. Credentials can be overridden per website, or per store view for per-language Smaily accounts.</comment>
+                <field id="subdomain" translate="label comment" type="text" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="1" canRestore="1">
+                    <label>Subdomain</label>
+                    <comment>Your Smaily subdomain. For example, if your Smaily URL is https://demo.sendsmaily.net, enter "demo". Pasting the full URL also works.</comment>
+                    <backend_model>Smaily\Connect\Model\Config\Backend\Subdomain</backend_model>
+                </field>
+                <field id="username" translate="label" type="text" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>API Username</label>
+                </field>
+                <field id="password" translate="label" type="obscure" sortOrder="30"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>API Password</label>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                </field>
+                <field id="test_connection" translate="label" type="label" sortOrder="35"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Verify</label>
+                    <frontend_model>Smaily\Connect\Block\Adminhtml\Config\TestConnection</frontend_model>
+                    <comment>Tests the credentials entered above without saving. Workflow dropdowns below refresh automatically after a successful test.</comment>
+                </field>
+                <field id="multilingual_mode" translate="label comment" type="select" sortOrder="40"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Multilingual Mode</label>
+                    <comment>How automation workflows are routed for multi-language stores. Single: one language. Per-language accounts: each store view has its own Smaily account (override credentials at store view scope). Per-language workflows: one account, a workflow per language. Single workflow: one workflow that branches by language inside Smaily.</comment>
+                    <source_model>Smaily\Connect\Model\Config\Source\MultilingualMode</source_model>
+                </field>
+                <field id="storefront_url" translate="label" type="text" sortOrder="50"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Storefront URL</label>
+                </field>
+            </group>
+            <group id="subscribers" translate="label comment" type="text" sortOrder="20"
+                   showInDefault="1" showInWebsite="1" showInStore="0">
+                <label>Subscriber Synchronization</label>
+                <comment>Synchronize newsletter subscribers between this store and Smaily.</comment>
+                <field id="sync_enabled" translate="label" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Enable Subscriber Synchronization</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="sync_mode" translate="label comment" type="select" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Contact Sync Mode</label>
+                    <comment>Lawful-basis preset. Subscribers only (default): sync only opted-in newsletter subscribers and mirror Smaily unsubscribes back. All customers (legitimate interest): every registered customer is synced; anyone who has not unsubscribed can receive your emails (soft opt-in). Soft opt-in allows marketing emails only about products similar to those the customer bought, and the customer must have had a clear way to refuse at purchase. Every email needs an unsubscribe link. You are responsible for the legal basis. Checkout opt-in only: no account sync, only customers who tick the checkout checkbox.</comment>
+                    <source_model>Smaily\Connect\Model\Config\Source\SyncMode</source_model>
+                    <depends><field id="sync_enabled">1</field></depends>
+                </field>
+                <field id="sync_fields" translate="label comment" type="multiselect" sortOrder="30"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Synchronized Fields</label>
+                    <comment>Optional customer fields sent to Smaily along with the email address. Empty source values are omitted so existing Smaily values are kept.</comment>
+                    <source_model>Smaily\Connect\Model\Config\Source\SyncFields</source_model>
+                    <can_be_empty>1</can_be_empty>
+                    <depends><field id="sync_enabled">1</field></depends>
+                </field>
+                <field id="include_guests" translate="label comment" type="select" sortOrder="40"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Include guest order emails</label>
+                    <comment>Also sync emails from guest orders without the checkout newsletter opt-in. Applies only in the All customers (legitimate interest) mode; in the other modes a guest is synced only after ticking the checkout newsletter checkbox.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <depends><field id="sync_enabled">1</field></depends>
+                </field>
+                <field id="checkout_optin_enabled" translate="label comment" type="select" sortOrder="55"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Show Newsletter Checkbox At Checkout</label>
+                    <comment>Adds a newsletter opt-in checkbox to the checkout payment step. Works for both guests and registered customers.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="suppress_optin_emails" translate="label comment" type="select" sortOrder="60"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Let Smaily Send Opt-In Emails</label>
+                    <comment>Suppress Magento's own newsletter confirmation and unsubscription emails so Smaily automations handle them instead.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+            </group>
+            <group id="automations" translate="label comment" type="text" sortOrder="30"
+                   showInDefault="1" showInWebsite="1" showInStore="0">
+                <label>Automations</label>
+                <comment>Trigger Smaily automation workflows on store events. Workflow lists load from your Smaily account after the API connection is saved. In per-language multilingual modes, per-language workflow mappings override these defaults.</comment>
+                <field id="welcome_enabled" translate="label" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Enable Welcome Automation</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="welcome_workflow" translate="label" type="select" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Welcome Workflow</label>
+                    <source_model>Smaily\Connect\Model\Config\Source\Workflows</source_model>
+                    <depends><field id="welcome_enabled">1</field></depends>
+                </field>
+                <field id="first_order_enabled" translate="label" type="select" sortOrder="30"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Enable First Order Automation</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="first_order_workflow" translate="label" type="select" sortOrder="40"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>First Order Workflow</label>
+                    <source_model>Smaily\Connect\Model\Config\Source\Workflows</source_model>
+                    <depends><field id="first_order_enabled">1</field></depends>
+                </field>
+                <field id="abandoned_enabled" translate="label" type="select" sortOrder="50"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Enable Abandoned Cart Automation</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="abandoned_workflow" translate="label" type="select" sortOrder="60"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Abandoned Cart Workflow</label>
+                    <source_model>Smaily\Connect\Model\Config\Source\Workflows</source_model>
+                    <depends><field id="abandoned_enabled">1</field></depends>
+                </field>
+                <field id="abandoned_cutoff" translate="label comment" type="text" sortOrder="70"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Abandoned Cart Cutoff (Minutes)</label>
+                    <comment>How long a cart must be inactive before it counts as abandoned. Minimum 10 minutes. Carts older than 24 hours are never mailed.</comment>
+                    <validate>validate-digits digits-range-10-1440</validate>
+                    <depends><field id="abandoned_enabled">1</field></depends>
+                </field>
+                <field id="engine_automations" translate="label" type="label" sortOrder="100"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label/>
+                    <frontend_model>Smaily\Connect\Block\Adminhtml\Config\EngineAutomations</frontend_model>
+                </field>
+            </group>
+            <group id="rss" translate="label comment" type="text" sortOrder="40"
+                   showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Product RSS Feed</label>
+                <comment><![CDATA[The product feed for the Smaily template editor is served at <strong>{store URL}smaily/rss/feed</strong>. Optional query parameters: <em>category</em> (category ID), <em>limit</em> (1-250, default 50), <em>sort</em> (created_at, updated_at, name, price), <em>order</em> (asc, desc). Example: https://example.com/smaily/rss/feed?category=12&limit=100&sort=updated_at]]></comment>
+                <field id="enabled" translate="label" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="1" canRestore="1">
+                    <label>Enable RSS Feed</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="url_builder" translate="label" type="label" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Feed URL Builder</label>
+                    <frontend_model>Smaily\Connect\Block\Adminhtml\Config\RssUrlBuilder</frontend_model>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+            </group>
+            <group id="intelligence" translate="label comment" type="text" sortOrder="50"
+                   showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Campaign Intelligence</label>
+                <comment>Optional integration with the Smaily recommendation engine: catalog, customer, order and browse data power personalized recommendations and engine-run automations.</comment>
+                <field id="status" translate="label" type="label" sortOrder="5"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Connection Status</label>
+                    <frontend_model>Smaily\Connect\Block\Adminhtml\Config\EngineStatus</frontend_model>
+                </field>
+                <field id="setup_token" translate="label comment" type="text" sortOrder="10"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Setup Token or URL</label>
+                    <comment>Paste the one-time setup URL (or token) provided by Smaily and save the configuration to connect. The token is exchanged immediately and never stored.</comment>
+                    <backend_model>Smaily\Connect\Model\Config\Backend\EngineSetupToken</backend_model>
+                </field>
+                <field id="browse_tracking" translate="label comment" type="select" sortOrder="50"
+                       showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
+                    <label>Storefront Browse Tracking</label>
+                    <comment>Sends anonymized browsing events (product views, searches, cart activity) to the engine, only for visitors who gave marketing consent. Off by default.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+            </group>
+            <group id="logging" translate="label" type="text" sortOrder="900"
+                   showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Logging</label>
+                <field id="verbosity" translate="label comment" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
+                    <label>Log Verbosity</label>
+                    <comment>Logs are written to var/log/smaily_connect.log. Debug verbosity logs full API requests and responses; use only for troubleshooting.</comment>
+                    <source_model>Smaily\Connect\Model\Config\Source\LogVerbosity</source_model>
+                </field>
+            </group>
+        </section>
+    </system>
 </config>

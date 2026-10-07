@@ -1,0 +1,28 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Static page-type context (checkout, success) — the type comes from
+ * layout XML arguments.
+ *
+ * @var \Magento\Framework\View\Element\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ * @var \Magento\Framework\View\Helper\SecureHtmlRenderer $secureRenderer
+ */
+
+$type = (string)$block->getData('context_type');
+if ($type === '') {
+    return;
+}
+// Rendered through SecureHtmlRenderer so the inline script is whitelisted
+// with CSP — Magento enforces (not just reports) CSP on checkout pages by
+// default, and a plain inline <script> is silently blocked there (the
+// checkout_start browse event would be lost on every store).
+?>
+<?= /* @noEscape */ $secureRenderer->renderTag(
+    'script',
+    ['type' => 'text/javascript'],
+    'window.smailyPageContext = {"type": "' . $escaper->escapeJs($type) . '"};',
+    false
+) ?>

@@ -23,7 +23,11 @@ services:
     - MAGENTO_ADMIN_PASSWORD=smailydev1
     volumes:
     - data:/var/www/html
-    - ./:/var/www/html/app/code/Smaily/SmailyForMagento
+    - ./:/var/www/html/app/code/Smaily/Connect
+    - /var/www/html/app/code/Smaily/Connect/vendor
+    # The image carries a copy of this script, so mount the working tree's own
+    # over it — otherwise a bootstrap change needs an image rebuild to take.
+    - ./.sandbox/entrypoint.sh:/entrypoint.sh:ro
     depends_on:
       db:
         condition: service_healthy
@@ -74,7 +78,7 @@ services:
     image: phpmyadmin/phpmyadmin
     restart: always
     ports:
-    - '8888:80'
+    - '${PMA_PORT:-8888}:80'
     environment:
       PMA_HOST: db
       PMA_USER: root

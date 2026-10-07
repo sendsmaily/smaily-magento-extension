@@ -1,2 +1,13 @@
 .vscode/launch.json
 .env
+/vendor/
+/var/
+/smaily-connect-magento2.zip
+/smaily-connect-magento2.zip.sha256
+.phpunit.result.cache
+phpcs.xml
+phpstan.neon
+phpunit.xml
+# Design-pack exports are working material, not repository content (PRO-2456).
+/docs/*.zip
+/Test/Js/build/

@@ -7,39 +7,30 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-        with:
-          ref: master
+      - name: Checkout tagged code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      - name: Compress ZIP
-        uses: TheDoctor0/zip-release@v0.3.0
-        with:
-          filename: release.zip
-          exclusions: >
-            /.git*
-            /.sandbox*
-            /.vscode*
-            /assets*
-            CHANGELOG.md
-            CONTRIBUTING.md
-            docker-compose.yaml
-            Dockerfile
-            USERGUIDE.md
+      # Packagist skips a tag whose version disagrees with composer.json, so a
+      # mistyped tag must fail here, before a ZIP is built or attached.
+      - name: Check the release tag matches the package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: bash bin/check-release-version.sh "$RELEASE_TAG"
 
-      - name: Get release
-        id: get_release_url
-        uses: bruceadams/get-release@v1.2.0
+      - name: Build and verify the release ZIP
+        run: bash bin/verify-release-zip.sh smaily-connect-magento2.zip
+
+      # The checksum ships beside the ZIP so a store can prove the archive it
+      # unpacked is the one this workflow built (bin/verify-release-zip.sh
+      # writes the .sha256 next to the archive it verified).
+      - name: Upload release assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload release asset
-        uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.get_release_url.outputs.upload_url }}
-          asset_path: ./release.zip
-          asset_name: smaily-for-magento2.zip
-          asset_content_type: application/zip
+        run: |
+          gh release upload "$GITHUB_REF_NAME" \
+            smaily-connect-magento2.zip \
+            smaily-connect-magento2.zip.sha256 \
+            --clobber

@@ -1,0 +1,1073 @@
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Smaily Connect admin styles: shared panel chrome (.smaily-ui, used by the
+ * setup wizard AND the Settings page), the wizard stepper, the settings
+ * tabs and the dashboard. Loaded via the page layout XMLs.
+ *
+ * PRO-1281 Stage A: the design-system foundation lives at the top of this file
+ * — the :root token sheet (single source of truth, from the Design agent's
+ * token spec) followed by six reusable component classes (choice-card, pill,
+ * banner, inline-status, tile, progress). Stage B rewires the screens onto
+ * these; the legacy chrome below stays until then so nothing breaks.
+ */
+
+/* ========================================================================= *
+ * Design tokens — single source of truth for the Smaily admin visual system.
+ * Accent is Smaily #e91e63 (selection / focus / progress / brand marks);
+ * primary buttons stay Magento action-orange; everything else sits on
+ * standard adminhtml neutrals. Light adminhtml only — no dark mode.
+ * ========================================================================= */
+:root {
+  /* Surfaces & borders */
+  --s-bg:#f4f4f4;      --s-surface:#ffffff;   --s-surface-2:#fbfbfb; --s-surface-3:#f0f0f0;
+  --s-border:#e3e3e3;  --s-border-2:#c9c9c9;  --s-border-strong:#adadad;
+
+  /* Text */
+  --s-text:#303030;    --s-text-2:#5a5a5a;    --s-text-3:#8a8a8a;
+  --s-link:#1979c3;    --s-link-hover:#006bb4;
+
+  /* Brand accent (Smaily) + Action (Magento primary) */
+  --s-accent:#e91e63;  --s-accent-hover:#c2185b; --s-accent-soft:#fce4ec; --s-accent-border:#f4a6c0;
+  --s-action:#eb5202;  --s-action-hover:#ba4000;
+
+  /* Status roles: fg / soft bg / border */
+  --s-success:#1f7a34; --s-success-soft:#e5efe5; --s-success-border:#93c47d;
+  --s-warning:#8a5a00; --s-warning-soft:#fdf0d5; --s-warning-border:#e0c56e;
+  --s-danger:#bb2b0e;  --s-danger-soft:#fae5e5;  --s-danger-border:#e0a3a3;
+  --s-info:#0f5a94;    --s-info-soft:#e6f0f8;    --s-info-border:#9cc3e0;
+  --s-neutral:#5a5a5a; --s-neutral-soft:#eeeeee; --s-neutral-border:#cccccc;
+  --s-parked:#6b4ea3;  --s-parked-soft:#efe9f7;  --s-parked-border:#c3b3e0;
+
+  /* Banner left-bar (Magento message levels) */
+  --s-bar-success:#4caf50; --s-bar-info:#1979c3; --s-bar-warning:#e0a800; --s-bar-error:#d72c0d;
+
+  /* Spacing (4px base) */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-8:32px; --sp-10:40px;
+
+  /* Radius */
+  --r-1:2px; --r-2:3px; --r-3:5px;
+
+  /* Type scale */
+  --fs-11:11px; --fs-12:12px; --fs-13:13px; --fs-14:14px;
+  --fs-16:16px; --fs-18:18px; --fs-22:22px; --fs-28:28px;
+
+  /* Font stacks. --font is Magento's own admin face, not the pack's system
+   * stack: one family per page, the pack's sizes and weights kept (owner
+   * decision 2026-10-02, ADMIN_UI_TARGET_SPEC.md "Page frame decisions"). */
+  --font:"Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  /* Elevation */
+  --shadow-1:0 1px 2px rgba(0,0,0,.06);
+  --shadow-2:0 2px 8px rgba(0,0,0,.12);
+  --shadow-panel:-2px 0 14px rgba(0,0,0,.16); /* slide-out */
+}
+
+/* --- Shared panel chrome (wizard steps + settings tabs) ------------------ */
+/* Page frame (PRO-2456, 2026-10-02): no width cap — our pages span the
+ * content area like native ones; cards, fields and inputs keep their own
+ * max-widths. Our own text and link colours, so Magento's brown body text
+ * and #007bdb links do not leak into our components (Magento colours the
+ * headings itself, so they are named here). Classed anchors (buttons,
+ * banner actions, tile links) keep their component colours. */
+.smaily-ui, .smaily-ui :is(h1, h2, h3, h4) { color: var(--s-text); }
+.smaily-ui a:not([class]) { color: var(--s-link); }
+.smaily-ui a:not([class]):hover { color: var(--s-link-hover); }
+.smaily-ui .smaily-card { background: #fff; border: 1px solid #e3e3e3; border-radius: 4px; padding: 2rem; margin-bottom: 2rem; }
+.smaily-ui .smaily-field { margin-bottom: 1.6rem; max-width: 44rem; }
+.smaily-ui .smaily-field label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
+.smaily-ui .smaily-field .note { margin-top: 0.4rem; }
+.smaily-ui input[type=text], .smaily-ui input[type=password], .smaily-ui input[type=number], .smaily-ui select { width: 100%; max-width: 40rem; }
+.smaily-ui .smaily-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; gap: 2rem; }
+.smaily-ui .smaily-footer > div { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; max-width: 40rem; }
+.smaily-ui .smaily-result { margin-left: 1rem; }
+.smaily-ui .smaily-result.ok { color: var(--s-success); }
+.smaily-ui .smaily-result.err { color: var(--s-danger); }
+.smaily-ui .smaily-inline-toggle { margin-bottom: 1rem; }
+.smaily-ui progress { width: 100%; max-width: 40rem; height: 1.4rem; }
+.smaily-ui #smaily-w-fields label { display: inline-block; width: 16rem; }
+.smaily-ui .smaily-muted { opacity: 0.5; }
+
+/* --- Multilingual routing (mode cards, per-language accounts, mapping) ---- */
+.smaily-ui .smaily-ml-table { width: 100%; max-width: 56rem; border-collapse: collapse; }
+.smaily-ui .smaily-ml-table th { text-align: left; font-weight: 600; color: #666; padding: 0.4rem 1rem 0.4rem 0; }
+.smaily-ui .smaily-ml-table th:last-child { text-align: center; }
+.smaily-ui .smaily-ml-table td { padding: 0.5rem 1rem 0.5rem 0; border-top: 1px solid #f0f0f0; vertical-align: middle; }
+.smaily-ui .smaily-ml-table td:last-child { text-align: center; }
+.smaily-ui .smaily-ml-table select { max-width: 34rem; }
+.smaily-ui .smaily-ml-none { color: #666; }
+/* Per-language Smaily accounts (PRO-3566, pack "Setup Wizard" frame 4): a
+ * dashed accent-tinted region (the pack's #d6c3cb, no token) that appears with
+ * the mode; the account blocks in a two-column grid that stacks when narrow;
+ * each block with a language chip, compact fields and its own status. */
+.smaily-ui .smaily-ml-region {
+    max-width: 680px; margin-bottom: 2rem; padding: 16px 18px;
+    background: var(--s-surface-2); border: 1px dashed #d6c3cb; border-radius: 6px;
+}
+.smaily-ui .smaily-ml-region__kicker {
+    margin-bottom: var(--sp-3); font: 700 var(--fs-11)/1 var(--font); letter-spacing: .5px;
+    text-transform: uppercase; color: var(--s-accent);
+}
+/* Settings: the mode cards and the fallback card share the region's measure
+ * (the initial setup already caps its cards at it). */
+.smaily-settings #smaily-ml-modes,
+.smaily-settings #smaily-w-accounts > .smaily-card { max-width: 680px; }
+.smaily-ui .smaily-ml-accounts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--sp-4); }
+.smaily-ui .smaily-ml-account {
+    min-width: 0; padding: 14px 16px; background: var(--s-surface);
+    border: 1px solid var(--s-border); border-radius: var(--r-3); color: var(--s-text);
+}
+.smaily-ui .smaily-ml-account__head { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.smaily-ui .smaily-ml-account__chip {
+    flex: 0 0 auto; width: 26px; height: 18px; border-radius: var(--r-2); background: var(--s-text-2);
+    color: #fff; font: 700 10px/18px var(--font); letter-spacing: .3px; text-align: center;
+}
+.smaily-ui .smaily-ml-account .smaily-ml-account__name { margin: 0; min-width: 0; font-size: var(--fs-14); font-weight: 700; color: var(--s-text); }
+.smaily-ui .smaily-ml-account > p.note { margin: 0 0 var(--sp-3); font-size: var(--fs-12); color: var(--s-text-3); }
+.smaily-ui .smaily-ml-account .smaily-field { max-width: none; margin-bottom: 11px; }
+.smaily-ui .smaily-ml-account .smaily-field label { font-size: var(--fs-12); color: var(--s-text-2); }
+.smaily-ui .smaily-ml-account .smaily-field input { max-width: none; padding: 6px 9px; font-size: var(--fs-13); }
+.smaily-ui .smaily-ml-account__foot { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: var(--sp-3); }
+.smaily-ui .smaily-ml-account__foot .smaily-result.smaily-inline-status { margin-left: 0; white-space: normal; line-height: 1.4; }
+
+/* --- Wizard stepper ------------------------------------------------------- */
+.smaily-wizard .smaily-steps { display: flex; gap: 0; margin: 0 0 3rem; padding: 0; list-style: none; }
+.smaily-wizard .smaily-steps li { flex: 1; text-align: center; padding: 1rem 0.5rem; border-bottom: 3px solid #d0d0d0; color: #666; cursor: default; }
+.smaily-wizard .smaily-steps li.active { border-color: #eb5202; color: #333; font-weight: 600; }
+.smaily-wizard .smaily-steps li.done { border-color: #79a22e; color: #333; cursor: pointer; }
+.smaily-wizard .smaily-step-panel { display: none; }
+.smaily-wizard .smaily-step-panel.active { display: block; }
+
+/* --- Settings tabs ---------------------------------------------------------- */
+/* Our content inherits Magento's Open Sans and its font smoothing (PRO-2456,
+ * 2026-10-02): the system-stack override is gone, so a Smaily page shows one
+ * family, like the title and menu around it. The tab strip is the pack's
+ * white bar across the content area, the grey pane directly below it. */
+.smaily-settings .smaily-tabs { display: flex; gap: var(--sp-1); margin: 0; padding: 0 var(--sp-6); list-style: none; background: var(--s-surface); border-bottom: 1px solid var(--s-border); }
+.smaily-settings .smaily-tabs li { padding: 13px 16px 11px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: #666; cursor: pointer; font-size: var(--fs-13); font-weight: 600; line-height: 1; white-space: nowrap; }
+.smaily-settings .smaily-tabs li:hover { color: #333; }
+.smaily-settings .smaily-tabs li.active { border-color: #eb5202; color: #333; font-weight: 700; }
+.smaily-settings .smaily-tab-panel { display: none; }
+.smaily-settings .smaily-tab-panel.active { display: block; }
+.smaily-settings .smaily-footer .note { margin: 0; }
+
+/* --- Dashboard ------------------------------------------------------------- */
+.smaily-dashboard { background: var(--s-bg); padding: 22px var(--sp-6) 26px; }
+.smaily-dashboard .smaily-verdict { display: flex; align-items: center; gap: 2rem; padding: 1.6rem 2rem; margin-bottom: 18px; border-radius: 4px; border: 1px solid; font-size: 1.6rem; }
+.smaily-dashboard .smaily-verdict-ok { background: #f2f8ec; border-color: #79a22e; }
+.smaily-dashboard .smaily-verdict-degraded { background: #fffbf0; border-color: #eb5202; }
+.smaily-dashboard .smaily-verdict-incomplete { background: #fffbf0; border-color: #eb5202; }
+.smaily-dashboard .smaily-verdict-action { margin-left: auto; white-space: nowrap; }
+.smaily-dashboard .smaily-connections { display: flex; gap: var(--sp-3); margin-bottom: 18px; flex-wrap: wrap; }
+.smaily-dashboard .smaily-connection { flex: 1 1 20rem; background: #fff; border: 1px solid #e3e3e3; border-radius: 4px; padding: 1.2rem 1.6rem; display: flex; align-items: center; gap: 1rem; }
+.smaily-dashboard .smaily-dot { width: 1rem; height: 1rem; border-radius: 50%; background: #d0d0d0; flex-shrink: 0; }
+.smaily-dashboard .smaily-connection.is-on .smaily-dot { background: #79a22e; }
+.smaily-dashboard .smaily-connection.is-off .smaily-dot { background: #d0d0d0; }
+.smaily-dashboard .smaily-tiles { display: flex; gap: var(--sp-3); margin-bottom: 18px; flex-wrap: wrap; }
+/* Tiles use the Stage A .smaily-tile component (BEM); layout only lives here. */
+.smaily-dashboard .smaily-columns { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+/* 66rem: the recent-activity table needs about 660px (with Estonian
+ * headings), so below that the panel takes the full row and Quick links
+ * moves under it instead of the table scrolling sideways. */
+.smaily-dashboard .smaily-activity { flex: 2 1 66rem; min-width: 0; }
+.smaily-dashboard .smaily-activity .admin__table-wrapper { overflow-x: auto; }
+.smaily-dashboard .smaily-quick-links { flex: 1 1 24rem; }
+.smaily-dashboard .smaily-quick-links ul { margin: 0; padding-left: 1.8rem; line-height: 2.2; }
+.smaily-dashboard .smaily-empty { color: #666; }
+.smaily-dashboard .smaily-status-failed { color: #e22626; font-weight: 600; }
+.smaily-dashboard .smaily-status-sent { color: #006400; }
+.smaily-dashboard .smaily-tile-link { display: inline-block; margin-top: 0.6rem; }
+
+/* --- Log page: failed banner + detail slide-out ----------------------------- */
+.smaily-log-failed-banner { margin-bottom: 2rem; }
+/* Details panel (PRO-3565): the design pack's 452 px right-docked panel, built
+ * on Magento's own slide modal (scrim, focus handling, Escape and the close
+ * button stay Magento's). The loaded header and footer are moved into the
+ * modal's header and below its scrolling body by log-actions.js. */
+.modal-slide.smaily-log-details-modal { left: auto; width: 452px; max-width: 100%; }
+.smaily-log-details-modal .modal-inner-wrap { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: var(--s-surface); box-shadow: var(--shadow-panel); color: var(--s-text); font-family: var(--font); }
+.smaily-log-details-modal .modal-header { flex: 0 0 auto; position: relative; margin: 0; padding: var(--sp-4) 62px var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--s-border); }
+.smaily-log-details-modal .modal-title { margin: 0; padding: 0; border: 0; min-height: 0; font: 700 var(--fs-16)/1.3 var(--font); color: var(--s-text); }
+.smaily-log-details-modal .action-close { position: absolute; top: var(--sp-4); right: var(--sp-5); display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid #d6d6d6; border-radius: var(--r-2); background: var(--s-surface); color: var(--s-text-2); }
+.smaily-log-details-modal .action-close:before { font-size: 1.4rem; line-height: 1; }
+.smaily-log-details-modal .action-close:hover { border-color: var(--s-border-strong); color: var(--s-text); }
+.smaily-log-details-modal .modal-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 18px var(--sp-5); }
+.smaily-log-details-modal :is(.action-close, .smaily-log-details__resend, .smaily-log-details__copy):focus-visible { outline: 2px solid var(--s-link); outline-offset: 2px; box-shadow: none; }
+.smaily-log-details__head { display: block; }
+.smaily-log-details__id { display: block; margin-bottom: 5px; font: 400 var(--fs-12)/1 var(--mono); color: var(--s-text-3); }
+.smaily-log-details__title { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+.smaily-log-details__type { font: 700 17px/1.3 var(--font); color: var(--s-text); word-break: break-word; }
+/* Magento's `.modal-title span` (14px, italic, 10px left margin) outranks
+ * the header parts above once log-actions.js moves them into the title. */
+.smaily-log-details-modal .modal-title span { font-style: normal; margin-left: 0; }
+.smaily-log-details-modal .modal-title .smaily-log-details__id { font-size: var(--fs-12); }
+.smaily-log-details-modal .modal-title .smaily-log-details__type { font-size: 17px; }
+.smaily-log-details-modal .modal-title .smaily-pill { font-size: var(--fs-11); }
+.smaily-log-details { max-width: none; font-size: var(--fs-13); }
+.smaily-log-details__summary { display: grid; grid-template-columns: auto 1fr; gap: 7px var(--sp-4); margin: 0 0 var(--sp-5); font-size: var(--fs-13); }
+.smaily-log-details__summary dt { margin: 0; font-weight: 400; color: var(--s-text-3); }
+.smaily-log-details__summary dd { margin: 0; color: var(--s-text); word-break: break-word; }
+.smaily-log-details h3 { margin: var(--sp-5) 0 10px; font: 700 var(--fs-11)/1.35 var(--font); letter-spacing: .5px; text-transform: uppercase; color: var(--s-text-3); }
+.smaily-log-details .note { margin: var(--sp-2) 0 0; font-size: var(--fs-12); color: var(--s-text-3); }
+.smaily-log-details .smaily-log-details-retry { margin-top: var(--sp-3); }
+.smaily-log-details-pre { margin: var(--sp-2) 0 0; padding: var(--sp-3) 14px; border: 0; border-radius: var(--r-3); background: #1f2329; color: #e6e6e6; font: 400 var(--fs-12)/1.6 var(--mono); max-height: 40rem; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+.smaily-log-details-error { background: #2a1f1e; color: #f2c9c2; border: 1px solid #6b3a33; }
+.smaily-log-timeline { margin: 0 0 var(--sp-4); padding: 0; list-style: none; }
+.smaily-log-timeline__item { position: relative; display: flex; gap: var(--sp-3); margin: 0; padding-bottom: 14px; --dot: var(--s-text-3); --ring: rgba(138, 138, 138, .13); --badge-fg: var(--s-neutral); --badge-bg: var(--s-neutral-soft); --badge-bd: var(--s-neutral-border); }
+.smaily-log-timeline__item:not(:last-child)::after { content: ""; position: absolute; left: 4.5px; top: 20px; bottom: 2px; width: 2px; background: #e0e0e0; }
+.smaily-log-timeline__item:last-child { padding-bottom: 0; }
+.smaily-log-timeline__item.is-failed { --dot: var(--s-bar-error); --ring: rgba(215, 44, 13, .13); --badge-fg: var(--s-danger); --badge-bg: var(--s-danger-soft); --badge-bd: var(--s-danger-border); }
+.smaily-log-timeline__item.is-delivered { --dot: var(--s-bar-success); --ring: rgba(76, 175, 80, .13); --badge-fg: var(--s-success); --badge-bg: var(--s-success-soft); --badge-bd: var(--s-success-border); }
+.smaily-log-timeline__item:is(.is-scheduled, .is-waiting, .is-in_progress) { --dot: var(--s-link); --ring: rgba(25, 121, 195, .13); --badge-fg: var(--s-info); --badge-bg: var(--s-info-soft); --badge-bd: var(--s-info-border); }
+.smaily-log-timeline__dot { flex: 0 0 auto; width: 11px; height: 11px; margin-top: 3px; border-radius: 50%; background: var(--dot); box-shadow: 0 0 0 3px var(--ring); }
+.smaily-log-timeline__body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.smaily-log-timeline__title { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); font-weight: 700; color: var(--s-text); }
+.smaily-log-timeline__badge { padding: 0 6px; border: 1px solid var(--badge-bd); border-radius: var(--r-2); background: var(--badge-bg); color: var(--badge-fg); font-size: 10px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; }
+.smaily-log-timeline__time { margin: 3px 0 2px; font: 400 var(--fs-12)/1.3 var(--mono); color: var(--s-text-3); }
+.smaily-log-timeline__detail { font-size: var(--fs-12); color: var(--s-text-2); word-break: break-word; }
+.smaily-log-details__foot { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); padding: 14px var(--sp-5); border-top: 1px solid var(--s-border); background: var(--s-surface); }
+.smaily-log-details__foot form { margin: 0; }
+.smaily-log-details__resend { padding: var(--sp-2) 15px; border: 1px solid var(--s-border-strong); border-radius: var(--r-2); background: var(--s-surface); color: var(--s-text); font: 700 var(--fs-13)/1 var(--font); cursor: pointer; }
+.smaily-log-details__resend:hover { background: var(--s-surface-3); }
+.smaily-log-details__resend:disabled { opacity: .6; cursor: default; }
+.smaily-log-details__copy { padding: var(--sp-2) var(--sp-3); border: 1px solid transparent; background: transparent; color: var(--s-link); font: 600 var(--fs-13)/1 var(--font); cursor: pointer; }
+.smaily-log-details__copy:hover { color: var(--s-link-hover); text-decoration: underline; background: transparent; }
+.smaily-log-details__foot .smaily-inline-status { white-space: normal; line-height: 1.4; }
+
+/* ========================================================================= *
+ * PRO-1281 Stage A — reusable design-system components.
+ *
+ * Six token-driven classes Stage B's screens (Dashboard, Wizard, Settings,
+ * Engine Automations, Log, Backfill) apply. Every value resolves to a token
+ * above; nothing here is wired into a template yet. Class names + BEM-ish
+ * element/modifier structure follow the Design agent's component specs so
+ * Stage B's per-screen annotations line up 1:1.
+ * ========================================================================= */
+
+/* --- Choice card: <label class="smaily-choice is-selected"> --------------- *
+ * Radio + title-row (+ optional Recommended badge) + description. Whole label
+ * is the hit target; selected = accent border + 1px ring + accent tint.
+ * PRO-1397 polish: a dead legacy `.smaily-ui .smaily-choice` rule (orange
+ * `.selected`, `display:block`) used to live above this block. Every page
+ * using this component (`.smaily-settings`, `.smaily-wizard`) also carries
+ * the `.smaily-ui` class, so that rule's higher specificity (0,2,0 vs this
+ * block's 0,1,0) was winning and collapsing the flex layout below back to
+ * `display:block` — the actual cause of the radio/label misalignment Erkki
+ * flagged on the Subscribers tab. No template has used `.selected` (vs.
+ * `.is-selected`) since the Phase-3 rebuild, so it was safe to delete. */
+.smaily-choice {
+    display: flex;
+    gap: var(--sp-3);
+    align-items: flex-start;
+    padding: var(--sp-4) var(--sp-4);
+    background: var(--s-surface);
+    border: 1px solid var(--s-border-2);
+    border-radius: var(--r-3);
+    cursor: pointer;
+    transition: border-color .12s, background .12s, box-shadow .12s;
+}
+.smaily-choice:hover { border-color: var(--s-border-strong); }
+.smaily-choice.is-selected {
+    background: var(--s-accent-soft);
+    border-color: var(--s-accent);
+    box-shadow: 0 0 0 1px var(--s-accent);
+}
+.smaily-choice.is-disabled { opacity: .55; cursor: not-allowed; }
+.smaily-choice__radio {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    border: 2px solid var(--s-border-strong);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.smaily-choice.is-selected .smaily-choice__radio { border-color: var(--s-accent); }
+.smaily-choice.is-selected .smaily-choice__radio::after {
+    content: "";
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--s-accent);
+}
+.smaily-choice__body { flex: 1; min-width: 0; }
+.smaily-choice__title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+    margin-bottom: 3px;
+}
+.smaily-choice__title { font-size: var(--fs-14); font-weight: 700; color: var(--s-text); }
+.smaily-choice__desc { display: block; font-size: var(--fs-13); color: var(--s-text-2); line-height: 1.45; }
+.smaily-choice__badge {
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--s-success);
+    background: var(--s-success-soft);
+    border: 1px solid var(--s-success-border);
+    border-radius: var(--r-2);
+    padding: 1px 7px;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+}
+
+/* --- Status pill: <span class="smaily-pill smaily-pill--{variant}"> -------- *
+ * One shape for automation modes (active/test/off) and queue statuses
+ * (sent/pending/failed/parked/neutral). Dot carries the color redundantly
+ * with the label for accessibility. */
+.smaily-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px;
+    border: 1px solid transparent;
+    border-radius: 11px;
+    font: 600 var(--fs-11)/1.6 var(--font);
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.smaily-pill__dot { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.smaily-pill--active,
+.smaily-pill--sent { color: var(--s-success); background: var(--s-success-soft); border-color: var(--s-success-border); }
+.smaily-pill--test { color: var(--s-info); background: var(--s-info-soft); border-color: var(--s-info-border); }
+.smaily-pill--pending { color: var(--s-warning); background: var(--s-warning-soft); border-color: var(--s-warning-border); }
+.smaily-pill--failed { color: var(--s-danger); background: var(--s-danger-soft); border-color: var(--s-danger-border); }
+.smaily-pill--parked { color: var(--s-parked); background: var(--s-parked-soft); border-color: var(--s-parked-border); }
+.smaily-pill--off,
+.smaily-pill--neutral { color: var(--s-neutral); background: var(--s-neutral-soft); border-color: var(--s-neutral-border); }
+
+/* --- Notice banner: <div class="smaily-banner smaily-banner--{level}"> ----- *
+ * Maps 1:1 onto Magento's four message levels. 4px left bar at full strength,
+ * soft bg, icon slot, optional title + message + right-aligned inline action.
+ * Layer on Magento's `.message .message-{level}` too if inheriting its box. */
+.smaily-banner {
+    display: flex;
+    gap: var(--sp-3);
+    align-items: flex-start;
+    padding: var(--sp-3) 14px;
+    border: 1px solid transparent;
+    border-left: 4px solid transparent;
+    border-radius: var(--r-2);
+    font: 400 var(--fs-13)/1.5 var(--font);
+}
+.smaily-banner__icon { flex: 0 0 auto; margin-top: 1px; }
+.smaily-banner__body { flex: 1; min-width: 0; }
+.smaily-banner__title { font-weight: 700; font-size: var(--fs-13); margin-bottom: 2px; }
+.smaily-banner__message { font-size: var(--fs-13); }
+.smaily-banner__action {
+    flex: 0 0 auto;
+    margin-left: 6px;
+    color: inherit;
+    font-weight: 700;
+    font-size: var(--fs-13);
+    text-decoration: underline;
+    white-space: nowrap;
+}
+.smaily-banner--success { color: var(--s-success); background: var(--s-success-soft); border-color: var(--s-success-border); border-left-color: var(--s-bar-success); }
+.smaily-banner--info { color: var(--s-info); background: var(--s-info-soft); border-color: var(--s-info-border); border-left-color: var(--s-bar-info); }
+.smaily-banner--warning { color: var(--s-warning); background: var(--s-warning-soft); border-color: var(--s-warning-border); border-left-color: var(--s-bar-warning); }
+.smaily-banner--error { color: var(--s-danger); background: var(--s-danger-soft); border-color: var(--s-danger-border); border-left-color: var(--s-bar-error); }
+
+/* --- Inline status: <span class="smaily-inline-status is-{state}"> --------- *
+ * Sits to the right of the button that triggered the action; the button stays
+ * stable while this animates. States: idle / working / saved / error. Never
+ * fixed-width (Estonian "Salvestatakse…" is longer than "Saving…"). */
+.smaily-inline-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font: 600 var(--fs-13)/1 var(--font);
+    color: var(--s-text-2);
+    white-space: nowrap;
+}
+.smaily-inline-status.is-idle { color: var(--s-text-3); }
+.smaily-inline-status.is-working { color: var(--s-text-2); }
+.smaily-inline-status.is-saved { color: var(--s-success); }
+.smaily-inline-status.is-error { color: var(--s-danger); }
+.smaily-inline-status__spinner {
+    flex: 0 0 auto;
+    width: 13px;
+    height: 13px;
+    border: 2px solid var(--s-border-2);
+    border-top-color: var(--s-text-2);
+    border-radius: 50%;
+    animation: smaily-spin .7s linear infinite;
+}
+.smaily-inline-status__check {
+    flex: 0 0 auto;
+    position: relative;
+    width: 14px;
+    height: 14px;
+}
+.smaily-inline-status__check::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 0;
+    width: 4px;
+    height: 9px;
+    border: solid var(--s-success);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+.smaily-inline-status__error {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--s-danger);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+}
+@keyframes smaily-spin { to { transform: rotate(360deg); } }
+
+/* --- Metric tile: <div class="smaily-tile smaily-tile--attention"> --------- *
+ * Dashboard counts. Default + attention only — attention flips the 3px top bar
+ * and value to danger and shows a badge. Grid should be
+ * auto-fit minmax(210px,1fr) so it reflows 4→2→1. */
+.smaily-tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--sp-4) 18px;
+    min-width: 0;
+    background: var(--s-surface);
+    border: 1px solid var(--s-border);
+    border-top: 3px solid var(--s-border-2);
+    border-radius: var(--r-3);
+    box-shadow: var(--shadow-1);
+}
+.smaily-tile--attention { border-color: var(--s-danger-border); border-top-color: var(--s-bar-error); }
+.smaily-tile__label-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.smaily-tile__label {
+    font-size: var(--fs-12);
+    font-weight: 600;
+    color: var(--s-text-2);
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+.smaily-tile__badge {
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--s-danger);
+    background: var(--s-danger-soft);
+    border: 1px solid var(--s-danger-border);
+    border-radius: var(--r-2);
+    padding: 1px 6px;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    white-space: nowrap;
+}
+.smaily-tile__value {
+    font-size: var(--fs-28);
+    font-weight: 700;
+    line-height: 1.05;
+    color: var(--s-text);
+    font-variant-numeric: tabular-nums;
+}
+.smaily-tile--attention .smaily-tile__value { color: var(--s-danger); }
+.smaily-tile__caption { font-size: var(--fs-12); color: var(--s-text-3); }
+
+/* --- Progress: <div class="smaily-progress is-{state}"> ------------------- *
+ * Backfill / long syncs. Running = animated accent stripes; terminal states
+ * (done / failed / stopped) recolor to their status role and stop animating.
+ * Width lives on __fill (inline `width:%` from the template). */
+.smaily-progress { width: 100%; }
+.smaily-progress__track {
+    width: 100%;
+    height: 8px;
+    background: var(--s-surface-3);
+    border: 1px solid var(--s-border-2);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.smaily-progress__fill {
+    width: 0;
+    height: 100%;
+    background: var(--s-accent);
+    border-radius: 6px;
+    transition: width .3s ease;
+}
+.smaily-progress.is-running .smaily-progress__fill {
+    background: repeating-linear-gradient(45deg, var(--s-accent), var(--s-accent) 7px, var(--s-accent-hover) 7px, var(--s-accent-hover) 14px);
+    background-size: 28px 28px;
+    animation: smaily-stripe .8s linear infinite;
+}
+.smaily-progress.is-done .smaily-progress__fill { background: var(--s-success); }
+.smaily-progress.is-failed .smaily-progress__fill { background: var(--s-danger); }
+.smaily-progress.is-stopped .smaily-progress__fill { background: var(--s-neutral); }
+@keyframes smaily-stripe { from { background-position: 0 0; } to { background-position: 28px 0; } }
+
+/* --- Backfill card: <div class="smaily-card smaily-backfill-card"> -------- *
+ * PRO-1397 polish #3 (finding #7's tail): the description, the import
+ * button and the progress bar had no vertical gap between them at all.
+ * Unscoped (not tab-scoped) because the card is one shared partial rendered
+ * on both the wizard step-2 and the Settings > Subscribers panel.
+ * PRO-2456 (pack "Backfill" frames): title, 13px body copy, progress, then
+ * one controls row under a divider — Start import, Cancel and the status
+ * sit on one line, and a long status wraps beside the buttons instead of
+ * dropping below them with an indent.
+ * PRO-3564 (the pack's six states): a white card with the state pill in the
+ * header, "X of Y" and the percentage under the bar, the outcome line with
+ * its icon, and the pack's compact buttons. The selectors outrank the tab
+ * and step card rules further down (the card sits inside their card). */
+.smaily-ui .smaily-card div.smaily-backfill-card {
+    max-width: none; margin: 0; padding: 18px 20px; background: var(--s-surface);
+    border: 1px solid var(--s-border); border-radius: 6px; box-shadow: var(--shadow-1); color: var(--s-text);
+}
+.smaily-ui .smaily-card div.smaily-backfill-card + .smaily-backfill-card { margin-top: var(--sp-3); }
+.smaily-backfill-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); margin-bottom: 14px; }
+.smaily-backfill-card__title { display: block; min-width: 0; font-size: 15px; font-weight: 700; color: var(--s-text); }
+.smaily-backfill-card__pill { flex: 0 0 auto; }
+.smaily-ui .smaily-card .smaily-backfill-card p.note { margin: 0; font-size: var(--fs-13); line-height: 1.45; color: var(--s-text-2); }
+.smaily-ui .smaily-card .smaily-backfill-card p.note + p.note { margin-top: var(--sp-1); }
+.smaily-backfill-card.is-finished .smaily-backfill-card__intro { display: none; }
+.smaily-backfill-card__progress { margin-bottom: var(--sp-3); }
+.smaily-backfill-card__count { display: flex; justify-content: space-between; gap: var(--sp-3); margin-top: 7px; font-size: var(--fs-12); }
+.smaily-backfill-card__done { font-weight: 700; color: var(--s-text); font-variant-numeric: tabular-nums; }
+.smaily-backfill-card__pct { font: var(--fs-11)/1 var(--mono); color: var(--s-text-3); align-self: center; }
+.smaily-backfill-verdict { display: flex; gap: var(--sp-2); align-items: flex-start; font-size: var(--fs-13); line-height: 1.45; color: var(--s-text-2); }
+.smaily-backfill-verdict__icon {
+    flex: 0 0 auto; width: 20px; height: 20px; margin-top: 1px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font: 700 var(--fs-12)/1 var(--font); color: #fff; background: var(--s-neutral);
+}
+.smaily-backfill-verdict__text { min-width: 0; }
+.smaily-backfill-verdict[data-state="done"] { color: var(--s-success); }
+.smaily-backfill-verdict[data-state="done"] .smaily-backfill-verdict__icon { background: var(--s-success); }
+.smaily-backfill-verdict[data-state="failures"] { color: var(--s-warning); }
+.smaily-backfill-verdict[data-state="failures"] .smaily-backfill-verdict__icon { background: var(--s-bar-warning); }
+.smaily-backfill-verdict[data-state="stopped"] { color: var(--s-danger); }
+.smaily-backfill-verdict[data-state="stopped"] .smaily-backfill-verdict__icon { background: var(--s-bar-error); }
+.smaily-backfill-verdict[data-state="cancelled"] .smaily-backfill-verdict__icon { color: var(--s-text-2); background: var(--s-neutral-soft); }
+.smaily-backfill-card__link { margin-top: 10px; font-size: var(--fs-13); font-weight: 600; }
+.smaily-backfill-card__controls {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+    margin-top: var(--sp-4); padding-top: 14px; border-top: 1px solid var(--s-border);
+}
+.smaily-ui .smaily-backfill-card__controls .action-primary,
+.smaily-ui .smaily-backfill-card__controls .action-secondary { padding: 8px 15px; }
+.smaily-backfill-card__controls .smaily-result.smaily-inline-status { flex: 1 1 16rem; min-width: 0; margin-left: var(--sp-1); white-space: normal; line-height: 1.4; }
+/* Settings > Intelligence: the imports heading and note above the cards. */
+.smaily-backfill-imports__title { display: block; font-size: var(--fs-14); font-weight: 700; color: var(--s-text); }
+.smaily-ui .smaily-backfill-imports > p.note { margin: var(--sp-1) 0 var(--sp-3); font-size: var(--fs-13); line-height: 1.45; color: var(--s-text-2); }
+
+/* ========================================================================= *
+ * PRO-1281 Stage B — the visual system applied to the screens.
+ *
+ * Screen-application CSS only: consumes the Stage A tokens + component classes
+ * above (never redefines them) to wire Dashboard / Wizard / Settings / Engine
+ * Automations / Log / Backfill onto the design system. Primary buttons stay
+ * Magento action-orange (untouched); accent (#e91e63) drives selection, the
+ * stepper/tab indicators and progress, per the token sheet.
+ * ========================================================================= */
+
+/* --- Choice card glue: the real radio is visually hidden; the .smaily-choice
+ * __radio span is the indicator. Kept focusable for keyboard users. --------- */
+/* Border-box, so the full width includes its padding and border and the card
+ * stays inside its parent whatever the host page's box model (PRO-3641). */
+.smaily-choice { width: 100%; box-sizing: border-box; margin-bottom: var(--sp-2); }
+.smaily-choice__input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; }
+.smaily-choice__input:focus-visible ~ .smaily-choice__radio { box-shadow: 0 0 0 3px var(--s-accent-soft); }
+.smaily-choice__desc .note { margin: 0; }
+
+/* --- InlineStatus wired into the shared AJAX result span. The result() helper
+ * builds a glyph + text; these map the legacy .ok/.err channel onto the
+ * inline-status roles so wizard, settings and backfill share one treatment. -- */
+.smaily-result.smaily-inline-status { margin-left: var(--sp-3); }
+/* In-progress copy is neutral grey (pack InlineStatus "working"), not the
+ * legacy .ok green that result() also sets on it. */
+.smaily-ui .smaily-result.smaily-inline-status.is-working { color: var(--s-text-2); }
+.smaily-inline-status:empty { display: none; }
+.smaily-inline-status a { color: inherit; text-decoration: underline; font-weight: 600; }
+
+/* --- Wizard stepper: accent for active, success for completed (token-driven,
+ * overrides the legacy literals above). --------------------------------------*/
+.smaily-wizard .smaily-steps li { border-bottom-color: var(--s-border-2); color: var(--s-text-2); }
+.smaily-wizard .smaily-steps li.active { border-bottom-color: var(--s-accent); color: var(--s-text); }
+.smaily-wizard .smaily-steps li.done { border-bottom-color: var(--s-success); color: var(--s-text); }
+.smaily-wizard .smaily-steps li .smaily-step-index {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; margin-right: var(--sp-2); border-radius: 50%;
+    background: var(--s-surface-3); color: var(--s-text-3);
+    border: 1px solid var(--s-border-2); font: 700 var(--fs-12)/1 var(--font); vertical-align: middle;
+}
+.smaily-wizard .smaily-steps li.active .smaily-step-index { background: var(--s-surface); color: var(--s-accent); border-color: var(--s-accent); }
+.smaily-wizard .smaily-steps li.done .smaily-step-index { background: var(--s-accent); color: #fff; border-color: var(--s-accent); }
+.smaily-wizard .smaily-steps li.done .smaily-step-index::before { content: "\2713"; }
+.smaily-wizard .smaily-steps li.done .smaily-step-index .smaily-step-num { display: none; }
+
+/* --- Wizard shell (PRO-2456, pack "Setup Wizard" frames): a left stepper
+ * rail beside a gray content pane on desktop widths, a footer divider, the
+ * primary group pinned right (also when Back is hidden on step 1) and a
+ * ghost Back. CSS-only — the rail is the same <ul> the JS already drives;
+ * narrower screens keep the horizontal strip above. -------------------------*/
+.smaily-wizard #smaily-wizard-main > .smaily-footer { margin-top: 0; padding-top: 18px; border-top: 1px solid var(--s-border); }
+.smaily-wizard .smaily-footer > div { margin-left: auto; flex-shrink: 1; min-width: 0; }
+/* A long step error (e.g. the workflow list failing) wraps beside the button
+ * instead of pushing it out of the pane. */
+.smaily-wizard .smaily-footer .smaily-inline-status { white-space: normal; line-height: 1.4; }
+.smaily-wizard #smaily-w-back {
+    padding: 9px 14px; background: transparent; border-color: transparent;
+    color: var(--s-link); font-weight: 600; font-size: var(--fs-13);
+}
+.smaily-wizard #smaily-w-back:hover { color: var(--s-link-hover); text-decoration: underline; }
+@media (min-width: 1024px) {
+    /* The grey pane spans the content area (pack frame, PRO-2456
+     * 2026-10-02): no width cap, no bordered and rounded box. */
+    .smaily-wizard #smaily-wizard-main {
+        display: grid; grid-template-columns: 232px minmax(0, 1fr);
+        background: var(--s-bg);
+    }
+    .smaily-wizard #smaily-wizard-main > * { grid-column: 2; }
+    .smaily-wizard #smaily-wizard-main > .smaily-steps {
+        grid-column: 1; grid-row: 1 / span 2; flex-direction: column; margin: 0; padding: 14px 0;
+        background: var(--s-surface-2); border-right: 1px solid var(--s-border);
+    }
+    .smaily-wizard .smaily-step-panel.active { padding: 26px 30px 0; }
+    .smaily-wizard #smaily-wizard-main > .smaily-footer { margin: 0 30px 26px; }
+    .smaily-wizard .smaily-steps li,
+    .smaily-wizard .smaily-steps li.active,
+    .smaily-wizard .smaily-steps li.done {
+        flex: none; display: flex; align-items: center; gap: var(--sp-3); padding: 11px 18px; text-align: left;
+        border-bottom: 0; border-left: 3px solid transparent;
+        font-size: var(--fs-13); font-weight: 700; line-height: 1.3; color: var(--s-text);
+    }
+    .smaily-wizard .smaily-steps li:not(.active):not(.done) { font-weight: 500; color: var(--s-text-3); }
+    .smaily-wizard .smaily-steps li.active { background: var(--s-surface); border-left-color: var(--s-accent); }
+    .smaily-wizard .smaily-steps li .smaily-step-index { flex: 0 0 auto; width: 26px; height: 26px; margin-right: 0; }
+    .smaily-wizard .smaily-steps li.active .smaily-step-index { border-width: 2px; }
+}
+
+/* --- Initial setup step heading (PRO-3561, pack "Setup Wizard" frames): the
+ * "Step N of 5" kicker and the step title above the step's card. ---------- */
+.smaily-wizard .smaily-step-head { max-width: 680px; margin: 0 0 18px; }
+.smaily-wizard .smaily-step-kicker-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.smaily-wizard .smaily-step-kicker {
+    font: 700 var(--fs-11)/1 var(--font); letter-spacing: .6px; text-transform: uppercase; color: var(--s-text-3);
+}
+.smaily-wizard .smaily-step-title { margin: 0; font-size: var(--fs-22); font-weight: 700; line-height: 1.25; color: var(--s-text); }
+/* Completed revisit (PRO-3563, pack frame 5): a read-only summary card. */
+.smaily-wizard .smaily-setup-summary {
+    max-width: 460px; margin-bottom: 2rem; padding: var(--sp-4) var(--sp-5); background: var(--s-surface);
+    border: 1px solid var(--s-border); border-radius: 6px; box-sizing: border-box;
+}
+.smaily-wizard .smaily-setup-summary__row {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4);
+    padding: var(--sp-2) 0; border-bottom: 1px solid #f2f2f2; font-size: var(--fs-13);
+}
+.smaily-wizard .smaily-setup-summary__row:last-child { border-bottom: 0; }
+.smaily-wizard .smaily-setup-summary__label { color: var(--s-text-3); }
+.smaily-wizard .smaily-setup-summary__value { font-weight: 600; color: var(--s-text); word-break: break-all; }
+.smaily-wizard code.smaily-setup-summary__value { font: 400 var(--fs-13)/1 var(--mono); background: none; padding: 0; }
+
+/* --- Settings tabs: accent underline for the active tab. -------------------- */
+.smaily-settings .smaily-tabs li { color: var(--s-text-2); }
+.smaily-settings .smaily-tabs li.active { border-bottom-color: var(--s-accent); color: var(--s-text); }
+
+/* --- Dashboard ------------------------------------------------------------- */
+/* PRO-3568 (pack Dashboard): the verdict at 6 px radius and 18/20 padding,
+ * flat, its dot ringed in the level colour; the warning banner above it in
+ * the degraded state; the danger "Review failures" button. */
+.smaily-dashboard .smaily-verdict { align-items: center; gap: var(--sp-4); padding: 18px 20px; border-left-width: 5px; border-radius: 6px; box-shadow: none; }
+.smaily-dashboard .smaily-dashboard-banner { margin-bottom: var(--sp-4); }
+.smaily-dashboard .smaily-verdict-dot { flex: 0 0 auto; width: 14px; height: 14px; border-radius: 50%; background: var(--s-neutral); }
+.smaily-dashboard .smaily-verdict-body { flex: 1; min-width: 0; }
+.smaily-dashboard .smaily-verdict-kicker { font: 700 var(--fs-11)/1 var(--font); letter-spacing: .6px; text-transform: uppercase; margin-bottom: 5px; }
+.smaily-dashboard .smaily-verdict-text { font-size: var(--fs-18); font-weight: 700; color: var(--s-text); line-height: 1.35; }
+.smaily-dashboard .smaily-verdict-ok { background: var(--s-success-soft); border-color: var(--s-success-border); border-left-color: var(--s-bar-success); }
+.smaily-dashboard .smaily-verdict-ok .smaily-verdict-dot { background: var(--s-bar-success); box-shadow: 0 0 0 4px color-mix(in srgb, var(--s-bar-success) 13%, transparent); }
+.smaily-dashboard .smaily-verdict-ok .smaily-verdict-kicker { color: var(--s-success); }
+.smaily-dashboard .smaily-verdict-degraded { background: var(--s-warning-soft); border-color: var(--s-warning-border); border-left-color: var(--s-bar-warning); }
+.smaily-dashboard .smaily-verdict-degraded .smaily-verdict-dot { background: var(--s-bar-warning); box-shadow: 0 0 0 4px color-mix(in srgb, var(--s-bar-warning) 13%, transparent); }
+.smaily-dashboard .smaily-verdict-degraded .smaily-verdict-kicker { color: var(--s-warning); }
+.smaily-dashboard .smaily-verdict-incomplete { background: var(--s-info-soft); border-color: var(--s-info-border); border-left-color: var(--s-bar-info); }
+.smaily-dashboard .smaily-verdict-incomplete .smaily-verdict-dot { background: var(--s-bar-info); box-shadow: 0 0 0 4px color-mix(in srgb, var(--s-bar-info) 13%, transparent); }
+.smaily-dashboard .smaily-verdict-incomplete .smaily-verdict-kicker { color: var(--s-info); }
+.smaily-dashboard .smaily-verdict-disconnected { background: var(--s-danger-soft); border-color: var(--s-danger-border); border-left-color: var(--s-bar-error); }
+.smaily-dashboard .smaily-verdict-disconnected .smaily-verdict-dot { background: var(--s-bar-error); box-shadow: 0 0 0 4px color-mix(in srgb, var(--s-bar-error) 13%, transparent); }
+.smaily-dashboard .smaily-verdict-disconnected .smaily-verdict-kicker { color: var(--s-danger); }
+.smaily-dashboard .smaily-verdict-action { align-self: center; }
+.smaily-ui .action-primary.smaily-verdict-action--danger,
+.smaily-ui .action-primary.smaily-verdict-action--danger:focus { background: var(--s-bar-error); border-color: var(--s-danger); color: #fff; }
+.smaily-ui .action-primary.smaily-verdict-action--danger:hover { background: var(--s-danger); border-color: var(--s-danger); color: #fff; }
+
+.smaily-dashboard .smaily-connections { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+/* Connection cards (PRO-3568, pack Dashboard): flat, 13/15 padding, 5 px
+ * radius; the 14 px dot in its own column beside label, sub-line and pill. */
+.smaily-dashboard .smaily-connection { align-items: flex-start; flex-direction: row; gap: 11px; padding: 13px 15px; border-radius: var(--r-3); box-shadow: none; min-width: 0; }
+.smaily-dashboard .smaily-connection-body { flex: 1; min-width: 0; }
+.smaily-dashboard .smaily-connection-label { font-size: var(--fs-13); font-weight: 600; color: var(--s-text); }
+.smaily-dashboard .smaily-connection-sub { margin-bottom: 6px; font-size: var(--fs-12); color: var(--s-text-3); }
+.smaily-dashboard .smaily-connection .smaily-dot { width: 14px; height: 14px; }
+.smaily-dashboard .smaily-connection.is-on .smaily-dot { background: var(--s-bar-success); box-shadow: 0 0 0 4px color-mix(in srgb, var(--s-bar-success) 13%, transparent); }
+.smaily-dashboard .smaily-connection.is-off .smaily-dot { background: var(--s-border-2); }
+
+/* auto-fit, not auto-fill: with the engine disconnected there are three
+ * tiles, and auto-fill left an empty fourth track instead of spanning the
+ * row like the pack's grid (PRO-2456). Still reflows 4→2→1. */
+.smaily-dashboard .smaily-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+
+.smaily-dashboard .smaily-activity-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.smaily-dashboard .smaily-activity-head h2 { margin: 0; }
+/* Panel headers + quick-link rows (PRO-2456, pack Dashboard lower area). */
+.smaily-dashboard .smaily-activity-head h2,
+.smaily-dashboard .smaily-quick-links > h2 { font-size: var(--fs-14); font-weight: 700; color: var(--s-text); }
+.smaily-dashboard .smaily-activity-head a::after { content: " \2192"; }
+/* Quick links (PRO-3568): the arrow is grey and right-aligned in its row. */
+.smaily-dashboard .smaily-quick-links li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--sp-3); align-items: center; }
+.smaily-dashboard .smaily-quick-links li > * { grid-column: 1; }
+.smaily-dashboard .smaily-quick-links li::after { content: "\2192"; grid-column: 2; grid-row: 1 / span 2; color: var(--s-border-2); }
+.smaily-dashboard .smaily-quick-links ul { list-style: none; padding: 0; line-height: 1.45; }
+.smaily-dashboard .smaily-quick-links li { padding: var(--sp-3) 0; border-top: 1px solid var(--s-border); font-size: var(--fs-13); }
+.smaily-dashboard .smaily-quick-links__desc { display: block; margin-top: 2px; font-size: var(--fs-12); color: var(--s-text-3); }
+/* The descriptions were written to follow an em dash, lower-case first. */
+.smaily-dashboard .smaily-quick-links__desc::first-letter { text-transform: uppercase; }
+
+/* --- Engine automations: trigger cards + run-mode pill --------------------- */
+.smaily-engine-triggers { display: flex; flex-direction: column; gap: var(--sp-3); margin: var(--sp-4) 0; }
+.smaily-engine-trigger { background: var(--s-surface); border: 1px solid var(--s-border); border-radius: var(--r-3); padding: 15px 17px; box-shadow: var(--shadow-1); }
+.smaily-engine-trigger.is-off { background: var(--s-surface-2); }
+.smaily-engine-trigger.is-test { border-left: 3px solid var(--s-info-border); }
+.smaily-engine-trigger.is-active { border-left: 3px solid var(--s-success-border); }
+.smaily-engine-trigger__top { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+.smaily-engine-trigger__head { flex: 1; min-width: 220px; }
+.smaily-engine-trigger__name-row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: 3px; }
+.smaily-engine-trigger__name { font-size: var(--fs-14); font-weight: 700; color: var(--s-text); }
+.smaily-engine-trigger__desc { font-size: var(--fs-12); color: var(--s-text-3); }
+/* The go-live step (PRO-3734): who switches real sends on. */
+.smaily-engine-trigger__hint { font-size: var(--fs-12); color: var(--s-text-2); margin-top: var(--sp-2); }
+.smaily-engine-trigger__controls { display: flex; gap: var(--sp-3); flex-wrap: wrap; align-items: flex-end; }
+.smaily-engine-trigger__ctrl { display: flex; flex-direction: column; gap: var(--sp-1); }
+.smaily-engine-trigger__ctrl > span { font-size: var(--fs-11); font-weight: 700; color: var(--s-text-3); text-transform: uppercase; letter-spacing: .4px; }
+.smaily-engine-trigger__ctrl label { display: inline-flex; align-items: center; gap: 6px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--s-text-2); font-size: var(--fs-13); line-height: 1.3; }
+.smaily-engine-empty { text-align: center; background: var(--s-surface); border: 1px solid var(--s-border); border-radius: var(--r-3); padding: 32px 24px; }
+.smaily-engine-empty__icon { width: 44px; height: 44px; border-radius: 50%; background: var(--s-info-soft); border: 1px solid var(--s-info-border); color: var(--s-info); font: 700 22px/44px var(--font); margin: 0 auto var(--sp-3); }
+.smaily-engine-empty__title { font-size: var(--fs-16); font-weight: 700; margin-bottom: 5px; }
+.smaily-engine-empty__body { font-size: var(--fs-13); color: var(--s-text-2); max-width: 40ch; margin: 0 auto var(--sp-4); line-height: 1.5; }
+.smaily-engine-automations.is-degraded .smaily-engine-triggers { opacity: .55; }
+
+/* Engine-trigger validation (PRO-1401): field-level danger on the offending
+ * control, indexed to the exact row; the summary count sits in a top
+ * .smaily-banner--error. Valid rows are untouched. */
+.smaily-engine-trigger__ctrl.is-invalid > span { color: var(--s-danger); }
+.smaily-engine-trigger__ctrl.is-invalid select,
+.smaily-engine-trigger__ctrl.is-invalid input { border-color: var(--s-danger); background: var(--s-danger-soft); }
+.smaily-engine-trigger__field-error { font-size: var(--fs-11); font-weight: 600; color: var(--s-danger); margin-top: 2px; }
+
+/* Store-event automations (PRO-1401): the trigger cards reuse the
+ * .smaily-engine-trigger family. */
+.smaily-store-trigger__enable { margin-top: var(--sp-2); }
+.smaily-store-trigger .smaily-w-workflow { min-width: 16rem; }
+.smaily-store-trigger #smaily-w-cutoff { width: 6rem; }
+
+/* --- Log details slide-out: attempt timeline ------------------------------ */
+.smaily-log-details-retry { display: flex; gap: var(--sp-2); align-items: center; background: var(--s-info-soft); border: 1px solid var(--s-info-border); color: var(--s-info); border-radius: var(--r-3); padding: 11px 14px; font-size: var(--fs-13); line-height: 1.45; }
+.smaily-log-details-retry.is-terminal { background: var(--s-neutral-soft); border-color: var(--s-neutral-border); color: var(--s-text-2); }
+
+/* --- Settings website selector (RFC_MULTI_WEBSITE.md §2, PRO-1461) --------- *
+ * Own chrome next to the tab strip, shown only on 2+-website installs. */
+.smaily-settings-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); }
+.smaily-settings-header .smaily-tabs { flex: 1 1 auto; }
+.smaily-website-select { display: flex; align-items: center; gap: var(--sp-2); white-space: nowrap; margin-top: 0.6rem; }
+.smaily-website-select label { font-weight: 600; font-size: var(--fs-13); }
+
+/* --- Settings > Connection tab (PRO-1379 pilot) ---------------------------- *
+ * Target-spec §2.3.A: H3 title + one-line description above the card, a
+ * 620px card with 440px-wide fields, a status line (Pill + account) and a
+ * tab-scoped footer (Test/Save Connection + InlineStatus). Scoped to
+ * .smaily-settings so the shared wizard step-1 partial keeps its own,
+ * wider layout untouched — except the subdomain suffix chip, which the
+ * pack's wizard frame shows too (PRO-2456). */
+.smaily-settings .smaily-tab-panel > h3 { margin: 0 0 var(--sp-1); font-size: var(--fs-18); font-weight: 700; }
+.smaily-settings .smaily-tab-desc { margin: 0 0 var(--sp-5); font-size: var(--fs-13); color: var(--s-text-2); }
+.smaily-settings #smaily-w-default-account .smaily-card { max-width: 620px; padding: 20px 22px; border-radius: 6px; color: var(--s-text); }
+.smaily-settings #smaily-w-default-account .smaily-field { max-width: 440px; }
+.smaily-ui .smaily-subdomain-row { display: flex; max-width: 440px; }
+.smaily-ui #smaily-w-default-account .smaily-subdomain-row input[type=text] { flex: 1; min-width: 0; border-radius: var(--r-1) 0 0 var(--r-1); }
+.smaily-ui .smaily-subdomain-suffix {
+    display: flex; align-items: center; padding: 0 11px; white-space: nowrap;
+    background: var(--s-surface-3); border: 1px solid var(--s-border-strong); border-left: none;
+    border-radius: 0 var(--r-1) var(--r-1) 0; font-size: var(--fs-13); color: var(--s-text-3);
+}
+.smaily-settings .smaily-connection-status { display: flex; align-items: center; gap: 10px; margin-top: var(--sp-4); font-size: var(--fs-13); }
+.smaily-settings .smaily-connection-status__label { color: var(--s-text-2); }
+.smaily-settings .smaily-connection-status__account { color: var(--s-text-3); }
+.smaily-settings .smaily-tab-footer {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: 1px solid var(--s-border); max-width: 620px;
+}
+/* "Using a separate storefront?" (PRO-3660; in the initial setup too,
+ * PRO-3802): a link under the account card that opens the Storefront URL
+ * card, the same measure as the account card. */
+.smaily-ui .smaily-disclosure__toggle {
+    display: inline-block; list-style: none; cursor: pointer; font-size: var(--fs-13); font-weight: 600; color: var(--s-link);
+}
+.smaily-ui .smaily-disclosure__toggle:hover { color: var(--s-link-hover); text-decoration: underline; }
+.smaily-ui .smaily-disclosure__toggle::-webkit-details-marker { display: none; }
+.smaily-ui .smaily-disclosure > .smaily-card { max-width: 620px; margin-top: var(--sp-3); padding: 20px 22px; border-radius: 6px; }
+.smaily-ui .smaily-disclosure .smaily-field { max-width: 440px; }
+
+/* --- PRO-1391: visual-fidelity pass — gray canvas + card polish, measured
+ * from the design pack (Settings.dc.html "FRAME 1: CONNECTION TAB"). Card
+ * max-width/padding/radius/color are consolidated into the .smaily-card rule
+ * above. ------------------------------------------------------------------ */
+.smaily-settings .smaily-tab-panel { background: var(--s-bg); padding: var(--sp-6) 28px; }
+/* Card + field typography, form controls and buttons — measured from the
+ * pack's Connection frame for Settings (PRO-1391), widened by PRO-2456 to
+ * every page of ours (.smaily-ui): the wizard renders the same partials and
+ * still showed browser-default inputs and Magento's dark secondary buttons. */
+.smaily-ui .smaily-card > h2 { margin: 0 0 var(--sp-2); font-size: var(--fs-16); font-weight: 700; color: var(--s-text); }
+.smaily-ui .smaily-card > p:not(.message) { margin: 0 0 var(--sp-4); font-size: var(--fs-13); color: var(--s-text-2); }
+.smaily-ui .smaily-field label {
+    font-size: var(--fs-13); font-weight: 600; color: var(--s-text); margin-bottom: 5px;
+}
+.smaily-ui .smaily-field .note {
+    color: var(--s-text-3); font-size: var(--fs-12);
+}
+.smaily-ui input[type=text],
+.smaily-ui input[type=password],
+.smaily-ui input[type=number],
+.smaily-ui select {
+    padding: 8px 11px; border: 1px solid var(--s-border-strong); border-radius: var(--r-1);
+    font-size: var(--fs-14); color: var(--s-text); background: var(--s-surface); box-sizing: border-box;
+}
+.smaily-ui select { padding: 7px 10px; cursor: pointer; }
+.smaily-ui .action-primary {
+    padding: 9px 18px; border-radius: var(--r-2); border-color: #d44f00; font-weight: 700; font-size: var(--fs-13);
+    line-height: 1; text-shadow: none;
+}
+.smaily-ui .action-secondary {
+    padding: 9px 16px; background: var(--s-surface); border: 1px solid var(--s-border-strong);
+    border-radius: var(--r-2); color: var(--s-text); font-weight: 700; font-size: var(--fs-13);
+    line-height: 1; text-shadow: none;
+}
+.smaily-ui .action-secondary:hover { background: var(--s-surface-3); border-color: var(--s-border-strong); color: var(--s-text); }
+
+/* --- Form errors (PRO-3562, pack "Setup Wizard" error frame): an error banner
+ * above the form, and the field that caused it with a danger border and its
+ * message under it. After the base input rules, which it outranks. ---------- */
+.smaily-ui .smaily-form-banner { max-width: 680px; margin: 0 0 var(--sp-4); }
+.smaily-settings [data-tab="connection"] .smaily-form-banner { max-width: 620px; }
+.smaily-ui input.is-invalid,
+.smaily-ui input.is-invalid:focus {
+    border-color: var(--s-bar-error); background: #fef8f7; box-shadow: 0 0 0 2px rgba(215, 44, 13, .13);
+}
+.smaily-ui .smaily-subdomain-row input.is-invalid + .smaily-subdomain-suffix { border-color: var(--s-bar-error); }
+.smaily-ui .smaily-field-error { margin: 5px 0 0; font-size: var(--fs-12); font-weight: 600; color: var(--s-danger); }
+
+/* --- Settings > Subscribers tab (PRO-1397) --------------------------------- *
+ * Same shell as Connection: H3 title + description above a white card. The
+ * card itself reuses the shared .smaily-choice component (lawful-basis radio
+ * cards, already token-driven) unchanged; this scopes card typography, the
+ * extra-fields checkbox grid and the toggle rows to the Connection tab's
+ * measured sizes (fs-13 labels, fs-12 muted notes) and fixes findings #6/#7
+ * (no opt-in-mode leak was ever built; checkboxes were unstyled with no
+ * spacing scale — every checkbox on this page now picks up an accent color
+ * and the toggle rows/checkbox grid use the 4px spacing tokens). PRO-2456:
+ * the wizard's Contacts step renders the same partial, so every rule below
+ * also covers it ([data-step="2"]). */
+.smaily-ui input[type=checkbox] { accent-color: var(--s-accent); width: 15px; height: 15px; cursor: pointer; }
+.smaily-ui input[type=radio] { accent-color: var(--s-accent); }
+.smaily-settings [data-tab="subscribers"] .smaily-card,
+.smaily-wizard [data-step="2"] .smaily-card { max-width: 680px; padding: 20px 22px; border-radius: 6px; color: var(--s-text); }
+.smaily-settings [data-tab="subscribers"] .smaily-card .smaily-card,
+.smaily-wizard [data-step="2"] .smaily-card .smaily-card { max-width: none; }
+.smaily-settings [data-tab="subscribers"] #smaily-w-subscribers-body > p,
+.smaily-wizard [data-step="2"] #smaily-w-subscribers-body > p { margin: 0 0 var(--sp-4); font-size: var(--fs-13); color: var(--s-text-2); }
+/* Spacing rhythm (PRO-1397 polish #2): the heading-to-first-row gap used to
+ * collapse to ~8px — smaller than the 12px gap between checkbox rows — so
+ * "Extra fields to sync..." didn't read as a heading at all. Rhythm is now
+ * deliberate: sp-5 above the first row (bigger than any within-group gap),
+ * sp-3 between rows/toggles (tight, unchanged for the grid), and the
+ * standalone toggles get their own sp-6 gap before the group starts (via
+ * this block's own margin-bottom, overriding the base 1.6rem), so they read
+ * as a separate cluster from the checkbox grid. */
+.smaily-settings [data-tab="subscribers"] .smaily-field,
+.smaily-wizard [data-step="2"] .smaily-field { margin-bottom: var(--sp-6); }
+.smaily-settings [data-tab="subscribers"] #smaily-w-fields,
+.smaily-wizard [data-step="2"] #smaily-w-fields {
+    display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-6); margin-top: var(--sp-5);
+}
+.smaily-settings [data-tab="subscribers"] #smaily-w-fields label,
+.smaily-wizard [data-step="2"] #smaily-w-fields label {
+    display: flex; align-items: center; gap: var(--sp-2); width: auto; min-width: 170px;
+    font-size: var(--fs-13); font-weight: 400; color: var(--s-text);
+}
+.smaily-settings [data-tab="subscribers"] .smaily-inline-toggle,
+.smaily-wizard [data-step="2"] .smaily-inline-toggle { margin: 0 0 var(--sp-3); }
+.smaily-settings [data-tab="subscribers"] .smaily-inline-toggle label,
+.smaily-wizard [data-step="2"] .smaily-inline-toggle label {
+    display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); font-weight: 600; color: var(--s-text);
+}
+.smaily-settings [data-tab="subscribers"] .smaily-inline-toggle .note,
+.smaily-wizard [data-step="2"] .smaily-inline-toggle .note {
+    margin: 3px 0 0 23px; font-size: var(--fs-12); color: var(--s-text-3);
+}
+/* PRO-2456: the same checkbox row everywhere else (Intelligence's browse
+ * tracking among them) — box and label on one centred line, the note
+ * indented under the label text. */
+.smaily-ui .smaily-inline-toggle label {
+    display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); font-weight: 600; color: var(--s-text);
+}
+.smaily-ui .smaily-inline-toggle .note { margin: 3px 0 0 23px; font-size: var(--fs-12); color: var(--s-text-3); }
+.smaily-ui .smaily-inline-toggle input[type=checkbox],
+.smaily-engine-trigger__ctrl label input[type=checkbox] { flex: 0 0 auto; margin: 0; }
+
+/* --- Intelligence (wizard step 4 + Settings > Intelligence, PRO-2456) ------ *
+ * The connected state: the success Banner, then the body copy and the browse
+ * tracking row on the card's 16px rhythm. */
+#smaily-w-engine-connected > .smaily-banner { margin-bottom: var(--sp-4); }
+.smaily-ui #smaily-w-engine-connected > p { margin: 0 0 var(--sp-4); font-size: var(--fs-13); line-height: 1.45; color: var(--s-text-2); }
+.smaily-ui #smaily-w-engine-connected > .smaily-inline-toggle { margin-bottom: var(--sp-4); }
+
+/* --- Initial setup Overview (step 5, PRO-2456) ----------------------------- *
+ * The link list at body line height (it inherited a 2.2 line height that
+ * stretched every wrapped line), and a footer under the pack's divider with
+ * Go to Dashboard as the primary action and Open Settings beside it. */
+.smaily-ui .smaily-overview-links { margin: 0 0 var(--sp-4); padding-left: 1.8rem; font-size: var(--fs-13); line-height: 1.5; color: var(--s-text); }
+.smaily-ui .smaily-overview-links li { margin-bottom: var(--sp-2); }
+.smaily-ui .smaily-overview-links .note { display: block; margin-top: 2px; font-size: var(--fs-12); color: var(--s-text-3); }
+.smaily-ui .smaily-overview-links code { font-family: var(--mono); font-size: var(--fs-12); word-break: break-all; }
+.smaily-wizard .smaily-overview-footer { margin-top: 0; padding: 18px 0 26px; border-top: 1px solid var(--s-border); }
+.smaily-wizard .smaily-overview-footer a.action-primary,
+.smaily-wizard .smaily-overview-footer a.action-secondary { display: inline-block; line-height: 1; text-decoration: none; }
+.smaily-wizard .smaily-overview-footer a.action-primary { color: #fff; }
+
+/* --- Settings > RSS tab (PRO-2456, pack Settings "RSS tab" frame) --------- *
+ * Same shell as the other tabs (H3 + description + tab footer, in
+ * settings/index.phtml); the URL builder is a two-column field grid with the
+ * feed URL as a monospace read-only chip beside a secondary Copy button. The
+ * builder rules are id-scoped because the same block also renders inside
+ * native system config. */
+.smaily-settings [data-tab="rss"] .smaily-card { max-width: 620px; padding: 20px 22px; border-radius: 6px; color: var(--s-text); }
+.smaily-settings [data-tab="rss"] .smaily-inline-toggle label {
+    display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); font-weight: 600; color: var(--s-text);
+}
+#smaily-rss-builder { max-width: 520px; margin-top: var(--sp-4); }
+/* The pack's compact form (PRO-2456): 12px secondary-colour labels, 13px
+ * controls with 6px 9px padding, selects with their own caret, a small
+ * "Feed URL" label 18px under the grid, and the URL as a 12.5px monospace
+ * chip with the pack's light border (#d6d6d6, no token). */
+#smaily-rss-builder .smaily-rss-builder__grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); margin-bottom: 18px; }
+#smaily-rss-builder .smaily-rss-builder__field,
+#smaily-rss-builder .smaily-rss-builder__label { font-size: var(--fs-12); font-weight: 600; color: var(--s-text-2); }
+#smaily-rss-builder .smaily-rss-builder__field { display: flex; flex-direction: column; gap: 5px; }
+#smaily-rss-builder .smaily-rss-builder__label { display: block; margin-bottom: 5px; }
+#smaily-rss-builder .smaily-rss-builder__field input,
+#smaily-rss-builder .smaily-rss-builder__field select {
+    width: 100%; max-width: none; padding: 6px 9px; font-size: var(--fs-13); font-weight: 400;
+}
+#smaily-rss-builder .smaily-rss-builder__field select {
+    padding-right: 28px; appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    background: var(--s-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M0 0h8L4 5z' fill='%238a8a8a'/%3E%3C/svg%3E") no-repeat right 11px center;
+}
+#smaily-rss-builder .smaily-rss-builder__url { display: flex; gap: var(--sp-2); align-items: stretch; }
+#smaily-rss-builder .smaily-rss-builder__url input {
+    flex: 1; min-width: 0; max-width: none; padding: 9px 11px; border-color: #d6d6d6;
+    font: 12.5px/1.4 var(--mono); color: var(--s-text); background: var(--s-surface-3);
+}
+#smaily-rss-builder .note { margin-top: var(--sp-2); font-size: var(--fs-12); color: var(--s-text-3); }
+
+/* --- Page frame (PRO-2456, 2026-10-02; owner decision: the pack's frame on
+ * every Smaily page) ---------------------------------------------------------
+ * The frame spans the content area, so the cards that had no measure of their
+ * own get one: the pack's card width on Settings, the pack's step width in the
+ * initial setup. Cards nested in a card fill their parent. */
+.smaily-settings [data-tab="automations"] .smaily-card,
+.smaily-settings [data-tab="intelligence"] .smaily-card { max-width: 666px; }
+.smaily-wizard .smaily-step-panel .smaily-card { max-width: 680px; }
+.smaily-settings .smaily-card .smaily-card,
+.smaily-wizard .smaily-step-panel .smaily-card .smaily-card { max-width: none; }
+/* Each tab footer spans its tab's card (PRO-3641); Connection and RSS keep
+ * the 620px measure of their cards from the base footer rule. */
+.smaily-settings [data-tab="subscribers"] .smaily-tab-footer { max-width: 680px; }
+.smaily-settings [data-tab="automations"] .smaily-tab-footer,
+.smaily-settings [data-tab="intelligence"] .smaily-tab-footer { max-width: 666px; }
+/* Automations: the Campaign Intelligence card below the tab footer keeps
+ * the pane's gap from Save Automations, and its heading reads like the
+ * store-events card heading above it. */
+.smaily-settings .smaily-tab-footer + .smaily-card { margin-top: var(--sp-6); }
+.smaily-ui .smaily-engine-automations > h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-16); font-weight: 700; color: var(--s-text); }
+/* A multilingual store's Connection tab: the default account card, the
+ * error banner, the storefront card and the footer share the 680px measure
+ * of the mode cards. */
+.smaily-settings [data-tab="connection"]:has(#smaily-ml-modes) :is(#smaily-w-default-account .smaily-card, .smaily-form-banner, .smaily-tab-footer, .smaily-disclosure > .smaily-card) { max-width: 680px; }
+/* Initial setup footer: the pack's 12px gap, and the step's measure, so the
+ * buttons stay with the card above them (as the Settings tab footers do). */
+.smaily-wizard .smaily-footer { gap: var(--sp-3); }
+.smaily-wizard #smaily-wizard-main > .smaily-footer,
+.smaily-wizard .smaily-overview-footer { max-width: 680px; }
+
+/* Initial setup steps on the pane (PRO-2456, owner decision 2026-10-02: follow
+ * the pack's "Setup Wizard" frames). The step's own sections are not cards
+ * here: no background, border, padding or corners, so the fields sit
+ * directly on the grey pane; Settings keeps its cards (same partials). The
+ * import card and the finished-setup summary stay cards, as in the pack. Each
+ * section ends 26px above the next one and above the footer divider (the
+ * pack's footer gap). The title is 6px above the intro, which reads at 14px
+ * / 1.5 with 22px below it; what opens a step without an intro (the summary,
+ * an error banner, the language routing choice) keeps 18px under the title. */
+.smaily-wizard .smaily-step-panel .smaily-card:not(.smaily-backfill-card) {
+    margin: 0 0 26px; padding: 0; background: none; border: 0; border-radius: 0;
+}
+.smaily-wizard .smaily-setup-summary { margin-bottom: 26px; }
+.smaily-wizard .smaily-step-head { margin-bottom: 0; }
+.smaily-wizard .smaily-step-title { margin-bottom: 6px; }
+.smaily-wizard .smaily-step-head + .smaily-setup-summary,
+.smaily-wizard .smaily-step-head + .smaily-form-banner,
+.smaily-wizard #smaily-w-connect-form > #smaily-ml-modes:first-child { margin-top: var(--sp-3); }
+.smaily-wizard .smaily-step-panel .smaily-card:not(.smaily-backfill-card) > p:not(.note):not(.message),
+.smaily-wizard .smaily-step-panel .smaily-card > div:not([id]):not([class]) > p,
+.smaily-wizard [data-step="2"] #smaily-w-subscribers-body > p {
+    max-width: 60ch; margin: 0 0 22px; font-size: var(--fs-14); line-height: 1.5; color: var(--s-text-2);
+}
+.smaily-wizard .smaily-step-panel .smaily-card > div:not([id]):not([class]) > p:not(:last-child) { margin-bottom: var(--sp-2); }
+/* The rail's sub-labels (pack: an 11px muted line under each step name, the
+ * circle top-aligned with the name). The narrow strip across the top keeps
+ * the name only. */
+.smaily-wizard .smaily-steps .smaily-step-sub { display: none; }
+@media (min-width: 1024px) {
+    /* A step shorter than the rail keeps its footer 26px under the content:
+     * the spare height goes below the footer, not between them. */
+    .smaily-wizard #smaily-wizard-main { grid-template-rows: auto 1fr; }
+    .smaily-wizard #smaily-wizard-main > .smaily-footer { align-self: start; }
+    .smaily-wizard .smaily-steps li,
+    .smaily-wizard .smaily-steps li.active,
+    .smaily-wizard .smaily-steps li.done { align-items: flex-start; }
+    .smaily-wizard .smaily-steps li .smaily-step-index { margin-top: 1px; }
+    .smaily-wizard .smaily-steps .smaily-step-text { min-width: 0; }
+    .smaily-wizard .smaily-steps .smaily-step-name { display: block; }
+    .smaily-wizard .smaily-steps .smaily-step-sub {
+        display: block; margin-top: 1px; font-size: var(--fs-11); font-weight: 400; line-height: 1.35; color: var(--s-text-3);
+    }
+}
+
+/* Dashboard lower panels: the header and every row carry the padding, with
+ * dividers between them (pack Dashboard). The Quick links heading outranks
+ * the generic card heading above (.smaily-ui .smaily-card > h2). */
+.smaily-dashboard .smaily-activity,
+.smaily-dashboard .smaily-quick-links { padding: 0; margin-bottom: 0; border-radius: var(--r-3); overflow: hidden; }
+.smaily-dashboard .smaily-activity-head { margin: 0; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--s-border); }
+.smaily-dashboard .smaily-activity-head a { font-size: var(--fs-12); }
+.smaily-dashboard .smaily-card.smaily-quick-links > h2 {
+    margin: 0; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--s-border);
+    font-size: var(--fs-14);
+}
+.smaily-dashboard .smaily-quick-links ul { margin: 0; }
+.smaily-dashboard .smaily-quick-links li { padding: var(--sp-3) var(--sp-4); border-top: 0; border-bottom: 1px solid var(--s-border); }
+.smaily-dashboard .smaily-quick-links li:last-child { border-bottom: 0; }
+.smaily-dashboard .smaily-activity > .smaily-empty { margin: 0; padding: var(--sp-3) var(--sp-4); }
+.smaily-dashboard .smaily-activity .admin__table-wrapper { padding: 0 var(--sp-4) var(--sp-1); }

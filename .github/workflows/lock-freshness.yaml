@@ -1,0 +1,95 @@
+# Lock freshness guard (PRO-2473; Decision A on the committed `composer.lock`).
+#
+# `composer.lock` is committed so CI installs a fixed toolchain instead of
+# resolving fresh on every run — an upstream release can no longer turn a green
+# build red without a change in this repository (it did, on 2026-09-10, when
+# PHPStan 2.2.6+ broke bitexpert/phpstan-magento's factory autoloader).
+#
+# The trade-off is that the lock now goes quietly stale. This job is the other
+# half of the deal: once a week it asks `composer update --dry-run` whether the
+# lock still matches what the constraints resolve to, and files a GitHub issue
+# when it does not. One issue at a time — a second drift comments on the open
+# one instead of opening another.
+#
+# On red: refresh the lock (`composer update --ignore-platform-req='ext-*'`,
+# see TESTING.md), run the gates, commit the lock.
+
+name: Lock freshness
+
+on:
+  schedule:
+    # Mondays 05:41 UTC — offset from the contract-staleness run at 05:23.
+    - cron: '41 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: composer.lock vs the latest resolvable dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          # The lock pins the platform to PHP 8.1 (config.platform.php), so the
+          # runner's own version does not steer the resolution.
+          php-version: '8.1'
+          extensions: bcmath, gd, intl, pdo_mysql, soap, xsl, zip
+          coverage: none
+
+      - name: Ask composer what would change
+        id: drift
+        run: |
+          set -o pipefail
+          composer update --dry-run --no-interaction --no-progress 2>&1 | tee report.txt
+          if grep -qx 'Nothing to modify in lock file' report.txt; then
+              echo 'drifted=false' >> "$GITHUB_OUTPUT"
+          else
+              echo 'drifted=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: File or update the drift issue
+        if: steps.drift.outputs.drifted == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: composer.lock is behind the latest resolvable dependencies
+        run: |
+          {
+              echo "\`composer update --dry-run\` on \`${GITHUB_REF_NAME}\` reports changes the"
+              echo "committed \`composer.lock\` does not have."
+              echo
+              echo "Refresh it, run the gates, and commit the lock (see TESTING.md):"
+              echo
+              echo '```'
+              echo "composer update --ignore-platform-req='ext-*'"
+              echo '```'
+              echo
+              echo "<details><summary>Dry-run output</summary>"
+              echo
+              echo '```'
+              head -c 40000 report.txt
+              echo '```'
+              echo
+              echo "</details>"
+              echo
+              echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } > body.md
+
+          existing="$( gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+              --json number,title \
+              --jq "[.[] | select(.title == \"$TITLE\")] | first | .number // empty" )"
+
+          if [ -n "$existing" ]; then
+              gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file body.md
+          else
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file body.md
+          fi

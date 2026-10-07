@@ -1,0 +1,275 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Engine-run automations table, embedded in the Automations config group.
+ * Saves via AJAX to smaily_connect/automations/save (the surrounding page
+ * is already a <form>, so no nested form here).
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\Adminhtml\AutomationsForm $viewModel */
+$viewModel = $block->getData('view_model');
+$saveUrl = $block->getUrl('smaily_connect/automations/save');
+?>
+<div class="smaily-engine-automations<?= $viewModel->isEngineConnected() && $viewModel->getLoadError() !== null ? ' is-degraded' : '' ?>">
+    <h3><?= $escaper->escapeHtml(__('Campaign Intelligence Automations')) ?></h3>
+<?php if (!$viewModel->isEngineConnected()): ?>
+    <div class="smaily-engine-empty">
+        <div class="smaily-engine-empty__icon">i</div>
+        <div class="smaily-engine-empty__title"><?= $escaper->escapeHtml(__('Connect Campaign Intelligence to set up these automations')) ?></div>
+        <div class="smaily-engine-empty__body">
+            <?= $escaper->escapeHtml(__('These engine-run automations (replenishment reminders, win-back and more) become available once Campaign Intelligence is connected.')) ?>
+        </div>
+    </div>
+<?php elseif ($viewModel->isEngineRefused()): ?>
+    <?php // Campaign Intelligence refuses the account (PRO-2451): explained as
+    // on Settings > Intelligence, and the engine is not asked (PRO-2465). ?>
+    <div class="smaily-banner smaily-banner--error" id="smaily-engine-automations-refused">
+        <span class="smaily-banner__icon">&#9888;</span>
+        <div class="smaily-banner__body">
+            <?= /* @noEscape */ $block->fetchView($block->getTemplateFile('Smaily_Connect::engine-refused-banner.phtml')) ?>
+            <div class="smaily-banner__message"><?= $escaper->escapeHtml(\Smaily\Connect\ViewModel\Adminhtml\AutomationsForm::refusedMessage()) ?></div>
+        </div>
+    </div>
+<?php else: ?>
+    <?php $loadError = $viewModel->getLoadError(); ?>
+    <?php if ($loadError !== null): ?>
+    <div class="smaily-banner smaily-banner--warning">
+        <span class="smaily-banner__icon">&#9888;</span>
+        <div class="smaily-banner__body">
+            <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('Could not load the automation catalog')) ?></div>
+            <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('%1 Your saved automations are unchanged.', $loadError)) ?></div>
+        </div>
+    </div>
+    <?php endif; ?>
+    <?php $workflows = $viewModel->getWorkflows(); ?>
+    <?php $workflowIds = array_map(static fn ($w) => (string)$w['id'], $workflows); ?>
+    <p class="note"><?= $escaper->escapeHtml(__('These automations run inside the Campaign Intelligence engine and fire the mapped Smaily workflow. Every trigger starts disabled and in test mode — nothing reaches real customers without your explicit action.')) ?></p>
+    <div class="smaily-engine-triggers" id="smaily-engine-automations-table">
+        <?php foreach ($viewModel->getRows() as $row): ?>
+            <?php
+            $key = $escaper->escapeHtmlAttr($row['key']);
+            if (!$row['enabled']) {
+                $modeClass = 'is-off';
+                $pillVariant = 'off';
+                $pillLabel = __('Off');
+            } elseif ($row['test_mode']) {
+                $modeClass = 'is-test';
+                $pillVariant = 'test';
+                $pillLabel = __('Test mode');
+            } else {
+                $modeClass = 'is-active';
+                $pillVariant = 'active';
+                $pillLabel = __('Active');
+            }
+            ?>
+            <div class="smaily-engine-trigger <?= /* @noEscape */ $modeClass ?>" data-trigger="<?= /* @noEscape */ $key ?>">
+                <input type="hidden" data-field="language_mode" value="<?= $escaper->escapeHtmlAttr($row['language_mode']) ?>"/>
+                <input type="hidden" data-field="original_map" value="<?= $escaper->escapeHtmlAttr($row['original_map']) ?>"/>
+                <div class="smaily-engine-trigger__top">
+                    <div class="smaily-engine-trigger__head">
+                        <div class="smaily-engine-trigger__name-row">
+                            <span class="smaily-engine-trigger__name"><?= $escaper->escapeHtml($row['name']) ?></span>
+                            <span class="smaily-pill smaily-pill--<?= $escaper->escapeHtmlAttr($pillVariant) ?>"><span class="smaily-pill__dot"></span><?= $escaper->escapeHtml($pillLabel) ?></span>
+                        </div>
+                        <div class="smaily-engine-trigger__desc"><?= $escaper->escapeHtml($row['description']) ?></div>
+                        <div class="smaily-engine-trigger__controls" style="margin-top:8px;">
+                            <span class="smaily-engine-trigger__ctrl"><label><input type="checkbox" data-field="enabled" <?= $row['enabled'] ? 'checked' : '' ?>/> <?= $escaper->escapeHtml(__('Enabled')) ?></label></span>
+                            <span class="smaily-engine-trigger__ctrl"><label><input type="checkbox" data-field="test_mode" <?= $row['test_mode'] ? 'checked' : '' ?>/> <?= $escaper->escapeHtml(__('Test mode')) ?></label></span>
+                        </div>
+                        <?php // The go-live step (PRO-3734): the engine keeps a trigger in test
+                            // mode until a Smaily operator switches real sends on. ?>
+                        <div class="smaily-engine-trigger__hint"<?= $modeClass === 'is-active' ? ' hidden' : '' ?>><?= $escaper->escapeHtml(__('Smaily switches real sends on after you confirm. Until then the trigger runs in test mode.')) ?></div>
+                    </div>
+                    <div class="smaily-engine-trigger__controls">
+                        <label class="smaily-engine-trigger__ctrl">
+                            <span><?= $escaper->escapeHtml(__('Smaily Workflow')) ?></span>
+                            <select data-field="workflow_id" style="min-width:16rem;">
+                                <option value=""><?= $escaper->escapeHtml(__('-- Not Selected --')) ?></option>
+                                <?php foreach ($workflows as $workflow): ?>
+                                    <option value="<?= (int)$workflow['id'] ?>"
+                                        <?= (string)$workflow['id'] === $row['workflow_id'] ? 'selected' : '' ?>>
+                                        <?= $escaper->escapeHtml($workflow['title']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                                <?php // Saved workflow missing from the current Smaily list: keep it
+                                    // as a selected option so the binding is visible and survives the
+                                    // save (the server also refuses to drop it — PRO-1268).
+                                if ($row['workflow_id'] !== '' && !in_array($row['workflow_id'], $workflowIds, true)): ?>
+                                    <option value="<?= $escaper->escapeHtmlAttr($row['workflow_id']) ?>" selected>
+                                        <?= $escaper->escapeHtml(
+                                            __('Workflow #%1 (not in your Smaily list — kept)', $row['workflow_id'])
+                                        ) ?>
+                                    </option>
+                                <?php endif; ?>
+                            </select>
+                        </label>
+                        <label class="smaily-engine-trigger__ctrl">
+                            <span><?= $escaper->escapeHtml(__('Cooldown (days)')) ?></span>
+                            <input type="number" min="1" max="365" style="width: 6rem;"
+                                   data-field="cooldown_days" value="<?= (int)$row['cooldown_days'] ?>"/>
+                        </label>
+                        <label class="smaily-engine-trigger__ctrl">
+                            <span><?= $escaper->escapeHtml(__('Daily Cap')) ?></span>
+                            <input type="number" min="1" max="100000" style="width: 12rem;"
+                                   data-field="daily_cap"
+                                   value="<?= $row['daily_cap'] === null ? '' : (int)$row['daily_cap'] ?>"
+                                   placeholder="<?= $escaper->escapeHtmlAttr(__('No cap')) ?>"/>
+                        </label>
+                        <label class="smaily-engine-trigger__ctrl">
+                            <span><?= $escaper->escapeHtml(__('Test Emails')) ?></span>
+                            <input type="text" style="width: 26rem;" data-field="test_emails"
+                                   value="<?= $escaper->escapeHtmlAttr($row['test_emails']) ?>"
+                                   placeholder="a@example.com, b@example.com"/>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    </div>
+    <div class="smaily-tab-footer">
+        <button type="button" id="smaily-engine-automations-save" class="action-primary">
+            <span><?= $escaper->escapeHtml(__('Save Intelligence Automations')) ?></span>
+        </button>
+        <span id="smaily-engine-automations-result" class="smaily-inline-status"></span>
+    </div>
+    <script>
+    require(['jquery'], function ($) {
+        'use strict';
+        // Strings translated server-side with __(): $t() inside phtml inline
+        // scripts is never collected into js-translation.json.
+
+        // Client-side validation (PRO-1401): a workflow is required once a
+        // trigger is Enabled. Errors are field-level (danger on the offending
+        // row's Workflow select) and summarised in a top banner with a count —
+        // valid rows are left untouched. Clears on every attempt.
+        function clearValidation() {
+            $('#smaily-engine-automations-errors').remove();
+            $('#smaily-engine-automations-table .smaily-engine-trigger__ctrl')
+                .removeClass('is-invalid').find('.smaily-engine-trigger__field-error').remove();
+        }
+
+        function validate() {
+            clearValidation();
+            var invalid = 0;
+            $('#smaily-engine-automations-table .smaily-engine-trigger').each(function () {
+                var $row = $(this);
+                var enabled = $row.find('[data-field="enabled"]').is(':checked');
+                var $workflow = $row.find('[data-field="workflow_id"]');
+                if (enabled && !$workflow.val()) {
+                    invalid += 1;
+                    $workflow.closest('.smaily-engine-trigger__ctrl').addClass('is-invalid')
+                        .append($('<div class="smaily-engine-trigger__field-error"></div>')
+                            .text('<?= $escaper->escapeJs(__('A workflow is required when this trigger is enabled.')) ?>'));
+                }
+            });
+            if (invalid > 0) {
+                var msg = '<?= $escaper->escapeJs(__('%1 automation(s) could not be saved. Pick a Smaily workflow for every enabled trigger, then save again.')) ?>'
+                    .replace('%1', invalid);
+                $('<div class="smaily-banner smaily-banner--error" id="smaily-engine-automations-errors">' +
+                    '<span class="smaily-banner__icon">&#9888;</span><div class="smaily-banner__body">' +
+                    '<div class="smaily-banner__message"></div></div></div>')
+                    .find('.smaily-banner__message').text(msg).end()
+                    .insertBefore('#smaily-engine-automations-table');
+            }
+            return invalid === 0;
+        }
+
+        // After a save, every card shows the state the engine stored (§12),
+        // not the one requested: a trigger asking for real sends stays in
+        // test mode until Smaily switches them on (PRO-3734). Returns true
+        // when a trigger asked for real sends and the engine kept test mode.
+        var goLiveNote = '<?= $escaper->escapeJs(__('Smaily switches real sends on after you confirm. Until then the trigger runs in test mode.')) ?>',
+            pills = {
+                'off': '<?= $escaper->escapeJs(__('Off')) ?>',
+                'test': '<?= $escaper->escapeJs(__('Test mode')) ?>',
+                'active': '<?= $escaper->escapeJs(__('Active')) ?>'
+            };
+
+        function showStoredStates(states) {
+            var keptInTest = false;
+            $('#smaily-engine-automations-table .smaily-engine-trigger').each(function () {
+                var $card = $(this),
+                    state = states[$card.data('trigger')];
+                if (!state) {
+                    return;
+                }
+                var $enabled = $card.find('[data-field="enabled"]'),
+                    $testMode = $card.find('[data-field="test_mode"]'),
+                    mode = !state.enabled ? 'off' : (state.test_mode ? 'test' : 'active');
+                if ($enabled.is(':checked') && !$testMode.is(':checked') && mode === 'test') {
+                    keptInTest = true;
+                }
+                $enabled.prop('checked', state.enabled);
+                $testMode.prop('checked', state.test_mode);
+                $card.removeClass('is-off is-test is-active').addClass('is-' + mode);
+                $card.find('.smaily-pill')
+                    .removeClass('smaily-pill--off smaily-pill--test smaily-pill--active')
+                    .addClass('smaily-pill--' + mode)
+                    .contents().last().replaceWith(document.createTextNode(pills[mode]));
+                $card.find('.smaily-engine-trigger__hint').prop('hidden', mode === 'active');
+            });
+            return keptInTest;
+        }
+
+        $('#smaily-engine-automations-save').on('click', function () {
+            if (!validate()) {
+                $('#smaily-engine-automations-result')
+                    .text('<?= $escaper->escapeJs(__('Saving failed.')) ?>').css('color', '#e22626');
+                return;
+            }
+            var params = new URLSearchParams();
+            params.set('form_key', window.FORM_KEY);
+            $('#smaily-engine-automations-table .smaily-engine-trigger').each(function () {
+                var key = $(this).data('trigger'),
+                    prefix = 'triggers[' + key + ']';
+
+                $(this).find('[data-field]').each(function () {
+                    var field = $(this).data('field');
+
+                    if ($(this).is(':checkbox')) {
+                        if ($(this).is(':checked')) {
+                            params.set(prefix + '[' + field + ']', '1');
+                        }
+                    } else {
+                        params.set(prefix + '[' + field + ']', $(this).val() || '');
+                    }
+                });
+            });
+
+            var $result = $('#smaily-engine-automations-result');
+            $result.text('<?= $escaper->escapeJs(__('Saving…')) ?>').css('color', '');
+            fetch('<?= $escaper->escapeJs($saveUrl) ?>', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: params.toString()
+            }).then(function (response) { return response.json(); }).then(function (data) {
+                if (data.saved) {
+                    clearValidation();
+                    var message = '<?= $escaper->escapeJs(__('Saved.')) ?>';
+                    if (!data.states) {
+                        message = '<?= $escaper->escapeJs(__('Saved. Reload the page to see the state of each trigger.')) ?>';
+                    } else if (showStoredStates(data.states)) {
+                        message += ' ' + goLiveNote;
+                    }
+                    $result.text(message).css('color', '#006400');
+                } else {
+                    $result.text((data.errors || []).join(' ')
+                        || '<?= $escaper->escapeJs(__('Saving failed.')) ?>').css('color', '#e22626');
+                }
+            }).catch(function () {
+                $result.text('<?= $escaper->escapeJs(__('Saving failed.')) ?>').css('color', '#e22626');
+            });
+        });
+    });
+    </script>
+<?php endif; ?>
+</div>

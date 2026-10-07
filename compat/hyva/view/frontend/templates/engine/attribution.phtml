@@ -1,0 +1,26 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Hyvä variant of the attribution bootstrap. No RequireJS / x-magento-init:
+ * the config travels in an inert application/json block and the logic lives
+ * in a static same-origin JS file — CSP-safe with no inline executable
+ * script at all, so it needs no whitelisting under strict CSP.
+ *
+ * @var \Magento\Framework\View\Element\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\EngineState $viewModel */
+$viewModel = $block->getData('view_model');
+if (!$viewModel->isAttributionActive()) {
+    return;
+}
+?>
+<script type="application/json" id="smaily-attribution-config">
+    <?= /* @noEscape */ $viewModel->getAttributionConfigJson() ?>
+</script>
+<script defer
+        src="<?= $escaper->escapeUrl($block->getViewFileUrl('Hyva_SmailyConnect::js/smaily-attribution.js')) ?>">
+</script>

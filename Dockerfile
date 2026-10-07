@@ -62,7 +62,7 @@ USER www-data
 
 # Download and install Magento.
 ENV MAGENTO_VERSION 2.4.8-p4
-RUN composer create-project magento/community-edition=${MAGENTO_VERSION} ./ \
+RUN composer create-project --repository=https://mirror.mage-os.org/ --add-repository magento/project-community-edition=${MAGENTO_VERSION} ./ \
     && chmod +x bin/magento \
     && git clone https://github.com/magento/magento2-sample-data.git /sample-data \
     && git -C /sample-data checkout ${MAGENTO_VERSION}

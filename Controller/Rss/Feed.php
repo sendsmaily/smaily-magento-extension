@@ -1,296 +1,105 @@
 <?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
 
-namespace Smaily\SmailyForMagento\Controller\Rss;
+declare(strict_types=1);
 
-use Smaily\SmailyForMagento\Helper\Data;
-use Smaily\SmailyForMagento\Model\XML;
+namespace Smaily\Connect\Controller\Rss;
 
-class Feed extends \Magento\Framework\App\Action\Action
+use Magento\Framework\App\Action\HttpGetActionInterface;
+use Magento\Framework\App\RequestInterface;
+use Magento\Framework\Controller\Result\Raw;
+use Magento\Framework\Controller\Result\RawFactory;
+use Magento\Store\Model\StoreManagerInterface;
+use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Rss\FeedBuilder;
+
+/**
+ * Public product RSS feed at smaily/rss/feed (legacy-compatible route).
+ *
+ * Query parameters: category (category ID), limit (1-250, default 50),
+ * sort (created_at|updated_at|name|price), order (asc|desc). Standard
+ * Magento store resolution applies, so per-store feeds use the store's
+ * base URL or ?___store=.
+ */
+class Feed implements HttpGetActionInterface
 {
-    const SMLY_NAMESPACE_XSD = 'https://sendsmaily.net/schema/editor/rss.xsd';
+    private const CACHE_LIFETIME_SECONDS = 900;
 
-    const RSS_DATE_FORMAT = 'r';
-
-    protected $categoryCollectionFactory;
-    protected $configurableProductType;
-    protected $dataHelper;
-    protected $pricingHelper;
-    protected $productCollectionFactory;
-    protected $productRepository;
-    protected $storeManager;
-    protected $taxHelper;
-
-    /**
-     * Class constructor.
-     *
-     * @access public
-     * @return void
-     */
     public function __construct(
-        \Magento\Catalog\Api\ProductRepositoryInterface $productRepository,
-        \Magento\Catalog\Model\ResourceModel\Category\CollectionFactory $categoryCollectionFactory,
-        \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory $productCollectionFactory,
-        \Magento\ConfigurableProduct\Model\ResourceModel\Product\Type\Configurable $configurableProductType,
-        \Magento\Framework\App\Action\Context $context,
-        \Magento\Framework\Pricing\Helper\Data $pricingHelper,
-        \Magento\Store\Model\StoreManagerInterface $storeManager,
-        \Magento\Tax\Model\Calculation $taxHelper,
-        Data $dataHelper
+        private readonly RequestInterface $request,
+        private readonly RawFactory $rawFactory,
+        private readonly StoreManagerInterface $storeManager,
+        private readonly FeedBuilder $feedBuilder,
+        private readonly Config $config,
+        private readonly \Magento\Framework\App\CacheInterface $cache
     ) {
-        $this->categoryCollectionFactory = $categoryCollectionFactory;
-        $this->configurableProductType = $configurableProductType;
-        $this->pricingHelper = $pricingHelper;
-        $this->productCollectionFactory = $productCollectionFactory;
-        $this->productRepository = $productRepository;
-        $this->storeManager = $storeManager;
-        $this->taxHelper = $taxHelper;
-        $this->dataHelper = $dataHelper;
-
-        parent::__construct($context);
     }
 
     /**
-     * Serve content.
-     *
-     * @access public
-     * @return void
+     * @inheritDoc
      */
-    public function execute()
+    public function execute(): Raw
     {
-        $categoryName = strip_tags($this->getRequest()->getparam('category', ''));
-        $limit = (int) $this->getRequest()->getParam('limit');
+        $result = $this->rawFactory->create();
 
-        // Normalize limit. NULL value will not apply limit.
-        $limit = $limit > 0 ? $limit : null;
+        if (!$this->config->isRssEnabled()) {
+            $result->setHttpResponseCode(404);
+            $result->setContents('');
 
-        if (!empty($categoryName)) {
-            $products = $this->getProductsByCategoryName($categoryName, $limit);
-        } else {
-            $products = $this->getLatestProducts($limit);
+            return $result;
         }
 
-        return $this->getResponse()
-            ->setHeader('Content-Type', 'text/xml')
-            ->setBody($this->generateRssFeed($products)->asXML());
-    }
-
-    /**
-     * Compile RSS feed.
-     *
-     * @param \Magento\Catalog\Model\ResourceModel\Product\Collection $products
-     * @access private
-     * @return \Smaily\SmailyForMagento\Model\XML
-     */
-    private function generateRssFeed(\Magento\Catalog\Model\ResourceModel\Product\Collection $products)
-    {
+        $categoryParam = $this->request->getParam('category');
+        $categoryId = is_numeric($categoryParam) ? (int)$categoryParam : null;
+        // A value that is not a single string (?limit[]=1) counts as absent.
+        [$limit, $sort, $order] = FeedBuilder::normalize(
+            (int)$this->stringParam('limit'),
+            $this->stringParam('sort'),
+            $this->stringParam('order')
+        );
         $store = $this->storeManager->getStore();
-        $baseUrl = $store->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_WEB);
-        $mediaUrl = $store->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_MEDIA);
 
-        $feed = $this->createRssRoot();
-
-        // Setup RSS feed.
-        $channel = $feed->addChild('channel');
-        $channel->addChildWithCDATA('title', $store->getName());
-        $channel->addChildWithCDATA('link', $baseUrl);
-        $channel->addChild('description', 'Smaily RSS compatible product feed');
-        $channel->addChild('lastBuildDate', date(self::RSS_DATE_FORMAT));
-
-        // Add products to RSS feed.
-        foreach ($products as $product) {
-            /** @var \Magento\Catalog\Model\Product $product */
-            $price = $this->getPriceIncludingTax($product);
-            if ($price == 0.0) {
-                // Probably a grouped product.
-                continue;
-            }
-            $finalPrice = $this->getFinalPriceIncludingTax($product);
-            $discount = $this->calculateDiscountPercentage($product);
-            $productUrl = $this->getProductUrl($product);
-
-            // Compile feed item.
-            $item = $channel->addChild('item');
-            $item->addChildWithCDATA('title', $product->getName());
-            $item->addChildWithCDATA('link', $productUrl);
-            $item->addChildWithCData('guid', $productUrl)
-                ->addAttribute('isPermalink', 'True');
-            $item->addChild('pubDate', date(self::RSS_DATE_FORMAT, strtotime($product->getCreatedAt())));
-            $item->addChildWithCDATA('description', $product->getData('description'));
-            $item->addChild('enclosure')
-                ->addAttribute('url', $mediaUrl . 'catalog/product' . $product->getImage());
-
-            // Add pricing information to feed item.
-            if ($discount > 0) {
-                $formattedFinalPrice = $this->pricingHelper->currencyByStore($finalPrice, $store, true, false);
-                $formattedPrice = $this->pricingHelper->currencyByStore($price, $store, true, false);
-
-                $item->addChild('price', $formattedFinalPrice, self::SMLY_NAMESPACE_XSD);
-                $item->addChild('old_price', $formattedPrice, self::SMLY_NAMESPACE_XSD);
-                $item->addChild('discount', $discount . '%', self::SMLY_NAMESPACE_XSD);
-            } else {
-                $formattedPrice = $this->pricingHelper->currencyByStore($price, $store, true, false);
-                $item->addChild('price', $formattedPrice, self::SMLY_NAMESPACE_XSD);
-            }
+        // Server-side cache: the feed is unauthenticated and rebuilding it
+        // loads up to 250 products, so requests for the same feed must not hit
+        // the DB — keyed by the normalized values, so varying an invalid
+        // parameter cannot bypass the cache.
+        $cacheKey = 'smaily_rss_' . sha1(implode('|', [
+            (int)$store->getId(),
+            (string)$categoryId,
+            $limit,
+            $sort,
+            $order,
+        ]));
+        $xml = $this->cache->load($cacheKey);
+        if ($xml === false) {
+            $xml = $this->feedBuilder->build($store, $categoryId, $limit, $sort, $order);
+            $this->cache->save($xml, $cacheKey, [], self::CACHE_LIFETIME_SECONDS);
         }
 
-        return $feed;
+        $result->setHeader('Content-Type', 'application/rss+xml; charset=UTF-8', true);
+        $result->setHeader(
+            'Cache-Control',
+            sprintf('public, max-age=%d', self::CACHE_LIFETIME_SECONDS),
+            true
+        );
+        $result->setContents($xml);
+
+        return $result;
     }
 
     /**
-     * Fetch list of latest products.
-     *
-     * @param int|null $limit
-     * @access protected
-     * @return \Magento\Catalog\Model\ResourceModel\Product\Collection
-     */
-    protected function getLatestProducts($limit = 50)
-    {
-        return $this->productCollectionFactory->create()
-            ->addAttributeToSelect('*')
-            ->addAttributeToSort('created_at', 'DESC')
-            ->setPageSize($limit)
-            ->load();
-    }
-
-    /**
-     * Fetch list of products by category name.
+     * A query value as a string; one that is not a single string counts as absent.
      *
      * @param string $name
-     * @param int|null $limit
-     * @access protected
-     * @return \Magento\Catalog\Model\ResourceModel\Product\Collection
+     * @return string
      */
-    protected function getProductsByCategoryName($name, $limit = 50)
+    private function stringParam(string $name): string
     {
-        $collection = $this->categoryCollectionFactory->create()
-            ->addAttributeToFilter('name', ['like' => $name])
-            ->addAttributeToSort('name', 'ASC')
-            ->setPageSize(1)
-            ->load();
+        $value = $this->request->getParam($name);
 
-        if ($collection->count() === 0) {
-            return $this->productCollectionFactory->create()
-                ->addFieldToFilter('entity_id', 0);
-        }
-
-        return $collection->getFirstItem()
-            ->getProductCollection()
-            ->addAttributeToSelect('*')
-            ->addAttributeToSort('created_at', 'DESC')
-            ->setPageSize($limit)
-            ->load();
-    }
-
-    /**
-     * Create RSS feed root element.
-     *
-     * @access protected
-     * @return \Smaily\SmailyForMagento\Model\XML
-     */
-    protected function createRssRoot()
-    {
-        $namespace = self::SMLY_NAMESPACE_XSD;
-        $rss = <<<XML
-<?xml version="1.0" encoding="utf-8"?>
-<rss xmlns:smly="{$namespace}" version="2.0">
-</rss>
-XML;
-        return new XML($rss);
-    }
-
-    /**
-     * Get product price including tax.
-     *
-     * @param \Magento\Catalog\Model\Product $product
-     * @return float
-     */
-    private function getPriceIncludingTax($product)
-    {
-        $priceExclTax = $product->getPrice();
-        $taxClassId = $product->getTaxClassId();
-
-        $taxRequest = $this->taxHelper->getRateRequest();
-        $taxRequest->setProductClassId($taxClassId);
-
-        $taxRate = $this->taxHelper->getRate($taxRequest);
-        $taxAmount = $this->taxHelper->calcTaxAmount(
-            $priceExclTax,
-            $taxRate,
-        );
-
-        return $priceExclTax + $taxAmount;
-    }
-
-    /**
-     * Get product final price including tax.
-     *
-     * @param \Magento\Catalog\Model\Product $product
-     * @return float
-     */
-    private function getFinalPriceIncludingTax($product)
-    {
-        $finalPrice = $product->getFinalPrice();
-
-        if ($finalPrice == 0.0) {
-            return 0.0;
-        }
-
-        $taxClassId = $product->getTaxClassId();
-        $taxRequest = $this->taxHelper->getRateRequest();
-        $taxRequest->setProductClassId($taxClassId);
-
-        $taxRate = $this->taxHelper->getRate($taxRequest);
-        $taxAmount = $this->taxHelper->calcTaxAmount(
-            $finalPrice,
-            $taxRate,
-        );
-
-        return $finalPrice + $taxAmount;
-    }
-
-    /**
-     * Calculate product discount percentage.
-     *
-     * @param \Magento\Catalog\Model\Product $product
-     * @return int
-     */
-    private function calculateDiscountPercentage($product)
-    {
-        $price = $product->getPrice();
-
-        if ($price == 0.0) {
-            return 0;
-        }
-
-        $finalPrice = $product->getFinalPrice();
-
-        if ($finalPrice >= $price || $finalPrice == 0.0) {
-            return 0;
-        }
-
-        return ceil(($price - $finalPrice) / $price * 100);
-    }
-
-    /**
-     * Get the product URL.
-     *
-     * @param \Magento\Catalog\Model\Product $product
-     */
-    private function getProductURL($product)
-    {
-        $url = $product->getProductUrl();
-
-        // Magento shows URL that results in 404 for products that are not visible.
-        // We want to return the parent product URL instead, so that the link is valid.
-        if (!$product->isVisibleInSiteVisibility()) {
-            $parentIds = $this->configurableProductType->getParentIdsByChild($product->getId());
-            if (count($parentIds) > 0) {
-                $parentId = $parentIds[0]; // Get the first parent ID
-                $parentProduct = $this->productRepository->getById($parentId);
-                return $parentProduct->getProductUrl();
-            }
-        }
-
-        return $url;
+        return is_string($value) ? $value : '';
     }
 }

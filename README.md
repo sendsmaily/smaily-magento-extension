@@ -1,6 +1,6 @@
 # Smaily Connect for Magento 2
 
-[![CI](https://github.com/erkkimarkus/magento-connect/actions/workflows/ci.yaml/badge.svg?branch=v3)](https://github.com/erkkimarkus/magento-connect/actions/workflows/ci.yaml)
+[![CI](https://github.com/sendsmaily/smaily-magento-extension/actions/workflows/ci.yaml/badge.svg?branch=master)](https://github.com/sendsmaily/smaily-magento-extension/actions/workflows/ci.yaml)
 
 [Smaily](https://smaily.com) email marketing, automations and Campaign
 Intelligence for Magento 2, Adobe Commerce and Mage-OS. Feature-aligned
@@ -52,21 +52,21 @@ the ZIP — `sha256sum -c smaily-connect-magento2.zip.sha256` confirms you
 downloaded the archive we built.
 
 **Upgrading from 2.8.x?** It's seamless — settings migrate automatically.
-See [UPGRADING.md](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/UPGRADING.md).
+See [UPGRADING.md](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/UPGRADING.md).
 
 ## Documentation
 
 | | |
 |---|---|
-| [User Guide](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/USER_GUIDE.md) | Setup, every setting explained, CLI reference, FAQ |
-| [Installing from the ZIP](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/INSTALLING.md) | Manual install without composer: verify, extract, set up, update, remove |
-| [Upgrading](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/UPGRADING.md) | Migrating from Smaily for Magento 2.8.x |
-| [Architecture](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/ARCHITECTURE.md) | How the module works inside (for developers) |
-| [Hyvä Support](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/HYVA_SUPPORT.md) | Hyvä theme compatibility: audit, compat module, verification results |
-| [Headless Storefronts](https://github.com/erkkimarkus/magento-connect/blob/v3/docs/HEADLESS_STOREFRONTS.md) | What works with a separate storefront application, and what its team must add |
-| [Testing](https://github.com/erkkimarkus/magento-connect/blob/v3/TESTING.md) | Test suites, sandbox, upgrade verification |
-| [Contributing](https://github.com/erkkimarkus/magento-connect/blob/v3/CONTRIBUTING.md) | Development environment and quality gates |
-| [Backlog](https://github.com/erkkimarkus/magento-connect/blob/v3/BACKLOG.md) | Known deferred work |
+| [User Guide](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/USER_GUIDE.md) | Setup, every setting explained, CLI reference, FAQ |
+| [Installing from the ZIP](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/INSTALLING.md) | Manual install without composer: verify, extract, set up, update, remove |
+| [Upgrading](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/UPGRADING.md) | Migrating from Smaily for Magento 2.8.x |
+| [Architecture](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/ARCHITECTURE.md) | How the module works inside (for developers) |
+| [Hyvä Support](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/HYVA_SUPPORT.md) | Hyvä theme compatibility: audit, compat module, verification results |
+| [Headless Storefronts](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/HEADLESS_STOREFRONTS.md) | What works with a separate storefront application, and what its team must add |
+| [Testing](https://github.com/sendsmaily/smaily-magento-extension/blob/master/TESTING.md) | Test suites, sandbox, upgrade verification |
+| [Contributing](https://github.com/sendsmaily/smaily-magento-extension/blob/master/CONTRIBUTING.md) | Development environment and quality gates |
+| [Backlog](https://github.com/sendsmaily/smaily-magento-extension/blob/master/BACKLOG.md) | Known deferred work |
 
 ## Quick start
 
@@ -99,6 +99,6 @@ docker compose up -d      # Magento 2.4.8 sandbox on http://localhost:8080
 
 GPL-3.0 — see [LICENSE.txt](LICENSE.txt).
 
-Legacy note: the 2.8.x extension (`Smaily_SmailyForMagento`) lives on the
-[`master`](https://github.com/sendsmaily/smaily-magento-extension/tree/master)
-branch.
+Legacy note: the 2.8.x extension (`Smaily_SmailyForMagento`) is no longer
+developed. Its releases stay available under their tags, the last one
+[`2.8.1`](https://github.com/sendsmaily/smaily-magento-extension/tree/2.8.1).

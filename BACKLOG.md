@@ -89,8 +89,7 @@ executed verification matrix (Luma / Hyvä / strict CSP — all pass) in
 
 ## Upstream
 
-- Coordinate with Smaily: staged review of the v3 branch, Marketplace
-  re-submission (product name "Smaily Connect"), transfer of the release
-  pipeline. The composer package name `smaily/smailyformagento` is kept so
+- Marketplace re-submission (product name "Smaily Connect") and the fate of
+  the existing listing. The composer package name `smaily/smailyformagento` is kept so
   existing installs upgrade via plain `composer update`. The full proposal
   package is drafted in [docs/UPSTREAM_PROPOSAL.md](docs/UPSTREAM_PROPOSAL.md).

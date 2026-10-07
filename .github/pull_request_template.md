@@ -1,27 +1,16 @@
-**Version changelog**
+**What changes and why**
 
-- Short description of the new feature or fix - [[#issue-or-PR-number](link-to-issue-or-PR)]
-- Short description of the new feature or fix - [[#issue-or-PR-number](link-to-issue-or-PR)]
+The problem this solves and what the change does about it. Pull requests are
+squash-merged: this title and description become the commit on `master`.
 
-**Release checklist**
+**Checklist**
 
-- [ ] Added `release` label to this pull request
-- [ ] Updated README.md
-- [ ] Updated CHANGELOG.md
-- [ ] Updated composer.json
-- [ ] Updated plugin version number
-- [ ] Updated screenshots in assets folder
-- [ ] Updated translations
-- [ ] Updated USERGUIDE.md
-- [ ] Ran pre-release checks. [Testing module before submitting for review](https://github.com/sendsmaily/smaily-magento-extension/blob/master/CONTRIBUTING.md#testing-module-before-submitting-for-review)
+- [ ] CI is green (unit, integration, phpcs, phpstan, PHP 8.1 syntax, JS harnesses, release ZIP)
+- [ ] `CHANGELOG.md` has an entry under the unreleased version (merchant-visible changes)
+- [ ] `docs/USER_GUIDE.md` and the other docs describe the new behaviour
+- [ ] New settings have `etc/config.xml` defaults (and a `LegacyConfigMapper` mapping when they replace a 2.8.x option)
 
-**After PR merge**
+**Version cut only**
 
-- [ ] Create a release
-- [ ] Submit built release ZIP-file for Magento review
-
-> When Magento should reject the code review, then create a patch and re-release the version in GitHub.
-
-**After acceptance in Magento Marketplace**
-
-- [ ] Pinged code owners to inform marketing about new version
+- [ ] `composer.json` `version`, `Model/ModuleInfo.php` and the `CHANGELOG.md` heading name the new version
+- [ ] After the merge: publish a GitHub release whose tag is the plain version (`3.0.0`, no `v`); a release candidate is published as a pre-release. The release workflow builds and attaches the ZIP and its `.sha256`.

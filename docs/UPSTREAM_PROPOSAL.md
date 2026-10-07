@@ -4,12 +4,14 @@
 `smaily/smailyformagento` composer package and the Magento Marketplace listing.
 **From:** the fork (`erkkimarkus/magento-connect`), branch `v3`, at **3.0.0-rc8**
 (a GitHub pre-release on the fork).
-**Status:** proposal / decision request. Nothing irreversible has been done — no
-composer release published, no Marketplace submission. 3.0.0-rc1 to 3.0.0-rc8 are GitHub
-pre-releases on the fork, with a ZIP for manual installs; the
-upstream repository has no release of the rewrite.
-This document makes the case, lays out a staged review and hand-over plan, and ends
-with the concrete go/no-go decisions.
+**Status:** accepted (2026-10-07). The rewrite moves into
+`sendsmaily/smaily-magento-extension` as one squash-merged pull request into
+`master`; development continues there and the fork is archived (§5, §7).
+3.0.0-rc1 to 3.0.0-rc8 are GitHub pre-releases on the fork, with a ZIP for
+manual installs; no stable composer release of the rewrite is published and
+there is no Marketplace submission yet.
+This document makes the case, describes the move and lists the decisions it
+rests on.
 
 ---
 
@@ -62,10 +64,12 @@ For a store on 2.8.x the upgrade is a normal `composer update` +
 - The merchant-facing upgrade path, including the few deliberate behavior changes
   to review, is documented in [UPGRADING.md](UPGRADING.md).
 
-## 3. Proposed staged review
+## 3. Review guide
 
-Rather than one monolithic review, we suggest four passes in this order — each is
-independently checkable and front-loads the highest-risk surfaces:
+The move does not wait for a separate staged review: the rewrite's maintainer
+maintains it in the official repository. For anyone reading the code, these four
+passes in this order are the recommended route — each is independently checkable
+and front-loads the highest-risk surfaces:
 
 1. **Wire contract** — [`RECENGINE_API_CONTRACT.md`](RECENGINE_API_CONTRACT.md)
    (v1.12.0, byte-synced across the Smaily connect repositories, drift guarded by a
@@ -99,8 +103,8 @@ docker compose up -d                                 # full Magento 2.4.8 sandbo
 
 Review artifacts available today: this proposal, [ARCHITECTURE.md](ARCHITECTURE.md)
 (how the module works inside), [USER_GUIDE.md](USER_GUIDE.md) (every setting
-explained), [UPGRADING.md](UPGRADING.md), [TESTING.md](../TESTING.md), the CI runs
-on the `v3` branch, and [BACKLOG.md](../BACKLOG.md) (known deferred work, stated
+explained), [UPGRADING.md](UPGRADING.md), [TESTING.md](../TESTING.md), the CI runs,
+and [BACKLOG.md](../BACKLOG.md) (known deferred work, stated
 openly).
 
 ## 4. Marketplace re-submission as "Smaily Connect"
@@ -116,7 +120,7 @@ the new name rather than a version bump of the old one. Proposed split:
 | Package manifest — `composer validate`, declared Magento dependencies, `type`/`autoload`/`license` | fork | ✅ checked, see below |
 | Public documentation set (README, User Guide, Upgrading, screenshots for the listing) | fork | ✅ docs done, published on GitHub (not inside the ZIP — see below); listing screenshots to be produced at submission |
 | Listing copy + name/branding decision ("Smaily Connect") | Smaily | ⏳ Smaily-owned |
-| Marketplace account, submission, EQP review cycle, responding to reviewer feedback | Smaily | ⏳ Smaily-owned (same flow as today's releases — see `.github/pull_request_template.md`) |
+| Marketplace account, submission, EQP review cycle, responding to reviewer feedback | Smaily | ⏳ Smaily-owned |
 | Decide fate of the existing listing (deprecate in favor of the new one vs. parallel run) | Smaily | ⏳ decision needed |
 
 **Pre-check results** (run locally at 3.0.0-rc1, 2026-09-10 — all of it repeatable
@@ -157,35 +161,43 @@ The Marketplace submission and the composer release are **independent knobs**:
 composer installs (the majority path, per the 2.8.x install docs) work as soon as
 the package version is published, regardless of Marketplace review state.
 
-## 5. Pipeline and ownership transfer
+## 5. The move into the official repository
 
-The aim is that Smaily ends up owning the code, the pipeline and the release
-button, exactly as it does today for 2.8.x.
+The code, the pipeline and the release button live in the repository Smaily
+already owns, `sendsmaily/smaily-magento-extension`.
 
-- **Repository**: two workable routes — (a) push the `v3` branch to
-  `sendsmaily/smaily-magento-extension` and make it the default branch (the fork's
-  git remotes are already set up for this; 2.8.x history is shared — the fork
-  branched from upstream `master`), or (b) transfer the fork repo wholesale and
-  archive-redirect. Route (a) keeps everything in the repo Smaily already owns and
-  is the recommendation. The legacy 2.8.x line stays available on `master` either
-  way (the README already points there).
-- **Branch policy**: `v3` is the working branch today; on adoption it becomes the
-  default, with `master` frozen as the 2.8.x maintenance line until v3 is stable.
+- **Repository**: the fork's `v3` branch reaches `master` as **one squash-merged
+  pull request**. The fork branched from upstream `master`, so the 2.8.x history
+  is shared and the pull request has no conflicts; its squash is exactly the v3
+  tree. The fork is then archived read-only — its pre-releases rc1–rc8 stay
+  readable as history, and nothing new is cut there.
+- **Working mode afterwards**: development continues in the official repository
+  through pull requests into `master`, squash-merged only; the pull request's
+  title and description become the commit. CI runs on every pull request and on
+  every push to `master`.
+- **The 2.8.x line** is not developed further. Its tags (up to `2.8.1`) stay;
+  there is no separate maintenance branch.
 - **Release workflow**: publishing a GitHub release builds and attaches
-  `smaily-connect-magento2.zip` (`.github/workflows/release.yaml`) — the same
-  artifact used for Marketplace submission and manual installs. No external
-  service, no secrets needed for releases. The workflow does not assemble the
-  package itself: it calls `bin/verify-release-zip.sh`, which builds it through
-  `bin/build-release-zip.sh` (the one owner of what ships) and refuses to hand
-  over an archive that is missing a required file, carries development material
-  or states the wrong version.
+  `smaily-connect-magento2.zip` and its `.sha256` (`.github/workflows/release.yaml`)
+  — the same artifact used for Marketplace submission and manual installs. No
+  external service, no secrets needed for releases. The workflow does not
+  assemble the package itself: it calls `bin/verify-release-zip.sh`, which builds
+  it through `bin/build-release-zip.sh` (the one owner of what ships) and refuses
+  to hand over an archive that is missing a required file, carries development
+  material or states the wrong version.
+- **Tags and composer**: a release is tagged with the plain version
+  (`3.0.0-rc9`, no `v` prefix). Packagist reads `smaily/smailyformagento` from this
+  repository, so every tag is a published composer version. Release candidates
+  are tagged publicly and published as GitHub pre-releases; composer installs a
+  release candidate only when the store asks for it (an explicit `3.0.0-rc…`
+  version or a minimum stability of `RC`), so a `composer update` on a 2.8.x
+  store does not pick one up.
+- **3.0.0 stable** waits for a pilot store on a release candidate.
 - **Secrets to carry over**: exactly one — `ENGINE_CONTRACT_READ_TOKEN`, a
   fine-grained PAT with `contents:read` on the Campaign Intelligence engine
   repository, used by the daily contract-staleness workflow to detect wire-contract
   drift. The workflow distinguishes "cannot check" (missing/expired token) from
   "contract stale", so a lapsed token is loud, not silent.
-- **Composer publishing**: stays with Smaily (the `smaily/smailyformagento`
-  package is Smaily's); the fork never publishes.
 
 ## 6. Open items, stated honestly
 
@@ -213,26 +225,27 @@ button, exactly as it does today for 2.8.x.
   release package is built and verified on every push (§4), and the sandbox is
   clean.
 
-## 7. Decision checklist
+## 7. Decisions
 
-These are the one-way doors, in the recommended order. Everything before a given
-door is reversible; each door is cheap to hold and expensive to walk back.
+Decided 2026-10-07:
 
-1. **Share the fork with Smaily and start the staged review** (§3). First move;
-   costs nothing irreversible, unlocks everything else.
-2. **Live engine-tenant click-through** (§6) — the Smaily-account half is done;
+1. **Move the rewrite into `sendsmaily/smaily-magento-extension` now** (§5): one
+   squash-merged pull request from the fork's `v3` into `master`, no separate
+   staged review; the fork is archived afterwards.
+2. **Work in the official repository** through squash-merged pull requests into
+   `master`; the 2.8.x line ends at its existing tags.
+3. **Tag release candidates publicly** in the official repository (plain version
+   tags, GitHub pre-releases, listed by Packagist).
+
+Still open, in the recommended order:
+
+4. **Live engine-tenant click-through** (§6) — the Smaily-account half is done;
    a pass against a real Campaign Intelligence tenant closes the last
-   verification gap. Do before any tag.
-3. **First public GitHub release (alpha/beta tag)** — creates a downloadable ZIP.
-   Low blast radius (opt-in manual installs only), but it is the first public
-   artifact of the rewrite; do it on the upstream repo, after door 1–2.
-4. **Repo/pipeline hand-over** (§5): `v3` to `sendsmaily/smaily-magento-extension`,
-   default-branch flip, secret carried over. After this, Smaily owns the button.
-5. **Marketplace re-submission as "Smaily Connect"** (§4) — public listing under a
-   new name; Smaily-owned, needs the listing-strategy decision for the old entry.
-6. **Publish 3.0.0 stable to the composer package** — the true one-way door: once
+   verification gap.
+5. **Publish 3.0.0 stable** — the true one-way door: once
    `smaily/smailyformagento:3.0.0` is published, every existing 2.8.x install whose
    version constraint allows it picks the rewrite up on its next
    `composer update`. This ships the migration to real stores and cannot be
-   un-shipped; it goes last, after the review, the click-through and (ideally) a
-   pilot store on the tagged pre-release.
+   un-shipped; it waits for a pilot store on a release candidate.
+6. **Marketplace re-submission as "Smaily Connect"** (§4) — public listing under a
+   new name; Smaily-owned, needs the listing-strategy decision for the old entry.

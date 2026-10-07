@@ -50,7 +50,7 @@ that owns the Magento files.
 ## 1. Download and verify
 
 Every release on the
-[releases page](https://github.com/erkkimarkus/magento-connect/releases)
+[releases page](https://github.com/sendsmaily/smaily-magento-extension/releases)
 carries two files: `smaily-connect-magento2.zip` and
 `smaily-connect-magento2.zip.sha256`. Download both into the same folder
 and check the archive:

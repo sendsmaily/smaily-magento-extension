@@ -28,8 +28,8 @@ $viewModel = $block->getData('view_model');
 $showChooser = $viewModel->hasMultipleWebsites() && !$viewModel->hasSelectedWebsite();
 $websiteOptions = $viewModel->getWebsiteOptions();
 
-// Hosted on GitHub for now — update this URL once a hosted docs site exists.
-$userGuideUrl = 'https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/USER_GUIDE.md';
+// The user guide's address is set in one place, Model/UserGuide.php.
+$userGuideUrl = \Smaily\Connect\Model\UserGuide::URL;
 
 // Carries the website this run just configured through to Settings/Log so a
 // multi-website merchant lands back on the same website, not silently the

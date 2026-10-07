@@ -12,12 +12,8 @@
             <label>Smaily</label>
         </tab>
         <!--
-            Merchant documentation (user guide) for this section:
-            https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/USER_GUIDE.md
-            (hosted on GitHub for now — update the URL here, in the setup
-            wizard Done step and in Model/Adminhtml/SetupNotice.php, keeping
-            the old address in SetupNotice::PREVIOUS_URLS, once a hosted docs
-            site exists).
+            Merchant documentation (user guide) for this section: its
+            address is set in one place, Model/UserGuide.php (UserGuide::URL).
 
             Native surface removal (PRO-1461, resolves PRO-1369's config-
             architecture decision 3, docs/internal/ADMIN_UI_TARGET_SPEC.md §4): this

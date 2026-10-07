@@ -62,6 +62,26 @@ class ContactsProcessorTest extends TestCase
         $this->createProcessor($jobManager, $audience, $clientProvider, false)->process($job);
     }
 
+    /**
+     * PRO-3950: the job is taken up before the contact count, so a worker
+     * that dies counting leaves a running job the tick can set aside, not a
+     * queued one that blocks the imports behind it.
+     */
+    public function testTheJobIsTakenUpBeforeTheContactCount(): void
+    {
+        $audience = $this->createMock(ContactAudience::class);
+        $audience->method('storeIds')->willReturn([5]);
+        $audience->method('count')->willThrowException(new \RuntimeException('count died'));
+
+        $job = $this->createJob();
+        $jobManager = $this->createMock(JobManager::class);
+        $jobManager->expects(self::once())->method('markRunning')->with($job);
+
+        $this->expectExceptionMessage('count died');
+        $this->createProcessor($jobManager, $audience, $this->createMock(SmailyClientProvider::class), true)
+            ->process($job);
+    }
+
     public function testSyncSwitchedOffMidImportStopsTheJobWithoutRewritingItsTotal(): void
     {
         $clientProvider = $this->createMock(SmailyClientProvider::class);

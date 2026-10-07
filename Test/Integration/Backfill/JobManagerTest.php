@@ -8,10 +8,17 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Backfill;
 
+use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
+use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Smaily\Connect\Cron\BackfillTick;
+use Smaily\Connect\Model\Backfill\EngineCatalogProcessor;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\ProcessorInterface;
+use Smaily\Connect\Model\Engine\CatalogIngest;
+use Smaily\Connect\Model\Engine\CatalogProductLoader;
+use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
+use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
@@ -294,6 +301,70 @@ class JobManagerTest extends IntegrationTestCase
         $this->jobManager->complete($behind);
         $tick->execute();
         self::assertSame([(int)$behind->getId(), (int)$stalled->getId()], $recorder->ran, 'then the stalled one again');
+    }
+
+    /**
+     * PRO-3950: a worker that dies before the first page — here while the
+     * catalog import counts its products, the process gone before the tick
+     * could record a failure — leaves a running job, not a queued one. It
+     * keeps its place for an hour and then is set aside like any other, so
+     * the import behind it runs.
+     */
+    public function testAnImportThatDiesBeforeItsFirstPageDoesNotBlockTheImportsBehindIt(): void
+    {
+        require_once __DIR__ . '/../Support/Stub/ProductCollectionFactory.php';
+        $collection = $this->createMock(ProductCollection::class);
+        $collection->method('getSize')->willThrowException(new \RuntimeException('worker died counting'));
+        $collectionFactory = $this->createMock(ProductCollectionFactory::class);
+        $collectionFactory->method('create')->willReturn($collection);
+        $dying = new EngineCatalogProcessor(
+            $this->jobManager,
+            $collectionFactory,
+            $this->createMock(CatalogPayloadBuilder::class),
+            $this->objectManager->create(IngestQueue::class),
+            $this->createMock(CatalogIngest::class),
+            $this->createMock(CatalogProductLoader::class)
+        );
+
+        $front = $this->jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0);
+        $behind = $this->jobManager->start(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1);
+        try {
+            $dying->process($front);
+            self::fail('the count should have died');
+        } catch (\RuntimeException) {
+            // The process ends here: nothing records a failure.
+        }
+        self::assertSame(Job::STATUS_RUNNING, $this->fetchRow(self::TABLE, (int)$front->getId())['status']);
+        self::assertSame($front->getId(), $this->jobManager->nextActive()?->getId(), 'keeps its place for the hour');
+        self::assertFalse($this->jobManager->isStalled(Job::TYPE_CATALOG, Job::TARGET_ENGINE), 'not stalled yet');
+
+        $this->movedAt($front, -JobManager::STALLED_SECONDS - 1);
+        $recorder = new class ($this->jobManager) implements ProcessorInterface {
+            /** @var int[] */
+            public array $ran = [];
+
+            public function __construct(private readonly JobManager $jobManager)
+            {
+            }
+
+            public function process(Job $job): void
+            {
+                $this->ran[] = (int)$job->getId();
+                $this->jobManager->markRunning($job);
+                $this->jobManager->recordProgress($job, 1, 0, '1');
+            }
+        };
+        $tick = new BackfillTick(
+            $this->jobManager,
+            $this->createMock(EngineSettings::class),
+            $this->createMock(Logger::class),
+            ['catalog:engine' => $dying, 'contacts:smaily' => $recorder]
+        );
+
+        $tick->execute();
+        self::assertSame([(int)$behind->getId()], $recorder->ran, 'the import behind runs');
+        self::assertSame(Job::STATUS_RUNNING, $this->fetchRow(self::TABLE, (int)$front->getId())['status']);
+        self::assertTrue($this->jobManager->isStalled(Job::TYPE_CATALOG, Job::TARGET_ENGINE), 'the card says stalled');
     }
 
     public function testALoneStalledJobIsStillTakenEveryRun(): void

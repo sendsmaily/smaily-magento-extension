@@ -740,8 +740,9 @@ corrections still apply.
 The check is skipped that night, and runs again the next night, while:
 
 - Campaign Intelligence is not connected, or the account is deactivated;
-- the catalog import is running or waiting to start (an import that has
-  not moved for an hour no longer holds the check back);
+- the catalog import is running or waiting to start (a catalog import
+  that has not moved for an hour no longer holds the check back, even
+  while other imports run);
 - product changes are still waiting to be sent in the **Log**.
 
 A store with more than 50,000 enabled products cannot use the check yet:
@@ -1062,19 +1063,19 @@ and look in `var/log/smaily_connect.log` and Magento's own logs for the
 error.
 
 Imports run one at a time, oldest first. A running import that nothing
-has moved for over an hour is set aside: the imports queued behind it run
-first, and its card keeps saying **"Stalled"**, with **Run again** and
-**Cancel import**. The cron tries a set-aside import again whenever no
-other import is waiting — on every cron run once the others are done —
-so one that failed for a passing reason carries on by itself.
+has moved for over an hour — one that fails before its first page too —
+is set aside: the imports queued behind it run first, and its card keeps
+saying **"Stalled"**, with **Run again** and **Cancel import**. The cron
+tries a set-aside import again whenever no other import is waiting — on
+every cron run once the others are done — so one that failed for a
+passing reason carries on by itself.
 
 An import still queued is never set aside. When the import at the front
 of the line never gets going — no import has moved for over an hour, for
-example because it fails before its first page or because cron does not
-run — an import waiting behind it says so and names that import's card,
-for example *Settings > Contacts > Initial contact import*; press
-**Cancel import** or **Run again** there, and the waiting import follows.
-Its own card then offers only **Cancel import**.
+example because cron does not run — an import waiting behind it says so
+and names that import's card, for example *Settings > Contacts > Initial
+contact import*; press **Cancel import** or **Run again** there, and the
+waiting import follows. Its own card then offers only **Cancel import**.
 
 ## The log and troubleshooting
 

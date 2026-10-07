@@ -113,6 +113,41 @@ class EngineCatalogProcessorTest extends TestCase
     }
 
     /**
+     * PRO-3950: the job is taken up before the product count, so a worker
+     * that dies counting leaves a running job the tick can set aside, not a
+     * queued one that blocks the imports behind it.
+     */
+    public function testTheJobIsTakenUpBeforeTheProductCount(): void
+    {
+        $collection = $this->createMock(Collection::class);
+        $collection->method('getSize')->willThrowException(new \RuntimeException('count died'));
+        $collectionFactory = $this->createMock(ProductCollectionFactory::class);
+        $collectionFactory->method('create')->willReturn($collection);
+
+        $job = $this->createMock(Job::class);
+        $job->method('getData')->willReturn(null);
+
+        $jobManager = $this->createMock(JobManager::class);
+        $jobManager->expects(self::once())->method('markRunning')->with($job);
+
+        $ingestQueue = $this->createMock(IngestQueue::class);
+        $ingestQueue->method('countPending')->willReturn(0);
+        $payloadBuilder = $this->createMock(CatalogPayloadBuilder::class);
+
+        $processor = new EngineCatalogProcessor(
+            $jobManager,
+            $collectionFactory,
+            $payloadBuilder,
+            $ingestQueue,
+            $this->createMock(CatalogIngest::class),
+            new CatalogProductLoader($collectionFactory, $payloadBuilder)
+        );
+
+        $this->expectExceptionMessage('count died');
+        $processor->process($job);
+    }
+
+    /**
      * PRO-2506: the page and the count apply no product limitation. Each of
      * the methods below joins `catalog_product_website` or the price index
      * on one website (Magento's Product\Collection::_applyProductLimitations()

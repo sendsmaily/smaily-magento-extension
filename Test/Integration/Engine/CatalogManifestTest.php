@@ -189,6 +189,30 @@ class CatalogManifestTest extends IntegrationTestCase
         self::assertCount(1, $this->sent);
     }
 
+    /**
+     * PRO-3950: a catalog import the tick has set aside does not move, however
+     * busy the imports behind it keep the worker, so it holds nothing back;
+     * one queued behind an import that moves still does.
+     */
+    public function testASetAsideCatalogImportDoesNotHoldTheListBackWhileOtherImportsRun(): void
+    {
+        $jobManager = $this->objectManager->create(JobManager::class);
+        $catalog = $jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
+        $jobManager->markRunning($catalog);
+        $this->jobMovedAt((int)$catalog->getId(), -CatalogManifest::STALLED_IMPORT_SECONDS - 1);
+        $contacts = $jobManager->start(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1);
+        $jobManager->markRunning($contacts);
+        $this->jobMovedAt((int)$contacts->getId(), -30);
+
+        $this->manifest()->send();
+        self::assertCount(1, $this->sent, 'the set-aside import holds nothing back');
+
+        $jobManager->requestCancel(Job::TYPE_CATALOG, Job::TARGET_ENGINE);
+        $jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
+        $this->manifest()->send();
+        self::assertCount(1, $this->sent, 'a queued import behind one that moves still does');
+    }
+
     public function testNothingIsSentWhileSendingIsNotAllowed(): void
     {
         $this->manifest(sendingAllowed: false)->send();

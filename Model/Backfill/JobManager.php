@@ -11,6 +11,7 @@ namespace Smaily\Connect\Model\Backfill;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Smaily\Connect\Model\ResourceModel\Backfill\Job as JobResource;
+use Smaily\Connect\Model\ResourceModel\Backfill\Job\Collection;
 use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
 
 /**
@@ -113,10 +114,7 @@ class JobManager
         $collection = $this->collectionFactory->create();
         $collection->addFieldToFilter('status', ['in' => [Job::STATUS_PENDING, Job::STATUS_RUNNING]]);
         if ($skipSetAside) {
-            $collection->addFieldToFilter(
-                ['status', 'updated_at'],
-                [['eq' => Job::STATUS_PENDING], ['gteq' => $this->stalledBefore()]]
-            );
+            $this->skipSetAside($collection);
         }
         $collection->setOrder('id', 'ASC')->setPageSize(1);
         $job = $collection->getFirstItem();
@@ -131,16 +129,24 @@ class JobManager
 
     /**
      * A queued or running job of this import — for one website, or for any
-     * website when $websiteId is null.
+     * website when $websiteId is null; with $skipSetAside, one the tick has
+     * not set aside (nextActive()).
      */
-    private function firstActive(string $jobType, string $target, ?int $websiteId = null): ?Job
-    {
+    private function firstActive(
+        string $jobType,
+        string $target,
+        ?int $websiteId = null,
+        bool $skipSetAside = false
+    ): ?Job {
         $collection = $this->collectionFactory->create();
         $collection->addFieldToFilter('status', ['in' => [Job::STATUS_PENDING, Job::STATUS_RUNNING]])
             ->addFieldToFilter('job_type', $jobType)
             ->addFieldToFilter('target', $target);
         if ($websiteId !== null) {
             $collection->addFieldToFilter('website_id', ['eq' => $websiteId]);
+        }
+        if ($skipSetAside) {
+            $this->skipSetAside($collection);
         }
         $collection->setPageSize(1);
         $job = $collection->getFirstItem();
@@ -156,11 +162,13 @@ class JobManager
      * and a job it has not reached yet waits behind one it does advance. A
      * job no tick has moved for that long (a worker that dies on the same
      * page every run) counts as stalled, so it cannot hold back what waits
-     * for imports to finish forever.
+     * for imports to finish forever. A job the tick has set aside
+     * (nextActive()) does not move either, however busy the imports behind
+     * it keep the worker (PRO-3950).
      */
     public function isActiveAndMoving(string $jobType, string $target, int $websiteId, int $stalledAfterSeconds): bool
     {
-        if ($this->findActive($jobType, $target, $websiteId) === null) {
+        if ($this->firstActive($jobType, $target, $websiteId, true) === null) {
             return false;
         }
 
@@ -203,6 +211,18 @@ class JobManager
         return $lastMoved >= $this->dateTime->gmtDate(
             'Y-m-d H:i:s',
             $this->dateTime->gmtTimestamp() - $seconds
+        );
+    }
+
+    /**
+     * Leave out the jobs the tick has set aside (nextActive()): running, and
+     * not written since stalledBefore(). isStalled() reads the same rule.
+     */
+    private function skipSetAside(Collection $collection): void
+    {
+        $collection->addFieldToFilter(
+            ['status', 'updated_at'],
+            [['eq' => Job::STATUS_PENDING], ['gteq' => $this->stalledBefore()]]
         );
     }
 

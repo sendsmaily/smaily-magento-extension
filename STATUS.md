@@ -5,7 +5,15 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-07 — **the pilot is postponed.** The first pilot
+_Last updated: 2026-10-07 — **3.0.0-rc8 is cut and ready for release, not
+yet published:** the version-cut commit on top of f1590d9 sets `3.0.0-rc8`
+(composer.json, `ModuleInfo::VERSION`, the ModuleVersion docblock, the
+upstream proposal; composer.lock content-hash only, no dependency change),
+and CHANGELOG's "Changes since 3.0.0-rc7" list is the rc8 list, in the
+order the changes landed; PRO-3913 is merged into PRO-3802's bullet,
+PRO-3924 into PRO-3918's and PRO-3923 into PRO-3915's, as rc4 merged
+PRO-3717 and PRO-3719. The gates pass and the ZIP builds and verifies
+locally. Earlier the same day: **the pilot is postponed.** The first pilot
 store runs Magento 2.4.3-p1 (PHP 7.3/7.4 only); the module needs Magento
 2.4.4+ and PHP 8.1–8.4, so it cannot be installed there. Owner decision
 (Erkki, 2026-10-07): the store upgrades first (Magento 2.4.7 or 2.4.8 on
@@ -34,7 +42,9 @@ order placed with "Login as Customer" carries no browser markers); the
 version check is now step one of INSTALLING and PILOT_CHECKLIST §0;
 HEADLESS_STOREFRONTS opens with a setup checklist (admin / back end /
 storefront developer), audited against the code.
-**Queue:** rc8 cut + clean-install check (not urgent) → pilot once the store has upgraded.
+**Queue:** publish rc8 (a GitHub pre-release on the fork, as rc1 to rc7) →
+clean-install check of the rc8 ZIP by docs/INSTALLING.md → pilot once the
+store has upgraded.
 Backlog: PRO-3790 (after the pilot), PRO-3746, PRO-3774._
 
 _Today in detail: PRO-3802 (the initial setup's Connect step
@@ -6792,7 +6802,7 @@ Earlier: 2026-09-11, 2026-09-10._
 | Issue | What | Priority |
 |---|---|---|
 | PRO-1198 | Release coordination with Smaily (upstream/Marketplace path) | High — waits on the pilot (the store upgrades first) |
-| PRO-3854 | Nightly catalog list (§3c manifest); the contract sync part is done | High — in progress; rc8 waits for it |
+| PRO-3854 | Nightly catalog list (§3c manifest); the contract sync part is done | High — landed 2026-10-07, in rc8 |
 | PRO-1971 | `gender` → `user_gender` release-comms obligation — parked 2026-09-02, reopens when 3.0.0 has a date | High — Erkki's decision |
 | PRO-1400 | Clean-install confirmation of the cron group (release gate) | Todo |
 | PRO-1484 | Canonical `mag-<id>` keys, `smaily_rec` click capture, browse keys (release gate) | Todo |

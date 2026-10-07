@@ -2,8 +2,8 @@
 
 **Audience:** the Smaily team that owns `sendsmaily/smaily-magento-extension`, the
 `smaily/smailyformagento` composer package and the Magento Marketplace listing.
-**From:** the fork (`erkkimarkus/magento-connect`), branch `v3`, at **3.0.0-rc7**
-(a GitHub pre-release on the fork).
+**From:** the fork (`erkkimarkus/magento-connect`), branch `v3`, at **3.0.0-rc8**
+(unreleased).
 **Status:** proposal / decision request. Nothing irreversible has been done — no
 composer release published, no Marketplace submission. 3.0.0-rc1 to 3.0.0-rc7 are GitHub
 pre-releases on the fork, with a ZIP for manual installs; the
@@ -28,7 +28,7 @@ ingest, attribution, engine-run automations). Full inventory: [CHANGELOG](../CHA
 
 Current state, all verifiable in the repo and its CI:
 
-| | 2.8.x (upstream `master`) | v3 (fork, 3.0.0-rc7) |
+| | 2.8.x (upstream `master`) | v3 (fork, 3.0.0-rc8) |
 |---|---|---|
 | 2.8.x feature set | ✓ | ✓ preserved, with an automatic settings migration |
 | Campaign Intelligence | — | ✓ full integration behind an optional connect step |
@@ -204,11 +204,11 @@ button, exactly as it does today for 2.8.x.
   Audit and the executed matrix are in [HYVA_SUPPORT.md](HYVA_SUPPORT.md).
   Classic Luma/Blank themes are fully covered.
 - **Campaign Intelligence dependency**: the extension builds against engine
-  contract v1.8.3; the engine repository is currently private, which is why the
+  contract v1.12.0; the engine repository is currently private, which is why the
   staleness check needs a read token. Everything engine-related is optional at
   runtime — a store that never connects the engine gets the full classic feature
   set with zero engine traffic.
-- Version is **3.0.0-rc7**: the release-candidate label reflects the remaining
+- Version is **3.0.0-rc8**: the release-candidate label reflects the remaining
   engine-tenant verification gap above, not known defects — gates are green, the
   release package is built and verified on every push (§4), and the sandbox is
   clean.

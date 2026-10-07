@@ -1,7 +1,7 @@
 {
     "name": "smaily/smailyformagento",
     "description": "Smaily Connect for Magento 2 — newsletter sync, marketing automations, abandoned cart, RSS product feeds and Campaign Intelligence",
-    "version": "3.0.0-rc7",
+    "version": "3.0.0-rc8",
     "type": "magento2-module",
     "license": "GPL-3.0-only",
     "authors": [

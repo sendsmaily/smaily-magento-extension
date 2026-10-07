@@ -866,10 +866,13 @@ malformed id — from a truncated link or a test-email placeholder — in the
 link and again when it sends the order. The order still reaches Campaign
 Intelligence, without that click.
 
-The visitor token (`vt_` followed by letters and digits), the context and
-the anonymous session id (letters, digits, `.`, `_` and `-`) are checked the
-same way, each up to 64 characters. A value that does not fit is ignored on
-its own, and the order keeps every other attribution value.
+The visitor token (`vt_` followed by letters and digits, or `vs_` followed
+by exactly 22 letters and digits — a token a separate storefront or a
+customization may create at checkout; the extension does not create one),
+the context and the anonymous session id (letters, digits, `.`, `_` and
+`-`) are checked the same way, each up to 64 characters. A value that does
+not fit is ignored on its own, and the order keeps every other attribution
+value.
 
 ### If your Campaign Intelligence account is deactivated
 

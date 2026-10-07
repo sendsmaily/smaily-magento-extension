@@ -375,6 +375,12 @@ class OrderPayloadBuilderTest extends TestCase
                 'visitor_token', 'vt_' . str_repeat('a', 62), 'smaily_visitor_token',
             ],
             'visitor token with a trailing newline' => ['visitor_token', "vt_abc123\n", 'smaily_visitor_token'],
+            'vs_ visitor token of 21 characters' => [
+                'visitor_token', 'vs_4fK9a2LmQ7xZ0bR3tY8wP', 'smaily_visitor_token',
+            ],
+            'vs_ visitor token with a dash' => [
+                'visitor_token', 'vs_4fK9a2LmQ7xZ0bR3tY8w-1', 'smaily_visitor_token',
+            ],
             'context with a slash' => ['rec_ctx', 'cross/sell', 'smaily_rec_ctx'],
             'context over 64 characters' => ['rec_ctx', str_repeat('c', 65), 'smaily_rec_ctx'],
             'session id with a quote' => ['anon_session_id', 'sess"1', 'session_id'],
@@ -400,6 +406,37 @@ class OrderPayloadBuilderTest extends TestCase
         self::assertSame('vt_' . str_repeat('A', 61), $payload['smaily_visitor_token']);
         self::assertSame('cart_abandoned.v2-' . str_repeat('x', 46), $payload['smaily_rec_ctx']);
         self::assertSame('wp_sess_abc123', $payload['session_id']);
+    }
+
+    /**
+     * PRO-3912: a visitor token of either form the contract allows, an
+     * engine `vt_` token or a store-created `vs_` token, travels unchanged.
+     *
+     * @dataProvider visitorTokens
+     */
+    public function testAVisitorTokenOfEitherFormTravelsUnchanged(string $token): void
+    {
+        $order = $this->order([['POC-CAT', 1, 22.99, 0.0]], 22.99, Order::STATE_COMPLETE, 5);
+
+        $payload = $this->builderWithReturns([], [
+            'rec_id' => null,
+            'visitor_token' => $token,
+            'rec_ctx' => null,
+            'anon_session_id' => null,
+        ])->build($order);
+
+        self::assertSame($token, $payload['smaily_visitor_token']);
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function visitorTokens(): array
+    {
+        return [
+            'engine vt_ token' => ['vt_8f3k2a'],
+            'store-created vs_ token' => ['vs_4fK9a2LmQ7xZ0bR3tY8wP1'],
+        ];
     }
 
     /**

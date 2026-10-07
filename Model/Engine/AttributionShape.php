@@ -17,17 +17,19 @@ namespace Smaily\Connect\Model\Engine;
  * (OrderPayloadBuilder). An off-shape value is dropped, never cut short, and
  * the order keeps its other signals (PRO-3584).
  *
- * The engine issues visitor tokens as `vt_` + 10 alphanumerics. One
- * difference from WooCommerce: the whole token is capped at 64 characters,
- * the width of the side table's visitor_token column, so a value this class
- * accepts always fits. The context and the session id keep WooCommerce's
+ * A visitor token takes either form the contract allows: an engine-issued
+ * `vt_` token, or a store-created `vs_` token, which is `vs_` + exactly 22
+ * alphanumerics (contract 1.11.0, PRO-3912). One difference from
+ * WooCommerce: a `vt_` token is capped at 64 characters, the width of the
+ * side table's visitor_token column, so a value this class accepts always
+ * fits. The context and the session id keep WooCommerce's
  * 64-character context charset; every session id this module generates is a
  * UUID, which fits it. The D modifier keeps `$` from accepting a trailing
  * newline.
  */
 class AttributionShape
 {
-    private const VISITOR_TOKEN_PATTERN = '/^vt_[A-Za-z0-9]{1,61}$/D';
+    private const VISITOR_TOKEN_PATTERN = '/^(?:vt_[A-Za-z0-9]{1,61}|vs_[A-Za-z0-9]{22})$/D';
 
     private const CONTEXT_PATTERN = '/^[A-Za-z0-9._-]{1,64}$/D';
 

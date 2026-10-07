@@ -22,8 +22,9 @@
     var REC_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     // The visitor token and the context are written only in the shape the
-    // order capture accepts (Engine\AttributionShape, PRO-3584).
-    var VISITOR_TOKEN_PATTERN = /^vt_[A-Za-z0-9]{1,61}$/,
+    // order capture accepts (Engine\AttributionShape, PRO-3584): a visitor
+    // token is an engine `vt_` token or a store-created `vs_` one (PRO-3912).
+    var VISITOR_TOKEN_PATTERN = /^(?:vt_[A-Za-z0-9]{1,61}|vs_[A-Za-z0-9]{22})$/,
         CONTEXT_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 
     function readParam(name) {

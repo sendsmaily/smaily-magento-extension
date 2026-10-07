@@ -6,7 +6,7 @@
  */
 -->
 <!--
-  Headless harness for the landing capture (PRO-3911): the Luma script
+  Headless harness for the landing capture (PRO-3911, PRO-3912): the Luma script
   (view/frontend/web/js/attribution.js) and the Hyvä script
   (compat/hyva/.../smaily-attribution.js), the real scripts, each landing in a
   fresh frame. Stubbed: the landing's query (a frame of a file:// page cannot
@@ -158,6 +158,16 @@
         jar = await land(theme, '?smaily_rec=rec_abc123&smaily_ctx=welcome', before);
         check(theme + ', a malformed rec id: both cookies are unchanged',
             jar.smaily_rec_id === OLD_REC_ID && jar.smaily_rec_ctx === 'storefront');
+
+        // PRO-3912: a visitor token of either form the contract allows.
+        jar = await land(theme, '?smaily_vt=vt_8f3k2a', {});
+        check(theme + ', an engine vt_ visitor token is written', jar.smaily_rec_uid === 'vt_8f3k2a');
+        jar = await land(theme, '?smaily_vt=vs_4fK9a2LmQ7xZ0bR3tY8wP1', {});
+        check(theme + ', a store-created vs_ visitor token is written',
+            jar.smaily_rec_uid === 'vs_4fK9a2LmQ7xZ0bR3tY8wP1');
+        jar = await land(theme, '?smaily_vt=vs_4fK9a2LmQ7', {smaily_rec_uid: 'vt_8f3k2a'});
+        check(theme + ', a visitor token of neither form leaves the cookie unchanged',
+            jar.smaily_rec_uid === 'vt_8f3k2a');
     }
 
     // bin/test-js.sh runs the page on Chrome's virtual time, which jumps to

@@ -239,7 +239,7 @@ value only when it has the shape shown; ignore it otherwise.
 | Query parameter | Shape | Cookie | Lifetime |
 |---|---|---|---|
 | `smaily_rec` | UUID (`8-4-4-4-12` hex) | `smaily_rec_id` | 30 days |
-| `smaily_vt` | `vt_` + 1–61 letters or digits | `smaily_rec_uid` | 365 days |
+| `smaily_vt` | `vt_` + 1–61 letters or digits, or `vs_` + exactly 22 letters or digits | `smaily_rec_uid` | 365 days |
 | `smaily_ctx` | 1–64 of `A-Z a-z 0-9 . _ -` | `smaily_rec_ctx` | 30 days |
 
 When the address has no valid `smaily_rec` but has `utm_source=smaily`,
@@ -255,6 +255,12 @@ email link without a context after a storefront click would count as the
 storefront's sale. A landing
 that writes no `smaily_rec_id` leaves both cookies as they are; a missing
 `smaily_vt` leaves its cookie as it is.
+
+The visitor token has two forms: `vt_`, issued by Campaign Intelligence in
+email links, and `vs_`, a token a store may create for a consenting guest at
+checkout (contract 1.11.0). The module does not create `vs_` tokens, but
+sends a `vs_` token it finds in the `smaily_rec_uid` cookie with the order
+unchanged, as it does a `vt_` token; a value of neither form is not sent.
 
 The anonymous session id of browse events, the cookie `smaily_anon_sid`,
 is not part of this capture: set it in step 4, with consent only.

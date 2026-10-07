@@ -38,7 +38,7 @@ class FlushEventQueueTest extends TestCase
     {
         $this->eventQueue->method('claimBatch')->willReturn([]);
         $this->eventQueue->expects(self::never())->method('markSent');
-        $this->eventQueue->expects(self::never())->method('markFailed');
+        $this->eventQueue->expects(self::never())->method('markFailedMany');
 
         $this->createCron(new HandlerPool([]))->execute();
     }
@@ -53,8 +53,8 @@ class FlushEventQueueTest extends TestCase
         $this->eventQueue->method('claimBatch')->willReturn([$event]);
 
         $event->expects(self::never())->method('setData');
-        $this->eventQueue->expects(self::once())->method('markFailed')
-            ->with($event, 'No handler registered for "unknown.type"', null, null, null, true);
+        $this->eventQueue->expects(self::once())->method('markFailedMany')
+            ->with([$event], 'No handler registered for "unknown.type"', null, true);
 
         $this->createCron(new HandlerPool([]))->execute();
     }
@@ -76,16 +76,11 @@ class FlushEventQueueTest extends TestCase
         ]);
 
         $calls = [];
-        $this->eventQueue->method('markFailed')->willReturnCallback(
-            function (
-                Event $event,
-                string $error,
-                ?string $sentPayload,
-                ?string $response,
-                ?int $retryAfter,
-                bool $terminal
-            ) use (&$calls): void {
-                $calls[(int)$event->getId()] = [$error, $terminal];
+        $this->eventQueue->method('markFailedMany')->willReturnCallback(
+            function (array $events, string $error, ?int $retryAfter, bool $terminal) use (&$calls): void {
+                foreach ($events as $event) {
+                    $calls[(int)$event->getId()] = [$error, $terminal];
+                }
             }
         );
 
@@ -107,7 +102,7 @@ class FlushEventQueueTest extends TestCase
         $handler->method('handle')->willReturn([1 => true, 2 => 'invalid email']);
 
         $this->eventQueue->expects(self::once())->method('markSent')->with($ok);
-        $this->eventQueue->expects(self::once())->method('markFailed')->with($bad, 'invalid email');
+        $this->eventQueue->expects(self::once())->method('markFailedMany')->with([$bad], 'invalid email', null, false);
 
         $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
     }
@@ -121,7 +116,8 @@ class FlushEventQueueTest extends TestCase
         $handler = $this->createMock(EventHandlerInterface::class);
         $handler->method('handle')->willThrowException(new TransportException('API down', 503));
 
-        $this->eventQueue->expects(self::exactly(2))->method('markFailed');
+        $this->eventQueue->expects(self::once())->method('markFailedMany')
+            ->with([$first, $second], 'API down', null, false);
         $this->eventQueue->expects(self::never())->method('markSent');
 
         $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
@@ -136,8 +132,8 @@ class FlushEventQueueTest extends TestCase
         $handler = $this->createMock(EventHandlerInterface::class);
         $handler->method('handle')->willThrowException(new RequestRefusedException('Gone', 404));
 
-        $this->eventQueue->expects(self::exactly(2))->method('markFailed')
-            ->with(self::anything(), self::stringContains('permanent_http_404'), null, null, null, true);
+        $this->eventQueue->expects(self::once())->method('markFailedMany')
+            ->with([$first, $second], self::stringContains('permanent_http_404'), null, true);
 
         $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
     }
@@ -155,16 +151,11 @@ class FlushEventQueueTest extends TestCase
         ]);
 
         $calls = [];
-        $this->eventQueue->method('markFailed')->willReturnCallback(
-            function (
-                Event $event,
-                string $error,
-                ?string $sentPayload,
-                ?string $response,
-                ?int $retryAfter,
-                bool $terminal
-            ) use (&$calls): void {
-                $calls[(int)$event->getId()] = [$error, $retryAfter, $terminal];
+        $this->eventQueue->method('markFailedMany')->willReturnCallback(
+            function (array $events, string $error, ?int $retryAfter, bool $terminal) use (&$calls): void {
+                foreach ($events as $event) {
+                    $calls[(int)$event->getId()] = [$error, $retryAfter, $terminal];
+                }
             }
         );
 
@@ -190,7 +181,7 @@ class FlushEventQueueTest extends TestCase
         $this->eventQueue->expects(self::once())->method('markSkipped')
             ->with($event, 'Smaily does not have this contact');
         $this->eventQueue->expects(self::never())->method('markSent');
-        $this->eventQueue->expects(self::never())->method('markFailed');
+        $this->eventQueue->expects(self::never())->method('markFailedMany');
 
         $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
     }
@@ -210,7 +201,7 @@ class FlushEventQueueTest extends TestCase
 
         $this->eventQueue->expects(self::once())->method('release')->with([$waiting]);
         $this->eventQueue->expects(self::once())->method('markSent')->with($sent);
-        $this->eventQueue->expects(self::never())->method('markFailed');
+        $this->eventQueue->expects(self::never())->method('markFailedMany');
 
         $this->createCron(new HandlerPool(['engine.identity_merge' => $handler]))->execute();
     }
@@ -244,10 +235,54 @@ class FlushEventQueueTest extends TestCase
         $handler = $this->createMock(EventHandlerInterface::class);
         $handler->method('handle')->willReturn([]);
 
-        $this->eventQueue->expects(self::once())->method('markFailed')
-            ->with($event, self::stringContains('no result'));
+        $this->eventQueue->expects(self::once())->method('markFailedMany')
+            ->with([$event], self::stringContains('no result'), null, false);
 
         $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
+    }
+
+    /**
+     * PRO-1964: the rows of one refusal Smaily gave a whole group are
+     * recorded in one write; a row refused for a reason of its own, or
+     * with another wait, is recorded alone.
+     */
+    public function testTheRowsOfOneSharedRefusalAreRecordedTogether(): void
+    {
+        $events = [];
+        foreach ([1, 2, 3, 4, 5] as $id) {
+            $events[$id] = $this->createEvent($id, 'contact.sync');
+        }
+        $this->eventQueue->method('claimBatch')->willReturn(array_values($events));
+
+        $shared = new RequestRefusedException('Unauthorized', 401);
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willReturn([
+            1 => $shared,
+            2 => $shared,
+            3 => new RequestRefusedException('Forbidden', 403),
+            4 => $shared,
+            5 => new TransportException('Unauthorized', 429, null, 90),
+        ]);
+
+        $calls = [];
+        $this->eventQueue->expects(self::exactly(3))->method('markFailedMany')->willReturnCallback(
+            function (array $rows, string $error, ?int $retryAfter, bool $terminal) use (&$calls): void {
+                $calls[] = [
+                    array_map(static fn (Event $event): int => (int)$event->getId(), $rows),
+                    $error,
+                    $retryAfter,
+                    $terminal,
+                ];
+            }
+        );
+
+        $this->createCron(new HandlerPool(['contact.sync' => $handler]))->execute();
+
+        self::assertSame([
+            [[1, 2, 4], 'permanent_http_401: Unauthorized', null, true],
+            [[3], 'permanent_http_403: Forbidden', null, true],
+            [[5], 'Unauthorized', 90, false],
+        ], $calls);
     }
 
     public function testHandlerPoolRejectsInvalidHandlers(): void

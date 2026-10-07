@@ -41,6 +41,29 @@ class EventQueue
      */
     public const CANCELLED_RESPONSE = 'cancelled';
 
+    /**
+     * The columns markFailedMany() writes: a failure's outcome and its
+     * exchange, plus the claim and timestamp columns as the row model holds
+     * them — what the model's own save in markFailed() writes there too, so
+     * a row failed in a batch ends exactly like one failed alone.
+     */
+    private const FAILURE_COLUMNS = [
+        'attempts',
+        'status',
+        'next_retry_at',
+        'last_error',
+        'sent_payload',
+        'last_response',
+        'claim_token',
+        'claimed_at',
+        'updated_at',
+    ];
+
+    /**
+     * Rows per UPDATE in markFailedMany(): a flush batch (200) fits in one.
+     */
+    private const WRITE_CHUNK = 200;
+
     public function __construct(
         private readonly EventFactory $eventFactory,
         private readonly EventResource $eventResource,
@@ -312,15 +335,7 @@ class EventQueue
         ?int $retryAfter = null,
         bool $terminal = false
     ): void {
-        $attempts = $event->getAttempts() + 1;
-        $exhausted = $terminal || $attempts >= self::MAX_ATTEMPTS;
-
-        $event->addData([
-            'attempts' => $attempts,
-            'status' => $exhausted ? Event::STATUS_FAILED : Event::STATUS_PENDING,
-            'next_retry_at' => $exhausted ? null : $this->nextRetryAt($attempts, $retryAfter),
-            'last_error' => mb_substr($error, 0, self::MAX_ERROR_LENGTH),
-        ] + $this->exchangeFields($event, $sentPayload, $response));
+        $exhausted = $this->applyFailure($event, $error, $sentPayload, $response, $retryAfter, $terminal);
         $this->eventResource->save($event);
 
         if ($exhausted) {
@@ -330,6 +345,131 @@ class EventQueue
                 'error' => $error,
             ]);
         }
+    }
+
+    /**
+     * Record one failure that many rows share — Smaily's one answer to a
+     * batch (PRO-1964): each row ends exactly as markFailed() leaves it, but
+     * in one UPDATE per WRITE_CHUNK rows, and the rows it parks get one
+     * error-log line with their count instead of a line each. Each row
+     * keeps its own step on the retry ladder (attempts, status, next retry
+     * follow its own attempt count) and the exchange recorded on it. A
+     * single row goes through markFailed().
+     *
+     * @param Event[] $events
+     */
+    public function markFailedMany(
+        array $events,
+        string $error,
+        ?int $retryAfter = null,
+        bool $terminal = false
+    ): void {
+        if (count($events) < 2) {
+            foreach ($events as $event) {
+                $this->markFailed($event, $error, retryAfter: $retryAfter, terminal: $terminal);
+            }
+
+            return;
+        }
+
+        $rows = [];
+        $parked = [];
+        foreach ($events as $event) {
+            if ($this->applyFailure($event, $error, null, null, $retryAfter, $terminal)) {
+                $parked[] = $event;
+            }
+            $rows[(int)$event->getId()] = array_intersect_key(
+                (array)$event->getData(),
+                array_flip(self::FAILURE_COLUMNS)
+            );
+        }
+        foreach (array_chunk($rows, self::WRITE_CHUNK, true) as $chunk) {
+            $this->updateRows($chunk);
+        }
+
+        if ($parked) {
+            $this->logger->error('Queue events failed permanently', [
+                'count' => count($parked),
+                'event_type' => implode(', ', array_unique(array_map(
+                    static fn (Event $event): string => $event->getEventType(),
+                    $parked
+                ))),
+                'ids' => array_map(static fn (Event $event): int => (int)$event->getId(), $parked),
+                'error' => $error,
+            ]);
+        }
+    }
+
+    /**
+     * Set one failed attempt's outcome on the row model, unsaved.
+     *
+     * @return bool whether the row is parked as failed
+     */
+    private function applyFailure(
+        Event $event,
+        string $error,
+        ?string $sentPayload,
+        ?string $response,
+        ?int $retryAfter,
+        bool $terminal
+    ): bool {
+        $attempts = $event->getAttempts() + 1;
+        $exhausted = $terminal || $attempts >= self::MAX_ATTEMPTS;
+
+        $event->addData([
+            'attempts' => $attempts,
+            'status' => $exhausted ? Event::STATUS_FAILED : Event::STATUS_PENDING,
+            'next_retry_at' => $exhausted ? null : $this->nextRetryAt($attempts, $retryAfter),
+            'last_error' => mb_substr($error, 0, self::MAX_ERROR_LENGTH),
+        ] + $this->exchangeFields($event, $sentPayload, $response));
+
+        return $exhausted;
+    }
+
+    /**
+     * Write each row's own values in one statement: a column every row
+     * holds alike is set once, any other through CASE on the row id, and a
+     * row that does not hold a column keeps it.
+     *
+     * @param array<int, array<string, mixed>> $rows column values by row id
+     */
+    private function updateRows(array $rows): void
+    {
+        $connection = $this->resourceConnection->getConnection();
+        $idColumn = $connection->quoteIdentifier('id');
+        $columns = array_keys(array_merge(...array_values($rows)));
+
+        $bind = [];
+        foreach ($columns as $column) {
+            $values = [];
+            foreach ($rows as $id => $row) {
+                if (array_key_exists($column, $row)) {
+                    $values[$id] = $row[$column];
+                }
+            }
+            $first = reset($values);
+            $alike = count($values) === count($rows);
+            foreach ($values as $value) {
+                $alike = $alike && $value === $first;
+            }
+            if ($alike) {
+                $bind[$column] = $first;
+                continue;
+            }
+
+            $quotedColumn = $connection->quoteIdentifier($column);
+            $cases = '';
+            foreach ($values as $id => $value) {
+                $cases .= sprintf(' WHEN %d THEN %s', $id, $value === null ? 'NULL' : $connection->quote($value));
+            }
+            $bind[$column] = new \Zend_Db_Expr(sprintf('CASE %s%s ELSE %s END', $idColumn, $cases, $quotedColumn));
+        }
+
+        $connection->update(
+            $this->resourceConnection->getTableName(EventResource::TABLE_NAME),
+            $bind,
+            ['id IN (?)' => array_keys($rows)]
+        );
     }
 
     /**

@@ -226,6 +226,29 @@ class JobManagerTest extends IntegrationTestCase
         self::assertFalse($this->jobManager->isStalled(Job::TYPE_CONTACTS, Job::TARGET_SMAILY), 'canceled');
     }
 
+    /**
+     * PRO-3915, PRO-3923: every start — the import card, the command line,
+     * connecting Campaign Intelligence — cancels a stalled import of its
+     * kind first, so the stalled one cannot block it.
+     */
+    public function testStartIfIdleCancelsAStalledImportOfItsKindFirst(): void
+    {
+        $first = $this->jobManager->start(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1);
+        $second = $this->jobManager->start(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 2);
+        $this->jobManager->markRunning($first);
+        $this->movedAt($first, -JobManager::STALLED_SECONDS - 1);
+        $this->movedAt($second, -JobManager::STALLED_SECONDS - 1);
+
+        $fresh = $this->jobManager->startIfIdle(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1);
+        self::assertNotNull($fresh);
+        self::assertSame(Job::STATUS_CANCELLED, $this->fetchRow(self::TABLE, (int)$first->getId())['status']);
+        self::assertSame(Job::STATUS_CANCELLED, $this->fetchRow(self::TABLE, (int)$second->getId())['status']);
+
+        // The fresh job moves, so the next website's start cancels nothing.
+        self::assertNotNull($this->jobManager->startIfIdle(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 2));
+        self::assertSame(Job::STATUS_PENDING, $this->fetchRow(self::TABLE, (int)$fresh->getId())['status']);
+    }
+
     private function inProgress(): bool
     {
         return $this->jobManager->isActiveAndMoving(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0, 3600);

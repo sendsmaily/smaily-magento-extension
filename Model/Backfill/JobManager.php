@@ -53,12 +53,19 @@ class JobManager
     }
 
     /**
-     * Queue the import unless an equivalent job is already active.
+     * Queue the import unless an equivalent job is already active. A stalled
+     * import of this kind (isStalled()) is cancelled first, so it cannot
+     * block the new one — for every start: the admin's import card, the
+     * smaily:backfill:start command and connecting Campaign Intelligence
+     * (PRO-3915, PRO-3923).
      *
      * @return Job|null the new job, or null when one was already queued or running
      */
     public function startIfIdle(string $jobType, string $target, int $websiteId, ?int $totalCount = null): ?Job
     {
+        if ($this->isStalled($jobType, $target)) {
+            $this->requestCancel($jobType, $target);
+        }
         if ($this->findActive($jobType, $target, $websiteId) !== null) {
             return null;
         }
@@ -136,7 +143,8 @@ class JobManager
      * Whether an import of this kind is queued or running, for any website,
      * but stalled: no queued or running job was written within
      * STALLED_SECONDS — isActiveAndMoving()'s rule (PRO-3915). The admin's
-     * import card says so, and starting the import again cancels it first.
+     * import card says so, and starting the import again cancels it first
+     * (startIfIdle()).
      */
     public function isStalled(string $jobType, string $target): bool
     {

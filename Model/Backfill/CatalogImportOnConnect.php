@@ -15,9 +15,10 @@ namespace Smaily\Connect\Model\Backfill;
  * (Model/Config/Backend/EngineSetupToken) — call this after a successful
  * setup exchange. The job is queued as the admin Start import queues it, one
  * active catalog import at a time, so a reconnect while one is queued or
- * running starts no second import. The job waits for the next
- * smaily_backfill_tick run; cancelled before then (the admin's Hold back, or
- * the card's Cancel import), it sends nothing.
+ * running starts no second import — unless it has stalled, which is
+ * cancelled first, as the card's Run again does (PRO-3923). The job waits
+ * for the next smaily_backfill_tick run; cancelled before then (the admin's
+ * Hold back, or the card's Cancel import), it sends nothing.
  */
 class CatalogImportOnConnect
 {

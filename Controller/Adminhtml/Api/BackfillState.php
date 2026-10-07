@@ -23,7 +23,7 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
 
 /**
  * POST {action: start|status|cancel, job_type} -> aggregated progress:
- * {status, processed, failed, total, percent, finished_at, error, stalled}
+ * {status, processed, failed, total, percent, finished_at, error, stalled, blocked_by}
  *
  * "start" starts jobs (per website for contacts, installation-wide for
  * engine types) and is idempotent — an already-active job is not an error.
@@ -34,7 +34,11 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * worker stops at its next page boundary, and a later "start" begins a
  * fresh import. `stalled` marks a queued or running import that nothing
  * has moved for an hour (JobManager::isStalled(), PRO-3915); a "start"
- * cancels such an import first, so it cannot block the new one.
+ * cancels such an import first (JobManager::startIfIdle()), so it cannot
+ * block the new one. `blocked_by` is the job type of the import a stalled
+ * one waits behind — the oldest queued or running job, which the tick takes
+ * first (JobManager::nextActive()) — when that is another import, else ''
+ * (PRO-3923).
  */
 class BackfillState extends AbstractJsonAction implements HttpPostActionInterface
 {
@@ -69,10 +73,6 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
             $refusal = $this->engineImportGuard->refusal($jobType, $target);
             if ($refusal !== null) {
                 return $this->jsonResponse($this->aggregate($jobType, $target) + ['message' => (string)$refusal]);
-            }
-            // A stalled import would keep the new one from starting (PRO-3915).
-            if ($this->jobManager->isStalled($jobType, $target)) {
-                $this->jobManager->requestCancel($jobType, $target);
             }
             $websiteIds = $target === Job::TARGET_ENGINE
                 ? [Job::ENGINE_WEBSITE_ID]
@@ -124,6 +124,9 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
         }
 
         $status = $this->statusAggregator->resolve($statuses);
+        $stalled = in_array($status, ['pending', 'running'], true)
+            && $this->jobManager->isStalled($jobType, $target);
+        $ahead = $stalled ? $this->jobManager->nextActive() : null;
 
         return [
             'status' => $status,
@@ -133,8 +136,8 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
             'percent' => $total > 0 ? (int)floor(min(100, $processed / $total * 100)) : 0,
             'finished_at' => $this->formatFinishedAt($finishedAt),
             'error' => $error,
-            'stalled' => in_array($status, ['pending', 'running'], true)
-                && $this->jobManager->isStalled($jobType, $target),
+            'stalled' => $stalled,
+            'blocked_by' => $ahead !== null && $ahead->getJobType() !== $jobType ? $ahead->getJobType() : '',
         ];
     }
 

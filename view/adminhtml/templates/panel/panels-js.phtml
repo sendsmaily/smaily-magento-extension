@@ -418,7 +418,8 @@ window.smailyPanelsInit = function ($) {
     // individual rows failed (queue rows still pending retry are NOT
     // failed); "Stopped before an error" when the job itself aborted;
     // "Cancelled" after an admin cancel; "Stalled" for a queued or running
-    // import nothing has moved for an hour (PRO-3915). The last outcome +
+    // import nothing has moved for an hour (PRO-3915), naming the import it
+    // waits behind when that is another one (PRO-3923). The last outcome +
     // timestamp persist server-side and re-render on every page load.
     var backfillTimers = {};
 
@@ -477,6 +478,15 @@ window.smailyPanelsInit = function ($) {
         cancelled: {pill: 'off', label: '<?= $escaper->escapeJs(__('Canceled')) ?>', icon: '—', primary: true}
     };
 
+    // Where each import's card is, for a stalled import that waits behind
+    // another one (`blocked_by`, PRO-3923).
+    var backfillCards = {
+        contacts: '<?= $escaper->escapeJs(__('Contacts')) ?> > <?= $escaper->escapeJs(__('Initial contact import')) ?>',
+        catalog: '<?= $escaper->escapeJs(__('Intelligence')) ?> > <?= $escaper->escapeJs(__('Catalog')) ?>',
+        customers: '<?= $escaper->escapeJs(__('Intelligence')) ?> > <?= $escaper->escapeJs(__('Customers')) ?>',
+        orders: '<?= $escaper->escapeJs(__('Intelligence')) ?> > <?= $escaper->escapeJs(__('Orders')) ?>'
+    };
+
     function backfillState(data) {
         // Run again starts a fresh import; the server cancels this one first.
         if (data.stalled && (data.status === 'pending' || data.status === 'running')) {
@@ -495,6 +505,8 @@ window.smailyPanelsInit = function ($) {
         var state = backfillState(data);
         var look = backfillStates[state] || {};
         var finished = !!look.icon;
+        // Run again here would only queue it behind the same import again.
+        var blocked = state === 'stalled' && !!backfillCards[data.blocked_by];
         var text = '';
         ui.card.attr('data-state', state).toggleClass('is-finished', finished);
         ui.pill.toggle(state !== 'idle')
@@ -502,7 +514,7 @@ window.smailyPanelsInit = function ($) {
             .addClass(look.pill ? 'smaily-pill--' + look.pill : '')
             .find('.smaily-backfill-card__pill-text').text(look.label || '');
         ui.cancel.toggle(state === 'pending' || state === 'running' || state === 'stalled');
-        ui.start.toggle(state === 'idle' || finished)
+        ui.start.toggle((state === 'idle' || finished) && !blocked)
             .toggleClass('action-primary', state === 'idle' || !!look.primary)
             .toggleClass('action-secondary', finished && !look.primary)
             .find('span').text(finished
@@ -548,6 +560,10 @@ window.smailyPanelsInit = function ($) {
                 .replace('%3', data.failed);
             ui.link.append($('<a></a>').attr('href', urls.logFailed)
                 .text('<?= $escaper->escapeJs(__('View them in the Log')) ?>')).show();
+        } else if (blocked) {
+            setProgress(ui, data, data.percent, 'failed');
+            text = '<?= $escaper->escapeJs(__('Stalled — this import waits behind another import that nothing has moved for over an hour: Settings > %1. Cancel that import, or press Run again on its card, and this one follows.')) ?>'
+                .replace('%1', backfillCards[data.blocked_by]);
         } else if (state === 'stalled') {
             setProgress(ui, data, data.percent, 'failed');
             text = '<?= $escaper->escapeJs(__('Stalled — nothing has moved this import for over an hour; %1 of %2 synced so far. Press Run again to start a fresh import. If it stalls again, check that Magento\'s cron runs.')) ?>'

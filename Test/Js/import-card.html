@@ -14,7 +14,9 @@
   requests (fetch), answered with the BackfillState endpoint's answer. A
   queued or running import nothing has moved for an hour (`stalled`) reads
   as stalled, says how to start it again and offers Run again, which posts a
-  start; an import that moves shows its progress as before. Run it with
+  start; one that waits behind another stalled import names that import's
+  card (`blocked_by`, PRO-3923) and offers only Cancel; an import that moves
+  shows its progress as before. Run it with
   bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
 -->
@@ -33,6 +35,7 @@
 
     var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
     var STALLED = 'Stalled — nothing has moved this import for over an hour; %1 of %2 synced so far. Press Run again to start a fresh import. If it stalls again, check that Magento\'s cron runs.';
+    var BLOCKED = 'Stalled — this import waits behind another import that nothing has moved for over an hour: Settings > %1. Cancel that import, or press Run again on its card, and this one follows.';
     var failures = 0;
     var passes = 0;
 
@@ -149,12 +152,13 @@
             strings = window.smailyAdminPages[page].strings,
             frame,
             seen,
+            blocked,
             starts;
 
         log('# ' + locale);
         if (locale !== 'en_US') {
             check(locale + ': the stalled card is translated', strings[STALLED] !== STALLED
-                && strings.Stalled !== 'Stalled');
+                && strings[BLOCKED] !== BLOCKED && strings.Stalled !== 'Stalled');
         }
 
         // A running import nothing has moved for an hour.
@@ -182,6 +186,21 @@
         check(locale + ', stalled while queued: the card says it has stalled',
             seen.state === 'stalled'
             && seen.verdict === strings[STALLED].replace('%1', '0').replace('%2', '?'));
+        frame.remove();
+
+        // A queued import waiting behind a contacts import that has stalled
+        // (PRO-3923) names it; Run again here would only queue it behind the
+        // same import again.
+        blocked = catalog('pending', 0, 0, true);
+        blocked.blocked_by = 'contacts';
+        frame = await open(page, {status: blocked});
+        seen = card(frame);
+        check(locale + ', waiting behind a stalled import: the card names it and how to clear it',
+            seen.state === 'stalled' && seen.pill === strings.Stalled
+            && seen.verdict === strings[BLOCKED].replace('%1',
+                strings.Contacts + ' > ' + strings['Initial contact import']));
+        check(locale + ', waiting behind a stalled import: only Cancel is offered',
+            seen.start === '' && seen.cancel);
         frame.remove();
 
         // An import that moves shows its progress as before.

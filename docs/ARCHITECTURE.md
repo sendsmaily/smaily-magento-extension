@@ -324,9 +324,15 @@ below.
   moved for an hour — a worker that dies on the same page every run, or
   no cron — is answered with `stalled: true` (`JobManager::isStalled()`:
   `isActiveAndMoving()`'s rule, `JobManager::STALLED_SECONDS`), shown on
-  the card as *Stalled* with **Run again**; a `start` cancels it first
+  the card as *Stalled* with **Run again**; every start — the card, the
+  command, connecting Campaign Intelligence (`CatalogImportOnConnect`) —
+  goes through `JobManager::startIfIdle()`, which cancels it first
   (`requestCancel()`), so the one-active-job lock cannot keep the new one
-  from starting (PRO-3915). There
+  from starting (PRO-3915, PRO-3923). The tick takes the oldest active job
+  (`nextActive()`), so an import queued behind a stalled one stalls too;
+  the endpoint answers it with `blocked_by` (that job's type) and the card
+  names the blocking import's card instead of offering **Run again**
+  (PRO-3923). There
   is no periodic full re-sync any more — the nightly `Cron/CatalogResync`
   of PRO-1951 is removed. A change no event sees (a CSV / `bin/magento
   import` run, an ERP link or any other direct write to the catalog

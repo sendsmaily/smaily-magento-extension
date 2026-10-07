@@ -1052,10 +1052,18 @@ An import that is queued or running but that nothing has moved for over an
 hour — for example one whose run fails on the same products every time, or
 a store whose cron does not run — shows **"Stalled"**, with how far it got
 and **Run again**. **Run again** cancels the stalled import and starts a
-fresh one; **Cancel import** only stops it. If the fresh import stalls
+fresh one; **Cancel import** only stops it. Starting the import with
+`smaily:backfill:start`, and the catalog import that connecting Campaign
+Intelligence starts, do the same. If the fresh import stalls
 too, check that Magento's cron runs (see [INSTALLING.md](INSTALLING.md#4-cron))
 and look in `var/log/smaily_connect.log` and Magento's own logs for the
 error.
+
+Imports run one at a time, oldest first. An import that waits behind
+another import that has stalled says so and names that import's card —
+for example *Settings > Contacts > Initial contact import*; press
+**Cancel import** or **Run again** there, and the waiting import follows.
+Its own card then offers only **Cancel import**.
 
 ## The log and troubleshooting
 

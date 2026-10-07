@@ -31,8 +31,10 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * orders) started while Campaign Intelligence is not connected recorded
  * every row as failed. The start is refused instead, with the reason beside
  * the Start import button. The contacts import goes to Smaily and starts.
- * PRO-3915: an import nothing has moved for an hour reads as stalled, and
- * starting it again cancels it first, so it cannot block the new one.
+ * PRO-3915: an import nothing has moved for an hour reads as stalled
+ * (starting it again cancels it first: JobManager::startIfIdle(), the
+ * integration JobManagerTest). PRO-3923: one that waits behind another
+ * import names it.
  */
 class BackfillStateTest extends TestCase
 {
@@ -156,42 +158,58 @@ class BackfillStateTest extends TestCase
         self::assertFalse($this->response['stalled']);
     }
 
-    public function testStartingAStalledImportAgainCancelsItFirst(): void
+    /**
+     * PRO-3923: a stalled import that waits behind another one — the oldest
+     * queued or running job, which the tick takes first — names it.
+     */
+    public function testAStalledImportWaitingBehindAnotherImportNamesIt(): void
     {
-        $calls = [];
         $this->jobManager->method('isStalled')->willReturn(true);
-        $this->jobManager->expects(self::once())->method('requestCancel')
-            ->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE)
-            ->willReturnCallback(static function () use (&$calls): int {
-                $calls[] = 'cancel';
+        $this->jobManager->method('nextActive')->willReturn($this->job(Job::STATUS_RUNNING, Job::TYPE_CONTACTS));
 
-                return 1;
-            });
-        $this->jobManager->expects(self::once())->method('startIfIdle')
-            ->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID)
-            ->willReturnCallback(function () use (&$calls): Job {
-                $calls[] = 'start';
+        $this->controller(
+            true,
+            ['action' => 'status', 'job_type' => Job::TYPE_CATALOG],
+            [$this->job(Job::STATUS_PENDING)]
+        )->execute();
 
-                return $this->createMock(Job::class);
-            });
-
-        $this->controller(true, ['action' => 'start', 'job_type' => Job::TYPE_CATALOG])->execute();
-
-        self::assertSame(['cancel', 'start'], $calls);
+        self::assertTrue($this->response['stalled']);
+        self::assertSame(Job::TYPE_CONTACTS, $this->response['blocked_by']);
     }
 
-    public function testStartingAnImportThatMovesCancelsNothing(): void
+    public function testAStalledImportFirstInLineIsBlockedByNothing(): void
+    {
+        $this->jobManager->method('isStalled')->willReturn(true);
+        $this->jobManager->method('nextActive')->willReturn($this->job(Job::STATUS_RUNNING, Job::TYPE_CATALOG));
+
+        $this->controller(
+            true,
+            ['action' => 'status', 'job_type' => Job::TYPE_CATALOG],
+            [$this->job(Job::STATUS_RUNNING)]
+        )->execute();
+
+        self::assertTrue($this->response['stalled']);
+        self::assertSame('', $this->response['blocked_by']);
+    }
+
+    public function testAnImportThatMovesIsBlockedByNothing(): void
     {
         $this->jobManager->method('isStalled')->willReturn(false);
-        $this->jobManager->expects(self::never())->method('requestCancel');
-        $this->jobManager->expects(self::once())->method('startIfIdle');
+        $this->jobManager->expects(self::never())->method('nextActive');
 
-        $this->controller(true, ['action' => 'start', 'job_type' => Job::TYPE_CATALOG])->execute();
+        $this->controller(
+            true,
+            ['action' => 'status', 'job_type' => Job::TYPE_CATALOG],
+            [$this->job(Job::STATUS_PENDING)]
+        )->execute();
+
+        self::assertSame('', $this->response['blocked_by']);
     }
 
-    private function job(string $status): Job&MockObject
+    private function job(string $status, string $jobType = Job::TYPE_CATALOG): Job&MockObject
     {
         $job = $this->createMock(Job::class);
+        $job->method('getJobType')->willReturn($jobType);
         $job->method('getWebsiteId')->willReturn(Job::ENGINE_WEBSITE_ID);
         $job->method('getStatus')->willReturn($status);
 

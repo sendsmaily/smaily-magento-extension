@@ -265,7 +265,8 @@ $pages = [
  * it was finished: with a Storefront URL saved and Campaign Intelligence
  * connected, and with neither (PRO-3913). Magento's cookie restriction mode
  * is on, except where a Storefront URL is saved (PRO-3918). The Settings
- * tab's import cards serve the stalled import harness too (PRO-3915).
+ * tab's import cards serve the stalled import harness too (PRO-3915,
+ * PRO-3923).
  */
 $intelligenceViewModel = static fn (
     string $storefrontUrl,
@@ -484,6 +485,11 @@ $intelligenceStrings = [
     'Stalled',
     'Stalled — nothing has moved this import for over an hour; %1 of %2 synced so far.'
         . ' Press Run again to start a fresh import. If it stalls again, check that Magento\'s cron runs.',
+    'Stalled — this import waits behind another import that nothing has moved for over an hour: Settings > %1.'
+        . ' Cancel that import, or press Run again on its card, and this one follows.',
+    'Contacts',
+    'Initial contact import',
+    'Intelligence',
     'Run again',
     'Running',
     'Importing…',

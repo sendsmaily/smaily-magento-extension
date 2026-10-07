@@ -58,6 +58,30 @@ class CatalogImportOnConnectTest extends IntegrationTestCase
         self::assertSame((string)Job::ENGINE_WEBSITE_ID, (string)$rows[0]['website_id']);
     }
 
+    /**
+     * PRO-3923: a stalled catalog import does not keep a connect from
+     * starting one, as Run again on the import card does.
+     */
+    public function testConnectingWhileTheCatalogImportHasStalledStartsAFreshOne(): void
+    {
+        $this->catalogImport->start();
+        $stalled = $this->jobManager->findActive(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
+        self::assertNotNull($stalled);
+        $this->jobManager->markRunning($stalled);
+        $this->connection->update(
+            self::TABLE,
+            ['updated_at' => $this->clockDate(-JobManager::STALLED_SECONDS - 1)],
+            ['id = ?' => (int)$stalled->getId()]
+        );
+
+        self::assertTrue($this->catalogImport->start());
+
+        self::assertSame(Job::STATUS_CANCELLED, $this->fetchRow(self::TABLE, (int)$stalled->getId())['status']);
+        $fresh = $this->jobManager->findActive(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
+        self::assertNotNull($fresh);
+        self::assertSame(Job::STATUS_PENDING, $fresh->getStatus());
+    }
+
     public function testHoldingTheImportBackBeforeItsFirstRunSendsNothing(): void
     {
         $this->catalogImport->start();

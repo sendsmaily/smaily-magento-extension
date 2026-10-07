@@ -2142,7 +2142,7 @@ bin/magento smaily:gdpr erase shopper@example.com --force   # art 17</code></pre
         <table>
           <thead><tr><th scope="col">Command</th><th scope="col">What it does</th></tr></thead>
           <tbody>
-            <tr><td><code>bin/magento smaily:backfill:start [contacts|catalog|customers|orders] [--website=ID]</code></td><td>Starts an import (default <code>contacts</code>; without <code>--website</code>, for every website).</td></tr>
+            <tr><td><code>bin/magento smaily:backfill:start [contacts|catalog|customers|orders] [--website=ID]</code></td><td>Starts an import (default <code>contacts</code>; without <code>--website</code>, for every website). For a website whose <strong>Sync contacts to Smaily</strong> is off it still starts the contacts import, and says that the import sends nothing.</td></tr>
             <tr><td><code>bin/magento smaily:backfill:status</code></td><td>Shows the imports and their progress.</td></tr>
             <tr><td><code>bin/magento smaily:engine:ping</code></td><td>Checks the Campaign Intelligence connection.</td></tr>
             <tr><td><code>bin/magento smaily:engine:disconnect --force</code></td><td>Removes the store's Campaign Intelligence connection.</td></tr>
@@ -2160,7 +2160,7 @@ bin/magento smaily:gdpr erase shopper@example.com --force   # art 17</code></pre
         <table>
           <thead><tr><th scope="col">Käsk</th><th scope="col">Mida see teeb</th></tr></thead>
           <tbody>
-            <tr><td><code>bin/magento smaily:backfill:start [contacts|catalog|customers|orders] [--website=ID]</code></td><td>Käivitab impordi (vaikimisi <code>contacts</code>; ilma <code>--website</code>-ta kõigi veebisaitide jaoks).</td></tr>
+            <tr><td><code>bin/magento smaily:backfill:start [contacts|catalog|customers|orders] [--website=ID]</code></td><td>Käivitab impordi (vaikimisi <code>contacts</code>; ilma <code>--website</code>-ta kõigi veebisaitide jaoks). Veebisaidil, kus <strong>Sünkrooni kontaktid Smailysse</strong> on väljas, käivitab ta kontaktide impordi ikkagi ja ütleb, et import ei saada midagi.</td></tr>
             <tr><td><code>bin/magento smaily:backfill:status</code></td><td>Näitab importe ja nende edenemist.</td></tr>
             <tr><td><code>bin/magento smaily:engine:ping</code></td><td>Kontrollib Campaign Intelligence'i ühendust.</td></tr>
             <tr><td><code>bin/magento smaily:engine:disconnect --force</code></td><td>Eemaldab poe Campaign Intelligence'i ühenduse.</td></tr>

@@ -989,7 +989,8 @@ traffic:
   switch exactly like the live syncs do: with the switch off the import
   button is disabled and says so, and an import started any other way
   (the CLI, or one already queued when you switched it off) sends nothing
-  and finishes at 0. An import that was already running when you switched
+  and finishes at 0; `smaily:backfill:start contacts` says so when it
+  starts one. An import that was already running when you switched
   it off stops at its next chunk and is reported as canceled, keeping the
   count it had genuinely sent.
 - **Catalog / Customers / Orders → Campaign Intelligence** — Settings >

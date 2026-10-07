@@ -12,6 +12,7 @@ use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Backfill\EngineImportGuard;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
+use Smaily\Connect\Model\Config;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -24,13 +25,17 @@ use Symfony\Component\Console\Output\OutputInterface;
  * Queues a chunked historical import; the smaily_backfill_tick cron job
  * advances it. Progress: smaily:backfill:status. A catalog, customers or
  * orders import needs a Campaign Intelligence connection (PRO-1969, PRO-3742).
+ * A contacts import for a website whose contact sync is off still starts —
+ * it sends nothing and finishes at 0, as the import itself decides
+ * (PRO-1764) — and the command says so (PRO-1970).
  */
 class BackfillStartCommand extends Command
 {
     public function __construct(
         private readonly JobManager $jobManager,
         private readonly StoreManagerInterface $storeManager,
-        private readonly EngineImportGuard $engineImportGuard
+        private readonly EngineImportGuard $engineImportGuard,
+        private readonly Config $config
     ) {
         parent::__construct();
     }
@@ -102,6 +107,16 @@ class BackfillStartCommand extends Command
                 (int)$job->getId(),
                 $websiteId
             ));
+            // The stored switch ContactsProcessor checks on every run
+            // (PRO-1764): a notice, not a refusal (PRO-1970).
+            if ($jobType === Job::TYPE_CONTACTS && !$this->config->isSyncEnabled($websiteId)) {
+                $output->writeln(sprintf(
+                    '<comment>Contact synchronization is off for website %d, so this import sends nothing and'
+                    . ' finishes at 0. Turn on Sync contacts to Smaily under Settings > Contacts, then start'
+                    . ' the import again.</comment>',
+                    $websiteId
+                ));
+            }
             $started++;
         }
 

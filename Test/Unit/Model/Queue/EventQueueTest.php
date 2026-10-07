@@ -230,6 +230,9 @@ class EventQueueTest extends TestCase
         self::assertSame(Event::STATUS_SENT, $captured['status']);
         self::assertNull($captured['last_error']);
         self::assertSame('{"code":101}', $captured['last_response']);
+        self::assertSame(gmdate('Y-m-d H:i:s', self::NOW_TIMESTAMP), $captured['updated_at'], 'PRO-3961');
+        self::assertNull($captured['claim_token']);
+        self::assertNull($captured['claimed_at']);
     }
 
     /**
@@ -271,6 +274,13 @@ class EventQueueTest extends TestCase
         [$bind, $where] = $updates[0];
         self::assertSame([1, 2, 3], $where['id IN (?)']);
         self::assertSame('HTTP 503', $bind['last_error'], 'A value every row shares is set once');
+        self::assertSame(
+            gmdate('Y-m-d H:i:s', self::NOW_TIMESTAMP),
+            $bind['updated_at'],
+            'The outcome dates every row (PRO-3961)'
+        );
+        self::assertNull($bind['claim_token']);
+        self::assertNull($bind['claimed_at']);
         self::assertSame(
             'CASE `id` WHEN 1 THEN 1 WHEN 2 THEN 1 WHEN 3 THEN 5 ELSE `attempts` END',
             (string)$bind['attempts']

@@ -215,6 +215,81 @@ class EventQueueTest extends IntegrationTestCase
     }
 
     /**
+     * PRO-3961: an outcome dates the row at the time it happened and
+     * releases the claim. The row model holds `updated_at` as the claim read
+     * it; saving that back would leave the row dated at its previous change.
+     *
+     * @param \Closure(EventQueue, Event): void $outcome
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('outcomes')]
+    public function testAnOutcomeDatesTheRowAtTheTimeItHappened(\Closure $outcome): void
+    {
+        $this->queue->enqueue('contact.sync', [], null, 0, 'u-dated');
+        $this->pinUpdatedAt(['u-dated'], $this->clockDate(-7200));
+        $claimed = $this->queue->claimBatch();
+        self::assertCount(1, $claimed);
+
+        $this->clock->travel(600);
+        $outcome($this->queue, $claimed[0]);
+
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame($this->clockDate(), $row['updated_at']);
+        self::assertNull($row['claim_token']);
+        self::assertNull($row['claimed_at']);
+    }
+
+    /**
+     * @return array<string, array{\Closure(EventQueue, Event): void}>
+     */
+    public static function outcomes(): array
+    {
+        return [
+            'failure' => [static fn (EventQueue $queue, Event $event) => $queue->markFailed($event, 'HTTP 503')],
+            'parking failure' => [
+                static fn (EventQueue $queue, Event $event) => $queue->markFailed(
+                    $event,
+                    'permanent_http_404: gone',
+                    terminal: true
+                ),
+            ],
+            'delivery' => [
+                static fn (EventQueue $queue, Event $event) => $queue->markSent($event, '[]', '{"code":101}'),
+            ],
+            'skip' => [static fn (EventQueue $queue, Event $event) => $queue->markSkipped($event, 'No workflow')],
+        ];
+    }
+
+    /**
+     * PRO-3961: the batched failure (PRO-1964) dates each row as a single
+     * failure does — the row it parks and the rows it reschedules alike.
+     */
+    public function testABatchedFailureDatesEveryRowAtTheTimeItHappened(): void
+    {
+        foreach (['u-b1', 'u-b2', 'u-b3'] as $uuid) {
+            $this->queue->enqueue('contact.sync', [], null, 0, $uuid);
+        }
+        $this->connection->update(
+            EventResource::TABLE_NAME,
+            ['attempts' => EventQueue::MAX_ATTEMPTS - 1],
+            ['event_uuid = ?' => 'u-b3']
+        );
+        $this->pinUpdatedAt(['u-b1', 'u-b2', 'u-b3'], $this->clockDate(-7200));
+        $claimed = $this->queue->claimBatch();
+        self::assertCount(3, $claimed);
+
+        $this->clock->travel(600);
+        $this->queue->markFailedMany($claimed, 'HTTP 503');
+
+        $rows = array_column($this->fetchAll(EventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(Event::STATUS_FAILED, $rows['u-b3']['status']);
+        foreach ($rows as $uuid => $row) {
+            self::assertSame($this->clockDate(), $row['updated_at'], $uuid);
+            self::assertNull($row['claim_token'], $uuid);
+            self::assertNull($row['claimed_at'], $uuid);
+        }
+    }
+
+    /**
      * PRO-2453: the shopper bought before the reminder went out, so the row
      * is withdrawn terminally — and only the matching trigger's, only for
      * this contact, and only while it is still pending.
@@ -315,6 +390,20 @@ class EventQueueTest extends IntegrationTestCase
             $email,
             0,
             $uuid
+        );
+    }
+
+    /**
+     * Date rows' last change at $at, as an earlier change would have left it.
+     *
+     * @param string[] $uuids
+     */
+    private function pinUpdatedAt(array $uuids, string $at): void
+    {
+        $this->connection->update(
+            EventResource::TABLE_NAME,
+            ['updated_at' => $at],
+            ['event_uuid IN (?)' => $uuids]
         );
     }
 }

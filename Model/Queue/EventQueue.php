@@ -43,9 +43,10 @@ class EventQueue
 
     /**
      * The columns markFailedMany() writes: a failure's outcome and its
-     * exchange, plus the claim and timestamp columns as the row model holds
-     * them — what the model's own save in markFailed() writes there too, so
-     * a row failed in a batch ends exactly like one failed alone.
+     * exchange, plus the released claim and the outcome's time
+     * (outcomeFields()) — what the model's own save in markFailed() writes
+     * there too, so a row failed in a batch ends exactly like one failed
+     * alone.
      */
     private const FAILURE_COLUMNS = [
         'attempts',
@@ -299,7 +300,8 @@ class EventQueue
         $event->addData(array_merge(
             $this->terminalFields($response),
             ['last_error' => null],
-            $this->exchangeFields($event, $sentPayload, $response)
+            $this->exchangeFields($event, $sentPayload, $response),
+            $this->outcomeFields()
         ));
         $this->eventResource->save($event);
     }
@@ -313,7 +315,8 @@ class EventQueue
         $event->addData(array_merge(
             $this->terminalFields(null),
             ['last_error' => mb_substr($reason, 0, self::MAX_ERROR_LENGTH)],
-            $this->exchangeFields($event, null, null)
+            $this->exchangeFields($event, null, null),
+            $this->outcomeFields()
         ));
         $this->eventResource->save($event);
     }
@@ -421,7 +424,7 @@ class EventQueue
             'status' => $exhausted ? Event::STATUS_FAILED : Event::STATUS_PENDING,
             'next_retry_at' => $exhausted ? null : $this->nextRetryAt($attempts, $retryAfter),
             'last_error' => mb_substr($error, 0, self::MAX_ERROR_LENGTH),
-        ] + $this->exchangeFields($event, $sentPayload, $response));
+        ] + $this->exchangeFields($event, $sentPayload, $response) + $this->outcomeFields());
 
         return $exhausted;
     }
@@ -734,6 +737,25 @@ class EventQueue
         return [
             'sent_payload' => $sentPayload ?? $event->getData('sent_payload'),
             'last_response' => $response ?? $event->getData('last_response'),
+        ];
+    }
+
+    /**
+     * What every outcome of a claimed row writes besides its own fields: the
+     * claim released, and the row's last-changed time set to the outcome's
+     * (PRO-3961). The row model still holds all three as they were before
+     * the claim, and saving those back would date a failure, a delivery or
+     * a skip at the row's previous change — in Details, in the Log and in
+     * the queue health check.
+     *
+     * @return array{claim_token: null, claimed_at: null, updated_at: string}
+     */
+    private function outcomeFields(): array
+    {
+        return [
+            'claim_token' => null,
+            'claimed_at' => null,
+            'updated_at' => $this->dateTime->gmtDate('Y-m-d H:i:s'),
         ];
     }
 

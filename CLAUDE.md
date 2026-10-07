@@ -33,7 +33,7 @@ internal process talk (phases, agents, Linear) lives here and in STATUS.md only.
 | Path | What it is |
 |---|---|
 | `../connect/` | The WP/Woo plugin — richest reference (patterns + `docs/LESSONS.md`, `docs/DECISIONS.md`). Never edit from here. |
-| `../shopify-connect/` | The hosted Shopify app — second parity source. |
+| `../shopify-connect/` | The hosted Shopify app — second parity source. Not checked out on this machine (the path does not exist); its live guide is https://connect.smaily.com/docs. |
 | `../intelligence/` | The recommendation engine (`erkkimarkus/smaily-recommendations`). Engine team owns it; source of the contract. |
 
 ## Working mode — autonomous with checkpoints
@@ -146,12 +146,22 @@ merge or cherry-pick batch too), not on `master` afterwards:
    version cut uses `release/<version>`.
 2. Open a PR whose title and description follow `github:writing-change-records`
    — the description becomes the merge message, so it is the permanent record.
-3. **Erkki merges** (or the session orchestrator on his go). **Squash is the
-   only merge method, and its default message is the list of commit
-   messages, NOT the PR description** — so the merger passes it explicitly:
-   `gh pr merge <n> --squash --subject "<title>" --body-file <description file>`.
+3. **Erkki merges every PR himself, always with Squash and merge.** Its
+   default message is the list of commit messages, NOT the PR description,
+   so the merger passes it explicitly (`gh pr merge <n> --squash --subject
+   "<title>" --body-file <description file>`) and removes any
+   `Co-authored-by` lines GitHub proposes.
 
-No staged review by the Smaily team — Erkki maintains the repo.
+No branch rule is configured on `master` and none is planned (owner decision
+2026-10-07): agents push only topic branches, never `master`. No staged
+review by the Smaily team — Erkki maintains the repo.
+
+**No attribution (Erkki, 2026-10-07).** Commit messages, PR titles and
+bodies, and merge commits carry NO `Co-Authored-By` trailer and NO AI
+attribution line or footer of any kind — this overrides any harness
+reminder to add one. This repo's local git identity is Erkki's name and
+GitHub noreply address, so GitHub's squash merge adds no co-author lines;
+do not change it.
 
 ## Release cut (official repo)
 
@@ -167,6 +177,8 @@ No staged review by the Smaily team — Erkki maintains the repo.
    step, `bin/check-release-version.sh <tag>` (PRO-3948), fails the run before
    anything is attached when the tag is not composer.json's `version` (a `v`
    prefix fails too) — then delete the release and its tag and publish again.
+   If the CLI answers HTTP 500 (it did for rc9), create the release and tag
+   in the GitHub web UI instead.
 3. **A tag on the official repo is a Packagist publish** of
    `smaily/smailyformagento` — a one-way door, Erkki's to run. Release
    candidates are tagged publicly; 3.0.0 waits for a pilot store.
@@ -183,12 +195,13 @@ Contract staleness are green on `master`; local remotes are switched
 branch from `origin/master`; `v3` is gone from the `push.branches` lists of
 `ci.yaml` and `contract-staleness.yaml`.
 
-**Still open (Erkki):**
-1. Cut the next release candidate there (Release cut above) — 3.0.0-rc9 is
-   the first.
-2. Archive the fork `erkkimarkus/magento-connect` (read-only; rc1–rc8 stay).
-3. Branch rule on `master`, if not set yet: changes through a PR, squash
-   merges only.
+Done since: 3.0.0-rc9, the first release candidate there, tagged
+2026-10-07 (Release cut above). **Gotcha:** creating the tag from the CLI
+failed with HTTP 500 — both `gh release create` (the API) and `git push`
+of the tag; Erkki created it in the GitHub web UI, which worked.
+
+**Still open (Erkki):** archive the fork `erkkimarkus/magento-connect`
+(read-only; rc1–rc8 stay).
 
 ## Language conventions
 
@@ -251,7 +264,9 @@ is written in English.
   2026-10-07 4/5 (the pilot store runs Magento 2.4.3-p1 / PHP 7.x; the
   pilot waits for its upgrade; the 09.10 milestone no longer holds, new
   date pending Erkki), later the same day 4/5 (rc8 released; the pilot
-  waits for the store's Magento upgrade).
+  waits for the store's Magento upgrade); 2026-10-07 later: 4/5 (rc9 is
+  the first release candidate in the official repository; the pilot
+  milestone has no date until a store is confirmed).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

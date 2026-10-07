@@ -14,6 +14,7 @@ use Magento\Framework\DB\Select;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Api\Data\OrderItemInterface;
 use Magento\Sales\Model\Order;
+use Magento\Sales\Model\Order\Creditmemo;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
 
@@ -228,6 +229,35 @@ class OrderPayloadBuilderTest extends TestCase
     }
 
     /**
+     * PRO-3798: only a refunded credit memo marks its lines returned. A
+     * canceled one gave nothing back and a pending (open) one has not
+     * refunded yet; neither marks a line, nor adds to a line's quantity.
+     */
+    public function testOnlyARefundedCreditMemoMarksItsLinesReturned(): void
+    {
+        $refunded = $this->item('POC-CAT', 1, 22.99, 0.0);
+        $refunded->method('getItemId')->willReturn(11);
+        $canceled = $this->item('POC-DENT', 1, 44.51, 0.0);
+        $canceled->method('getItemId')->willReturn(12);
+        $pending = $this->item('POC-BONE', 2, 10.00, 0.0);
+        $pending->method('getItemId')->willReturn(13);
+
+        $order = $this->order([], 77.50, Order::STATE_COMPLETE, 5, 22.99);
+        $order->method('getItems')->willReturn([$refunded, $canceled, $pending]);
+
+        $items = $this->builderWithReturns([
+            [11, 1.0, '2026-07-02 09:00:00', Creditmemo::STATE_REFUNDED],
+            [12, 1.0, '2026-07-03 09:00:00', Creditmemo::STATE_CANCELED],
+            [13, 1.0, '2026-07-04 09:00:00', Creditmemo::STATE_REFUNDED],
+            [13, 1.0, '2026-07-05 09:00:00', Creditmemo::STATE_OPEN],
+        ])->build($order)['items'];
+
+        self::assertSame('2026-07-02T09:00:00Z', $items[0]['returned_at']);
+        self::assertArrayNotHasKey('returned_at', $items[1], 'a canceled credit memo returns nothing');
+        self::assertArrayNotHasKey('returned_at', $items[2], 'a pending credit memo does not complete the line');
+    }
+
+    /**
      * An order no credit memo has ever touched (total_refunded IS NULL) never
      * runs the credit-memo query at all.
      */
@@ -375,8 +405,9 @@ class OrderPayloadBuilderTest extends TestCase
     /**
      * Credit-memo item rows as the join returns them, oldest memo first.
      *
-     * @param array<int, array{0: int, 1: float, 2: string}> $returns
-     *     [order_item_id, qty, credit-memo created_at]
+     * @param array<int, array{0: int, 1: float, 2: string, 3?: int}> $returns
+     *     [order_item_id, qty, credit-memo created_at, credit-memo state
+     *     (refunded when left out)]
      * @param array<string, ?string>|false $attribution the side-table row
      */
     private function builderWithReturns(array $returns, array|false $attribution = false): OrderPayloadBuilder
@@ -386,6 +417,7 @@ class OrderPayloadBuilderTest extends TestCase
                 'order_item_id' => $row[0],
                 'qty' => $row[1],
                 'created_at' => $row[2],
+                'state' => (string)($row[3] ?? Creditmemo::STATE_REFUNDED),
             ],
             $returns
         );

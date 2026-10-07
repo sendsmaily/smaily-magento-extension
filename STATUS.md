@@ -5,10 +5,12 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-07 — PRO-3854: the engine contract copy is
-synced v1.8.3 → v1.12.0 (doc only, nothing the extension sends changes;
-unreleased, a CHANGELOG bullet under "Changes since 3.0.0-rc7"; Contract
-staleness green again). 2026-10-05 session handoff: after rc7, PRO-3768, PRO-1958,
+_Last updated: 2026-10-07 — PRO-3798 (only a refunded credit memo marks
+order lines returned for Campaign Intelligence; a canceled or pending one
+does not; unreleased) and PRO-3854's contract part: the engine contract copy
+is synced v1.8.3 → v1.12.0 (doc only, nothing the extension sends changes;
+Contract staleness green again); both under CHANGELOG's "Changes since
+3.0.0-rc7". 2026-10-05 session handoff: after rc7, PRO-3768, PRO-1958,
 PRO-3747, PRO-3753, PRO-3767, PRO-3780, PRO-1957, PRO-1955 and the
 simplification passes landed on v3, unreleased (CHANGELOG's "Changes since
 3.0.0-rc7"); they go into the next rc after the pilot. In detail: after rc7, PRO-1955 (a credit memo that moves
@@ -233,6 +235,32 @@ Earlier: 2026-09-11, 2026-09-10._
   manifest, which this module does not send; cites v1.12.0),
   UPSTREAM_PROPOSAL cites v1.12.0, CHANGELOG (rc7-list bullet as for
   1.8.3; the 3.0.0 "Ships the … contract" line).
+- **PRO-3798 — only a refunded credit memo marks lines returned
+  (2026-10-07; unreleased, after rc7).** `OrderPayloadBuilder` read every
+  credit memo of the order for `items[].returned_at`, whatever its state.
+  It now reads the memo's `state` and counts only
+  `Creditmemo::STATE_REFUNDED`: a canceled memo gave nothing back, and a
+  pending (open) one has not refunded yet — §5 prefers a missed return to
+  a wrong one. Vendor read: every core refund path stores the memo as
+  refunded (`CreditmemoService::refund()`, `RefundOrder`, `RefundInvoice`,
+  the gateway refund notification through the same service);
+  `CreditmemoManagementInterface::cancel()` throws and nothing in core sets
+  the open or canceled state, so both come only from an extension. Such a
+  change saves an existing memo, which queues nothing (PRO-1955's plugin
+  queues only a new memo; `OrderSaveAfter` only if the extension also moves
+  the order's state or refunded total), so an order already sent keeps the
+  return until its next queued save or an order import (CHANGELOG says
+  so). **Evidence:** sandbox, real credit memo through
+  `CreditmemoManagementInterface::refund()` offline (zero-value, whole
+  line, order 000000001), then the memo's state saved through the
+  repository as canceled and as open, all in one transaction rolled back
+  (queue 0 before and after; nothing flushed or sent); the builder under
+  test loaded from a copy in the container before the module's (the main
+  checkout untouched). Old builder: returned_at in all three builds. New:
+  returned_at with the memo refunded, none when canceled or open. Each
+  state save queued 0 rows. Unit `OrderPayloadBuilderTest` (refunded,
+  canceled, open; red without the change). No DI change. Docs:
+  ARCHITECTURE, USER_GUIDE (what syncs, Orders), CHANGELOG.
 
 - **PRO-1955 — a zero-value credit memo queues its order (2026-10-05;
   unreleased, after rc7).** `OrderSaveAfter` queued an order only when its
@@ -2890,8 +2918,8 @@ Earlier: 2026-09-11, 2026-09-10._
   - Human acceptance left: PRO-2474 (pilot installed and connected), PRO-3660 (a recommendation and a back-in-stock link open on the storefront), the pilot-day checks in the checklist.
   - Pilot decisions made 2026-10-05 (PRO-3600): consent contact mode, connect Campaign Intelligence on 09.10, 25% holdout before activation (engine side), 12-week reading window, Estonian emails; Personalization stays hidden while refused.
   - **Erkki:** HC Pro (PRO-3661 2.x settings, PRO-3663 Mageplaza checks, PRO-3665 other abandoned-cart senders, spike PRO-3662); Estonian proofreading of the strings added 2026-10-02..05.
-  - **On v3 after rc7, unreleased** (CHANGELOG "Changes since 3.0.0-rc7"; into the next rc after the pilot): PRO-3768 (CSV-import deletes reach the engine), PRO-1958, PRO-3747, PRO-3753 (a 203 group is sent one by one), PRO-3767, PRO-3780, PRO-1957, PRO-1955, the simplification passes.
-  - **Open queue:** PRO-3798 (a canceled credit memo may mark lines returned; Medium), PRO-3746 (after the pilot: one connect step and one import-start step), PRO-3774 (remove a product from the engine by SKU; Replace-import note), PRO-2461, PRO-1970, PRO-1964 (low), PRO-1464/PRO-1463 multi-website phases (one-way door; wait on the engine).
+  - **On v3 after rc7, unreleased** (CHANGELOG "Changes since 3.0.0-rc7"; into the next rc after the pilot): PRO-3768 (CSV-import deletes reach the engine), PRO-1958, PRO-3747, PRO-3753 (a 203 group is sent one by one), PRO-3767, PRO-3780, PRO-1957, PRO-1955, the simplification passes, PRO-3798 (only a refunded credit memo marks lines returned).
+  - **Open queue:** PRO-3746 (after the pilot: one connect step and one import-start step), PRO-3774 (remove a product from the engine by SKU; Replace-import note), PRO-2461, PRO-1970, PRO-1964 (low), PRO-1464/PRO-1463 multi-website phases (one-way door; wait on the engine).
   - **Cross-repo asks open:** WooCommerce PRO-3743 (catalog import on connect), PRO-3750 (code 203, and contact sync ignores it), PRO-3796 (over_10_products); Shopify PRO-3744, PRO-3751, PRO-3797. Engine PRO-3740 is done (contract 1.8.3 synced).
   - Sandbox: remove finished agent worktrees under `.claude/worktrees` before any sandbox `setup:di:compile`.
 

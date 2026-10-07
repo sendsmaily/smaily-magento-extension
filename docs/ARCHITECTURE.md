@@ -352,7 +352,16 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   field would erase the return. A line is marked returned only once its FULL
   quantity has been credited (a partly credited quantity stays kept, §5);
   neither reason field is sent, because Magento has no structured return
-  taxonomy to map from. A partial credit memo leaves the order state alone,
+  taxonomy to map from. Only a refunded credit memo
+  (`Creditmemo::STATE_REFUNDED`) counts (PRO-3798): a canceled one gave
+  nothing back, and a pending (open) one has not refunded yet. Every
+  Magento refund path stores its credit memo as refunded
+  (`CreditmemoManagementInterface::cancel()` throws, and nothing in core
+  sets the open or canceled state), so the other two come only from an
+  extension. Such a state change saves an existing credit memo, which
+  queues nothing on its own (`CreditmemoSave` below queues only a new
+  one), so the corrected order reaches the engine with the order's next
+  queued save or an order import. A partial credit memo leaves the order state alone,
   so `OrderSaveAfter`'s enqueue gate treats a moved `total_refunded` as a
   change worth re-sending. A credit memo that moves quantity and no money
   (the return of a fully discounted line, or one with an adjustment that

@@ -12,6 +12,7 @@ use Magento\Framework\App\ResourceConnection;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Api\Data\OrderItemInterface;
 use Magento\Sales\Model\Order;
+use Magento\Sales\Model\Order\Creditmemo;
 use Smaily\Connect\Model\Engine\AttributionShape;
 use Smaily\Connect\Model\Engine\RecId;
 
@@ -155,6 +156,12 @@ class OrderPayloadBuilder
      * rows come oldest-first, so the last memo to touch a line — the one that
      * completed it — dates the return.
      *
+     * Only a refunded credit memo counts (PRO-3798). A canceled one gave
+     * nothing back, and a pending (open) one has not refunded yet; §5 would
+     * rather miss a return than mark a line the customer still has. Every
+     * Magento refund path stores its credit memo as refunded; the other two
+     * states come only from an extension.
+     *
      * @return array<int, array{qty: float, created_at: string}> keyed by order-item id
      */
     private function returnsByOrderItem(OrderInterface $order): array
@@ -177,13 +184,16 @@ class OrderPayloadBuilder
             ->join(
                 ['c' => $this->resourceConnection->getTableName('sales_creditmemo', 'sales')],
                 'c.entity_id = ci.parent_id',
-                ['created_at']
+                ['created_at', 'state']
             )
             ->where('c.order_id = ?', (int)$order->getEntityId())
             ->order('c.created_at ASC');
 
         $returns = [];
         foreach ($connection->fetchAll($select) as $row) {
+            if ((int)$row['state'] !== Creditmemo::STATE_REFUNDED) {
+                continue;
+            }
             $orderItemId = (int)$row['order_item_id'];
             $qty = (float)$row['qty'];
             if ($orderItemId <= 0 || $qty <= 0) {

@@ -695,7 +695,7 @@ toggle; catalog, customer and order sync run automatically once connected.
 |---|---|
 | Catalog | On product save/delete (deletes become out-of-stock) and on every stock change — a shipment that sells the last unit, a credit memo that puts it back, an Advanced Inventory or Sources edit, an API stock update. Products deleted with Magento's import (**Delete** behaviour) are removed too. The whole catalog goes once, with the catalog import; there is no periodic full re-sync. A change made outside Magento's own product save — an ERP link, a CSV or `bin/magento import` run, a direct database import — is not seen: start the catalog import by hand afterwards |
 | Customers | On profile create/update (no consent fields — the engine is a separate lawful surface) |
-| Orders | On order placement, status changes, and refunds — a credit memo re-syncs the order, so a fully credited line is reported as returned and stops being recommended back to that customer (a partly credited line still counts as kept) |
+| Orders | On order placement, status changes, and refunds — a credit memo re-syncs the order, so a line fully credited by refunded credit memos is reported as returned and stops being recommended back to that customer (a partly credited line still counts as kept, and so does a line on a credit memo that is pending or canceled) |
 | Browse events | Product views, searches, cart adds, checkout — batched from the storefront (**Enable storefront browse tracking (product views, searches, cart activity)**, off by default — a separate, consent-gated toggle, not part of the always-on sync above) |
 
 Browse tracking sends events only for a visitor who gave marketing consent

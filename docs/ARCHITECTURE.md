@@ -1173,7 +1173,15 @@ or a subscription Smaily's consent mirror writes counts too.
   many orders make one; once that row is delivered, the next confirmation
   queues one again, which the engine takes as a no-op. The row is queued
   only after the engine confirmed the shopper, so it finds them.
-- **Identity merge.** `Queue\Handler\IdentityMergeHandler` asks
+- **Identity merge.** `Observer\Engine\CustomerLogin` (`customer_login`)
+  queues the row when the request carries the session or visitor cookie
+  (`AttributionManager::readCookies()`; no Magento session is needed).
+  Magento's own login passes the customer model, a customer token login
+  (`Integration\Model\CustomerTokenService`: GraphQL
+  `generateCustomerToken`, REST `integration/customer/token`) the customer
+  data object; both are taken, so a separate storefront that forwards the
+  cookies on its login request gets the merge too (PRO-3917).
+  `Queue\Handler\IdentityMergeHandler` asks
   `isAllowed()` (at the customer's store view, whose Smaily account holds
   the contact) before each merge; an opted-out shopper's row is closed
   without a call as `Queue\Skipped`, so their browsing stays anonymous. Asked on the cron, not

@@ -48,15 +48,15 @@ install, in this order. Each line links to its details below.
 
 1. Product links open: route `/<url-key>.html`, or redirect it to the product page keeping the query string — [Storefront URL](#storefront-url).
 2. Campaign clicks (`smaily_rec`, `smaily_vt`, `smaily_ctx`) are written into first-party cookies on every page load — [hand-off item 2](#2-capture-campaign-clicks-into-cookies).
-3. Those cookies travel with the place-order request — [hand-off item 3](#3-carry-the-cookies-to-order-placement).
+3. Those cookies travel with the place-order request, and `smaily_anon_sid` and `smaily_rec_uid` with the login (customer token) request — [hand-off item 3](#3-carry-the-cookies-to-order-placement).
 4. A guest's email goes on the cart as soon as it is typed (`setGuestEmailOnCart`) — [hand-off item 7](#7-put-a-guests-email-on-the-cart).
 5. Browse events go to `/smaily/relay`, only with marketing-cookie consent — [hand-off item 4](#4-send-browse-events).
 6. Checkout has the storefront's own unticked newsletter checkbox, which subscribes the shopper through Magento — [hand-off item 5](#5-newsletter-consent-at-checkout).
 7. The merchant gets the storefront's cart page address for the abandoned-cart email — [Abandoned-cart link](#abandoned-cart-link).
 
-Three features have no headless path: linking browsing to the account at
-login, the My Account personalization page, and the welcome automation for
-signups made on the storefront — see the table below.
+Two features have no headless path: the My Account personalization page,
+and the welcome automation for signups made on the storefront — see the
+table below.
 
 ## What works and what does not
 
@@ -79,7 +79,7 @@ available** — no headless path today.
 | Campaign-click capture (`smaily_rec`, `smaily_vt`, `smaily_ctx`) | Storefront script | **Needs storefront work** — see [hand-off item 2](#2-capture-campaign-clicks-into-cookies) |
 | Recommendation attribution on orders | Server, reads the shopper's cookies at order placement | **Needs storefront work** — the order request must carry the cookies; see [hand-off item 3](#3-carry-the-cookies-to-order-placement) |
 | Browse tracking (product views, searches, cart adds, checkout) | Storefront script posting to `smaily/relay` | **Needs storefront work** — see [hand-off item 4](#4-send-browse-events) |
-| Identity merge on login | Server: Magento's login event, reads the shopper's cookies | **Not available** — the module links browsing to the account only on a login through Magento's own storefront session; a GraphQL or REST login (a customer token) does not start it, with or without cookies. Browse events still carry the visitor token from a campaign click |
+| Identity merge on login | Server: Magento's login event, reads the shopper's cookies | **Needs storefront work** — a GraphQL `generateCustomerToken` or REST `integration/customer/token` login links the shopper's earlier browsing to their account, as a login on Magento's own pages does, when the login request carries the cookies; see [hand-off item 3](#3-carry-the-cookies-to-order-placement) |
 | My Account > Personalization (profiling opt-out) | Magento customer account page | **Not available** — the module has no API for this choice |
 | GDPR erase command | Server: CLI | **Works** |
 
@@ -281,6 +281,16 @@ cookies to the back end: use the server or the proxy route.
 
 Without this, orders reach Campaign Intelligence without attribution, and
 recommendation emails show no conversions.
+
+**The login request too.** When a shopper logs in — GraphQL
+`generateCustomerToken`, or REST `POST /V1/integration/customer/token` —
+the module links the browsing recorded before the login to their account.
+It reads two of the cookies from that request: `smaily_anon_sid` (the
+browsing session, item 4) and `smaily_rec_uid` (the visitor token, item 2);
+either one is enough. Carry them the same way as for the place-order
+request. A login request without them links nothing; the login itself
+works as before. A shopper who turned profiling off is not linked, as on
+Magento's own pages.
 
 ### 4. Send browse events
 

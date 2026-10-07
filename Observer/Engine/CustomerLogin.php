@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Observer\Engine;
 
+use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Customer\Model\Customer;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
@@ -18,7 +19,9 @@ use Smaily\Connect\Model\Queue\EventType;
 
 /**
  * Identity merge on login: binds the anonymous session/visitor cookies to
- * the now-known customer. Queued (never blocks login) — the handler calls
+ * the now-known customer, on a login through Magento's own pages or a
+ * customer token request (whose cookies a separate storefront forwards).
+ * Queued (never blocks login) — the handler calls
  * POST identity/merge with the engine's retry policy.
  */
 class CustomerLogin implements ObserverInterface
@@ -39,8 +42,11 @@ class CustomerLogin implements ObserverInterface
             return;
         }
 
+        // Magento's own login passes the customer model; a customer token
+        // login (GraphQL generateCustomerToken, REST integration/customer/token)
+        // passes the customer data object.
         $customer = $observer->getEvent()->getData('customer');
-        if (!$customer instanceof Customer || !$customer->getEmail()) {
+        if (!($customer instanceof Customer || $customer instanceof CustomerInterface) || !$customer->getEmail()) {
             return;
         }
 

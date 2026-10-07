@@ -11,7 +11,9 @@ store runs Magento 2.4.3-p1 (PHP 7.3/7.4 only); the module needs Magento
 (Erkki, 2026-10-07): the store upgrades first (Magento 2.4.7 or 2.4.8 on
 PHP 8.2/8.3); Erkki sets the new date once the store's developer estimates
 the upgrade; the "Pilot store live" milestone (2026-10-09) no longer holds.
-Landed today, unreleased: PRO-3854 (the nightly catalog manifest, §3c, sent
+Landed today, unreleased: PRO-3917 (a login through Magento's API —
+GraphQL/REST customer token — links earlier browsing, as on Magento's own
+pages, when the storefront forwards the cookies), PRO-3854 (the nightly catalog manifest, §3c, sent
 at 03:30; and the contract copy 1.12.0), PRO-3798,
 PRO-3802 (the pilot-day order needs it, so the pilot installs rc8),
 PRO-3913 (a reopened setup asks for the catalog import again after a

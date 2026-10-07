@@ -15,8 +15,14 @@ via a plain `composer update`). Target: feature parity with the UNION of the Woo
 Campaign Intelligence support. Aim: become Smaily's official upstream extension.
 Magento 2.4.4+ / PHP 8.1–8.4. GPL-3.0. Public product name "Smaily Connect".
 
-Fork: `erkkimarkus/magento-connect` (upstream
-`sendsmaily/smaily-magento-extension`). Work happens on branch `v3` (default).
+Repository: the official `sendsmaily/smaily-magento-extension`, branch
+`master` (owner decision 2026-10-07, PRO-1198). Until the move lands, work
+still happens in the fork `erkkimarkus/magento-connect` on branch `v3`
+(default); the move is one squash-merged PR from the fork's `v3` into the
+official `master` (see "The move into sendsmaily" below). After it, the
+fork is archived and every change reaches `master` through a pull request
+("Changes reach `master`"). The 2.8.x line is not developed further; its
+tags stay, no maintenance branch.
 
 **Public facade:** README, CONTRIBUTING, CHANGELOG, TESTING and `docs/` are
 written as finished-product public documentation. Keep them in that tone —
@@ -57,7 +63,8 @@ repo (`../intelligence/`, `erkkimarkus/smaily-recommendations`) — never
 hand-edit it. The `Contract staleness` workflow (daily + push/PR) runs
 `bin/check-contract-staleness.sh` and goes red on drift; it needs the repo
 secret `ENGINE_CONTRACT_READ_TOKEN` (fine-grained PAT, contents:read on the
-engine repo). Locally, the script's fallback engine checkout
+engine repo) — in whichever repo runs it, so the official repo needs its own
+copy (After the move, step 1). Locally, the script's fallback engine checkout
 (`$ENGINE_CHECKOUT`'s default) is a hard-coded Linux path that does not
 exist on this Mac — pass the path explicitly:
 `bin/check-contract-staleness.sh ../intelligence/docs/RECENGINE_API_CONTRACT.md`
@@ -125,7 +132,67 @@ start one.
   first `setup:upgrade` can fail with "Too few arguments" (or a type error) from the stale
   compiled DI; run `setup:di:compile`, then both again.
 - Release ZIP is built by `.github/workflows/release.yaml` on a published
-  GitHub release.
+  GitHub release (see "Release cut" below).
+
+## Changes reach `master` through pull requests — squash-merged (Erkki, 2026-10-07)
+
+Mirrors the WooCommerce repo (`../connect/` CLAUDE.md, PRO-2281). Once v3 is
+in `sendsmaily/smaily-magento-extension`, every change — code, docs, a
+contract sync, a version cut — goes to `master` as a PR; nothing is pushed
+to `master` directly:
+1. Work on a topic branch named like Linear's branch name for the issue
+   (`erkki/pro-1234-short-slug`).
+2. Open a PR whose title and description follow `github:writing-change-records`
+   — the description becomes the merge message, so it is the permanent record.
+3. **Erkki merges** (or the session orchestrator on his go). **Squash is the
+   only merge method, and its default message is the list of commit
+   messages, NOT the PR description** — so the merger passes it explicitly:
+   `gh pr merge <n> --squash --subject "<title>" --body-file <description file>`.
+
+No staged review by the Smaily team — Erkki maintains the repo.
+
+## Release cut (official repo)
+
+1. The version-cut PR sets the version in `composer.json`,
+   `Model/ModuleInfo.php`, the ModuleVersion docblock and
+   docs/UPSTREAM_PROPOSAL.md, and names it in CHANGELOG; squash-merge it.
+2. `gh release create 3.0.0-rc9 --repo sendsmaily/smaily-magento-extension
+   --target master --title "…" --notes-file … --prerelease` (a release
+   candidate; 3.0.0 itself without `--prerelease`). **Tag = the PLAIN
+   version, no `v`**, equal to composer.json's `version` (Packagist skips a
+   tag that disagrees with it). No local ZIP argument: `release.yaml` builds,
+   verifies and attaches `smaily-connect-magento2.zip` + `.sha256`.
+3. **A tag on the official repo is a Packagist publish** of
+   `smaily/smailyformagento` — a one-way door, Erkki's to run. Release
+   candidates are tagged publicly; 3.0.0 waits for a pilot store.
+   `dev-master` on Packagist becomes v3 the moment the move PR merges.
+
+## The move into sendsmaily (PRO-1198)
+
+`v3` descends from `upstream/master` (e2e5d45, the last 2.8.x commit), so a
+PR from the fork's `v3` into `sendsmaily:master` is conflict-free and its
+squash is exactly the v3 tree; `git merge upstream/master` is a no-op
+(checked 2026-10-07). If upstream lands anything on `master` before the PR
+merges, merge `upstream/master` into `v3` (never rebase; our side wins) and
+audit what merges CLEANLY — a legacy file that comes back or an upstream
+config that shadows ours (Woo CLAUDE.md "Merging `upstream/main`"); run
+`bin/lint-php.sh` under PHP 8.1 after it.
+
+**After the move — checklist for Erkki:**
+1. Official repo → Settings → Secrets: create `ENGINE_CONTRACT_READ_TOKEN`
+   (fine-grained PAT, contents:read on `erkkimarkus/smaily-recommendations`)
+   — without it Contract staleness fails with "CANNOT CHECK".
+2. Open the PR `erkkimarkus:v3` → `sendsmaily:master` and squash-merge it
+   (`gh pr merge <n> --squash --subject … --body-file …`); set the branch
+   rule on `master`: changes through a PR, squash merges only.
+3. Check that CI and Contract staleness are green on `master`.
+4. Cut the next release candidate there (Release cut above).
+5. Archive the fork `erkkimarkus/magento-connect` (read-only; rc1–rc8 stay).
+6. Locally: `git remote rename origin fork`, `git remote rename upstream
+   origin`, then `git checkout -b master origin/master` (or reset the
+   local `master` to it); worktrees branch from `master`.
+7. Drop `v3` from the `push.branches` lists in `ci.yaml` and
+   `contract-staleness.yaml` (they carry both until the move).
 
 ## Language conventions
 

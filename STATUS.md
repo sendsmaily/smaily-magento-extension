@@ -61,6 +61,22 @@ PILOT_CHECKLIST's pilot-day order opens with switching off other Smaily
 subscriber/opt-out syncs when contact sync goes on (and HEADLESS_STOREFRONTS A3).
 **Queue:** the pilot installs rc8 once the store has upgraded (Erkki sets
 the date).
+**The move into `sendsmaily/smaily-magento-extension` is prepared
+(PRO-1198; owner decisions 2026-10-07: one squash-merged PR from the
+fork's `v3` into the official `master`, squash-only PRs there afterwards,
+no staged review, 2.8.x ends at its tags, release candidates tagged
+publicly, 3.0.0 after the pilot), on branch
+`worktree-agent-a413398f97a66ba10` for `v3`; it waits for Erkki's go to
+open the PR.** `v3` already descends from `upstream/master` (e2e5d45), so
+the merge is a no-op and the PR is conflict-free. The admin's User Guide
+links, README, INSTALLING, CONTRIBUTING, the PR template and
+UPSTREAM_PROPOSAL §5/§7 name the official repo; CLAUDE.md has "Changes
+reach `master`", "Release cut" and the after-the-move checklist (the
+official repo needs the `ENGINE_CONTRACT_READ_TOKEN` secret first).
+**Queue:** Erkki's go → open and squash-merge the move PR → the
+after-the-move checklist (CLAUDE.md) → rc9 cut in the official repo;
+the pilot installs the newest release candidate once the store has
+upgraded (Erkki sets the date).
 Backlog: PRO-3790 (after the pilot), PRO-3746, PRO-3774._
 
 _Today in detail: PRO-3802 (the initial setup's Connect step
@@ -6894,10 +6910,10 @@ PRO-1267 (engine: Magento product-identity contract note).
 
 ## Questions / tasks for Erkki
 
-1. PRO-1198 — release coordination with Smaily (High; blocks any public
-   release path). The proposal package is drafted
-   (`docs/UPSTREAM_PROPOSAL.md`) and ready for your review; the decision
-   checklist at its end lists the one-way doors in recommended order.
+1. PRO-1198 — decided 2026-10-07 (the official repo is taken over now;
+   `docs/UPSTREAM_PROPOSAL.md` §5/§7). Your go opens the move PR; then the
+   "After the move" checklist in CLAUDE.md (secret, merge, tag, archive the
+   fork, switch local `origin`).
 2. PRO-1201 — Hyvä boundary decisions (see "Open release decisions" in
    `docs/HYVA_SUPPORT.md`; the verification matrix itself is now fully
    executed and green): (a) confirm Hyvä Checkout (commercial, Magewire)

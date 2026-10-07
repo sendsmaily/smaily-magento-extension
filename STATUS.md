@@ -25,7 +25,8 @@ Dashboard's browse tracking and the consent note describe the separate
 storefront; no consent-source notice for it), PRO-3914 (the Dashboard
 says when no nightly product list has gone out for three nights, and
 why), PRO-3915 (an import nothing has moved for an hour shows *Stalled*;
-Run again cancels it and starts a fresh one); the
+Run again cancels it and starts a fresh one), PRO-3920 (an admin's
+"Login as Customer" links no browsing to the customer); the
 version check is now step one of INSTALLING and PILOT_CHECKLIST §0;
 HEADLESS_STOREFRONTS opens with a setup checklist (admin / back end /
 storefront developer), audited against the code.

@@ -1207,6 +1207,16 @@ or a subscription Smaily's consent mirror writes counts too.
   `generateCustomerToken`, REST `integration/customer/token`) the customer
   data object; both are taken, so a separate storefront that forwards the
   cookies on its login request gets the merge too (PRO-3917).
+  An admin's "Login as Customer" queues nothing (PRO-3920): its storefront
+  page (`loginascustomer/login/index`) logs the admin's browser in with
+  `Session::loginById()`, so `customer_login` carries the admin's own
+  cookies. The observer recognizes it by the request's route
+  (`RequestInterface::getModuleName()` = `loginascustomer`), not through
+  `LoginAsCustomerApi`: `AuthenticateCustomerBySecret` records the admin on
+  the session (`SetLoggedAsCustomerAdminId`) only after the event, and the
+  Magento_LoginAsCustomer* modules are optional, so the module takes no
+  dependency on them. Login as Customer's GraphQL path
+  (`generateCustomerTokenAsAdmin`) dispatches no `customer_login`.
   `Queue\Handler\IdentityMergeHandler` asks
   `isAllowed()` (at the customer's store view, whose Smaily account holds
   the contact) before each merge; an opted-out shopper's row is closed

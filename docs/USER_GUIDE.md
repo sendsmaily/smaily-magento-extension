@@ -1242,6 +1242,9 @@ error.
   shopper's preference — when they open **My Account > Personalization** or
   log in. When a shopper who opted out
   logs in, their earlier anonymous browsing is not linked to their account.
+  An admin who opens a customer's account with Magento's **Login as
+  Customer** links nothing either: the browsing in that browser is the
+  admin's own, not the shopper's.
 - **Unsubscribing from marketing also stops profiling.** When Campaign
   Intelligence is connected, a newsletter unsubscribe — in the store, or in
   Smaily and mirrored back — also opts the shopper out of personalized

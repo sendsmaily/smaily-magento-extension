@@ -10,6 +10,7 @@ namespace Smaily\Connect\Observer\Engine;
 
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Customer\Model\Customer;
+use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Smaily\Connect\Model\Engine\AttributionManager;
@@ -21,12 +22,23 @@ use Smaily\Connect\Model\Queue\EventType;
  * Identity merge on login: binds the anonymous session/visitor cookies to
  * the now-known customer, on a login through Magento's own pages or a
  * customer token request (whose cookies a separate storefront forwards).
+ * Not on an admin's "Login as Customer": those cookies are the admin's own.
  * Queued (never blocks login) — the handler calls
  * POST identity/merge with the engine's retry policy.
  */
 class CustomerLogin implements ObserverInterface
 {
+    /**
+     * Front name of Magento's "Login as Customer" storefront page
+     * (Magento_LoginAsCustomerFrontendUi, loginascustomer/login/index), where
+     * the admin's browser is logged in as the customer. Matched by route, not
+     * through the module's API: the module is optional, and it records the
+     * admin on the session only after customer_login has fired.
+     */
+    private const LOGIN_AS_CUSTOMER_ROUTE = 'loginascustomer';
+
     public function __construct(
+        private readonly RequestInterface $request,
         private readonly Settings $settings,
         private readonly AttributionManager $attributionManager,
         private readonly EventQueue $eventQueue
@@ -38,7 +50,9 @@ class CustomerLogin implements ObserverInterface
      */
     public function execute(Observer $observer): void
     {
-        if (!$this->settings->isConnected()) {
+        if (!$this->settings->isConnected()
+            || $this->request->getModuleName() === self::LOGIN_AS_CUSTOMER_ROUTE
+        ) {
             return;
         }
 

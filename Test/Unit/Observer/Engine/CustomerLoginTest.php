@@ -10,6 +10,7 @@ namespace Smaily\Connect\Test\Unit\Observer\Engine;
 
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Customer\Model\Customer;
+use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Event;
 use Magento\Framework\Event\Observer;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -25,6 +26,8 @@ use Smaily\Connect\Observer\Engine\CustomerLogin;
  * dispatches customer_login with the customer model; a customer token login
  * (Integration\Model\CustomerTokenService — GraphQL generateCustomerToken,
  * REST integration/customer/token) with the customer data object (PRO-3917).
+ * An admin's "Login as Customer" (loginascustomer/login/index) dispatches the
+ * same event from the admin's browser and links nothing (PRO-3920).
  */
 class CustomerLoginTest extends TestCase
 {
@@ -33,6 +36,7 @@ class CustomerLoginTest extends TestCase
 
     private EventQueue&MockObject $eventQueue;
     private bool $engineConnected = true;
+    private ?string $route = 'customer';
 
     /** @var array{rec_id: ?string, visitor_token: ?string, rec_ctx: ?string, anon_session_id: ?string} */
     private array $cookies = [
@@ -83,6 +87,22 @@ class CustomerLoginTest extends TestCase
         $this->observer()->execute($this->eventFor($this->customerDataObject('person@example.com')));
     }
 
+    public function testAnApiLoginWithoutARouteQueuesTheMerge(): void
+    {
+        $this->route = null;
+        $this->expectMerge();
+
+        $this->observer()->execute($this->eventFor($this->customerDataObject('Person@Example.com ')));
+    }
+
+    public function testAnAdminsLoginAsCustomerQueuesNothing(): void
+    {
+        $this->route = 'loginascustomer';
+        $this->eventQueue->expects(self::never())->method('enqueue');
+
+        $this->observer()->execute($this->eventFor($this->customerModel('person@example.com')));
+    }
+
     public function testNothingIsQueuedWithoutCampaignIntelligence(): void
     {
         $this->engineConnected = false;
@@ -129,12 +149,14 @@ class CustomerLoginTest extends TestCase
 
     private function observer(): CustomerLogin
     {
+        $request = $this->createMock(RequestInterface::class);
+        $request->method('getModuleName')->willReturn($this->route);
         $settings = $this->createMock(Settings::class);
         $settings->method('isConnected')->willReturn($this->engineConnected);
         $attributionManager = $this->createMock(AttributionManager::class);
         $attributionManager->method('readCookies')->willReturn($this->cookies);
 
-        return new CustomerLogin($settings, $attributionManager, $this->eventQueue);
+        return new CustomerLogin($request, $settings, $attributionManager, $this->eventQueue);
     }
 
     private function customerModel(?string $email): Customer

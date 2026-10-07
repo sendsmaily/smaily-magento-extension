@@ -17,7 +17,8 @@ use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\Settings;
 
 /**
- * Storefront view model for the attribution and browse-tracking scripts.
+ * Storefront view model for the attribution, browse-tracking and
+ * recommendations scripts.
  */
 class EngineState implements ArgumentInterface
 {
@@ -41,6 +42,15 @@ class EngineState implements ArgumentInterface
         return $this->settings->isBrowseTrackingEnabled();
     }
 
+    /**
+     * The recommendations script loads only where the engine may be called;
+     * the widget's container renders under the same gate.
+     */
+    public function isRecommendationsActive(): bool
+    {
+        return $this->settings->isSendingAllowed();
+    }
+
     public function getAttributionConfigJson(): string
     {
         return $this->serializer->serialize($this->attributionManager->getClientConfig());
@@ -59,6 +69,19 @@ class EngineState implements ArgumentInterface
             // accepted on; the tracker reads it for this website only.
             'websiteId' => (int)$this->storeManager->getWebsite()->getId(),
             'attribution' => $this->attributionManager->getClientConfig(),
+        ]);
+    }
+
+    /**
+     * The recommendations script's config: the store route it asks and what
+     * it reads consent from, as the tracker does.
+     */
+    public function getRecommendationsConfigJson(): string
+    {
+        return $this->serializer->serialize([
+            'url' => $this->urlBuilder->getUrl('smaily/recommendations'),
+            'cookieRestriction' => (bool)$this->cookieHelper->isCookieRestrictionModeEnabled(),
+            'websiteId' => (int)$this->storeManager->getWebsite()->getId(),
         ]);
     }
 }

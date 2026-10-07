@@ -1,0 +1,26 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Hyvä variant of the recommendations bootstrap. Same pattern as the
+ * tracker template: inert JSON config + a static same-origin JS file, no
+ * inline executable script (strict-CSP-safe). The script does nothing on a
+ * page without the "Smaily recommendations" widget's container.
+ *
+ * @var \Magento\Framework\View\Element\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\EngineState $viewModel */
+$viewModel = $block->getData('view_model');
+if (!$viewModel->isRecommendationsActive()) {
+    return;
+}
+?>
+<script type="application/json" id="smaily-recommendations-config">
+    <?= /* @noEscape */ $viewModel->getRecommendationsConfigJson() ?>
+</script>
+<script defer
+        src="<?= $escaper->escapeUrl($block->getViewFileUrl('Hyva_SmailyConnect::js/smaily-recommendations.js')) ?>">
+</script>

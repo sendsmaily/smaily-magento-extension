@@ -1,0 +1,49 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Hyvä variant of the shopper's recommendation cards: Hyvä's product card
+ * (Tailwind `card` classes, the theme's own image and price renderers),
+ * with the store's image, name and price at this store view. Each link
+ * carries the slot's recommendation id and the storefront context
+ * (Model\Engine\RecommendedProducts). Nothing renders without items, not
+ * even the heading. No Alpine and no script: the markup is inserted by the
+ * recommendations script after the page has loaded.
+ *
+ * @var \Magento\Catalog\Block\Product\AbstractProduct $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var array<int, array{product: \Magento\Catalog\Model\Product, url: string}> $items */
+$items = (array)$block->getData('items');
+if (!$items) {
+    return;
+}
+?>
+<section class="smaily-connect-recommendations my-8">
+    <h2 class="text-2xl font-medium title-font text-gray-900 mb-4">
+        <?= $escaper->escapeHtml(__('Recommended for you')) ?>
+    </h2>
+    <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <?php foreach ($items as $item): ?>
+            <?php $product = $item['product']; ?>
+            <li class="item product product-item card card-interactive flex flex-col w-full">
+                <a href="<?= $escaper->escapeUrl($item['url']) ?>"
+                   class="product photo product-item-photo block mx-auto mb-3">
+                    <?= $block->getImage($product, 'category_page_grid')->toHtml() ?>
+                </a>
+                <div class="product-info flex flex-col grow">
+                    <div class="mt-2 mb-1 items-center justify-center text-primary text-lg">
+                        <a class="product-item-link" href="<?= $escaper->escapeUrl($item['url']) ?>">
+                            <?= $escaper->escapeHtml($product->getName()) ?>
+                        </a>
+                    </div>
+                    <div class="py-1 mx-auto">
+                        <?= /* @noEscape */ $block->getProductPrice($product) ?>
+                    </div>
+                </div>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+</section>

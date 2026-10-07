@@ -23,6 +23,13 @@
                     <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\EngineState</argument>
                 </arguments>
             </block>
+            <block class="Magento\Framework\View\Element\Template"
+                   name="smaily.connect.recommendations"
+                   template="Smaily_Connect::engine/recommendations.phtml">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\EngineState</argument>
+                </arguments>
+            </block>
         </referenceContainer>
     </body>
 </page>

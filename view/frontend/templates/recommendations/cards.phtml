@@ -1,0 +1,52 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * The shopper's recommendation cards in the store's own product-list markup
+ * (Luma's product widget grid): image, name and price from the store at
+ * this store view. Each link carries the slot's recommendation id and the
+ * storefront context (Model\Engine\RecommendedProducts). Nothing renders
+ * without items, not even the heading.
+ *
+ * @var \Magento\Catalog\Block\Product\AbstractProduct $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var array<int, array{product: \Magento\Catalog\Model\Product, url: string}> $items */
+$items = (array)$block->getData('items');
+if (!$items) {
+    return;
+}
+?>
+<div class="block widget block-products-list grid smaily-connect-recommendations">
+    <div class="block-title">
+        <strong><?= $escaper->escapeHtml(__('Recommended for you')) ?></strong>
+    </div>
+    <div class="block-content">
+        <div class="products-grid grid">
+            <ol class="product-items widget-product-grid">
+                <?php foreach ($items as $item): ?>
+                    <?php $product = $item['product']; ?>
+                    <li class="product-item">
+                        <div class="product-item-info">
+                            <a href="<?= $escaper->escapeUrl($item['url']) ?>" class="product-item-photo">
+                                <?= $block->getImage($product, 'category_page_grid')->toHtml() ?>
+                            </a>
+                            <div class="product-item-details">
+                                <strong class="product-item-name">
+                                    <a title="<?= $escaper->escapeHtmlAttr($product->getName()) ?>"
+                                       href="<?= $escaper->escapeUrl($item['url']) ?>"
+                                       class="product-item-link">
+                                        <?= $escaper->escapeHtml($product->getName()) ?>
+                                    </a>
+                                </strong>
+                                <?= /* @noEscape */ $block->getProductPrice($product) ?>
+                            </div>
+                        </div>
+                    </li>
+                <?php endforeach; ?>
+            </ol>
+        </div>
+    </div>
+</div>

@@ -19,6 +19,8 @@ $verdict = $viewModel->getVerdict();
 $failed = $viewModel->getFailedLast24h();
 $engineRefused = $viewModel->isEngineRefused();
 $engineDown = $viewModel->isEngineDown();
+// No nightly product list for several nights in a row, and why (PRO-3914).
+$unsentProductList = $viewModel->getUnsentProductList();
 // Smaily refuses every request because the package has no API access
 // (code 227, PRO-3579): not connected, but not the credentials' fault.
 $smailyPlanBlocked = $viewModel->isSmailyPlanBlocked();
@@ -36,7 +38,8 @@ $sourceLabels = [
 ];
 
 // One-sentence health verdict, by priority: incomplete > Smaily not
-// connected > account not active > failures > engine unreachable > all good.
+// connected > account not active > failures > engine unreachable > no
+// nightly product list > all good.
 // Smaily credentials that Smaily has not accepted (PRO-3560) and a
 // deactivated Campaign Intelligence account (PRO-2451) outrank the rest
 // because they explain them. Kicker is the short role label above it.
@@ -59,6 +62,9 @@ if ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_INCO
 } elseif ($engineDown) {
     $verdictKicker = __('Needs attention');
     $verdictText = __('Smaily Connect is running, but Campaign Intelligence is currently unreachable — data is queued locally and will sync when it recovers.');
+} elseif ($unsentProductList !== null) {
+    $verdictKicker = __('Needs attention');
+    $verdictText = __('Smaily Connect is running, but no nightly product list has gone to Campaign Intelligence for %1 nights.', $unsentProductList['nights']);
 } else {
     $verdictKicker = __('All systems normal');
     $verdictText = __('Everything is running — deliveries to Smaily are flowing normally.');
@@ -118,6 +124,19 @@ $showFailures = $failed > 0
                 : __('%1 events failed in the last 24 hours', $failed)) ?></div>
         </div>
         <a class="smaily-banner__action" href="<?= $escaper->escapeUrl($urls['logFailed']) ?>"><?= $escaper->escapeHtml(__('Review failures')) ?></a>
+    </div>
+    <?php endif; ?>
+    <?php // Shown whatever outranks it in the verdict, with the last night's reason (PRO-3914). ?>
+    <?php if ($unsentProductList !== null
+        && $verdict !== \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_INCOMPLETE
+        && $verdict !== \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_DISCONNECTED
+    ): ?>
+    <div class="smaily-banner smaily-banner--warning smaily-dashboard-banner" id="smaily-dashboard-unsent-product-list" role="status">
+        <span class="smaily-banner__icon">&#9888;</span>
+        <div class="smaily-banner__body">
+            <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('No nightly product list has gone to Campaign Intelligence for %1 nights', $unsentProductList['nights'])) ?></div>
+            <div class="smaily-banner__message"><?= $escaper->escapeHtml($unsentProductList['reason']) ?></div>
+        </div>
     </div>
     <?php endif; ?>
     <div class="smaily-verdict smaily-verdict-<?= $escaper->escapeHtmlAttr($verdict) ?>">

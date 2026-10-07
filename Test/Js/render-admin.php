@@ -540,13 +540,19 @@ $pages['setup-completed'] = $setupCompleted + ['viewModel' => $intelligence];
 /*
  * The Dashboard (view/adminhtml/templates/dashboard/index.phtml): set up,
  * Smaily and Campaign Intelligence connected, browse tracking on, nothing
- * failed. The -storefront page has a Storefront URL saved (PRO-3918).
+ * failed. The -storefront page has a Storefront URL saved (PRO-3918); the
+ * -unsent page has had no nightly product list for three nights, the last
+ * one held back by product changes waiting in the Log (PRO-3914).
  */
-$dashboardViewModel = static fn (bool $separateStorefront): object => new class ($separateStorefront) {
+$dashboardViewModel = static fn (
+    bool $separateStorefront,
+    bool $unsent = false
+): object => new class ($separateStorefront, $unsent) {
     /**
      * @param bool $separateStorefront
+     * @param bool $unsent
      */
-    public function __construct(private readonly bool $separateStorefront)
+    public function __construct(private readonly bool $separateStorefront, private readonly bool $unsent)
     {
     }
 
@@ -555,7 +561,22 @@ $dashboardViewModel = static fn (bool $separateStorefront): object => new class 
      */
     public function getVerdict(): string
     {
-        return \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_OK;
+        return $this->unsent
+            ? \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_DEGRADED
+            : \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_OK;
+    }
+
+    /**
+     * @return array{nights: int, reason: string}|null
+     */
+    public function getUnsentProductList(): ?array
+    {
+        return $this->unsent ? [
+            'nights' => 3,
+            'reason' => (string)__(
+                'Last night product changes were still waiting to be sent in the Log, and the list waits for them.'
+            ),
+        ] : null;
     }
 
     /**
@@ -674,6 +695,11 @@ $dashboardStrings = [
     'Browse tracking',
     'Script live on storefront',
     'Your separate storefront must send the events itself',
+    'All systems normal',
+    'Needs attention',
+    'No nightly product list has gone to Campaign Intelligence for %1 nights',
+    'Smaily Connect is running, but no nightly product list has gone to Campaign Intelligence for %1 nights.',
+    'Last night product changes were still waiting to be sent in the Log, and the list waits for them.',
 ];
 $pages['dashboard'] = [
     'template' => $root . '/view/adminhtml/templates/dashboard/index.phtml',
@@ -683,6 +709,11 @@ $pages['dashboard'] = [
 $pages['dashboard-storefront'] = [
     'template' => $root . '/view/adminhtml/templates/dashboard/index.phtml',
     'viewModel' => $dashboardViewModel(true),
+    'strings' => $dashboardStrings,
+];
+$pages['dashboard-unsent'] = [
+    'template' => $root . '/view/adminhtml/templates/dashboard/index.phtml',
+    'viewModel' => $dashboardViewModel(false, true),
     'strings' => $dashboardStrings,
 ];
 

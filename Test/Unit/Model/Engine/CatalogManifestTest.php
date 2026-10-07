@@ -10,6 +10,7 @@ namespace Smaily\Connect\Test\Unit\Model\Engine;
 
 use Magento\Catalog\Model\Product;
 use Magento\CatalogInventory\Model\StockRegistryStorage;
+use Magento\Framework\FlagManager;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Backfill\Job;
@@ -42,6 +43,9 @@ class CatalogManifestTest extends TestCase
     private Logger&MockObject $logger;
     private IngestEvent&MockObject $event;
 
+    /** @var array<string, mixed> FlagManager's flags as the manifest leaves them */
+    private array $flags = [];
+
     /** @var array<string, int> undelivered rows per queue domain */
     private array $pending = [];
 
@@ -72,6 +76,81 @@ class CatalogManifestTest extends TestCase
             'response' => ['http_status' => 200, 'body' => ['ok' => true, 'removed' => 3]],
         ]);
         $this->logger = $this->createMock(Logger::class);
+    }
+
+    /**
+     * PRO-3914: each night no list goes out counts one more night, with
+     * the reason, for the Dashboard; a list sent clears the count, and so
+     * does a night when no list is due.
+     *
+     * @param array{nights: int, reason: string}|null $before
+     * @param array{nights: int, reason: string}|null $after
+     * @dataProvider unsentNights
+     */
+    public function testTheNightsWithoutAListAreCountedWithTheLastReason(
+        string $night,
+        ?array $before,
+        ?array $after
+    ): void {
+        if ($before !== null) {
+            $this->flags[CatalogManifest::FLAG_UNSENT] = $before;
+        }
+        $this->queue->method('newEvent')->willReturn($this->event);
+        switch ($night) {
+            case 'not allowed':
+                $this->settings = $this->createMock(Settings::class);
+                break;
+            case 'import':
+                $this->jobManager->method('isActiveAndMoving')->willReturn(true);
+                break;
+            case 'queue':
+                $this->pending[Client::DOMAIN_CATALOG] = 1;
+                break;
+            case 'build':
+                $this->loader->method('loadForManifest')->willThrowException(new \RuntimeException('Lost connection'));
+                break;
+            case 'too many':
+                // Pages of 1,000 without end, as in the over-the-limit test.
+                $id = 0;
+                $product = $this->createMock(Product::class);
+                $product->method('getId')->willReturnCallback(static function () use (&$id): int {
+                    return ++$id;
+                });
+                $this->loader->method('loadForManifest')->willReturn(array_fill(0, 1000, $product));
+                $this->builder = $this->createMock(CatalogPayloadBuilder::class);
+                $this->builder->method('manifestItem')->willReturn(['sku' => 'SKU', 'in_stock' => true]);
+                break;
+            case 'failed':
+                $this->catalog([[$this->product(1)]]);
+                $this->client->method('catalogManifest')
+                    ->willThrowException(new EngineRequestException('Engine request failed with HTTP 400', 400));
+                break;
+            default:
+                $this->catalog([[$this->product(1)]]);
+                $this->client->method('catalogManifest')->willReturn(['ok' => true]);
+        }
+
+        $this->manifest()->send();
+
+        self::assertSame($after, $this->flags[CatalogManifest::FLAG_UNSENT] ?? null);
+    }
+
+    /**
+     * @return array<string, array{string, array{nights: int, reason: string}|null, array{nights: int, reason: string}|null}>
+     */
+    public static function unsentNights(): array
+    {
+        $two = ['nights' => 2, 'reason' => CatalogManifest::REASON_IMPORT];
+
+        return [
+            'sent after two nights without' => ['sent', $two, null],
+            'not allowed: no list is due' => ['not allowed', $two, null],
+            'import, a third night' => ['import', $two, ['nights' => 3, 'reason' => CatalogManifest::REASON_IMPORT]],
+            'queue, a first night' => ['queue', null, ['nights' => 1, 'reason' => CatalogManifest::REASON_QUEUE]],
+            'build' => ['build', $two, ['nights' => 3, 'reason' => CatalogManifest::REASON_BUILD]],
+            'too many' => ['too many', null, ['nights' => 1, 'reason' => CatalogManifest::REASON_TOO_MANY]],
+            'failed' => ['failed', $two, ['nights' => 3, 'reason' => CatalogManifest::REASON_FAILED]],
+        ];
     }
 
     public function testTheWholeCatalogIsReadPageByPageAndSentInOneRequest(): void
@@ -257,7 +336,26 @@ class CatalogManifestTest extends TestCase
             $this->builder,
             $this->stockStorage,
             $this->client,
-            $this->logger
+            $this->logger,
+            $this->flagManager()
         );
+    }
+
+    private function flagManager(): FlagManager&MockObject
+    {
+        $flagManager = $this->createMock(FlagManager::class);
+        $flagManager->method('getFlagData')->willReturnCallback(fn (string $code) => $this->flags[$code] ?? null);
+        $flagManager->method('saveFlag')->willReturnCallback(function (string $code, $data) use ($flagManager) {
+            $this->flags[$code] = $data;
+
+            return $flagManager;
+        });
+        $flagManager->method('deleteFlag')->willReturnCallback(function (string $code) use ($flagManager) {
+            unset($this->flags[$code]);
+
+            return $flagManager;
+        });
+
+        return $flagManager;
     }
 }

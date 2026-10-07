@@ -136,7 +136,9 @@ catalog import again — unchanged, or not connected, it does not.
 languages: with a Storefront URL saved, the Browse tracking card says the
 separate storefront must send the events itself and the note asks for no
 Magento consent source (with cookie restriction mode off); without one,
-both read as before. To
+both read as before. A store whose nightly product list has not gone out
+for three nights shows the verdict and the warning banner with the last
+night's reason; one whose list went out shows neither. To
 check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.

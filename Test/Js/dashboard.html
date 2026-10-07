@@ -13,7 +13,10 @@
   tracking card says the separate storefront must send the events itself
   and the consent note under the setting on Settings > Intelligence
   (panel/intelligence.phtml) asks for no Magento consent source; without
-  one, both read as before (PRO-3918). The page has no script of its own,
+  one, both read as before (PRO-3918). A store whose nightly product list
+  has not gone out for three nights says so in the verdict and in a warning
+  banner with the last night's reason; one whose list went out shows
+  neither (PRO-3914). The page has no script of its own,
   so nothing is stubbed. Run it with bin/test-js.sh (it renders the pages
   first); the page ends with "RESULT: PASS" or "RESULT: FAIL".
 -->
@@ -25,6 +28,8 @@
     <script src="build/dashboard.et_EE.js"></script>
     <script src="build/dashboard-storefront.en_US.js"></script>
     <script src="build/dashboard-storefront.et_EE.js"></script>
+    <script src="build/dashboard-unsent.en_US.js"></script>
+    <script src="build/dashboard-unsent.et_EE.js"></script>
     <script src="build/intelligence-settings.en_US.js"></script>
     <script src="build/intelligence-settings.et_EE.js"></script>
     <script src="build/intelligence-settings-storefront.en_US.js"></script>
@@ -39,6 +44,9 @@
     var SCRIPT_LIVE = 'Script live on storefront';
     var STOREFRONT_SENDS = 'Your separate storefront must send the events itself';
     var MAGENTO_CONSENT = 'Consent comes from Magento’s cookie notice: browse events are sent only after the visitor allows cookies.';
+    var UNSENT_TITLE = 'No nightly product list has gone to Campaign Intelligence for %1 nights';
+    var UNSENT_VERDICT = 'Smaily Connect is running, but no nightly product list has gone to Campaign Intelligence for %1 nights.';
+    var UNSENT_QUEUE = 'Last night product changes were still waiting to be sent in the Log, and the list waits for them.';
     var STOREFRONT_CONSENT = 'Your separate storefront sends the browse events itself, so its own cookie consent banner decides when they are sent.';
     var failures = 0;
     var passes = 0;
@@ -103,6 +111,8 @@
         var magento = page('dashboard.' + locale),
             storefront = page('dashboard-storefront.' + locale),
             strings = magento.strings,
+            unsent,
+            banner,
             card;
 
         log('# ' + locale);
@@ -117,6 +127,24 @@
         card = connection(storefront.doc, strings['Browse tracking']);
         check(locale + ', dashboard: with a Storefront URL, browse tracking says the storefront must send the events itself',
             !!card && card.sub === strings[STOREFRONT_SENDS]);
+
+        // PRO-3914: no nightly product list for three nights.
+        unsent = page('dashboard-unsent.' + locale);
+        if (locale !== 'en_US') {
+            check(locale + ': the product-list signal is translated', strings[UNSENT_TITLE] !== UNSENT_TITLE
+                && strings[UNSENT_QUEUE] !== UNSENT_QUEUE);
+        }
+        banner = unsent.doc.getElementById('smaily-dashboard-unsent-product-list');
+        check(locale + ', dashboard: three nights without a product list, a banner says so and why',
+            !!banner
+            && banner.querySelector('.smaily-banner__title').textContent === strings[UNSENT_TITLE].replace('%1', '3')
+            && banner.querySelector('.smaily-banner__message').textContent === strings[UNSENT_QUEUE]);
+        check(locale + ', dashboard: three nights without a product list, the verdict needs attention',
+            unsent.doc.querySelector('.smaily-verdict-kicker').textContent === strings['Needs attention']
+            && unsent.doc.querySelector('.smaily-verdict-text').textContent === strings[UNSENT_VERDICT].replace('%1', '3'));
+        check(locale + ', dashboard: the list went out, no banner and all systems normal',
+            !magento.doc.getElementById('smaily-dashboard-unsent-product-list')
+            && magento.doc.querySelector('.smaily-verdict-kicker').textContent === strings['All systems normal']);
 
         // PRO-3918: the consent note under the setting (Settings > Intelligence).
         magento = page('intelligence-settings.' + locale);

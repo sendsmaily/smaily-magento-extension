@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\ViewModel\Adminhtml;
 
 use Magento\Framework\FlagManager;
+use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
 use Smaily\Connect\Cron\HealthCheck;
 use Smaily\Connect\Model\Adminhtml\DashboardStats;
@@ -16,6 +17,7 @@ use Smaily\Connect\Model\Adminhtml\SetupGuard;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Engine\CatalogManifest;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Health\QueueHealth;
 use Smaily\Connect\Model\Log\StatusPill;
@@ -33,10 +35,16 @@ class DashboardData implements ArgumentInterface
     public const VERDICT_DEGRADED = 'degraded';
     public const VERDICT_OK = 'ok';
 
+    /** Nights in a row without a nightly product list before the Dashboard says so (PRO-3914). */
+    public const UNSENT_PRODUCT_LIST_NIGHTS = 3;
+
     private ?int $failed24h = null;
     private ?bool $smailyConnected = null;
     private ?bool $engineRefused = null;
     private ?bool $engineDown = null;
+
+    /** @var array{nights: int, reason: string}|false|null false once read and nothing to say */
+    private array|false|null $unsentProductList = null;
 
     public function __construct(
         private readonly Config $config,
@@ -48,7 +56,8 @@ class DashboardData implements ArgumentInterface
         private readonly VerifiedCredentials $verifiedCredentials,
         private readonly WebsiteContext $websiteContext,
         private readonly StatusPill $statusPill,
-        private readonly QueueStatusOptions $statusOptions
+        private readonly QueueStatusOptions $statusOptions,
+        private readonly DateTime $dateTime
     ) {
     }
 
@@ -130,6 +139,69 @@ class DashboardData implements ArgumentInterface
     }
 
     /**
+     * The nightly product list (PRO-3914) has not gone out for
+     * UNSENT_PRODUCT_LIST_NIGHTS nights or more in a row: how many, and why
+     * the last night's did not, in the admin's language. Null when it went
+     * out since; while Campaign Intelligence is not connected or refuses the
+     * account (other signals cover those); and for a connection younger than
+     * that many nights.
+     *
+     * @return array{nights: int, reason: string}|null
+     */
+    public function getUnsentProductList(): ?array
+    {
+        if ($this->unsentProductList === null) {
+            $this->unsentProductList = $this->readUnsentProductList() ?? false;
+        }
+
+        return $this->unsentProductList ?: null;
+    }
+
+    /**
+     * @return array{nights: int, reason: string}|null
+     */
+    private function readUnsentProductList(): ?array
+    {
+        if (!$this->isEngineConnected() || $this->isEngineRefused()) {
+            return null;
+        }
+        $unsent = $this->flagManager->getFlagData(CatalogManifest::FLAG_UNSENT);
+        $nights = is_array($unsent) ? (int)($unsent['nights'] ?? 0) : 0;
+        if ($nights < self::UNSENT_PRODUCT_LIST_NIGHTS) {
+            return null;
+        }
+        $connectedAt = strtotime($this->engineSettings->getIssuedAt());
+        if ($connectedAt !== false
+            && $connectedAt > $this->dateTime->gmtTimestamp() - self::UNSENT_PRODUCT_LIST_NIGHTS * 86400
+        ) {
+            return null;
+        }
+
+        // The over-the-limit night in its failed Log row's own words.
+        $reasons = [
+            CatalogManifest::REASON_IMPORT => __(
+                'Last night the catalog import was running or waiting to start, and the list waits for it to finish.'
+            ),
+            CatalogManifest::REASON_QUEUE => __(
+                'Last night product changes were still waiting to be sent in the Log, and the list waits for them.'
+            ),
+            CatalogManifest::REASON_BUILD => __(
+                'Last night the list could not be built; var/log/smaily_connect.log on the server says why.'
+            ),
+            CatalogManifest::REASON_TOO_MANY => __(CatalogManifest::TOO_MANY_PRODUCTS),
+            CatalogManifest::REASON_FAILED => __(
+                'Last night Campaign Intelligence did not take the list;'
+                . ' its failed catalog_manifest row in the Log says why.'
+            ),
+        ];
+
+        return [
+            'nights' => $nights,
+            'reason' => (string)($reasons[(string)($unsent['reason'] ?? '')] ?? ''),
+        ];
+    }
+
+    /**
      * The dashboard connection strip's Campaign Intelligence row — sub-line,
      * pill variant and pill label. All three are read off one engine state,
      * so they can never tell three different stories.
@@ -189,7 +261,11 @@ class DashboardData implements ArgumentInterface
         if (!$this->isSmailyConnected()) {
             return self::VERDICT_DISCONNECTED;
         }
-        if ($this->isEngineRefused() || $this->getFailedLast24h() > 0 || $this->isEngineDown()) {
+        if ($this->isEngineRefused()
+            || $this->getFailedLast24h() > 0
+            || $this->isEngineDown()
+            || $this->getUnsentProductList() !== null
+        ) {
             return self::VERDICT_DEGRADED;
         }
 

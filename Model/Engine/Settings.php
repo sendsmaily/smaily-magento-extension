@@ -163,6 +163,12 @@ class Settings
         return (string)$this->scopeConfig->getValue(self::XML_PATH_ENGINE_VERSION);
     }
 
+    /** When the connection's API key was issued (contract §1, Z-suffix), empty when not stored. */
+    public function getIssuedAt(): string
+    {
+        return (string)$this->scopeConfig->getValue(self::XML_PATH_ISSUED_AT);
+    }
+
     /**
      * The endpoints map from setup-exchange (absolute URLs, prefixed keys).
      *

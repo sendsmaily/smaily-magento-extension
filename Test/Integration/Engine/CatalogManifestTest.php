@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Integration\Engine;
 
 use Magento\Catalog\Model\Product;
+use Magento\Framework\FlagManager;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\CatalogIngest;
@@ -24,6 +25,7 @@ use Smaily\Connect\Model\Log\ResendGuard;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Model\ResourceModel\Log\Collection;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
 
 /**
  * PRO-3854 against a real MySQL: the nightly catalog manifest's waits read
@@ -32,7 +34,9 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
  * list itself comes from a stubbed catalog page here; the page's own
  * select runs against real product tables in CatalogProductLoaderTest, and
  * its key and stock parity with the catalog sync is unit-tested
- * (CatalogPayloadBuilderTest) and checked on the sandbox catalog.
+ * (CatalogPayloadBuilderTest) and checked on the sandbox catalog. The
+ * nights without a list are counted in Magento's real flag table
+ * (PRO-3914).
  */
 class CatalogManifestTest extends IntegrationTestCase
 {
@@ -53,6 +57,12 @@ class CatalogManifestTest extends IntegrationTestCase
     private ?\Exception $failure = null;
 
     private int $catalogSize = 4;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        (new SchemaInstaller($this->connection))->createFlag();
+    }
 
     public function testANightThatSendsLeavesOneLogRowWithTheEnginesAnswer(): void
     {
@@ -146,11 +156,18 @@ class CatalogManifestTest extends IntegrationTestCase
             self::assertSame([], $this->sent, $domain);
             $this->connection->delete(IngestEventResource::TABLE_NAME);
         }
+        // Three nights without a list, for the Dashboard (PRO-3914).
+        $flags = $this->objectManager->create(FlagManager::class);
+        self::assertSame(
+            ['nights' => 3, 'reason' => CatalogManifest::REASON_QUEUE],
+            $flags->getFlagData(CatalogManifest::FLAG_UNSENT)
+        );
 
         $this->queueRow(Client::DOMAIN_CATALOG, IngestEvent::STATUS_FAILED);
         $this->queueRow(Client::DOMAIN_ORDERS, IngestEvent::STATUS_PENDING);
         $this->manifest()->send();
         self::assertCount(1, $this->sent);
+        self::assertNull($this->objectManager->create(FlagManager::class)->getFlagData(CatalogManifest::FLAG_UNSENT));
     }
 
     /**

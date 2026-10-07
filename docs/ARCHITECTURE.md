@@ -399,7 +399,14 @@ below.
   worker no longer moves holds nothing back. A store with more than 50,000
   enabled products sends nothing (§3c forbids a partial list); its Log row
   is `failed` with `CatalogManifest::TOO_MANY_PRODUCTS`, shown in the
-  admin's language (`Log\FailureMessage`).
+  admin's language (`Log\FailureMessage`). Each night no list goes out —
+  skipped, not built, over the limit, or not taken by the engine — adds
+  one to a count in the flag `smaily_connect_catalog_manifest_unsent`
+  (`CatalogManifest::FLAG_UNSENT`, `{nights, reason}` with the night's
+  `REASON_*`); a list sent, and a night when sending is not allowed (no
+  list is due), delete it. A flag rather than a Log row: a skipped night
+  has no exchange to show, and the Dashboard needs only this value; no
+  table or column changes (PRO-3914).
 - **Order line `sku`.** A line is the parent order item (a configurable's
   child item is skipped; its price is on the parent), keyed on the item's
   SKU — for a configurable, Magento's own copy of the chosen variant's SKU.
@@ -1309,8 +1316,18 @@ Initial setup, Settings, Log. Design rules:
   and `isWebsitePlanBlocked()` (`boot.planBlocked`, the Dashboard's card and
   verdict sentence) names the package instead of the credentials. The
   verdict order is: setup incomplete > Smaily not connected > Campaign
-  Intelligence account not active > failures > engine unreachable > all
-  good.
+  Intelligence account not active > failures > engine unreachable > no
+  nightly product list > all good.
+- **No nightly product list for three nights (PRO-3914).**
+  `DashboardData::getUnsentProductList()` reads the manifest's
+  `FLAG_UNSENT` count: from `UNSENT_PRODUCT_LIST_NIGHTS` (3) nights in a
+  row, the verdict is degraded (its sentence when nothing outranks it) and
+  a warning banner above it — shown whatever outranks it, as the failures
+  banner is — says how many nights and why the last one did not go out,
+  in the admin's language. Nothing while Campaign Intelligence is not
+  connected or refuses the account, and nothing for a connection whose
+  `issued_at` (`Settings::getIssuedAt()`, the setup exchange) is less than
+  three days old.
 - **Unified log.** One grid (`smaily_log_grid`) over BOTH queues:
   `Model\ResourceModel\Log\Collection` builds a `UNION ALL` of the two
   queue tables as a derived table, keyed by the synthetic

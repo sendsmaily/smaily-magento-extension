@@ -65,7 +65,7 @@ Everything lives under **Marketing > Smaily Connect**, four pages:
 
 | Page | What it is |
 |---|---|
-| **Dashboard** | The landing page: a one-sentence health verdict, connection status for Smaily / Campaign Intelligence / browse tracking (with a Storefront URL saved, browse tracking says the separate storefront must send the events itself), operational counters (deliveries in the last 30 days — only events that reached Smaily or Campaign Intelligence, never a skipped or withdrawn row — the events queued today that are still waiting to send, failures) and the latest queue activity, each row's status labeled and colored as in the Log (*Skipped* and *Withdrawn* included). Every number is a real local queue query. When deliveries failed in the last 24 hours, a warning banner above the verdict counts them and the verdict carries a red **Review failures** button — both open the Log filtered to failed rows; when everything runs, the verdict offers **View full log**. |
+| **Dashboard** | The landing page: a one-sentence health verdict, connection status for Smaily / Campaign Intelligence / browse tracking (with a Storefront URL saved, browse tracking says the separate storefront must send the events itself), operational counters (deliveries in the last 30 days — only events that reached Smaily or Campaign Intelligence, never a skipped or withdrawn row — the events queued today that are still waiting to send, failures) and the latest queue activity, each row's status labeled and colored as in the Log (*Skipped* and *Withdrawn* included). Every number is a real local queue query. When deliveries failed in the last 24 hours, a warning banner above the verdict counts them and the verdict carries a red **Review failures** button — both open the Log filtered to failed rows; when no nightly product list has gone to Campaign Intelligence for three nights, a warning banner says so and why (see [The nightly product check](#the-nightly-product-check)); when everything runs, the verdict offers **View full log**. |
 | **Initial setup** | The guided five-step onboarding. On a fresh install every Smaily Connect page brings you here until setup is completed; you can re-run it any time — your settings are kept. |
 | **Settings** | The initial setup's content as always-available tabs — Connection, Contacts, Automations, Intelligence, RSS. Each tab saves instantly via AJAX. Tabs are deep-linkable (`?tab=rss`). |
 | **Log** | One unified delivery log for both Smaily and Campaign Intelligence, with mass retry for failed rows. |
@@ -747,6 +747,13 @@ The check is skipped that night, and runs again the next night, while:
 A store with more than 50,000 enabled products cannot use the check yet:
 nothing is sent, and the **Log** shows a failed *catalog_manifest* row
 that says so.
+
+When no list has gone out for three nights in a row — skipped, or not
+sent for one of the reasons above — the Dashboard says so: its verdict
+needs attention, and a warning banner says for how many nights and why the
+last night's list did not go out. The banner goes once a list is sent. A
+store that connected Campaign Intelligence less than three nights ago, or
+whose account is not connected or deactivated, does not see it.
 
 Each night the list is sent appears in the **Log** as one
 *catalog_manifest* row. **Details** shows the first products of the list

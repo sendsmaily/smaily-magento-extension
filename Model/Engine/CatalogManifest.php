@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Engine;
 
 use Magento\CatalogInventory\Model\StockRegistryStorage;
+use Magento\Framework\FlagManager;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
@@ -40,7 +41,9 @@ use Smaily\Connect\Model\Logger\Logger;
  * or when building the list fails. A store with more than MAX_PRODUCTS
  * enabled products sends nothing either, and gets a failed Log row saying
  * why. Every list sent is one Log row (domain catalog_manifest) holding the
- * engine's answer.
+ * engine's answer. The nights in a row no list went out, and why the last
+ * one did not, are kept in a flag (FLAG_UNSENT) for the Dashboard
+ * (PRO-3914).
  */
 class CatalogManifest
 {
@@ -64,6 +67,42 @@ class CatalogManifest
     /** A catalog import that nothing has moved for this long no longer holds the list back. */
     public const STALLED_IMPORT_SECONDS = 3600;
 
+    /**
+     * The nights in a row no list went out and why the last one did not
+     * (PRO-3914): {nights: int, reason: one of the REASON_* values}. A flag,
+     * not a Log row: a skipped night sends nothing, so it has no exchange to
+     * show, and the Dashboard needs only this one value. Deleted when a list
+     * is sent, and while sending is not allowed — no list is due then, so a
+     * new connection counts from its first night. Read by
+     * ViewModel\Adminhtml\DashboardData.
+     */
+    public const FLAG_UNSENT = 'smaily_connect_catalog_manifest_unsent';
+
+    /** The catalog import was queued or running and moving. */
+    public const REASON_IMPORT = 'import';
+
+    /** Catalog rows, removals or stock-change markers still waited in the queue. */
+    public const REASON_QUEUE = 'queue';
+
+    /** Building the list failed. */
+    public const REASON_BUILD = 'build';
+
+    /** The store has more than MAX_PRODUCTS enabled products. */
+    public const REASON_TOO_MANY = 'too_many';
+
+    /** The engine did not take the list (the failed Log row has its answer). */
+    public const REASON_FAILED = 'failed';
+
+    /** Sending to the engine is not allowed: no list is due. */
+    private const REASON_NOT_ALLOWED = 'not_allowed';
+
+    /** What the info log says for each night skipped before the list is built. */
+    private const SKIP_LOG = [
+        self::REASON_NOT_ALLOWED => 'Campaign Intelligence is not connected, or refuses this store',
+        self::REASON_IMPORT => 'the catalog import is running or waiting to start',
+        self::REASON_QUEUE => 'catalog changes still wait in the queue',
+    ];
+
     /** Products read per page. */
     private const PAGE_SIZE = 1000;
 
@@ -85,7 +124,8 @@ class CatalogManifest
         private readonly CatalogPayloadBuilder $payloadBuilder,
         private readonly StockRegistryStorage $stockRegistryStorage,
         private readonly Client $client,
-        private readonly Logger $logger
+        private readonly Logger $logger,
+        private readonly FlagManager $flagManager
     ) {
     }
 
@@ -93,7 +133,8 @@ class CatalogManifest
     {
         $skip = $this->skipReason();
         if ($skip !== null) {
-            $this->logger->info('Nightly catalog manifest not sent', ['reason' => $skip]);
+            $this->logger->info('Nightly catalog manifest not sent', ['reason' => self::SKIP_LOG[$skip]]);
+            $this->recordUnsent($skip);
 
             return;
         }
@@ -104,6 +145,7 @@ class CatalogManifest
             $this->logger->error('Nightly catalog manifest not sent: building the product list failed', [
                 'error' => $exception->getMessage(),
             ]);
+            $this->recordUnsent(self::REASON_BUILD);
 
             return;
         }
@@ -114,6 +156,7 @@ class CatalogManifest
                 self::TOO_MANY_PRODUCTS,
                 true
             );
+            $this->recordUnsent(self::REASON_TOO_MANY);
 
             return;
         }
@@ -132,18 +175,21 @@ class CatalogManifest
         $this->recordExchange($event, $products);
         if ($error === null) {
             $this->queue->markSent($event);
+            $this->flagManager->deleteFlag(self::FLAG_UNSENT);
         } else {
             $this->queue->markFailed($event, $error, true);
+            $this->recordUnsent(self::REASON_FAILED);
         }
     }
 
     /**
-     * Why tonight's list must not be sent, or null when it may.
+     * Why tonight's list must not be sent (a key of SKIP_LOG), or null when
+     * it may.
      */
     private function skipReason(): ?string
     {
         if (!$this->settings->isSendingAllowed()) {
-            return 'Campaign Intelligence is not connected, or refuses this store';
+            return self::REASON_NOT_ALLOWED;
         }
         if ($this->jobManager->isActiveAndMoving(
             Job::TYPE_CATALOG,
@@ -151,15 +197,33 @@ class CatalogManifest
             Job::ENGINE_WEBSITE_ID,
             self::STALLED_IMPORT_SECONDS
         )) {
-            return 'the catalog import is running or waiting to start';
+            return self::REASON_IMPORT;
         }
         foreach (self::CATALOG_DOMAINS as $domain) {
             if ($this->queue->countPending($domain) > 0) {
-                return 'catalog changes still wait in the queue';
+                return self::REASON_QUEUE;
             }
         }
 
         return null;
+    }
+
+    /**
+     * Count one more night without a list, and remember why (FLAG_UNSENT).
+     */
+    private function recordUnsent(string $reason): void
+    {
+        if ($reason === self::REASON_NOT_ALLOWED) {
+            $this->flagManager->deleteFlag(self::FLAG_UNSENT);
+
+            return;
+        }
+
+        $unsent = $this->flagManager->getFlagData(self::FLAG_UNSENT);
+        $this->flagManager->saveFlag(self::FLAG_UNSENT, [
+            'nights' => (is_array($unsent) ? (int)($unsent['nights'] ?? 0) : 0) + 1,
+            'reason' => $reason,
+        ]);
     }
 
     /**

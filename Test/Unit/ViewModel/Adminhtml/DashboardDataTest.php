@@ -9,12 +9,14 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Unit\ViewModel\Adminhtml;
 
 use Magento\Framework\FlagManager;
+use Magento\Framework\Stdlib\DateTime\DateTime;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Adminhtml\DashboardStats;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Engine\CatalogManifest;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Health\QueueHealth;
 use Smaily\Connect\Model\Log\StatusPill;
@@ -128,6 +130,82 @@ class DashboardDataTest extends TestCase
         self::assertFalse($this->createViewModel(false)->hasSeparateStorefront());
     }
 
+    /**
+     * PRO-3914: three nights in a row without a nightly product list is a
+     * health signal of its own — how many nights, and why the last one did
+     * not go out — and degrades the verdict.
+     */
+    public function testThreeNightsWithoutAProductListSaySoAndWhy(): void
+    {
+        $viewModel = $this->createViewModel(
+            false,
+            unsent: ['nights' => 3, 'reason' => CatalogManifest::REASON_QUEUE],
+            issuedAt: '2026-09-01T10:00:00Z'
+        );
+
+        self::assertSame(
+            [
+                'nights' => 3,
+                'reason' => 'Last night product changes were still waiting to be sent in the Log,'
+                    . ' and the list waits for them.',
+            ],
+            $viewModel->getUnsentProductList()
+        );
+        self::assertSame(DashboardData::VERDICT_DEGRADED, $viewModel->getVerdict());
+    }
+
+    public function testAStoreOverTheLimitIsToldSoInTheLogRowsWords(): void
+    {
+        $viewModel = $this->createViewModel(false, unsent: ['nights' => 5, 'reason' => CatalogManifest::REASON_TOO_MANY]);
+
+        self::assertSame(
+            ['nights' => 5, 'reason' => CatalogManifest::TOO_MANY_PRODUCTS],
+            $viewModel->getUnsentProductList()
+        );
+    }
+
+    /**
+     * @param array{nights: int, reason: string}|null $unsent
+     * @dataProvider noUnsentSignalProvider
+     */
+    public function testNoProductListSignal(
+        ?array $unsent,
+        string $issuedAt,
+        bool $engineConnected,
+        bool $refused
+    ): void {
+        $viewModel = $this->createViewModel(
+            $refused,
+            unsent: $unsent,
+            issuedAt: $issuedAt,
+            engineConnected: $engineConnected
+        );
+
+        self::assertNull($viewModel->getUnsentProductList());
+        if (!$refused) {
+            self::assertSame(DashboardData::VERDICT_OK, $viewModel->getVerdict());
+        }
+    }
+
+    /**
+     * @return array<string, array{array{nights: int, reason: string}|null, string, bool, bool}>
+     */
+    public static function noUnsentSignalProvider(): array
+    {
+        $threeNights = ['nights' => 3, 'reason' => CatalogManifest::REASON_IMPORT];
+
+        return [
+            'the list went out last night' => [null, '2026-09-01T10:00:00Z', true, false],
+            'two nights without one' => [['nights' => 2, 'reason' => CatalogManifest::REASON_IMPORT], '', true, false],
+            'connected less than three nights ago' => [$threeNights, '2026-10-05T10:00:00Z', true, false],
+            'Campaign Intelligence not connected' => [$threeNights, '', false, false],
+            'the account refused' => [$threeNights, '', true, true],
+        ];
+    }
+
+    /**
+     * @param array{nights: int, reason: string}|null $unsent the FLAG_UNSENT value
+     */
     private function createViewModel(
         bool $refused,
         bool $smailyVerified = true,
@@ -135,11 +213,23 @@ class DashboardDataTest extends TestCase
         bool $setupCompleted = true,
         bool $planBlocked = false,
         ?DashboardStats $stats = null,
-        string $storefrontUrl = ''
+        string $storefrontUrl = '',
+        ?array $unsent = null,
+        string $issuedAt = '',
+        bool $engineConnected = true
     ): DashboardData {
         $engineSettings = $this->createMock(EngineSettings::class);
-        $engineSettings->method('isConnected')->willReturn(true);
+        $engineSettings->method('isConnected')->willReturn($engineConnected);
         $engineSettings->method('isRefused')->willReturn($refused);
+        $engineSettings->method('getIssuedAt')->willReturn($issuedAt);
+
+        $flags = $this->createMock(FlagManager::class);
+        $flags->method('getFlagData')->willReturnCallback(
+            static fn (string $code) => $code === CatalogManifest::FLAG_UNSENT ? $unsent : null
+        );
+        // 2026-10-07 12:00 UTC.
+        $dateTime = $this->createMock(DateTime::class);
+        $dateTime->method('gmtTimestamp')->willReturn(1_791_374_400);
 
         $setupGuard = $this->createMock(SetupGuard::class);
         $setupGuard->method('isSetupCompleted')->willReturn($setupCompleted);
@@ -167,11 +257,12 @@ class DashboardDataTest extends TestCase
             $setupGuard,
             $queueHealth,
             $stats ?? $this->createMock(DashboardStats::class),
-            $this->createMock(FlagManager::class),
+            $flags,
             $verifiedCredentials,
             $websiteContext,
             new StatusPill(),
-            new QueueStatusOptions()
+            new QueueStatusOptions(),
+            $dateTime
         );
     }
 }

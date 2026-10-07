@@ -5,21 +5,30 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-07 — **3.0.0-rc8 is cut and ready for release, not
-yet published:** the version-cut commit on top of f1590d9 sets `3.0.0-rc8`
-(composer.json, `ModuleInfo::VERSION`, the ModuleVersion docblock, the
-upstream proposal; composer.lock content-hash only, no dependency change),
-and CHANGELOG's "Changes since 3.0.0-rc7" list is the rc8 list, in the
-order the changes landed; PRO-3913 is merged into PRO-3802's bullet,
-PRO-3924 into PRO-3918's and PRO-3923 into PRO-3915's, as rc4 merged
-PRO-3717 and PRO-3719. The gates pass and the ZIP builds and verifies
-locally. Earlier the same day: **the pilot is postponed.** The first pilot
+_Last updated: 2026-10-07 — **3.0.0-rc8 is released as a GitHub
+pre-release on the fork**
+(https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc8),
+built by the release workflow (run 37615294088) from the version-cut commit
+055276c; CI and Contract staleness are green on 055276c. Checked after
+publishing: 397 entries, `shasum -a 256 -c` OK, sha256
+fd3450434708f7cb076a…, composer.json inside says 3.0.0-rc8. **The rc8 ZIP
+from the release installs on a clean store by docs/INSTALLING.md**
+(PRO-3936, below; Magento 2.4.8-p4, PHP 8.3.35); one guide step was
+corrected (step 2 and the update section now say to give `unzip` the ZIP's
+full path when it is not in the Magento root). The version cut sets
+`3.0.0-rc8` (composer.json, `ModuleInfo::VERSION`, the ModuleVersion
+docblock, the upstream proposal; composer.lock content-hash only, no
+dependency change), and CHANGELOG's "Changes since 3.0.0-rc7" list is the
+rc8 list, in the order the changes landed; PRO-3913 is merged into
+PRO-3802's bullet, PRO-3924 into PRO-3918's and PRO-3923 into PRO-3915's,
+as rc4 merged PRO-3717 and PRO-3719. Earlier the same day: **the pilot is
+postponed.** The first pilot
 store runs Magento 2.4.3-p1 (PHP 7.3/7.4 only); the module needs Magento
 2.4.4+ and PHP 8.1–8.4, so it cannot be installed there. Owner decision
 (Erkki, 2026-10-07): the store upgrades first (Magento 2.4.7 or 2.4.8 on
 PHP 8.2/8.3); Erkki sets the new date once the store's developer estimates
 the upgrade; the "Pilot store live" milestone (2026-10-09) no longer holds.
-Landed today, unreleased: PRO-3911 (a recommendation link without a
+Landed today, released in rc8: PRO-3911 (a recommendation link without a
 context clears the context cookie), PRO-3912 (`vs_` visitor tokens reach
 the order), PRO-3917 (a login through Magento's API —
 GraphQL/REST customer token — links earlier browsing, as on Magento's own
@@ -42,9 +51,8 @@ order placed with "Login as Customer" carries no browser markers); the
 version check is now step one of INSTALLING and PILOT_CHECKLIST §0;
 HEADLESS_STOREFRONTS opens with a setup checklist (admin / back end /
 storefront developer), audited against the code.
-**Queue:** publish rc8 (a GitHub pre-release on the fork, as rc1 to rc7) →
-clean-install check of the rc8 ZIP by docs/INSTALLING.md → pilot once the
-store has upgraded.
+**Queue:** the pilot installs rc8 once the store has upgraded (Erkki sets
+the date).
 Backlog: PRO-3790 (after the pilot), PRO-3746, PRO-3774._
 
 _Today in detail: PRO-3802 (the initial setup's Connect step
@@ -52,7 +60,7 @@ takes the Storefront URL, saved before the Contacts step switches contact
 sync on; PILOT_CHECKLIST's pilot-day order follows it and so needs a build
 with PRO-3802), PRO-3798 (only a refunded credit memo marks order lines
 returned) and PRO-3854 (the nightly catalog manifest; the engine contract copy synced
-v1.8.3 → v1.12.0; Contract staleness green again); all unreleased,
+v1.8.3 → v1.12.0; Contract staleness green again); all in rc8,
 CHANGELOG's "Changes since 3.0.0-rc7". New backlog Stories: PRO-3913 (a
 reopened setup does not prompt a catalog re-import after a Storefront URL
 change; its summary lacks the Storefront URL), PRO-3911 (the landing
@@ -260,6 +268,49 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3936 — the rc8 package installs on a clean store by the install
+  guide (2026-10-07; docs only, no CHANGELOG bullet).** As PRO-3769 for
+  rc7: the ZIP and its .sha256 were downloaded from the 3.0.0-rc8 GitHub
+  release with `gh release download` (`shasum -a 256 -c` OK on macOS,
+  `sha256sum -c` OK in the container; 397 entries, archive comment
+  055276c, composer.json 3.0.0-rc8) and installed into a real `app/code`
+  on a fresh Magento 2.4.8-p4 without sample data, in production mode, on
+  a separate temporary compose project (own name, containers, volumes,
+  port; sandbox image; no working-tree mount — the sandbox's `magento2`
+  and `magento2_db` stayed Up with the same container IDs). The guide's
+  new "Before you start" version check: `bin/magento --version` →
+  "Magento CLI 2.4.8-p4", `php -v` → "PHP 8.3.35 (cli)" (the admin footer
+  says "Magento ver. 2.4.8-p4"); the twelve required Magento modules are
+  enabled. Then step by step: extract (the guide's `mkdir -p` creates
+  `app/code`), the production sequence with `setup:static-content:deploy
+  en_US et_EE` (every command exit 0), `crontab -l` / `cron:install` (the
+  cron package installed in the temporary container first), module
+  enabled, six `smaily_*` tables, the "ready to set up" notice under the
+  bell, four menu entries. **Guide fix:** step 2's `unzip
+  smaily-connect-magento2.zip …` runs from the Magento root, so with the
+  ZIP downloaded into another folder (step 1 lets it be any folder) it
+  stops with "cannot find or open"; step 2 and the update section now say
+  to give `unzip` the ZIP's full path. All eight `smaily_*` cron jobs
+  finished `success` without a Smaily or engine connection (the daily
+  janitor, the nightly `smaily_catalog_manifest` and the 5- and 15-minute
+  jobs queued by hand); `SendCatalogManifest::execute()` was also run
+  directly with the log level at info: `smaily_connect.log` says "Nightly
+  catalog manifest not sent" with the reason "Campaign Intelligence is not
+  connected, or refuses this store", and no flag, queue or Log row is
+  written (no unsent-nights flag, as no list is due). No `exception.log`,
+  no `var/report`, no Smaily line in `system.log`. Initial setup opens
+  from every module page; step 1 refuses Continue without a tested
+  connection ("Fill in the credentials and press Test connection
+  first."); "Using a separate storefront?" opens the Storefront URL field
+  (placeholder https://shop.example.com) with its help text. Dashboard
+  (Not connected everywhere), Settings (all five tabs) and Log (empty)
+  were opened with `setup_completed` set in the database: no console
+  errors. The update section (maintenance on, `rm -rf`, `mkdir -p`, fresh
+  extraction, the step 3 commands, second `setup:upgrade`) passed;
+  settings and tables kept, the Dashboard opens without the initial
+  setup, the group runs again with no failure. TESTING.md records the
+  run. Stack removed afterwards (`down -v`; no image pulled).
 
 - **PRO-3854 — the nightly catalog manifest (2026-10-07; unreleased,
   after rc7).** `Cron/SendCatalogManifest` (`smaily_catalog_manifest`,
@@ -5904,7 +5955,7 @@ Earlier: 2026-09-11, 2026-09-10._
   merchant recovery).
 
 **All 6 v3 phases implemented** (~110 files) on branch `v3`, version
-**3.0.0-rc7 — GitHub pre-release on the fork** (the newest). Current truth:
+**3.0.0-rc8 — GitHub pre-release on the fork** (the newest). Current truth:
 
 - **PRO-1391 final-polish done — four refinements on Settings > Connection
   after Erkki's side-by-side review of the PRO-1391 visual-fidelity pass.**

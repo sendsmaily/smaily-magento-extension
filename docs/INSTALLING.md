@@ -68,7 +68,9 @@ it again before going further.
 
 The ZIP has no top-level folder: `registration.php`, `composer.json`,
 `etc/`, `view/` and the rest sit at the root of the archive. Extract it
-straight into the module directory:
+straight into the module directory. The commands run from the Magento
+root; if the ZIP is in another folder, give `unzip` its full path
+(`unzip /path/to/smaily-connect-magento2.zip -d app/code/Smaily/Connect`):
 
 ```bash
 mkdir -p app/code/Smaily/Connect
@@ -162,7 +164,8 @@ before switching the automations on.
 Settings, queues and the log are kept in the database, so an update only
 replaces the code. Download and verify the new ZIP (step 1), then replace
 the whole directory — removing the old files first, so a file the new
-release no longer ships does not linger:
+release no longer ships does not linger (from the Magento root; give
+`unzip` the ZIP's full path if it is elsewhere, as in step 2):
 
 ```bash
 bin/magento maintenance:enable            # production mode

@@ -187,7 +187,8 @@ is written in English.
   2026-10-05 4/5 (rc7 released; only the pilot install is left);
   2026-10-07 4/5 (the pilot store runs Magento 2.4.3-p1 / PHP 7.x; the
   pilot waits for its upgrade; the 09.10 milestone no longer holds, new
-  date pending Erkki).
+  date pending Erkki), later the same day 4/5 (rc8 released; the pilot
+  waits for the store's Magento upgrade).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

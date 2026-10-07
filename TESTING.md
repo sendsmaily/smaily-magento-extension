@@ -471,7 +471,7 @@ catalog` (and `customers`, `orders`) prints "Campaign Intelligence is not
 connected, …" and exits 1, and the admin import endpoint answers a catalog
 start with the same message; neither writes a job or a queue row.
 
-Latest run: 3.0.0-rc7 (the ZIP downloaded from the GitHub release) on
+Earlier run: 3.0.0-rc7 (the ZIP downloaded from the GitHub release) on
 Magento 2.4.8-p4 without sample data, 2026-10-05, in production mode, the
 same way as the rc6 run — steps 1–5 and the update section passed as
 written, with no guide change. All seven `smaily_*` cron jobs finished with
@@ -485,3 +485,24 @@ endpoint refuses a catalog start, and `bin/magento smaily:gdpr export` and
 `erase --force` for a placeholder address (u1@example.invalid) handle the
 store's own data; `erase` says "Campaign Intelligence is not connected;
 no engine data to erase." for the engine half (exit 0).
+
+Latest run: 3.0.0-rc8 (the ZIP downloaded from the GitHub release with
+`gh release download`) on Magento 2.4.8-p4 / PHP 8.3.35 without sample
+data, 2026-10-07, in production mode, the same way as the rc7 run, the
+guide's "Before you start" version check included (`bin/magento
+--version`, `php -v`). Steps 1–5 and the update section passed; one guide
+step changed: with the ZIP in a folder other than the Magento root, step
+2's `unzip smaily-connect-magento2.zip` cannot find it, so step 2 and the
+update section now say to give `unzip` the ZIP's full path. All eight
+`smaily_*` cron jobs finished with `success` (the daily janitor, the
+nightly `smaily_catalog_manifest` and the 5- and 15-minute jobs queued by
+hand), and nothing was written to `exception.log` or `var/report`. With
+the log level at info, `smaily_connect.log` shows the manifest skipping:
+"Nightly catalog manifest not sent" with the reason "Campaign
+Intelligence is not connected, or refuses this store"; it writes no flag,
+queue or Log row. The initial setup's "Using a separate storefront?"
+opens the Storefront URL field. A row queued by hand in `cron_schedule`
+can be deleted unrun when the same `cron:run` regenerates the schedule
+(Magento drops pending rows that do not match the job's cron
+expression); queue it again, or run the job class directly through the
+object manager in the `crontab` area.

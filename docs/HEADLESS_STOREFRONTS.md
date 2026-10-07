@@ -47,7 +47,7 @@ install, in this order. Each line links to its details below.
 **C. On the storefront (its developer)**
 
 1. Product links open: route `/<url-key>.html`, or redirect it to the product page keeping the query string — [Storefront URL](#storefront-url).
-2. Campaign clicks (`smaily_rec`, `smaily_vt`, `smaily_ctx`) are written into first-party cookies on every page load — [hand-off item 2](#2-capture-campaign-clicks-into-cookies).
+2. Campaign clicks (`smaily_rec`, `smaily_vt`, `smaily_ctx`) are written into first-party cookies on every page load; a landing that writes `smaily_rec_id` but has no `smaily_ctx` deletes the context cookie — [hand-off item 2](#2-capture-campaign-clicks-into-cookies).
 3. Those cookies travel with the place-order request, and `smaily_anon_sid` and `smaily_rec_uid` with the login (customer token) request — [hand-off item 3](#3-carry-the-cookies-to-order-placement).
 4. A guest's email goes on the cart as soon as it is typed (`setGuestEmailOnCart`) — [hand-off item 7](#7-put-a-guests-email-on-the-cart).
 5. Browse events go to `/smaily/relay`, only with marketing-cookie consent — [hand-off item 4](#4-send-browse-events).
@@ -244,8 +244,17 @@ value only when it has the shape shown; ignore it otherwise.
 
 When the address has no valid `smaily_rec` but has `utm_source=smaily`,
 take `utm_content` as the `smaily_rec_id` value, under the same UUID rule,
-as Magento's own storefront does. A parameter missing from the address
-leaves its cookie as it is.
+as Magento's own storefront does.
+
+The context cookie always describes the same click as `smaily_rec_id`:
+write `smaily_rec_ctx` only on a landing that writes `smaily_rec_id`, from
+that address's `smaily_ctx`, and on such a landing without a valid
+`smaily_ctx` delete the cookie. Otherwise an earlier click's context stays
+behind and the purchase is credited to the wrong channel — a click on an
+email link without a context after a storefront click would count as the
+storefront's sale. A landing
+that writes no `smaily_rec_id` leaves both cookies as they are; a missing
+`smaily_vt` leaves its cookie as it is.
 
 The anonymous session id of browse events, the cookie `smaily_anon_sid`,
 is not part of this capture: set it in step 4, with consent only.

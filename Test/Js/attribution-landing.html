@@ -1,0 +1,181 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the landing capture (PRO-3911): the Luma script
+  (view/frontend/web/js/attribution.js) and the Hyvä script
+  (compat/hyva/.../smaily-attribution.js), the real scripts, each landing in a
+  fresh frame. Stubbed: the landing's query (a frame of a file:// page cannot
+  change its address, so URLSearchParams reads the query given here),
+  document.cookie (file:// pages keep no cookies; a cookie whose expiry has
+  passed is removed, as a browser does) and, for Luma, RequireJS's define().
+  Run it with bin/test-js.sh; the page ends with "RESULT: PASS" or
+  "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>attribution landing harness</title>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var REC_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+    var OLD_REC_ID = '0f8e3c1a-5b2d-4e6f-8a9b-1c2d3e4f5a6b';
+    var failures = 0;
+    var passes = 0;
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    // The defaults of Engine\AttributionManager::getClientConfig().
+    var CONFIG = {
+        paramRecId: 'smaily_rec',
+        paramVisitor: 'smaily_vt',
+        paramContext: 'smaily_ctx',
+        cookieRecId: 'smaily_rec_id',
+        cookieVisitor: 'smaily_rec_uid',
+        cookieContext: 'smaily_rec_ctx',
+        cookieSession: 'smaily_anon_sid',
+        ttlRecIdDays: 30,
+        ttlVisitorDays: 365,
+        ttlContextDays: 30,
+        ttlSessionDays: 30
+    };
+
+    // Runs in the frame before the script under test: the landing's query
+    // and the cookies the shopper already holds.
+    function stubs(query, cookies) {
+        return [
+            'var RealParams = URLSearchParams;',
+            'window.URLSearchParams = function () { return new RealParams(' + JSON.stringify(query) + '); };',
+            'var jar = ' + JSON.stringify(cookies) + ';',
+            'Object.defineProperty(document, "cookie", {configurable: true,',
+            '  get: function () { return Object.keys(jar).map(function (k) { return k + "=" + jar[k]; }).join("; "); },',
+            '  set: function (v) { var parts = v.split(";"), pair = parts[0], i = pair.indexOf("="),',
+            '    expires = parts.filter(function (p) { return /^\\s*expires=/i.test(p); })[0];',
+            '    if (expires && Date.parse(expires.split("=")[1]) <= Date.now()) { delete jar[pair.slice(0, i)]; }',
+            '    else { jar[pair.slice(0, i)] = pair.slice(i + 1); } }});'
+        ].join('\n');
+    }
+
+    function lumaFrame() {
+        return [
+            '<script>',
+            'var factory;',
+            'function define(deps, f) { factory = f; }',
+            'define.amd = {};',
+            '<\/script>',
+            '<script src="../../view/frontend/web/js/attribution.js"><\/script>',
+            '<script>factory()(' + JSON.stringify(CONFIG) + ');<\/script>'
+        ].join('\n');
+    }
+
+    function hyvaFrame() {
+        return [
+            '<script type="application/json" id="smaily-attribution-config">'
+                + JSON.stringify(CONFIG) + '<\/script>',
+            '<script src="../../compat/hyva/view/frontend/web/js/smaily-attribution.js"><\/script>'
+        ].join('\n');
+    }
+
+    // Lands on a page with the given query and cookies; resolves with the
+    // cookies the page leaves behind.
+    function land(theme, query, cookies) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe');
+
+            frame.onload = function () {
+                try {
+                    var jar = Object.assign({}, frame.contentWindow.jar);
+
+                    frame.remove();
+                    resolve(jar);
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><script>'
+                + stubs(query, cookies) + '<\/script>'
+                + (theme === 'Luma' ? lumaFrame() : hyvaFrame())
+                + '</head><body></body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    async function run(theme) {
+        var before = {smaily_rec_id: OLD_REC_ID, smaily_rec_ctx: 'storefront'},
+            jar;
+
+        log('# ' + theme);
+
+        jar = await land(theme, '?smaily_rec=' + REC_ID + '&smaily_ctx=cart_abandoned', before);
+        check(theme + ', a recommendation link with a context: the rec id cookie holds its rec id',
+            jar.smaily_rec_id === REC_ID);
+        check(theme + ', a recommendation link with a context: the context cookie holds its context',
+            jar.smaily_rec_ctx === 'cart_abandoned');
+
+        jar = await land(theme, '?smaily_rec=' + REC_ID + '&smaily_ctx=welcome', {});
+        check(theme + ', a first recommendation link with a context: the context cookie holds its context',
+            jar.smaily_rec_ctx === 'welcome');
+
+        jar = await land(theme, '?smaily_rec=' + REC_ID, before);
+        check(theme + ', a recommendation link without a context: the rec id cookie holds its rec id',
+            jar.smaily_rec_id === REC_ID);
+        check(theme + ', a recommendation link without a context: the context cookie is cleared',
+            !('smaily_rec_ctx' in jar));
+
+        jar = await land(theme, '?utm_source=smaily&utm_content=' + REC_ID, before);
+        check(theme + ', a utm_content recommendation link without a context: the context cookie is cleared',
+            jar.smaily_rec_id === REC_ID && !('smaily_rec_ctx' in jar));
+
+        jar = await land(theme, '', before);
+        check(theme + ', a landing without a recommendation link: both cookies are unchanged',
+            jar.smaily_rec_id === OLD_REC_ID && jar.smaily_rec_ctx === 'storefront');
+
+        jar = await land(theme, '?smaily_ctx=welcome', before);
+        check(theme + ', a context without a recommendation link: both cookies are unchanged',
+            jar.smaily_rec_id === OLD_REC_ID && jar.smaily_rec_ctx === 'storefront');
+
+        jar = await land(theme, '?smaily_rec=rec_abc123&smaily_ctx=welcome', before);
+        check(theme + ', a malformed rec id: both cookies are unchanged',
+            jar.smaily_rec_id === OLD_REC_ID && jar.smaily_rec_ctx === 'storefront');
+    }
+
+    // bin/test-js.sh runs the page on Chrome's virtual time, which jumps to
+    // the end of its budget whenever no timer is pending, even while a frame
+    // loads. A short interval keeps it stepping until the run ends.
+    var keepAlive = setInterval(function () {}, 10);
+
+    run('Luma').then(function () {
+        return run('Hyvä');
+    }).then(function () {
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    }).catch(function (error) {
+        document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }).then(function () {
+        clearInterval(keepAlive);
+    });
+</script>
+</body>
+</html>

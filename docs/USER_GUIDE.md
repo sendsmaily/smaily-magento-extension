@@ -855,7 +855,10 @@ window.smailyConnect.consentOverride = function () {
 Campaign clicks (`smaily_rec`/`smaily_vt`/`smaily_ctx` URL parameters) are
 captured into first-party cookies and stamped onto the resulting order, so
 the engine can credit purchases to recommendations. This works with Full
-Page Cache because the capture runs client-side.
+Page Cache because the capture runs client-side. The last click wins: a new
+recommendation click replaces the earlier click's context, or clears it
+when the new link carries none, so a purchase is credited to the link the
+shopper clicked last.
 
 A recommendation id must be a well-formed UUID. Campaign Intelligence
 refuses a whole order over a malformed one, so the extension ignores a

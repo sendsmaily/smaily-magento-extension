@@ -86,14 +86,16 @@
             recId = validRecId(readParam('utm_content'));
         }
 
+        // Contract "Cookie names", context cookie rule: the context cookie
+        // describes the same landing as the rec id cookie, so a landing with
+        // a rec id sets it to the link's context, or clears it when the link
+        // has none; any other landing leaves it alone (PRO-3911).
         if (recId) {
             setCookie(config.cookieRecId, recId, config.ttlRecIdDays);
+            setCookie(config.cookieContext, context || '', context ? config.ttlContextDays : -1);
         }
         if (visitorToken) {
             setCookie(config.cookieVisitor, visitorToken, config.ttlVisitorDays);
-        }
-        if (context) {
-            setCookie(config.cookieContext, context, config.ttlContextDays);
         }
 
         // The anonymous session id of browse events is not written here: the

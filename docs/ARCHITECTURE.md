@@ -1007,8 +1007,11 @@ both ends (`Engine\RecId`, contract §5 — a malformed `smaily_rec_id`
 rejects the whole order): the capture scripts write the cookie only for a
 well-formed UUID, from `smaily_rec` or the guarded `utm_content` fallback,
 and `OrderPayloadBuilder` omits a malformed stored value and sends the
-order without it. The visitor token, context and session id are
-shape-checked by `Engine\AttributionShape` (WooCommerce's PRO-1942
+order without it. The context cookie follows the contract's context cookie
+rule: only a landing that writes the rec id cookie touches it, setting it
+to the link's `smaily_ctx` or deleting it when the link has none, so the
+two cookies always describe the same click (`Test/Js/attribution-landing.html`).
+The visitor token, context and session id are shape-checked by `Engine\AttributionShape` (WooCommerce's PRO-1942
 definitions, the visitor token capped at 64 characters in total): the
 capture scripts write the visitor token and context cookies only in shape,
 `AttributionManager::readCookies()` treats every off-shape cookie, the rec

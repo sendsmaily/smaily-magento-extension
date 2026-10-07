@@ -343,6 +343,24 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3963 — erasing a shopper's data keeps their queue rows on their
+  retention schedule (2026-10-07; branch
+  `erkki/pro-3963-erasure-keeps-retention` for a PR).** Found with
+  PRO-3961: `Model\Privacy\LocalEraser` anonymised a kept (`sent` /
+  `failed`) row of either queue with a direct UPDATE, which fired MySQL's
+  `ON UPDATE CURRENT_TIMESTAMP` on `updated_at` — the time
+  `Cron\QueueJanitor` counts retention from — so an erased shopper's rows
+  stayed up to 30/90 days past their schedule. The UPDATE now writes
+  `updated_at = updated_at`; confirmed on MySQL 8.4 by a new integration
+  test (`GdprEraseTest::testAnAnonymisedRowKeepsItsRetentionSchedule`,
+  fails without the fix): backdated rows keep their time through the
+  erasure and the janitor removes them. Every other direct UPDATE on the
+  queue tables (claim, unclaim/requeue, retry, cancel, pending-payload
+  replace, outcomes) is a state change, not erasure — unchanged. What is
+  erased and the retention periods are unchanged; no schema change.
+  ARCHITECTURE (Art. 17 erasure), CHANGELOG "Changes since 3.0.0-rc10".
+  Gates: unit, phpcs, phpstan, integration, PHP 8.1 syntax.
+
 - **PRO-3961 — a queue row's failure, delivery or skip moves its
   last-changed time (2026-10-07; branch
   `erkki/pro-3961-queue-row-updated-at` for a PR).** The defect PRO-1964

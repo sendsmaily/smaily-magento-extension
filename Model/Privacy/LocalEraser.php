@@ -209,13 +209,21 @@ class LocalEraser
     /**
      * What a kept row carries afterwards.
      *
+     * `updated_at` is written as itself (PRO-3963): the column moves on
+     * every UPDATE unless it is set explicitly, and it is the row's
+     * last-outcome time that the janitor counts retention from. Anonymising
+     * is not an outcome, so the row keeps its 30- or 90-day schedule.
+     *
      * @param array<string, mixed> $row
      * @param array<string, array<int|string, mixed>|null> $decoded
-     * @return array<string, string|null>
+     * @return array<string, string|null|\Zend_Db_Expr>
      */
     private function anonymisedValues(array $row, array $decoded): array
     {
-        $values = ['entity_id' => Erasure::PLACEHOLDER];
+        $values = [
+            'entity_id' => Erasure::PLACEHOLDER,
+            'updated_at' => new \Zend_Db_Expr('updated_at'),
+        ];
         foreach (self::MATCHED_COLUMNS as $column) {
             $stored = $this->column($row, $column);
             // last_error is free text, not a payload: there is no structure

@@ -438,6 +438,17 @@ $intelligenceViewModel = static fn (
     }
 
     /**
+     * The consent-source note is drawn, hidden, beside a Storefront URL's
+     * note (PRO-3924).
+     *
+     * @return string
+     */
+    public function getConsentGuideUrl(): string
+    {
+        return 'https://example.com/consent-guide';
+    }
+
+    /**
      * @return array<string, string>
      */
     public function getWebsiteQuery(): array

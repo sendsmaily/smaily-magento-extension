@@ -1085,7 +1085,9 @@ separate storefront whose own consent banner decides, so the notice skips
 it (`ConsentSource::isMissing()`), the note says so for the selected
 website, and the Dashboard's browse-tracking card says the storefront must
 send the events itself (`DashboardData::hasSeparateStorefront()`,
-PRO-3918).
+PRO-3918). Both notes are drawn, one hidden, and a successful Connection
+save switches them by the Storefront URL it posted, as it does the
+separate-storefront hint (`panels.saveStep('connect')`, PRO-3924).
 
 ### Profiling consent
 

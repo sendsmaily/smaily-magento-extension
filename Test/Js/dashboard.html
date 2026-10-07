@@ -101,8 +101,22 @@
         return null;
     }
 
+    // The consent note shown under the setting: Magento's or the separate
+    // storefront's, the other one drawn hidden (PRO-3924); null unless
+    // exactly one is shown.
+    function shownConsentNote(doc) {
+        var shown = Array.prototype.filter.call(
+            doc.querySelectorAll('#smaily-w-browse-consent, #smaily-w-browse-consent-storefront'),
+            function (note) {
+                return note.style.display !== 'none';
+            }
+        );
+
+        return shown.length === 1 ? shown[0] : null;
+    }
+
     function consentNote(doc) {
-        var note = doc.getElementById('smaily-w-browse-consent');
+        var note = shownConsentNote(doc);
 
         return note ? note.textContent : null;
     }
@@ -157,7 +171,7 @@
             consentNote(magento.doc) === magento.strings[MAGENTO_CONSENT]);
         check(locale + ', settings: with a Storefront URL and cookie restriction mode off, no Magento consent source is asked for',
             consentNote(storefront.doc) === storefront.strings[STOREFRONT_CONSENT]
-            && storefront.doc.querySelectorAll('#smaily-w-browse-consent a').length === 0);
+            && shownConsentNote(storefront.doc).querySelectorAll('a').length === 0);
     }
 
     try {

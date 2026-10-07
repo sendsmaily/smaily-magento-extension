@@ -800,7 +800,9 @@ A store view with a Storefront URL saved (see
 [A separate storefront](#a-separate-storefront)) does not count: its
 separate storefront sends the browse events and its own consent banner
 decides, so the note says that instead and the notification does not
-come for it.
+come for it. The note follows a Storefront URL saved or cleared on
+**Settings > Connection**, or on the initial setup's Connect step, at
+once; no reload is needed.
 Connect one of the two:
 
 - **Magento's cookie notice** — switch on Cookie Restriction Mode. Nothing

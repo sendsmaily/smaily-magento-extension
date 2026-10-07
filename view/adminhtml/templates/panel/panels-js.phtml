@@ -250,12 +250,15 @@ window.smailyPanelsInit = function ($) {
                 // the default fallback account — is the website's, the one
                 // an empty password now keeps (PRO-3690, PRO-3718).
                 boot.websiteAccount = {subdomain: data.subdomain, username: data.username};
-                // The Intelligence tab's or step's separate-storefront hint
-                // follows the Storefront URL just saved; the Settings tabs
-                // and the setup steps switch without a reload (PRO-3747,
-                // PRO-3802).
+                // The Intelligence tab's or step's separate-storefront hint,
+                // and the consent note under browse tracking, follow the
+                // Storefront URL just saved; the Settings tabs and the setup
+                // steps switch without a reload (PRO-3747, PRO-3802,
+                // PRO-3924).
                 if (typeof data.storefront_url === 'string') {
                     $('#smaily-w-engine-storefront-hint').toggle(data.storefront_url.trim() === '');
+                    $('#smaily-w-browse-consent').toggle(data.storefront_url.trim() === '');
+                    $('#smaily-w-browse-consent-storefront').toggle(data.storefront_url.trim() !== '');
                 }
                 (data.accounts || []).forEach(function (account) {
                     var $block = $('.smaily-ml-account[data-language=' + account.language + ']');

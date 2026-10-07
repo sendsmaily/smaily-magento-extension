@@ -29,7 +29,8 @@ Run again cancels it and starts a fresh one), PRO-3920 (an admin's
 "Login as Customer" links no browsing to the customer); the
 Run again cancels it and starts a fresh one), PRO-3923 (the command line
 and connecting cancel a stalled import first too; an import waiting
-behind a stalled one names it on its card); the
+behind a stalled one names it on its card), PRO-3924 (the consent note
+under browse tracking follows a Storefront URL save without a reload); the
 version check is now step one of INSTALLING and PILOT_CHECKLIST §0;
 HEADLESS_STOREFRONTS opens with a setup checklist (admin / back end /
 storefront developer), audited against the code.

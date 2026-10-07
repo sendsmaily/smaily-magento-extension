@@ -13,7 +13,9 @@
   Test/Js/render-admin.php into Test/Js/build/ as the initial setup's step
   and as the Settings tab (each without and with a saved Storefront URL, for
   the storefront hint of PRO-3745; on Settings a Connection save shows or
-  hides it without a reload, PRO-3747), and the initial setup's Connect step
+  hides it without a reload, PRO-3747, and switches the consent note under
+  browse tracking between Magento's cookie notice and the separate
+  storefront's banner, PRO-3924), and the initial setup's Connect step
   (panel/connection.phtml) in front of its Intelligence step, for the setup's
   Storefront URL field (PRO-3802), and the initial setup itself
   (wizard/index.phtml) reopened after it was finished, for its summary's
@@ -55,6 +57,8 @@
     var STOREFRONT_HINT = 'Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: go back to the Connect step, open Using a separate storefront? and enter the address as Storefront URL. Or connect now and press Hold back the import.';
     var SETTINGS_STOREFRONT_HINT = 'Using a separate storefront? Set its Storefront URL under Settings > Connection > Using a separate storefront? before you connect, so that the catalog import sends the storefront\'s product links. Or connect now and press Hold back the import.';
     var REFUSED_STOREFRONT = 'Enter the storefront\'s address only, starting with https:// — for example https://shop.example.com — without a path or a query.';
+    var MAGENTO_CONSENT = 'Consent comes from Magento’s cookie notice: browse events are sent only after the visitor allows cookies.';
+    var STOREFRONT_CONSENT = 'Your separate storefront sends the browse events itself, so its own cookie consent banner decides when they are sent.';
     var FINISHED ='The catalog import had already finished, so there was nothing left to hold back.';
     var REIMPORT = 'Saved. Run the catalog import again under Intelligence > Historical imports, so that Campaign Intelligence gets the new product links.';
     var failures = 0;
@@ -260,6 +264,20 @@
         return !!element && element.getClientRects().length > 0;
     }
 
+    // The consent note under browse tracking that is not hidden — Magento's
+    // or the separate storefront's (PRO-3924); null unless exactly one. The
+    // setting sits in the connected block, so it is read by its own style.
+    function consentNote(doc) {
+        var shown = Array.prototype.filter.call(
+            doc.querySelectorAll('#smaily-w-browse-consent, #smaily-w-browse-consent-storefront'),
+            function (note) {
+                return note.style.display !== 'none';
+            }
+        );
+
+        return shown.length === 1 ? shown[0].textContent : null;
+    }
+
     function holdBackResult(doc) {
         return doc.getElementById('smaily-w-engine-catalog-holdback-result').textContent;
     }
@@ -332,10 +350,18 @@
         await saveConnection(frame, 'https://shop.example.com', false);
         check(locale + ', settings: a refused Connection save leaves the storefront hint',
             visible(frame.contentDocument, 'smaily-w-engine-storefront-hint'));
+        check(locale + ', settings: a refused Connection save leaves the consent note on Magento\'s cookie notice',
+            consentNote(frame.contentDocument) === strings[MAGENTO_CONSENT]);
         await saveConnection(frame, 'https://shop.example.com');
         check(locale + ', settings: a Storefront URL saved on the Connection tab hides the storefront hint',
             visible(frame.contentDocument, 'smaily-w-engine-connect')
             && !visible(frame.contentDocument, 'smaily-w-engine-storefront-hint'));
+        // The consent note under browse tracking follows it (PRO-3924).
+        check(locale + ', settings: a Storefront URL saved, the consent note describes the storefront\'s banner',
+            consentNote(frame.contentDocument) === strings[STOREFRONT_CONSENT]);
+        await saveConnection(frame, '');
+        check(locale + ', settings: the Storefront URL cleared, the consent note is Magento\'s cookie notice again',
+            consentNote(frame.contentDocument) === strings[MAGENTO_CONSENT]);
         frame.remove();
 
         // The initial setup's Connect step offers the Storefront URL field,

@@ -119,7 +119,9 @@ checks that the initial setup's step and the Settings tab each show their
 hint to set the Storefront URL first, or hold the import back, only while
 no Storefront URL is saved, that on Settings a Connection save with a
 Storefront URL hides it and one that clears the URL shows it again without
-a reload (a refused save changes nothing), and that Settings drops it once
+a reload (a refused save changes nothing), that the consent note under
+browse tracking switches the same way between Magento's cookie notice and
+the separate storefront's banner, and that Settings drops the hint once
 connected. The initial setup's Connect step is rendered in front of its
 Intelligence step too: it checks that the step draws the Storefront URL
 field collapsed, that its save posts the field with the credentials —

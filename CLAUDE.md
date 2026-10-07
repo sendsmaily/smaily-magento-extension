@@ -20,7 +20,7 @@ branch `master` (owner decision 2026-10-07, PRO-1198; moved by PR #126,
 squash-merged as aa0c995). Every change reaches `master` through a
 squash-merged PR from a short-lived topic branch ("Changes reach `master`");
 nothing is pushed to `master` directly. The fork `erkkimarkus/magento-connect`
-(branch `v3`, rc1–rc8) is history, to be archived read-only. Local remotes:
+(branch `v3`, rc1–rc8) is history, archived read-only (2026-10-07). Local remotes:
 `origin` = sendsmaily, `fork` = the fork. The 2.8.x line is not developed
 further; its tags stay, no maintenance branch.
 
@@ -221,8 +221,8 @@ Done since: 3.0.0-rc9, the first release candidate there, tagged
 failed with HTTP 500 — both `gh release create` (the API) and `git push`
 of the tag; Erkki created it in the GitHub web UI, which worked.
 
-**Still open (Erkki):** archive the fork `erkkimarkus/magento-connect`
-(read-only; rc1–rc8 stay).
+The fork `erkkimarkus/magento-connect` is archived read-only (Erkki,
+2026-10-07); its rc1–rc8 releases stay. Nothing of the move is left open.
 
 ## Language conventions
 
@@ -287,10 +287,12 @@ is written in English.
   date pending Erkki), later the same day 4/5 (rc8 released; the pilot
   waits for the store's Magento upgrade); 2026-10-07 later: 4/5 (rc9 is
   the first release candidate in the official repository; the pilot
-  milestone has no date until a store is confirmed).
+  milestone has no date until a store is confirmed); 2026-10-07 evening:
+  4/5 (3 fixes on master since rc9; pilot store not yet confirmed).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385
   canceled, PRO-3680 done); 2026-10-04: 0 open (PRO-1357 closed);
-  2026-10-05: 0 open; 2026-10-07: 0 open. Dates: none yet (2026-10-02 —
+  2026-10-05: 0 open; 2026-10-07: 0 open; 2026-10-07 evening: 0 open
+  (PRO-3957 closed). Dates: none yet (2026-10-02 —
   not asked; PRO-2456 is placed before the rc1 tag).

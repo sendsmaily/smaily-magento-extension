@@ -7,6 +7,7 @@ The package version is currently `3.0.0-rc9` — the ninth release-candidate cut
 **Changes since 3.0.0-rc9**
 
 - A stalled import holds up less. A catalog import set aside as *Stalled* no longer keeps the nightly product list from going to Campaign Intelligence while other imports run behind it; before, the list waited until those imports had finished. An import that fails before its first page — for example while it counts the products, contacts or orders it will send — now counts as started, so after an hour it is set aside like any other stalled import and the imports behind it run; before, it stayed *Pending* and every import behind it waited until you pressed **Run again** or **Cancel import** on its card.
+- An order created in the admin under **Sales > Orders > Create New Order**, or placed with **Login as Customer**, no longer counts as an order through the store's own pages when the extension decides whether to open **Using a separate storefront?** by itself. Before, on a store whose shoppers buy only on a separate storefront, one such order by the staff kept the Storefront URL field collapsed for 30 days. A shopper's order on the store's own pages, and an order through Magento's API, count as before.
 
 **Changes since 3.0.0-rc8**
 

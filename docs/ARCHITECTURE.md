@@ -592,9 +592,11 @@ below.
   (`sales_order_place_after`) stamps each order's time into one of two
   `smaily_connect_*` flags — an API order is placed in the `graphql` area, or
   in `webapi_rest` without the `form_key` cookie of Magento's storefront
-  session; every other order (Luma's checkout REST call carries the cookie)
-  is a storefront order. `isApiOnly()`: an API order and no storefront
-  order in the last 30 days. Installation-wide; no table or column.
+  session; an order an admin places otherwise (`Model\OrderPlacer::isAdmin()`,
+  the attribution stamp's rule: the admin's order screen or "Login as
+  Customer") stamps neither flag (PRO-3949); every other order (Luma's
+  checkout REST call carries the cookie) is a storefront order.
+  `isApiOnly()`: an API order and no storefront order in the last 30 days. Installation-wide; no table or column.
   Connecting starts the catalog import, so `panel/intelligence.phtml`
   adds a note under the setup URL field while
   `WizardData::getSavedStorefrontUrl()` is empty for the selected website:
@@ -1074,7 +1076,8 @@ admin requests, so they would be the admin's own browsing. The check is
 the request's area — any order saved in an `adminhtml` request is an
 admin's (`App\State::getAreaCode()`; no area set reads as not admin) — a
 property of the request that needs no admin-only session object.
-`saveForOrder()` asks one rule, `isPlacedByAdmin()`, for both cases.
+`saveForOrder()` asks one rule, `Model\OrderPlacer::isAdmin()`, for both
+cases; `Model\OrderOrigin` asks the same rule (PRO-3949).
 
 ### Browse tracking
 

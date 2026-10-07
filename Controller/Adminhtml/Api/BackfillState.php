@@ -33,7 +33,7 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * "cancel" flips every active job of the type to cancelled; the background
  * worker stops at its next page boundary, and a later "start" begins a
  * fresh import. `stalled` marks a queued or running import that nothing
- * has moved for an hour (JobManager::isStalled(), PRO-3915); a "start"
+ * has moved for an hour (JobManager::isStalled()'s rule, PRO-3915); a "start"
  * cancels such an import first (JobManager::startIfIdle()), so it cannot
  * block the new one. `blocked_by` is the job type of the import a stalled
  * one waits behind — the oldest queued or running job, which the tick takes
@@ -124,8 +124,10 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
         }
 
         $status = $this->statusAggregator->resolve($statuses);
-        $stalled = in_array($status, ['pending', 'running'], true)
-            && $this->jobManager->isStalled($jobType, $target);
+        // A pending or running status already means an active job of this
+        // import, so isStalled()'s own active-job read is skipped.
+        $stalled = in_array($status, [Job::STATUS_PENDING, Job::STATUS_RUNNING], true)
+            && !$this->jobManager->activeMovedWithin(JobManager::STALLED_SECONDS);
         $ahead = $stalled ? $this->jobManager->nextActive() : null;
 
         return [

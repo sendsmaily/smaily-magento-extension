@@ -109,8 +109,8 @@ class ConsentSourceTest extends TestCase
         );
 
         $config = $this->createMock(Config::class);
-        $config->method('getStorefrontUrl')->willReturnCallback(
-            static fn (int $storeId): string => $storefrontByStore[$storeId] ?? ''
+        $config->method('hasStorefrontUrl')->willReturnCallback(
+            static fn (int $storeId): bool => ($storefrontByStore[$storeId] ?? '') !== ''
         );
 
         return new ConsentSource($scopeConfig, $storeManager, $config);

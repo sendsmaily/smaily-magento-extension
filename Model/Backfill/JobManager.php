@@ -109,12 +109,23 @@ class JobManager
 
     public function findActive(string $jobType, string $target, int $websiteId): ?Job
     {
+        return $this->firstActive($jobType, $target, $websiteId);
+    }
+
+    /**
+     * A queued or running job of this import — for one website, or for any
+     * website when $websiteId is null.
+     */
+    private function firstActive(string $jobType, string $target, ?int $websiteId = null): ?Job
+    {
         $collection = $this->collectionFactory->create();
         $collection->addFieldToFilter('status', ['in' => [Job::STATUS_PENDING, Job::STATUS_RUNNING]])
             ->addFieldToFilter('job_type', $jobType)
-            ->addFieldToFilter('target', $target)
-            ->addFieldToFilter('website_id', ['eq' => $websiteId])
-            ->setPageSize(1);
+            ->addFieldToFilter('target', $target);
+        if ($websiteId !== null) {
+            $collection->addFieldToFilter('website_id', ['eq' => $websiteId]);
+        }
+        $collection->setPageSize(1);
         $job = $collection->getFirstItem();
 
         return $job instanceof Job && $job->getId() ? $job : null;
@@ -148,20 +159,15 @@ class JobManager
      */
     public function isStalled(string $jobType, string $target): bool
     {
-        $collection = $this->collectionFactory->create();
-        $collection->addFieldToFilter('status', ['in' => [Job::STATUS_PENDING, Job::STATUS_RUNNING]])
-            ->addFieldToFilter('job_type', $jobType)
-            ->addFieldToFilter('target', $target)
-            ->setPageSize(1);
-
-        return $collection->getFirstItem()->getId() && !$this->activeMovedWithin(self::STALLED_SECONDS);
+        return $this->firstActive($jobType, $target) !== null && !$this->activeMovedWithin(self::STALLED_SECONDS);
     }
 
     /**
      * Whether some queued or running job was written within the last
-     * $seconds.
+     * $seconds. A caller that already knows an import is queued or running
+     * asks this alone for isStalled()'s answer (BackfillState).
      */
-    private function activeMovedWithin(int $seconds): bool
+    public function activeMovedWithin(int $seconds): bool
     {
         $lastMoved = (string)$this->connection()->fetchOne(
             $this->connection()->select()

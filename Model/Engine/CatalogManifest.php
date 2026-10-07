@@ -74,7 +74,7 @@ class CatalogManifest
      * show, and the Dashboard needs only this one value. Deleted when a list
      * is sent, and while sending is not allowed — no list is due then, so a
      * new connection counts from its first night. Read by
-     * ViewModel\Adminhtml\DashboardData.
+     * ViewModel\Adminhtml\DashboardData through readUnsent().
      */
     public const FLAG_UNSENT = 'smaily_connect_catalog_manifest_unsent';
 
@@ -134,7 +134,11 @@ class CatalogManifest
         $skip = $this->skipReason();
         if ($skip !== null) {
             $this->logger->info('Nightly catalog manifest not sent', ['reason' => self::SKIP_LOG[$skip]]);
-            $this->recordUnsent($skip);
+            if ($skip === self::REASON_NOT_ALLOWED) {
+                $this->clearUnsent();
+            } else {
+                $this->recordUnsent($skip);
+            }
 
             return;
         }
@@ -175,7 +179,7 @@ class CatalogManifest
         $this->recordExchange($event, $products);
         if ($error === null) {
             $this->queue->markSent($event);
-            $this->flagManager->deleteFlag(self::FLAG_UNSENT);
+            $this->clearUnsent();
         } else {
             $this->queue->markFailed($event, $error, true);
             $this->recordUnsent(self::REASON_FAILED);
@@ -209,21 +213,40 @@ class CatalogManifest
     }
 
     /**
+     * The nights in a row no list went out, and why the last one did not (a
+     * REASON_* value; '' when none is recorded) — FLAG_UNSENT as the
+     * Dashboard reads it.
+     *
+     * @return array{nights: int, reason: string}
+     */
+    public function readUnsent(): array
+    {
+        $unsent = $this->flagManager->getFlagData(self::FLAG_UNSENT);
+        if (!is_array($unsent)) {
+            return ['nights' => 0, 'reason' => ''];
+        }
+
+        return ['nights' => (int)($unsent['nights'] ?? 0), 'reason' => (string)($unsent['reason'] ?? '')];
+    }
+
+    /**
      * Count one more night without a list, and remember why (FLAG_UNSENT).
      */
     private function recordUnsent(string $reason): void
     {
-        if ($reason === self::REASON_NOT_ALLOWED) {
-            $this->flagManager->deleteFlag(self::FLAG_UNSENT);
-
-            return;
-        }
-
-        $unsent = $this->flagManager->getFlagData(self::FLAG_UNSENT);
         $this->flagManager->saveFlag(self::FLAG_UNSENT, [
-            'nights' => (is_array($unsent) ? (int)($unsent['nights'] ?? 0) : 0) + 1,
+            'nights' => $this->readUnsent()['nights'] + 1,
             'reason' => $reason,
         ]);
+    }
+
+    /**
+     * Forget the nights without a list (FLAG_UNSENT): one went out, or none
+     * is due.
+     */
+    private function clearUnsent(): void
+    {
+        $this->flagManager->deleteFlag(self::FLAG_UNSENT);
     }
 
     /**

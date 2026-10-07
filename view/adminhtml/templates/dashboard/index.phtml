@@ -109,9 +109,9 @@ $connections = [
 // Failed deliveries are the verdict's subject unless setup or the Smaily
 // connection outranks them: then the pack's degraded state — a warning
 // banner above the verdict and a danger "Review failures" button (PRO-3568).
-$showFailures = $failed > 0
-    && $verdict !== \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_INCOMPLETE
-    && $verdict !== \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_DISCONNECTED;
+$bannersSuppressed = $verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_INCOMPLETE
+    || $verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_DISCONNECTED;
+$showFailures = $failed > 0 && !$bannersSuppressed;
 ?>
 <div id="smaily-dashboard" class="smaily-ui smaily-dashboard">
     <?php if ($showFailures): ?>
@@ -127,10 +127,7 @@ $showFailures = $failed > 0
     </div>
     <?php endif; ?>
     <?php // Shown whatever outranks it in the verdict, with the last night's reason (PRO-3914). ?>
-    <?php if ($unsentProductList !== null
-        && $verdict !== \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_INCOMPLETE
-        && $verdict !== \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_DISCONNECTED
-    ): ?>
+    <?php if ($unsentProductList !== null && !$bannersSuppressed): ?>
     <div class="smaily-banner smaily-banner--warning smaily-dashboard-banner" id="smaily-dashboard-unsent-product-list" role="status">
         <span class="smaily-banner__icon">&#9888;</span>
         <div class="smaily-banner__body">

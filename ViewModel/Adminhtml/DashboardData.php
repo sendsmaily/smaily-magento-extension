@@ -57,7 +57,8 @@ class DashboardData implements ArgumentInterface
         private readonly WebsiteContext $websiteContext,
         private readonly StatusPill $statusPill,
         private readonly QueueStatusOptions $statusOptions,
-        private readonly DateTime $dateTime
+        private readonly DateTime $dateTime,
+        private readonly CatalogManifest $catalogManifest
     ) {
     }
 
@@ -116,7 +117,7 @@ class DashboardData implements ArgumentInterface
      */
     public function hasSeparateStorefront(): bool
     {
-        return $this->config->getStorefrontUrl($this->websiteContext->getStoreId()) !== '';
+        return $this->config->hasStorefrontUrl($this->websiteContext->getStoreId());
     }
 
     /**
@@ -165,8 +166,8 @@ class DashboardData implements ArgumentInterface
         if (!$this->isEngineConnected() || $this->isEngineRefused()) {
             return null;
         }
-        $unsent = $this->flagManager->getFlagData(CatalogManifest::FLAG_UNSENT);
-        $nights = is_array($unsent) ? (int)($unsent['nights'] ?? 0) : 0;
+        $unsent = $this->catalogManifest->readUnsent();
+        $nights = $unsent['nights'];
         if ($nights < self::UNSENT_PRODUCT_LIST_NIGHTS) {
             return null;
         }
@@ -197,7 +198,7 @@ class DashboardData implements ArgumentInterface
 
         return [
             'nights' => $nights,
-            'reason' => (string)($reasons[(string)($unsent['reason'] ?? '')] ?? ''),
+            'reason' => (string)($reasons[$unsent['reason']] ?? ''),
         ];
     }
 

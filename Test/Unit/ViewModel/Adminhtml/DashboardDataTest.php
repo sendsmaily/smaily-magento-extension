@@ -223,10 +223,8 @@ class DashboardDataTest extends TestCase
         $engineSettings->method('isRefused')->willReturn($refused);
         $engineSettings->method('getIssuedAt')->willReturn($issuedAt);
 
-        $flags = $this->createMock(FlagManager::class);
-        $flags->method('getFlagData')->willReturnCallback(
-            static fn (string $code) => $code === CatalogManifest::FLAG_UNSENT ? $unsent : null
-        );
+        $catalogManifest = $this->createMock(CatalogManifest::class);
+        $catalogManifest->method('readUnsent')->willReturn($unsent ?? ['nights' => 0, 'reason' => '']);
         // 2026-10-07 12:00 UTC.
         $dateTime = $this->createMock(DateTime::class);
         $dateTime->method('gmtTimestamp')->willReturn(1_791_374_400);
@@ -243,8 +241,8 @@ class DashboardDataTest extends TestCase
         $websiteContext->method('getWebsiteId')->willReturn(4);
         $websiteContext->method('getStoreId')->willReturn(7);
         $config = $this->createMock(Config::class);
-        $config->method('getStorefrontUrl')->willReturnCallback(
-            static fn (int $storeId): string => $storeId === 7 ? $storefrontUrl : ''
+        $config->method('hasStorefrontUrl')->willReturnCallback(
+            static fn (int $storeId): bool => $storeId === 7 && $storefrontUrl !== ''
         );
         $verifiedCredentials = $this->createMock(VerifiedCredentials::class);
         $verifiedCredentials->method('isVerified')->willReturn(!$smailyVerified);
@@ -257,12 +255,13 @@ class DashboardDataTest extends TestCase
             $setupGuard,
             $queueHealth,
             $stats ?? $this->createMock(DashboardStats::class),
-            $flags,
+            $this->createMock(FlagManager::class),
             $verifiedCredentials,
             $websiteContext,
             new StatusPill(),
             new QueueStatusOptions(),
-            $dateTime
+            $dateTime,
+            $catalogManifest
         );
     }
 }

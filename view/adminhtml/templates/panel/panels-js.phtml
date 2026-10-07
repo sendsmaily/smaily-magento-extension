@@ -492,7 +492,7 @@ window.smailyPanelsInit = function ($) {
 
     function backfillState(data) {
         // Run again starts a fresh import; the server cancels this one first.
-        if (data.stalled && (data.status === 'pending' || data.status === 'running')) {
+        if (data.stalled) {
             return 'stalled';
         }
         if (data.status === 'completed') {

@@ -1079,7 +1079,7 @@ ungated. Only restriction mode is visible server-side
 `Cron\HealthCheck` posts a minor admin notice once (again after the
 condition clears and returns), and the browse toggle's note in
 `panel/intelligence.phtml` recommends the two consent sources. A store
-view with a Storefront URL saved (`Config::getStorefrontUrl()`, the
+view with a Storefront URL saved (`Config::hasStorefrontUrl()`, the
 definition of a separate storefront everywhere in the admin) sells on a
 separate storefront whose own consent banner decides, so the notice skips
 it (`ConsentSource::isMissing()`), the note says so for the selected
@@ -1345,7 +1345,8 @@ Initial setup, Settings, Log. Design rules:
   nightly product list > all good.
 - **No nightly product list for three nights (PRO-3914).**
   `DashboardData::getUnsentProductList()` reads the manifest's
-  `FLAG_UNSENT` count: from `UNSENT_PRODUCT_LIST_NIGHTS` (3) nights in a
+  `FLAG_UNSENT` count (`CatalogManifest::readUnsent()`): from
+  `UNSENT_PRODUCT_LIST_NIGHTS` (3) nights in a
   row, the verdict is degraded (its sentence when nothing outranks it) and
   a warning banner above it — shown whatever outranks it, as the failures
   banner is — says how many nights and why the last one did not go out,

@@ -45,11 +45,7 @@ class ConsentSource
     public function isCookieRestrictionOnEverywhere(): bool
     {
         foreach ($this->storeManager->getStores() as $store) {
-            if (!$this->scopeConfig->isSetFlag(
-                CookieHelper::XML_PATH_COOKIE_RESTRICTION,
-                ScopeInterface::SCOPE_STORE,
-                $store->getId()
-            )) {
+            if (!$this->isRestrictionOn((int)$store->getId())) {
                 return false;
             }
         }
@@ -67,15 +63,24 @@ class ConsentSource
     public function isMissing(): bool
     {
         foreach ($this->storeManager->getStores() as $store) {
-            if (!$this->scopeConfig->isSetFlag(
-                CookieHelper::XML_PATH_COOKIE_RESTRICTION,
-                ScopeInterface::SCOPE_STORE,
-                $store->getId()
-            ) && $this->config->getStorefrontUrl($store->getId()) === '') {
+            $storeId = (int)$store->getId();
+            if (!$this->isRestrictionOn($storeId) && !$this->config->hasStorefrontUrl($storeId)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Whether Magento's cookie restriction mode is on in this store view.
+     */
+    private function isRestrictionOn(int $storeId): bool
+    {
+        return $this->scopeConfig->isSetFlag(
+            CookieHelper::XML_PATH_COOKIE_RESTRICTION,
+            ScopeInterface::SCOPE_STORE,
+            $storeId
+        );
     }
 }

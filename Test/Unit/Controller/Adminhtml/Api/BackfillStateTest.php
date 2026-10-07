@@ -114,7 +114,7 @@ class BackfillStateTest extends TestCase
      */
     public function testAnImportNothingHasMovedForAnHourReadsAsStalled(string $status): void
     {
-        $this->jobManager->method('isStalled')->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE)->willReturn(true);
+        $this->jobManager->method('activeMovedWithin')->with(JobManager::STALLED_SECONDS)->willReturn(false);
 
         $this->controller(true, ['action' => 'status', 'job_type' => Job::TYPE_CATALOG], [$this->job($status)])
             ->execute();
@@ -133,7 +133,7 @@ class BackfillStateTest extends TestCase
 
     public function testAnImportThatMovesIsNotStalled(): void
     {
-        $this->jobManager->method('isStalled')->willReturn(false);
+        $this->jobManager->method('activeMovedWithin')->willReturn(true);
 
         $this->controller(
             true,
@@ -147,7 +147,7 @@ class BackfillStateTest extends TestCase
 
     public function testAFinishedImportIsNeverStalled(): void
     {
-        $this->jobManager->expects(self::never())->method('isStalled');
+        $this->jobManager->expects(self::never())->method('activeMovedWithin');
 
         $this->controller(
             true,
@@ -164,7 +164,7 @@ class BackfillStateTest extends TestCase
      */
     public function testAStalledImportWaitingBehindAnotherImportNamesIt(): void
     {
-        $this->jobManager->method('isStalled')->willReturn(true);
+        $this->jobManager->method('activeMovedWithin')->willReturn(false);
         $this->jobManager->method('nextActive')->willReturn($this->job(Job::STATUS_RUNNING, Job::TYPE_CONTACTS));
 
         $this->controller(
@@ -179,7 +179,7 @@ class BackfillStateTest extends TestCase
 
     public function testAStalledImportFirstInLineIsBlockedByNothing(): void
     {
-        $this->jobManager->method('isStalled')->willReturn(true);
+        $this->jobManager->method('activeMovedWithin')->willReturn(false);
         $this->jobManager->method('nextActive')->willReturn($this->job(Job::STATUS_RUNNING, Job::TYPE_CATALOG));
 
         $this->controller(
@@ -194,7 +194,7 @@ class BackfillStateTest extends TestCase
 
     public function testAnImportThatMovesIsBlockedByNothing(): void
     {
-        $this->jobManager->method('isStalled')->willReturn(false);
+        $this->jobManager->method('activeMovedWithin')->willReturn(true);
         $this->jobManager->expects(self::never())->method('nextActive');
 
         $this->controller(

@@ -152,6 +152,15 @@ class Config
     }
 
     /**
+     * Whether a separate storefront's address is saved for the store's
+     * website (getStorefrontUrl() is not '').
+     */
+    public function hasStorefrontUrl(?int $storeId = null): bool
+    {
+        return $this->getStorefrontUrl($storeId) !== '';
+    }
+
+    /**
      * Get configured log verbosity (error|info|debug).
      */
     public function getLogVerbosity(): string

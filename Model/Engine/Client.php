@@ -55,6 +55,13 @@ class Client
     /** Spec-conservative §3b batch ceiling (the wrapper allows up to 1000 ids; mirrors Woo). */
     public const CATALOG_REMOVE_BATCH_LIMIT = 100;
 
+    /**
+     * The Log row of a nightly catalog manifest (§3c, PRO-3854). Never
+     * queued for sending: Engine\CatalogManifest sends the list itself and
+     * writes the row with the outcome, so no flusher claims this domain.
+     */
+    public const DOMAIN_CATALOG_MANIFEST = 'catalog_manifest';
+
     public const DOMAIN_WRAPPERS = [
         self::DOMAIN_CATALOG => 'products',
         self::DOMAIN_CUSTOMERS => 'customers',
@@ -82,6 +89,13 @@ class Client
     private const RETRY_DELAYS_SECONDS = [1, 2, 4, 8, 16];
     private const TIMEOUT_SECONDS = 30;
     private const CONNECT_TIMEOUT_SECONDS = 10;
+
+    /**
+     * The nightly manifest's one request: up to 50,000 items (about 4.5 MB)
+     * that the engine compares with its whole catalog, far more than a
+     * 100-item batch; it runs in cron, never in a shopper's request.
+     */
+    private const MANIFEST_TIMEOUT_SECONDS = 60;
 
     /** The ceiling on a back-off the engine asks for (429 retry_after_seconds). */
     private const MAX_RETRY_AFTER_SECONDS = 60;
@@ -240,6 +254,32 @@ class Client
     }
 
     /**
+     * The store's complete product list — POST /api/v1/ingest/catalog/manifest
+     * (contract v1.12.0 §3c, PRO-3854). One request of 0–50,000
+     * `{sku, in_stock}` items; the engine tombstones each product missing
+     * from it, takes the list's `in_stock` where it differs and counts the
+     * skus it does not have. One bad item is a 400 for the whole list.
+     * Response: {ok, products_in_manifest, removed, stock_fixed,
+     * missing_in_engine, guard_tripped, guard_reason, would_remove}.
+     *
+     * The endpoints map carries `ingest_catalog_manifest` since v1.12.0; a
+     * connection set up earlier falls back to the contract's path (§1 "map
+     * age"), as catalogRemove() does.
+     *
+     * @param array<int, array{sku: string, in_stock: bool}> $products
+     * @return array<string, mixed>
+     */
+    public function catalogManifest(array $products): array
+    {
+        return $this->request(
+            'POST',
+            $this->endpoint('ingest_catalog_manifest', '/api/v1/ingest/catalog/manifest'),
+            ['products' => $products],
+            timeoutSeconds: self::MANIFEST_TIMEOUT_SECONDS
+        );
+    }
+
+    /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
@@ -371,6 +411,7 @@ class Client
     /**
      * @param array<string, mixed>|null $body
      * @param bool $singleAttempt one short attempt, no retry and no wait (the storefront relay)
+     * @param int $timeoutSeconds the whole request's bound, unless $singleAttempt sets the relay's
      * @return array<string, mixed>
      */
     private function request(
@@ -378,12 +419,13 @@ class Client
         string $url,
         ?array $body,
         bool $authenticated = true,
-        bool $singleAttempt = false
+        bool $singleAttempt = false,
+        int $timeoutSeconds = self::TIMEOUT_SECONDS
     ): array {
         $this->lastExchange = null;
         $retryDelays = $singleAttempt ? [] : self::RETRY_DELAYS_SECONDS;
         $options = [
-            RequestOptions::TIMEOUT => $singleAttempt ? self::RELAY_TIMEOUT_SECONDS : self::TIMEOUT_SECONDS,
+            RequestOptions::TIMEOUT => $singleAttempt ? self::RELAY_TIMEOUT_SECONDS : $timeoutSeconds,
             RequestOptions::CONNECT_TIMEOUT => $singleAttempt
                 ? self::RELAY_CONNECT_TIMEOUT_SECONDS
                 : self::CONNECT_TIMEOUT_SECONDS,

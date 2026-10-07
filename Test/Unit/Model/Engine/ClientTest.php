@@ -267,6 +267,54 @@ class ClientTest extends TestCase
         );
     }
 
+    /**
+     * PRO-3854: the nightly manifest is one larger request, bounded by its
+     * own longer timeout.
+     */
+    public function testCatalogManifestSendsTheListToTheMappedEndpoint(): void
+    {
+        $this->settings->method('getEndpoint')->with('ingest_catalog_manifest')
+            ->willReturn('https://engine.example/api/v1/ingest/catalog/manifest');
+        $client = $this->createClient([
+            new Response(200, [], '{"ok":true,"products_in_manifest":2,"removed":1,"stock_fixed":0,'
+                . '"missing_in_engine":0,"guard_tripped":false,"guard_reason":null,"would_remove":1}'),
+        ]);
+
+        $response = $client->catalogManifest([
+            ['sku' => 'TENT', 'in_stock' => true],
+            ['sku' => 'mag-12', 'in_stock' => false],
+        ]);
+
+        self::assertSame(1, $response['removed']);
+        $request = $this->history[0]['request'];
+        self::assertSame('POST', $request->getMethod());
+        self::assertSame('https://engine.example/api/v1/ingest/catalog/manifest', (string)$request->getUri());
+        self::assertSame('Bearer sk_test_key', $request->getHeaderLine('Authorization'));
+        self::assertSame(
+            '{"products":[{"sku":"TENT","in_stock":true},{"sku":"mag-12","in_stock":false}]}',
+            (string)$request->getBody()
+        );
+        self::assertSame(60, $this->history[0]['options']['timeout'] ?? null);
+        self::assertSame(10, $this->history[0]['options']['connect_timeout'] ?? null);
+    }
+
+    public function testCatalogManifestFallsBackToTheContractPathWhenTheMapLacksTheKey(): void
+    {
+        // A connection set up before contract v1.12.0 keeps a map without
+        // ingest_catalog_manifest (§1 "map age").
+        $this->settings->method('getEndpoint')->willReturn(null);
+        $this->settings->method('getEngineBaseUrl')->willReturn('https://engine.example/');
+        $client = $this->createClient([new Response(200, [], '{"ok":true}')]);
+
+        $client->catalogManifest([]);
+
+        self::assertSame(
+            'https://engine.example/api/v1/ingest/catalog/manifest',
+            (string)$this->history[0]['request']->getUri()
+        );
+        self::assertSame('{"products":[]}', (string)$this->history[0]['request']->getBody());
+    }
+
     public function testCustomerDeleteSubstitutesEmailPlaceholderAndTreats404AsSuccess(): void
     {
         $this->settings->method('getEndpoint')->with('customer_delete')

@@ -5,30 +5,25 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-07 late evening — **The 3.0.0-rc10 cut is ready on
-branch `release/3.0.0-rc10` for its PR:** the version is `3.0.0-rc10`
-(composer.json, `ModuleInfo::VERSION`, the ModuleVersion docblock;
-composer.lock content-hash only), and CHANGELOG's "Changes since
-3.0.0-rc9" is the rc10 list in the order the changes landed — PRO-3949
-(#130), PRO-3957 (#131), PRO-3950 (#132), PRO-1970 (#134), PRO-1964
-(#135); no bullet adds or corrects a catalog field, so none asks for a
-catalog import. All gates pass on the branch (unit, phpcs, phpstan,
-integration, browser harnesses, PHP 8.1 syntax, the release-version check
-for `3.0.0-rc10`; the release ZIP verifies with 399 entries). **Queue:**
-merge the rc10 PR → tag `3.0.0-rc10` on `master` (Erkki's yes; a tag is a
-Packagist publish; the GitHub web UI if the CLI returns HTTP 500) → the
-release workflow and the ZIP/checksum check → the pilot when a store is
-confirmed (the HC PRO store may be next week). **Open for Erkki:** HC
-PRO's Magento/PHP versions and storefront type; the Estonian proofread and
-upload of `docs/site/index.html`. **Waiting on the engine side:**
-PRO-3919, PRO-3941, PRO-3956._
+_Last updated: 2026-10-07 night — **3.0.0-rc10 is released from the official
+repository** (https://github.com/sendsmaily/smaily-magento-extension/releases/tag/3.0.0-rc10),
+created with `gh release create` (the CLI worked this time): the release workflow
+is green on 148cccd, the ZIP has 399 files, sha256 dd80633d6ece1b994971…, its
+composer.json says 3.0.0-rc10, and Packagist lists 3.0.0-rc10 next to 3.0.0-rc9
+and 2.8.1. It is the package a pilot store installs. **Queue:** PRO-3961 and
+PRO-3962 in progress; the pilot when a store is confirmed (the HC PRO store may
+be next week). **Open for Erkki:** HC PRO's Magento/PHP versions and storefront
+type; the Estonian proofread and upload of `docs/site/index.html`. **Waiting on
+the engine side:** PRO-3919, PRO-3941, PRO-3956._
 
-_Earlier the same evening: **The move into
-`sendsmaily/smaily-magento-extension` is complete (PRO-1198):** `master` is
-the only line, every change reaches it through a squash-merged PR, and the
-fork `erkkimarkus/magento-connect` is archived read-only (rc1–rc8 stay).
-PRO-3949 (#130), PRO-3957 (#131), PRO-3950 (#132), PRO-1970 (#134) and
-PRO-1964 (#135) landed on `master` after 3.0.0-rc9._
+_Earlier the same evening: the rc10 version cut merged (#136) —
+CHANGELOG's "Changes since 3.0.0-rc9" lists PRO-3949 (#130), PRO-3957
+(#131), PRO-3950 (#132), PRO-1970 (#134) and PRO-1964 (#135); no bullet
+asks for a catalog import; all gates passed on the branch. **The move into
+`sendsmaily/smaily-magento-extension` is complete (PRO-1198):** `master`
+is the only line, every change reaches it through a squash-merged PR, and
+the fork `erkkimarkus/magento-connect` is archived read-only (rc1–rc8
+stay)._
 
 _Earlier on 2026-10-07: **3.0.0-rc9 is released from the official
 repository**
@@ -348,6 +343,30 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3961 — a queue row's failure, delivery or skip moves its
+  last-changed time (2026-10-07; branch
+  `erkki/pro-3961-queue-row-updated-at` for a PR).** The defect PRO-1964
+  found: an outcome saved the row model, which holds `updated_at`,
+  `claimed_at` and `claim_token` as the claim read them, so an explicit
+  write of the old `updated_at` kept MySQL's ON UPDATE from firing and
+  Details, the Log, the Dashboard's recent activity, the health check and
+  the retention sweep all dated the outcome at the row's previous change.
+  Now `EventQueue::markSent()/markSkipped()/markFailed()` and the batched
+  `markFailedMany()` write `outcomeFields()`: claim cleared (both columns
+  null) and `updated_at` = the outcome's time from the injected clock.
+  `IngestQueue` had the same defect (its `markSent()`/`markFailed()`);
+  fixed the same way. No schema change; rows already stored keep their
+  time until their next outcome. Readers checked: `AttemptHistory`
+  (Details), `log/details.phtml` "Updated", the Log grid's Updated column
+  (sort/filter), `DashboardStats::recentActivity()`, `QueueHealth`
+  (Dashboard/Log banners, `Cron\HealthCheck`), `Cron\QueueJanitor`
+  retention (now counted from the outcome); `requeueStale()` reads
+  `claimed_at` of `sending` rows only, untouched. New integration tests
+  (fail without the fix): single and batched outcomes in both queues,
+  Details entries, the health count. ARCHITECTURE (Claiming), CHANGELOG
+  "Changes since 3.0.0-rc10". Gates: unit, phpcs, phpstan, integration,
+  PHP 8.1 syntax.
+
 - **PRO-3962 — a Campaign Intelligence batch that fails for one reason
   is recorded in one write and one log line (2026-10-07; branch
   `erkki/pro-3962-ingest-batch-failure-write` for a PR).** PRO-1964 for
@@ -361,8 +380,9 @@ Earlier: 2026-09-11, 2026-09-10._
   write moved out of `EventQueue` into the shared `Model\Queue\RowWriter`
   (one implementation for both queues); each queue keeps its own
   `FAILURE_COLUMNS` (attempts, status, next_retry_at, last_error,
-  sent_payload, last_response, claim_token, claimed_at, updated_at — as
-  the model holds them, what its save writes). A row parked alone now
+  sent_payload, last_response, claim_token, claimed_at, updated_at — the
+  claim cleared and `updated_at` the outcome's time, PRO-3961's
+  `outcomeFields()`, as a single row's save). A row parked alone now
   logs the group's wording with count 1 in both queues ("Queue events
   failed permanently" / "Ingest events failed permanently"); CHANGELOG
   bullet. The account-refusal release path (PRO-2451/PRO-3752) is

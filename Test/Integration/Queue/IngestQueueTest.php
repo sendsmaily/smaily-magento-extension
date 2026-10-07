@@ -212,4 +212,77 @@ class IngestQueueTest extends IntegrationTestCase
 
         self::assertSame(['d-3'], array_column($this->fetchAll(IngestEventResource::TABLE_NAME), 'event_uuid'));
     }
+
+    /**
+     * PRO-3961: an outcome dates the row at the time it happened and
+     * releases the claim, as in the marketing queue. The row model holds
+     * `updated_at` as the claim read it; saving that back would leave the
+     * row dated at its previous change.
+     *
+     * @param \Closure(IngestQueue, IngestEvent): void $outcome
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('outcomes')]
+    public function testAnOutcomeDatesTheRowAtTheTimeItHappened(\Closure $outcome): void
+    {
+        $this->queue->enqueue('catalog', [], null, null, 'ing-dated');
+        $this->connection->update(
+            IngestEventResource::TABLE_NAME,
+            ['updated_at' => $this->clockDate(-7200)],
+            ['event_uuid = ?' => 'ing-dated']
+        );
+        $claimed = $this->queue->claimBatch('catalog', 100);
+        self::assertCount(1, $claimed);
+
+        $this->clock->travel(600);
+        $outcome($this->queue, $claimed[0]);
+
+        $row = $this->fetchAll(IngestEventResource::TABLE_NAME)[0];
+        self::assertSame($this->clockDate(), $row['updated_at']);
+        self::assertNull($row['claim_token']);
+        self::assertNull($row['claimed_at']);
+    }
+
+    /**
+     * PRO-3962 with PRO-3961: a failure written for many rows at once dates
+     * each row at the time it happened and releases its claim, as a
+     * failure written for one row does.
+     */
+    public function testABatchedFailureDatesEachRowAtTheTimeItHappened(): void
+    {
+        foreach (['ing-b1', 'ing-b2', 'ing-b3'] as $uuid) {
+            $this->queue->enqueue('catalog', [], null, null, $uuid);
+        }
+        $this->connection->update(
+            IngestEventResource::TABLE_NAME,
+            ['updated_at' => $this->clockDate(-7200)],
+            ['event_uuid IN (?)' => ['ing-b1', 'ing-b2', 'ing-b3']]
+        );
+        $claimed = $this->queue->claimBatch('catalog', 100);
+        self::assertCount(3, $claimed);
+
+        $this->clock->travel(600);
+        $this->queue->markFailedMany($claimed, 'HTTP 503');
+
+        foreach ($this->fetchAll(IngestEventResource::TABLE_NAME) as $row) {
+            self::assertSame($this->clockDate(), $row['updated_at'], $row['event_uuid']);
+            self::assertNull($row['claim_token'], $row['event_uuid']);
+            self::assertNull($row['claimed_at'], $row['event_uuid']);
+            self::assertSame(IngestEvent::STATUS_PENDING, $row['status']);
+            self::assertSame('1', (string)$row['attempts']);
+        }
+    }
+
+    /**
+     * @return array<string, array{\Closure(IngestQueue, IngestEvent): void}>
+     */
+    public static function outcomes(): array
+    {
+        return [
+            'failure' => [static fn (IngestQueue $queue, IngestEvent $event) => $queue->markFailed($event, 'HTTP 503')],
+            'parking failure' => [
+                static fn (IngestQueue $queue, IngestEvent $event) => $queue->markFailed($event, 'invalid', true),
+            ],
+            'delivery' => [static fn (IngestQueue $queue, IngestEvent $event) => $queue->markSent($event, '{}')],
+        ];
+    }
 }

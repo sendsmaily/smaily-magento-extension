@@ -89,8 +89,24 @@ class IngestQueueTest extends TestCase
             (string)$bind['next_retry_at']
         );
         self::assertStringContainsString('WHEN 3 THEN NULL', (string)$bind['sent_payload']);
+        self::assertSame(
+            gmdate('Y-m-d H:i:s', self::NOW_TIMESTAMP),
+            $bind['updated_at'],
+            'The outcome dates every row (PRO-3961)'
+        );
+        self::assertNull($bind['claim_token']);
+        self::assertNull($bind['claimed_at']);
         self::assertEqualsCanonicalizing(
-            ['attempts', 'status', 'next_retry_at', 'last_error', 'sent_payload'],
+            [
+                'attempts',
+                'status',
+                'next_retry_at',
+                'last_error',
+                'sent_payload',
+                'claim_token',
+                'claimed_at',
+                'updated_at',
+            ],
             array_keys($bind),
             'Only the failure columns the models hold are written'
         );

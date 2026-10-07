@@ -13,8 +13,11 @@ c09cdc065647fe95248f…, and Packagist lists 3.0.0-rc9 next to 2.8.1. Erkki
 created the tag in the web UI after `gh release create` and `git push` of
 the tag both returned GitHub HTTP 500 (CLAUDE.md "Release cut"). CLAUDE.md
 now states: no attribution in commits, PRs or merges; Erkki squash-merges
-every PR; no branch rule on `master`. **Queue:** the user guide site (in
-progress) → archive the fork (Erkki) → the pilot when a store is ready
+every PR; no branch rule on `master`. **Queue:** the user guide site —
+`docs/site/index.html` (EN + ET, one page) and `Model/UserGuide.php` (the
+one guide URL, still GitHub) are on branch `docs/user-guide-site` for a PR;
+then the Estonian proofread, Erkki's upload to smaily.com/connect-magento/
+and the URL switch (CLAUDE.md) → archive the fork (Erkki) → the pilot when a store is ready
 (the HC PRO store may be next week). **Docs tidy-up (owner decisions
 2026-10-07):** the maintainers' working papers moved to `docs/internal/`
 (`PILOT_CHECKLIST.md`, `BACKLOG.md`, `RFC_MULTI_WEBSITE.md`,

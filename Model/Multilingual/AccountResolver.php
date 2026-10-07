@@ -19,7 +19,7 @@ use Magento\Store\Model\Website;
  * Smaily accounts by an account key (the language code, or 'default'); in
  * Magento a per-language account is a store-view scoped credential set, so
  * an account key resolves to the store views whose locale matches that
- * language. The binding unit is website x language (RFC_MULTI_WEBSITE.md
+ * language. The binding unit is website x language (docs/internal/RFC_MULTI_WEBSITE.md
  * §2): two websites that both have an 'en' store view are distinct account
  * keys, never resolved across each other. Used both by the admin save path
  * (writing mode-A credentials) and by the automation dispatcher (posting a

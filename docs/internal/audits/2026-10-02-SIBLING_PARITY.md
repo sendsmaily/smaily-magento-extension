@@ -303,7 +303,7 @@ Each one is a small change.
 - **Evidence.** WooCommerce `includes/Smaily/RecEngine/CatalogPayloadBuilder.php`
   (readme 3.8.1); Shopify `app/lib/engine/catalog-builder.server.ts:101`.
   Magento `Model/Engine/Payload/CatalogPayloadBuilder.php:426,446`.
-- **Covered?** **PRO-1952** (Medium, backlog). It is also listed in BACKLOG.md.
+- **Covered?** **PRO-1952** (Medium, backlog). It is also listed in docs/internal/BACKLOG.md.
 - **Effort.** Low.
 - **Why before public.** Contract drift. Both siblings send the flag, and
   recommendation quality for uncategorised products depends on it.
@@ -456,7 +456,7 @@ Each one is a small change.
 
 ## Observations outside this audit's question
 
-- `BACKLOG.md` is stale in places. It lists PRO-2451, PRO-2452, PRO-2453 and PRO-2454
+- `docs/internal/BACKLOG.md` is stale in places. It lists PRO-2451, PRO-2452, PRO-2453 and PRO-2454
   and "i18n translation files" as open, and the "browse `source:
   plugin_magento` not yet in the contract" note is wrong: the contract has
   listed the constant since v1.4.0 (§6, line 1036).

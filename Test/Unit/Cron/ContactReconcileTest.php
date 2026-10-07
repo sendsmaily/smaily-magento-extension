@@ -27,7 +27,7 @@ use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 
 /**
- * PRO-1457/RFC_MULTI_WEBSITE.md §6: the cron must poll every distinct Smaily
+ * PRO-1457, docs/internal/RFC_MULTI_WEBSITE.md §6: the cron must poll every distinct Smaily
  * account a website resolves to (mode A's per-language accounts included),
  * not just the default store's account, and never poll the same underlying
  * account twice.

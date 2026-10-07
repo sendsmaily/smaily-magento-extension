@@ -261,7 +261,7 @@ class WizardStepSaverTest extends TestCase
 
     /**
      * PRO-1460: connection credentials and the multilingual mode write at
-     * website scope (RFC_MULTI_WEBSITE.md §1) — no website chooser exists
+     * website scope (docs/internal/RFC_MULTI_WEBSITE.md §1) — no website chooser exists
      * yet, so this is the installation's default website (id 0 with a bare
      * StoreManager stub in this test harness).
      */
@@ -740,7 +740,7 @@ class WizardStepSaverTest extends TestCase
 
     /**
      * PRO-1460: mode-A per-language accounts resolve their store views
-     * through the target website (RFC_MULTI_WEBSITE.md §2) — the resolver
+     * through the target website (docs/internal/RFC_MULTI_WEBSITE.md §2) — the resolver
      * is asked for THIS save's website, not an installation-wide scan.
      */
     public function testModeAPerLanguageAccountsResolveStoreViewsWithinTheTargetWebsite(): void
@@ -856,7 +856,7 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
-     * PRO-1462 (RFC_MULTI_WEBSITE.md §6, Phase 3): the automation-mapping
+     * PRO-1462 (docs/internal/RFC_MULTI_WEBSITE.md §6, Phase 3): the automation-mapping
      * table's admin save routes through the real target website instead of
      * the previously hardcoded website_id=0.
      */
@@ -878,7 +878,7 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
-     * Engine tenant scoping is Phase 4 (RFC_MULTI_WEBSITE.md §3) and RSS is
+     * Engine tenant scoping is Phase 4 (docs/internal/RFC_MULTI_WEBSITE.md §3) and RSS is
      * outside §1's field list — both stay at default scope in this phase.
      */
     public function testIntelligenceAndRssStayAtDefaultScope(): void
@@ -892,7 +892,7 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
-     * PRO-1461 (RFC_MULTI_WEBSITE.md §2, Phase 2): the setup-completed flag
+     * PRO-1461 (docs/internal/RFC_MULTI_WEBSITE.md §2, Phase 2): the setup-completed flag
      * is website-scoped so a second website's own wizard run is tracked
      * independently of the first.
      */

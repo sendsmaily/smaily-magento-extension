@@ -18,7 +18,7 @@ use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 
 /**
  * The single seam every admin save/prefill path reads its target website
- * through (RFC_MULTI_WEBSITE.md §2): a `website` request param wins when it
+ * through (docs/internal/RFC_MULTI_WEBSITE.md §2): a `website` request param wins when it
  * names a real website, otherwise the installation's default website —
  * unchanged behaviour for a single-website install.
  */

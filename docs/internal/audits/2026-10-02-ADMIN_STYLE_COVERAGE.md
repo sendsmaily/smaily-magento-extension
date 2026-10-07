@@ -8,9 +8,9 @@ sandbox admin (Magento 2.4.8-p4), en_US, 1440 px viewport (page frame also at
 **Scope:** styles only — computed CSS values of components and of the page
 frame. Copy, features and behaviour are out of scope; where a pack element
 needs new copy or behaviour, it is listed as *missing* and marked so.
-**Authority:** `docs/ADMIN_UI_TARGET_SPEC.md` §1 (the pack binds layout and
+**Authority:** `docs/internal/ADMIN_UI_TARGET_SPEC.md` §1 (the pack binds layout and
 element visuals) and §5 (accepted micro-value differences). Companion:
-`docs/audits/2026-10-02-ADMIN_DESIGN_PACK_FIDELITY.md` (the eye comparison).
+`docs/internal/audits/2026-10-02-ADMIN_DESIGN_PACK_FIDELITY.md` (the eye comparison).
 
 ## Summary
 

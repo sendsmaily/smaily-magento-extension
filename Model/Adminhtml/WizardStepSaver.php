@@ -40,7 +40,7 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * guided view over it.
  *
  * Website-scoped fields (connection credentials, subscriber sync toggles,
- * automation toggles — RFC_MULTI_WEBSITE.md §1) write at the target
+ * automation toggles — docs/internal/RFC_MULTI_WEBSITE.md §1) write at the target
  * website's scope, defaulting to the installation's default website when no
  * website is specified — unchanged behaviour for a single-website install,
  * since Config's readers already resolve website scope. The automation
@@ -665,7 +665,7 @@ class WizardStepSaver
         // saved mapping row whose id is missing from its account's live list
         // instead of dropping it on the full sync (PRO-1286). The mapping
         // table now saves at the real target website scope
-        // (RFC_MULTI_WEBSITE.md §6, Phase 3) — the Router already prefers a
+        // (docs/internal/RFC_MULTI_WEBSITE.md §6, Phase 3) — the Router already prefers a
         // website-specific row over a legacy website_id=0 row, so a
         // single-website install keeps resolving its pre-existing rows
         // unchanged until this website's own row is saved.

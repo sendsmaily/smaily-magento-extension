@@ -31,7 +31,7 @@ use Smaily\Connect\Model\SubdomainNormalizer;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 
 /**
- * WizardStepSaver's website-scoped writes (RFC_MULTI_WEBSITE.md §1) against
+ * WizardStepSaver's website-scoped writes (docs/internal/RFC_MULTI_WEBSITE.md §1) against
  * a real core_config_data table: the target website's row is a real,
  * distinct scoped row, and a pre-existing default-scope value (an
  * un-migrated single-website install, or a value another website falls
@@ -161,7 +161,7 @@ class WizardStepSaverTest extends IntegrationTestCase
     }
 
     /**
-     * PRO-1462 (RFC_MULTI_WEBSITE.md §6, Phase 3): the automation-mapping
+     * PRO-1462 (docs/internal/RFC_MULTI_WEBSITE.md §6, Phase 3): the automation-mapping
      * admin save routes through the real target website instead of the
      * previously hardcoded website_id=0 — a pre-existing legacy global row
      * (2.8.x migration / a pre-Phase-3 save) survives untouched, and the
@@ -223,7 +223,7 @@ class WizardStepSaverTest extends IntegrationTestCase
     }
 
     /**
-     * PRO-1461 (RFC_MULTI_WEBSITE.md §2, Phase 2): the setup-completed flag
+     * PRO-1461 (docs/internal/RFC_MULTI_WEBSITE.md §2, Phase 2): the setup-completed flag
      * lands as a real website-scoped row, and a real ScopeConfig read at that
      * website resolves it — while a different website with no row of its own
      * still falls back to a pre-existing default-scope value unchanged (an

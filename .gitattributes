@@ -24,12 +24,11 @@
 /compat export-ignore
 
 # Developer and internal working documents, and the documentation set (it
-# carries the engine contract vendored from a private repository; the
-# package links to the documentation on GitHub instead).
+# carries the engine contract vendored from a private repository and the
+# maintainers' working papers in docs/internal/; the package links to the
+# documentation on GitHub instead).
 /CONTRIBUTING.md export-ignore
 /CLAUDE.md export-ignore
 /STATUS.md export-ignore
-/BACKLOG.md export-ignore
 /TESTING.md export-ignore
-/PILOT_CHECKLIST.md export-ignore
 /docs export-ignore

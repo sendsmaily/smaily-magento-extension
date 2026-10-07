@@ -5,12 +5,12 @@
 standalone analyses below as the thing Phase B builds against. The pack is
 not kept in the repository (it stays in git history, commit `db2fc53`); the
 latest fidelity check against it is
-`docs/audits/2026-10-02-ADMIN_DESIGN_PACK_FIDELITY.md`.
+`docs/internal/audits/2026-10-02-ADMIN_DESIGN_PACK_FIDELITY.md`.
 
 **Inputs:**
-- `docs/audits/2026-07-14-ADMIN_DESIGN_LAYOUT_EXTRACT.md` (A1) — design pack's
+- `docs/internal/audits/2026-07-14-ADMIN_DESIGN_LAYOUT_EXTRACT.md` (A1) — design pack's
   layout + element visuals per screen.
-- `docs/audits/2026-07-14-ADMIN_FUNCTIONALITY_TEXT_MAP.md` (A2) — our real
+- `docs/internal/audits/2026-07-14-ADMIN_FUNCTIONALITY_TEXT_MAP.md` (A2) — our real
   functionality + sibling (Woo/Shopify) options and canonical EST+ENG texts.
 - PRO-1357 findings (the visual/functional audit that triggered this work).
 

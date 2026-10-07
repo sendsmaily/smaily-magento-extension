@@ -21,7 +21,7 @@ use Smaily\Connect\Model\ModuleVersion;
 
 /**
  * The setup-completed gate reads at the currently targeted website's scope
- * (RFC_MULTI_WEBSITE.md §2) so it stays in step with the wizard's own
+ * (docs/internal/RFC_MULTI_WEBSITE.md §2) so it stays in step with the wizard's own
  * website-chooser step and the Settings page's website selector.
  */
 class SetupGuardTest extends TestCase

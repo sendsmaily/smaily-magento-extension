@@ -5,7 +5,24 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-07 — **The move into
+_Last updated: 2026-10-07 — **3.0.0-rc9 is released from the official
+repository**
+(https://github.com/sendsmaily/smaily-magento-extension/releases/tag/3.0.0-rc9):
+the release workflow is green, the ZIP has 397 files, sha256
+c09cdc065647fe95248f…, and Packagist lists 3.0.0-rc9 next to 2.8.1. Erkki
+created the tag in the web UI after `gh release create` and `git push` of
+the tag both returned GitHub HTTP 500 (CLAUDE.md "Release cut"). CLAUDE.md
+now states: no attribution in commits, PRs or merges; Erkki squash-merges
+every PR; no branch rule on `master`. **Queue:** the user guide site (in
+progress) → archive the fork (Erkki) → the pilot when a store is ready
+(the HC PRO store may be next week). **Docs tidy-up (owner decisions
+2026-10-07):** the maintainers' working papers moved to `docs/internal/`
+(`PILOT_CHECKLIST.md`, `BACKLOG.md`, `RFC_MULTI_WEBSITE.md`,
+`ADMIN_UI_TARGET_SPEC.md`, `audits/`; its README says they are not merchant
+documentation); `docs/UPSTREAM_PROPOSAL.md` and TESTING's dated rc-run log
+are deleted (git history keeps them; the upstream decision record is
+Linear PRO-1198). Older entries below keep the old paths.
+Earlier the same day: **The move into
 `sendsmaily/smaily-magento-extension` is done (PRO-1198):** PR #126 was
 squash-merged into `master` as aa0c995, a tree identical to the fork's
 last `v3` (0179e95); CI and Contract staleness are green on `master` (the
@@ -6885,13 +6902,15 @@ Earlier: 2026-09-11, 2026-09-10._
   staged review plan, Marketplace re-submission as "Smaily Connect",
   pipeline/secret hand-over, honest open items, and the one-way-door decision
   checklist. Awaiting Erkki's review; NOTHING sent or published — the release
-  decision and all contact with Smaily are Erkki's alone.
+  decision and all contact with Smaily are Erkki's alone. **Deleted
+  2026-10-07** (finished; the text is in git history): the decision record
+  is Linear PRO-1198.
 
 ## Open Linear issues
 
 | Issue | What | Priority |
 |---|---|---|
-| PRO-1198 | Release coordination with Smaily (upstream/Marketplace path) | High — the move is done (PR #126); left: the rc9 tag, archiving the fork; 3.0.0 waits on the pilot |
+| PRO-1198 | Release coordination with Smaily (upstream/Marketplace path) | High — the move is done (PR #126), rc9 tagged 2026-10-07; left: archiving the fork; 3.0.0 waits on the pilot |
 | PRO-3854 | Nightly catalog list (§3c manifest); the contract sync part is done | High — landed 2026-10-07, in rc8 |
 | PRO-1971 | `gender` → `user_gender` release-comms obligation — parked 2026-09-02, reopens when 3.0.0 has a date | High — Erkki's decision |
 | PRO-1400 | Clean-install confirmation of the cron group (release gate) | Todo |
@@ -6926,9 +6945,9 @@ PRO-1267 (engine: Magento product-identity contract note).
 ## Questions / tasks for Erkki
 
 1. PRO-1198 — the move is done (PR #126 → aa0c995, secret set, master
-   green, remotes switched). Left: your yes to tag `3.0.0-rc9` once its PR
-   is merged, then archive the fork `erkkimarkus/magento-connect`
-   (CLAUDE.md "The move into sendsmaily").
+   green, remotes switched) and 3.0.0-rc9 is tagged and released there.
+   Left: archive the fork `erkkimarkus/magento-connect` (CLAUDE.md "The
+   move into sendsmaily").
 2. PRO-1201 — Hyvä boundary decisions (see "Open release decisions" in
    `docs/HYVA_SUPPORT.md`; the verification matrix itself is now fully
    executed and green): (a) confirm Hyvä Checkout (commercial, Magewire)

@@ -20,7 +20,7 @@
             site exists).
 
             Native surface removal (PRO-1461, resolves PRO-1369's config-
-            architecture decision 3, docs/ADMIN_UI_TARGET_SPEC.md §4): this
+            architecture decision 3, docs/internal/ADMIN_UI_TARGET_SPEC.md §4): this
             section is deliberately hidden from Stores > Configuration —
             showInDefault/showInWebsite/showInStore are "0" below so it never
             appears in the native left nav for ANY admin, regardless of ACL

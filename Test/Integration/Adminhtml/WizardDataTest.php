@@ -31,7 +31,7 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\ViewModel\Adminhtml\WizardData;
 
 /**
- * PRO-1462 (RFC_MULTI_WEBSITE.md §6, Phase 3): the Automations tab's prefill
+ * PRO-1462 (docs/internal/RFC_MULTI_WEBSITE.md §6, Phase 3): the Automations tab's prefill
  * must see what the same phase's write path now saves — a website-scoped
  * mapping row — while still falling back to a legacy website_id=0 row (the
  * 2.8.x migration / a pre-Phase-3 save) for a key the target website hasn't

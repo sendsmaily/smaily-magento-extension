@@ -13,7 +13,7 @@
  * editing surface).
  *
  * On a 2+-website install, an explicit website selector (own chrome, not
- * Magento's native store-switcher — RFC_MULTI_WEBSITE.md §2) sits next to
+ * Magento's native store-switcher — docs/internal/RFC_MULTI_WEBSITE.md §2) sits next to
  * the tab strip, persisted as `?website=<id>`: every save/prefill path
  * already reads its target website through `Model\Adminhtml\WebsiteContext`,
  * so switching the selector and reloading is the entire mechanism.
@@ -166,7 +166,7 @@ require(['jquery'], function ($) {
 
     panels.initAll();
 
-    // Website selector (RFC_MULTI_WEBSITE.md §2): reloads the page with
+    // Website selector (docs/internal/RFC_MULTI_WEBSITE.md §2): reloads the page with
     // ?website=<id>, keeping the current tab — every save/prefill path reads
     // its target website server-side, so a plain reload is the whole
     // mechanism, no client-side state to carry.

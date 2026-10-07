@@ -33,7 +33,7 @@ use Smaily\Connect\Model\Multilingual\AccountResolver;
  * ReconcileGuard so the subscriber-save observer never echoes them back
  * (and a Smaily delete never re-creates the contact, fighting GDPR erasure).
  *
- * PRO-1457/RFC_MULTI_WEBSITE.md §6: a website is not always one Smaily
+ * PRO-1457, docs/internal/RFC_MULTI_WEBSITE.md §6: a website is not always one Smaily
  * account — multilingual mode A binds a distinct account per language
  * (`Model\Multilingual\AccountResolver`, website x language). Every website
  * is therefore polled once per DISTINCT resolved account, not just through

@@ -8,7 +8,7 @@ Compat module done and **verified on Hyvä 1.5.2** (`compat/hyva/`, module
 `Hyva_SmailyConnect`): framework-free tracker/attribution delivery, Tailwind
 personalization form, Tailwind-build registration. Full audit and the
 executed verification matrix (Luma / Hyvä / strict CSP — all pass) in
-[docs/HYVA_SUPPORT.md](docs/HYVA_SUPPORT.md). Remaining:
+[docs/HYVA_SUPPORT.md](../HYVA_SUPPORT.md). Remaining:
 
 - Verify the `cart_add` submit-capture path against third-party
   AJAX-add-to-cart compat modules (programmatic `form.submit()` fires no
@@ -91,5 +91,5 @@ executed verification matrix (Luma / Hyvä / strict CSP — all pass) in
 
 - Marketplace re-submission (product name "Smaily Connect") and the fate of
   the existing listing. The composer package name `smaily/smailyformagento` is kept so
-  existing installs upgrade via plain `composer update`. The full proposal
-  package is drafted in [docs/UPSTREAM_PROPOSAL.md](docs/UPSTREAM_PROPOSAL.md).
+  existing installs upgrade via plain `composer update`. The upstream
+  decisions are recorded on Linear PRO-1198.

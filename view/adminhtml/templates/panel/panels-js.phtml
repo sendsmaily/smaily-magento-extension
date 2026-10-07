@@ -23,7 +23,7 @@
 
 /** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
 $viewModel = $block->getData('view_model');
-// Connection/Subscribers/Automations are website-scoped (RFC_MULTI_WEBSITE.md
+// Connection/Subscribers/Automations are website-scoped (docs/internal/RFC_MULTI_WEBSITE.md
 // §2): every AJAX call those tabs make carries the currently selected website
 // so Model\Adminhtml\WebsiteContext resolves the same target the page was
 // rendered with, no further plumbing. Intelligence/backfill stay installation-
@@ -56,7 +56,7 @@ window.smailyPanelsInit = function ($) {
     var mlSwitchConfirmed = false;
 
     function post(url, data) {
-        // Some URLs (Connection/Subscribers/Automations, RFC_MULTI_WEBSITE.md
+        // Some URLs (Connection/Subscribers/Automations, docs/internal/RFC_MULTI_WEBSITE.md
         // §2) already carry a ?website=<id> query string baked in server-side
         // — append with & instead of a second ? so form_key still parses.
         var separator = url.indexOf('?') === -1 ? '?' : '&';

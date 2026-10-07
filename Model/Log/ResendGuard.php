@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Log;
 
 use Magento\Framework\Phrase;
+use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Privacy\Erasure;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
@@ -28,7 +29,9 @@ use Smaily\Connect\Model\ResourceModel\Log\Collection;
  * already reached the contact, or the contact's data is gone. Everything
  * else is safe — an engine ingest row is an idempotent upsert, and a
  * contact sync or an identity merge repeats a state, not a message. The
- * fourth is the plain one: only a failed row is sent again at all.
+ * fourth is the plain one: only a failed row is sent again at all. A
+ * nightly catalog manifest row is never sent again: its list was the store
+ * as it was that night, and the next night sends a new one (PRO-3854).
  */
 class ResendGuard
 {
@@ -43,6 +46,12 @@ class ResendGuard
 
     /** Nothing went wrong with this row — there is nothing to send again. */
     public const REASON_NOT_FAILED = 'not_failed';
+
+    /**
+     * A nightly catalog manifest (PRO-3854): the list is built afresh right
+     * before each night's send, so a row's list is never sent again.
+     */
+    public const REASON_NIGHTLY = 'nightly';
 
     public function __construct(
         private readonly EventQueue $eventQueue
@@ -74,6 +83,11 @@ class ResendGuard
 
         foreach ($rows as $id => $row) {
             $reason = $this->permanentReason($row);
+            if ($source === Collection::SOURCE_INTELLIGENCE
+                && (string)($row['type'] ?? '') === Client::DOMAIN_CATALOG_MANIFEST
+            ) {
+                $reason = self::REASON_NIGHTLY;
+            }
             if ($reason !== '') {
                 $refused[$id] = $reason;
                 continue;
@@ -117,6 +131,9 @@ class ResendGuard
             ),
             self::REASON_ERASED => __('This contact\'s data was erased; the event cannot be re-sent.'),
             self::REASON_NOT_FAILED => __('Only a failed event can be sent again.'),
+            self::REASON_NIGHTLY => __(
+                'The product list is built afresh each night, so this one is not sent again.'
+            ),
             default => new Phrase(''),
         };
     }

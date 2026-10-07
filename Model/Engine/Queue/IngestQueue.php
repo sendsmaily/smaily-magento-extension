@@ -89,6 +89,22 @@ class IngestQueue
     }
 
     /**
+     * A row that is not saved yet, for a send made outside the queue that
+     * the Log still records (the nightly catalog manifest, PRO-3854): the
+     * caller records the exchange on it, and markSent() or markFailed()
+     * saves it with the outcome, so no flusher ever sees it pending.
+     *
+     * @param array<string, mixed> $payload
+     */
+    public function newEvent(string $domain, array $payload): IngestEvent
+    {
+        $event = $this->eventFactory->create();
+        $event->addData($this->row($domain, $payload, null, null));
+
+        return $event;
+    }
+
+    /**
      * Put a newer payload into a row queued earlier, instead of queuing a
      * second row, while that row is still pending and was never tried: it
      * has not reached the engine, so the engine gets only the newer payload

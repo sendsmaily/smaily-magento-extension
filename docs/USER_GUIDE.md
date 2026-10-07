@@ -696,7 +696,7 @@ toggle; catalog, customer and order sync run automatically once connected.
 
 | Data | When |
 |---|---|
-| Catalog | On product save/delete (deletes become out-of-stock) and on every stock change — a shipment that sells the last unit, a credit memo that puts it back, an Advanced Inventory or Sources edit, an API stock update. Products deleted with Magento's import (**Delete** behaviour) are removed too. The whole catalog goes once, with the catalog import; there is no periodic full re-sync. A change made outside Magento's own product save — an ERP link, a CSV or `bin/magento import` run, a direct database import — is not seen: start the catalog import by hand afterwards |
+| Catalog | On product save/delete (deletes become out-of-stock) and on every stock change — a shipment that sells the last unit, a credit memo that puts it back, an Advanced Inventory or Sources edit, an API stock update. Products deleted with Magento's import (**Delete** behaviour) are removed too. The whole catalog goes once, with the catalog import; there is no periodic full re-sync. Once a night, a [product check](#the-nightly-product-check) sends the list of your products with their stock, so a deletion or stock change that did not arrive is corrected by the next morning. A change made outside Magento's own product save — an ERP link, a CSV or `bin/magento import` run, a direct database import — is not seen at once: the nightly check corrects its stock and deletions, and for anything else (prices, names, new products) start the catalog import by hand afterwards |
 | Customers | On profile create/update (no consent fields — the engine is a separate lawful surface) |
 | Orders | On order placement, status changes, and refunds — a credit memo re-syncs the order, so a line fully credited by refunded credit memos is reported as returned and stops being recommended back to that customer (a partly credited line still counts as kept, and so does a line on a credit memo that is pending or canceled) |
 | Browse events | Product views, searches, cart adds, checkout — batched from the storefront (**Enable storefront browse tracking (product views, searches, cart activity)**, off by default — a separate, consent-gated toggle, not part of the always-on sync above) |
@@ -707,6 +707,52 @@ and sends them through your own server (`smaily/relay`) so the API key never
 reaches the browser. On **Settings > Intelligence** the toggle is saved with the tab's
 **Save** button, which appears once Campaign Intelligence is connected —
 before that the tab has nothing to save, and **Connect** is its only action.
+
+### The nightly product check
+
+Once a night, at 03:30 in the time zone set under **Stores > Configuration >
+General > Locale Options** (default scope), the extension sends Campaign
+Intelligence the list of every product your store has — each product's code
+(its SKU) and whether it is in stock, nothing else. Campaign Intelligence
+compares it with what it has:
+
+- A product missing from the list is no longer recommended — for example
+  one deleted straight in the database, or one whose deletion did not
+  arrive.
+- A product whose stock differs takes the stock from the list. A product
+  found back in stock this way sends no back-in-stock email, because the
+  real time of the restock is unknown.
+- A product in the list that Campaign Intelligence does not have is
+  counted, and Smaily's team sees that a catalog import is needed.
+
+Disabled products are left out of the list, so Campaign Intelligence stops
+recommending them. A variant of a configurable product is listed as out of
+stock, as the catalog sync sends it; its parent product is listed with
+its own stock.
+
+If the list would remove more than a fifth of your products, or is empty,
+Campaign Intelligence removes nothing and Smaily's team checks it; stock
+corrections still apply.
+
+The check is skipped that night, and runs again the next night, while:
+
+- Campaign Intelligence is not connected, or the account is deactivated;
+- the catalog import is running or waiting to start (an import that has
+  not moved for an hour no longer holds the check back);
+- product changes are still waiting to be sent in the **Log**.
+
+A store with more than 50,000 enabled products cannot use the check yet:
+nothing is sent, and the **Log** shows a failed *catalog_manifest* row
+that says so.
+
+Each night the list is sent appears in the **Log** as one
+*catalog_manifest* row. **Details** shows the first products of the list
+and Campaign Intelligence's answer: how many products were removed
+(`removed`), how many stock values were corrected (`stock_fixed`), how many
+it does not have (`missing_in_engine`), and whether its safety check held
+the removals back (`guard_tripped`). If the list could not be delivered,
+the row is failed and is not sent again: the next night builds a new list
+from the store as it is then.
 
 ### Connecting your cookie consent tool
 
@@ -936,13 +982,13 @@ traffic:
   API) and its import with the **Delete** behaviour (**System > Data
   Transfer > Import**, or a tool that runs Magento's import). A product
   deleted any other way — straight in the database, or by a tool that
-  bypasses Magento's import — stays in Campaign Intelligence as it was, and a
-  catalog import does not change that. To take such a product out of the
-  recommendations, add a product with the same SKU in the admin with
+  bypasses Magento's import — is not seen at once, and a catalog import
+  does not change that: the [nightly product check](#the-nightly-product-check)
+  takes it out of the recommendations the next night. To take such a
+  product out at once, add a product with the same SKU in the admin with
   **Enable Product** off and save it: Campaign Intelligence then has it
   as out of stock. You can delete that product in the admin afterwards
-  as usual. The extension has no other way to remove a product from
-  Campaign Intelligence. When a release note asks you to
+  as usual. When a release note asks you to
   start the catalog import (for example because Campaign Intelligence now
   gets a new product detail), start it under **Settings > Intelligence**.
   The **Catalog**, **Customers** and **Orders** imports need a Campaign
@@ -1022,10 +1068,12 @@ card — you do not have to keep the page open:
   new row notes which row it repeats, who pressed the button and when;
   **Details** on the new row shows that line.
 - **Some failed rows have no Send again button**, because sending again
-  would reach the shopper twice or reach nobody. Details on such a row says
-  which of the three it is: the reminder was withdrawn when the shopper
-  completed the purchase, a later message of the same kind already reached
-  that contact, or the contact's data was erased under Art. 17. A later
+  would reach the shopper twice, reach nobody, or send an outdated list.
+  Details on such a row says which it is: the reminder was withdrawn when
+  the shopper completed the purchase, a later message of the same kind
+  already reached that contact, the contact's data was erased under
+  Art. 17, or it is a [nightly product check](#the-nightly-product-check),
+  whose list is built afresh each night. A later
   row that was skipped or withdrawn reached nobody, so it does not count as
   "already reached".
 - **Withdrawn** is its own status in the grid and in the status filter: a

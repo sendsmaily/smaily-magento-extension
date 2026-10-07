@@ -181,6 +181,30 @@ class CatalogPayloadBuilder
         return $item;
     }
 
+    /**
+     * The product's item in the nightly catalog manifest (contract §3c,
+     * PRO-3854): the `sku` and `in_stock` its catalog row carries, read the
+     * way build() and the tombstone read them — a product that left the
+     * sellable set (CatalogIngest sends its tombstone) is out of stock. Null
+     * for a disabled product, which the list leaves out so the engine stops
+     * recommending it. Reads only `status`, `visibility`, `sku` and the
+     * stock row, so a light collection can feed it
+     * (CatalogProductLoader::loadForManifest()).
+     *
+     * @return array{sku: string, in_stock: bool}|null
+     */
+    public function manifestItem(Product $product): ?array
+    {
+        if ((int)$product->getStatus() !== Status::STATUS_ENABLED) {
+            return null;
+        }
+
+        return [
+            'sku' => $this->sku($product),
+            'in_stock' => $this->isIngestible($product) && $this->isInStock($product),
+        ];
+    }
+
     private function sku(Product $product): string
     {
         $sku = trim((string)$product->getSku());

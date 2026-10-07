@@ -11,19 +11,19 @@ store runs Magento 2.4.3-p1 (PHP 7.3/7.4 only); the module needs Magento
 (Erkki, 2026-10-07): the store upgrades first (Magento 2.4.7 or 2.4.8 on
 PHP 8.2/8.3); Erkki sets the new date once the store's developer estimates
 the upgrade; the "Pilot store live" milestone (2026-10-09) no longer holds.
-Landed today, unreleased: PRO-3854's contract part (copy 1.12.0), PRO-3798,
+Landed today, unreleased: PRO-3854 (the nightly catalog manifest, §3c, sent
+at 03:30; and the contract copy 1.12.0), PRO-3798,
 PRO-3802 (the pilot-day order needs it, so the pilot installs rc8); the
 version check is now step one of INSTALLING and PILOT_CHECKLIST §0.
-**Queue:** PRO-3854 nightly catalog list (in progress) → rc8 cut +
-clean-install check (not urgent) → pilot once the store has upgraded.
+**Queue:** rc8 cut + clean-install check (not urgent) → pilot once the store has upgraded.
 Backlog: PRO-3913, PRO-3911, PRO-3912, PRO-3790 (after the pilot), PRO-3746, PRO-3774._
 
 _Today in detail: PRO-3802 (the initial setup's Connect step
 takes the Storefront URL, saved before the Contacts step switches contact
 sync on; PILOT_CHECKLIST's pilot-day order follows it and so needs a build
 with PRO-3802), PRO-3798 (only a refunded credit memo marks order lines
-returned) and PRO-3854's contract part (the engine contract copy synced
-v1.8.3 → v1.12.0, doc only; Contract staleness green again); all unreleased,
+returned) and PRO-3854 (the nightly catalog manifest; the engine contract copy synced
+v1.8.3 → v1.12.0; Contract staleness green again); all unreleased,
 CHANGELOG's "Changes since 3.0.0-rc7". New backlog Stories: PRO-3913 (a
 reopened setup does not prompt a catalog re-import after a Storefront URL
 change; its summary lacks the Storefront URL), PRO-3911 (the landing
@@ -232,6 +232,37 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3854 — the nightly catalog manifest (2026-10-07; unreleased,
+  after rc7).** `Cron/SendCatalogManifest` (`smaily_catalog_manifest`,
+  03:30 admin time zone) → `Model/Engine/CatalogManifest`: every product
+  the catalog import sends a row for, less the disabled ones (owner
+  decision 2026-10-07), as `{sku, in_stock}` from
+  `CatalogPayloadBuilder::manifestItem()` (the row's own key and stock;
+  a variant not visible on its own is `false`, as its tombstone), paged
+  1,000 at a time by `CatalogProductLoader::loadForManifest()` (status +
+  visibility only), sent in one request (`Client::catalogManifest()`, map
+  key `ingest_catalog_manifest`, fallback path for a pre-1.12.0 map, 60 s
+  timeout), never queued; one Log row (domain `catalog_manifest`, written
+  after the send, `failed` at once on an error, refused by ResendGuard's
+  `nightly`). Skipped (info log only) while sending is not allowed, while
+  the catalog import is queued or running and some active job moved in
+  the last hour (`JobManager::isInProgress()`, the Woo PRO-3886 bound), or
+  while `catalog` / `catalog_remove` / `catalog_changed` rows are pending
+  or sending; over 50,000 enabled products: a `failed` row with
+  `TOO_MANY_PRODUCTS` (EN + ET). Unit (CatalogManifestTest, builder,
+  client, guard, translation) + integration on MySQL (CatalogManifestTest:
+  waits on real queue/job rows, the Log row, 50,000 sent / 50,001 refused,
+  the guard; JobManagerTest stall bound). Sandbox (worktree classes loaded
+  over the mount, a Settings double, mock engine in the container; the
+  sandbox's stored connection — a live tenant — untouched): 2,046 products,
+  one request of 81 KB, items `sku` + `in_stock` only, 187 in stock;
+  mapped key and fallback path both reached the mock; refused,
+  disconnected and a waiting marker sent nothing; parity with
+  CatalogIngest's own build over the whole catalog in a rolled-back
+  transaction (one product out of stock, one disabled): 0 mismatches, the
+  disabled one left out; peak ~7 MB above baseline (22 MB cold). Docs:
+  ARCHITECTURE (new bullet, lifecycle, cron table, guard), USER_GUIDE (The
+  nightly product check), CHANGELOG.
 - **PRO-3854 — engine contract synced v1.8.3 → v1.12.0 (2026-10-07, doc
   only, no sender change).** Byte-identical with engine main 15785a0
   (`bin/check-contract-staleness.sh <engine checkout>/docs/RECENGINE_API_CONTRACT.md`:

@@ -165,4 +165,48 @@ class JobManagerTest extends IntegrationTestCase
         self::assertSame(Job::STATUS_FAILED, $row['status']);
         self::assertSame('engine unreachable', $row['error_message']);
     }
+
+    /**
+     * PRO-3854: what the nightly catalog manifest waits for. An import is in
+     * progress while it is queued or running and the import worker still
+     * moves; one nothing has moved for the bound is stalled and holds
+     * nothing back (Woo PRO-3886's lesson).
+     */
+    public function testAnImportIsInProgressWhileTheImportWorkerMovesWithinTheBound(): void
+    {
+        self::assertFalse($this->inProgress(), 'no catalog import at all');
+
+        $catalog = $this->jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0);
+        $this->movedAt($catalog, -60);
+        self::assertTrue($this->inProgress(), 'queued, written a minute ago');
+
+        $this->movedAt($catalog, -3601);
+        self::assertFalse($this->inProgress(), 'nothing has moved it for over an hour');
+
+        // Waiting its turn behind a contacts import the worker does advance.
+        $contacts = $this->jobManager->start(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1);
+        $this->movedAt($contacts, -30);
+        self::assertTrue($this->inProgress(), 'waits behind an import that moves');
+
+        $this->movedAt($contacts, -7200);
+        self::assertFalse($this->inProgress(), 'the import ahead stalled too');
+
+        $this->jobManager->complete($catalog);
+        $this->movedAt($catalog, 0);
+        self::assertFalse($this->inProgress(), 'a finished import holds nothing back');
+    }
+
+    private function inProgress(): bool
+    {
+        return $this->jobManager->isInProgress(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0, 3600);
+    }
+
+    private function movedAt(Job $job, int $offsetSeconds): void
+    {
+        $this->connection->update(
+            self::TABLE,
+            ['updated_at' => $this->clockDate($offsetSeconds)],
+            ['id = ?' => (int)$job->getId()]
+        );
+    }
 }

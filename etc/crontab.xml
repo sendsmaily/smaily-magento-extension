@@ -29,5 +29,8 @@
         <job name="smaily_health_check" instance="Smaily\Connect\Cron\HealthCheck" method="execute">
             <schedule>*/15 * * * *</schedule>
         </job>
+        <job name="smaily_catalog_manifest" instance="Smaily\Connect\Cron\SendCatalogManifest" method="execute">
+            <schedule>30 3 * * *</schedule>
+        </job>
     </group>
 </config>

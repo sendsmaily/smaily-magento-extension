@@ -52,13 +52,39 @@ class CatalogProductLoader
      */
     public function load(callable $filter): array
     {
+        return $this->loadSelecting(CatalogPayloadBuilder::PRODUCT_ATTRIBUTES, true, $filter);
+    }
+
+    /**
+     * The nightly manifest's page (PRO-3854): the same scope and the same
+     * unfiltered product set as load(), selecting only what
+     * CatalogPayloadBuilder::manifestItem() reads — no URL rewrites, no
+     * payload attributes — so a page of a large catalog stays small.
+     *
+     * @param callable(Collection): void $filter the caller's own filter, order and page size
+     * @return Product[]
+     */
+    public function loadForManifest(callable $filter): array
+    {
+        return $this->loadSelecting(['status', 'visibility'], false, $filter);
+    }
+
+    /**
+     * @param string[] $attributes
+     * @param callable(Collection): void $filter
+     * @return Product[]
+     */
+    private function loadSelecting(array $attributes, bool $urlRewrite, callable $filter): array
+    {
         $collection = $this->productCollectionFactory->create();
         if (!$collection instanceof Collection) {
             return [];
         }
         $collection->setStoreId($this->payloadBuilder->canonicalStoreId());
-        $collection->addAttributeToSelect(CatalogPayloadBuilder::PRODUCT_ATTRIBUTES);
-        $collection->addUrlRewrite();
+        $collection->addAttributeToSelect($attributes);
+        if ($urlRewrite) {
+            $collection->addUrlRewrite();
+        }
         $filter($collection);
 
         return array_values(array_filter(

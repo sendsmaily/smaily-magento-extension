@@ -110,6 +110,34 @@ class JobManager
         return $job instanceof Job && $job->getId() ? $job : null;
     }
 
+    /**
+     * Whether an import of this kind is queued or running and the import
+     * worker still moves (PRO-3854): some queued or running job — this one,
+     * or the one ahead of it in line — was written within $stalledAfterSeconds.
+     * The tick writes the job it advances at every page (recordProgress()),
+     * and a job it has not reached yet waits behind one it does advance. A
+     * job no tick has moved for that long (a worker that dies on the same
+     * page every run) counts as stalled, so it cannot hold back what waits
+     * for imports to finish forever.
+     */
+    public function isInProgress(string $jobType, string $target, int $websiteId, int $stalledAfterSeconds): bool
+    {
+        if ($this->findActive($jobType, $target, $websiteId) === null) {
+            return false;
+        }
+
+        $lastMoved = (string)$this->connection()->fetchOne(
+            $this->connection()->select()
+                ->from($this->table(), ['last' => 'MAX(updated_at)'])
+                ->where('status IN (?)', [Job::STATUS_PENDING, Job::STATUS_RUNNING])
+        );
+
+        return $lastMoved >= $this->dateTime->gmtDate(
+            'Y-m-d H:i:s',
+            $this->dateTime->gmtTimestamp() - $stalledAfterSeconds
+        );
+    }
+
     public function markRunning(Job $job): void
     {
         $updated = $this->connection()->update(

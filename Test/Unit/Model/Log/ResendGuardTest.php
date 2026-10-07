@@ -10,6 +10,7 @@ namespace Smaily\Connect\Test\Unit\Model\Log;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Log\ResendGuard;
 use Smaily\Connect\Model\Privacy\Erasure;
 use Smaily\Connect\Model\Queue\Event;
@@ -165,12 +166,29 @@ class ResendGuardTest extends TestCase
             (string)$this->guard->message(ResendGuard::REASON_SUPERSEDED),
             (string)$this->guard->message(ResendGuard::REASON_ERASED),
             (string)$this->guard->message(ResendGuard::REASON_NOT_FAILED),
+            (string)$this->guard->message(ResendGuard::REASON_NIGHTLY),
         ];
 
-        self::assertCount(4, array_unique($messages));
+        self::assertCount(5, array_unique($messages));
         self::assertStringContainsString('withdrawn', $messages[0]);
         self::assertStringContainsString('twice', $messages[1]);
         self::assertStringContainsString('erased', $messages[2]);
         self::assertStringContainsString('failed', $messages[3]);
+        self::assertStringContainsString('each night', $messages[4]);
+    }
+
+    /**
+     * PRO-3854: a nightly catalog manifest row holds that night's list; the
+     * next night sends a new one, so a failed one is never sent again.
+     */
+    public function testANightlyCatalogManifestRowIsNeverSentAgain(): void
+    {
+        $refused = $this->guard->refusalReasons(Collection::SOURCE_INTELLIGENCE, [
+            5 => ['type' => Client::DOMAIN_CATALOG_MANIFEST, 'entity_id' => null, 'status' => Event::STATUS_FAILED],
+            6 => ['type' => Client::DOMAIN_CATALOG_MANIFEST, 'entity_id' => null, 'status' => Event::STATUS_SENT],
+            7 => ['type' => Client::DOMAIN_CATALOG, 'entity_id' => '7', 'status' => Event::STATUS_FAILED],
+        ]);
+
+        self::assertSame([5 => ResendGuard::REASON_NIGHTLY, 6 => ResendGuard::REASON_NIGHTLY], $refused);
     }
 }

@@ -14,6 +14,8 @@ use Magento\Catalog\Helper\Image as ImageHelper;
 use Magento\Catalog\Helper\ImageFactory as ImageHelperFactory;
 use Magento\Catalog\Model\Category;
 use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\Product\Attribute\Source\Status;
+use Magento\Catalog\Model\Product\Visibility;
 use Magento\CatalogInventory\Api\Data\StockItemInterface;
 use Magento\CatalogInventory\Api\StockRegistryInterface;
 use Magento\CatalogInventory\Model\StockRegistryStorage;
@@ -296,6 +298,61 @@ class CatalogPayloadBuilderTest extends TestCase
         $item = $this->createBuilder('42', null, null, $storage)->build($this->product(42, 'SHIRT'));
 
         self::assertTrue($item['in_stock']);
+    }
+
+    /**
+     * PRO-3854: the nightly manifest item is the catalog row's own `sku` and
+     * `in_stock`, read by the same code.
+     */
+    public function testAManifestItemCarriesTheKeyAndStockOfTheProductsCatalogRow(): void
+    {
+        $builder = $this->createBuilder('42', null, null, null, null, null, '', null, [], null, $this->stock(false));
+        $product = $this->listedProduct('SHIRT', Status::STATUS_ENABLED, Visibility::VISIBILITY_BOTH);
+        $row = $builder->build($product);
+
+        self::assertSame(['sku' => 'SHIRT', 'in_stock' => false], $builder->manifestItem($product));
+        self::assertSame(['sku' => $row['sku'], 'in_stock' => $row['in_stock']], $builder->manifestItem($product));
+        self::assertSame(
+            ['sku' => 'SHIRT', 'in_stock' => true],
+            $this->createBuilder('42')->manifestItem($product)
+        );
+    }
+
+    public function testAManifestItemOfAProductWithoutASkuIsKeyedAsItsCatalogRow(): void
+    {
+        $product = $this->listedProduct('  ', Status::STATUS_ENABLED, Visibility::VISIBILITY_IN_CATALOG);
+
+        self::assertSame('mag-42', $this->createBuilder('42')->manifestItem($product)['sku'] ?? null);
+    }
+
+    /**
+     * A product that left the sellable set — a configurable's variant is not
+     * visible on its own — is sent as its tombstone, so it is out of stock in
+     * the list too; its stock is not read.
+     */
+    public function testAProductNotVisibleOnItsOwnIsOutOfStockInTheManifestAsInItsTombstone(): void
+    {
+        $stockRegistry = $this->createMock(StockRegistryInterface::class);
+        $stockRegistry->expects(self::never())->method('getStockItem');
+        $builder = $this->createBuilder('42', null, null, null, null, null, '', null, [], null, $stockRegistry);
+        $product = $this->listedProduct('SHIRT-RED', Status::STATUS_ENABLED, Visibility::VISIBILITY_NOT_VISIBLE);
+
+        self::assertSame(['sku' => 'SHIRT-RED', 'in_stock' => false], $builder->manifestItem($product));
+    }
+
+    /**
+     * Owner decision 2026-10-07: a disabled product is left out of the list,
+     * so the engine stops recommending it.
+     */
+    public function testADisabledProductHasNoManifestItem(): void
+    {
+        $stockRegistry = $this->createMock(StockRegistryInterface::class);
+        $stockRegistry->expects(self::never())->method('getStockItem');
+        $builder = $this->createBuilder('42', null, null, null, null, null, '', null, [], null, $stockRegistry);
+
+        self::assertNull($builder->manifestItem(
+            $this->listedProduct('SHIRT', Status::STATUS_DISABLED, Visibility::VISIBILITY_BOTH)
+        ));
     }
 
     /**
@@ -663,7 +720,8 @@ class CatalogPayloadBuilderTest extends TestCase
         string $storefrontUrl = '',
         ?ImageHelperFactory $imageHelperFactory = null,
         array $parentCategoryIds = [],
-        ?Http $request = null
+        ?Http $request = null,
+        ?StockRegistryInterface $stockRegistry = null
     ): CatalogPayloadBuilder {
         $parentResolver = $this->createMock(ParentProductResolver::class);
         $parentResolver->method('productIdOf')->with(42)->willReturn($resolvedProductId);
@@ -674,10 +732,12 @@ class CatalogPayloadBuilderTest extends TestCase
             $storeManager->method('getStores')->willReturn([]);
         }
 
-        $stockItem = $this->createMock(StockItemInterface::class);
-        $stockItem->method('getIsInStock')->willReturn(true);
-        $stockRegistry = $this->createMock(StockRegistryInterface::class);
-        $stockRegistry->method('getStockItem')->willReturn($stockItem);
+        if ($stockRegistry === null) {
+            $stockItem = $this->createMock(StockItemInterface::class);
+            $stockItem->method('getIsInStock')->willReturn(true);
+            $stockRegistry = $this->createMock(StockRegistryInterface::class);
+            $stockRegistry->method('getStockItem')->willReturn($stockItem);
+        }
 
         return new CatalogPayloadBuilder(
             $storeManager,
@@ -692,6 +752,28 @@ class CatalogPayloadBuilderTest extends TestCase
             $this->storefrontUrl($storefrontUrl),
             new StorefrontScript($storeManager, $request ?? $this->createMock(Http::class))
         );
+    }
+
+    private function stock(bool $inStock): StockRegistryInterface
+    {
+        $stockItem = $this->createMock(StockItemInterface::class);
+        $stockItem->method('getIsInStock')->willReturn($inStock);
+        $stockRegistry = $this->createMock(StockRegistryInterface::class);
+        $stockRegistry->method('getStockItem')->willReturn($stockItem);
+
+        return $stockRegistry;
+    }
+
+    /**
+     * Product 42 as a catalog page loads it, with its status and visibility.
+     */
+    private function listedProduct(string $sku, int $status, int $visibility): Product&MockObject
+    {
+        $product = $this->product(42, $sku);
+        $product->method('getStatus')->willReturn($status);
+        $product->method('getVisibility')->willReturn($visibility);
+
+        return $product;
     }
 
     private function storefrontUrl(string $saved): StorefrontUrl

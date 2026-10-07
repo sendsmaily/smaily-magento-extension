@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Log;
 
 use Smaily\Connect\Cron\AbandonedCart;
+use Smaily\Connect\Model\Engine\CatalogManifest;
 use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
 use Smaily\Connect\Model\Queue\Handler\ContactSyncHandler;
 use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
@@ -60,6 +61,8 @@ class FailureMessage
         ProfilingConsentHandler::SKIPPED_REPLACED,
         IdentityMergeHandler::SKIPPED_OPTED_OUT,
         AbandonedCart::SKIPPED_RECENTLY_REMINDED,
+        // Why a nightly catalog manifest was not sent (PRO-3854).
+        CatalogManifest::TOO_MANY_PRODUCTS,
     ];
 
     /**

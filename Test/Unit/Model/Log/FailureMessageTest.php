@@ -141,6 +141,13 @@ class FailureMessageTest extends TestCase
                 'Vahele jäetud: sellele aadressile saadeti viimase 24 tunni jooksul juba teise ostukorvi'
                     . ' meeldetuletus. Midagi ei saadetud.',
             ],
+            // PRO-3854: a store too large for the nightly catalog manifest.
+            'nightly product list not sent' => [
+                'Not sent: the store has more than 50,000 enabled products,'
+                    . ' the most the nightly product list can hold.',
+                'Ei saadetud: poes on üle 50 000 lubatud toote, aga öine tootenimekiri mahutab neid'
+                    . ' kõige rohkem 50 000.',
+            ],
         ];
     }
 

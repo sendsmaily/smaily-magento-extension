@@ -111,6 +111,11 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
        (domain: catalog | customers | orders | browse | catalog_remove | catalog_changed)
 ```
 
+The nightly catalog manifest, like the browse relay, is not queued: it is
+built and sent in its own cron run and only recorded in the queue table
+(domain `catalog_manifest`) for the Log — see *Nightly catalog manifest*
+below.
+
 - One wire item per row; the row UUID doubles as the wire `event_id`, so
   engine-side transport dedup makes retries safe.
 - `Cron/FlushIngestQueue` first builds the catalog rows of the products the
@@ -329,14 +334,67 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   by hand whenever the merchant starts one; no scheduled full re-sync. A
   catalog import does not remove a product that is missing from it — the
   engine deletes by absence only through the nightly catalog manifest
-  (contract v1.12.0, §3c), which this module does not send, so the delete
-  paths above are its only delete signal from this store, and a product
-  deleted where no event sees it (a direct database delete, a tool that
-  bypasses Magento's import) stays in the engine as it was. A release that adds a catalog field, or corrects what one holds,
+  (contract v1.12.0, §3c, below), so a product deleted where no event sees
+  it (a direct database delete, a tool that bypasses Magento's import)
+  leaves the engine's recommendations with the next manifest, and a stock
+  change no event saw is corrected by it. A release that adds a catalog field, or corrects what one holds,
   tells the merchant to start the catalog import by hand: no scheduled
-  re-sync carries it.
+  re-sync carries it, and the manifest carries only `sku` and `in_stock`.
   On an upgrade, Magento ignores the removed job's leftover `cron_schedule`
   rows: it reads and prunes only the job codes its configuration lists.
+- **Nightly catalog manifest (PRO-3854; contract §3c, v1.12.0).** At 03:30
+  in the admin's time zone (Magento reads `crontab.xml` schedules in it),
+  `Cron/SendCatalogManifest` runs `Model/Engine/CatalogManifest::send()`:
+  the store's complete product list as `{sku, in_stock}` only, in one
+  `POST` to the setup map's `ingest_catalog_manifest`
+  (`Engine\Client::catalogManifest()`; a connection set up before v1.12.0
+  has no such key and falls back to the contract's path on the engine base
+  URL, contract §1 "map age", as `catalogRemove()` does). The engine
+  tombstones every product missing from it, takes its stock where it
+  differs and counts products it does not have; its guard removes nothing
+  for an empty list or one that would remove more than 20% of the live
+  catalog. *The list* is every product the catalog import sends a row for
+  — `CatalogProductLoader::loadForManifest()` pages the same unfiltered
+  collection at the same canonical scope as `load()`, every type and
+  visibility, configurable parents and their variants each under its own
+  key — less the products disabled at that scope (owner decision
+  2026-10-07, as in the WooCommerce plugin: the engine stops recommending
+  them). Each item is `CatalogPayloadBuilder::manifestItem()`: the row's
+  own `sku()` (the SKU, `mag-<entity_id>` when empty) and its `in_stock`
+  as the sync sends it — a product that left the sellable set (not
+  visible on its own, as a configurable's variant) is sent by the sync as
+  its tombstone, so it is `false` here too; otherwise `isInStock()`. The
+  page selects only `status` and `visibility` and no URL rewrites, 1,000
+  products a page by entity id until a page comes back empty (an early
+  stop would read as deletions), and keeps two values per product; the
+  stock registry's memo is cleaned after each page. Peak memory on the
+  2,046-product sandbox catalog: about 7 MB above the process baseline
+  (22 MB on a cold first run); a 50,000-item list is about 21 MB.
+  *Built right before the send, never queued*: a queued payload would be
+  as old as its row, so the cron builds and sends in one run and writes
+  the Log row afterwards (`IngestQueue::newEvent()`, saved by
+  `markSent()`/`markFailed()`), domain `catalog_manifest`, which no
+  flusher claims. A failed send (after `Engine\Client`'s own in-call
+  retries on 429/5xx, 60-second timeout) is parked `failed` at once; the
+  next night builds a new list, and `Log\ResendGuard` refuses **Send
+  again** / **Retry** for the domain (`nightly`). The row's payload holds
+  the counts, its `sent_payload` the first 20 items plus
+  `products_not_shown`, its `last_response` the engine's answer
+  (`removed`, `stock_fixed`, `missing_in_engine`, `guard_tripped`, …).
+  *Not sent* — logged at info level only, no Log row — while sending is
+  not allowed (`Settings::isSendingAllowed()`: disconnected, or the
+  remembered refusal), while the catalog import is queued or running
+  (`JobManager::isInProgress()`), while undelivered (pending or sending)
+  `catalog`, `catalog_remove` or `catalog_changed` rows wait — a parked
+  `failed` row does not hold it back, healing it is the list's job — or
+  when building the list throws. The import wait is bounded (Woo
+  PRO-3886): the tick writes the job it advances at every page, so an
+  import counts only while some queued or running job was written within
+  the last hour (`CatalogManifest::STALLED_IMPORT_SECONDS`); one the
+  worker no longer moves holds nothing back. A store with more than 50,000
+  enabled products sends nothing (§3c forbids a partial list); its Log row
+  is `failed` with `CatalogManifest::TOO_MANY_PRODUCTS`, shown in the
+  admin's language (`Log\FailureMessage`).
 - **Order line `sku`.** A line is the parent order item (a configurable's
   child item is skipped; its price is on the parent), keyed on the item's
   SKU — for a configurable, Magento's own copy of the chosen variant's SKU.
@@ -397,7 +455,8 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   is the one gate every SENDING path consults: `Cron/FlushIngestQueue`,
   the engine-bound backfills at `Cron/BackfillTick`'s router,
   `Controller/Relay/Index`, `Queue\Handler\IdentityMergeHandler`,
-  and `Queue\Handler\ProfilingConsentHandler`. The
+  `Queue\Handler\ProfilingConsentHandler` and the nightly
+  `Engine\CatalogManifest`. The
   paths that loop re-ask it as they go, because a mid-run 403 can change
   its refusal half: the flusher only that half, per domain, once
   connectedness is proved (so one refusal ends the run); the merge and
@@ -586,8 +645,9 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
 - **Sending again (PRO-2454):** the Log's per-row **Send again** and the
   mass **Retry** both ask `Model\Log\ResendGuard` first — one server-owned
   answer, shaped after Woo's `TransactionalRetryGuard`: a reason code
-  (`withdrawn` / `superseded` / `erased`, plus the plain `not_failed` — only
-  a failed row is sent again at all) with the merchant sentence beside it,
+  (`withdrawn` / `superseded` / `erased`, `nightly` for a catalog manifest
+  row, plus the plain `not_failed` — only a failed row is sent again at
+  all) with the merchant sentence beside it,
   or `''` for a row that is safe. `superseded` is the only one that costs a
   query: for an `automation.trigger` row it asks whether a LATER row of the
   same trigger and the same recipient was delivered (and not itself
@@ -753,6 +813,7 @@ invoke `bin/magento cron:run` every minute.
 | `smaily_contact_reconcile` | every 15 min | Smaily→Magento consent mirror |
 | `smaily_health_check` | every 15 min | Engine-down / failure-volume / missing-consent-source notices |
 | `smaily_queue_janitor` | daily 02:20 | Retention pruning (both queues + the abandoned-cart tracker) |
+| `smaily_catalog_manifest` | daily 03:30 | The store's complete product list to the engine (contract §3c), when nothing holds it back |
 
 ## Key flows
 

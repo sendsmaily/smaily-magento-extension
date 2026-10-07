@@ -4,6 +4,10 @@
 
 The package version is currently `3.0.0-rc10` — the tenth release-candidate cut of everything below. Release candidates are GitHub pre-releases for pilot stores, tagged in this repository from 3.0.0-rc9 on; composer installs one only when a store asks for that version or for a minimum stability of `RC`, and still resolves 2.8.1 as the newest stable release.
 
+**Changes since 3.0.0-rc10**
+
+- **Details** in **Marketing > Smaily Connect > Log** shows when a row's latest attempt happened: the time of its latest failure, its delivery or its skip. The Log's **Updated** column and the Dashboard's **Recent activity** show the same time. Before, a row that failed, was delivered or was skipped kept the time of its previous change — often the time it was queued. The banners and the admin notification about deliveries that failed in the last 24 hours now count failures by when they happened, and the Log keeps a delivered or failed row for its retention period counted from that time. Rows already in the Log keep the time they show until their next attempt.
+
 **Changes since 3.0.0-rc9**
 
 - An order created in the admin under **Sales > Orders > Create New Order**, or placed with **Login as Customer**, no longer counts as an order through the store's own pages when the extension decides whether to open **Using a separate storefront?** by itself. Before, on a store whose shoppers buy only on a separate storefront, one such order by the staff kept the Storefront URL field collapsed for 30 days. A shopper's order on the store's own pages, and an order through Magento's API, count as before.

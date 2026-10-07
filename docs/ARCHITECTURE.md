@@ -675,7 +675,15 @@ below.
 - **Claiming:** rows are claimed with a per-worker `claim_token`; only rows
   the worker actually won are processed, so concurrent flushes (manual cron,
   multi-node) can never double-send. Rows stuck in `sending` (killed
-  worker) are requeued after 15 minutes.
+  worker) are requeued after 15 minutes. Every outcome of a row —
+  `markSent()`, `markFailed()`, `markSkipped()` and the batched
+  `markFailedMany()` — clears `claim_token` and `claimed_at` and sets
+  `updated_at` to the outcome's time (PRO-3961): the row model still holds
+  all three as they were before the claim, and the model's save writes
+  every column it holds. So `updated_at` is the time of the row's latest
+  outcome, the time that Details, the Log grid, the Dashboard's recent
+  activity, the failure count of the health check and the retention sweep
+  read.
 - **Idempotency:** `event_uuid` is unique; callers may pass a deterministic
   UUID to make an enqueue idempotent.
 - **Exchange evidence (PRO-1965, Woo F3-44 parity):** both clients keep

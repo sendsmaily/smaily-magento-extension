@@ -356,7 +356,7 @@ class IngestQueue
             'status' => IngestEvent::STATUS_SENT,
             'last_error' => null,
             'last_response' => $response ?? $event->getData('last_response'),
-        ]);
+        ] + $this->outcomeFields());
         $this->eventResource->save($event);
     }
 
@@ -370,7 +370,7 @@ class IngestQueue
             'status' => $exhausted ? IngestEvent::STATUS_FAILED : IngestEvent::STATUS_PENDING,
             'next_retry_at' => $exhausted ? null : $this->nextRetryAt($attempts),
             'last_error' => mb_substr($error, 0, 60000),
-        ]);
+        ] + $this->outcomeFields());
         $this->eventResource->save($event);
 
         if ($exhausted) {
@@ -479,6 +479,23 @@ class IngestQueue
     private function table(): string
     {
         return $this->resourceConnection->getTableName(IngestEventResource::TABLE_NAME);
+    }
+
+    /**
+     * What every outcome of a row writes besides its own fields: the claim
+     * released, and the row's last-changed time set to the outcome's
+     * (PRO-3961), as EventQueue::outcomeFields() does — a claimed row model
+     * holds all three as they were before the claim.
+     *
+     * @return array{claim_token: null, claimed_at: null, updated_at: string}
+     */
+    private function outcomeFields(): array
+    {
+        return [
+            'claim_token' => null,
+            'claimed_at' => null,
+            'updated_at' => $this->dateTime->gmtDate('Y-m-d H:i:s'),
+        ];
     }
 
     private function nextRetryAt(int $attempts): string

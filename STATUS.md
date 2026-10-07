@@ -348,6 +348,30 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3961 — a queue row's failure, delivery or skip moves its
+  last-changed time (2026-10-07; branch
+  `erkki/pro-3961-queue-row-updated-at` for a PR).** The defect PRO-1964
+  found: an outcome saved the row model, which holds `updated_at`,
+  `claimed_at` and `claim_token` as the claim read them, so an explicit
+  write of the old `updated_at` kept MySQL's ON UPDATE from firing and
+  Details, the Log, the Dashboard's recent activity, the health check and
+  the retention sweep all dated the outcome at the row's previous change.
+  Now `EventQueue::markSent()/markSkipped()/markFailed()` and the batched
+  `markFailedMany()` write `outcomeFields()`: claim cleared (both columns
+  null) and `updated_at` = the outcome's time from the injected clock.
+  `IngestQueue` had the same defect (its `markSent()`/`markFailed()`);
+  fixed the same way. No schema change; rows already stored keep their
+  time until their next outcome. Readers checked: `AttemptHistory`
+  (Details), `log/details.phtml` "Updated", the Log grid's Updated column
+  (sort/filter), `DashboardStats::recentActivity()`, `QueueHealth`
+  (Dashboard/Log banners, `Cron\HealthCheck`), `Cron\QueueJanitor`
+  retention (now counted from the outcome); `requeueStale()` reads
+  `claimed_at` of `sending` rows only, untouched. New integration tests
+  (fail without the fix): single and batched outcomes in both queues,
+  Details entries, the health count. ARCHITECTURE (Claiming), CHANGELOG
+  "Changes since 3.0.0-rc10". Gates: unit, phpcs, phpstan, integration,
+  PHP 8.1 syntax.
+
 - **PRO-1964 — a batch that fails for one reason is recorded in one
   write and one log line (2026-10-07; branch
   `erkki/pro-1964-batch-failure-write` for a PR).** `Cron\FlushEventQueue`

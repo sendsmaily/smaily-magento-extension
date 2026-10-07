@@ -3,7 +3,7 @@
 If you are a fresh agent picking up this repo: read this first, then `STATUS.md`
 (where we are now), then `docs/ARCHITECTURE.md` (how the module is built),
 `docs/RECENGINE_API_CONTRACT.md` (the engine contract you build against), and
-`BACKLOG.md`. README gives the 30-second orientation.
+`docs/internal/BACKLOG.md`. README gives the 30-second orientation.
 
 ## Mission
 
@@ -84,7 +84,7 @@ start one.
   that runs `bin/magento`). Magento 2.4.3 and older run only on PHP 7.x and
   cannot run this module — a 2.4.3-p1 pilot store surfaced two days before
   pilot day (2026-10-07). docs/INSTALLING.md "Before you start" and
-  PILOT_CHECKLIST §0 carry the check.
+  `docs/internal/PILOT_CHECKLIST.md` §0 carry the check.
 
 - Local PHP is 8.5 and this host is missing a few Magento PHP extensions, so:
   `composer install --ignore-platform-reqs`. Magento packages come from

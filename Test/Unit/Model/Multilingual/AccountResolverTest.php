@@ -18,7 +18,7 @@ use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
 
 /**
- * The binding unit is website x language (RFC_MULTI_WEBSITE.md §2): two
+ * The binding unit is website x language (docs/internal/RFC_MULTI_WEBSITE.md §2): two
  * websites sharing a language must never resolve to each other's store views
  * or accounts.
  */

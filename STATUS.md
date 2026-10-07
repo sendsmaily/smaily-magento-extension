@@ -5,7 +5,14 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-07 — **The move into
+_Last updated: 2026-10-07 — **Docs tidy-up (owner decisions
+2026-10-07):** the maintainers' working papers moved to `docs/internal/`
+(`PILOT_CHECKLIST.md`, `BACKLOG.md`, `RFC_MULTI_WEBSITE.md`,
+`ADMIN_UI_TARGET_SPEC.md`, `audits/`; its README says they are not merchant
+documentation); `docs/UPSTREAM_PROPOSAL.md` and TESTING's dated rc-run log
+are deleted (git history keeps them; the upstream decision record is
+Linear PRO-1198). Older entries below keep the old paths.
+Earlier the same day: **The move into
 `sendsmaily/smaily-magento-extension` is done (PRO-1198):** PR #126 was
 squash-merged into `master` as aa0c995, a tree identical to the fork's
 last `v3` (0179e95); CI and Contract staleness are green on `master` (the

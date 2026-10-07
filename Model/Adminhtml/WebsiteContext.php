@@ -15,7 +15,7 @@ use Magento\Store\Model\Website;
 
 /**
  * The website the admin surfaces (wizard + Settings) currently target
- * (RFC_MULTI_WEBSITE.md §2) — the single seam every save/prefill path reads
+ * (docs/internal/RFC_MULTI_WEBSITE.md §2) — the single seam every save/prefill path reads
  * to know which website's scope to use.
  *
  * A single-website install always resolves its one real website, exactly as

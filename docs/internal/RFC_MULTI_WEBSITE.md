@@ -138,7 +138,7 @@ calls `ScopeConfigInterface::getValue()` with no scope argument at all — the
 class has no `$storeId`/`$websiteId` parameter anywhere, unlike `Model/Config`.
 `etc/adminhtml/system.xml`'s `intelligence` group is
 `showInWebsite="0" showInStore="0"` on every field, so native config can't
-even create an override. `BACKLOG.md` records this as a deliberate,
+even create an override. `docs/internal/BACKLOG.md` records this as a deliberate,
 already-shipped decision ("per-website engine tenants are out of scope"),
 which this RFC now reverses.
 
@@ -338,7 +338,7 @@ two-website (new) behaviour, en_US + et_EE.
 - Any change to the native `Stores > Configuration > Smaily` surface beyond
   the `intelligence` group's scope flags (§3) — the broader question of
   keeping vs. removing that native surface is tracked separately
-  (`docs/ADMIN_UI_TARGET_SPEC.md` §4, PRO-1369).
+  (`docs/internal/ADMIN_UI_TARGET_SPEC.md` §4, PRO-1369).
 
 ## 9. Risks / open questions
 

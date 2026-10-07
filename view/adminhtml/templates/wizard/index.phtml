@@ -14,7 +14,7 @@
  *
  * On a 2+-website install, a website-chooser card renders BEFORE the normal
  * step rail whenever the request hasn't already named a website
- * (RFC_MULTI_WEBSITE.md §2): picking one reloads the page with
+ * (docs/internal/RFC_MULTI_WEBSITE.md §2): picking one reloads the page with
  * `?website=<id>`, which is the same mechanism the Settings selector uses —
  * every step from then on saves/prefills against that website's scope with
  * no further plumbing.
@@ -203,7 +203,7 @@ require(['jquery'], function ($) {
     var panels = window.smailyPanelsInit($);
     // Strings are translated server-side — see panel/panels-js.phtml.
 
-    // Website chooser (RFC_MULTI_WEBSITE.md §2, 2+-website installs only):
+    // Website chooser (docs/internal/RFC_MULTI_WEBSITE.md §2, 2+-website installs only):
     // reloads with ?website=<id>, same mechanism as the Settings selector.
     $('#smaily-wizard-website-continue').on('click', function () {
         var url = new URL(window.location.href);

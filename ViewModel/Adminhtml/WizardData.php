@@ -97,7 +97,7 @@ class WizardData implements ArgumentInterface
 
     /**
      * The website the page/wizard currently targets — feeds the Settings
-     * selector's/wizard chooser's own chrome (RFC_MULTI_WEBSITE.md §2).
+     * selector's/wizard chooser's own chrome (docs/internal/RFC_MULTI_WEBSITE.md §2).
      */
     public function getSelectedWebsiteId(): int
     {

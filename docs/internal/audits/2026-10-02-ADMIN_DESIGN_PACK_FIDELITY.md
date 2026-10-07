@@ -5,7 +5,7 @@
 (exported 2026-07-12; not kept in the repository — git history, commit
 `db2fc53`) against the running sandbox admin (Magento 2.4.8-p4) in **en_US
 and et_EE**, at a 1400 px viewport plus a 900 px spot check.
-**Authority:** `docs/ADMIN_UI_TARGET_SPEC.md` §1 — the pack binds layout and
+**Authority:** `docs/internal/ADMIN_UI_TARGET_SPEC.md` §1 — the pack binds layout and
 element visuals only. Where the pack's copy differs from the shared Connect
 terminology, the terminology wins and the difference is noted, not changed.
 

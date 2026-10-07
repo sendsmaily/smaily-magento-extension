@@ -55,7 +55,7 @@
 
   /* Font stacks. --font is Magento's own admin face, not the pack's system
    * stack: one family per page, the pack's sizes and weights kept (owner
-   * decision 2026-10-02, ADMIN_UI_TARGET_SPEC.md "Page frame decisions"). */
+   * decision 2026-10-02, docs/internal/ADMIN_UI_TARGET_SPEC.md "Page frame decisions"). */
   --font:"Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 
@@ -777,7 +777,7 @@
 .smaily-log-details-retry { display: flex; gap: var(--sp-2); align-items: center; background: var(--s-info-soft); border: 1px solid var(--s-info-border); color: var(--s-info); border-radius: var(--r-3); padding: 11px 14px; font-size: var(--fs-13); line-height: 1.45; }
 .smaily-log-details-retry.is-terminal { background: var(--s-neutral-soft); border-color: var(--s-neutral-border); color: var(--s-text-2); }
 
-/* --- Settings website selector (RFC_MULTI_WEBSITE.md §2, PRO-1461) --------- *
+/* --- Settings website selector (docs/internal/RFC_MULTI_WEBSITE.md §2, PRO-1461) *
  * Own chrome next to the tab strip, shown only on 2+-website installs. */
 .smaily-settings-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); }
 .smaily-settings-header .smaily-tabs { flex: 1 1 auto; }

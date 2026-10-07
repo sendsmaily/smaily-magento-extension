@@ -24,7 +24,7 @@ use Smaily\Connect\Model\ModuleVersion;
  *   posted instead of a hard redirect — the store keeps running on the
  *   migrated settings.
  *
- * The completed flag is website-scoped (RFC_MULTI_WEBSITE.md §2, Phase 2):
+ * The completed flag is website-scoped (docs/internal/RFC_MULTI_WEBSITE.md §2, Phase 2):
  * it reads via the normal website-falls-back-to-default chain, so an
  * existing single-website install is unaffected (its default-scope flag
  * still resolves as "completed" for its one website), while a newly added

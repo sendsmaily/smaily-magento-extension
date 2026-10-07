@@ -32,7 +32,7 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory as M
 use Smaily\Connect\ViewModel\Adminhtml\WizardData;
 
 /**
- * PRO-1461 (RFC_MULTI_WEBSITE.md §2, Phase 2): every prefill path the
+ * PRO-1461 (docs/internal/RFC_MULTI_WEBSITE.md §2, Phase 2): every prefill path the
  * Settings selector / wizard chooser can switch between must actually read
  * the selected website's own scope — before this pass, getBootJson() called
  * most Config/Mode getters with no scope argument at all, so switching

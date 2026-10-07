@@ -19,9 +19,10 @@
 # honour too: the development apparatus (tests, CI, sandbox, tooling,
 # static-analysis config), the Hyvä companion (compat/, published as the
 # separate package smaily/module-connect-hyva), the developer and internal
-# working documents (TESTING.md, CONTRIBUTING.md, CLAUDE.md, STATUS.md,
-# BACKLOG.md, PILOT_CHECKLIST.md) and the whole docs/ folder — it carries the
-# engine contract vendored from a private repository and internal audits, so
+# working documents (TESTING.md, CONTRIBUTING.md, CLAUDE.md, STATUS.md) and
+# the whole docs/ folder, the maintainers' working papers in docs/internal/
+# included — it carries the engine contract vendored from a private
+# repository and internal audits, so
 # the documentation set lives on GitHub and the package links to it there
 # (Erkki's decision, 2026-09-10). What ships alongside the code: README.md,
 # CHANGELOG.md, LICENSE.txt.

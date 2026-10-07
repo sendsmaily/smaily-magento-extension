@@ -1291,7 +1291,7 @@ Initial setup, Settings, Log. Design rules:
   Campaign Intelligence API key — are declared sensitive in `etc/di.xml`
   (`Magento\Config\Model\Config\TypePool`), so `app:config:dump` never
   writes them to `app/etc/config.php`.
-- **Multi-website (RFC_MULTI_WEBSITE.md).** `Model\Adminhtml\WebsiteContext`
+- **Multi-website (docs/internal/RFC_MULTI_WEBSITE.md).** `Model\Adminhtml\WebsiteContext`
   is the single seam every admin save/prefill path reads to know its target
   website: it resolves a `website` request param (validated against real
   websites) falling back to the installation's default website. On a

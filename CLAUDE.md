@@ -15,14 +15,14 @@ via a plain `composer update`). Target: feature parity with the UNION of the Woo
 Campaign Intelligence support. Aim: become Smaily's official upstream extension.
 Magento 2.4.4+ / PHP 8.1–8.4. GPL-3.0. Public product name "Smaily Connect".
 
-Repository: the official `sendsmaily/smaily-magento-extension`, branch
-`master` (owner decision 2026-10-07, PRO-1198). Until the move lands, work
-still happens in the fork `erkkimarkus/magento-connect` on branch `v3`
-(default); the move is one squash-merged PR from the fork's `v3` into the
-official `master` (see "The move into sendsmaily" below). After it, the
-fork is archived and every change reaches `master` through a pull request
-("Changes reach `master`"). The 2.8.x line is not developed further; its
-tags stay, no maintenance branch.
+Repository: the code lives in the official `sendsmaily/smaily-magento-extension`,
+branch `master` (owner decision 2026-10-07, PRO-1198; moved by PR #126,
+squash-merged as aa0c995). Every change reaches `master` through a
+squash-merged PR from a short-lived topic branch ("Changes reach `master`");
+nothing is pushed to `master` directly. The fork `erkkimarkus/magento-connect`
+(branch `v3`, rc1–rc8) is history, to be archived read-only. Local remotes:
+`origin` = sendsmaily, `fork` = the fork. The 2.8.x line is not developed
+further; its tags stay, no maintenance branch.
 
 **Public facade:** README, CONTRIBUTING, CHANGELOG, TESTING and `docs/` are
 written as finished-product public documentation. Keep them in that tone —
@@ -63,8 +63,8 @@ repo (`../intelligence/`, `erkkimarkus/smaily-recommendations`) — never
 hand-edit it. The `Contract staleness` workflow (daily + push/PR) runs
 `bin/check-contract-staleness.sh` and goes red on drift; it needs the repo
 secret `ENGINE_CONTRACT_READ_TOKEN` (fine-grained PAT, contents:read on the
-engine repo) — in whichever repo runs it, so the official repo needs its own
-copy (After the move, step 1). Locally, the script's fallback engine checkout
+engine repo) — in whichever repo runs it; the official repo has its own copy
+(set 2026-10-07). Locally, the script's fallback engine checkout
 (`$ENGINE_CHECKOUT`'s default) is a hard-coded Linux path that does not
 exist on this Mac — pass the path explicitly:
 `bin/check-contract-staleness.sh ../intelligence/docs/RECENGINE_API_CONTRACT.md`
@@ -136,12 +136,14 @@ start one.
 
 ## Changes reach `master` through pull requests — squash-merged (Erkki, 2026-10-07)
 
-Mirrors the WooCommerce repo (`../connect/` CLAUDE.md, PRO-2281). Once v3 is
-in `sendsmaily/smaily-magento-extension`, every change — code, docs, a
-contract sync, a version cut — goes to `master` as a PR; nothing is pushed
-to `master` directly:
-1. Work on a topic branch named like Linear's branch name for the issue
-   (`erkki/pro-1234-short-slug`).
+Mirrors the WooCommerce repo (`../connect/` CLAUDE.md, PRO-2281). In
+`sendsmaily/smaily-magento-extension` every change — code, docs, a contract
+sync, a version cut — goes to `master` as a PR; **there is no direct push to
+`master`**. Run the gates on the topic branch before it is pushed (after a
+merge or cherry-pick batch too), not on `master` afterwards:
+1. Work on a short-lived topic branch from `origin/master`, named like
+   Linear's branch name for the issue (`erkki/pro-1234-short-slug`); a
+   version cut uses `release/<version>`.
 2. Open a PR whose title and description follow `github:writing-change-records`
    — the description becomes the merge message, so it is the permanent record.
 3. **Erkki merges** (or the session orchestrator on his go). **Squash is the
@@ -168,34 +170,25 @@ No staged review by the Smaily team — Erkki maintains the repo.
 3. **A tag on the official repo is a Packagist publish** of
    `smaily/smailyformagento` — a one-way door, Erkki's to run. Release
    candidates are tagged publicly; 3.0.0 waits for a pilot store.
-   `dev-master` on Packagist becomes v3 the moment the move PR merges.
+   `dev-master` on Packagist has been v3 since the move PR merged.
 
-## The move into sendsmaily (PRO-1198)
+## The move into sendsmaily (PRO-1198) — done 2026-10-07
 
-`v3` descends from `upstream/master` (e2e5d45, the last 2.8.x commit), so a
-PR from the fork's `v3` into `sendsmaily:master` is conflict-free and its
-squash is exactly the v3 tree; `git merge upstream/master` is a no-op
-(checked 2026-10-07). If upstream lands anything on `master` before the PR
-merges, merge `upstream/master` into `v3` (never rebase; our side wins) and
-audit what merges CLEANLY — a legacy file that comes back or an upstream
-config that shadows ours (Woo CLAUDE.md "Merging `upstream/main`"); run
-`bin/lint-php.sh` under PHP 8.1 after it.
+The fork's `v3` (descended from upstream's last 2.8.x commit e2e5d45) reached
+`sendsmaily:master` as one squash-merged PR, #126 → aa0c995, whose tree is
+identical to the fork's last `v3` (0179e95). Done: the
+`ENGINE_CONTRACT_READ_TOKEN` secret is set in the official repo; CI and
+Contract staleness are green on `master`; local remotes are switched
+(`origin` = sendsmaily, `fork` = erkkimarkus/magento-connect) and worktrees
+branch from `origin/master`; `v3` is gone from the `push.branches` lists of
+`ci.yaml` and `contract-staleness.yaml`.
 
-**After the move — checklist for Erkki:**
-1. Official repo → Settings → Secrets: create `ENGINE_CONTRACT_READ_TOKEN`
-   (fine-grained PAT, contents:read on `erkkimarkus/smaily-recommendations`)
-   — without it Contract staleness fails with "CANNOT CHECK".
-2. Open the PR `erkkimarkus:v3` → `sendsmaily:master` and squash-merge it
-   (`gh pr merge <n> --squash --subject … --body-file …`); set the branch
-   rule on `master`: changes through a PR, squash merges only.
-3. Check that CI and Contract staleness are green on `master`.
-4. Cut the next release candidate there (Release cut above).
-5. Archive the fork `erkkimarkus/magento-connect` (read-only; rc1–rc8 stay).
-6. Locally: `git remote rename origin fork`, `git remote rename upstream
-   origin`, then `git checkout -b master origin/master` (or reset the
-   local `master` to it); worktrees branch from `master`.
-7. Drop `v3` from the `push.branches` lists in `ci.yaml` and
-   `contract-staleness.yaml` (they carry both until the move).
+**Still open (Erkki):**
+1. Cut the next release candidate there (Release cut above) — 3.0.0-rc9 is
+   the first.
+2. Archive the fork `erkkimarkus/magento-connect` (read-only; rc1–rc8 stay).
+3. Branch rule on `master`, if not set yet: changes through a PR, squash
+   merges only.
 
 ## Language conventions
 

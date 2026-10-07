@@ -15,7 +15,6 @@
 /** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
 $viewModel = $block->getData('view_model');
 $isSettings = $block->getData('context') === 'settings';
-$totals = $viewModel->getStoreTotals();
 // The import obeys this website's subscriber-sync switch exactly like the
 // live paths do (PRO-1764), so with the switch off the control is disabled
 // and says why instead of quoting numbers it will not send. Settings renders
@@ -129,28 +128,25 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
     </div>
 
     <?php
-    // Magento's __() has no plural forms, so each count picks its own
-    // singular or plural phrase ("1 order", not "1 orders").
-    $storeCounts = [];
-    foreach ([
-        'orders' => [__('%1 order', $totals['orders']), __('%1 orders', $totals['orders'])],
-        'products' => [__('%1 product', $totals['products']), __('%1 products', $totals['products'])],
-    ] as $countKey => $countPhrases) {
-        $storeCounts[] = (string)$countPhrases[(int)$totals[$countKey] === 1 ? 0 : 1];
-    }
-    // The contact count is the audience the import sends under each
-    // contact-sync mode (PRO-3582): the sentence for the saved mode renders,
-    // and panels-js.phtml swaps in the one for the mode picked on the panel.
+    // The estimate is the number of contacts the import sends from this
+    // website under each contact-sync mode (PRO-3582), and nothing else — no
+    // order or product totals, which other imports send (PRO-1970). The
+    // sentence for the saved mode renders, and panels-js.phtml swaps in the
+    // one for the mode picked on the panel. Magento's __() has no plural
+    // forms, so each count picks its own singular or plural phrase.
     $importEstimates = [];
     foreach ($viewModel->getContactImportCounts() as $countMode => $contactCount) {
-        $contactPhrase = $contactCount === 1
-            ? __('%1 contact to import', $contactCount)
-            : __('%1 contacts to import', $contactCount);
-        $importEstimates[$countMode] = (string)__(
-            'Your store has %1, %2 and %3. The import runs in the background, a chunk per minute, and never slows the storefront down.',
-            (string)$contactPhrase,
-            ...$storeCounts
-        );
+        $importEstimates[$countMode] = (string)($contactCount === 1
+            ? __(
+                'This import sends %1 contact from this website. It runs in the background,'
+                . ' a chunk per minute, and never slows the storefront down.',
+                $contactCount
+            )
+            : __(
+                'This import sends %1 contacts from this website. It runs in the background,'
+                . ' a chunk per minute, and never slows the storefront down.',
+                $contactCount
+            ));
     }
     $savedSyncMode = $viewModel->getSyncMode();
     ?>

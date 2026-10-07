@@ -8,8 +8,6 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Adminhtml;
 
-use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
-use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\App\RequestInterface;
@@ -17,8 +15,6 @@ use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\FlagManager;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json;
-use Magento\Sales\Model\ResourceModel\Order\Collection as OrderCollection;
-use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
@@ -495,13 +491,8 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
      */
     private function wizardData(): WizardData
     {
-        require_once __DIR__ . '/../Support/Stub/ProductCollectionFactory.php';
         $request = $this->createMock(RequestInterface::class);
         $request->method('getParam')->willReturn(null);
-        $orderCollectionFactory = $this->createMock(OrderCollectionFactory::class);
-        $orderCollectionFactory->method('create')->willReturn($this->createMock(OrderCollection::class));
-        $productCollectionFactory = $this->createMock(ProductCollectionFactory::class);
-        $productCollectionFactory->method('create')->willReturn($this->createMock(ProductCollection::class));
 
         return new WizardData(
             $this->config,
@@ -510,8 +501,6 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
             $this->scopeConfig,
             new AccountResolver($this->storeManager, new LanguageResolver($this->scopeConfig)),
             $this->createMock(ContactAudience::class),
-            $orderCollectionFactory,
-            $productCollectionFactory,
             new Json(),
             $this->createMock(MappingCollectionFactory::class),
             new WebsiteContext($this->storeManager, $request),

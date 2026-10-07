@@ -8,13 +8,9 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Unit\ViewModel\Adminhtml;
 
-use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
-use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json;
-use Magento\Sales\Model\ResourceModel\Order\Collection as OrderCollection;
-use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Magento\Store\Model\ScopeInterface;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
@@ -71,8 +67,6 @@ class WizardDataTest extends TestCase
 
     protected function setUp(): void
     {
-        require_once __DIR__ . '/../../Support/Stub/ProductCollectionFactory.php';
-
         $this->config = $this->createMock(Config::class);
         $this->mode = $this->createMock(Mode::class);
         $this->scopeConfig = $this->createMock(ScopeConfigInterface::class);
@@ -86,16 +80,6 @@ class WizardDataTest extends TestCase
 
         $this->contactAudience = $this->createMock(ContactAudience::class);
 
-        $orderCollection = $this->createMock(OrderCollection::class);
-        $orderCollection->method('getSize')->willReturn(0);
-        $orderCollectionFactory = $this->createMock(OrderCollectionFactory::class);
-        $orderCollectionFactory->method('create')->willReturn($orderCollection);
-
-        $productCollection = $this->createMock(ProductCollection::class);
-        $productCollection->method('getSize')->willReturn(0);
-        $productCollectionFactory = $this->createMock(ProductCollectionFactory::class);
-        $productCollectionFactory->method('create')->willReturn($productCollection);
-
         $this->orderOrigin = $this->createMock(OrderOrigin::class);
         $this->viewModel = new WizardData(
             $this->config,
@@ -104,8 +88,6 @@ class WizardDataTest extends TestCase
             $this->scopeConfig,
             $this->accountResolver,
             $this->contactAudience,
-            $orderCollectionFactory,
-            $productCollectionFactory,
             new Json(),
             $this->createMock(MappingCollectionFactory::class),
             $this->websiteContext,

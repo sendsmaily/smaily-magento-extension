@@ -979,8 +979,9 @@ traffic:
   subscriber, and a contact Smaily already has keeps its status. This
   includes a customer whose newsletter signup still waits for its
   confirmation email. A customer who unsubscribed in the store goes as
-  unsubscribed. Guest-order emails are not imported. The estimate above the **Start import** button counts these
-  contacts for the mode picked on the panel.
+  unsubscribed. Guest-order emails are not imported. The estimate above the **Start import** button says how many of
+  these contacts the import sends from the website, for the mode picked on
+  the panel, and names no other total.
   When Smaily answers a chunk with "invalid data", the import sends that
   chunk's contacts again one at a time, so only the contacts Smaily
   refuses count as failed and the others are imported.
@@ -988,7 +989,8 @@ traffic:
   switch exactly like the live syncs do: with the switch off the import
   button is disabled and says so, and an import started any other way
   (the CLI, or one already queued when you switched it off) sends nothing
-  and finishes at 0. An import that was already running when you switched
+  and finishes at 0; `smaily:backfill:start contacts` says so when it
+  starts one. An import that was already running when you switched
   it off stops at its next chunk and is reported as canceled, keeping the
   count it had genuinely sent.
 - **Catalog / Customers / Orders → Campaign Intelligence** — Settings >

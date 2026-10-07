@@ -15,6 +15,7 @@ use Smaily\Connect\Console\Command\BackfillStartCommand;
 use Smaily\Connect\Model\Backfill\EngineImportGuard;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
+use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -23,6 +24,8 @@ use Symfony\Component\Console\Tester\CommandTester;
  * PRO-1969, PRO-3742: `smaily:backfill:start catalog|customers|orders` does
  * not start an import while Campaign Intelligence is not connected, and says
  * why; `smaily:backfill:start contacts` goes to Smaily and starts.
+ * PRO-1970: a contacts import for a website whose contact sync is off still
+ * starts, and the command says it will send nothing.
  */
 class BackfillStartCommandTest extends TestCase
 {
@@ -100,6 +103,37 @@ class BackfillStartCommandTest extends TestCase
         self::assertStringContainsString('Started contacts backfill #8', $tester->getDisplay());
     }
 
+    public function testAContactsImportForAWebsiteWithContactSyncOffStartsAndSaysItSendsNothing(): void
+    {
+        $job = $this->createMock(Job::class);
+        $job->method('getId')->willReturn(9);
+        $this->jobManager->expects(self::once())->method('startIfIdle')
+            ->with(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 2)
+            ->willReturn($job);
+
+        $tester = $this->startImport(Job::TYPE_CONTACTS, false, ['--website' => '2'], false);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('Started contacts backfill #9 for website 2.', $tester->getDisplay());
+        self::assertStringContainsString(
+            'Contact synchronization is off for website 2, so this import sends nothing and finishes at 0.'
+            . ' Turn on Sync contacts to Smaily under Settings > Contacts, then start the import again.',
+            $tester->getDisplay()
+        );
+    }
+
+    public function testAContactsImportForAWebsiteWithContactSyncOnPrintsNoNotice(): void
+    {
+        $job = $this->createMock(Job::class);
+        $job->method('getId')->willReturn(10);
+        $this->jobManager->method('startIfIdle')->willReturn($job);
+
+        $tester = $this->startImport(Job::TYPE_CONTACTS, false, ['--website' => '2'], true);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringNotContainsString('Contact synchronization is off', $tester->getDisplay());
+    }
+
     public function testAnImportAlreadyActiveIsNotStartedAgainAndSaysSo(): void
     {
         $message = 'A "catalog" import to engine is already running for website 0.';
@@ -117,14 +151,21 @@ class BackfillStartCommandTest extends TestCase
     /**
      * @param array<string, string> $options
      */
-    private function startImport(string $jobType, bool $connected, array $options = []): CommandTester
-    {
+    private function startImport(
+        string $jobType,
+        bool $connected,
+        array $options = [],
+        bool $syncEnabled = true
+    ): CommandTester {
         $engineSettings = $this->createMock(EngineSettings::class);
         $engineSettings->method('isConnected')->willReturn($connected);
+        $config = $this->createMock(Config::class);
+        $config->method('isSyncEnabled')->willReturn($syncEnabled);
         $tester = new CommandTester(new BackfillStartCommand(
             $this->jobManager,
             $this->createMock(StoreManagerInterface::class),
-            new EngineImportGuard($engineSettings)
+            new EngineImportGuard($engineSettings),
+            $config
         ));
         $tester->execute(['type' => $jobType] + $options);
 

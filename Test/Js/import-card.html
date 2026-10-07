@@ -18,6 +18,9 @@
   card (`blocked_by`, PRO-3923) and offers only Cancel; an import that stopped
   before an error names the button the card shows (Run again) in both
   languages (PRO-3957); an import that moves shows its progress as before.
+  The contacts card (panel/subscribers.phtml, the Contacts tab) quotes the
+  number of contacts its import sends for the mode picked on the panel, and
+  no other total (PRO-1970).
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
 -->
@@ -27,6 +30,8 @@
     <title>import card harness</title>
     <script src="build/intelligence-settings.en_US.js"></script>
     <script src="build/intelligence-settings.et_EE.js"></script>
+    <script src="build/contacts-settings.en_US.js"></script>
+    <script src="build/contacts-settings.et_EE.js"></script>
 </head>
 <body>
 <pre id="log"></pre>
@@ -38,6 +43,8 @@
     var STALLED = 'Stalled — nothing has moved this import for over an hour; %1 of %2 synced so far. Press Run again to start a fresh import. If it stalls again, check that Magento\'s cron runs.';
     var BLOCKED = 'Stalled — this import waits behind another import that nothing has moved for over an hour: Settings > %1. Cancel that import, or press Run again on its card, and this one follows.';
     var STOPPED = 'Stopped before an error — %1 of %2 synced so far. Press Run again to run it again.';
+    var ONE_CONTACT = 'This import sends %1 contact from this website. It runs in the background, a chunk per minute, and never slows the storefront down.';
+    var CONTACTS = 'This import sends %1 contacts from this website. It runs in the background, a chunk per minute, and never slows the storefront down.';
     var failures = 0;
     var passes = 0;
 
@@ -229,8 +236,49 @@
         frame.remove();
     }
 
+    // The contacts card before its import starts: the fixture's import sends
+    // 1 contact under Subscribers only (saved), 42 under All customers and 0
+    // under Checkout opt-in only.
+    async function contacts(locale) {
+        var page = 'contacts-settings.' + locale,
+            strings = window.smailyAdminPages[page].strings,
+            frame = await open(page, {}),
+            doc = frame.contentDocument,
+            estimate = doc.getElementById('smaily-w-backfill-estimate'),
+            pick = function (mode) {
+                var radio = doc.querySelector('input[name=smaily-w-mode][value=' + mode + ']');
+                radio.checked = true;
+                frame.contentWindow.jQuery(radio).trigger('change');
+
+                return estimate.textContent;
+            };
+
+        log('# ' + locale + ', contacts');
+        if (locale !== 'en_US') {
+            check(locale + ': the contacts estimate is translated',
+                strings[ONE_CONTACT] !== ONE_CONTACT && strings[CONTACTS] !== CONTACTS);
+        }
+        check(locale + ', contacts: the estimate is shown before the import starts',
+            estimate.style.display !== 'none');
+        check(locale + ', contacts: the saved mode quotes its contacts, in the singular',
+            estimate.textContent === strings[ONE_CONTACT].replace('%1', '1'));
+        check(locale + ', contacts: All customers quotes its contacts',
+            pick('legitimate_interest') === strings[CONTACTS].replace('%1', '42'));
+        check(locale + ', contacts: and no other total',
+            JSON.stringify(estimate.textContent.match(/\d+/g)) === '["42"]');
+        check(locale + ', contacts: Checkout opt-in only quotes none',
+            pick('checkout_optin') === strings[CONTACTS].replace('%1', '0'));
+        check(locale + ', contacts: back on Subscribers only, its own count again',
+            pick('consent') === strings[ONE_CONTACT].replace('%1', '1'));
+        frame.remove();
+    }
+
     run('en_US').then(function () {
         return run('et_EE');
+    }).then(function () {
+        return contacts('en_US');
+    }).then(function () {
+        return contacts('et_EE');
     }).then(function () {
         document.getElementById('result').textContent = failures === 0 && passes > 0
             ? 'RESULT: PASS (' + passes + ' checks)'

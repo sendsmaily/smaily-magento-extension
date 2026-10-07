@@ -8,15 +8,28 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Backfill;
 
+use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\Locale\ResolverInterface;
+use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Newsletter\Model\Subscriber;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
+use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Backfill\ContactAudience;
+use Smaily\Connect\Model\Client\VerifiedCredentials;
+use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Source\SyncMode;
+use Smaily\Connect\Model\ContactSync\Mode;
+use Smaily\Connect\Model\Engine\ConsentSource;
+use Smaily\Connect\Model\Engine\Settings as EngineSettings;
+use Smaily\Connect\Model\Multilingual\AccountResolver;
+use Smaily\Connect\Model\OrderOrigin;
+use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory as MappingCollectionFactory;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
+use Smaily\Connect\ViewModel\Adminhtml\WizardData;
 
 /**
  * PRO-3582: the contact import sends the audience the live sync covers under
@@ -100,6 +113,45 @@ class ContactAudienceTest extends IntegrationTestCase
     public function testCheckoutOptInOnlyImportsNobody(): void
     {
         self::assertSame(0, $this->audience->count(self::WEBSITE_ID, SyncMode::MODE_CHECKOUT_OPTIN));
+    }
+
+    /**
+     * PRO-1970: the estimate on the contacts import card — the panel's view
+     * model, for the selected website — is the number of contacts the import
+     * then walks, under each mode.
+     */
+    public function testTheImportCardEstimateIsTheNumberOfContactsTheImportWalks(): void
+    {
+        $websiteContext = $this->createMock(WebsiteContext::class);
+        $websiteContext->method('getWebsiteId')->willReturn(self::WEBSITE_ID);
+        $panel = new WizardData(
+            $this->createMock(Config::class),
+            $this->createMock(Mode::class),
+            $this->createMock(EngineSettings::class),
+            $this->createMock(ScopeConfigInterface::class),
+            $this->createMock(AccountResolver::class),
+            $this->audience,
+            new Json(),
+            $this->createMock(MappingCollectionFactory::class),
+            $websiteContext,
+            $this->createMock(VerifiedCredentials::class),
+            $this->createMock(ResolverInterface::class),
+            $this->createMock(ConsentSource::class),
+            $this->createMock(OrderOrigin::class)
+        );
+
+        $walked = [];
+        foreach ([SyncMode::MODE_CONSENT, SyncMode::MODE_LEGITIMATE_INTEREST] as $mode) {
+            $walked[$mode] = count($this->walk($mode));
+        }
+        // ContactsProcessor ends before its first page under checkout opt-in.
+        $walked[SyncMode::MODE_CHECKOUT_OPTIN] = 0;
+
+        self::assertSame(
+            [SyncMode::MODE_CONSENT => 5, SyncMode::MODE_LEGITIMATE_INTEREST => 7, SyncMode::MODE_CHECKOUT_OPTIN => 0],
+            $walked
+        );
+        self::assertSame($walked, $panel->getContactImportCounts());
     }
 
     public function testPagesResumeAfterTheCursor(): void

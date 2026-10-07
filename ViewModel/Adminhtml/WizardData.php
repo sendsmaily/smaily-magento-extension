@@ -12,8 +12,6 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
-use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
-use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Store\Model\ScopeInterface;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
@@ -39,9 +37,6 @@ use Smaily\Connect\Model\SmailyUrl;
  */
 class WizardData implements ArgumentInterface
 {
-    /** @var array{orders: int, products: int}|null */
-    private ?array $storeTotals = null;
-
     public function __construct(
         private readonly Config $config,
         private readonly Mode $mode,
@@ -49,8 +44,6 @@ class WizardData implements ArgumentInterface
         private readonly ScopeConfigInterface $scopeConfig,
         private readonly AccountResolver $accountResolver,
         private readonly ContactAudience $contactAudience,
-        private readonly OrderCollectionFactory $orderCollectionFactory,
-        private readonly ProductCollectionFactory $productCollectionFactory,
         private readonly Json $serializer,
         private readonly MappingCollectionFactory $mappingCollectionFactory,
         private readonly WebsiteContext $websiteContext,
@@ -263,7 +256,6 @@ class WizardData implements ArgumentInterface
             'rss' => [
                 'enabled' => $this->config->isRssEnabled(),
             ],
-            'totals' => $this->getStoreTotals(),
         ]);
     }
 
@@ -356,20 +348,6 @@ class WizardData implements ArgumentInterface
         }
 
         return $counts;
-    }
-
-    /**
-     * Two collection counts, asked for twice per render (the template and
-     * the boot JSON), so they are counted once per request.
-     *
-     * @return array{orders: int, products: int}
-     */
-    public function getStoreTotals(): array
-    {
-        return $this->storeTotals ??= [
-            'orders' => $this->orderCollectionFactory->create()->getSize(),
-            'products' => $this->productCollectionFactory->create()->getSize(),
-        ];
     }
 
     /**

@@ -112,8 +112,12 @@ $isRefused = $viewModel->isEngineRefused();
             <?php // Where the tracker's consent comes from (PRO-3664). Without
             // Magento's cookie restriction mode the server cannot see a
             // consent source, so the note recommends one, as Cron\HealthCheck's
-            // notice does; %1–%4 open and close the two links. ?>
-            <?php if ($viewModel->isCookieRestrictionOnEverywhere()): ?>
+            // notice does; %1–%4 open and close the two links. With a
+            // Storefront URL saved the separate storefront sends the events
+            // and its own consent banner decides (PRO-3918). ?>
+            <?php if ($viewModel->getSavedStorefrontUrl() !== ''): ?>
+            <p class="note" id="smaily-w-browse-consent"><?= $escaper->escapeHtml(__('Your separate storefront sends the browse events itself, so its own cookie consent banner decides when they are sent.')) ?></p>
+            <?php elseif ($viewModel->isCookieRestrictionOnEverywhere()): ?>
             <p class="note" id="smaily-w-browse-consent"><?= $escaper->escapeHtml(__('Consent comes from Magento’s cookie notice: browse events are sent only after the visitor allows cookies.')) ?></p>
             <?php else: ?>
             <p class="note" id="smaily-w-browse-consent"><?= /* @noEscape */ strtr(

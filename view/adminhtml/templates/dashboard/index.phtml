@@ -86,7 +86,13 @@ $connections = [
     ],
     [
         __('Browse tracking'),
-        $viewModel->isBrowseTrackingEnabled() ? __('Script live on storefront') : __('Disabled'),
+        // Magento's own pages carry the script; a separate storefront sends
+        // the events itself (PRO-3918).
+        $viewModel->isBrowseTrackingEnabled()
+            ? ($viewModel->hasSeparateStorefront()
+                ? __('Your separate storefront must send the events itself')
+                : __('Script live on storefront'))
+            : __('Disabled'),
         $viewModel->isBrowseTrackingEnabled(),
         $viewModel->isBrowseTrackingEnabled() ? 'active' : 'off',
         $viewModel->isBrowseTrackingEnabled() ? __('On') : __('Off'),

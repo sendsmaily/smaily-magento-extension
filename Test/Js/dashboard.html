@@ -1,0 +1,147 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the Dashboard's health signals: the real template
+  (view/adminhtml/templates/dashboard/index.phtml), rendered in en_US and
+  et_EE by Test/Js/render-admin.php into Test/Js/build/, and read as the
+  merchant sees it. On a store with a Storefront URL saved, the Browse
+  tracking card says the separate storefront must send the events itself
+  and the consent note under the setting on Settings > Intelligence
+  (panel/intelligence.phtml) asks for no Magento consent source; without
+  one, both read as before (PRO-3918). The page has no script of its own,
+  so nothing is stubbed. Run it with bin/test-js.sh (it renders the pages
+  first); the page ends with "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>dashboard harness</title>
+    <script src="build/dashboard.en_US.js"></script>
+    <script src="build/dashboard.et_EE.js"></script>
+    <script src="build/dashboard-storefront.en_US.js"></script>
+    <script src="build/dashboard-storefront.et_EE.js"></script>
+    <script src="build/intelligence-settings.en_US.js"></script>
+    <script src="build/intelligence-settings.et_EE.js"></script>
+    <script src="build/intelligence-settings-storefront.en_US.js"></script>
+    <script src="build/intelligence-settings-storefront.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var SCRIPT_LIVE = 'Script live on storefront';
+    var STOREFRONT_SENDS = 'Your separate storefront must send the events itself';
+    var MAGENTO_CONSENT = 'Consent comes from Magento’s cookie notice: browse events are sent only after the visitor allows cookies.';
+    var STOREFRONT_CONSENT = 'Your separate storefront sends the browse events itself, so its own cookie consent banner decides when they are sent.';
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    // The rendered page as a document; its scripts do not run.
+    function page(name) {
+        var rendered = (window.smailyAdminPages || {})[name];
+
+        if (!rendered) {
+            throw new Error('Test/Js/build/' + name + '.js is missing; bin/test-js.sh renders it');
+        }
+
+        return {
+            doc: new DOMParser().parseFromString('<!doctype html><body>' + rendered.html, 'text/html'),
+            strings: rendered.strings
+        };
+    }
+
+    // The connection card with this label: its sub-line and pill.
+    function connection(doc, label) {
+        var cards = doc.querySelectorAll('.smaily-connection'),
+            i;
+
+        for (i = 0; i < cards.length; i++) {
+            if (cards[i].querySelector('.smaily-connection-label').textContent === label) {
+                return {
+                    sub: cards[i].querySelector('.smaily-connection-sub').textContent,
+                    pill: cards[i].querySelector('.smaily-pill').textContent.trim()
+                };
+            }
+        }
+
+        return null;
+    }
+
+    function consentNote(doc) {
+        var note = doc.getElementById('smaily-w-browse-consent');
+
+        return note ? note.textContent : null;
+    }
+
+    function run(locale) {
+        var magento = page('dashboard.' + locale),
+            storefront = page('dashboard-storefront.' + locale),
+            strings = magento.strings,
+            card;
+
+        log('# ' + locale);
+        if (locale !== 'en_US') {
+            check(locale + ': the page is translated', strings[STOREFRONT_SENDS] !== STOREFRONT_SENDS);
+        }
+
+        // PRO-3918: the Browse tracking card.
+        card = connection(magento.doc, strings['Browse tracking']);
+        check(locale + ', dashboard: without a Storefront URL, browse tracking reads as the script live on the storefront',
+            !!card && card.sub === strings[SCRIPT_LIVE]);
+        card = connection(storefront.doc, strings['Browse tracking']);
+        check(locale + ', dashboard: with a Storefront URL, browse tracking says the storefront must send the events itself',
+            !!card && card.sub === strings[STOREFRONT_SENDS]);
+
+        // PRO-3918: the consent note under the setting (Settings > Intelligence).
+        magento = page('intelligence-settings.' + locale);
+        storefront = page('intelligence-settings-storefront.' + locale);
+        if (locale !== 'en_US') {
+            check(locale + ': the consent note is translated',
+                storefront.strings[STOREFRONT_CONSENT] !== STOREFRONT_CONSENT);
+        }
+        check(locale + ', settings: without a Storefront URL, consent comes from Magento\'s cookie notice',
+            consentNote(magento.doc) === magento.strings[MAGENTO_CONSENT]);
+        check(locale + ', settings: with a Storefront URL and cookie restriction mode off, no Magento consent source is asked for',
+            consentNote(storefront.doc) === storefront.strings[STOREFRONT_CONSENT]
+            && storefront.doc.querySelectorAll('#smaily-w-browse-consent a').length === 0);
+    }
+
+    try {
+        run('en_US');
+        run('et_EE');
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    } catch (error) {
+        document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }
+    clearInterval(keepAlive);
+</script>
+</body>
+</html>

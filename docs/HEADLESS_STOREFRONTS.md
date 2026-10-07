@@ -361,13 +361,14 @@ Send events from the shopper's browser to
   must be configured to trust its forwarding header (see
   [On the Magento back end](#on-the-magento-back-end)).
 
-Two admin messages describe Magento's own theme, not the storefront: the
-Dashboard's **Browse tracking** shows **Script live on storefront** as soon
-as the setting is on, and with Magento's **Cookie Restriction Mode** off an
-admin notice and a note under the setting say the tracker sends no browse
-events. On a separate
-storefront the storefront's own consent banner decides; once its events
-reach the relay, mark that notice as read.
+With a Storefront URL saved, the admin describes the separate storefront,
+not Magento's own theme: the Dashboard's **Browse tracking** says **Your
+separate storefront must send the events itself** while the setting is on,
+and the note under the setting says the storefront's own cookie consent
+banner decides. No admin notice asks for Magento's **Cookie Restriction
+Mode** for a store view with a Storefront URL saved; one still comes for a
+store view without one where the mode is off, because its visitors browse
+Magento's own pages.
 
 ### 5. Newsletter consent at checkout
 

@@ -130,7 +130,13 @@ rendered reopened after it was finished: it checks that its summary lists a
 saved Storefront URL (and has no such row without one), and that a
 Storefront URL changed through **Edit credentials** while Campaign
 Intelligence is connected asks, beside the next step's Continue, for the
-catalog import again — unchanged, or not connected, it does not. To
+catalog import again — unchanged, or not connected, it does not.
+`Test/Js/dashboard.html` reads the rendered Dashboard
+(`dashboard/index.phtml`) and the Settings tab's consent note in both
+languages: with a Storefront URL saved, the Browse tracking card says the
+separate storefront must send the events itself and the note asks for no
+Magento consent source (with cookie restriction mode off); without one,
+both read as before. To
 check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.

@@ -27,7 +27,9 @@ use Smaily\Connect\Model\Logger\Logger;
  * - Browse tracking on without Magento cookie restriction mode -> minor
  *   notice once, again after the condition has cleared and come back: the
  *   tracker then has no consent source the server can see and sends
- *   nothing unless the store added the consent override (PRO-3664).
+ *   nothing unless the store added the consent override (PRO-3664). A
+ *   store view with a Storefront URL saved does not count: its separate
+ *   storefront's own consent banner decides (PRO-3918).
  *
  * The flags and the failed-row query are shared with the admin dashboard
  * (ViewModel\Adminhtml\DashboardData) so both surfaces tell the same story.
@@ -155,7 +157,7 @@ class HealthCheck
     private function checkConsentSource(): void
     {
         if (!$this->settings->isBrowseTrackingEnabled()
-            || $this->consentSource->isCookieRestrictionOnEverywhere()
+            || !$this->consentSource->isMissing()
         ) {
             $this->flagManager->deleteFlag(self::FLAG_CONSENT_SOURCE_NOTIFIED);
 

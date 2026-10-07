@@ -101,6 +101,16 @@ class DashboardData implements ArgumentInterface
     }
 
     /**
+     * Whether the target website sells on a separate storefront: a
+     * Storefront URL is saved, as Settings > Intelligence reads it
+     * (PRO-3918).
+     */
+    public function hasSeparateStorefront(): bool
+    {
+        return $this->config->getStorefrontUrl($this->websiteContext->getStoreId()) !== '';
+    }
+
+    /**
      * Whether Campaign Intelligence has refused this account outright
      * (contract §2) — a verdict, not an outage, so the dashboard must not
      * report it as one (PRO-2451). Same name, same meaning as on WizardData.

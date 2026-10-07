@@ -1058,7 +1058,14 @@ ungated. Only restriction mode is visible server-side
 (`Model\Engine\ConsentSource`: on in every store view): without it,
 `Cron\HealthCheck` posts a minor admin notice once (again after the
 condition clears and returns), and the browse toggle's note in
-`panel/intelligence.phtml` recommends the two consent sources.
+`panel/intelligence.phtml` recommends the two consent sources. A store
+view with a Storefront URL saved (`Config::getStorefrontUrl()`, the
+definition of a separate storefront everywhere in the admin) sells on a
+separate storefront whose own consent banner decides, so the notice skips
+it (`ConsentSource::isMissing()`), the note says so for the selected
+website, and the Dashboard's browse-tracking card says the storefront must
+send the events itself (`DashboardData::hasSeparateStorefront()`,
+PRO-3918).
 
 ### Profiling consent
 

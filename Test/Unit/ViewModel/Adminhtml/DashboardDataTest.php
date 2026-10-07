@@ -117,13 +117,25 @@ class DashboardDataTest extends TestCase
         self::assertSame('skipped', $rows[0]['status']);
     }
 
+    /**
+     * PRO-3918: a Storefront URL saved for the target website is a store
+     * with a separate storefront — read as Settings > Intelligence reads it.
+     */
+    public function testASavedStorefrontUrlIsASeparateStorefront(): void
+    {
+        self::assertTrue($this->createViewModel(false, storefrontUrl: 'https://shop.example.com')
+            ->hasSeparateStorefront());
+        self::assertFalse($this->createViewModel(false)->hasSeparateStorefront());
+    }
+
     private function createViewModel(
         bool $refused,
         bool $smailyVerified = true,
         int $failed = 0,
         bool $setupCompleted = true,
         bool $planBlocked = false,
-        ?DashboardStats $stats = null
+        ?DashboardStats $stats = null,
+        string $storefrontUrl = ''
     ): DashboardData {
         $engineSettings = $this->createMock(EngineSettings::class);
         $engineSettings->method('isConnected')->willReturn(true);
@@ -139,13 +151,18 @@ class DashboardDataTest extends TestCase
         // status: the one saved for the target website (PRO-3719).
         $websiteContext = $this->createMock(WebsiteContext::class);
         $websiteContext->method('getWebsiteId')->willReturn(4);
+        $websiteContext->method('getStoreId')->willReturn(7);
+        $config = $this->createMock(Config::class);
+        $config->method('getStorefrontUrl')->willReturnCallback(
+            static fn (int $storeId): string => $storeId === 7 ? $storefrontUrl : ''
+        );
         $verifiedCredentials = $this->createMock(VerifiedCredentials::class);
         $verifiedCredentials->method('isVerified')->willReturn(!$smailyVerified);
         $verifiedCredentials->method('isWebsiteVerified')->with(4)->willReturn($smailyVerified);
         $verifiedCredentials->method('isWebsitePlanBlocked')->with(4)->willReturn($planBlocked);
 
         return new DashboardData(
-            $this->createMock(Config::class),
+            $config,
             $engineSettings,
             $setupGuard,
             $queueHealth,

@@ -20,7 +20,9 @@ at 03:30; and the contract copy 1.12.0), PRO-3798,
 PRO-3802 (the pilot-day order needs it, so the pilot installs rc8),
 PRO-3913 (a reopened setup asks for the catalog import again after a
 Storefront URL change while Campaign Intelligence is connected; its summary
-lists the Storefront URL); the
+lists the Storefront URL), PRO-3918 (with a Storefront URL saved, the
+Dashboard's browse tracking and the consent note describe the separate
+storefront; no consent-source notice for it); the
 version check is now step one of INSTALLING and PILOT_CHECKLIST §0;
 HEADLESS_STOREFRONTS opens with a setup checklist (admin / back end /
 storefront developer), audited against the code.

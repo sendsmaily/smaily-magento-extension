@@ -149,7 +149,7 @@ class HealthCheckTest extends TestCase
     /**
      * @dataProvider consentSourcePresentProvider
      */
-    public function testNoConsentSourceNoticeWhenNothingIsMissing(bool $browseTracking, bool $restrictionOn): void
+    public function testNoConsentSourceNoticeWhenNothingIsMissing(bool $browseTracking, bool $sourcePresent): void
     {
         $flags = $this->createMock(FlagManager::class);
         $flags->expects(self::once())->method('deleteFlag')
@@ -157,7 +157,7 @@ class HealthCheckTest extends TestCase
         $notifier = $this->createMock(NotifierInterface::class);
         $notifier->expects(self::never())->method('addMinor');
 
-        $this->createConsentCron($browseTracking, $restrictionOn, $flags, $notifier)->execute();
+        $this->createConsentCron($browseTracking, $sourcePresent, $flags, $notifier)->execute();
     }
 
     /**
@@ -167,13 +167,15 @@ class HealthCheckTest extends TestCase
     {
         return [
             'browse tracking off' => [false, false],
-            'cookie restriction mode on' => [true, true],
+            // Cookie restriction mode on, or a Storefront URL saved where it
+            // is off (ConsentSourceTest, PRO-3918).
+            'a consent source in every store view' => [true, true],
         ];
     }
 
     private function createConsentCron(
         bool $browseTracking,
-        bool $restrictionOn,
+        bool $sourcePresent,
         FlagManager&MockObject $flags,
         NotifierInterface&MockObject $notifier
     ): HealthCheck {
@@ -189,7 +191,7 @@ class HealthCheckTest extends TestCase
         $queueHealth->method('failedSince')->willReturn(0);
 
         $consentSource = $this->createMock(ConsentSource::class);
-        $consentSource->method('isCookieRestrictionOnEverywhere')->willReturn($restrictionOn);
+        $consentSource->method('isMissing')->willReturn(!$sourcePresent);
 
         return new HealthCheck(
             $settings,

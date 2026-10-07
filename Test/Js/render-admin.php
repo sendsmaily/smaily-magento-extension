@@ -263,7 +263,8 @@ $pages = [
  * (PRO-3802). The setup-completed pages render the initial setup itself
  * (wizard/index.phtml) with its Connect and Intelligence steps, reopened after
  * it was finished: with a Storefront URL saved and Campaign Intelligence
- * connected, and with neither (PRO-3913).
+ * connected, and with neither (PRO-3913). Magento's cookie restriction mode
+ * is on, except where a Storefront URL is saved (PRO-3918).
  */
 $intelligenceViewModel = static fn (
     string $storefrontUrl,
@@ -424,11 +425,14 @@ $intelligenceViewModel = static fn (
     }
 
     /**
+     * Off where a Storefront URL is saved, so the -storefront pages show
+     * which consent note a separate storefront gets (PRO-3918).
+     *
      * @return bool
      */
     public function isCookieRestrictionOnEverywhere(): bool
     {
-        return true;
+        return $this->storefrontUrl === '';
     }
 
     /**
@@ -474,6 +478,8 @@ $intelligenceStrings = [
     'The catalog import had already finished, so there was nothing left to hold back.',
     'Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: go back to the Connect step, open Using a separate storefront? and enter the address as Storefront URL. Or connect now and press Hold back the import.',
     'Using a separate storefront? Set its Storefront URL under Settings > Connection > Using a separate storefront? before you connect, so that the catalog import sends the storefront\'s product links. Or connect now and press Hold back the import.',
+    'Consent comes from Magento’s cookie notice: browse events are sent only after the visitor allows cookies.',
+    'Your separate storefront sends the browse events itself, so its own cookie consent banner decides when they are sent.',
 ];
 $intelligenceTemplates = [
     $root . '/view/adminhtml/templates/panel/intelligence.phtml',
@@ -530,6 +536,155 @@ $setupCompleted = [
 $pages['setup-completed-storefront'] = $setupCompleted
     + ['viewModel' => $intelligenceViewModel('https://shop.example.com', true)];
 $pages['setup-completed'] = $setupCompleted + ['viewModel' => $intelligence];
+
+/*
+ * The Dashboard (view/adminhtml/templates/dashboard/index.phtml): set up,
+ * Smaily and Campaign Intelligence connected, browse tracking on, nothing
+ * failed. The -storefront page has a Storefront URL saved (PRO-3918).
+ */
+$dashboardViewModel = static fn (bool $separateStorefront): object => new class ($separateStorefront) {
+    /**
+     * @param bool $separateStorefront
+     */
+    public function __construct(private readonly bool $separateStorefront)
+    {
+    }
+
+    /**
+     * @return string
+     */
+    public function getVerdict(): string
+    {
+        return \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_OK;
+    }
+
+    /**
+     * @return int
+     */
+    public function getFailedLast24h(): int
+    {
+        return 0;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isEngineRefused(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isEngineDown(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSmailyPlanBlocked(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return array{sub: string, variant: string, label: string}
+     */
+    public function getEngineStateLabels(): array
+    {
+        return ['sub' => 'Connected (Pilot)', 'variant' => 'active', 'label' => 'On'];
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSmailyConnected(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSmailySubdomain(): string
+    {
+        return 'demo';
+    }
+
+    /**
+     * @return bool
+     */
+    public function isEngineConnected(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isBrowseTrackingEnabled(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasSeparateStorefront(): bool
+    {
+        return $this->separateStorefront;
+    }
+
+    /**
+     * @return int
+     */
+    public function getContactSyncsDelivered(): int
+    {
+        return 12;
+    }
+
+    /**
+     * @return int
+     */
+    public function getCatalogItemsDelivered(): int
+    {
+        return 340;
+    }
+
+    /**
+     * @return int
+     */
+    public function getQueuedToday(): int
+    {
+        return 0;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getRecentActivity(): array
+    {
+        return [];
+    }
+};
+$dashboardStrings = [
+    'Browse tracking',
+    'Script live on storefront',
+    'Your separate storefront must send the events itself',
+];
+$pages['dashboard'] = [
+    'template' => $root . '/view/adminhtml/templates/dashboard/index.phtml',
+    'viewModel' => $dashboardViewModel(false),
+    'strings' => $dashboardStrings,
+];
+$pages['dashboard-storefront'] = [
+    'template' => $root . '/view/adminhtml/templates/dashboard/index.phtml',
+    'viewModel' => $dashboardViewModel(true),
+    'strings' => $dashboardStrings,
+];
 
 $render = static function (string $template, object $block, Escaper $escaper): string {
     ob_start();

@@ -99,9 +99,7 @@ class FlushIngestQueue
             $response = $this->client->ingest($domain, $items);
         } catch (EngineTransportException $exception) {
             $this->recordBatchExchange($domain, $events, $items);
-            foreach ($events as $event) {
-                $this->queue->markFailed($event, $exception->getMessage());
-            }
+            $this->queue->markFailedMany($events, $exception->getMessage());
             $this->logger->info('Ingest batch rescheduled', [
                 'domain' => $domain,
                 'count' => count($events),
@@ -117,9 +115,7 @@ class FlushIngestQueue
             // Whole-batch 4xx: the request shape is wrong; retrying the same
             // rows cannot succeed.
             $this->recordBatchExchange($domain, $events, $items);
-            foreach ($events as $event) {
-                $this->queue->markFailed($event, $exception->getMessage(), true);
-            }
+            $this->queue->markFailedMany($events, $exception->getMessage(), true);
 
             return;
         }
@@ -132,7 +128,7 @@ class FlushIngestQueue
      * Keep on each row, for the Log's Details (PRO-1965), its own item in
      * the wrapper's shape and the engine's reply as it concerns that row:
      * a D6 errors[] entry names its row by index, so no row carries another
-     * row's error. Stored with the outcome markSent()/markFailed() records.
+     * row's error. Stored with the outcome markSent()/markFailedMany() records.
      *
      * @param IngestEvent[] $events indexed 0..n-1 in send order
      * @param array<int, array<string, mixed>> $items the same indexes
@@ -173,15 +169,19 @@ class FlushIngestQueue
         }
 
         $keyed = [];
+        $keyless = [];
         foreach ($events as $event) {
             $payload = $this->queue->decodePayload($event);
             $productId = trim((string)($payload['product_id'] ?? ''));
             if ($productId === '') {
-                // No removal key — terminal, observable skip (never silent).
-                $this->queue->markFailed($event, 'catalog/remove row has no product_id', true);
+                $keyless[] = $event;
                 continue;
             }
             $keyed[] = [$event, $productId];
+        }
+        if ($keyless) {
+            // No removal key — terminal, observable skip (never silent).
+            $this->queue->markFailedMany($keyless, 'catalog/remove row has no product_id', true);
         }
         if (!$keyed) {
             return;
@@ -195,9 +195,7 @@ class FlushIngestQueue
             $response = $this->client->catalogRemove($ids);
         } catch (EngineTransportException $exception) {
             $this->recordRemoveExchange($keyed);
-            foreach ($keyed as [$event]) {
-                $this->queue->markFailed($event, $exception->getMessage());
-            }
+            $this->queue->markFailedMany($this->keyedEvents($keyed), $exception->getMessage());
             $this->logger->info('Catalog remove batch rescheduled', [
                 'count' => count($keyed),
                 'error' => $exception->getMessage(),
@@ -205,7 +203,7 @@ class FlushIngestQueue
 
             return;
         } catch (EngineRequestException $exception) {
-            if ($this->releaseIfRefused(array_map(static fn (array $pair): IngestEvent => $pair[0], $keyed))) {
+            if ($this->releaseIfRefused($this->keyedEvents($keyed))) {
                 return;
             }
 
@@ -213,9 +211,7 @@ class FlushIngestQueue
             // resending, and a 404 means the engine predates §3b — the
             // parked row can be retried from the Log once it has it.
             $this->recordRemoveExchange($keyed);
-            foreach ($keyed as [$event]) {
-                $this->queue->markFailed($event, $exception->getMessage(), true);
-            }
+            $this->queue->markFailedMany($this->keyedEvents($keyed), $exception->getMessage(), true);
 
             return;
         }
@@ -248,6 +244,15 @@ class FlushIngestQueue
         foreach ($keyed as [$event, $productId]) {
             $this->queue->recordExchange($event, ['product_ids' => [$productId]], $exchange['response']);
         }
+    }
+
+    /**
+     * @param array<int, array{0: IngestEvent, 1: string}> $keyed
+     * @return IngestEvent[]
+     */
+    private function keyedEvents(array $keyed): array
+    {
+        return array_map(static fn (array $pair): IngestEvent => $pair[0], $keyed);
     }
 
     /**
@@ -287,15 +292,19 @@ class FlushIngestQueue
         }
 
         $confirmedItems = [];
+        $failed = [];
         foreach ($events as $index => $event) {
             if (isset($errorsByIndex[$index])) {
-                // Per-item validation error: terminal, the data won't improve
-                // by resending the identical payload.
-                $this->queue->markFailed($event, $errorsByIndex[$index], true);
+                $failed[$errorsByIndex[$index]][] = $event;
             } else {
                 $this->queue->markSent($event);
                 $confirmedItems[] = $items[$index];
             }
+        }
+        // Per-item validation error: terminal, the data won't improve by
+        // resending the identical payload. One write per reason (PRO-3962).
+        foreach ($failed as $reason => $group) {
+            $this->queue->markFailedMany($group, (string)$reason, true);
         }
         $this->optOutReplay->afterConfirmed($domain, $confirmedItems);
 

@@ -4,6 +4,10 @@
 
 The package version is currently `3.0.0-rc10` — the tenth release-candidate cut of everything below. Release candidates are GitHub pre-releases for pilot stores, tagged in this repository from 3.0.0-rc9 on; composer installs one only when a store asks for that version or for a minimum stability of `RC`, and still resolves 2.8.1 as the newest stable release.
 
+**Changes since 3.0.0-rc10**
+
+- The extension's log (`var/log/smaily_connect.log`) records Campaign Intelligence rows it gives up on as it records contact syncs and automations since 3.0.0-rc10: when the engine refuses a whole batch, or a batch fails for one reason, the rows it parks get one line, "Ingest events failed permanently", with their number and ids, instead of one "Ingest event failed permanently" line per row. A row given up on alone now gets the same line, with a number of 1 and its id — "Ingest events failed permanently", or "Queue events failed permanently" for a contact sync or an automation — instead of "Ingest event failed permanently" or "Queue event failed permanently". **Marketing > Smaily Connect > Log** shows each row's status, attempts and error as before.
+
 **Changes since 3.0.0-rc9**
 
 - An order created in the admin under **Sales > Orders > Create New Order**, or placed with **Login as Customer**, no longer counts as an order through the store's own pages when the extension decides whether to open **Using a separate storefront?** by itself. Before, on a store whose shoppers buy only on a separate storefront, one such order by the staff kept the Storefront URL field collapsed for 30 days. A shopper's order on the store's own pages, and an order through Magento's API, count as before.

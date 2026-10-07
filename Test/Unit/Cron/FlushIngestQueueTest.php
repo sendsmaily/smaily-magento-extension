@@ -70,9 +70,11 @@ class FlushIngestQueueTest extends TestCase
             }
         );
         $failed = [];
-        $this->queue->method('markFailed')->willReturnCallback(
-            static function (IngestEvent $event, string $error, bool $terminal = false) use (&$failed): void {
-                $failed[(int)$event->getId()] = [$error, $terminal];
+        $this->queue->method('markFailedMany')->willReturnCallback(
+            static function (array $events, string $error, bool $terminal = false) use (&$failed): void {
+                foreach ($events as $event) {
+                    $failed[(int)$event->getId()] = [$error, $terminal];
+                }
             }
         );
 
@@ -91,8 +93,8 @@ class FlushIngestQueueTest extends TestCase
         $this->client->method('ingest')
             ->willThrowException(new EngineTransportException('engine down', 503));
 
-        $this->queue->expects(self::once())->method('markFailed')
-            ->with($event, 'engine down');
+        $this->queue->expects(self::once())->method('markFailedMany')
+            ->with([$event], 'engine down');
         $this->queue->expects(self::never())->method('markSent');
 
         $this->createCron()->execute();
@@ -105,8 +107,8 @@ class FlushIngestQueueTest extends TestCase
         $this->client->method('ingest')
             ->willThrowException(new EngineRequestException('bad wrapper', 400));
 
-        $this->queue->expects(self::once())->method('markFailed')
-            ->with($event, 'bad wrapper', true);
+        $this->queue->expects(self::once())->method('markFailedMany')
+            ->with([$event], 'bad wrapper', true);
 
         $this->createCron()->execute();
     }
@@ -143,7 +145,7 @@ class FlushIngestQueueTest extends TestCase
         );
 
         $this->queue->expects(self::once())->method('release')->with([$event]);
-        $this->queue->expects(self::never())->method('markFailed');
+        $this->queue->expects(self::never())->method('markFailedMany');
         $this->queue->expects(self::never())->method('markSent');
         // catalog is the first domain: customers/orders/browse/catalog_remove
         // are never even claimed once the refusal is known.
@@ -245,7 +247,7 @@ class FlushIngestQueueTest extends TestCase
                 $sent[(int)$event->getId()] = (array)json_decode((string)$response, true);
             }
         );
-        $this->queue->expects(self::never())->method('markFailed');
+        $this->queue->expects(self::never())->method('markFailedMany');
 
         $this->createCron()->execute();
 
@@ -260,8 +262,8 @@ class FlushIngestQueueTest extends TestCase
         $this->stubClaims([Client::DOMAIN_CATALOG_REMOVE => [$keyless]]);
 
         $this->client->expects(self::never())->method('catalogRemove');
-        $this->queue->expects(self::once())->method('markFailed')
-            ->with($keyless, 'catalog/remove row has no product_id', true);
+        $this->queue->expects(self::once())->method('markFailedMany')
+            ->with([$keyless], 'catalog/remove row has no product_id', true);
 
         $this->createCron()->execute();
     }
@@ -274,8 +276,8 @@ class FlushIngestQueueTest extends TestCase
         $this->client->method('catalogRemove')
             ->willThrowException(new EngineTransportException('engine down', 503));
 
-        $this->queue->expects(self::once())->method('markFailed')
-            ->with($event, 'engine down');
+        $this->queue->expects(self::once())->method('markFailedMany')
+            ->with([$event], 'engine down');
         $this->queue->expects(self::never())->method('markSent');
 
         $this->createCron()->execute();
@@ -291,8 +293,8 @@ class FlushIngestQueueTest extends TestCase
         $this->client->method('catalogRemove')
             ->willThrowException(new EngineRequestException('HTTP 404: not found', 404));
 
-        $this->queue->expects(self::once())->method('markFailed')
-            ->with($event, 'HTTP 404: not found', true);
+        $this->queue->expects(self::once())->method('markFailedMany')
+            ->with([$event], 'HTTP 404: not found', true);
 
         $this->createCron()->execute();
     }

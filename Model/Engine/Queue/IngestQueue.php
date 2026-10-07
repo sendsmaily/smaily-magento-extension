@@ -17,6 +17,7 @@ use Smaily\Connect\Model\Log\Resend;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\Erasure;
 use Smaily\Connect\Model\Queue\PayloadDecoder;
+use Smaily\Connect\Model\Queue\RowWriter;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent\CollectionFactory;
 
@@ -33,6 +34,24 @@ class IngestQueue
     public const MAX_ATTEMPTS = 5;
     public const BACKOFF_SECONDS = [60, 300, 900, 3600, 21600];
 
+    /**
+     * The columns markFailedMany() writes: a failure's outcome and its
+     * exchange, plus the claim and timestamp columns as the row model holds
+     * them — what the model's own save in markFailed() writes there too, so
+     * a row failed in a batch ends exactly like one failed alone.
+     */
+    private const FAILURE_COLUMNS = [
+        'attempts',
+        'status',
+        'next_retry_at',
+        'last_error',
+        'sent_payload',
+        'last_response',
+        'claim_token',
+        'claimed_at',
+        'updated_at',
+    ];
+
     public function __construct(
         private readonly IngestEventFactory $eventFactory,
         private readonly IngestEventResource $eventResource,
@@ -42,7 +61,8 @@ class IngestQueue
         private readonly PayloadDecoder $payloadDecoder,
         private readonly DateTime $dateTime,
         private readonly ResourceConnection $resourceConnection,
-        private readonly Logger $logger
+        private readonly Logger $logger,
+        private readonly RowWriter $rowWriter
     ) {
     }
 
@@ -362,23 +382,46 @@ class IngestQueue
 
     public function markFailed(IngestEvent $event, string $error, bool $terminal = false): void
     {
-        $attempts = $event->getAttempts() + 1;
-        $exhausted = $terminal || $attempts >= self::MAX_ATTEMPTS;
-
-        $event->addData([
-            'attempts' => $attempts,
-            'status' => $exhausted ? IngestEvent::STATUS_FAILED : IngestEvent::STATUS_PENDING,
-            'next_retry_at' => $exhausted ? null : $this->nextRetryAt($attempts),
-            'last_error' => mb_substr($error, 0, 60000),
-        ]);
+        $exhausted = $this->applyFailure($event, $error, $terminal);
         $this->eventResource->save($event);
 
         if ($exhausted) {
-            $this->logger->error('Ingest event failed permanently', [
-                'id' => $event->getId(),
-                'domain' => $event->getDomain(),
-                'error' => $error,
-            ]);
+            $this->logParked([$event], $error);
+        }
+    }
+
+    /**
+     * Record one failure that many rows share — the engine's one answer to
+     * a batch, or no answer at all (PRO-3962, as EventQueue::markFailedMany()
+     * for the marketing queue): each row ends exactly as markFailed() leaves
+     * it, but in one UPDATE per RowWriter::CHUNK rows, and the rows it parks
+     * get one error-log line with their count instead of a line each. Each
+     * row keeps its own step on the retry ladder (attempts, status, next
+     * retry follow its own attempt count) and the exchange recorded on it.
+     * A single row goes through markFailed().
+     *
+     * @param IngestEvent[] $events
+     */
+    public function markFailedMany(array $events, string $error, bool $terminal = false): void
+    {
+        if (count($events) < 2) {
+            foreach ($events as $event) {
+                $this->markFailed($event, $error, $terminal);
+            }
+
+            return;
+        }
+
+        $parked = [];
+        foreach ($events as $event) {
+            if ($this->applyFailure($event, $error, $terminal)) {
+                $parked[] = $event;
+            }
+        }
+        $this->rowWriter->write(IngestEventResource::TABLE_NAME, $events, self::FAILURE_COLUMNS);
+
+        if ($parked) {
+            $this->logParked($parked, $error);
         }
     }
 
@@ -465,6 +508,45 @@ class IngestQueue
             'status' => IngestEvent::STATUS_PENDING,
             'attempts' => 0,
         ];
+    }
+
+    /**
+     * Set one failed attempt's outcome on the row model, unsaved.
+     *
+     * @return bool whether the row is parked as failed
+     */
+    private function applyFailure(IngestEvent $event, string $error, bool $terminal): bool
+    {
+        $attempts = $event->getAttempts() + 1;
+        $exhausted = $terminal || $attempts >= self::MAX_ATTEMPTS;
+
+        $event->addData([
+            'attempts' => $attempts,
+            'status' => $exhausted ? IngestEvent::STATUS_FAILED : IngestEvent::STATUS_PENDING,
+            'next_retry_at' => $exhausted ? null : $this->nextRetryAt($attempts),
+            'last_error' => mb_substr($error, 0, 60000),
+        ]);
+
+        return $exhausted;
+    }
+
+    /**
+     * One error-log line for the rows one failure parks — a single row's
+     * line has the same wording and fields as a group's (PRO-3962).
+     *
+     * @param IngestEvent[] $parked
+     */
+    private function logParked(array $parked, string $error): void
+    {
+        $this->logger->error('Ingest events failed permanently', [
+            'count' => count($parked),
+            'domain' => implode(', ', array_unique(array_map(
+                static fn (IngestEvent $event): string => $event->getDomain(),
+                $parked
+            ))),
+            'ids' => $this->ids($parked),
+            'error' => $error,
+        ]);
     }
 
     /**

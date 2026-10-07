@@ -21,6 +21,7 @@ use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventFactory;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\PayloadDecoder;
+use Smaily\Connect\Model\Queue\RowWriter;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Model\ResourceModel\Queue\Event\CollectionFactory;
 
@@ -61,7 +62,8 @@ class EventQueueTest extends TestCase
             new PayloadDecoder(new Json()),
             $dateTime,
             $this->createMock(ResourceConnection::class),
-            $this->createMock(Logger::class)
+            $this->createMock(Logger::class),
+            new RowWriter($this->createMock(ResourceConnection::class))
         );
     }
 
@@ -304,6 +306,23 @@ class EventQueueTest extends TestCase
     }
 
     /**
+     * PRO-3962: a row parked alone is logged in the words and fields of a
+     * parked group — one line with the count and the ids.
+     */
+    public function testARowParkedAloneIsLoggedLikeAGroup(): void
+    {
+        $row = $this->row(['id' => 7, 'attempts' => 0]);
+        $logger = $this->createMock(Logger::class);
+        $logger->expects(self::once())->method('error')->with(
+            'Queue events failed permanently',
+            ['count' => 1, 'event_type' => 'contact.sync', 'ids' => [7], 'error' => 'permanent_http_404: gone']
+        );
+
+        $this->queue($this->createMock(ResourceConnection::class), $logger)
+            ->markFailed($row, 'permanent_http_404: gone', terminal: true);
+    }
+
+    /**
      * A queue row model with real data handling and no database behind it.
      *
      * @param array<string, mixed> $data
@@ -327,7 +346,8 @@ class EventQueueTest extends TestCase
             new PayloadDecoder(new Json()),
             $this->dateTime,
             $resource,
-            $logger
+            $logger,
+            new RowWriter($resource)
         );
     }
 }

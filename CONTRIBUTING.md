@@ -24,6 +24,10 @@ removable. Revisit it when the Magento floor (2.4.4+) is raised, not before.
 The MSI packages themselves are listed under `suggest` — they are wired only
 through `etc/di.xml` plugin declarations, never named in PHP.
 
+The maintainers' working papers — the pilot checklist, the backlog, the
+multi-website RFC, the admin UI spec and the audits — are in
+[docs/internal/](docs/internal/README.md); they are not merchant documentation.
+
 ## Development environment
 
 A Docker sandbox with Magento 2.4.8 + sample data and the module mounted at

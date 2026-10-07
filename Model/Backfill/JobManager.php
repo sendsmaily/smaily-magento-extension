@@ -120,7 +120,7 @@ class JobManager
      * page every run) counts as stalled, so it cannot hold back what waits
      * for imports to finish forever.
      */
-    public function isInProgress(string $jobType, string $target, int $websiteId, int $stalledAfterSeconds): bool
+    public function isActiveAndMoving(string $jobType, string $target, int $websiteId, int $stalledAfterSeconds): bool
     {
         if ($this->findActive($jobType, $target, $websiteId) === null) {
             return false;

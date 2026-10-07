@@ -25,6 +25,9 @@ class SchemaInstaller
     /** Magento_Quote's declarative schema, the source of the cart mirrors. */
     private const QUOTE_SCHEMA = 'vendor/magento/module-quote/etc/db_schema.xml';
 
+    /** Magento_Catalog's declarative schema, the source of the product tables. */
+    private const CATALOG_SCHEMA = 'vendor/magento/module-catalog/etc/db_schema.xml';
+
     public function __construct(
         private readonly AdapterInterface $connection
     ) {
@@ -91,6 +94,24 @@ class SchemaInstaller
         $this->connection->query(
             'ALTER TABLE `quote` ADD `reminder_date` TIMESTAMP NULL, ADD `is_sent` SMALLINT NULL'
         );
+    }
+
+    /**
+     * The core catalog_product_entity and catalog_product_entity_int tables
+     * as Magento ships them (see createQuote()): the product rows and the
+     * int attribute values (status, visibility) per store view, for a real
+     * product collection's select.
+     */
+    public function createCatalogProductTables(): void
+    {
+        $this->createMagentoTable(self::CATALOG_SCHEMA, 'catalog_product_entity');
+        $this->createMagentoTable(self::CATALOG_SCHEMA, 'catalog_product_entity_int');
+    }
+
+    public function dropCatalogProductTables(): void
+    {
+        $this->connection->query('DROP TABLE IF EXISTS `catalog_product_entity_int`');
+        $this->connection->query('DROP TABLE IF EXISTS `catalog_product_entity`');
     }
 
     /**

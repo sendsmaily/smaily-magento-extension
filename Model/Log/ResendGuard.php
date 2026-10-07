@@ -9,7 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Log;
 
 use Magento\Framework\Phrase;
-use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\CatalogManifest;
 use Smaily\Connect\Model\Privacy\Erasure;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
@@ -82,12 +82,10 @@ class ResendGuard
         $automation = [];
 
         foreach ($rows as $id => $row) {
-            $reason = $this->permanentReason($row);
-            if ($source === Collection::SOURCE_INTELLIGENCE
-                && (string)($row['type'] ?? '') === Client::DOMAIN_CATALOG_MANIFEST
-            ) {
-                $reason = self::REASON_NIGHTLY;
-            }
+            $reason = $source === Collection::SOURCE_INTELLIGENCE
+                && (string)($row['type'] ?? '') === CatalogManifest::DOMAIN
+                ? self::REASON_NIGHTLY
+                : $this->permanentReason($row);
             if ($reason !== '') {
                 $refused[$id] = $reason;
                 continue;

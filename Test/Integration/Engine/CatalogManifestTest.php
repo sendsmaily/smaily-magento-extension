@@ -9,7 +9,6 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Integration\Engine;
 
 use Magento\Catalog\Model\Product;
-use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\CatalogIngest;
@@ -30,8 +29,9 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
  * PRO-3854 against a real MySQL: the nightly catalog manifest's waits read
  * the real ingest queue and import job tables, and each night that sends
  * leaves one row in the real Log, which is never sent again. The product
- * list itself comes from a stubbed catalog page (the harness has no EAV
- * catalog); its key and stock parity with the catalog sync is unit-tested
+ * list itself comes from a stubbed catalog page here; the page's own
+ * select runs against real product tables in CatalogProductLoaderTest, and
+ * its key and stock parity with the catalog sync is unit-tested
  * (CatalogPayloadBuilderTest) and checked on the sandbox catalog.
  */
 class CatalogManifestTest extends IntegrationTestCase
@@ -66,7 +66,7 @@ class CatalogManifestTest extends IntegrationTestCase
         $rows = $this->fetchAll(IngestEventResource::TABLE_NAME);
         self::assertCount(1, $rows);
         $row = $rows[0];
-        self::assertSame(Client::DOMAIN_CATALOG_MANIFEST, $row['domain']);
+        self::assertSame(CatalogManifest::DOMAIN, $row['domain']);
         self::assertSame(IngestEvent::STATUS_SENT, $row['status']);
         self::assertSame(['products' => 3, 'in_stock' => 2], json_decode((string)$row['payload'], true));
         self::assertSame(['products' => $this->sent[0]], json_decode((string)$row['sent_payload'], true));
@@ -77,7 +77,7 @@ class CatalogManifestTest extends IntegrationTestCase
 
         $log = $this->objectManager->create(Collection::class)->getItems();
         self::assertCount(1, $log);
-        self::assertSame(Client::DOMAIN_CATALOG_MANIFEST, reset($log)->getData('type'));
+        self::assertSame(CatalogManifest::DOMAIN, reset($log)->getData('type'));
     }
 
     public function testAFailedNightIsParkedAndNeverSentAgain(): void
@@ -216,26 +216,9 @@ class CatalogManifestTest extends IntegrationTestCase
     private function catalogPages(): CatalogProductLoader
     {
         $loader = $this->createMock(CatalogProductLoader::class);
-        $loader->method('loadForManifest')->willReturnCallback(function (callable $filter): array {
-            $cursor = 0;
-            $pageSize = 0;
-            $collection = $this->createMock(ProductCollection::class);
-            $collection->method('addFieldToFilter')->willReturnCallback(
-                function (string $field, array $condition) use (&$cursor, $collection): ProductCollection {
-                    $cursor = (int)$condition['gt'];
-                    return $collection;
-                }
-            );
-            $collection->method('setPageSize')->willReturnCallback(
-                function (int $size) use (&$pageSize, $collection): ProductCollection {
-                    $pageSize = $size;
-                    return $collection;
-                }
-            );
-            $filter($collection);
-
+        $loader->method('loadForManifest')->willReturnCallback(function (int $afterId, int $pageSize): array {
             $page = [];
-            for ($id = $cursor + 1; $id <= min($cursor + $pageSize, $this->catalogSize); $id++) {
+            for ($id = $afterId + 1; $id <= min($afterId + $pageSize, $this->catalogSize); $id++) {
                 $page[] = $this->product($id);
             }
 

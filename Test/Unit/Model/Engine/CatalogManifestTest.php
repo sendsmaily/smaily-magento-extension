@@ -9,7 +9,6 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Unit\Model\Engine;
 
 use Magento\Catalog\Model\Product;
-use Magento\Catalog\Model\ResourceModel\Product\Collection;
 use Magento\CatalogInventory\Model\StockRegistryStorage;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -85,7 +84,7 @@ class CatalogManifestTest extends TestCase
             ['sku' => 'SKU-3', 'in_stock' => true],
         ])->willReturn(['ok' => true]);
         $this->queue->expects(self::once())->method('newEvent')
-            ->with(Client::DOMAIN_CATALOG_MANIFEST, ['products' => 2, 'in_stock' => 2])
+            ->with(CatalogManifest::DOMAIN, ['products' => 2, 'in_stock' => 2])
             ->willReturn($this->event);
         $this->queue->expects(self::once())->method('recordExchange')->with(
             $this->event,
@@ -137,7 +136,7 @@ class CatalogManifestTest extends TestCase
         $this->builder->method('manifestItem')->willReturn(['sku' => 'SKU', 'in_stock' => true]);
         $this->client->expects(self::never())->method('catalogManifest');
         $this->queue->expects(self::once())->method('newEvent')
-            ->with(Client::DOMAIN_CATALOG_MANIFEST, ['limit' => 50000])
+            ->with(CatalogManifest::DOMAIN, ['limit' => 50000])
             ->willReturn($this->event);
         $this->queue->expects(self::once())->method('markFailed')
             ->with($this->event, CatalogManifest::TOO_MANY_PRODUCTS, true);
@@ -184,7 +183,7 @@ class CatalogManifestTest extends TestCase
     ): void {
         $this->settings = $this->createMock(Settings::class);
         $this->settings->method('isSendingAllowed')->willReturn($sendingAllowed);
-        $this->jobManager->method('isInProgress')
+        $this->jobManager->method('isActiveAndMoving')
             ->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID, CatalogManifest::STALLED_IMPORT_SECONDS)
             ->willReturn($importInProgress);
         if ($pendingDomain !== '') {
@@ -229,18 +228,14 @@ class CatalogManifestTest extends TestCase
     private function catalog(array $pages): void
     {
         $pages[] = [];
-        $this->loader->method('loadForManifest')->willReturnCallback(function (callable $filter) use (&$pages): array {
-            $collection = $this->createMock(Collection::class);
-            $collection->method('addFieldToFilter')->willReturnCallback(
-                function (string $field, array $condition) use ($collection): Collection {
-                    $this->cursors[] = $condition['gt'];
-                    return $collection;
-                }
-            );
-            $filter($collection);
+        $this->loader->method('loadForManifest')->willReturnCallback(
+            function (int $afterId, int $pageSize) use (&$pages): array {
+                $this->cursors[] = $afterId;
+                self::assertSame(1000, $pageSize);
 
-            return array_shift($pages);
-        });
+                return array_shift($pages);
+            }
+        );
     }
 
     private function product(int $id, bool $disabled = false): Product&MockObject

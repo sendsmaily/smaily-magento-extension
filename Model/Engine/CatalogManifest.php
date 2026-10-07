@@ -8,7 +8,6 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Engine;
 
-use Magento\Catalog\Model\ResourceModel\Product\Collection;
 use Magento\CatalogInventory\Model\StockRegistryStorage;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
@@ -45,6 +44,13 @@ use Smaily\Connect\Model\Logger\Logger;
  */
 class CatalogManifest
 {
+    /**
+     * The Log row of a nightly catalog manifest (§3c, PRO-3854). Never
+     * queued for sending: send() sends the list itself and writes the row
+     * with the outcome, so no flusher claims this domain.
+     */
+    public const DOMAIN = 'catalog_manifest';
+
     /** Contract §3c: at most this many items, in one request. */
     public const MAX_PRODUCTS = 50000;
 
@@ -93,7 +99,7 @@ class CatalogManifest
         }
 
         try {
-            $products = $this->products(self::MAX_PRODUCTS + 1);
+            $products = $this->products();
         } catch (\Throwable $exception) {
             $this->logger->error('Nightly catalog manifest not sent: building the product list failed', [
                 'error' => $exception->getMessage(),
@@ -104,7 +110,7 @@ class CatalogManifest
 
         if (count($products) > self::MAX_PRODUCTS) {
             $this->queue->markFailed(
-                $this->queue->newEvent(Client::DOMAIN_CATALOG_MANIFEST, ['limit' => self::MAX_PRODUCTS]),
+                $this->queue->newEvent(self::DOMAIN, ['limit' => self::MAX_PRODUCTS]),
                 self::TOO_MANY_PRODUCTS,
                 true
             );
@@ -112,21 +118,23 @@ class CatalogManifest
             return;
         }
 
-        $event = $this->queue->newEvent(Client::DOMAIN_CATALOG_MANIFEST, [
+        $event = $this->queue->newEvent(self::DOMAIN, [
             'products' => count($products),
             'in_stock' => count(array_filter(array_column($products, 'in_stock'))),
         ]);
+        $error = null;
         try {
             $this->client->catalogManifest($products);
         } catch (EngineException $exception) {
-            $this->recordExchange($event, $products);
-            $this->queue->markFailed($event, $exception->getMessage(), true);
-
-            return;
+            $error = $exception->getMessage();
         }
 
         $this->recordExchange($event, $products);
-        $this->queue->markSent($event);
+        if ($error === null) {
+            $this->queue->markSent($event);
+        } else {
+            $this->queue->markFailed($event, $error, true);
+        }
     }
 
     /**
@@ -137,7 +145,7 @@ class CatalogManifest
         if (!$this->settings->isSendingAllowed()) {
             return 'Campaign Intelligence is not connected, or refuses this store';
         }
-        if ($this->jobManager->isInProgress(
+        if ($this->jobManager->isActiveAndMoving(
             Job::TYPE_CATALOG,
             Job::TARGET_ENGINE,
             Job::ENGINE_WEBSITE_ID,
@@ -157,20 +165,17 @@ class CatalogManifest
     /**
      * The list, read in pages by entity id until a page comes back empty —
      * an early stop would leave products out, which the engine reads as
-     * deleted. Stops once it holds $limit items.
+     * deleted. Stops one item past MAX_PRODUCTS, enough to tell the store
+     * is over the limit.
      *
      * @return array<int, array{sku: string, in_stock: bool}>
      */
-    private function products(int $limit): array
+    private function products(): array
     {
         $products = [];
         $cursor = 0;
         do {
-            $page = $this->productLoader->loadForManifest(static function (Collection $collection) use ($cursor): void {
-                $collection->addFieldToFilter('entity_id', ['gt' => $cursor]);
-                $collection->setOrder('entity_id', 'ASC');
-                $collection->setPageSize(self::PAGE_SIZE);
-            });
+            $page = $this->productLoader->loadForManifest($cursor, self::PAGE_SIZE);
             foreach ($page as $product) {
                 $cursor = max($cursor, (int)$product->getId());
                 $item = $this->payloadBuilder->manifestItem($product);
@@ -178,7 +183,7 @@ class CatalogManifest
                     continue;
                 }
                 $products[] = $item;
-                if (count($products) >= $limit) {
+                if (count($products) > self::MAX_PRODUCTS) {
                     return $products;
                 }
             }

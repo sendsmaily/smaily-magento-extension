@@ -198,7 +198,7 @@ class JobManagerTest extends IntegrationTestCase
 
     private function inProgress(): bool
     {
-        return $this->jobManager->isInProgress(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0, 3600);
+        return $this->jobManager->isActiveAndMoving(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0, 3600);
     }
 
     private function movedAt(Job $job, int $offsetSeconds): void

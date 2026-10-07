@@ -8,7 +8,6 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Backfill;
 
-use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\ResourceModel\Product\Collection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Smaily\Connect\Model\Engine\CatalogIngest;
@@ -56,7 +55,7 @@ class EngineCatalogProcessor implements ProcessorInterface
         $deadline = microtime(true) + self::TIME_BUDGET_SECONDS;
         do {
             $cursor = (int)$job->getCursorValue();
-            $products = $this->loadPage($cursor);
+            $products = $this->productLoader->loadPage($cursor, self::PAGE_SIZE);
             if (!$products) {
                 $this->jobManager->complete($job);
 
@@ -86,23 +85,11 @@ class EngineCatalogProcessor implements ProcessorInterface
         } while (microtime(true) < $deadline);
     }
 
-    /**
-     * @return Product[]
-     */
-    private function loadPage(int $cursor): array
-    {
-        return $this->productLoader->load(static function (Collection $collection) use ($cursor): void {
-            $collection->addFieldToFilter('entity_id', ['gt' => $cursor]);
-            $collection->setOrder('entity_id', 'ASC');
-            $collection->setPageSize(self::PAGE_SIZE);
-        });
-    }
-
     private function countProducts(): int
     {
         $collection = $this->productCollectionFactory->create();
         if ($collection instanceof Collection) {
-            // Same canonical scope as loadPage() (PRO-1353) — otherwise the
+            // Same canonical scope as the page (PRO-1353) — otherwise the
             // progress-bar total can disagree with the scoped pages on
             // multi-store installs.
             $collection->setStoreId($this->payloadBuilder->canonicalStoreId());

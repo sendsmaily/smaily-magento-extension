@@ -10,6 +10,7 @@ namespace Smaily\Connect\Test\Unit\Model\Log;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\Engine\CatalogManifest;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Log\ResendGuard;
 use Smaily\Connect\Model\Privacy\Erasure;
@@ -184,8 +185,8 @@ class ResendGuardTest extends TestCase
     public function testANightlyCatalogManifestRowIsNeverSentAgain(): void
     {
         $refused = $this->guard->refusalReasons(Collection::SOURCE_INTELLIGENCE, [
-            5 => ['type' => Client::DOMAIN_CATALOG_MANIFEST, 'entity_id' => null, 'status' => Event::STATUS_FAILED],
-            6 => ['type' => Client::DOMAIN_CATALOG_MANIFEST, 'entity_id' => null, 'status' => Event::STATUS_SENT],
+            5 => ['type' => CatalogManifest::DOMAIN, 'entity_id' => null, 'status' => Event::STATUS_FAILED],
+            6 => ['type' => CatalogManifest::DOMAIN, 'entity_id' => null, 'status' => Event::STATUS_SENT],
             7 => ['type' => Client::DOMAIN_CATALOG, 'entity_id' => '7', 'status' => Event::STATUS_FAILED],
         ]);
 

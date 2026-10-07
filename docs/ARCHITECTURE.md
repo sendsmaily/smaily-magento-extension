@@ -354,12 +354,17 @@ below.
   differs and counts products it does not have; its guard removes nothing
   for an empty list or one that would remove more than 20% of the live
   catalog. *The list* is every product the catalog import sends a row for
-  — `CatalogProductLoader::loadForManifest()` pages the same unfiltered
-  collection at the same canonical scope as `load()`, every type and
-  visibility, configurable parents and their variants each under its own
-  key — less the products disabled at that scope (owner decision
-  2026-10-07, as in the WooCommerce plugin: the engine stops recommending
-  them). Each item is `CatalogPayloadBuilder::manifestItem()`: the row's
+  — `CatalogProductLoader::loadForManifest()` pages the same collection
+  at the same canonical scope as the import's `loadPage()` (one page
+  helper for both), every type and visibility, configurable parents and
+  their variants each under its own key — less the products disabled at
+  that scope (owner decision 2026-10-07, as in the WooCommerce plugin: the
+  engine stops recommending them). The page filters on `status` in SQL,
+  added after `setStoreId()`, so it reads the canonical store view's
+  value, falling back to the default one;
+  `Test/Integration/Engine/CatalogProductLoaderTest` runs that select on
+  Magento's own product tables. `manifestItem()` still returns null for a
+  disabled product, as a guard. Each item is `CatalogPayloadBuilder::manifestItem()`: the row's
   own `sku()` (the SKU, `mag-<entity_id>` when empty) and its `in_stock`
   as the sync sends it — a product that left the sellable set (not
   visible on its own, as a configurable's variant) is sent by the sync as
@@ -384,7 +389,7 @@ below.
   *Not sent* — logged at info level only, no Log row — while sending is
   not allowed (`Settings::isSendingAllowed()`: disconnected, or the
   remembered refusal), while the catalog import is queued or running
-  (`JobManager::isInProgress()`), while undelivered (pending or sending)
+  (`JobManager::isActiveAndMoving()`), while undelivered (pending or sending)
   `catalog`, `catalog_remove` or `catalog_changed` rows wait — a parked
   `failed` row does not hold it back, healing it is the list's job — or
   when building the list throws. The import wait is bounded (Woo
@@ -483,7 +488,7 @@ below.
   the default website, the same "default scope" concept as `Engine\Client`'s
   base-URL fallback and `Multilingual\AccountResolver`'s default account),
   never Magento's implicit current-store resolver: the backfill collection
-  (`CatalogProductLoader`, which loads `EngineCatalogProcessor::loadPage()`
+  (`CatalogProductLoader`, which loads the import's page, `loadPage()`,
   and the stock-change batch) calls `setStoreId()` with it
   explicitly before `addUrlRewrite()`, and the live path
   (`ProductSaveAfter`/`ProductDeleteBefore`) re-scopes the product to it via

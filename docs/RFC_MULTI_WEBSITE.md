@@ -241,7 +241,7 @@ re-scoped per the entity's own website(s):
   `storesByLanguage()` filtering to `$product->getWebsiteIds()`; price and
   URL follow one website per product since PRO-1458, and now resolve per
   that row's own website's canonical store). Backfill
-  (`EngineCatalogProcessor::loadPage()`) and the live path
+  (`CatalogProductLoader::loadPage()`) and the live path
   (`ProductSaveAfter`/`ProductDeleteBefore`) both route through this.
 - **Orders:** `OrderPayloadBuilder` resolves the order's own `store_id` →
   website and enqueues to that website's tenant. Since one tenant now means

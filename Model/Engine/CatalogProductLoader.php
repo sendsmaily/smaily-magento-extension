@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Engine;
 
 use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\Product\Attribute\Source\Status;
 use Magento\Catalog\Model\ResourceModel\Product\Collection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
@@ -16,8 +17,8 @@ use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 /**
  * Loads products the way every catalog row built from a collection needs
  * them — the catalog import page (EngineCatalogProcessor) and the
- * stock-change batch (CatalogIngest::buildChanged()) alike. Each caller adds
- * only its own filter.
+ * stock-change batch (CatalogIngest::buildChanged()) alike, and the nightly
+ * manifest's page at the same scope. Each caller adds only its own filter.
  */
 class CatalogProductLoader
 {
@@ -56,17 +57,49 @@ class CatalogProductLoader
     }
 
     /**
-     * The nightly manifest's page (PRO-3854): the same scope and the same
-     * unfiltered product set as load(), selecting only what
-     * CatalogPayloadBuilder::manifestItem() reads — no URL rewrites, no
-     * payload attributes — so a page of a large catalog stays small.
+     * The catalog import's page (EngineCatalogProcessor): load() for the
+     * products after $afterId, in entity id order.
      *
-     * @param callable(Collection): void $filter the caller's own filter, order and page size
      * @return Product[]
      */
-    public function loadForManifest(callable $filter): array
+    public function loadPage(int $afterId, int $pageSize): array
     {
-        return $this->loadSelecting(['status', 'visibility'], false, $filter);
+        return $this->load(static function (Collection $collection) use ($afterId, $pageSize): void {
+            self::page($collection, $afterId, $pageSize);
+        });
+    }
+
+    /**
+     * The nightly manifest's page (PRO-3854): the same scope and page as
+     * loadPage(), less the products disabled at that scope, selecting only
+     * what CatalogPayloadBuilder::manifestItem() reads — no URL rewrites, no
+     * payload attributes — so a page of a large catalog stays small. The
+     * status filter is added after setStoreId(), so it reads the canonical
+     * store's value, falling back to the default one, as the selected
+     * `status` does.
+     *
+     * @return Product[]
+     */
+    public function loadForManifest(int $afterId, int $pageSize): array
+    {
+        return $this->loadSelecting(
+            ['status', 'visibility'],
+            false,
+            static function (Collection $collection) use ($afterId, $pageSize): void {
+                $collection->addAttributeToFilter('status', ['eq' => Status::STATUS_ENABLED]);
+                self::page($collection, $afterId, $pageSize);
+            }
+        );
+    }
+
+    /**
+     * One page by entity id: the products after $afterId, in id order.
+     */
+    private static function page(Collection $collection, int $afterId, int $pageSize): void
+    {
+        $collection->addFieldToFilter('entity_id', ['gt' => $afterId]);
+        $collection->setOrder('entity_id', 'ASC');
+        $collection->setPageSize($pageSize);
     }
 
     /**

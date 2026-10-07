@@ -55,13 +55,6 @@ class Client
     /** Spec-conservative §3b batch ceiling (the wrapper allows up to 1000 ids; mirrors Woo). */
     public const CATALOG_REMOVE_BATCH_LIMIT = 100;
 
-    /**
-     * The Log row of a nightly catalog manifest (§3c, PRO-3854). Never
-     * queued for sending: Engine\CatalogManifest sends the list itself and
-     * writes the row with the outcome, so no flusher claims this domain.
-     */
-    public const DOMAIN_CATALOG_MANIFEST = 'catalog_manifest';
-
     public const DOMAIN_WRAPPERS = [
         self::DOMAIN_CATALOG => 'products',
         self::DOMAIN_CUSTOMERS => 'customers',

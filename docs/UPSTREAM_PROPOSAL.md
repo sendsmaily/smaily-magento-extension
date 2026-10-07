@@ -2,14 +2,16 @@
 
 **Audience:** the Smaily team that owns `sendsmaily/smaily-magento-extension`, the
 `smaily/smailyformagento` composer package and the Magento Marketplace listing.
-**From:** the fork (`erkkimarkus/magento-connect`), branch `v3`, at **3.0.0-rc8**
-(a GitHub pre-release on the fork).
-**Status:** accepted (2026-10-07). The rewrite moves into
+**From:** the rewrite, first developed in the fork (`erkkimarkus/magento-connect`),
+now on `master` of `sendsmaily/smaily-magento-extension`, at **3.0.0-rc9**
+(unreleased).
+**Status:** accepted and carried out (2026-10-07). The rewrite moved into
 `sendsmaily/smaily-magento-extension` as one squash-merged pull request into
-`master`; development continues there and the fork is archived (§5, §7).
+`master` (#126); development continues there and the fork is archived (§5, §7).
 3.0.0-rc1 to 3.0.0-rc8 are GitHub pre-releases on the fork, with a ZIP for
-manual installs; no stable composer release of the rewrite is published and
-there is no Marketplace submission yet.
+manual installs; release candidates from 3.0.0-rc9 on are tagged in the official
+repository. No stable composer release of the rewrite is published and there is
+no Marketplace submission yet.
 This document makes the case, describes the move and lists the decisions it
 rests on.
 
@@ -30,7 +32,7 @@ ingest, attribution, engine-run automations). Full inventory: [CHANGELOG](../CHA
 
 Current state, all verifiable in the repo and its CI:
 
-| | 2.8.x (upstream `master`) | v3 (fork, 3.0.0-rc8) |
+| | 2.8.x (up to 2.8.1) | v3 (3.0.0-rc9) |
 |---|---|---|
 | 2.8.x feature set | ✓ | ✓ preserved, with an automatic settings migration |
 | Campaign Intelligence | — | ✓ full integration behind an optional connect step |
@@ -166,11 +168,11 @@ the package version is published, regardless of Marketplace review state.
 The code, the pipeline and the release button live in the repository Smaily
 already owns, `sendsmaily/smaily-magento-extension`.
 
-- **Repository**: the fork's `v3` branch reaches `master` as **one squash-merged
-  pull request**. The fork branched from upstream `master`, so the 2.8.x history
-  is shared and the pull request has no conflicts; its squash is exactly the v3
-  tree. The fork is then archived read-only — its pre-releases rc1–rc8 stay
-  readable as history, and nothing new is cut there.
+- **Repository**: the fork's `v3` branch reached `master` as **one squash-merged
+  pull request** (#126, 2026-10-07). The fork branched from upstream `master`, so
+  the 2.8.x history is shared and the pull request had no conflicts; its squash
+  is exactly the v3 tree. The fork is archived read-only — its pre-releases
+  rc1–rc8 stay readable as history, and nothing new is cut there.
 - **Working mode afterwards**: development continues in the official repository
   through pull requests into `master`, squash-merged only; the pull request's
   title and description become the commit. CI runs on every pull request and on
@@ -222,7 +224,7 @@ already owns, `sendsmaily/smaily-magento-extension`.
   staleness check needs a read token. Everything engine-related is optional at
   runtime — a store that never connects the engine gets the full classic feature
   set with zero engine traffic.
-- Version is **3.0.0-rc8**: the release-candidate label reflects the remaining
+- Version is **3.0.0-rc9**: the release-candidate label reflects the remaining
   engine-tenant verification gap above, not known defects — gates are green, the
   release package is built and verified on every push (§4), and the sandbox is
   clean.

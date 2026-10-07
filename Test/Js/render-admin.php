@@ -498,6 +498,8 @@ $intelligenceStrings = [
         . ' Press Run again to start a fresh import. If it stalls again, check that Magento\'s cron runs.',
     'Stalled — this import waits behind another import that nothing has moved for over an hour: Settings > %1.'
         . ' Cancel that import, or press Run again on its card, and this one follows.',
+    'Stopped',
+    'Stopped before an error — %1 of %2 synced so far. Press Run again to run it again.',
     'Contacts',
     'Initial contact import',
     'Intelligence',

@@ -24,7 +24,19 @@ class SetupNotice
     public const TABLE = 'adminnotification_inbox';
 
     /** Hosted on GitHub for now — update once a hosted docs site exists. */
-    public const URL = 'https://github.com/erkkimarkus/magento-connect/blob/v3/docs/USER_GUIDE.md';
+    public const URL = 'https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/USER_GUIDE.md';
+
+    /**
+     * Read Details links that earlier versions wrote into the notice
+     * (3.0.0-rc1 to 3.0.0-rc8). The install writes the notice once, so a store
+     * that installed one of them keeps that link; the notice is still found.
+     */
+    public const PREVIOUS_URLS = [
+        'https://github.com/erkkimarkus/magento-connect/blob/v3/docs/USER_GUIDE.md',
+    ];
+
+    /** Every Read Details link the notice can carry: the current one first. */
+    public const ALL_URLS = [self::URL, ...self::PREVIOUS_URLS];
 
     public function __construct(
         private readonly ResourceConnection $resource
@@ -42,6 +54,6 @@ class SetupNotice
             return;
         }
 
-        $connection->update($table, ['is_read' => 1], ['url = ?' => self::URL, 'is_read = ?' => 0]);
+        $connection->update($table, ['is_read' => 1], ['url IN (?)' => self::ALL_URLS, 'is_read = ?' => 0]);
     }
 }

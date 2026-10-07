@@ -13,10 +13,11 @@
         </tab>
         <!--
             Merchant documentation (user guide) for this section:
-            https://github.com/erkkimarkus/magento-connect/blob/v3/docs/USER_GUIDE.md
+            https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/USER_GUIDE.md
             (hosted on GitHub for now — update the URL here, in the setup
-            wizard Done step and in Setup/Patch/Data/AddSetupNotice.php once
-            a hosted docs site exists).
+            wizard Done step and in Model/Adminhtml/SetupNotice.php, keeping
+            the old address in SetupNotice::PREVIOUS_URLS, once a hosted docs
+            site exists).
 
             Native surface removal (PRO-1461, resolves PRO-1369's config-
             architecture decision 3, docs/ADMIN_UI_TARGET_SPEC.md §4): this

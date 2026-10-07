@@ -52,6 +52,28 @@ class SetupNoticeTest extends IntegrationTestCase
     }
 
     /**
+     * A store that installed a release candidate keeps the Read Details link
+     * that version wrote; finishing the setup still marks that notice read.
+     */
+    public function testMarkReadFindsTheNoticeByTheLinkAnEarlierVersionWrote(): void
+    {
+        $this->connection->update(
+            'adminnotification_inbox',
+            ['url' => SetupNotice::PREVIOUS_URLS[0]],
+            ['url = ?' => SetupNotice::URL]
+        );
+
+        $this->objectManager->create(SetupNotice::class)->markRead();
+
+        self::assertSame(
+            ['Smaily Connect is ready to set up' => '1', 'Smaily Connect upgrade' => '0'],
+            $this->connection->fetchPairs(
+                $this->connection->select()->from('adminnotification_inbox', ['title', 'is_read'])
+            )
+        );
+    }
+
+    /**
      * Magento_AdminNotification may be disabled: finishing the setup still works.
      */
     public function testMarkReadWithoutTheNotificationTableDoesNothing(): void

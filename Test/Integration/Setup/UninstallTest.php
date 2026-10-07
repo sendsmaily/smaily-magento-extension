@@ -150,6 +150,8 @@ class UninstallTest extends IntegrationTestCase
 
         $notices = [
             ['Smaily Connect is ready to set up', SetupNotice::URL],
+            // The link a release candidate wrote (SetupNotice::PREVIOUS_URLS).
+            ['Smaily Connect is ready to set up', SetupNotice::PREVIOUS_URLS[0]],
             ['Smaily Connect upgrade', null],
             ['Magento security update', 'https://example.com/security'],
         ];

@@ -64,7 +64,7 @@ class Uninstall implements UninstallInterface
     public function removeSetupNotice(AdapterInterface $connection, string $inboxTable): void
     {
         if ($connection->isTableExists($inboxTable)) {
-            $connection->delete($inboxTable, ['url = ?' => SetupNotice::URL]);
+            $connection->delete($inboxTable, ['url IN (?)' => SetupNotice::ALL_URLS]);
         }
     }
 }

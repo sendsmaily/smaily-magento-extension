@@ -28,6 +28,11 @@ use Smaily\Connect\Test\Unit\Support\StoreLocale;
 $root = dirname(__DIR__, 2);
 require $root . '/vendor/autoload.php';
 
+// Laminas's escaper calls ord() on a multibyte character when it escapes an
+// HTML attribute holding one (an Estonian phrase); PHP 8.5 reports that as
+// deprecated, and the notice would be printed into the rendered page.
+error_reporting(E_ALL & ~E_DEPRECATED);
+
 // Magento's Escaper without an object manager: its two helpers set directly.
 $escaper = new Escaper();
 (new ReflectionProperty(Escaper::class, 'escaper'))->setValue($escaper, new ZendEscaper());
@@ -266,7 +271,7 @@ $pages = [
  * connected, and with neither (PRO-3913). Magento's cookie restriction mode
  * is on, except where a Storefront URL is saved (PRO-3918). The Settings
  * tab's import cards serve the stalled import harness too (PRO-3915,
- * PRO-3923).
+ * PRO-3923). The same view model serves the Contacts tab (PRO-1970).
  */
 $intelligenceViewModel = static fn (
     string $storefrontUrl,
@@ -457,6 +462,43 @@ $intelligenceViewModel = static fn (
     }
 
     /**
+     * The Contacts tab (PRO-1970): contact sync on, Subscribers only saved.
+     *
+     * @return bool
+     */
+    public function isSyncEnabled(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSyncMode(): string
+    {
+        return 'consent';
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getSelectedSyncFields(): array
+    {
+        return [];
+    }
+
+    /**
+     * The contacts the import sends under each mode: one, so the singular
+     * phrase renders, and more under All customers.
+     *
+     * @return array<string, int>
+     */
+    public function getContactImportCounts(): array
+    {
+        return ['consent' => 1, 'legitimate_interest' => 42, 'checkout_optin' => 0];
+    }
+
+    /**
      * @return string
      */
     public function getBootJson(): string
@@ -470,7 +512,13 @@ $intelligenceViewModel = static fn (
             'connection' => ['subdomain' => 'demo', 'username' => 'api', 'hasPassword' => true, 'multilingualMode' => 'single'],
             'websiteAccount' => ['subdomain' => 'demo', 'username' => 'api'],
             'multilingual' => ['languages' => ['en'], 'fallbackLanguage' => 'en'],
-            'subscribers' => [],
+            'subscribers' => [
+                'syncEnabled' => true,
+                'syncMode' => 'consent',
+                'checkoutOptin' => true,
+                'suppressOptinEmails' => true,
+                'includeGuests' => false,
+            ],
             'automations' => [],
             'intelligence' => [
                 'connected' => $this->intelligenceConnected,
@@ -479,7 +527,6 @@ $intelligenceViewModel = static fn (
                 'browseTracking' => false,
             ],
             'rss' => ['enabled' => false],
-            'totals' => [],
         ]);
     }
 };
@@ -546,6 +593,24 @@ $pages['intelligence-settings-storefront'] = [
     'viewModel' => $intelligenceViewModel('https://shop.example.com'),
     'data' => ['context' => 'settings'],
     'strings' => $intelligenceStrings,
+];
+/*
+ * The Contacts tab (view/adminhtml/templates/panel/subscribers.phtml) with its
+ * behaviour, for the contacts import card's estimate (PRO-1970).
+ */
+$pages['contacts-settings'] = [
+    'template' => [
+        $root . '/view/adminhtml/templates/panel/subscribers.phtml',
+        $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+    ],
+    'viewModel' => $intelligence,
+    'data' => ['context' => 'settings'],
+    'strings' => [
+        'This import sends %1 contact from this website. It runs in the background,'
+            . ' a chunk per minute, and never slows the storefront down.',
+        'This import sends %1 contacts from this website. It runs in the background,'
+            . ' a chunk per minute, and never slows the storefront down.',
+    ],
 ];
 $setupCompleted = [
     'template' => $root . '/view/adminhtml/templates/wizard/index.phtml',

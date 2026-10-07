@@ -147,7 +147,10 @@ running import that is stalled reads *Stalled*, says how far it got and
 how to start it again, and offers **Run again** (which posts a start); one
 waiting behind another stalled import (`blocked_by`) names that import's
 card and offers only **Cancel import**; an
-import that moves shows its progress as before. To
+import that moves shows its progress as before. It renders the Contacts
+tab too: before its import starts, the contacts card quotes the number of
+contacts the import sends for the mode picked on the panel, in the
+singular for one, and no other total. To
 check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.

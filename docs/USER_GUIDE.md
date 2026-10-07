@@ -979,8 +979,9 @@ traffic:
   subscriber, and a contact Smaily already has keeps its status. This
   includes a customer whose newsletter signup still waits for its
   confirmation email. A customer who unsubscribed in the store goes as
-  unsubscribed. Guest-order emails are not imported. The estimate above the **Start import** button counts these
-  contacts for the mode picked on the panel.
+  unsubscribed. Guest-order emails are not imported. The estimate above the **Start import** button says how many of
+  these contacts the import sends from the website, for the mode picked on
+  the panel, and names no other total.
   When Smaily answers a chunk with "invalid data", the import sends that
   chunk's contacts again one at a time, so only the contacts Smaily
   refuses count as failed and the others are imported.

@@ -28,13 +28,14 @@ install, in this order. Each line links to its details below.
 
 1. Check the versions first: Magento 2.4.4 or newer, PHP 8.1–8.4 — [INSTALLING.md](INSTALLING.md#before-you-start).
 2. On the initial setup's **Connect** step, enter the storefront's address as **Storefront URL** (**Using a separate storefront?**) — [Storefront URL](#storefront-url).
-3. On the **Contacts** step choose **Subscribers only (consent)** or **All customers (legitimate interest)**, never **Checkout opt-in only** — [Newsletter consent at checkout](#5-newsletter-consent-at-checkout).
-4. On the **Automations** step map the workflows but leave **Enabled** unticked — [Before switching anything on](#before-switching-anything-on).
-5. Connect Campaign Intelligence only once the Storefront URL is saved: connecting starts the catalog import with the storefront's links — [Storefront URL](#storefront-url).
-6. Open one `product_url` and `image_url` from **Log > Details** (needs C1) — [Check before recommendation emails](#check-before-recommendation-emails).
-7. In Smaily's abandoned-cart template, link to the storefront's cart page instead of `{{abandoned_cart_url}}`, and to the storefront's address instead of a back-end `{{store_url}}` — [Abandoned-cart link](#abandoned-cart-link).
-8. Once the links check out, switch the automations on under **Settings > Automations** — [Before switching anything on](#before-switching-anything-on).
-9. Switch on **Enable storefront browse tracking** only once the storefront sends browse events (C5) — [Send browse events](#4-send-browse-events).
+3. Find out which other integrations sync newsletter subscribers or opt-outs with Smaily; switch them off when the **Contacts** step's save switches contact sync on (step 4), not before — until then they carry the opt-outs.
+4. On the **Contacts** step choose **Subscribers only (consent)** or **All customers (legitimate interest)**, never **Checkout opt-in only** — [Newsletter consent at checkout](#5-newsletter-consent-at-checkout).
+5. On the **Automations** step map the workflows but leave **Enabled** unticked — [Before switching anything on](#before-switching-anything-on).
+6. Connect Campaign Intelligence only once the Storefront URL is saved: connecting starts the catalog import with the storefront's links — [Storefront URL](#storefront-url).
+7. Open one `product_url` and `image_url` from **Log > Details** (needs C1) — [Check before recommendation emails](#check-before-recommendation-emails).
+8. In Smaily's abandoned-cart template, link to the storefront's cart page instead of `{{abandoned_cart_url}}`, and to the storefront's address instead of a back-end `{{store_url}}` — [Abandoned-cart link](#abandoned-cart-link).
+9. Once the links check out, switch the automations on under **Settings > Automations** — [Before switching anything on](#before-switching-anything-on).
+10. Switch on **Enable storefront browse tracking** only once the storefront sends browse events (C5) — [Send browse events](#4-send-browse-events).
 
 **B. On the Magento server (back end)**
 

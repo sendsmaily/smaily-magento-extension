@@ -21,7 +21,7 @@ name: Contract staleness
 
 on:
   push:
-    branches: [v3, master]
+    branches: [master]
   pull_request:
   schedule:
     # Daily 05:23 UTC — odd minute to avoid the on-the-hour GH cron pile-up,

@@ -156,8 +156,8 @@ No staged review by the Smaily team — Erkki maintains the repo.
 ## Release cut (official repo)
 
 1. The version-cut PR sets the version in `composer.json`,
-   `Model/ModuleInfo.php`, the ModuleVersion docblock and
-   docs/UPSTREAM_PROPOSAL.md, and names it in CHANGELOG; squash-merge it.
+   `Model/ModuleInfo.php` and the ModuleVersion docblock, and names it in
+   CHANGELOG; squash-merge it.
 2. `gh release create 3.0.0-rc9 --repo sendsmaily/smaily-magento-extension
    --target master --title "…" --notes-file … --prerelease` (a release
    candidate; 3.0.0 itself without `--prerelease`). **Tag = the PLAIN

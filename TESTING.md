@@ -438,71 +438,20 @@ should not stay in production mode. After an uninstall, `app/etc/config.php`
 lists the module as disabled, so run `bin/magento module:enable
 Smaily_Connect` before `setup:upgrade` and `setup:di:compile`.
 
-Last full run: 3.0.0-rc1 on Magento 2.4.8-p4, 2026-10-02 — every step
-passed in production mode; the developer/default-mode update sequence
-was run as well. A second run the same day on fresh volumes added the
-admin walk in en_US and et_EE, a contact sync, an order and a product
-save without Smaily or Campaign Intelligence credentials, and the
-uninstall.
+Tips from past runs:
 
-Earlier run: 3.0.0-rc5 (the ZIP downloaded from the GitHub release) on
-Magento 2.4.8-p4 without sample data, 2026-10-04, in production mode —
-steps 1–5 and the update section passed as written. It ran on a separate,
-temporary compose project (its own name, containers, volumes and ports,
-the sandbox image, no working-tree mount) so the sandbox stayed untouched;
-without sample data `app/code` does not exist yet and the guide's
-`mkdir -p` creates it as a real directory. All eight `smaily_*` cron jobs
-finished with `success` (the two daily jobs queued by hand), and nothing
-was written to `exception.log` or `var/report`. The Dashboard, Settings
-and Log were opened by setting `smaily_connect/internal/setup_completed`
-for the website directly in the database, since step 1 of the initial
-setup needs a working Smaily connection.
+- To leave the sandbox untouched, run the check on a separate, temporary
+  compose project — its own project name, containers, volumes and port, the
+  sandbox image, no working-tree mount. Without sample data `app/code` does
+  not exist yet, and the guide's `mkdir -p` creates it as a real directory.
+- Step 1 of the initial setup needs a working Smaily connection. Without
+  one, open the Dashboard, Settings and Log by setting
+  `smaily_connect/internal/setup_completed` for the website directly in the
+  database.
+- A row queued by hand in `cron_schedule` can be deleted unrun when the
+  same `cron:run` regenerates the schedule (Magento drops pending rows that
+  do not match the job's cron expression); queue it again, or run the job
+  class directly through the object manager in the `crontab` area.
 
-Earlier run: 3.0.0-rc6 (the ZIP downloaded from the GitHub release) on
-Magento 2.4.8-p4 without sample data, 2026-10-04, in production mode, the
-same way as the rc5 run — steps 1–5 and the update section passed as
-written, with no guide change. All seven `smaily_*` cron jobs finished with
-`success` (the daily janitor and the two 15-minute jobs queued by hand),
-and nothing was written to `exception.log` or `var/report`. The initial
-setup's Campaign Intelligence step and Settings > Intelligence show the
-separate-storefront note while no Storefront URL is saved. While
-Campaign Intelligence is not connected, `bin/magento smaily:backfill:start
-catalog` (and `customers`, `orders`) prints "Campaign Intelligence is not
-connected, …" and exits 1, and the admin import endpoint answers a catalog
-start with the same message; neither writes a job or a queue row.
-
-Earlier run: 3.0.0-rc7 (the ZIP downloaded from the GitHub release) on
-Magento 2.4.8-p4 without sample data, 2026-10-05, in production mode, the
-same way as the rc6 run — steps 1–5 and the update section passed as
-written, with no guide change. All seven `smaily_*` cron jobs finished with
-`success` (the daily janitor and the 5- and 15-minute jobs queued by
-hand), and nothing was written to `exception.log` or `var/report`. The
-initial setup's Campaign Intelligence step and Settings > Intelligence
-show the separate-storefront note. While Campaign Intelligence is not
-connected, `bin/magento smaily:backfill:start catalog` (and `customers`,
-`orders`) exits 1 with the not-connected message and the admin import
-endpoint refuses a catalog start, and `bin/magento smaily:gdpr export` and
-`erase --force` for a placeholder address (u1@example.invalid) handle the
-store's own data; `erase` says "Campaign Intelligence is not connected;
-no engine data to erase." for the engine half (exit 0).
-
-Latest run: 3.0.0-rc8 (the ZIP downloaded from the GitHub release with
-`gh release download`) on Magento 2.4.8-p4 / PHP 8.3.35 without sample
-data, 2026-10-07, in production mode, the same way as the rc7 run, the
-guide's "Before you start" version check included (`bin/magento
---version`, `php -v`). Steps 1–5 and the update section passed; one guide
-step changed: with the ZIP in a folder other than the Magento root, step
-2's `unzip smaily-connect-magento2.zip` cannot find it, so step 2 and the
-update section now say to give `unzip` the ZIP's full path. All eight
-`smaily_*` cron jobs finished with `success` (the daily janitor, the
-nightly `smaily_catalog_manifest` and the 5- and 15-minute jobs queued by
-hand), and nothing was written to `exception.log` or `var/report`. With
-the log level at info, `smaily_connect.log` shows the manifest skipping:
-"Nightly catalog manifest not sent" with the reason "Campaign
-Intelligence is not connected, or refuses this store"; it writes no flag,
-queue or Log row. The initial setup's "Using a separate storefront?"
-opens the Storefront URL field. A row queued by hand in `cron_schedule`
-can be deleted unrun when the same `cron:run` regenerates the schedule
-(Magento drops pending rows that do not match the job's cron
-expression); queue it again, or run the job class directly through the
-object manager in the `crontab` area.
+The dated record of each run (version, Magento and PHP version, result) is
+in git history.

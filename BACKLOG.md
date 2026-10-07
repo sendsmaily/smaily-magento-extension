@@ -91,5 +91,5 @@ executed verification matrix (Luma / Hyvä / strict CSP — all pass) in
 
 - Marketplace re-submission (product name "Smaily Connect") and the fate of
   the existing listing. The composer package name `smaily/smailyformagento` is kept so
-  existing installs upgrade via plain `composer update`. The full proposal
-  package is drafted in [docs/UPSTREAM_PROPOSAL.md](docs/UPSTREAM_PROPOSAL.md).
+  existing installs upgrade via plain `composer update`. The upstream
+  decisions are recorded on Linear PRO-1198.

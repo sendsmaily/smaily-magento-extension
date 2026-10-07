@@ -6885,7 +6885,9 @@ Earlier: 2026-09-11, 2026-09-10._
   staged review plan, Marketplace re-submission as "Smaily Connect",
   pipeline/secret hand-over, honest open items, and the one-way-door decision
   checklist. Awaiting Erkki's review; NOTHING sent or published — the release
-  decision and all contact with Smaily are Erkki's alone.
+  decision and all contact with Smaily are Erkki's alone. **Deleted
+  2026-10-07** (finished; the text is in git history): the decision record
+  is Linear PRO-1198.
 
 ## Open Linear issues
 

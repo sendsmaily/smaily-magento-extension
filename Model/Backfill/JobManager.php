@@ -16,7 +16,8 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
 /**
  * Lifecycle management for chunked backfill jobs: one active job per
  * (job_type, target, website) at a time; the cron tick advances the oldest
- * active job one time-budgeted chunk per run.
+ * active job that is not set aside (nextActive()) one time-budgeted chunk
+ * per run.
  *
  * All status transitions are conditional single-statement UPDATEs so an
  * admin cancel can land at any moment without being overwritten by the
@@ -94,14 +95,30 @@ class JobManager
     }
 
     /**
-     * The oldest job that still needs work.
+     * The job the tick advances next: the oldest one that still needs work
+     * and is not set aside. A job is set aside while it is running and its
+     * own row has not been written for STALLED_SECONDS (updated_at, which
+     * markRunning() and every recordProgress() refresh) — a worker that
+     * dies on the same page every run. The imports queued behind it run,
+     * and it is tried again when none waits (PRO-3927). A queued job is
+     * never set aside: the tick has not taken it up yet.
      */
     public function nextActive(): ?Job
     {
+        return $this->oldestActive(true) ?? $this->oldestActive(false);
+    }
+
+    private function oldestActive(bool $skipSetAside): ?Job
+    {
         $collection = $this->collectionFactory->create();
-        $collection->addFieldToFilter('status', ['in' => [Job::STATUS_PENDING, Job::STATUS_RUNNING]])
-            ->setOrder('id', 'ASC')
-            ->setPageSize(1);
+        $collection->addFieldToFilter('status', ['in' => [Job::STATUS_PENDING, Job::STATUS_RUNNING]]);
+        if ($skipSetAside) {
+            $collection->addFieldToFilter(
+                ['status', 'updated_at'],
+                [['eq' => Job::STATUS_PENDING], ['gteq' => $this->stalledBefore()]]
+            );
+        }
+        $collection->setOrder('id', 'ASC')->setPageSize(1);
         $job = $collection->getFirstItem();
 
         return $job instanceof Job && $job->getId() ? $job : null;
@@ -152,20 +169,28 @@ class JobManager
 
     /**
      * Whether an import of this kind is queued or running, for any website,
-     * but stalled: no queued or running job was written within
-     * STALLED_SECONDS — isActiveAndMoving()'s rule (PRO-3915). The admin's
-     * import card says so, and starting the import again cancels it first
-     * (startIfIdle()).
+     * but stalled: one of its jobs is set aside (nextActive(), PRO-3927), or
+     * no queued or running job was written within STALLED_SECONDS —
+     * isActiveAndMoving()'s rule (PRO-3915). The admin's import card says
+     * so, and starting the import again cancels it first (startIfIdle()).
      */
     public function isStalled(string $jobType, string $target): bool
     {
+        $setAside = $this->collectionFactory->create();
+        $setAside->addFieldToFilter('status', Job::STATUS_RUNNING)
+            ->addFieldToFilter('job_type', $jobType)
+            ->addFieldToFilter('target', $target)
+            ->addFieldToFilter('updated_at', ['lt' => $this->stalledBefore()]);
+        if ($setAside->getSize() > 0) {
+            return true;
+        }
+
         return $this->firstActive($jobType, $target) !== null && !$this->activeMovedWithin(self::STALLED_SECONDS);
     }
 
     /**
      * Whether some queued or running job was written within the last
-     * $seconds. A caller that already knows an import is queued or running
-     * asks this alone for isStalled()'s answer (BackfillState).
+     * $seconds — whether the worker still moves any import.
      */
     public function activeMovedWithin(int $seconds): bool
     {
@@ -179,6 +204,14 @@ class JobManager
             'Y-m-d H:i:s',
             $this->dateTime->gmtTimestamp() - $seconds
         );
+    }
+
+    /**
+     * A job last written before this time has not moved for STALLED_SECONDS.
+     */
+    private function stalledBefore(): string
+    {
+        return $this->dateTime->gmtDate('Y-m-d H:i:s', $this->dateTime->gmtTimestamp() - self::STALLED_SECONDS);
     }
 
     public function markRunning(Job $job): void

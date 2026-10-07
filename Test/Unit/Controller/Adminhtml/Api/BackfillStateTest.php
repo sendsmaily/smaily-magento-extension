@@ -34,7 +34,8 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * PRO-3915: an import nothing has moved for an hour reads as stalled
  * (starting it again cancels it first: JobManager::startIfIdle(), the
  * integration JobManagerTest). PRO-3923: one that waits behind another
- * import names it.
+ * import names it. PRO-3927: one the tick has set aside reads as stalled
+ * and waits behind nothing.
  */
 class BackfillStateTest extends TestCase
 {
@@ -112,8 +113,9 @@ class BackfillStateTest extends TestCase
     /**
      * @dataProvider activeStatuses
      */
-    public function testAnImportNothingHasMovedForAnHourReadsAsStalled(string $status): void
+    public function testAStalledImportReadsAsStalled(string $status): void
     {
+        $this->jobManager->method('isStalled')->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE)->willReturn(true);
         $this->jobManager->method('activeMovedWithin')->with(JobManager::STALLED_SECONDS)->willReturn(false);
 
         $this->controller(true, ['action' => 'status', 'job_type' => Job::TYPE_CATALOG], [$this->job($status)])
@@ -133,7 +135,7 @@ class BackfillStateTest extends TestCase
 
     public function testAnImportThatMovesIsNotStalled(): void
     {
-        $this->jobManager->method('activeMovedWithin')->willReturn(true);
+        $this->jobManager->method('isStalled')->willReturn(false);
 
         $this->controller(
             true,
@@ -147,7 +149,7 @@ class BackfillStateTest extends TestCase
 
     public function testAFinishedImportIsNeverStalled(): void
     {
-        $this->jobManager->expects(self::never())->method('activeMovedWithin');
+        $this->jobManager->expects(self::never())->method('isStalled');
 
         $this->controller(
             true,
@@ -159,11 +161,12 @@ class BackfillStateTest extends TestCase
     }
 
     /**
-     * PRO-3923: a stalled import that waits behind another one — the oldest
-     * queued or running job, which the tick takes first — names it.
+     * PRO-3923: a stalled import that waits behind another one — while no
+     * queued or running job moves, the job the tick takes first — names it.
      */
     public function testAStalledImportWaitingBehindAnotherImportNamesIt(): void
     {
+        $this->jobManager->method('isStalled')->willReturn(true);
         $this->jobManager->method('activeMovedWithin')->willReturn(false);
         $this->jobManager->method('nextActive')->willReturn($this->job(Job::STATUS_RUNNING, Job::TYPE_CONTACTS));
 
@@ -179,6 +182,7 @@ class BackfillStateTest extends TestCase
 
     public function testAStalledImportFirstInLineIsBlockedByNothing(): void
     {
+        $this->jobManager->method('isStalled')->willReturn(true);
         $this->jobManager->method('activeMovedWithin')->willReturn(false);
         $this->jobManager->method('nextActive')->willReturn($this->job(Job::STATUS_RUNNING, Job::TYPE_CATALOG));
 
@@ -194,7 +198,7 @@ class BackfillStateTest extends TestCase
 
     public function testAnImportThatMovesIsBlockedByNothing(): void
     {
-        $this->jobManager->method('activeMovedWithin')->willReturn(true);
+        $this->jobManager->method('isStalled')->willReturn(false);
         $this->jobManager->expects(self::never())->method('nextActive');
 
         $this->controller(
@@ -203,6 +207,26 @@ class BackfillStateTest extends TestCase
             [$this->job(Job::STATUS_PENDING)]
         )->execute();
 
+        self::assertSame('', $this->response['blocked_by']);
+    }
+
+    /**
+     * PRO-3927: an import the tick has set aside reads as stalled, and the
+     * imports behind it run, so it waits behind none of them.
+     */
+    public function testASetAsideImportWhileAnotherMovesIsBlockedByNothing(): void
+    {
+        $this->jobManager->method('isStalled')->willReturn(true);
+        $this->jobManager->method('activeMovedWithin')->willReturn(true);
+        $this->jobManager->expects(self::never())->method('nextActive');
+
+        $this->controller(
+            true,
+            ['action' => 'status', 'job_type' => Job::TYPE_CATALOG],
+            [$this->job(Job::STATUS_RUNNING)]
+        )->execute();
+
+        self::assertTrue($this->response['stalled']);
         self::assertSame('', $this->response['blocked_by']);
     }
 

@@ -329,8 +329,20 @@ below.
   goes through `JobManager::startIfIdle()`, which cancels it first
   (`requestCancel()`), so the one-active-job lock cannot keep the new one
   from starting (PRO-3915, PRO-3923). The tick takes the oldest active job
-  (`nextActive()`), so an import queued behind a stalled one stalls too;
-  the endpoint answers it with `blocked_by` (that job's type) and the card
+  that is not set aside (`nextActive()`, PRO-3927): a job is set aside
+  while it is `running` and its own row's `updated_at` (refreshed by
+  `markRunning()` and every `recordProgress()`) is older than
+  `STALLED_SECONDS`; it is taken again only when no other active job
+  waits, so a lone one is retried every tick and recovers by itself after
+  a passing failure. A `pending` job is never set aside — the tick has not
+  taken it up, so a wait in line never counts against it.
+  `isStalled()` is true for an import with a set-aside job, or by
+  the rule above, so its card stays *Stalled* and **Run again** cancels it
+  first while the tick runs the imports behind it. An import waits behind
+  another only while no active job moves at all — the job at the front is
+  `pending` and the tick never gets it going (no cron, or it dies before
+  `markRunning()`); the endpoint then answers the waiting import with
+  `blocked_by` (the type of the job `nextActive()` takes) and the card
   names the blocking import's card instead of offering **Run again**
   (PRO-3923). There
   is no periodic full re-sync any more — the nightly `Cron/CatalogResync`

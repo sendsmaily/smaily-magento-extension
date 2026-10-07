@@ -8,8 +8,12 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Backfill;
 
+use Smaily\Connect\Cron\BackfillTick;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
+use Smaily\Connect\Model\Backfill\ProcessorInterface;
+use Smaily\Connect\Model\Engine\Settings as EngineSettings;
+use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 
 /**
@@ -199,7 +203,8 @@ class JobManagerTest extends IntegrationTestCase
     /**
      * PRO-3915: the import card's stalled state reads the same rule — a
      * queued or running import, for any website, that no tick has moved for
-     * an hour, its own or the one ahead of it in line.
+     * an hour, its own or the one ahead of it in line. PRO-3927: a running
+     * one the tick has set aside reads as stalled while it runs others.
      */
     public function testAnImportIsStalledOnceNothingHasMovedItForAnHour(): void
     {
@@ -216,14 +221,107 @@ class JobManagerTest extends IntegrationTestCase
 
         $catalog = $this->jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0);
         $this->movedAt($catalog, -30);
-        self::assertFalse(
+        self::assertTrue(
             $this->jobManager->isStalled(Job::TYPE_CONTACTS, Job::TARGET_SMAILY),
-            'the worker still moves an import'
+            'set aside while the worker moves another import'
         );
 
         $this->jobManager->requestCancel(Job::TYPE_CATALOG, Job::TARGET_ENGINE);
         $this->jobManager->requestCancel(Job::TYPE_CONTACTS, Job::TARGET_SMAILY);
         self::assertFalse($this->jobManager->isStalled(Job::TYPE_CONTACTS, Job::TARGET_SMAILY), 'canceled');
+    }
+
+    /**
+     * A queued import waits behind one the worker moves, however long that
+     * takes; the wait is not its own stall.
+     */
+    public function testAQueuedImportWaitingBehindOneThatMovesIsNotStalled(): void
+    {
+        $catalog = $this->jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0);
+        $this->jobManager->markRunning($catalog);
+        $contacts = $this->jobManager->start(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1);
+        $this->movedAt($catalog, -30);
+        $this->movedAt($contacts, -2 * JobManager::STALLED_SECONDS);
+
+        self::assertFalse($this->jobManager->isStalled(Job::TYPE_CONTACTS, Job::TARGET_SMAILY));
+        self::assertSame($catalog->getId(), $this->jobManager->nextActive()?->getId());
+    }
+
+    /**
+     * PRO-3927: a job the tick dies on the same page every run is set aside:
+     * the tick runs the one queued behind it, and takes the stalled one again
+     * once nothing else waits.
+     */
+    public function testTheTickRunsTheImportBehindOneThatHasStalled(): void
+    {
+        $stalled = $this->jobManager->start(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1);
+        $this->jobManager->markRunning($stalled);
+        $this->movedAt($stalled, -JobManager::STALLED_SECONDS - 1);
+        $behind = $this->jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0);
+
+        // The real tick, with a processor that records the job it is given
+        // and moves it one page.
+        $recorder = new class ($this->jobManager) implements ProcessorInterface {
+            /** @var int[] */
+            public array $ran = [];
+
+            public function __construct(private readonly JobManager $jobManager)
+            {
+            }
+
+            public function process(Job $job): void
+            {
+                $this->ran[] = (int)$job->getId();
+                $this->jobManager->markRunning($job);
+                $this->jobManager->recordProgress($job, 1, 0, (string)count($this->ran));
+            }
+        };
+        $tick = new BackfillTick(
+            $this->jobManager,
+            $this->createMock(EngineSettings::class),
+            $this->createMock(Logger::class),
+            ['contacts:smaily' => $recorder, 'catalog:engine' => $recorder]
+        );
+
+        $tick->execute();
+        self::assertSame([(int)$behind->getId()], $recorder->ran, 'the import behind runs');
+        self::assertSame(Job::STATUS_RUNNING, $this->fetchRow(self::TABLE, (int)$behind->getId())['status']);
+        self::assertTrue(
+            $this->jobManager->isStalled(Job::TYPE_CONTACTS, Job::TARGET_SMAILY),
+            'the set-aside import still reads as stalled'
+        );
+
+        $this->jobManager->complete($behind);
+        $tick->execute();
+        self::assertSame([(int)$behind->getId(), (int)$stalled->getId()], $recorder->ran, 'then the stalled one again');
+    }
+
+    public function testALoneStalledJobIsStillTakenEveryRun(): void
+    {
+        $stalled = $this->jobManager->start(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1);
+        $this->jobManager->markRunning($stalled);
+        $this->movedAt($stalled, -JobManager::STALLED_SECONDS - 1);
+
+        self::assertSame($stalled->getId(), $this->jobManager->nextActive()?->getId());
+    }
+
+    /**
+     * Only a running job that has not moved for STALLED_SECONDS is set
+     * aside: one that started within the hour, or one still queued, keeps
+     * its place in line.
+     */
+    public function testAJobThatHadNoChanceYetKeepsItsPlace(): void
+    {
+        $started = $this->jobManager->start(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1);
+        $this->jobManager->markRunning($started);
+        $this->movedAt($started, -JobManager::STALLED_SECONDS + 60);
+        $behind = $this->jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0);
+        self::assertSame($started->getId(), $this->jobManager->nextActive()?->getId(), 'started within the hour');
+
+        $this->jobManager->requestCancel(Job::TYPE_CONTACTS, Job::TARGET_SMAILY);
+        $this->movedAt($behind, -2 * JobManager::STALLED_SECONDS);
+        $this->jobManager->start(Job::TYPE_ORDERS, Job::TARGET_ENGINE, 0);
+        self::assertSame($behind->getId(), $this->jobManager->nextActive()?->getId(), 'queued for two hours');
     }
 
     /**

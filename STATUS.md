@@ -51,6 +51,10 @@ order placed with "Login as Customer" carries no browser markers); the
 version check is now step one of INSTALLING and PILOT_CHECKLIST §0;
 HEADLESS_STOREFRONTS opens with a setup checklist (admin / back end /
 storefront developer), audited against the code.
+Landed today after rc8 (CHANGELOG's "Changes since 3.0.0-rc8"): PRO-3927
+(the tick sets aside a running import nothing has moved for an hour and
+runs the imports queued behind it; the set-aside one stays *Stalled* on
+its card and is tried again when none waits).
 **Queue:** the pilot installs rc8 once the store has upgraded (Erkki sets
 the date).
 Backlog: PRO-3790 (after the pilot), PRO-3746, PRO-3774._

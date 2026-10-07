@@ -1061,8 +1061,17 @@ too, check that Magento's cron runs (see [INSTALLING.md](INSTALLING.md#4-cron))
 and look in `var/log/smaily_connect.log` and Magento's own logs for the
 error.
 
-Imports run one at a time, oldest first. An import that waits behind
-another import that has stalled says so and names that import's card —
+Imports run one at a time, oldest first. A running import that nothing
+has moved for over an hour is set aside: the imports queued behind it run
+first, and its card keeps saying **"Stalled"**, with **Run again** and
+**Cancel import**. The cron tries a set-aside import again whenever no
+other import is waiting — on every cron run once the others are done —
+so one that failed for a passing reason carries on by itself.
+
+An import still queued is never set aside. When the import at the front
+of the line never gets going — no import has moved for over an hour, for
+example because it fails before its first page or because cron does not
+run — an import waiting behind it says so and names that import's card,
 for example *Settings > Contacts > Initial contact import*; press
 **Cancel import** or **Run again** there, and the waiting import follows.
 Its own card then offers only **Cancel import**.

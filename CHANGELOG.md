@@ -4,6 +4,10 @@
 
 The package version is currently `3.0.0-rc8` — the eighth release-candidate cut of everything below. Release candidates are GitHub pre-releases for pilot stores; composer still resolves 2.8.1 as the newest stable release.
 
+**Changes since 3.0.0-rc8**
+
+- An import that has stalled no longer holds up the imports queued behind it. A running import that nothing has moved for over an hour — for example one whose run fails on the same products every time — is set aside: the imports behind it run, its card keeps showing *Stalled* with **Run again** and **Cancel import**, and it is tried again whenever no other import is waiting. Before, every import queued behind it waited until you pressed **Run again** or **Cancel import** on its card.
+
 **Changes since 3.0.0-rc7**
 
 - Products deleted with Magento's import — **System > Data Transfer > Import** with the **Delete** behaviour, or a tool that runs Magento's import — are removed from Campaign Intelligence, as a product deleted in the admin is: in the Log, a *catalog_remove* row per product, and for a variant of a configurable product a *catalog* row that marks it out of stock. Before, the import sent nothing, so Campaign Intelligence kept recommending the deleted products, and a catalog import did not remove them. A product deleted straight in the database, or by a tool that bypasses Magento's import, still sends nothing at once: the nightly product list (below) takes it out of the recommendations the next night, and the user guide says how to take it out at once.

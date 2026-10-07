@@ -198,8 +198,9 @@ do not change it.
    step, `bin/check-release-version.sh <tag>` (PRO-3948), fails the run before
    anything is attached when the tag is not composer.json's `version` (a `v`
    prefix fails too) — then delete the release and its tag and publish again.
-   If the CLI answers HTTP 500 (it did for rc9), create the release and tag
-   in the GitHub web UI instead.
+   If the CLI answers HTTP 500 (it did for rc9; rc10 went through the CLI
+   without it), create the release and tag in the GitHub web UI instead —
+   a fallback, not the default path.
 3. **A tag on the official repo is a Packagist publish** of
    `smaily/smailyformagento` — a one-way door, Erkki's to run. Release
    candidates are tagged publicly; 3.0.0 waits for a pilot store.
@@ -219,7 +220,9 @@ branch from `origin/master`; `v3` is gone from the `push.branches` lists of
 Done since: 3.0.0-rc9, the first release candidate there, tagged
 2026-10-07 (Release cut above). **Gotcha:** creating the tag from the CLI
 failed with HTTP 500 — both `gh release create` (the API) and `git push`
-of the tag; Erkki created it in the GitHub web UI, which worked.
+of the tag; Erkki created it in the GitHub web UI, which worked. 3.0.0-rc10
+was created with `gh release create` without the HTTP 500, so the CLI stays
+the default and the web UI stays the fallback.
 
 The fork `erkkimarkus/magento-connect` is archived read-only (Erkki,
 2026-10-07); its rc1–rc8 releases stay. Nothing of the move is left open.
@@ -288,7 +291,8 @@ is written in English.
   waits for the store's Magento upgrade); 2026-10-07 later: 4/5 (rc9 is
   the first release candidate in the official repository; the pilot
   milestone has no date until a store is confirmed); 2026-10-07 evening:
-  4/5 (3 fixes on master since rc9; pilot store not yet confirmed).
+  4/5 (3 fixes on master since rc9; pilot store not yet confirmed);
+  2026-10-07 night: 4/5 (rc10 released; pilot store not yet confirmed).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

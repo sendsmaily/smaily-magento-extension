@@ -4,6 +4,10 @@
 
 The package version is currently `3.0.0-rc9` — the ninth release-candidate cut of everything below, and the first tagged in this repository. Release candidates are GitHub pre-releases for pilot stores; from 3.0.0-rc9 on, composer installs one only when a store asks for that version or for a minimum stability of `RC`, and still resolves 2.8.1 as the newest stable release.
 
+**Changes since 3.0.0-rc9**
+
+- Two admin texts now read the same in English and Estonian: an import card that stopped before an error tells you to press **Run again**, the button the card shows (the English text said "the import button"), and the Estonian setup notice names the menu **Turundus > Smaily Connect > Algseadistus**, as the Estonian admin shows it, instead of *Marketing > …*. The setup notice is written once, at install, so a store that has it already keeps the earlier wording.
+
 **Changes since 3.0.0-rc8**
 
 - An import that has stalled no longer holds up the imports queued behind it. A running import that nothing has moved for over an hour — for example one whose run fails on the same products every time — is set aside: the imports behind it run, its card keeps showing *Stalled* with **Run again** and **Cancel import**, and it is tried again whenever no other import is waiting. Before, every import queued behind it waited until you pressed **Run again** or **Cancel import** on its card, and their cards named it as the import they waited behind. An import still queued is never set aside: when the import at the front of the line never gets going — for example because it fails before its first page or because cron does not run — the imports behind it still wait, and their cards still name it.

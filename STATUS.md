@@ -5,6 +5,8 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
+**PRO-3957 on branch `fix/admin-et-en-texts` for a PR:** the stopped-import hint names **Run again** in EN (as ET did) and the ET setup notice says *Turundus > Smaily Connect > Algseadistus* (new installs only).
+
 _Last updated: 2026-10-07 — **3.0.0-rc9 is released from the official
 repository**
 (https://github.com/sendsmaily/smaily-magento-extension/releases/tag/3.0.0-rc9):

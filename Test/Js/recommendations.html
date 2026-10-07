@@ -1,0 +1,225 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the storefront recommendations scripts (PRO-3790): the
+  Luma script (view/frontend/web/js/recommendations.js) and the Hyvä script
+  (compat/hyva/.../smaily-recommendations.js), the real scripts, each
+  scenario in a fresh frame with two widget containers. Stubbed:
+  document.cookie (file:// pages keep no cookies), window.fetch (answers the
+  store route with the scenario's status and body), and jQuery as far as the
+  Luma script uses it. The cookie notice's cookie user_allowed_save_cookie
+  holds the website ids the shopper accepted on, e.g. {"1":1}. Run it with
+  bin/test-js.sh; the page ends with "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>recommendations harness</title>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var COOKIE = 'user_allowed_save_cookie';
+    var CARDS = '<div class="block widget block-products-list grid">'
+        + '<a href="https://store.example/jacket.html?smaily_rec=3fa85f64-5717-4562-b3fc-2c963f66afa6'
+        + '&amp;smaily_ctx=storefront">Jacket</a></div>';
+    var failures = 0;
+    var passes = 0;
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function config() {
+        return {
+            url: 'https://store.example/smaily/recommendations/',
+            cookieRestriction: true,
+            websiteId: 1
+        };
+    }
+
+    // Runs in the frame before the scripts under test.
+    function stubs(cookieValue, override, status, body) {
+        return [
+            'var jar = {};',
+            'Object.defineProperty(document, "cookie", {configurable: true,',
+            '  get: function () { return Object.keys(jar).map(function (k) { return k + "=" + jar[k]; }).join("; "); },',
+            '  set: function (v) { var pair = v.split(";")[0], i = pair.indexOf("=");',
+            '    jar[pair.slice(0, i)] = pair.slice(i + 1); }});',
+            cookieValue === null ? '' : 'jar.' + COOKIE + ' = ' + JSON.stringify(encodeURIComponent(cookieValue)) + ';',
+            'window.requests = []; window.requestsBeforeLoad = null;',
+            'window.fetch = function (url, options) {',
+            '  window.requests.push({url: url, options: options});',
+            '  return Promise.resolve({ok: ' + (status >= 200 && status < 300) + ', status: ' + status + ',',
+            '    text: function () { return Promise.resolve(' + JSON.stringify(body) + '); }}); };',
+            'window.addEventListener("load", function () { window.requestsBeforeLoad = window.requests.length; },',
+            '  {capture: true});',
+            override === undefined ? ''
+                : 'window.smailyConnect = {consentOverride: function () { return ' + override + '; }};'
+        ].join('\n');
+    }
+
+    var CONTAINERS = '<div data-smaily-connect-recs></div><p>page content</p><div data-smaily-connect-recs></div>';
+
+    function lumaFrame() {
+        return [
+            '<script>',
+            'var factories = {}, pendingName = null, handlers = {};',
+            'function define(name, deps, factory) {',
+            '  if (typeof name !== "string") { factory = deps; deps = name; name = pendingName; }',
+            '  factories[name] = {deps: deps, factory: factory}; }',
+            'define.amd = {};',
+            'function $() { return {on: function (events, handler) {',
+            '  events.split(" ").forEach(function (e) { (handlers[e] = handlers[e] || []).push(handler); }); }}; }',
+            'window.acceptCookieNotice = function () {',
+            '  (handlers["user:allowed:save:cookie"] || []).forEach(function (h) { h({}); }); };',
+            '<\/script>',
+            '<script>pendingName = "Smaily_Connect/js/recommendations";<\/script>',
+            '<script src="../../view/frontend/web/js/recommendations.js"><\/script>',
+            '<script>',
+            // x-magento-init calls the component once per matching container.
+            'var component = factories["Smaily_Connect/js/recommendations"].factory($);',
+            'document.querySelectorAll("[data-smaily-connect-recs]").forEach(function (el) {',
+            '  component(' + JSON.stringify(config()) + ', el); });',
+            '<\/script>'
+        ].join('\n');
+    }
+
+    function hyvaFrame() {
+        return [
+            '<script>',
+            'window.acceptCookieNotice = function () {',
+            '  window.dispatchEvent(new CustomEvent("user-allowed-save-cookie")); };',
+            '<\/script>',
+            '<script type="application/json" id="smaily-recommendations-config">'
+                + JSON.stringify(config()) + '<\/script>',
+            '<script src="../../compat/hyva/view/frontend/web/js/smaily-recommendations.js"><\/script>'
+        ].join('\n');
+    }
+
+    function settle(win) {
+        return new Promise(function (resolve) {
+            win.setTimeout(resolve, 20);
+        });
+    }
+
+    // Opens a page with two widget containers, lets it load, lets the shopper
+    // act on it, then reports what the page asked and shows.
+    function page(theme, cookieValue, options) {
+        options = options || {};
+
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe');
+
+            frame.onload = function () {
+                var win = frame.contentWindow;
+
+                settle(win).then(function () {
+                    if (options.accept) {
+                        win.eval('jar.' + COOKIE + ' = '
+                            + JSON.stringify(encodeURIComponent(options.accept)) + ';');
+                        win.acceptCookieNotice();
+                        win.acceptCookieNotice();
+                    }
+
+                    return settle(win);
+                }).then(function () {
+                    var slots = win.document.querySelectorAll('[data-smaily-connect-recs]'),
+                        result = {
+                            requests: win.requests.slice(),
+                            requestsBeforeLoad: win.requestsBeforeLoad,
+                            shown: Array.prototype.map.call(slots, function (slot) {
+                                return slot.innerHTML;
+                            })
+                        };
+
+                    frame.remove();
+                    resolve(result);
+                }).catch(reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><script>'
+                + stubs(cookieValue, options.override, options.status || 200,
+                    options.body === undefined ? CARDS : options.body)
+                + '<\/script></head><body>' + CONTAINERS
+                + (theme === 'Luma' ? lumaFrame() : hyvaFrame())
+                + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function askedOnceAndShown(label, result) {
+        check(label + ': nothing is asked before the page has loaded', result.requestsBeforeLoad === 0);
+        check(label + ': the store is asked once', result.requests.length === 1);
+        check(label + ': the store route is asked, with the shopper\'s own cookies and no cache',
+            result.requests.length > 0
+                && result.requests[0].url === 'https://store.example/smaily/recommendations/'
+                && result.requests[0].options.credentials === 'same-origin'
+                && result.requests[0].options.cache === 'no-store');
+        check(label + ': the answer is shown in every container',
+            result.shown.length === 2 && result.shown[0] === CARDS && result.shown[1] === CARDS);
+    }
+
+    function notAsked(label, result) {
+        check(label + ': nothing is asked', result.requests.length === 0);
+        check(label + ': nothing is shown', result.shown.join('') === '');
+    }
+
+    async function run(theme) {
+        var p = function (cookieValue, options) {
+            return page(theme, cookieValue, options);
+        };
+
+        log('# ' + theme);
+        notAsked(theme + ', no consent (no cookie)', await p(null));
+        notAsked(theme + ', the cookie notice accepted on another website', await p('{"2":1}'));
+        askedOnceAndShown(theme + ', the cookie notice accepted on this website', await p('{"1":1}'));
+        askedOnceAndShown(theme + ', the consent override says yes', await p(null, {override: true}));
+        notAsked(theme + ', the consent override says no, cookie accepted', await p('{"1":1}', {override: false}));
+        askedOnceAndShown(theme + ', the shopper accepts the cookie notice on the page',
+            await p(null, {accept: '{"1":1}'}));
+
+        var empty = await p('{"1":1}', {body: ''});
+        check(theme + ', an empty answer: asked once', empty.requests.length === 1);
+        check(theme + ', an empty answer: nothing is shown', empty.shown.join('') === '');
+
+        var failed = await p('{"1":1}', {status: 404, body: '<html>Not found</html>'});
+        check(theme + ', a failed answer: nothing is shown', failed.shown.join('') === '');
+    }
+
+    // bin/test-js.sh runs the page on Chrome's virtual time, which jumps to
+    // the end of its budget whenever no timer is pending (PRO-3738). A short
+    // interval keeps it stepping until the run ends.
+    var keepAlive = setInterval(function () {}, 10);
+
+    run('Luma').then(function () {
+        return run('Hyvä');
+    }).then(function () {
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    }).catch(function (error) {
+        document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }).then(function () {
+        clearInterval(keepAlive);
+    });
+</script>
+</body>
+</html>

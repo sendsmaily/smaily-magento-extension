@@ -315,6 +315,79 @@ class ClientTest extends TestCase
         self::assertSame('{"products":[]}', (string)$this->history[0]['request']->getBody());
     }
 
+    /**
+     * PRO-3790: a logged-in shopper is named by the store customer id only,
+     * at the mapped endpoint, in one attempt bounded by 10 seconds.
+     */
+    public function testCustomerRecommendationsNameTheShopperByTheCustomerIdOnly(): void
+    {
+        $this->settings->method('getEndpoint')->with('recommendations_customer')
+            ->willReturn('https://engine.example/api/v1/recommendations/customer');
+        $client = $this->createClient([new Response(200, [], '{"slots":[]}')]);
+
+        $response = $client->customerRecommendations('1042', 4);
+
+        self::assertSame(['slots' => []], $response);
+        $request = $this->history[0]['request'];
+        self::assertSame('POST', $request->getMethod());
+        self::assertSame('https://engine.example/api/v1/recommendations/customer', (string)$request->getUri());
+        self::assertSame('Bearer sk_test_key', $request->getHeaderLine('Authorization'));
+        self::assertSame('{"customer_external_id":"1042","limit":4}', (string)$request->getBody());
+        self::assertSame(10, $this->history[0]['options']['timeout'] ?? null);
+    }
+
+    /**
+     * PRO-3790: a guest is named by the visitor token only.
+     */
+    public function testVisitorRecommendationsNameTheShopperByTheVisitorTokenOnly(): void
+    {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/recommendations/customer');
+        $client = $this->createClient([new Response(200, [], '{"slots":[]}')]);
+
+        $client->visitorRecommendations('vt_8f3k2a', 4);
+
+        self::assertSame(
+            '{"smaily_visitor_token":"vt_8f3k2a","limit":4}',
+            (string)$this->history[0]['request']->getBody()
+        );
+    }
+
+    /**
+     * PRO-3790: a connection set up before contract v1.9.0 has no
+     * recommendations_customer in its map (§1 "map age").
+     */
+    public function testRecommendationsFallBackToTheContractPathWhenTheMapLacksTheKey(): void
+    {
+        $this->settings->method('getEndpoint')->willReturn(null);
+        $this->settings->method('getEngineBaseUrl')->willReturn('https://engine.example/');
+        $client = $this->createClient([new Response(200, [], '{"slots":[]}')]);
+
+        $client->customerRecommendations('7', 4);
+
+        self::assertSame(
+            'https://engine.example/api/v1/recommendations/customer',
+            (string)$this->history[0]['request']->getUri()
+        );
+    }
+
+    /**
+     * PRO-3790: a failing engine gets one attempt and no wait.
+     */
+    public function testRecommendationsAreOneAttemptWithoutAWait(): void
+    {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/recommendations/customer');
+        $client = $this->createClient([new Response(503, [], '{"error":"unavailable"}')]);
+
+        try {
+            $client->customerRecommendations('7', 4);
+            self::fail('A 503 is a transport failure');
+        } catch (EngineTransportException $exception) {
+            self::assertSame(503, $exception->getHttpStatus());
+        }
+        self::assertCount(1, $this->history);
+        self::assertSame([], $this->sleeps);
+    }
+
     public function testCustomerDeleteSubstitutesEmailPlaceholderAndTreats404AsSuccess(): void
     {
         $this->settings->method('getEndpoint')->with('customer_delete')

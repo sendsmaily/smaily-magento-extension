@@ -328,10 +328,11 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   is the full row with `in_stock: false`, never a patch); a full import
   by hand whenever the merchant starts one; no scheduled full re-sync. A
   catalog import does not remove a product that is missing from it — the
-  engine never deletes by absence, so the delete paths above are its only
-  delete signal, and a product deleted where no event sees it (a direct
-  database delete, a tool that bypasses Magento's import) stays in the
-  engine as it was. A release that adds a catalog field, or corrects what one holds,
+  engine deletes by absence only through the nightly catalog manifest
+  (contract v1.12.0, §3c), which this module does not send, so the delete
+  paths above are its only delete signal from this store, and a product
+  deleted where no event sees it (a direct database delete, a tool that
+  bypasses Magento's import) stays in the engine as it was. A release that adds a catalog field, or corrects what one holds,
   tells the merchant to start the catalog import by hand: no scheduled
   re-sync carries it.
   On an upgrade, Magento ignores the removed job's leftover `cron_schedule`
@@ -1229,7 +1230,7 @@ Initial setup, Settings, Log. Design rules:
 ## Wire contracts
 
 The authoritative engine contract is
-[RECENGINE_API_CONTRACT.md](RECENGINE_API_CONTRACT.md) (v1.8.3, byte-synced
+[RECENGINE_API_CONTRACT.md](RECENGINE_API_CONTRACT.md) (v1.12.0, byte-synced
 across the Smaily connect repositories). Load-bearing invariants
 implemented here:
 

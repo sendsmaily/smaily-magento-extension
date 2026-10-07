@@ -1,8 +1,8 @@
-# Smaily Recommendation Engine — API Contract v1.8
+# Smaily Recommendation Engine — API Contract v1.12
 
-**Version**: 1.8.3
+**Version**: 1.12.0
 **Published**: 2026-05-19
-**Last updated**: 2026-10-05 (v1.8.3 — §3/§3b: catalog sync lifecycle. A full import at setup, changes after that, a full import by hand when the merchant starts one; no scheduled full re-sync. PATCH bump: no new endpoint, field or wire shape — PRO-3740)
+**Last updated**: 2026-10-06 (v1.12.0 — new §3c `POST /api/v1/ingest/catalog/manifest`: once a night the sender sends every product code with its stock; the engine removes products missing from the list (as §3b), corrects stock, counts products it does not have, and a truncation guard removes nothing when the list is empty or would remove more than 20% of the live catalog. MINOR bump: new endpoint — PRO-3763)
 **Status**: Stable — basis for plugin implementation
 
 ---
@@ -48,6 +48,7 @@ This document consolidates the earlier dialogue (`RECENGINE_API_ANALYSIS.md` + `
    - [GET /api/v1/ingest/ping](#2-get-apiv1ingestping)
    - [POST /api/v1/ingest/catalog](#3-post-apiv1ingestcatalog)
    - [POST /api/v1/ingest/catalog/remove](#3b-post-apiv1ingestcatalogremove)
+   - [POST /api/v1/ingest/catalog/manifest](#3c-post-apiv1ingestcatalogmanifest)
    - [POST /api/v1/ingest/customers](#4-post-apiv1ingestcustomers)
    - [POST /api/v1/ingest/orders](#5-post-apiv1ingestorders)
    - [POST /api/v1/ingest/browse](#6-post-apiv1ingestbrowse)
@@ -59,6 +60,7 @@ This document consolidates the earlier dialogue (`RECENGINE_API_ANALYSIS.md` + `
    - [GET /api/v1/automations/config](#12-get-apiv1automationsconfig)
    - [PUT /api/v1/automations/config](#13-put-apiv1automationsconfig)
    - [POST /api/v1/notifications/ingest](#14-post-apiv1notificationsingest)
+   - [POST /api/v1/recommendations/customer](#15-post-apiv1recommendationscustomer)
 9. [Appendices](#appendices)
 
 ---
@@ -85,7 +87,7 @@ This document consolidates the earlier dialogue (`RECENGINE_API_ANALYSIS.md` + `
 - Tenant IDs: UUID v4
 - Customer IDs: UUID v4 (generated engine-side from the first customer ingest)
 - Recommendation IDs: UUID v4
-- Visitor tokens: opaque string, 8–12 characters, prefix `vt_`
+- Visitor tokens: opaque string. Engine-issued (email links): prefix `vt_`, 8–12 characters. Store-created at checkout (v1.11.0, [§5](#store-created-visitor-token)): `vs_` + exactly 22 characters `[A-Za-z0-9]`
 - Order `external_id`: text, plugin/platform-defined
 - SKU: text, max 64 characters
 
@@ -163,7 +165,7 @@ https://shop.example.com/product/widget?
 |-----------|---------|-----|
 | `smaily_vt` | Visitor token (opaque, prefix `vt_`) | Identity resolution (anonymous → customer_id) |
 | `smaily_rec` | Recommendation ID (UUID) | Attribution: which recommendation was clicked |
-| `smaily_ctx` | Context string (`welcome`, `cart_abandoned`, `cross_sell`, etc.) | Attribution: in which context the click occurred |
+| `smaily_ctx` | Context string (`welcome`, `cart_abandoned`, `cross_sell`, etc.; `email` on an email slot without an intent; `storefront` on a storefront slot link, §15) | Attribution: in which context the click occurred. **Every link that carries `smaily_rec` also carries `smaily_ctx`** (v1.9.0). |
 
 **UTM namespace** is reserved for the client's marketing tools (Google Analytics, ad platforms). The engine does NOT use `utm_content` for `rec_id` — that would pollute GA attribution data.
 
@@ -184,6 +186,8 @@ The plugin manages four cookies. Names come from the **engine setup-response con
 **Domain**: `auto` (uses the `Domain=.example.com` pattern so both `www.example.com` and `example.com` are covered).
 
 **Last-touch overwrite**: each new email click overwrites `smaily_rec_id` and `smaily_rec_ctx`. Last touch wins on the cookie. **The engine retains first-touch info** in the `rec_attribution` table; the cookie carries only last touch.
+
+**Context cookie rule** (v1.9.0): a landing whose URL carries `smaily_rec` sets `smaily_rec_id` to it AND sets `smaily_rec_ctx` to the URL's `smaily_ctx` — or **clears** `smaily_rec_ctx` when the URL has no `smaily_ctx`. The two cookies always describe the same landing. This applies to every landing with `smaily_rec`, storefront slot links (§15) included. Without it, an email click after a storefront click would leave the `storefront` context standing, and the purchase would be credited to the store instead of the email.
 
 ---
 
@@ -267,6 +271,7 @@ HTTP 400 Bad Request
 | `/api/v1/identity/merge` | 100 requests | per 1 second |
 | `/api/v1/automations/...` | 100 requests | per 1 second |
 | `/api/v1/notifications/ingest` | 100 requests | per 1 second |
+| `/api/v1/recommendations/customer` | 100 requests | per 1 second |
 | `/api/v1/customer/...` (GDPR) | 10 requests | per 60 seconds |
 | `/api/setup/exchange` | 10 requests | per 60 seconds (per IP) |
 
@@ -421,6 +426,7 @@ User-Agent: <plugin-identifier>/<version>  (e.g. "SmailyRecEngine-WooPlugin/0.1.
     "ingest_ping":       "https://intelligence.smaily.com/api/v1/ingest/ping",
     "ingest_catalog":    "https://intelligence.smaily.com/api/v1/ingest/catalog",
     "ingest_catalog_remove": "https://intelligence.smaily.com/api/v1/ingest/catalog/remove",
+    "ingest_catalog_manifest": "https://intelligence.smaily.com/api/v1/ingest/catalog/manifest",
     "ingest_customers":  "https://intelligence.smaily.com/api/v1/ingest/customers",
     "ingest_orders":     "https://intelligence.smaily.com/api/v1/ingest/orders",
     "ingest_browse":     "https://intelligence.smaily.com/api/v1/ingest/browse",
@@ -430,6 +436,7 @@ User-Agent: <plugin-identifier>/<version>  (e.g. "SmailyRecEngine-WooPlugin/0.1.
     "customer_opt_out":  "https://intelligence.smaily.com/api/v1/customer/{email}/opt-out",
     "recommendations_preview": "https://intelligence.smaily.com/api/v1/recommendations/preview",
     "recommendations_issue":   "https://intelligence.smaily.com/api/v1/recommendations/issue",
+    "recommendations_customer": "https://intelligence.smaily.com/api/v1/recommendations/customer",
     "automations_catalog":     "https://intelligence.smaily.com/api/v1/automations/catalog",
     "automations_config":      "https://intelligence.smaily.com/api/v1/automations/config",
     "notifications_ingest":    "https://intelligence.smaily.com/api/v1/notifications/ingest"
@@ -456,6 +463,8 @@ User-Agent: <plugin-identifier>/<version>  (e.g. "SmailyRecEngine-WooPlugin/0.1.
 ```
 
 **Endpoint map convention**: keys use `ingest_*`, `identity_*`, `customer_*`, `recommendations_*`, `automations_*` prefixes for the categories. Plugin code should read endpoint URLs from this map (`endpoints[ingest_catalog]`) rather than concatenating base URL + hardcoded paths. This way, future path migrations on the engine side don't require plugin updates — only the setup-response map changes.
+
+> **Deprecated keys** (v1.9.1, PRO-3793): `recommendations_preview` and `recommendations_issue` point at routes that the engine retired on 2026-07-13 (PRO-1295); they answer `404`. The setup response still carries both keys, so the map shape does not change, but plugins must not call them. Contract 2.0 removes both keys. Storefront recommendations use `recommendations_customer` ([§15](#15-post-apiv1recommendationscustomer)).
 
 > **Map age**: a connection keeps the endpoints map it received at exchange time. Connections established before a key existed (e.g. the `automations_*` keys, added v1.1.0) won't have it in their stored map — the plugin ships fallback path constants for exactly this case (the existing `resolve_url()` pattern). New keys serve future path migrations, not retroactive updates.
 
@@ -650,7 +659,7 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 - **One row per canonical product — collapse translations.** Send exactly one catalog row per real, purchasable product. Do **NOT** send a separate row per language: a multilingual product (WPML/Polylang) must be a **single `sku`** whose translations are carried in the `{lang: value}` object form of `name` / `description` / `product_url` (see *Multilingual variant* above). Keep the `sku` identical across languages and across syncs. Emitting one row per translation creates duplicate SKUs that the engine **cannot** dedupe (there is no language tag or parent link), producing language-mixed recommendations.
 - **Parent product id — `tags.product_id`.** Alongside the variant-level `sku`, emit the platform **parent product id** as `tags.product_id` (Shopify `<product_id>`, Woo `<product_id>`). All variants of one product share one `tags.product_id`. The engine uses it for **product-level removal** (see [§3b](#3b-post-apiv1ingestcatalogremove)) and for **cross-variant grouping** — it groups catalog variants sharing a `tags.product_id` into one product family for cross-variant cadence and `sample_to_full` (live since PRO-1227). `sku` stays the variant-level key and `external_id` stays the variant id; only the grouping is by parent. Shopify and Woo emit it today; Magento rolls it in with its canonical-key work. Where a sender does not emit it, product-level removal is unavailable and cadence/grouping degrade to per-SKU for that sender (per-SKU `in_stock=false` still works).
 - **Real products only.** Do not send non-purchasable artifacts: language-switcher pseudo-products, gift cards, donation items, or virtual config entries. *(The engine additionally derives an internal `recommendable` flag at ingest to defensively exclude such items — see [Engine-internal fields](#engine-internal). The source should still not send them, to avoid catalog bloat.)*
-- **Lifecycle is UPSERT-only — no delete-by-absence; removal is soft, never a hard delete.** The engine UPSERTs by `sku` and never removes a `sku` merely because it stopped appearing in a sync. **Removal is explicit and always *soft*:** either re-send the product with `in_stock=false` (per-SKU), or call [`POST /api/v1/ingest/catalog/remove`](#3b-post-apiv1ingestcatalogremove) with the parent `product_id` to tombstone all of a product's SKUs at once (the path for a platform hard-delete, where the webhook gives only the product id). A tombstone sets `in_stock=false` + `recommendable=false` — it drops the product from every recommendation path but **keeps the row**. Catalog rows (like `orders` / `order_items`) are **retained as a learning corpus** and are **never hard-deleted** except on GDPR erasure or tenant offboarding; the engine offers no full-catalog replace/reconcile and does not delete by absence. When to send what is the [catalog sync lifecycle](#catalog-sync-lifecycle) below. **Consequence when changing the SKU scheme:** migrated old SKUs are **not** auto-removed — they linger as stale rows; orphan removal at a SKU-scheme migration is a **one-time manual purge** on the engine side, coordinated with the sender.
+- **Lifecycle is UPSERT-only; removal is soft, never a hard delete.** The engine UPSERTs by `sku` and never removes a `sku` merely because it stopped appearing in a §3 sync or a full import. The one place absence counts is the nightly [manifest (§3c)](#3c-post-apiv1ingestcatalogmanifest), which lists the store's complete catalog. **Removal is explicit and always *soft*:** either re-send the product with `in_stock=false` (per-SKU), or call [`POST /api/v1/ingest/catalog/remove`](#3b-post-apiv1ingestcatalogremove) with the parent `product_id` to tombstone all of a product's SKUs at once (the path for a platform hard-delete, where the webhook gives only the product id). A tombstone sets `in_stock=false` + `recommendable=false` — it drops the product from every recommendation path but **keeps the row**. Catalog rows (like `orders` / `order_items`) are **retained as a learning corpus** and are **never hard-deleted** except on GDPR erasure or tenant offboarding; the engine offers no full-catalog replace and deletes by absence only through the §3c manifest. A product missing from the nightly [manifest (§3c)](#3c-post-apiv1ingestcatalogmanifest) is tombstoned the same way. When to send what is the [catalog sync lifecycle](#catalog-sync-lifecycle) below. **Consequence when changing the SKU scheme:** migrated old SKUs are **not** auto-removed — they linger as stale rows; orphan removal at a SKU-scheme migration is a **one-time manual purge** on the engine side, coordinated with the sender.
 
 <a name="catalog-sync-lifecycle"></a>
 **Catalog sync lifecycle** (v1.8.3, PRO-3740):
@@ -663,8 +672,9 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
    - **Platform hard delete** → [§3b](#3b-post-apiv1ingestcatalogremove) with the parent `product_id`.
 
    **Send the whole row, not a patch.** The UPSERT replaces every sender-owned column with the value in the request, so an optional field that a change omits (`compare_price`, `description`, `image_url`, …) is cleared. Only `tags` is merged (keys the request does not set are kept).
-3. **Full import by hand.** The merchant can start a full import at any time. It uses the same §3 batches as the setup import and is safe to repeat (natural-key UPSERT, [Idempotency](#idempotency)). It does **not** remove products that are missing from it — the engine does not delete by absence.
+3. **Full import by hand.** The merchant can start a full import at any time. It uses the same §3 batches as the setup import and is safe to repeat (natural-key UPSERT, [Idempotency](#idempotency)). It does **not** remove products that are missing from it — absence counts only in the nightly [manifest (§3c)](#3c-post-apiv1ingestcatalogmanifest).
 4. **No scheduled full re-sync.** The engine does not need a periodic full re-sync and does not expect one. A sender that still runs one causes no harm (the UPSERT is idempotent, and back-in-stock detection only reacts to a real stock transition), but it is not part of this contract.
+5. **Nightly manifest (v1.12.0).** Once a night the sender sends the store's complete product list — `sku` + `in_stock` only — to [§3c](#3c-post-apiv1ingestcatalogmanifest). It heals lost stock-change and delete events, and tells the operator when a full import is needed.
 
 **What the engine reconciles itself.** Every engine-derived catalog value is computed from data the engine already stores on the row (`name`, `name_i18n`, `category_path`, `product_type`, `raw_attributes`, `tags`) or from other engine data. When the engine changes its own rules, it re-derives the values engine-side, from the stored rows. **No plugin re-sync is needed and the engine never asks for one for this reason.**
 - `recommendable` (see [Engine-internal fields](#engine-internal)) — computed on every upsert; after a classifier change the engine re-classifies stored rows with an engine-side backfill.
@@ -676,9 +686,9 @@ The engine accepts both forms — field type is checked at runtime. Storage beha
 **When a full import from the plugin is required.** Only when the engine needs data that it does not store:
 - A contract change that adds a catalog field, or changes what a field must hold. The changelog entry for that version says so explicitly (as the v1.4.0 entry did for the order gross-amount re-sync). Without such a note, no re-sync is needed after an engine release.
 - A sender-side mapping fix: the sender corrects what it sends (for example attribute labels instead of term ids). The corrected values exist only in the store.
-- After the sender knows that it lost change events (see the next paragraph).
+- After the sender knows that it lost change events, or the engine's operator reports that the [manifest (§3c)](#3c-post-apiv1ingestcatalogmanifest) named products the engine does not have.
 
-**Known gap: a lost change is not healed automatically.** Without a scheduled full re-sync, a change event that never reaches the engine (a failed webhook, a dropped queue item, an outage longer than the sender's retries) stays wrong until that product changes again or the merchant runs a full import. The engine cannot detect this today: it keeps no per-row last-sync time and does not compare its catalog with the store. Deletes are a special case that a full re-sync never covered either: a product missing from a full import is not removed, so a lost delete event stays unhealed until the sender sends §3b or an `in_stock=false` row for that product. Senders therefore **SHOULD** send change events from a durable queue with retries, and show the merchant when events fail, so that the merchant knows when to start a full import by hand.
+**Lost change events are healed by the nightly manifest.** A change event that never reaches the engine (a failed webhook, a dropped queue item, an outage longer than the sender's retries) used to stay wrong until that product changed again or the merchant ran a full import. Since v1.12.0 the [manifest (§3c)](#3c-post-apiv1ingestcatalogmanifest) heals the two cases that keep a wrong product in recommendations within a night: a lost stock change (the engine takes the manifest's `in_stock`) and a lost delete (a product missing from the manifest is tombstoned as §3b does). Other lost field changes (name, price, category, …) are not in the manifest and still wait for the next change of that product or a full import; a product the store has and the engine does not is reported to the operator as "full import needed". Senders **SHOULD** still send change events from a durable queue with retries, and show the merchant when events fail.
 
 <a name="engine-internal"></a>
 **Engine-internal fields** (not part of the request — do not send): the engine derives some columns at ingest that senders never supply. Notably `recommendable` (boolean): the engine's **exclusion decision** (a per-store/business-model call the connector must NOT make). Derived primarily from the **`product_type` signal** (gift-card types → excluded), with `sku`/`category_path`/`name` heuristics as fallback (test artifacts `LIVE-*`/`live-test`, name-matched gift cards/donations). `is_virtual`/`is_downloadable` are **stored but do NOT auto-exclude** (digital-goods stores sell those). Recomputed on every upsert, so a corrected sync self-heals; tunable engine-side without redeploying connectors. Excluded products are never recommended via any path. **Division of labour: the connector sends structural signal; the engine owns the exclusion.**
@@ -772,7 +782,7 @@ Returned when every product carrying an `event_id` in the request was already pr
 - **All SKUs at once.** A product's variants share one `tags.product_id`, so one id removes the whole product.
 - **Idempotent.** Re-removing an already-removed product is a no-op. A product id matching no rows is counted in `not_found`, not an error.
 - **Effect on serving.** A tombstoned product is excluded from every recommendation path (hard-gate, tier-0, orchestrator); if it was in a customer's replenishment set, the `stock_status_change` trigger surfaces a substitute.
-- **The only delete signal.** The engine never deletes by absence, so this call (or an `in_stock=false` row via §3) is the only way it learns that a product is gone — a full import does not remove a product that is missing from it. Send it from a durable queue with retries; a lost delete event is not healed automatically (see [catalog sync lifecycle](#catalog-sync-lifecycle)).
+- **The direct delete signal.** A full import does not remove a product that is missing from it, so this call (or an `in_stock=false` row via §3) is how the engine learns at once that a product is gone. Send it from a durable queue with retries; a lost delete event is healed by the next nightly [manifest (§3c)](#3c-post-apiv1ingestcatalogmanifest), which tombstones each SKU missing from the store's list the same way.
 
 **Response 200 OK**:
 ```json
@@ -787,6 +797,72 @@ Returned when every product carrying an `event_id` in the request was already pr
 `removed_products` = ids that matched ≥1 row; `rows_tombstoned` = catalog rows set to `in_stock=false` + `recommendable=false`; `not_found` = ids that matched no row for this tenant (safe to ignore — already removed, or never sent).
 
 **Errors**: a malformed wrapper (`product_ids` missing / not an array / empty / >1000) → `400 validation_failed` (same shape as §3). Auth and rate-limit behave as the other ingest routes.
+
+---
+
+### 3c. POST /api/v1/ingest/catalog/manifest
+
+**Nightly catalog manifest** (v1.12.0, PRO-3763). Once a night the sender sends the store's **complete** product list — the product code and its stock, nothing else. The engine compares it with its own catalog for the store and heals what lost change events left wrong.
+
+**URL**: `POST /api/v1/ingest/catalog/manifest`
+
+**Auth**: `Authorization: Bearer sk_...`
+
+**Rate limit**: shares the `/api/v1/ingest/catalog` bucket (100 req/sec). One request per night is expected.
+
+**Request body**:
+```json
+{
+  "products": [
+    {"sku": "woo-101", "in_stock": true},
+    {"sku": "woo-102", "in_stock": false}
+  ]
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `products` | array | YES | The store's **complete** product list, **0–50,000** items, in **one** request. Send every product the store has, in stock or not. |
+| `products[].sku` | string (1–64) | YES | The same `sku` value §3 sends for the product (the canonical identity token — see [Product identity](#catalog-identity)). One item per catalog row, variants included. |
+| `products[].in_stock` | boolean | YES | The product's stock now, with the same meaning as §3 `in_stock`. |
+
+Send nothing else (no names, prices or descriptions). Unknown keys are ignored. Send compact JSON: the request body must stay under 4.5 MB (the hosting limit; about 50,000 items with typical SKUs).
+
+**When and what to send.**
+- Once a night, at a quiet hour. Build the list immediately before sending it.
+- The list covers the **whole store catalog**, however many connections feed this tenant. A product left out is treated as deleted.
+- A store with more than 50,000 products cannot use this endpoint yet; it must not send a partial list.
+
+**What the engine does** with each difference:
+
+| Case | Engine action |
+|------|---------------|
+| Product in the engine, **missing** from the list | Tombstoned exactly as [§3b](#3b-post-apiv1ingestcatalogremove) does: `in_stock=false` + `recommendable=false`, row kept. It is no longer recommended. A row that is already tombstoned is left alone. |
+| Product in both, `in_stock` **differs** | The engine takes the list's value. The back-in-stock clock is kept as for a §3 stock change, but a product found back in stock **here sends no back-in-stock email** — the real time of the restock is unknown. |
+| Product in the list, **missing** in the engine | Not created (the list has no name or price). Counted and reported to the engine's operator as "full import needed". |
+| Same `sku` twice in the list | The last occurrence wins. |
+
+**Truncation guard.** If the list is **empty**, or would remove **more than 20%** of the store's live catalog rows (rows not already tombstoned), the engine removes **nothing**. Stock corrections still apply. The engine's operator gets a warning. The guard does not apply when nothing would be removed. Nightly drift is one day of lost delete events — far below 20%; a list cut short by a paging bug or a timeout is usually far above it. When the guard trips on a real cleanup, the engine's operator removes the products by hand.
+
+**Idempotent.** Re-sending the same list changes nothing: removed products are no longer live, corrected stock already matches. Each manifest overwrites the engine's record of the last one.
+
+**Response 200 OK**:
+```json
+{
+  "ok": true,
+  "products_in_manifest": 1840,
+  "removed": 3,
+  "stock_fixed": 12,
+  "missing_in_engine": 0,
+  "guard_tripped": false,
+  "guard_reason": null,
+  "would_remove": 3
+}
+```
+
+`products_in_manifest` = distinct SKUs in the list; `removed` = rows tombstoned; `stock_fixed` = rows whose `in_stock` changed; `missing_in_engine` = SKUs in the list that the engine does not have; `guard_tripped` / `guard_reason` (`"empty_list"` | `"too_many_removals"` | `null`) = whether the guard stopped the removals; `would_remove` = rows the list would remove (equal to `removed` unless the guard tripped). The sender does not need to act on any of these; the engine's operator sees them.
+
+**Errors**: a malformed wrapper or item (`products` missing / not an array / more than 50,000 items; an item without a non-empty `sku` of at most 64 characters or without a boolean `in_stock`) → `400 validation_failed` (same shape as §3). The whole list is rejected: a partly accepted list would read as missing products. Auth and rate limit behave as the other ingest routes.
 
 ---
 
@@ -927,8 +1003,8 @@ Batch upload of orders + line items. **Order natural key is `(tenant_id, externa
 | `currency` | string (ISO 4217) | NO | Default `EUR`. Stored **as sent** — not strictly ISO-validated. |
 | `status` | enum | YES | `completed` / `processing` / `cancelled` / `refunded`. **Required** — a missing or out-of-enum `status` is a per-item `errors[]` entry. |
 | `smaily_rec_id` | UUID v4 string | NO | Attribution: which recommendation was clicked pre-purchase (from cookie). Stored; consumed by the async attribution cron (see below). **UUID-validated — a malformed value rejects the whole order** (see below). |
-| `smaily_visitor_token` | string | NO | Attribution: visitor token (from cookie). Stored; async. |
-| `smaily_rec_ctx` | string | NO | Attribution: context (from cookie). **Stored and available to the attribution flow, but not yet consumed by matching** (future feature). |
+| `smaily_visitor_token` | string | NO | Visitor token from the visitor-token cookie: an engine-issued `vt_` token, or a token the store created at checkout (`vs_`, v1.11.0 — [below](#store-created-visitor-token)). Stored; attribution is async. Also binds the token to the order's customer (below). |
+| `smaily_rec_ctx` | string | NO | Attribution: context (from the `smaily_rec_ctx` cookie). Never decides *which* recommendation matches. Since v1.9.0 it decides the **channel**: `storefront` with a cookie match = a storefront credit (§15). Forward it on every order that carries `smaily_rec_id`. |
 | `session_id` | string | NO | Accept-and-ignore (PRO-1544): stored on the order, but no longer read by the attribution matcher — the browse-event/`session_id` matching step it used to feed was removed in PRO-1524. Kept accepting it so senders don't need a plugin update. |
 | `items[]` | array | YES | Order line items |
 | `items[].sku` | string | YES | |
@@ -991,7 +1067,19 @@ Matching steps (run by the cron; PRO-1524, 2026-07-23 — a former 4th-priority
 3. Else → most recent email `click` for this customer with a `recommendations` link, within the match window (default **30 days**; per-tenant override via `tenant_settings.attribution_match_window_days`) → match.
 4. No match → `rec_attribution` with `attribution_type='control_purchase'`, `outcome_score=0.0` (a softer `assisted_open` tier may also apply here — see `lib/engine/attribution/match-purchase-to-rec.ts`).
 
-`smaily_rec_ctx` is stored and made available to the attribution flow but **not yet consumed by matching** (future feature). Detailed logic lives in `lib/engine/attribution/`.
+`smaily_rec_ctx` never decides which recommendation matches. Since v1.9.0 it decides the channel of a step-1 (cookie) match: when the order carries `smaily_rec_ctx: "storefront"`, the purchase is credited to the storefront (§15) — no email click time and no email campaign — else to the email. Detailed logic lives in `lib/engine/attribution/`.
+
+<a id="store-created-visitor-token"></a>
+**Store-created visitor token** (v1.11.0, PRO-3844). An engine `vt_` token exists only for a shopper who clicked a Smaily email link. So that a **guest buyer** can be recognised on a later visit ([§15](#15-post-apiv1recommendationscustomer)), the store may create a token itself at checkout and send it on this order's existing `smaily_visitor_token` field. There is no new field.
+
+- **Format.** `vs_` followed by exactly 22 characters from `[A-Za-z0-9]`, from a cryptographically secure random source (for example 16 random bytes, base62). The prefix shows in the data that the store created the token.
+- **Consent.** Create and send a `vs_` token **only for a shopper who gave marketing consent** at checkout. Without consent, create no token and send none.
+- **Cookie.** Store the token in the visitor-token cookie (default name `smaily_rec_uid`, [cookie names](#cookie-names-plugin-side-management)). A cookie the **server sets** (`Set-Cookie` header) is recommended: Safari deletes cookies set by page JavaScript after 7 days. When the shopper already has a visitor-token cookie (an engine `vt_` token from an email link), keep it and send that value — do not replace it with a new token.
+- **What the engine does.** When the order is written, the engine binds the token to the order's customer (the `customer_email` customer). An unknown `vs_` token is created for that customer. A token that is already bound to the **same** customer is renewed. A token that is already bound to **another** customer does not move — the [one-customer-per-token rule](#one-customer-per-visitor-token) — and the order is still written. A customer who objected to profiling ([§10](#10-post-apiv1customeremailopt-out)) is not bound.
+- **Lifetime.** A token carried on an order lives **365 days from that order**. Every later order that carries the same token renews it to 365 days from that order; a token is never shortened. An engine `vt_` token that is never carried on an order keeps its 90 days from issue.
+- **An invalid value is ignored, never rejected.** A value that starts with `vs_` but does not match the format is stored on the order like any other value and creates no binding; the order is written normally and there is no `errors[]` entry.
+- **No credit by itself.** A store-created token names the shopper; it carries no recommendation, so it never makes a purchase an email or storefront credit. Purchase credit still comes from `smaily_rec_id` / `smaily_rec_ctx` and email clicks, as above.
+- **Response.** The binding is not reported in the response; the response shape does not change.
 
 <a id="rec-id-uuid-validation"></a>
 **`smaily_rec_id` is UUID-validated, and a bad value costs the order — not just the field.** The value is a `recommendations.rec_id`, so the route types it as a UUID (`z.string().uuid()`). A present-but-malformed value (a truncated cookie, a `rec_abc123`-style placeholder, an empty string) fails per-order validation: that order lands in `errors[]` with `field: "smaily_rec_id"` and is **not written** — the order's revenue is lost to the engine, not merely its attribution. This is the standard per-order rejection path described above: the rest of the batch still processes, the rejected order's `event_id` is not registered, and a corrected retry writes it normally. **Sender rule**: omit the field entirely when there is no cookie or the cookie value is not a well-formed UUID. Omitted (or `null`) is always safe — the order then attributes through the visitor-token or email-click mechanism, or as `control_purchase`. Do not send `""`.
@@ -1837,6 +1925,114 @@ curl -X POST https://intelligence.smaily.com/api/v1/notifications/ingest \
 
 ---
 
+### 15. POST /api/v1/recommendations/customer
+
+Storefront recommendations (v1.9.0, PRO-3781; visitor token v1.10.0, PRO-3834): the current recommendations of one shopper, for the plugin to show in the store (product page, cart, account page). **The same products, in the same order and language, as in that customer's Smaily contact fields** (`rec_N_*`) — the engine serves the recommendations it already issued; nothing is computed on the request.
+
+**URL**: `POST /api/v1/recommendations/customer`
+
+**Auth**: `Authorization: Bearer sk_...`. **Server-side calls only** — the API key never reaches the browser. The plugin's backend calls this endpoint and renders the result.
+
+**Rate limit**: 100 req/sec per tenant.
+
+**Request body** — a logged-in shopper:
+```json
+{
+  "customer_external_id": "1042",
+  "limit": 4
+}
+```
+
+A returning guest shopper (no store customer account), named by the visitor token from the store's cookie (v1.10.0):
+```json
+{
+  "smaily_visitor_token": "vt_8f3k2a",
+  "limit": 4
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `customer_external_id` | string | ONE OF | The **store's own customer id** of the logged-in shopper — the `external_id` the plugin sends on [`POST /api/v1/ingest/customers`](#4-post-apiv1ingestcustomers) (WooCommerce user id, Shopify customer id, Magento customer id). 1–255 characters. |
+| `smaily_visitor_token` | string | ONE OF | The visitor token from the visitor-token cookie (default name `smaily_rec_uid`, [cookie names](#cookie-names-plugin-side-management)) — the `smaily_vt` value of an engine link, or the token the store created at checkout and sent on the order (v1.11.0, [§5](#store-created-visitor-token)). 1–255 characters. Send it for a shopper who has no store customer id, so a guest shopper can be shown their recommendations. |
+| `limit` | integer | NO | Default `9`, max `9`. A value above 9 is clamped, not rejected. |
+
+**At least one of `customer_external_id` and `smaily_visitor_token` is required.** When the request carries both, **`customer_external_id` wins and the token is ignored entirely** — the engine does not fall back to the token when the customer id finds nobody, because on a shared browser the cookie can belong to a different person than the logged-in shopper.
+
+**Which customer a token names** (v1.11.0). An engine `vt_` token names the customer the engine issued it for, for 90 days from issue. A token carried on an order — a store-created `vs_` token or a `vt_` token — names the order's customer for 365 days from the latest order that carried it ([§5](#store-created-visitor-token)). The empty-answer rules below are the same for both.
+
+**Which customer a visitor token names.** The customer the engine issued the token for, in this tenant, while the token is valid: a token is valid for 90 days after the engine issued it, even though the cookie lives longer. An expired token, a token issued for another tenant, and a value the engine never issued are all answered as an unknown shopper (the empty answer below). Send the token only for a shopper who has given marketing consent in the store (Erkki's decision 2026-10-06).
+
+**Never send an email address, name or other contact detail** in this request. The shopper is named by the store's id or the visitor token only. Unknown fields are ignored.
+
+**Response 200 OK**:
+```json
+{
+  "slots": [
+    {
+      "position": 1,
+      "rec_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "sku": "woo-24150",
+      "external_id": "24150",
+      "name": "Grain-free adult food 3 kg",
+      "description": "…",
+      "price": 29.99,
+      "compare_price": 34.99,
+      "in_stock": true,
+      "image_url": "https://shop.example.com/img/24150.jpg",
+      "product_url": "https://shop.example.com/product/24150?smaily_rec=3fa85f64-5717-4562-b3fc-2c963f66afa6&smaily_ctx=storefront",
+      "headline": "…",
+      "cta": "…",
+      "reason": "…"
+    }
+  ]
+}
+```
+
+| Field | Notes |
+|-------|-------|
+| `slots` | Up to `limit` slots, in the email's order. **Can be empty** (see below). Never padded: a slot whose product is gone from the catalog is left out, as in the email. |
+| `position` | 1-based, consecutive. |
+| `rec_id` | The recommendation (UUID). The same id is in the customer's email fields. |
+| `sku` | The canonical catalog key ([§3](#3-post-apiv1ingestcatalog)) — the stable product identity. |
+| `external_id` | The catalog row's `external_id`, **nullable**. When null, use `sku` (for `woo-` and `shp-` keys the platform id is the `sku` without its prefix). On a multilingual stand-in row it can differ from the id in `sku`; render with `external_id`, identify with `sku`. |
+| `name`, `description`, `product_url` | Localized in the customer's language (`customers.language`), else the tenant default — as in the email. `description` is not truncated. |
+| `price`, `compare_price` | Numbers; `compare_price` nullable. Read live from the catalog at request time. No currency — render in the store's own. |
+| `in_stock` | Live from the catalog. **Informational** — an out-of-stock slot is not removed. Re-check price and stock locally before rendering. |
+| `image_url` | Nullable. |
+| `product_url` | `<product url>?smaily_rec=<rec_id>&smaily_ctx=storefront` — **no `utm_*` and no `smaily_vt`** (an on-site click is not email traffic). Null when the product has no valid absolute URL. Capture it like any landing with `smaily_rec` ([context cookie rule](#cookie-names-plugin-side-management)), and forward `smaily_rec_id` + `smaily_rec_ctx` on the order. |
+| `headline`, `cta`, `reason` | The slot copy the email renders, in the customer's language. Rendered **without the customer's first name** — a greeting falls back to its default word. Nullable. |
+
+**Empty answer.** `{ "slots": [] }` with status 200 for: an unknown `customer_external_id`; an unknown, expired or other-tenant `smaily_visitor_token`; an id that several customers share in the tenant; a customer in the holdout group of a running measurement; a customer who objected to profiling ([§10](#10-post-apiv1customeremailopt-out)) or whom Smaily reports unsubscribed; a customer with no current recommendations. **The response is the same in every case and does not say which** — render nothing (or your own fallback). Do not retry.
+
+**Attribution.** A purchase whose last landing was a storefront link (order `smaily_rec_ctx: "storefront"`, matched by `smaily_rec_id`) is credited to the **storefront**: it names no email campaign, and an earlier email click on the same `rec_id` does not count. An email click after the storefront click overwrites both cookies, and the purchase is credited to the email. Last touch wins.
+
+**Caching.** The engine answers with `Cache-Control: no-store, private`. Cache in the plugin's own server-side store, keyed by tenant + a **hash** of the identifier the request sent (`customer_external_id`, else `smaily_visitor_token`), for about 1 hour. Never let a shared or CDN cache hold a response across shoppers.
+
+**Timeouts.** Ask from a background request after the page has loaded, so a slower answer does not delay the page. The 1-second client timeout of v1.9.x no longer applies (v1.10.0): the engine ends a request after 10 seconds, so use a client timeout of at most 10 seconds, and render nothing (or the last cached answer) on a timeout or an error.
+
+**Errors**: `400 validation_failed` (neither `customer_external_id` nor `smaily_visitor_token` — reported under `details.customer_external_id`; an empty or over-long identifier; bad `limit`), `400 invalid_json`, `401`, `403 tenant_inactive`, `429` — the standard shapes ([Error handling](#error-handling)).
+
+**Read only.** The call writes nothing in the engine — a visitor-token request does not mark the token as seen either. The engine logs no identifier from the request.
+
+**Endpoint map key**: `recommendations_customer` (setup-exchange response, [§1](#1-post-apisetupexchange)). A connection set up before v1.9.0 does not have the key — use the fallback path constant.
+
+**Curl example**:
+```bash
+curl -X POST https://intelligence.smaily.com/api/v1/recommendations/customer \
+  -H "Authorization: Bearer sk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"customer_external_id": "1042", "limit": 4}'
+
+# A returning guest shopper, by the visitor token (v1.10.0)
+curl -X POST https://intelligence.smaily.com/api/v1/recommendations/customer \
+  -H "Authorization: Bearer sk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"smaily_visitor_token": "vt_8f3k2a", "limit": 4}'
+```
+
+---
+
 ## Appendices
 
 ### Appendix A: Pagination (future)
@@ -2097,6 +2293,45 @@ curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
 - **What the engine reconciles itself.** Every engine-derived value (`recommendable`, lexicon tags, AI-sweep tags, popularity) is re-derived engine-side from stored rows when the engine's own rules change. A plugin full import is required only for a contract change that says so, a sender-side mapping fix, or after lost change events.
 - **Known gap, stated honestly.** A lost change event (or a lost delete event, which a full re-sync never healed either) stays wrong until the product changes again or the merchant runs a full import; the engine cannot detect it today. Senders SHOULD queue change events durably with retries and show failures to the merchant.
 - **What the plugin does.** Nothing new if it already works this way. A sender that keeps a scheduled full re-sync is not wrong, but it can drop it.
+
+**v1.9.0** (2026-10-05) — **§15 `POST /api/v1/recommendations/customer`: storefront recommendations**. MINOR bump per the [Versioning](#versioning) rule (new endpoint; backward-compatible — nothing existing changes shape). PRO-3781, Erkki's decisions 2026-10-05, design `docs/RFC_storefront_recommendations.md` §10b (spike PRO-3698):
+- **The endpoint.** `POST` with `{customer_external_id, limit?}` — the shopper is named by the store's own customer id, never an email. The answer is the products already in the customer's Smaily contact fields, same order and language, with live price and stock. Unknown, holdout, objected-to-profiling and unsubscribed customers all get the same `{"slots": []}`.
+- **Storefront links.** `<product url>?smaily_rec=<rec_id>&smaily_ctx=storefront` — no `utm_*`, no `smaily_vt`. This replaces the RFC draft's `smaily_src=store`, which the engine would never have seen.
+- **Channel of a purchase.** Derived, no new field: a cookie match whose order carries `smaily_rec_ctx: "storefront"` is a storefront credit (no email campaign, no email click time); everything else is email. §5's `smaily_rec_ctx` is now read for this.
+- **Every email link carries `smaily_ctx`.** Email slots without an intent now carry `smaily_ctx=email` (before: no context). Contacts get the new links as their slots are next synced.
+- **Context cookie rule.** A landing with `smaily_rec` sets `smaily_rec_ctx` to the URL's `smaily_ctx`, or clears it when the URL has none ([cookie names](#cookie-names-plugin-side-management)).
+- **What the plugin does.** To show recommendations: call §15 server-side and render the slots. For correct credit: apply the context cookie rule, and forward `smaily_rec_ctx` on every order that carries `smaily_rec_id`. A plugin that does neither keeps working; its storefront sales then count as email.
+
+**v1.9.1** (2026-10-05) — **§1: `recommendations_preview` and `recommendations_issue` deprecated**. PATCH bump per the [Versioning](#versioning) rule (wording only — no new endpoint, no new field, no shape change; the setup response still carries both keys). PRO-3793, Erkki's decision 2026-10-05:
+- **The gap.** The §1 endpoints map lists two keys whose routes the engine retired on 2026-07-13 (PRO-1295). They never served real recommendations, and a call now answers `404`.
+- **The rule.** Plugins must not call `recommendations_preview` or `recommendations_issue`. Contract 2.0 removes both keys from the setup response.
+- **What the plugin does.** Nothing, if it never calls them. Storefront recommendations use `recommendations_customer` (§15).
+
+**v1.10.0** (2026-10-06) — **§15: a returning guest shopper is named by the visitor token**. MINOR bump per the [Versioning](#versioning) rule (new optional field; backward-compatible — a v1.9.x request is still valid and answers the same). PRO-3834, Erkki's decision 2026-10-06:
+- **The gap.** §15 named the shopper only by the store's customer id. At the pilot store nearly every purchase is a guest checkout, so the call answered empty for almost every shopper.
+- **The field.** `smaily_visitor_token` — the visitor token from the store's visitor-token cookie. `customer_external_id` is no longer required on its own: a request carries at least one of the two; with neither, the answer is `400 validation_failed` as before.
+- **Which identifier wins.** When both are sent, `customer_external_id` wins and the token is ignored entirely, also when the customer id finds nobody: on a shared browser the cookie can belong to someone else.
+- **Same answer rules.** A token names the customer the engine issued it for, in this tenant, for 90 days after issue. That customer gets the same slots the customer id gives, under the same empty-answer rules. An expired, other-tenant or unknown token gets the same `{"slots": []}` as an unknown customer id, and the answer does not say which case applies.
+- **Timeouts.** Ask from a background request after the page has loaded. The 1-second client timeout no longer applies; use at most 10 seconds (the engine ends a request after 10 seconds).
+- **What the plugin does.** For a shopper without a store customer id who has given marketing consent, send `smaily_visitor_token` from the visitor-token cookie. A plugin that sends only `customer_external_id` keeps working unchanged.
+
+**v1.11.0** (2026-10-06) — **§5: a store may create a visitor token at checkout; a guest buyer is recognised on a later visit**. MINOR bump per the [Versioning](#versioning) rule (a new accepted token format on an existing field; no new field, no shape change — a v1.10.x order is still valid and is written the same). PRO-3844, Erkki's decision 2026-10-06:
+- **The gap.** v1.10.0 lets §15 name a guest shopper by a visitor token, but the engine issued tokens only on email links. A guest buyer who never clicked a Smaily email had no token, so the store could not show them their recommendations.
+- **The format.** `vs_` + exactly 22 characters `[A-Za-z0-9]`, created by the store from a secure random source. Engine tokens keep `vt_`.
+- **Where it travels.** On the order's existing `smaily_visitor_token` field ([§5](#store-created-visitor-token)). Create and send it only for a shopper who gave marketing consent. A server-set cookie is recommended (Safari deletes script-set cookies after 7 days); an existing visitor-token cookie is kept, not replaced.
+- **What the engine does.** It binds the token to the order's customer: an unknown `vs_` token is created, a token of the same customer is renewed, a token of another customer does not move (one-customer-per-token rule), and the order is written in every case. A customer who objected to profiling is not bound. An invalid `vs_` value is ignored, not rejected.
+- **Lifetime.** A token carried on an order lives 365 days from the latest order that carries it. A `vt_` token never carried on an order keeps 90 days from issue.
+- **§15.** Unchanged in shape. The token now also names a guest buyer; the customer id still wins when both are sent; the empty-answer rules are unchanged.
+- **What the plugin does.** At checkout, for a guest shopper who gave marketing consent and has no visitor-token cookie: create a `vs_` token, set it in the visitor-token cookie (server-set), and send it on the order's `smaily_visitor_token`. On later visits, send the cookie value to §15 as in v1.10.0. A plugin that does none of this keeps working unchanged.
+
+**v1.12.0** (2026-10-06) — **§3c `POST /api/v1/ingest/catalog/manifest`: nightly catalog manifest**. MINOR bump per the [Versioning](#versioning) rule (new endpoint; backward-compatible — nothing existing changes shape). PRO-3763, Erkki's decisions 2026-10-06:
+- **The gap.** Since v1.8.3 a sender sends the full catalog once and only changes after that. A lost stock-change or delete event stayed wrong, so an out-of-stock or deleted product could stay in recommendations.
+- **The endpoint.** Once a night, the store's complete product list in one request: `{"products":[{"sku","in_stock"}]}`, 0–50,000 items, nothing else. Setup-exchange `endpoints` map gains `ingest_catalog_manifest` (§1).
+- **What the engine does.** A product missing from the list is tombstoned exactly as §3b; a stock difference takes the list's value (no back-in-stock email for a restock found this way); a product the engine does not have is counted and reported to the engine's operator as "full import needed".
+- **Truncation guard.** An empty list, or one that would remove more than 20% of the live catalog, removes nothing; stock corrections still apply and the operator is warned.
+- **One list per store.** The list covers the whole store catalog, however many connections feed the tenant.
+- **Lifecycle wording.** §3 "no delete-by-absence" and §3b "the only delete signal" now name the manifest as the one place absence counts; the "known gap" paragraph now says what the manifest heals and what still needs a full import.
+- **What the plugin does.** Send the manifest once a night from the store's full product list. A plugin that does not send it keeps working; lost events then stay unhealed as before.
 
 ### Appendix F: Migration notes
 

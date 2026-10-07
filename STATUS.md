@@ -5,7 +5,10 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-05 — session handoff: after rc7, PRO-3768, PRO-1958,
+_Last updated: 2026-10-07 — PRO-3854: the engine contract copy is
+synced v1.8.3 → v1.12.0 (doc only, nothing the extension sends changes;
+unreleased, a CHANGELOG bullet under "Changes since 3.0.0-rc7"; Contract
+staleness green again). 2026-10-05 session handoff: after rc7, PRO-3768, PRO-1958,
 PRO-3747, PRO-3753, PRO-3767, PRO-3780, PRO-1957, PRO-1955 and the
 simplification passes landed on v3, unreleased (CHANGELOG's "Changes since
 3.0.0-rc7"); they go into the next rc after the pilot. In detail: after rc7, PRO-1955 (a credit memo that moves
@@ -205,6 +208,31 @@ released the same way from commit 9af1d9e (354 files, checksum OK).
 Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
+
+- **PRO-3854 — engine contract synced v1.8.3 → v1.12.0 (2026-10-07, doc
+  only, no sender change).** Byte-identical with engine main 15785a0
+  (`bin/check-contract-staleness.sh <engine checkout>/docs/RECENGINE_API_CONTRACT.md`:
+  OK, md5 `d4a98e3d…`); the Contract staleness job was red on v3 since
+  2026-10-05. Every 1.9.0–1.12.0 addition is optional for a connector and
+  not built: §15 storefront recommendations (1.9.0, guests by visitor token
+  1.10.0), a store-created `vs_` visitor token on the order (1.11.0), the
+  nightly §3c catalog manifest (1.12.0). 1.9.1 retires
+  `recommendations_preview` / `recommendations_issue`; the module never
+  called either (no reference outside the contract). Checked against the
+  connector: the order forwards `smaily_rec_ctx` whenever the context
+  cookie is set (`OrderPayloadBuilder::attribution()`), new endpoint keys
+  pass the setup-exchange URL check. **Two gaps, code (reported, not
+  changed):** the landing capture (`attribution.js`, Hyvä
+  `smaily-attribution.js`; HEADLESS_STOREFRONTS step 2 says the same) sets
+  `smaily_rec_ctx` only when the URL has `smaily_ctx` and never clears it
+  on a `smaily_rec` landing without one (the 1.9.0 context cookie rule);
+  and `AttributionShape` and both capture scripts accept only `vt_`
+  visitor tokens, so a `vs_` token in `smaily_rec_uid` (set by a headless
+  storefront or another tool) is dropped from the order. Docs:
+  ARCHITECTURE (the engine deletes by absence only through the §3c
+  manifest, which this module does not send; cites v1.12.0),
+  UPSTREAM_PROPOSAL cites v1.12.0, CHANGELOG (rc7-list bullet as for
+  1.8.3; the 3.0.0 "Ships the … contract" line).
 
 - **PRO-1955 — a zero-value credit memo queues its order (2026-10-05;
   unreleased, after rc7).** `OrderSaveAfter` queued an order only when its

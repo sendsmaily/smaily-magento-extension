@@ -68,7 +68,7 @@ Rather than one monolithic review, we suggest four passes in this order — each
 independently checkable and front-loads the highest-risk surfaces:
 
 1. **Wire contract** — [`RECENGINE_API_CONTRACT.md`](RECENGINE_API_CONTRACT.md)
-   (v1.8.3, byte-synced across the Smaily connect repositories, drift guarded by a
+   (v1.12.0, byte-synced across the Smaily connect repositories, drift guarded by a
    daily CI workflow). This is the smallest artifact with the widest blast radius:
    it defines what the extension sends to Campaign Intelligence and is shared with
    the WooCommerce and Shopify connectors.

@@ -1025,8 +1025,8 @@ traffic:
 
 Each import is a card. Before its first run it offers **Start import**.
 Once started, a status pill in the card's header says where it is —
-*Pending* (queued for the next cron run), *Running*, *Done*, *Stopped* or
-*Canceled* — and a progress bar shows how far it got, with "X of Y" and the
+*Pending* (queued for the next cron run), *Running*, *Stalled*, *Done*,
+*Stopped* or *Canceled* — and a progress bar shows how far it got, with "X of Y" and the
 percentage under it. While a job is queued or running the card offers only
 **Cancel import** — the background worker stops cleanly at its next page
 boundary. After it ends, **Run again** starts a fresh import. A canceled import is
@@ -1047,6 +1047,15 @@ card — you do not have to keep the page open:
   again.
 - **"Canceled"** — stopped on your request; starting again begins a
   fresh import.
+
+An import that is queued or running but that nothing has moved for over an
+hour — for example one whose run fails on the same products every time, or
+a store whose cron does not run — shows **"Stalled"**, with how far it got
+and **Run again**. **Run again** cancels the stalled import and starts a
+fresh one; **Cancel import** only stops it. If the fresh import stalls
+too, check that Magento's cron runs (see [INSTALLING.md](INSTALLING.md#4-cron))
+and look in `var/log/smaily_connect.log` and Magento's own logs for the
+error.
 
 ## The log and troubleshooting
 

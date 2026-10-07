@@ -1,0 +1,211 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for an import card whose import has stalled (PRO-3915):
+  the real templates (view/adminhtml/templates/panel/intelligence.phtml and
+  panel/panels-js.phtml), rendered in en_US and et_EE by
+  Test/Js/render-admin.php into Test/Js/build/ as the Settings tab, run with
+  jQuery from vendor/, one fresh frame per scenario. Stubbed: only the
+  requests (fetch), answered with the BackfillState endpoint's answer. A
+  queued or running import nothing has moved for an hour (`stalled`) reads
+  as stalled, says how to start it again and offers Run again, which posts a
+  start; an import that moves shows its progress as before. Run it with
+  bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>import card harness</title>
+    <script src="build/intelligence-settings.en_US.js"></script>
+    <script src="build/intelligence-settings.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var STALLED = 'Stalled — nothing has moved this import for over an hour; %1 of %2 synced so far. Press Run again to start a fresh import. If it stalls again, check that Magento\'s cron runs.';
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    // The BackfillState endpoint's answer.
+    function catalog(status, processed, total, stalled) {
+        return {
+            status: status,
+            processed: processed,
+            failed: 0,
+            total: total,
+            percent: total ? Math.floor(processed / total * 100) : 0,
+            finished_at: '',
+            error: '',
+            stalled: stalled
+        };
+    }
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    // Runs in the frame before the page: the admin's form key, RequireJS's
+    // require() for a page script that asks for jQuery, and the requests,
+    // answered from window.answers by action (status, start).
+    function stubs(answers) {
+        return [
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.require = function (deps, callback) { callback(window.jQuery); };',
+            'window.requests = [];',
+            'window.answers = ' + JSON.stringify(answers) + ';',
+            'window.fetch = function (url, options) {',
+            '  var body = JSON.parse(options.body || "{}");',
+            '  window.requests.push({url: url, body: body});',
+            '  var answer = body.job_type === "catalog" ? window.answers[body.action] : {status: "idle"};',
+            '  return Promise.resolve(new Response(JSON.stringify(answer),',
+            '    {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>'
+        ].join('\n');
+    }
+
+    function open(page, answers) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.onload = function () {
+                wait(50).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs(answers)
+                + '</head><body>' + rendered.html
+                + '<script>window.panels = window.smailyPanelsInit(window.jQuery); window.panels.initAll();<\/script>'
+                + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    // The Catalog card's parts as the merchant reads them.
+    function card(frame) {
+        var element = frame.contentDocument.querySelector('.smaily-backfill-card[data-job-type="catalog"]'),
+            shown = function (selector) {
+                var part = element.querySelector(selector);
+
+                return !!part && part.style.display !== 'none';
+            };
+
+        return {
+            state: element.getAttribute('data-state'),
+            pill: shown('.smaily-backfill-card__pill')
+                ? element.querySelector('.smaily-backfill-card__pill-text').textContent : '',
+            verdict: shown('.smaily-backfill-verdict')
+                ? element.querySelector('.smaily-backfill-verdict__text').textContent : '',
+            result: element.querySelector('.smaily-result').textContent,
+            done: element.querySelector('.smaily-backfill-card__done').textContent,
+            start: shown('.smaily-backfill-card__start')
+                ? element.querySelector('.smaily-backfill-card__start').textContent.trim() : '',
+            startPrimary: element.querySelector('.smaily-backfill-card__start').classList.contains('action-primary'),
+            cancel: shown('.smaily-backfill-card__cancel'),
+            element: element
+        };
+    }
+
+    async function run(locale) {
+        var page = 'intelligence-settings.' + locale,
+            strings = window.smailyAdminPages[page].strings,
+            frame,
+            seen,
+            starts;
+
+        log('# ' + locale);
+        if (locale !== 'en_US') {
+            check(locale + ': the stalled card is translated', strings[STALLED] !== STALLED
+                && strings.Stalled !== 'Stalled');
+        }
+
+        // A running import nothing has moved for an hour.
+        frame = await open(page, {status: catalog('running', 400, 1200, true), start: catalog('pending', 0, 0, false)});
+        seen = card(frame);
+        check(locale + ', stalled while running: the card says it has stalled',
+            seen.state === 'stalled' && seen.pill === strings.Stalled);
+        check(locale + ', stalled while running: and how to start it again',
+            seen.verdict === strings[STALLED].replace('%1', '400').replace('%2', '1200'));
+        check(locale + ', stalled while running: Run again is offered as the primary action, Cancel too',
+            seen.start === strings['Run again'] && seen.startPrimary && seen.cancel);
+        seen.element.querySelector('.smaily-backfill-card__start').click();
+        await wait(50);
+        starts = frame.contentWindow.requests.filter(function (request) {
+            return request.body.action === 'start';
+        });
+        check(locale + ', stalled: Run again posts a start of the catalog import',
+            starts.length === 1 && starts[0].body.job_type === 'catalog');
+        check(locale + ', stalled: the fresh import shows queued', card(frame).state === 'pending');
+        frame.remove();
+
+        // A queued import the worker never picked up.
+        frame = await open(page, {status: catalog('pending', 0, 0, true)});
+        seen = card(frame);
+        check(locale + ', stalled while queued: the card says it has stalled',
+            seen.state === 'stalled'
+            && seen.verdict === strings[STALLED].replace('%1', '0').replace('%2', '?'));
+        frame.remove();
+
+        // An import that moves shows its progress as before.
+        frame = await open(page, {status: catalog('running', 400, 1200, false)});
+        seen = card(frame);
+        check(locale + ', moving: the card shows progress',
+            seen.state === 'running' && seen.pill === strings.Running
+            && seen.result === strings['Importing…'] && seen.verdict === ''
+            && seen.done === strings['%1 of %2'].replace('%1', '400').replace('%2', '1200')
+            && seen.start === '' && seen.cancel);
+        frame.remove();
+    }
+
+    run('en_US').then(function () {
+        return run('et_EE');
+    }).then(function () {
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    }).catch(function (error) {
+        document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }).then(function () {
+        clearInterval(keepAlive);
+    });
+</script>
+</body>
+</html>

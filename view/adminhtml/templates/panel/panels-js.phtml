@@ -417,8 +417,9 @@ window.smailyPanelsInit = function ($) {
     // synced" when everything landed; "N failed — view in the Log" when
     // individual rows failed (queue rows still pending retry are NOT
     // failed); "Stopped before an error" when the job itself aborted;
-    // "Cancelled" after an admin cancel. The last outcome + timestamp
-    // persist server-side and re-render on every page load.
+    // "Cancelled" after an admin cancel; "Stalled" for a queued or running
+    // import nothing has moved for an hour (PRO-3915). The last outcome +
+    // timestamp persist server-side and re-render on every page load.
     var backfillTimers = {};
 
     function withDate(text, data) {
@@ -472,10 +473,15 @@ window.smailyPanelsInit = function ($) {
         done: {pill: 'sent', label: '<?= $escaper->escapeJs(__('Done')) ?>', icon: '✓'},
         failures: {pill: 'sent', label: '<?= $escaper->escapeJs(__('Done')) ?>', icon: '!'},
         stopped: {pill: 'failed', label: '<?= $escaper->escapeJs(__('Stopped')) ?>', icon: '×', primary: true},
+        stalled: {pill: 'failed', label: '<?= $escaper->escapeJs(__('Stalled')) ?>', icon: '!', primary: true},
         cancelled: {pill: 'off', label: '<?= $escaper->escapeJs(__('Canceled')) ?>', icon: '—', primary: true}
     };
 
     function backfillState(data) {
+        // Run again starts a fresh import; the server cancels this one first.
+        if (data.stalled && (data.status === 'pending' || data.status === 'running')) {
+            return 'stalled';
+        }
         if (data.status === 'completed') {
             return data.failed ? 'failures' : 'done';
         }
@@ -495,7 +501,7 @@ window.smailyPanelsInit = function ($) {
             .removeClass('smaily-pill--pending smaily-pill--sent smaily-pill--failed smaily-pill--off')
             .addClass(look.pill ? 'smaily-pill--' + look.pill : '')
             .find('.smaily-backfill-card__pill-text').text(look.label || '');
-        ui.cancel.toggle(state === 'pending' || state === 'running');
+        ui.cancel.toggle(state === 'pending' || state === 'running' || state === 'stalled');
         ui.start.toggle(state === 'idle' || finished)
             .toggleClass('action-primary', state === 'idle' || !!look.primary)
             .toggleClass('action-secondary', finished && !look.primary)
@@ -542,6 +548,10 @@ window.smailyPanelsInit = function ($) {
                 .replace('%3', data.failed);
             ui.link.append($('<a></a>').attr('href', urls.logFailed)
                 .text('<?= $escaper->escapeJs(__('View them in the Log')) ?>')).show();
+        } else if (state === 'stalled') {
+            setProgress(ui, data, data.percent, 'failed');
+            text = '<?= $escaper->escapeJs(__('Stalled — nothing has moved this import for over an hour; %1 of %2 synced so far. Press Run again to start a fresh import. If it stalls again, check that Magento\'s cron runs.')) ?>'
+                .replace('%1', data.processed).replace('%2', data.total || '?');
         } else if (state === 'stopped') {
             setProgress(ui, data, data.percent, 'failed');
             text = '<?= $escaper->escapeJs(__('Stopped before an error — %1 of %2 synced so far. Press the import button to run it again.')) ?>'

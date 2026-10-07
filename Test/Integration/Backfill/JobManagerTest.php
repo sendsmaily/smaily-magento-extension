@@ -196,6 +196,36 @@ class JobManagerTest extends IntegrationTestCase
         self::assertFalse($this->inProgress(), 'a finished import holds nothing back');
     }
 
+    /**
+     * PRO-3915: the import card's stalled state reads the same rule — a
+     * queued or running import, for any website, that no tick has moved for
+     * an hour, its own or the one ahead of it in line.
+     */
+    public function testAnImportIsStalledOnceNothingHasMovedItForAnHour(): void
+    {
+        self::assertFalse($this->jobManager->isStalled(Job::TYPE_CONTACTS, Job::TARGET_SMAILY), 'no import at all');
+
+        $contacts = $this->jobManager->start(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 2);
+        $this->jobManager->markRunning($contacts);
+        $this->movedAt($contacts, -60);
+        self::assertFalse($this->jobManager->isStalled(Job::TYPE_CONTACTS, Job::TARGET_SMAILY), 'moved a minute ago');
+
+        $this->movedAt($contacts, -JobManager::STALLED_SECONDS - 1);
+        self::assertTrue($this->jobManager->isStalled(Job::TYPE_CONTACTS, Job::TARGET_SMAILY), 'not moved for an hour');
+        self::assertFalse($this->jobManager->isStalled(Job::TYPE_CATALOG, Job::TARGET_ENGINE), 'another import');
+
+        $catalog = $this->jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0);
+        $this->movedAt($catalog, -30);
+        self::assertFalse(
+            $this->jobManager->isStalled(Job::TYPE_CONTACTS, Job::TARGET_SMAILY),
+            'the worker still moves an import'
+        );
+
+        $this->jobManager->requestCancel(Job::TYPE_CATALOG, Job::TARGET_ENGINE);
+        $this->jobManager->requestCancel(Job::TYPE_CONTACTS, Job::TARGET_SMAILY);
+        self::assertFalse($this->jobManager->isStalled(Job::TYPE_CONTACTS, Job::TARGET_SMAILY), 'canceled');
+    }
+
     private function inProgress(): bool
     {
         return $this->jobManager->isActiveAndMoving(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0, 3600);

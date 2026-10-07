@@ -320,7 +320,13 @@ below.
   with an error; started anyway, the catalog import would record every
   product as failed, since `CatalogIngest` queues nothing while
   disconnected, and a customers or orders import would queue rows with
-  no tenant to send them to. There
+  no tenant to send them to. An import queued or running that no tick has
+  moved for an hour — a worker that dies on the same page every run, or
+  no cron — is answered with `stalled: true` (`JobManager::isStalled()`:
+  `isActiveAndMoving()`'s rule, `JobManager::STALLED_SECONDS`), shown on
+  the card as *Stalled* with **Run again**; a `start` cancels it first
+  (`requestCancel()`), so the one-active-job lock cannot keep the new one
+  from starting (PRO-3915). There
   is no periodic full re-sync any more — the nightly `Cron/CatalogResync`
   of PRO-1951 is removed. A change no event sees (a CSV / `bin/magento
   import` run, an ERP link or any other direct write to the catalog
@@ -395,7 +401,8 @@ below.
   when building the list throws. The import wait is bounded (Woo
   PRO-3886): the tick writes the job it advances at every page, so an
   import counts only while some queued or running job was written within
-  the last hour (`CatalogManifest::STALLED_IMPORT_SECONDS`); one the
+  the last hour (`CatalogManifest::STALLED_IMPORT_SECONDS`, which is
+  `JobManager::STALLED_SECONDS`); one the
   worker no longer moves holds nothing back. A store with more than 50,000
   enabled products sends nothing (§3c forbids a partial list); its Log row
   is `failed` with `CatalogManifest::TOO_MANY_PRODUCTS`, shown in the

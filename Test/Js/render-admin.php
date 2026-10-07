@@ -264,7 +264,8 @@ $pages = [
  * (wizard/index.phtml) with its Connect and Intelligence steps, reopened after
  * it was finished: with a Storefront URL saved and Campaign Intelligence
  * connected, and with neither (PRO-3913). Magento's cookie restriction mode
- * is on, except where a Storefront URL is saved (PRO-3918).
+ * is on, except where a Storefront URL is saved (PRO-3918). The Settings
+ * tab's import cards serve the stalled import harness too (PRO-3915).
  */
 $intelligenceViewModel = static fn (
     string $storefrontUrl,
@@ -480,6 +481,13 @@ $intelligenceStrings = [
     'Using a separate storefront? Set its Storefront URL under Settings > Connection > Using a separate storefront? before you connect, so that the catalog import sends the storefront\'s product links. Or connect now and press Hold back the import.',
     'Consent comes from Magento’s cookie notice: browse events are sent only after the visitor allows cookies.',
     'Your separate storefront sends the browse events itself, so its own cookie consent banner decides when they are sent.',
+    'Stalled',
+    'Stalled — nothing has moved this import for over an hour; %1 of %2 synced so far.'
+        . ' Press Run again to start a fresh import. If it stalls again, check that Magento\'s cron runs.',
+    'Run again',
+    'Running',
+    'Importing…',
+    '%1 of %2',
 ];
 $intelligenceTemplates = [
     $root . '/view/adminhtml/templates/panel/intelligence.phtml',

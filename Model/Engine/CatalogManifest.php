@@ -65,7 +65,7 @@ class CatalogManifest
         . ' the most the nightly product list can hold.';
 
     /** A catalog import that nothing has moved for this long no longer holds the list back. */
-    public const STALLED_IMPORT_SECONDS = 3600;
+    public const STALLED_IMPORT_SECONDS = JobManager::STALLED_SECONDS;
 
     /**
      * The nights in a row no list went out and why the last one did not

@@ -31,6 +31,8 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * orders) started while Campaign Intelligence is not connected recorded
  * every row as failed. The start is refused instead, with the reason beside
  * the Start import button. The contacts import goes to Smaily and starts.
+ * PRO-3915: an import nothing has moved for an hour reads as stalled, and
+ * starting it again cancels it first, so it cannot block the new one.
  */
 class BackfillStateTest extends TestCase
 {
@@ -106,9 +108,101 @@ class BackfillStateTest extends TestCase
     }
 
     /**
-     * @param array<string, string> $body
+     * @dataProvider activeStatuses
      */
-    private function controller(bool $connected, array $body): BackfillState
+    public function testAnImportNothingHasMovedForAnHourReadsAsStalled(string $status): void
+    {
+        $this->jobManager->method('isStalled')->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE)->willReturn(true);
+
+        $this->controller(true, ['action' => 'status', 'job_type' => Job::TYPE_CATALOG], [$this->job($status)])
+            ->execute();
+
+        self::assertSame($status, $this->response['status']);
+        self::assertTrue($this->response['stalled']);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function activeStatuses(): array
+    {
+        return ['queued' => [Job::STATUS_PENDING], 'running' => [Job::STATUS_RUNNING]];
+    }
+
+    public function testAnImportThatMovesIsNotStalled(): void
+    {
+        $this->jobManager->method('isStalled')->willReturn(false);
+
+        $this->controller(
+            true,
+            ['action' => 'status', 'job_type' => Job::TYPE_CATALOG],
+            [$this->job(Job::STATUS_RUNNING)]
+        )->execute();
+
+        self::assertSame('running', $this->response['status']);
+        self::assertFalse($this->response['stalled']);
+    }
+
+    public function testAFinishedImportIsNeverStalled(): void
+    {
+        $this->jobManager->expects(self::never())->method('isStalled');
+
+        $this->controller(
+            true,
+            ['action' => 'status', 'job_type' => Job::TYPE_CATALOG],
+            [$this->job(Job::STATUS_COMPLETED)]
+        )->execute();
+
+        self::assertFalse($this->response['stalled']);
+    }
+
+    public function testStartingAStalledImportAgainCancelsItFirst(): void
+    {
+        $calls = [];
+        $this->jobManager->method('isStalled')->willReturn(true);
+        $this->jobManager->expects(self::once())->method('requestCancel')
+            ->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE)
+            ->willReturnCallback(static function () use (&$calls): int {
+                $calls[] = 'cancel';
+
+                return 1;
+            });
+        $this->jobManager->expects(self::once())->method('startIfIdle')
+            ->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID)
+            ->willReturnCallback(function () use (&$calls): Job {
+                $calls[] = 'start';
+
+                return $this->createMock(Job::class);
+            });
+
+        $this->controller(true, ['action' => 'start', 'job_type' => Job::TYPE_CATALOG])->execute();
+
+        self::assertSame(['cancel', 'start'], $calls);
+    }
+
+    public function testStartingAnImportThatMovesCancelsNothing(): void
+    {
+        $this->jobManager->method('isStalled')->willReturn(false);
+        $this->jobManager->expects(self::never())->method('requestCancel');
+        $this->jobManager->expects(self::once())->method('startIfIdle');
+
+        $this->controller(true, ['action' => 'start', 'job_type' => Job::TYPE_CATALOG])->execute();
+    }
+
+    private function job(string $status): Job&MockObject
+    {
+        $job = $this->createMock(Job::class);
+        $job->method('getWebsiteId')->willReturn(Job::ENGINE_WEBSITE_ID);
+        $job->method('getStatus')->willReturn($status);
+
+        return $job;
+    }
+
+    /**
+     * @param array<string, string> $body
+     * @param Job[] $jobs the import's latest jobs
+     */
+    private function controller(bool $connected, array $body, array $jobs = []): BackfillState
     {
         $request = $this->createMock(HttpRequest::class);
         $request->method('getContent')->willReturn((string)json_encode($body));
@@ -128,7 +222,7 @@ class BackfillStateTest extends TestCase
         $collection->method('addFieldToFilter')->willReturnSelf();
         $collection->method('setOrder')->willReturnSelf();
         $collection->method('setPageSize')->willReturnSelf();
-        $collection->method('getItems')->willReturn([]);
+        $collection->method('getItems')->willReturn($jobs);
         $collectionFactory = $this->createMock(CollectionFactory::class);
         $collectionFactory->method('create')->willReturn($collection);
 

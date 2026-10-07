@@ -138,7 +138,12 @@ separate storefront must send the events itself and the note asks for no
 Magento consent source (with cookie restriction mode off); without one,
 both read as before. A store whose nightly product list has not gone out
 for three nights shows the verdict and the warning banner with the last
-night's reason; one whose list went out shows neither. To
+night's reason; one whose list went out shows neither.
+`Test/Js/import-card.html` renders the Settings tab's import cards with
+the status request answered by the import endpoint's answer: a queued or
+running import that is stalled reads *Stalled*, says how far it got and
+how to start it again, and offers **Run again** (which posts a start); an
+import that moves shows its progress as before. To
 check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.

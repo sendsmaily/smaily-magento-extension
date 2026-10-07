@@ -27,6 +27,9 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  */
 class JobManager
 {
+    /** An active job no tick has moved for this long counts as stalled (PRO-3854, PRO-3915). */
+    public const STALLED_SECONDS = 3600;
+
     public function __construct(
         private readonly JobFactory $jobFactory,
         private readonly JobResource $jobResource,
@@ -126,6 +129,32 @@ class JobManager
             return false;
         }
 
+        return $this->activeMovedWithin($stalledAfterSeconds);
+    }
+
+    /**
+     * Whether an import of this kind is queued or running, for any website,
+     * but stalled: no queued or running job was written within
+     * STALLED_SECONDS — isActiveAndMoving()'s rule (PRO-3915). The admin's
+     * import card says so, and starting the import again cancels it first.
+     */
+    public function isStalled(string $jobType, string $target): bool
+    {
+        $collection = $this->collectionFactory->create();
+        $collection->addFieldToFilter('status', ['in' => [Job::STATUS_PENDING, Job::STATUS_RUNNING]])
+            ->addFieldToFilter('job_type', $jobType)
+            ->addFieldToFilter('target', $target)
+            ->setPageSize(1);
+
+        return $collection->getFirstItem()->getId() && !$this->activeMovedWithin(self::STALLED_SECONDS);
+    }
+
+    /**
+     * Whether some queued or running job was written within the last
+     * $seconds.
+     */
+    private function activeMovedWithin(int $seconds): bool
+    {
         $lastMoved = (string)$this->connection()->fetchOne(
             $this->connection()->select()
                 ->from($this->table(), ['last' => 'MAX(updated_at)'])
@@ -134,7 +163,7 @@ class JobManager
 
         return $lastMoved >= $this->dateTime->gmtDate(
             'Y-m-d H:i:s',
-            $this->dateTime->gmtTimestamp() - $stalledAfterSeconds
+            $this->dateTime->gmtTimestamp() - $seconds
         );
     }
 

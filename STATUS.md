@@ -5,7 +5,7 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-07 — PRO-3949 on branch `fix/admin-order-origin` for a PR: admin-placed orders no longer count as storefront orders. **3.0.0-rc9 is released from the official
+_Last updated: 2026-10-07 — **PRO-3957 on branch `fix/admin-et-en-texts` for a PR:** the stopped-import hint names **Run again** in EN (as ET did) and the ET setup notice says *Turundus > Smaily Connect > Algseadistus* (new installs only). Earlier: PRO-3949 (admin-placed orders no longer count as storefront orders; PR #130, merged). **3.0.0-rc9 is released from the official
 repository**
 (https://github.com/sendsmaily/smaily-magento-extension/releases/tag/3.0.0-rc9):
 the release workflow is green, the ZIP has 397 files, sha256

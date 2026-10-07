@@ -573,7 +573,7 @@ window.smailyPanelsInit = function ($) {
                 .replace('%1', data.processed).replace('%2', data.total || '?');
         } else if (state === 'stopped') {
             setProgress(ui, data, data.percent, 'failed');
-            text = '<?= $escaper->escapeJs(__('Stopped before an error — %1 of %2 synced so far. Press the import button to run it again.')) ?>'
+            text = '<?= $escaper->escapeJs(__('Stopped before an error — %1 of %2 synced so far. Press Run again to run it again.')) ?>'
                 .replace('%1', data.processed).replace('%2', data.total || '?');
             if (data.error) {
                 text += ' ' + data.error;

@@ -19,6 +19,7 @@ use Magento\Framework\Stdlib\CookieManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\OrderPlacer;
 
 /**
  * The visitor-token cookie is read in either form the contract allows, an
@@ -45,9 +46,7 @@ class AttributionManagerTest extends TestCase
             $settings,
             $cookieManager,
             $this->createMock(ResourceConnection::class),
-            $this->createMock(ModuleManager::class),
-            $this->createMock(ObjectManagerInterface::class),
-            $this->createMock(State::class)
+            $this->createMock(OrderPlacer::class)
         );
 
         self::assertSame($expected, $manager->readCookies()['visitor_token']);
@@ -166,6 +165,11 @@ class AttributionManagerTest extends TestCase
             $appState->method('getAreaCode')->willReturn($area);
         }
 
-        return new AttributionManager($settings, $cookieManager, $resource, $moduleManager, $objectManager, $appState);
+        return new AttributionManager(
+            $settings,
+            $cookieManager,
+            $resource,
+            new OrderPlacer($moduleManager, $objectManager, $appState)
+        );
     }
 }

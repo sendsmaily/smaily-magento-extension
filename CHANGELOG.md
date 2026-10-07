@@ -7,6 +7,7 @@ The package version is currently `3.0.0-rc9` — the ninth release-candidate cut
 **Changes since 3.0.0-rc9**
 
 - Two admin texts now read the same in English and Estonian: an import card that stopped before an error tells you to press **Run again**, the button the card shows (the English text said "the import button"), and the Estonian setup notice names the menu **Turundus > Smaily Connect > Algseadistus**, as the Estonian admin shows it, instead of *Marketing > …*. The setup notice is written once, at install, so a store that has it already keeps the earlier wording.
+- An order created in the admin under **Sales > Orders > Create New Order**, or placed with **Login as Customer**, no longer counts as an order through the store's own pages when the extension decides whether to open **Using a separate storefront?** by itself. Before, on a store whose shoppers buy only on a separate storefront, one such order by the staff kept the Storefront URL field collapsed for 30 days. A shopper's order on the store's own pages, and an order through Magento's API, count as before.
 
 **Changes since 3.0.0-rc8**
 

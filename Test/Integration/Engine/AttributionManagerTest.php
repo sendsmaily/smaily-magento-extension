@@ -12,6 +12,7 @@ use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\Framework\Stdlib\CookieManagerInterface;
 use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\OrderPlacer;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 
 /**
@@ -113,8 +114,10 @@ class AttributionManagerTest extends IntegrationTestCase
         return $this->objectManager->create(AttributionManager::class, [
             'settings' => $settings,
             'cookieManager' => $cookieManager,
-            // Magento_LoginAsCustomer is absent here.
-            'moduleManager' => $this->createMock(ModuleManager::class),
+            'orderPlacer' => $this->objectManager->create(OrderPlacer::class, [
+                // Magento_LoginAsCustomer is absent here.
+                'moduleManager' => $this->createMock(ModuleManager::class),
+            ]),
         ]);
     }
 

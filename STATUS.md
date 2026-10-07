@@ -75,6 +75,8 @@ after-the-move checklist (CLAUDE.md) → rc9 cut in the official repo;
 the pilot (the furniture store after its upgrade in the new year, or
 another store as early as next week; the milestone date was dropped
 2026-10-07) installs the newest release candidate.
+PRO-3948: the release workflow fails, before attaching anything, on a
+tag that is not composer.json's version (`bin/check-release-version.sh`).
 Backlog: PRO-3790 (after the pilot), PRO-3746, PRO-3921 (waits on the
 engine's answer, PRO-3941), PRO-3916 (waits on PRO-3919)._
 

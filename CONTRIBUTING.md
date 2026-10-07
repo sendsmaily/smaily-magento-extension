@@ -77,7 +77,9 @@ A version cut is a pull request like any other: it sets the version in
 in `CHANGELOG.md`. After it is merged, publish a GitHub release on `master`
 whose tag is the plain version (`3.0.0`, no `v` prefix); a release candidate
 (`3.0.0-rc9`) is published as a pre-release. Publishing the release
-triggers `.github/workflows/release.yaml`, which builds, verifies and
+triggers `.github/workflows/release.yaml`, which first checks that the tag
+is the version in `composer.json` (`bin/check-release-version.sh`; on a
+mismatch the run fails and nothing is attached), then builds, verifies and
 attaches the installable ZIP and its `.sha256`. The composer package is
 `smaily/smailyformagento`: Packagist reads it from this repository, so every
 tag is a published version.

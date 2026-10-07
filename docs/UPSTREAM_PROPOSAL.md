@@ -184,7 +184,9 @@ already owns, `sendsmaily/smaily-magento-extension`.
   assemble the package itself: it calls `bin/verify-release-zip.sh`, which builds
   it through `bin/build-release-zip.sh` (the one owner of what ships) and refuses
   to hand over an archive that is missing a required file, carries development
-  material or states the wrong version.
+  material or states the wrong version. Before it builds,
+  `bin/check-release-version.sh` fails the run, with nothing attached, when
+  the release tag is not the version in `composer.json`.
 - **Tags and composer**: a release is tagged with the plain version
   (`3.0.0-rc9`, no `v` prefix). Packagist reads `smaily/smailyformagento` from this
   repository, so every tag is a published composer version. Release candidates

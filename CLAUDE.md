@@ -161,7 +161,10 @@ No staged review by the Smaily team — Erkki maintains the repo.
    candidate; 3.0.0 itself without `--prerelease`). **Tag = the PLAIN
    version, no `v`**, equal to composer.json's `version` (Packagist skips a
    tag that disagrees with it). No local ZIP argument: `release.yaml` builds,
-   verifies and attaches `smaily-connect-magento2.zip` + `.sha256`.
+   verifies and attaches `smaily-connect-magento2.zip` + `.sha256`. Its first
+   step, `bin/check-release-version.sh <tag>` (PRO-3948), fails the run before
+   anything is attached when the tag is not composer.json's `version` (a `v`
+   prefix fails too) — then delete the release and its tag and publish again.
 3. **A tag on the official repo is a Packagist publish** of
    `smaily/smailyformagento` — a one-way door, Erkki's to run. Release
    candidates are tagged publicly; 3.0.0 waits for a pilot store.

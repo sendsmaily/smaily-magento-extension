@@ -28,7 +28,7 @@ internal process talk (phases, agents, Linear) lives here and in STATUS.md only.
 |---|---|
 | `../connect/` | The WP/Woo plugin — richest reference (patterns + `docs/LESSONS.md`, `docs/DECISIONS.md`). Never edit from here. |
 | `../shopify-connect/` | The hosted Shopify app — second parity source. |
-| `../re/` | The recommendation engine (`smaily-recommendations`). Engine team owns it; source of the contract. |
+| `../intelligence/` | The recommendation engine (`erkkimarkus/smaily-recommendations`). Engine team owns it; source of the contract. |
 
 ## Working mode — autonomous with checkpoints
 
@@ -53,11 +53,15 @@ user-visible behaviour change updates it in the same commit.
 ## Contract discipline
 
 `docs/RECENGINE_API_CONTRACT.md` is a **byte-identical copy** from the engine
-repo (`../re/`, `erkkimarkus/smaily-recommendations`) — never hand-edit it.
-The `Contract staleness` workflow (daily + push/PR) runs
+repo (`../intelligence/`, `erkkimarkus/smaily-recommendations`) — never
+hand-edit it. The `Contract staleness` workflow (daily + push/PR) runs
 `bin/check-contract-staleness.sh` and goes red on drift; it needs the repo
 secret `ENGINE_CONTRACT_READ_TOKEN` (fine-grained PAT, contents:read on the
-engine repo). A sync is NOT code-complete: after any wire-shape change, carry
+engine repo). Locally, the script's fallback engine checkout
+(`$ENGINE_CHECKOUT`'s default) is a hard-coded Linux path that does not
+exist on this Mac — pass the path explicitly:
+`bin/check-contract-staleness.sh ../intelligence/docs/RECENGINE_API_CONTRACT.md`
+(a local checkout can lag engine main; pull it first). A sync is NOT code-complete: after any wire-shape change, carry
 it through code + test fixtures in the same pass (Woo LESSONS §2.7 — the scar
 is real). Datetimes are Z-suffix only; engine URL placeholders are `{email}`
 style (str_replace, never sprintf). There is no scheduled catalog re-sync
@@ -67,6 +71,13 @@ only through a catalog import, so its CHANGELOG bullet tells the merchant to
 start one.
 
 ## Build / test commands
+
+- **Before any pilot or merchant install, confirm Magento ≥ 2.4.4 and
+  PHP ≥ 8.1 first** (admin footer "Magento ver."; `php -v` with the PHP
+  that runs `bin/magento`). Magento 2.4.3 and older run only on PHP 7.x and
+  cannot run this module — a 2.4.3-p1 pilot store surfaced two days before
+  pilot day (2026-10-07). docs/INSTALLING.md "Before you start" and
+  PILOT_CHECKLIST §0 carry the check.
 
 - Local PHP is 8.5 and this host is missing a few Magento PHP extensions, so:
   `composer install --ignore-platform-reqs`. Magento packages come from
@@ -173,10 +184,13 @@ is written in English.
   2026-10-03 4/5 (rc4 released; only the pilot install is left);
   2026-10-04 4/5 (rc5 released; only the pilot install is left), later
   the same day 4/5 (rc6 released; only the pilot install is left);
-  2026-10-05 4/5 (rc7 released; only the pilot install is left).
+  2026-10-05 4/5 (rc7 released; only the pilot install is left);
+  2026-10-07 4/5 (the pilot store runs Magento 2.4.3-p1 / PHP 7.x; the
+  pilot waits for its upgrade; the 09.10 milestone no longer holds, new
+  date pending Erkki).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385
   canceled, PRO-3680 done); 2026-10-04: 0 open (PRO-1357 closed);
-  2026-10-05: 0 open. Dates: none yet (2026-10-02 —
+  2026-10-05: 0 open; 2026-10-07: 0 open. Dates: none yet (2026-10-02 —
   not asked; PRO-2456 is placed before the rc1 tag).

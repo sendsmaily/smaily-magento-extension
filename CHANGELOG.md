@@ -7,6 +7,7 @@ The package version is currently `3.0.0-rc10` — the tenth release-candidate cu
 **Changes since 3.0.0-rc10**
 
 - **Details** in **Marketing > Smaily Connect > Log** shows when a row's latest attempt happened: the time of its latest failure, its delivery or its skip. The Log's **Updated** column and the Dashboard's **Recent activity** show the same time. Before, a row that failed, was delivered or was skipped kept the time of its previous change — often the time it was queued. The banners and the admin notification about deliveries that failed in the last 24 hours now count failures by when they happened, and the Log keeps a delivered or failed row for its retention period counted from that time. Rows already in the Log keep the time they show until their next attempt.
+- The extension's log (`var/log/smaily_connect.log`) records Campaign Intelligence rows it gives up on as it records contact syncs and automations since 3.0.0-rc10: when the engine refuses a whole batch, or a batch fails for one reason, the rows it parks get one line, "Ingest events failed permanently", with their number and ids, instead of one "Ingest event failed permanently" line per row. A row given up on alone now gets the same line, with a number of 1 and its id — "Ingest events failed permanently", or "Queue events failed permanently" for a contact sync or an automation — instead of "Ingest event failed permanently" or "Queue event failed permanently". **Marketing > Smaily Connect > Log** shows each row's status, attempts and error as before.
 
 **Changes since 3.0.0-rc9**
 

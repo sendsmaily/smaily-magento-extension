@@ -367,6 +367,27 @@ Earlier: 2026-09-11, 2026-09-10._
   "Changes since 3.0.0-rc10". Gates: unit, phpcs, phpstan, integration,
   PHP 8.1 syntax.
 
+- **PRO-3962 — a Campaign Intelligence batch that fails for one reason
+  is recorded in one write and one log line (2026-10-07; branch
+  `erkki/pro-3962-ingest-batch-failure-write` for a PR).** PRO-1964 for
+  the ingest queue: `Cron\FlushIngestQueue` hands a transport failure, a
+  whole-batch refusal, a refused catalog/remove wrapper, the keyless
+  catalog/remove rows and each D6 per-item reason shared by several rows
+  to the new `IngestQueue::markFailedMany()` — one UPDATE (CASE on the id;
+  200 rows a statement, every ingest batch is ≤100) and one error line
+  "Ingest events failed permanently" with count, domain and ids for the
+  rows it parks; a group of one goes through `markFailed()`. The CASE
+  write moved out of `EventQueue` into the shared `Model\Queue\RowWriter`
+  (one implementation for both queues); each queue keeps its own
+  `FAILURE_COLUMNS` (attempts, status, next_retry_at, last_error,
+  sent_payload, last_response, claim_token, claimed_at, updated_at — the
+  claim cleared and `updated_at` the outcome's time, PRO-3961's
+  `outcomeFields()`, as a single row's save). A row parked alone now
+  logs the group's wording with count 1 in both queues ("Queue events
+  failed permanently" / "Ingest events failed permanently"); CHANGELOG
+  bullet. The account-refusal release path (PRO-2451/PRO-3752) is
+  unchanged. Gates: unit, phpcs, phpstan, integration, PHP 8.1 syntax.
+
 - **PRO-1964 — a batch that fails for one reason is recorded in one
   write and one log line (2026-10-07; branch
   `erkki/pro-1964-batch-failure-write` for a PR).** `Cron\FlushEventQueue`

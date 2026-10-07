@@ -303,6 +303,146 @@ class FlushIngestQueueTest extends IntegrationTestCase
     }
 
     /**
+     * PRO-3962: a batch the engine does not take is recorded in one UPDATE,
+     * not one per row — and each row still ends on its own step of the
+     * ladder, with its own item as sent.
+     */
+    public function testABatchFailureIsRecordedInOneWriteWithEachRowOnItsOwnStep(): void
+    {
+        $this->enqueueCatalog(5);
+        // fi-g5 failed three times before: this failure is its fourth.
+        $this->connection->update(IngestEventResource::TABLE_NAME, ['attempts' => 3], ['event_uuid = ?' => 'fi-g5']);
+
+        $client = $this->createMock(Client::class);
+        $client->method('ingest')->willThrowException(new EngineTransportException('HTTP 503'));
+        $client->method('lastExchange')->willReturn(
+            ['request' => [], 'response' => ['http_status' => 503, 'body' => ['error' => 'unavailable']]]
+        );
+        $writes = $this->failureWrites(fn () => $this->runCron($client));
+
+        self::assertSame(1, $writes, 'One statement for the five rows');
+        $rows = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), null, 'event_uuid');
+        foreach ([1, 2, 3, 4, 5] as $n) {
+            $row = $rows['fi-g' . $n];
+            self::assertSame(IngestEvent::STATUS_PENDING, $row['status']);
+            self::assertSame($n === 5 ? '4' : '1', (string)$row['attempts']);
+            self::assertSame(
+                $this->clockDate(IngestQueue::BACKOFF_SECONDS[$n === 5 ? 3 : 0]),
+                $row['next_retry_at'],
+                'Each row on its own step of the ladder'
+            );
+            self::assertSame('HTTP 503', $row['last_error']);
+            self::assertSame(
+                ['sku' => 'SKU-' . $n, 'event_id' => 'fi-g' . $n],
+                json_decode((string)$row['sent_payload'], true)['products'][0],
+                'Each row keeps its own item as sent'
+            );
+            self::assertSame(
+                ['http_status' => 503, 'body' => ['error' => 'unavailable']],
+                json_decode((string)$row['last_response'], true)
+            );
+        }
+    }
+
+    /**
+     * PRO-3962: a batch failure that reaches the last step parks the rows
+     * whose attempts are spent and reschedules the others, in the same
+     * write.
+     */
+    public function testABatchFailureParksOnlyTheRowsWhoseAttemptsAreSpent(): void
+    {
+        $this->enqueueCatalog(3);
+        $this->connection->update(
+            IngestEventResource::TABLE_NAME,
+            ['attempts' => IngestQueue::MAX_ATTEMPTS - 1],
+            ['event_uuid = ?' => 'fi-g2']
+        );
+
+        $client = $this->createMock(Client::class);
+        $client->method('ingest')->willThrowException(new EngineTransportException('HTTP 503'));
+        $writes = $this->failureWrites(fn () => $this->runCron($client));
+
+        self::assertSame(1, $writes);
+        $rows = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(IngestEvent::STATUS_FAILED, $rows['fi-g2']['status']);
+        self::assertSame((string)IngestQueue::MAX_ATTEMPTS, (string)$rows['fi-g2']['attempts']);
+        self::assertNull($rows['fi-g2']['next_retry_at']);
+        foreach (['fi-g1', 'fi-g3'] as $uuid) {
+            self::assertSame(IngestEvent::STATUS_PENDING, $rows[$uuid]['status']);
+            self::assertSame('1', (string)$rows[$uuid]['attempts']);
+            self::assertSame($this->clockDate(IngestQueue::BACKOFF_SECONDS[0]), $rows[$uuid]['next_retry_at']);
+        }
+    }
+
+    /**
+     * PRO-3962: a whole batch the engine refuses is parked in one write,
+     * and so is a catalog/remove wrapper it refuses.
+     */
+    public function testARefusedBatchIsParkedInOneWrite(): void
+    {
+        $this->enqueueCatalog(3);
+        foreach (['7', '8'] as $productId) {
+            $this->queue->enqueue(Client::DOMAIN_CATALOG_REMOVE, ['product_id' => $productId], $productId, null);
+        }
+
+        $client = $this->createMock(Client::class);
+        $client->method('ingest')->willThrowException(new EngineRequestException('HTTP 400: bad wrapper', 400));
+        $client->method('catalogRemove')->willThrowException(new EngineRequestException('HTTP 404: not found', 404));
+        $writes = $this->failureWrites(fn () => $this->runCron($client));
+
+        self::assertSame(2, $writes, 'One write for the catalog batch, one for the catalog/remove wrapper');
+        foreach ($this->fetchAll(IngestEventResource::TABLE_NAME) as $row) {
+            self::assertSame(IngestEvent::STATUS_FAILED, $row['status']);
+            self::assertSame('1', (string)$row['attempts']);
+            self::assertNull($row['next_retry_at']);
+            self::assertSame(
+                $row['domain'] === Client::DOMAIN_CATALOG ? 'HTTP 400: bad wrapper' : 'HTTP 404: not found',
+                $row['last_error']
+            );
+        }
+    }
+
+    /**
+     * PRO-3962: the rows a D6 reply refuses keep their own reasons — one
+     * write per reason, the rows of a shared reason together — and the
+     * rows it takes are delivered.
+     */
+    public function testRowsRefusedForDifferentReasonsKeepTheirOwn(): void
+    {
+        $this->enqueueCatalog(5);
+
+        $client = $this->createMock(Client::class);
+        $client->method('ingest')->willReturn([
+            'processed' => 2,
+            'deduplicated' => 0,
+            'errors' => [
+                ['index' => 0, 'field' => 'price', 'message' => 'must be a number'],
+                ['index' => 2, 'field' => 'price', 'message' => 'must be a number'],
+                ['index' => 3, 'field' => 'sku', 'message' => 'required'],
+            ],
+        ]);
+        $writes = $this->failureWrites(fn () => $this->runCron($client));
+
+        self::assertSame(2, $writes, 'One write per reason');
+        $rows = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), null, 'event_uuid');
+        $reasons = [
+            'fi-g1' => 'price: must be a number',
+            'fi-g3' => 'price: must be a number',
+            'fi-g4' => 'sku: required',
+        ];
+        foreach ($reasons as $uuid => $reason) {
+            self::assertSame(IngestEvent::STATUS_FAILED, $rows[$uuid]['status'], $uuid);
+            self::assertSame('1', (string)$rows[$uuid]['attempts'], $uuid);
+            self::assertNull($rows[$uuid]['next_retry_at'], $uuid);
+            self::assertSame($reason, $rows[$uuid]['last_error'], $uuid);
+        }
+        foreach (['fi-g2', 'fi-g5'] as $uuid) {
+            self::assertSame(IngestEvent::STATUS_SENT, $rows[$uuid]['status'], $uuid);
+            self::assertNull($rows[$uuid]['last_error'], $uuid);
+        }
+    }
+
+    /**
      * @param Client&\PHPUnit\Framework\MockObject\MockObject $client
      */
     private function runCron(Client $client): void
@@ -328,5 +468,52 @@ class FlushIngestQueueTest extends IntegrationTestCase
             $serializer,
             $logger
         );
+    }
+
+    /**
+     * Catalog rows fi-g1..fi-g$count, item SKU-n each.
+     */
+    private function enqueueCatalog(int $count): void
+    {
+        for ($n = 1; $n <= $count; $n++) {
+            $this->queue->enqueue(Client::DOMAIN_CATALOG, ['sku' => 'SKU-' . $n], 'SKU-' . $n, null, 'fi-g' . $n);
+        }
+    }
+
+    /**
+     * How many statements recorded a failed attempt while $run ran: the
+     * UPDATEs of the queue table that set last_error and a failed outcome
+     * (a claim sets no error, a delivery no pending or failed status).
+     */
+    private function failureWrites(callable $run): int
+    {
+        $connection = $this->connection;
+        if (!$connection instanceof \Zend_Db_Adapter_Abstract) {
+            self::fail('The test connection keeps no query profile');
+        }
+        $profiler = $connection->getProfiler();
+        $profiler->clear();
+        $profiler->setEnabled(true);
+        try {
+            $run();
+        } finally {
+            $profiler->setEnabled(false);
+        }
+
+        $writes = 0;
+        foreach ($profiler->getQueryProfiles() ?: [] as $profile) {
+            $query = $profile->getQuery();
+            $outcomes = [IngestEvent::STATUS_PENDING, IngestEvent::STATUS_FAILED];
+            $failed = str_contains($query, 'CASE') || array_intersect($outcomes, $profile->getQueryParams());
+            if (str_starts_with($query, 'UPDATE `' . IngestEventResource::TABLE_NAME . '`')
+                && str_contains($query, '`last_error`')
+                && $failed
+            ) {
+                $writes++;
+            }
+        }
+        $profiler->clear();
+
+        return $writes;
     }
 }

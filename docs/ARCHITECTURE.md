@@ -644,7 +644,14 @@ below.
   attempt count — and keeps its own exchange; a row with a verdict of its
   own (among them each contact a 203 group sends again alone) goes
   through `markFailed()` as before. `Engine\Client` +
-  `Cron\FlushIngestQueue` do the same for the ingest queue, row by row.
+  `Cron\FlushIngestQueue` do the same for the ingest queue through
+  `IngestQueue::markFailedMany()` (PRO-3962): a batch the engine does not
+  take — a transport failure, a whole-batch refusal, a refused
+  catalog/remove wrapper — and the per-item errors of a D6 reply that
+  share a reason are each recorded in one UPDATE and, for the rows it
+  parks, one line ("Ingest events failed permanently"). Both queues write
+  through the one `Model\Queue\RowWriter`, and a row parked alone gets the
+  same line as a group, with a count of 1.
 - **Smaily envelope codes (PRO-1962; proposed as the cross-platform
   canon for the WooCommerce and Shopify plugins).** Smaily can refuse a
   request with HTTP 200 and a non-101 code in the body (an

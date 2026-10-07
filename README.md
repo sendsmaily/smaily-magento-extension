@@ -66,7 +66,6 @@ See [UPGRADING.md](https://github.com/sendsmaily/smaily-magento-extension/blob/m
 | [Headless Storefronts](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/HEADLESS_STOREFRONTS.md) | What works with a separate storefront application, and what its team must add |
 | [Testing](https://github.com/sendsmaily/smaily-magento-extension/blob/master/TESTING.md) | Test suites, sandbox, upgrade verification |
 | [Contributing](https://github.com/sendsmaily/smaily-magento-extension/blob/master/CONTRIBUTING.md) | Development environment and quality gates |
-| [Backlog](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/internal/BACKLOG.md) | Known deferred work |
 
 ## Quick start
 

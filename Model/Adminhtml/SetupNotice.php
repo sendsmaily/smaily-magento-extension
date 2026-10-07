@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Adminhtml;
 
 use Magento\Framework\App\ResourceConnection;
+use Smaily\Connect\Model\UserGuide;
 
 /**
  * The "Smaily Connect is ready to set up" admin notice that the install adds
@@ -23,13 +24,14 @@ class SetupNotice
 {
     public const TABLE = 'adminnotification_inbox';
 
-    /** Hosted on GitHub for now — update once a hosted docs site exists. */
-    public const URL = 'https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/USER_GUIDE.md';
+    /** The user guide, set in UserGuide::URL. */
+    public const URL = UserGuide::URL;
 
     /**
      * Read Details links that earlier versions wrote into the notice
      * (3.0.0-rc1 to 3.0.0-rc8). The install writes the notice once, so a store
      * that installed one of them keeps that link; the notice is still found.
+     * When UserGuide::URL changes, its old value is added here.
      */
     public const PREVIOUS_URLS = [
         'https://github.com/erkkimarkus/magento-connect/blob/v3/docs/USER_GUIDE.md',

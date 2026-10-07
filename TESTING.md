@@ -151,6 +151,14 @@ import that moves shows its progress as before. To
 check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.
+`Test/Js/user-guide-site.html` checks the merchant user guide,
+`docs/site/index.html` (copied into `Test/Js/build/user-guide-site.js` by
+`render-admin.php` and rendered in a frame with its own script): every
+in-page link has its target, ids are unique, the section the admin
+deep-links to exists, the page loads nothing from elsewhere, every English
+block has its Estonian twin right after it with the same tables, rows, list
+items, headings, code blocks, links and notes, and the language switch
+shows one language at a time and is remembered on reload.
 
 CI runs `bin/test-js.sh` on every push and pull request (the `browser` job:
 PHP 8.3, an install from `composer.lock`, the Google Chrome the runner image

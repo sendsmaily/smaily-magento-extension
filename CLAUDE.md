@@ -56,6 +56,27 @@ commit. **STATUS.md updates in the same commit that changes reality.** New
 operational gotchas go into this file. `docs/USER_GUIDE.md` is a doc too — a
 user-visible behaviour change updates it in the same commit.
 
+**Merchant guide site (`docs/site/index.html`)** — the bilingual (EN/ET)
+merchant user guide, one self-contained page (no build step, no external
+resources; open it in a browser), laid out like the Woo guide
+(`../connect/docs/site/`). A user-visible change — a label, a step, a
+setting, an error or notice text, an import's behaviour, a requirement —
+updates it in the same commit **in both languages**: every unit is a
+`data-lang="en"` element followed by its `data-lang="et"` twin; edit the
+pair together, and quote admin labels exactly as `i18n/en_US.csv` /
+`et_EE.csv` show them. `Test/Js/user-guide-site.html` (in `bin/test-js.sh`)
+fails on a broken in-page link, a missing twin or twins whose structure
+drifted. The email-field reference lives there (`#email-fields`).
+**Publishing:** Erkki uploads the file to https://smaily.com/connect-magento/
+(as for Woo's smaily.com/connect-woo/), after an Estonian proofread of
+changed text; it is not in the package (`/docs` is export-ignored). Until it
+is live, the admin links the GitHub `docs/USER_GUIDE.md`. **Switching the
+admin to the site** is one change: `Model/UserGuide.php::URL` → the site
+URL, the old URL appended to `SetupNotice::PREVIOUS_URLS`, and
+`docs/USER_GUIDE.md` cut to a pointer at the site (drop the Markdown check
+in `Test/Unit/Model/UserGuideTest.php` with it; the `UserGuide` anchors exist
+on the site too).
+
 ## Contract discipline
 
 `docs/RECENGINE_API_CONTRACT.md` is a **byte-identical copy** from the engine

@@ -780,3 +780,17 @@ foreach ($pages as $name => $page) {
     }
 }
 StoreLocale::reset();
+
+// The merchant user guide (docs/site/index.html) as a string, for
+// Test/Js/user-guide-site.html: a page opened from file:// cannot read
+// another file's document, but it can load this script and render the
+// guide into a same-origin frame.
+$guide = file_get_contents($root . '/docs/site/index.html'); // phpcs:ignore Magento2.Functions.DiscouragedFunction
+$file = $build . '/user-guide-site.js';
+if ($guide === false || file_put_contents( // phpcs:ignore Magento2.Functions.DiscouragedFunction
+    $file,
+    'window.smailyUserGuideSite = '
+    . json_encode($guide, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ";\n"
+) === false) {
+    throw new RuntimeException('Cannot write ' . $file . '.');
+}

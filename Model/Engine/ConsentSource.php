@@ -12,8 +12,8 @@ use Magento\Cookie\Helper\Cookie as CookieHelper;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
-use Smaily\Connect\Model\Adminhtml\SetupNotice;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\UserGuide;
 
 /**
  * Whether the browse tracker has a consent source the server can see.
@@ -30,7 +30,7 @@ use Smaily\Connect\Model\Config;
 class ConsentSource
 {
     /** User Guide section on connecting a consent tool. */
-    public const GUIDE_URL = SetupNotice::URL . '#connecting-your-cookie-consent-tool';
+    public const GUIDE_URL = UserGuide::URL . '#' . UserGuide::SECTION_CONSENT_TOOL;
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,

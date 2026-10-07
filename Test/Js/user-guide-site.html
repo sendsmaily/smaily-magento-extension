@@ -1,0 +1,234 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the merchant user guide, docs/site/index.html: one
+  self-contained bilingual page. Test/Js/render-admin.php copies the page
+  into Test/Js/build/user-guide-site.js; this page renders it in a frame
+  with its own script running and checks that every in-page link has its
+  target, that ids are unique, that the deep-link anchor the module links
+  to (Model/UserGuide.php) exists, that the page loads nothing from
+  elsewhere, that every English block has its Estonian twin right after it
+  with the same structure (tables, rows, list items, headings, code blocks,
+  links, notes), and that the language switch shows one language at a time
+  and is remembered. Run it with bin/test-js.sh; the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>user guide site harness</title>
+    <script src="build/user-guide-site.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<iframe id="guide" title="guide" style="width:1200px;height:800px;border:0"></iframe>
+<script>
+    'use strict';
+
+    // Model/UserGuide.php: the section the admin's consent notes link to.
+    var MODULE_ANCHORS = ['connecting-your-cookie-consent-tool'];
+    // Counted inside each English block and its Estonian twin.
+    var PARITY = ['table', 'tr', 'td', 'th', 'ul', 'ol', 'li', 'h3', 'pre', 'a', '.note'];
+    var LANG_KEY = 'sc-docs-lang';
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function finish(error) {
+        document.getElementById('result').textContent = error
+            ? 'RESULT: FAIL (' + error.message + ')'
+            : (failures === 0 && passes > 0
+                ? 'RESULT: PASS (' + passes + ' checks)'
+                : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)');
+        clearInterval(keepAlive);
+    }
+
+    function storage() {
+        try {
+            return window.localStorage;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // Renders the guide into the frame; done(doc) once its script has run.
+    function load(done) {
+        var frame = document.getElementById('guide');
+
+        frame.onload = function () {
+            done(frame.contentDocument);
+        };
+        frame.srcdoc = window.smailyUserGuideSite;
+    }
+
+    function shown(doc, element) {
+        return doc.defaultView.getComputedStyle(element).display !== 'none';
+    }
+
+    function structure(doc) {
+        var ids = {},
+            duplicates = [],
+            missing = [];
+
+        Array.prototype.forEach.call(doc.querySelectorAll('[id]'), function (element) {
+            if (ids[element.id]) {
+                duplicates.push(element.id);
+            }
+            ids[element.id] = true;
+        });
+        check('every id is unique' + (duplicates.length ? ': ' + duplicates.join(', ') : ''), duplicates.length === 0);
+
+        Array.prototype.forEach.call(doc.querySelectorAll('a[href^="#"]'), function (link) {
+            var target = link.getAttribute('href').slice(1);
+
+            if (!doc.getElementById(target) && missing.indexOf(target) === -1) {
+                missing.push(target);
+            }
+        });
+        check('every in-page link has its target' + (missing.length ? ': #' + missing.join(', #') : ''),
+            missing.length === 0 && doc.querySelectorAll('a[href^="#"]').length > 100);
+
+        MODULE_ANCHORS.forEach(function (anchor) {
+            check('the anchor the module links to exists: #' + anchor, !!doc.getElementById(anchor));
+        });
+
+        check('the page loads nothing from elsewhere',
+            doc.querySelectorAll('script[src], link[rel="stylesheet"], img, iframe').length === 0);
+    }
+
+    function pairs(doc) {
+        var english = doc.querySelectorAll('body [data-lang="en"]'),
+            estonian = doc.querySelectorAll('body [data-lang="et"]'),
+            unpaired = [],
+            drift = [],
+            empty = [];
+
+        Array.prototype.forEach.call(english, function (en) {
+            var et = en.nextElementSibling,
+                where = (en.closest('[id]') || {}).id || en.tagName;
+
+            if (!et || et.getAttribute('data-lang') !== 'et' || et.tagName !== en.tagName) {
+                unpaired.push(where);
+
+                return;
+            }
+            if (en.textContent.trim() === '' || et.textContent.trim() === '') {
+                empty.push(where);
+            }
+            PARITY.forEach(function (selector) {
+                var a = en.querySelectorAll(selector).length,
+                    b = et.querySelectorAll(selector).length;
+
+                if (a !== b) {
+                    drift.push(where + ' ' + selector + ' ' + a + '/' + b);
+                }
+            });
+        });
+        Array.prototype.forEach.call(estonian, function (et) {
+            var en = et.previousElementSibling;
+
+            if (!en || en.getAttribute('data-lang') !== 'en') {
+                unpaired.push(((et.closest('[id]') || {}).id || et.tagName) + ' (et)');
+            }
+        });
+
+        check('the page has English and Estonian blocks (' + english.length + ')',
+            english.length > 150 && english.length === estonian.length);
+        check('every English block has its Estonian twin right after it' + (unpaired.length ? ': ' + unpaired.join(', ') : ''),
+            unpaired.length === 0);
+        check('every twin has the same structure' + (drift.length ? ': ' + drift.join('; ') : ''), drift.length === 0);
+        check('no language block is empty' + (empty.length ? ': ' + empty.join(', ') : ''), empty.length === 0);
+    }
+
+    function language(doc, then) {
+        var root = doc.documentElement,
+            enButton = doc.querySelector('[data-setlang="en"]'),
+            etButton = doc.querySelector('[data-setlang="et"]'),
+            enHeading = doc.querySelector('#overview h1 [data-lang="en"]'),
+            etHeading = doc.querySelector('#overview h1 [data-lang="et"]'),
+            store = storage();
+
+        check('it opens in English', root.getAttribute('data-lang') === 'en' && root.getAttribute('lang') === 'en'
+            && shown(doc, enHeading) && !shown(doc, etHeading)
+            && enButton.getAttribute('aria-pressed') === 'true' && etButton.getAttribute('aria-pressed') === 'false');
+
+        etButton.click();
+        check('ET switches the page to Estonian', root.getAttribute('data-lang') === 'et' && root.getAttribute('lang') === 'et'
+            && !shown(doc, enHeading) && shown(doc, etHeading)
+            && etButton.getAttribute('aria-pressed') === 'true' && enButton.getAttribute('aria-pressed') === 'false');
+        check('in Estonian, no English block shows',
+            Array.prototype.every.call(doc.querySelectorAll('body [data-lang="en"]'), function (element) {
+                return !shown(doc, element);
+            }));
+
+        if (!store) {
+            log('(no localStorage in this browser: the remembered choice is not checked)');
+            enButton.click();
+            check('EN switches back to English', root.getAttribute('data-lang') === 'en' && shown(doc, enHeading));
+            then();
+
+            return;
+        }
+        check('the choice is remembered', store.getItem(LANG_KEY) === 'et');
+        load(function (again) {
+            var againRoot = again.documentElement;
+
+            check('a reload opens in the remembered language', againRoot.getAttribute('data-lang') === 'et'
+                && shown(again, again.querySelector('#overview h1 [data-lang="et"]')));
+            again.querySelector('[data-setlang="en"]').click();
+            check('EN switches back to English', againRoot.getAttribute('data-lang') === 'en'
+                && shown(again, again.querySelector('#overview h1 [data-lang="en"]'))
+                && store.getItem(LANG_KEY) === 'en');
+            store.removeItem(LANG_KEY);
+            then();
+        });
+    }
+
+    try {
+        if (typeof window.smailyUserGuideSite !== 'string') {
+            throw new Error('Test/Js/build/user-guide-site.js is missing; bin/test-js.sh renders it');
+        }
+        if (storage()) {
+            storage().removeItem(LANG_KEY);
+        }
+        load(function (doc) {
+            try {
+                structure(doc);
+                pairs(doc);
+                language(doc, function () {
+                    finish(null);
+                });
+            } catch (error) {
+                finish(error);
+            }
+        });
+    } catch (error) {
+        finish(error);
+    }
+</script>
+</body>
+</html>

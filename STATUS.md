@@ -5,12 +5,13 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-07 — PRO-3798 (only a refunded credit memo marks
-order lines returned for Campaign Intelligence; a canceled or pending one
-does not; unreleased) and PRO-3854's contract part: the engine contract copy
-is synced v1.8.3 → v1.12.0 (doc only, nothing the extension sends changes;
-Contract staleness green again); both under CHANGELOG's "Changes since
-3.0.0-rc7". 2026-10-05 session handoff: after rc7, PRO-3768, PRO-1958,
+_Last updated: 2026-10-07 — PRO-3802 (the initial setup's Connect step
+takes the Storefront URL, saved before the Contacts step switches contact
+sync on; PILOT_CHECKLIST's pilot-day order follows it and so needs a build
+with PRO-3802), PRO-3798 (only a refunded credit memo marks order lines
+returned) and PRO-3854's contract part (the engine contract copy synced
+v1.8.3 → v1.12.0, doc only; Contract staleness green again); all unreleased,
+CHANGELOG's "Changes since 3.0.0-rc7". 2026-10-05 session handoff: after rc7, PRO-3768, PRO-1958,
 PRO-3747, PRO-3753, PRO-3767, PRO-3780, PRO-1957, PRO-1955 and the
 simplification passes landed on v3, unreleased (CHANGELOG's "Changes since
 3.0.0-rc7"); they go into the next rc after the pilot. In detail: after rc7, PRO-1955 (a credit memo that moves
@@ -2914,11 +2915,11 @@ Earlier: 2026-09-11, 2026-09-10._
 
 - **Next session opens here (2026-10-05).** A fresh session starts from this block.
   - **Pilot 09.10:** the pilot store installs 3.0.0-rc7 (released 2026-10-05, the newest GitHub pre-release; its clean install by the guide passed, PRO-3769), following PILOT_CHECKLIST.md.
-  - Separate-storefront order: the Storefront URL under Settings > Connection first, then connect Campaign Intelligence — connecting starts the catalog import (**Hold back the import** if needed).
+  - Separate-storefront order: the Storefront URL on the initial setup's Connect step (PRO-3802; needs rc8 — on rc7 it is Settings > Connection after the setup), then connect Campaign Intelligence — connecting starts the catalog import (**Hold back the import** if needed).
   - Human acceptance left: PRO-2474 (pilot installed and connected), PRO-3660 (a recommendation and a back-in-stock link open on the storefront), the pilot-day checks in the checklist.
   - Pilot decisions made 2026-10-05 (PRO-3600): consent contact mode, connect Campaign Intelligence on 09.10, 25% holdout before activation (engine side), 12-week reading window, Estonian emails; Personalization stays hidden while refused.
   - **Erkki:** HC Pro (PRO-3661 2.x settings, PRO-3663 Mageplaza checks, PRO-3665 other abandoned-cart senders, spike PRO-3662); Estonian proofreading of the strings added 2026-10-02..05.
-  - **On v3 after rc7, unreleased** (CHANGELOG "Changes since 3.0.0-rc7"; into the next rc after the pilot): PRO-3768 (CSV-import deletes reach the engine), PRO-1958, PRO-3747, PRO-3753 (a 203 group is sent one by one), PRO-3767, PRO-3780, PRO-1957, PRO-1955, the simplification passes, PRO-3798 (only a refunded credit memo marks lines returned).
+  - **On v3 after rc7, unreleased** (CHANGELOG "Changes since 3.0.0-rc7"; into the next rc after the pilot): PRO-3768 (CSV-import deletes reach the engine), PRO-1958, PRO-3747, PRO-3753 (a 203 group is sent one by one), PRO-3767, PRO-3780, PRO-1957, PRO-1955, the simplification passes, PRO-3798 (only a refunded credit memo marks lines returned), PRO-3802 (the setup's Storefront URL field).
   - **Open queue:** PRO-3746 (after the pilot: one connect step and one import-start step), PRO-3774 (remove a product from the engine by SKU; Replace-import note), PRO-2461, PRO-1970, PRO-1964 (low), PRO-1464/PRO-1463 multi-website phases (one-way door; wait on the engine).
   - **Cross-repo asks open:** WooCommerce PRO-3743 (catalog import on connect), PRO-3750 (code 203, and contact sync ignores it), PRO-3796 (over_10_products); Shopify PRO-3744, PRO-3751, PRO-3797. Engine PRO-3740 is done (contract 1.8.3 synced).
   - Sandbox: remove finished agent worktrees under `.claude/worktrees` before any sandbox `setup:di:compile`.

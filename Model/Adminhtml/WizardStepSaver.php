@@ -176,8 +176,9 @@ class WizardStepSaver
             }
         }
 
-        // The storefront address (Settings only, PRO-3660) is checked before
-        // anything is saved as well; a post without the key leaves it as is.
+        // The storefront address (PRO-3660; Settings > Connection and the
+        // initial setup's Connect step, PRO-3802) is checked before anything
+        // is saved as well; a post without the key leaves it as is.
         $storefrontUrl = null;
         if (array_key_exists('storefront_url', $data)) {
             $storefrontUrl = is_string($data['storefront_url'])

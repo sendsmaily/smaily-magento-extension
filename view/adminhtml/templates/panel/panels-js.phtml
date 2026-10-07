@@ -247,9 +247,10 @@ window.smailyPanelsInit = function ($) {
                 // the default fallback account — is the website's, the one
                 // an empty password now keeps (PRO-3690, PRO-3718).
                 boot.websiteAccount = {subdomain: data.subdomain, username: data.username};
-                // The Intelligence tab's separate-storefront hint follows the
-                // Storefront URL just saved; the Settings tabs switch without
-                // a reload (PRO-3747). The initial setup posts no URL.
+                // The Intelligence tab's or step's separate-storefront hint
+                // follows the Storefront URL just saved; the Settings tabs
+                // and the setup steps switch without a reload (PRO-3747,
+                // PRO-3802).
                 if (typeof data.storefront_url === 'string') {
                     $('#smaily-w-engine-storefront-hint').toggle(data.storefront_url.trim() === '');
                 }
@@ -890,8 +891,9 @@ window.smailyPanelsInit = function ($) {
         });
     }
 
-    // The Storefront URL field is drawn in Settings only (PRO-3660): the
-    // initial setup's save posts no key and leaves the saved value as is.
+    // The Storefront URL field (PRO-3660), on Settings > Connection and in
+    // the initial setup's Connect step (PRO-3802); a page without the field
+    // posts no key and leaves the saved value as is.
     function withStorefrontUrl(data) {
         var $field = $('#smaily-w-storefront-url');
         if ($field.length) {

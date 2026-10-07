@@ -13,7 +13,9 @@
   Test/Js/render-admin.php into Test/Js/build/ as the initial setup's step
   and as the Settings tab (each without and with a saved Storefront URL, for
   the storefront hint of PRO-3745; on Settings a Connection save shows or
-  hides it without a reload, PRO-3747), run with jQuery from vendor/, one fresh frame per
+  hides it without a reload, PRO-3747), and the initial setup's Connect step
+  (panel/connection.phtml) in front of its Intelligence step, for the setup's
+  Storefront URL field (PRO-3802), run with jQuery from vendor/, one fresh frame per
   scenario. Stubbed: only the requests (fetch) — the Connect answers with
   the EngineExchange endpoint's answer, the import requests with the
   BackfillState endpoint's, a Connection save with the SaveStep endpoint's. Run it with bin/test-js.sh (it renders the pages
@@ -31,6 +33,8 @@
     <script src="build/intelligence-settings.et_EE.js"></script>
     <script src="build/intelligence-settings-storefront.en_US.js"></script>
     <script src="build/intelligence-settings-storefront.et_EE.js"></script>
+    <script src="build/connection-setup.en_US.js"></script>
+    <script src="build/connection-setup.et_EE.js"></script>
 </head>
 <body>
 <pre id="log"></pre>
@@ -41,8 +45,9 @@
     var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
     var HELD_BACK = 'Held back: the catalog import is canceled. Start it any time under Marketing > Smaily Connect > Settings > Intelligence.';
     var CANCELED = 'Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.';
-    var STOREFRONT_HINT = 'Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: finish the setup without connecting, enter the address under Marketing > Smaily Connect > Settings > Connection > Using a separate storefront? > Storefront URL, then connect under Settings > Intelligence. Or connect now and press Hold back the import.';
+    var STOREFRONT_HINT = 'Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: go back to the Connect step, open Using a separate storefront? and enter the address as Storefront URL. Or connect now and press Hold back the import.';
     var SETTINGS_STOREFRONT_HINT = 'Using a separate storefront? Set its Storefront URL under Settings > Connection > Using a separate storefront? before you connect, so that the catalog import sends the storefront\'s product links. Or connect now and press Hold back the import.';
+    var REFUSED_STOREFRONT = 'Enter the storefront\'s address only, starting with https:// — for example https://shop.example.com — without a path or a query.';
     var FINISHED ='The catalog import had already finished, so there was nothing left to hold back.';
     var failures = 0;
     var passes = 0;
@@ -163,6 +168,39 @@
         });
     }
 
+    // Saves the initial setup's Connect step as the setup's Continue does
+    // (panels.collect.connect(), then panels.saveStep('connect')), with this
+    // Storefront URL typed into the step's field; the server accepts the
+    // save, or refuses the address on its field. A refused save is shown as
+    // the setup shows it (panels.showFormErrors()). Answers the request the
+    // step posted.
+    function saveSetupConnect(frame, storefrontUrl, refusal) {
+        var win = frame.contentWindow,
+            $ = win.jQuery;
+
+        win.answers.save = refusal
+            ? {saved: false, errors: [{field: 'storefront_url', message: refusal}]}
+            : {saved: true, errors: [], verified: true, accountName: 'demo', storefrontUrlChanged: storefrontUrl !== ''};
+        $('#smaily-w-subdomain').val('demo');
+        $('#smaily-w-username').val('api');
+        $('#smaily-w-storefront').prop('open', storefrontUrl !== '');
+        $('#smaily-w-storefront-url').val(storefrontUrl);
+
+        return new Promise(function (resolve) {
+            resolve(win.panels.collect.connect());
+        }).then(function (data) {
+            return win.panels.saveStep('connect', data);
+        }).catch(function (error) {
+            win.panels.showFormErrors($('body'), error);
+        }).then(function () {
+            var saves = win.requests.filter(function (request) {
+                return request.url.indexOf('savestep') !== -1;
+            });
+
+            return saves.length ? saves[saves.length - 1].body : null;
+        });
+    }
+
     function holdBack(frame, statusAfter) {
         frame.contentWindow.answers.status = statusAfter;
         frame.contentDocument.getElementById('smaily-w-engine-catalog-holdback').click();
@@ -201,7 +239,8 @@
             hint,
             doc,
             card,
-            cancels;
+            cancels,
+            save;
 
         log('# ' + locale);
         if (locale !== 'en_US') {
@@ -259,6 +298,42 @@
             visible(frame.contentDocument, 'smaily-w-engine-connect')
             && !visible(frame.contentDocument, 'smaily-w-engine-storefront-hint'));
         frame.remove();
+
+        // The initial setup's Connect step offers the Storefront URL field,
+        // collapsed while none is saved, and saves it with the connection —
+        // before the Contacts step — on the field Settings > Connection saves
+        // (PRO-3802): empty, an address, a refused address.
+        frame = await open('connection-setup.' + locale, {status: catalog('idle', 0)});
+        doc = frame.contentDocument;
+        strings = window.smailyAdminPages['connection-setup.' + locale].strings;
+        check(locale + ', setup Connect: the Storefront URL field is drawn, collapsed, under its own label',
+            !!doc.getElementById('smaily-w-storefront-url')
+            && !doc.getElementById('smaily-w-storefront').open
+            && doc.querySelector('#smaily-w-storefront summary').textContent === strings['Using a separate storefront?']
+            && doc.querySelector('label[for="smaily-w-storefront-url"]').textContent === strings['Storefront URL']);
+        save = await saveSetupConnect(frame, '');
+        check(locale + ', setup Connect: left empty, the step saves the connection with an empty Storefront URL',
+            !!save && save.step === 'connect' && save.data.subdomain === 'demo' && save.data.storefront_url === '');
+        check(locale + ', setup Connect: left empty, the Intelligence step keeps its storefront hint',
+            visible(doc, 'smaily-w-engine-storefront-hint')
+            && doc.getElementById('smaily-w-engine-storefront-hint').textContent === strings[STOREFRONT_HINT]);
+        save = await saveSetupConnect(frame, 'https://shop.example.com/products', strings[REFUSED_STOREFRONT]);
+        check(locale + ', setup Connect: the address is posted to the save for the server\'s check',
+            !!save && save.data.storefront_url === 'https://shop.example.com/products');
+        check(locale + ', setup Connect: a refused address is marked on the field, with the message under it',
+            doc.getElementById('smaily-w-storefront-url').classList.contains('is-invalid')
+            && doc.querySelector('#smaily-w-storefront .smaily-field-error').textContent === strings[REFUSED_STOREFRONT]
+            && !!doc.querySelector('.smaily-form-banner'));
+        check(locale + ', setup Connect: a refused save leaves the Intelligence step\'s storefront hint',
+            visible(doc, 'smaily-w-engine-storefront-hint'));
+        save = await saveSetupConnect(frame, 'https://shop.example.com');
+        check(locale + ', setup Connect: an address is saved with the connection',
+            !!save && save.data.storefront_url === 'https://shop.example.com'
+            && save.data.subdomain === 'demo' && save.data.username === 'api');
+        check(locale + ', setup Connect: an address saved, the Intelligence step drops its storefront hint',
+            visible(doc, 'smaily-w-engine-connect') && !visible(doc, 'smaily-w-engine-storefront-hint'));
+        frame.remove();
+        strings = window.smailyAdminPages[setup].strings;
 
         // Initial setup: a Connect that started the catalog import, held back
         // before its first cron run.

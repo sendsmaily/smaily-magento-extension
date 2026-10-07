@@ -116,7 +116,12 @@ hint to set the Storefront URL first, or hold the import back, only while
 no Storefront URL is saved, that on Settings a Connection save with a
 Storefront URL hides it and one that clears the URL shows it again without
 a reload (a refused save changes nothing), and that Settings drops it once
-connected. To
+connected. The initial setup's Connect step is rendered in front of its
+Intelligence step too: it checks that the step draws the Storefront URL
+field collapsed, that its save posts the field with the credentials —
+empty, a refused address (marked on the field with the server's message,
+the hint left as it was) and an accepted one (the Intelligence step's hint
+gone without a reload). To
 check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.

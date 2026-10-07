@@ -612,6 +612,33 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
+     * PRO-3802: the initial setup's Connect step posts the Storefront URL
+     * with the first credentials, as the setup's script collects them; the
+     * one connection save stores it at the website's scope with them, so it
+     * is saved before the Contacts step's save switches contact sync on.
+     */
+    public function testTheInitialSetupsConnectStepSavesTheStorefrontUrlWithTheCredentials(): void
+    {
+        $this->websiteContext->method('getWebsiteId')->willReturn(2);
+        $this->config->method('getStorefrontUrl')->willReturn('');
+
+        $errors = $this->saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'multilingual_mode' => 'single',
+            'storefront_url' => 'https://shop.example.com',
+        ]);
+
+        self::assertSame([], $errors);
+        foreach ([Config::XML_PATH_SUBDOMAIN, Config::XML_PATH_PASSWORD, Config::XML_PATH_STOREFRONT_URL] as $path) {
+            self::assertTrue($this->wasSavedAtScope($path, ScopeInterface::SCOPE_WEBSITES, 2), $path);
+        }
+        self::assertSame('https://shop.example.com', $this->savedValue(Config::XML_PATH_STOREFRONT_URL));
+        self::assertFalse($this->wasSaved(Config::XML_PATH_SYNC_ENABLED));
+    }
+
+    /**
      * @dataProvider unchangedStorefrontUrlProvider
      */
     public function testSavingTheSameStorefrontUrlIsNoChange(string $saved, string $posted): void

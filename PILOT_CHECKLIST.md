@@ -25,33 +25,28 @@ uses, and that you cancel or refund it afterwards.
 
 ## Pilot-day order
 
-The first pilot store runs a separate (headless) storefront, so contact sync
-stays off until the product-link check passes (§0, the separate-storefront
-row). The steps run in this order:
+The first pilot store runs a separate (headless) storefront, so the
+abandoned-cart reminder stays off until the product-link check passes (§0,
+the separate-storefront row). The steps run in this order:
 
-1. Connect the Smaily account in the initial setup and choose the consent
-   contact mode (**Subscribers only (consent)**) on its **Contacts** step —
-   §1. Do not connect on the **Intelligence** step: press **Finish** — §2.
-   The initial setup has no off switch for contact sync: saving its
-   **Contacts** step switches contact sync on. Right after **Finish**, open
-   **Settings > Contacts**, untick **Sync contacts to Smaily** and press
-   **Save Contacts**. The consent mode stays saved, greyed out, while contact
-   sync is off. Until then contact sync runs, so keep this step short.
-2. Set the **Storefront URL** under **Settings > Connection** — §2.
-3. Connect Campaign Intelligence under **Settings > Intelligence**;
-   connecting starts the catalog import — §2.
-4. Run the product-link check: `docs/HEADLESS_STOREFRONTS.md`, "Before
+1. Connect the Smaily account in the initial setup and set the
+   **Storefront URL** on its **Connect** step (**Using a separate
+   storefront?**) — §1. It is saved with the connection, before the
+   **Contacts** step switches contact sync on. Choose the consent contact
+   mode (**Subscribers only (consent)**) on the **Contacts** step: saving it
+   switches contact sync on in that mode — §1.
+2. Connect Campaign Intelligence on the initial setup's **Intelligence**
+   step; connecting starts the catalog import with the storefront's product
+   links — §2.
+3. Run the product-link check: `docs/HEADLESS_STOREFRONTS.md`, "Before
    switching anything on", step 2, and §2's last row (one catalog entry's
    product link and image link open on the storefront).
-5. Once the check passes, switch contact sync on in the consent mode:
-   **Settings > Contacts** → tick **Sync contacts to Smaily**, check that
-   **Subscribers only (consent)** is selected → **Save Contacts**. Then
-   switch the abandoned-cart reminder on: **Settings > Automations** → tick
-   **Enabled** on **Abandoned cart** (its workflow is mapped in the initial
-   setup, §1) → **Save Automations**.
-6. Start the customer history import (and the order history import, if
+4. Once the check passes, switch the abandoned-cart reminder on:
+   **Settings > Automations** → tick **Enabled** on **Abandoned cart** (its
+   workflow is mapped in the initial setup, §1) → **Save Automations**.
+5. Start the customer history import (and the order history import, if
    wanted) — §2, **Historical imports to Campaign Intelligence**.
-7. The engine operator switches the 25% holdout on before activation — §2.
+6. The engine operator switches the 25% holdout on before activation — §2.
    This is an engine-side step: Smaily Connect has no control for it.
 
 ## 0. Pre-flight
@@ -60,7 +55,7 @@ row). The steps run in this order:
 |---|---|
 | Confirm the store has one website. | Stores > All Stores lists one website. More than one: Initial setup opens with "Which website are you setting up?" and Settings shows a **Website** selector — onboard each website, and note it in PRO-2474. |
 | Confirm the storefront theme is Luma-based, not Hyvä. | Content > Design > Configuration. A Hyvä theme needs the separate compat module (`compat/hyva`), which the ZIP does not carry — stop and raise it. |
-| Confirm shoppers buy on Magento's own theme, not on a separate (headless) storefront application. | Open a product page on the public shop: Magento's own theme loads `requirejs` (Luma) or Alpine.js (Hyvä). A headless storefront (PRO-3614): walk `docs/HEADLESS_STOREFRONTS.md` "Before switching anything on" first — keep contact sync and automations off until its product-link check passes, and set the Storefront URL before connecting Campaign Intelligence (§2); §5's `{{abandoned_cart_url}}`, the checkout checkbox and §6 do not apply until the storefront team's hand-off items are in place. |
+| Confirm shoppers buy on Magento's own theme, not on a separate (headless) storefront application. | Open a product page on the public shop: Magento's own theme loads `requirejs` (Luma) or Alpine.js (Hyvä). A headless storefront (PRO-3614): walk `docs/HEADLESS_STOREFRONTS.md` "Before switching anything on" first — keep the automations off until its product-link check passes, and set the Storefront URL on the initial setup's **Connect** step, before contact sync and Campaign Intelligence (§1); §5's `{{abandoned_cart_url}}`, the checkout checkbox and §6 do not apply until the storefront team's hand-off items are in place. |
 | Confirm the ZIP the developer installed is the release build. | Developer ran `sha256sum -c smaily-connect-magento2.zip.sha256` → `OK`. `bin/magento module:status Smaily_Connect` → `Module is enabled`. |
 | List which modules send abandoned-cart emails today — for example a Magento extension such as Mageplaza SMTP or Avada Email Marketing, or Adobe Commerce's own email reminder rules. | Developer runs `bin/magento module:status --enabled`; the merchant says which of those send abandoned-cart emails. Each one's abandoned-cart emails are off before §1's **Automations** step ticks **Enabled** on **Abandoned cart**, or the test shopper in §5 gets two reminders. Note the list (or "none") in PRO-2474. |
 | Confirm the store's Magento cron is installed. | `crontab -l` on the server shows the `#~ MAGENTO START` block running `bin/magento cron:run` every minute. |
@@ -71,27 +66,24 @@ row). The steps run in this order:
 |---|---|
 | Open **Marketing > Smaily Connect**. | A fresh install lands on **Initial setup**, step bar: **Connect, Contacts, Automations, Intelligence, Overview**. |
 | **Connect** step: fill **Subdomain**, **API username**, **API password**; press **Test connection**. | "Connected!" and a green status with the account name; **Continue** goes to **Contacts**. A failure shows the Smaily-side reason — fix the credentials, do not continue. |
-| **Contacts** step: mode **Subscribers only (consent)** — the pilot store's decided mode; keep **Show a newsletter checkbox at checkout** on. **Continue**. | The step saves ("Saving…" then the next step). Saving switches contact sync on — the initial setup has no off switch. On a separate storefront, switch it off under **Settings > Contacts** right after the setup (Pilot-day order, step 1). |
-| **Automations** step: map **Abandoned cart** to the merchant's Smaily workflow and tick **Enabled** (needed for §5). On a separate storefront, leave **Enabled** unticked here: it goes on under **Settings > Automations** together with contact sync, once the product-link check passes (Pilot-day order, step 5). Map **Welcome** / **First order** only if the merchant has those workflows. **Wait (minutes)** stays at **30** unless the merchant asked otherwise. | Workflow dropdowns list the Smaily account's workflows (**Refresh workflows** if one is missing). |
+| Separate storefront (the pilot): on the same **Connect** step, open **Using a separate storefront?** under the account fields and enter the storefront's https address (host only, e.g. `https://shop.example.com`) as **Storefront URL**, then **Continue**. | **Continue** saves it with the connection and goes to **Contacts**. An address with a path, a query or `http://` is refused with a message under the field; fix it, do not continue without it. After the setup, **Settings > Connection** shows it under **Using a separate storefront?**. |
+| **Contacts** step: mode **Subscribers only (consent)** — the pilot store's decided mode; keep **Show a newsletter checkbox at checkout** on. **Continue**. | The step saves ("Saving…" then the next step). Saving switches contact sync on, in the consent mode. On a separate storefront the Storefront URL is already saved (the **Connect** step), so contact sync stays on. |
+| **Automations** step: map **Abandoned cart** to the merchant's Smaily workflow and tick **Enabled** (needed for §5). On a separate storefront, leave **Enabled** unticked here: it goes on under **Settings > Automations** once the product-link check passes (Pilot-day order, step 4). Map **Welcome** / **First order** only if the merchant has those workflows. **Wait (minutes)** stays at **30** unless the merchant asked otherwise. | Workflow dropdowns list the Smaily account's workflows (**Refresh workflows** if one is missing). |
 
 ## 2. Engine setup exchange (Intelligence step)
 
-**Separate (headless) storefront — the pilot's case: set the Storefront URL
-BEFORE connecting Campaign Intelligence.** Connecting starts the catalog
-import at once, and without a Storefront URL every product link in it is
-the back-end's. The initial setup has no Storefront URL field (Settings
-opens only once the setup is finished), so on such a store the rows below
-run in this order:
+**Separate (headless) storefront — the pilot's case: the Storefront URL is
+set BEFORE connecting Campaign Intelligence** — on the initial setup's
+**Connect** step (§1). Connecting starts the catalog import at once, and
+without a Storefront URL every product link in it is the back-end's.
 
 | What to do | Where to look / what good looks like |
 |---|---|
-| On the **Intelligence** step, do not connect: press **Finish**, then **Go to Dashboard** on **Overview**. | Under **Setup URL or token from Smaily** the step says "Using a separate storefront? Set its Storefront URL before you connect, …" — it shows while no Storefront URL is saved for the website. |
-| **Settings > Connection** → open **Using a separate storefront?** → enter the storefront's https address (host only, e.g. `https://shop.example.com`) as **Storefront URL** → **Save Connection**. | Saved; the field stays filled after a reload. |
-| **Settings > Intelligence**: do the rows below from **Before connecting** on there — **Connect** is the same; **Enable storefront browse tracking** is saved with the tab's **Save** (no **Finish** / **Overview**). | Before **Connect**, no "Using a separate storefront? …" note under the setup URL field (the Storefront URL is saved; the note is gone without a reload). The catalog import that connecting starts sends the storefront's product links. |
-| Connected before the Storefront URL was set (by mistake)? | Press **Hold back the import** at once (before the next cron run, usually within a minute), set the Storefront URL as above, then **Run again** on the Catalog card under **Settings > Intelligence**. |
+| On the **Intelligence** step, before **Connect**: look under **Setup URL or token from Smaily**. | No "Using a separate storefront? …" note — the Storefront URL is saved. The note shows while none is saved for the website: then go back to the **Connect** step, open **Using a separate storefront?**, enter the address and **Continue** through the steps again — do not connect before the note is gone. |
+| Connected before the Storefront URL was set (by mistake)? | Press **Hold back the import** at once (before the next cron run, usually within a minute), set the Storefront URL under **Settings > Connection** → **Using a separate storefront?** → **Save Connection** (after **Finish**), then **Run again** on the Catalog card under **Settings > Intelligence**. |
 
-A store on Magento's own theme runs the rows below on the initial setup's
-Intelligence step:
+Then every store — the separate storefront too — runs the rows below on the
+initial setup's Intelligence step:
 
 | What to do | Where to look / what good looks like |
 |---|---|

@@ -197,12 +197,13 @@ $modeCards = [
 </div>
 <?php endif; ?>
 
-<?php if ($isSettings): ?>
 <?php // A store that sells on a separate (headless) storefront: product links
 // in the catalog sync and the RSS feed go to the storefront's address
 // (PRO-3660). Collapsed behind a link; drawn open when an address is saved,
 // or, with one sentence saying why, when the last 30 days' orders all came
-// through the API. ?>
+// through the API. Drawn in the initial setup too, so the address is saved
+// with the connection, before the Contacts step switches contact sync on
+// (PRO-3802). ?>
 <?php $storefrontUrl = $viewModel->getSavedStorefrontUrl(); ?>
 <?php $apiOnly = $viewModel->isApiOnlyStore(); ?>
 <details class="smaily-disclosure" id="smaily-w-storefront"<?= $viewModel->isStorefrontDisclosureOpen() ? ' open' : '' ?>>
@@ -219,4 +220,3 @@ $modeCards = [
         </div>
     </div>
 </details>
-<?php endif; ?>

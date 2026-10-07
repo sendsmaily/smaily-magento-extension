@@ -211,15 +211,17 @@ credentials for you, see below).
 
 When shoppers buy on a separate (headless) storefront and Magento is the
 back end only, open **Using a separate storefront?** under the account
-fields on **Settings > Connection** and enter the storefront's address as
-**Storefront URL**, for example `https://shop.example.com`. The product
+fields on **Settings > Connection**, or on the initial setup's Connect step,
+and enter the storefront's address as **Storefront URL**, for example
+`https://shop.example.com`. The product
 links in the catalog sync to Campaign Intelligence and in the RSS feed then
 start with that address: the scheme, host and port of Magento's link are
 replaced, and the path and the query string stay. Image links, the
 abandoned-cart link and Magento's own emails do not change. Leave the field
 empty to send Magento's own product links. The value is kept per website and
-saved with **Save Connection**; the field is drawn open while a value is
-saved.
+saved with **Save Connection** — in the initial setup, with the Connect
+step's **Continue**, together with the account; the field is drawn open
+while a value is saved.
 
 The field also opens by itself, with a sentence saying why, when the store's
 orders of the last 30 days all came through Magento's API: placed through
@@ -230,7 +232,8 @@ store that has not taken an order since the module was installed.
 
 The address must be https and the host alone: a path other than `/`, a
 query or a fragment is refused on save, with the message under the field
-(a trailing `/` is dropped). After a save that changes the address, the
+(a trailing `/` is dropped) — on the initial setup's Connect step the same
+way. After a save on **Settings > Connection** that changes the address, the
 result beside the button asks you to run the catalog import again under
 **Settings > Intelligence > Historical imports**, so that Campaign
 Intelligence gets the new links. The RSS feed shows them within 15 minutes.
@@ -239,10 +242,10 @@ the query string — see
 [HEADLESS_STOREFRONTS.md](HEADLESS_STOREFRONTS.md#product-links-and-images).
 
 Connecting Campaign Intelligence starts the catalog import, so set the
-Storefront URL before you connect Campaign Intelligence. The initial setup
-has no Storefront URL field: on a new install, finish the initial setup
-with its Campaign Intelligence step left unconnected, set the Storefront
-URL here, and connect under **Settings > Intelligence**. Connected already
+Storefront URL before you connect Campaign Intelligence. On a new install,
+enter it on the initial setup's Connect step: it is saved with the
+connection, before the Contacts step switches contact sync on, and the
+setup's Campaign Intelligence step then connects with it. Connected already
 without it: press **Hold back the import** at once, set the Storefront
 URL, and start the catalog import then (see
 [Connecting](#connecting)).
@@ -670,13 +673,13 @@ While no Storefront URL is saved for the website, the setup URL field
 says that a store with a separate storefront sets its Storefront URL
 before connecting — or connects and presses **Hold back the import** (see
 [A separate storefront](#a-separate-storefront)). Initial setup step 4
-says to finish the setup without connecting, enter the address under
-**Settings > Connection > Using a separate storefront? > Storefront URL**,
-then connect under **Settings > Intelligence**; **Settings > Intelligence**
+says to go back to the Connect step and enter the address under **Using a
+separate storefront?**; **Settings > Intelligence**
 says to set it under **Settings > Connection > Using a separate
 storefront?** first. With a Storefront URL saved, and once connected,
-neither says it. Saving a Storefront URL on **Settings > Connection** hides
-the note on **Settings > Intelligence** at once, and clearing it and saving
+neither says it. Saving a Storefront URL on **Settings > Connection**, or
+on the initial setup's Connect step, hides the note on **Settings >
+Intelligence** or on the setup's step 4 at once, and clearing it and saving
 shows the note again; no reload is needed.
 
 The setup URL must be an https address on `intelligence.smaily.com`; a bare

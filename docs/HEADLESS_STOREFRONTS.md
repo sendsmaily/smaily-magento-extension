@@ -74,7 +74,8 @@ not route.
 ### Storefront URL
 
 **Settings > Connection > Using a separate storefront? > Storefront URL**
-puts the product links on the storefront's address. Enter the storefront's
+— also on the initial setup's Connect step — puts the product links on the
+storefront's address. Enter the storefront's
 address only — `https://shop.example.com`, https, no path, no query. Every
 product link in the catalog sync and in the RSS feed then starts with it:
 the scheme, host and port of Magento's link are replaced, the path and the
@@ -89,9 +90,9 @@ through the API (GraphQL, or REST without Magento's storefront session).
 After a change, run the catalog import again (**Settings > Intelligence >
 Historical imports > Catalog**) so Campaign Intelligence gets the new links.
 Connecting Campaign Intelligence starts the catalog import, so set the
-Storefront URL before connecting Campaign Intelligence — leave the initial
-setup's optional Intelligence step unconnected and connect under
-**Settings > Intelligence** afterwards — or press **Hold back the import** right after connecting and
+Storefront URL before connecting Campaign Intelligence — on a new install,
+on the initial setup's Connect step, which saves it before the setup's
+Intelligence step — or press **Hold back the import** right after connecting and
 run the import once the Storefront URL is set. While no Storefront URL is
 saved, the initial setup's Intelligence step and **Settings > Intelligence**
 say the same under their setup URL field, until Campaign Intelligence is
@@ -268,12 +269,13 @@ only in the same browser, while the storefront still holds the cart.
 
 ## Before switching anything on
 
-1. Install the module and connect it as usual; leave contact sync and
-   automations off, and leave the initial setup's Campaign Intelligence
-   step unconnected — connecting starts the catalog import.
-2. Set the **Storefront URL** when shoppers cannot open the back-end host,
-   then connect Campaign Intelligence under **Settings > Intelligence**.
-   Run one catalog sync and open a product's `product_url` and `image_url`
+1. Install the module and connect it as usual; set the **Storefront URL**
+   on the initial setup's Connect step (**Using a separate storefront?**)
+   when shoppers cannot open the back-end host — connecting Campaign
+   Intelligence starts the catalog import with it. Leave contact sync and
+   automations off.
+2. Connect Campaign Intelligence (the initial setup's Intelligence step, or
+   **Settings > Intelligence**). Run one catalog sync and open a product's `product_url` and `image_url`
    from **Log > Details**: the link opens the right product page on the
    storefront, with an added `?probe=1` still in the address bar after any
    redirect; the image loads.

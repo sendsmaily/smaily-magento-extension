@@ -476,7 +476,11 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   multi-website RFC's Phase 4, PRO-1762) are the fix for that, not this.
 - **Storefront URL (PRO-3660):** a store that sells on a separate
   (headless) storefront saves its address at website scope
-  (`smaily_connect/connection/storefront_url`, Settings > Connection).
+  (`smaily_connect/connection/storefront_url`, Settings > Connection and
+  the initial setup's Connect step — the same `panel/connection.phtml`
+  field, posted by `panels.collect.connect()` and checked and saved by
+  `WizardStepSaver::saveConnect()`, PRO-3802; the setup saves it with the
+  connection, before its Contacts step switches contact sync on).
   `Model\StorefrontUrl::apply()` replaces the scheme, host and port of the
   product link with it — path and query string kept — read at the store the
   link was built for: `CatalogPayloadBuilder::productUrl()` after the
@@ -491,19 +495,18 @@ Observer / backfill ──enqueue──> smaily_ingest_queue ──cron flush (1
   session; every other order (Luma's checkout REST call carries the cookie)
   is a storefront order. `isApiOnly()`: an API order and no storefront
   order in the last 30 days. Installation-wide; no table or column.
-  Connecting starts the catalog import, and the initial setup has no
-  Storefront URL field (Settings opens once the setup is finished), so
-  `panel/intelligence.phtml` adds a note under the setup URL field while
+  Connecting starts the catalog import, so `panel/intelligence.phtml`
+  adds a note under the setup URL field while
   `WizardData::getSavedStorefrontUrl()` is empty for the selected website:
   set the Storefront URL first, or hold the import back (PRO-3745). The
-  setup step says to finish without connecting; Settings > Intelligence,
-  which has its own Connect, points to the Connection tab. The note sits
-  in the disconnected block, so it goes once connected. It is always
-  drawn there, hidden while a Storefront URL is saved, and a successful
-  Connection save shows or hides it by the Storefront URL it posted
-  (`panels.saveStep('connect')` in `panel/panels-js.phtml`, PRO-3747): the
-  Settings tabs switch without a reload. The initial setup posts no
-  Storefront URL, so its note stays as drawn.
+  setup step points back to its Connect step (PRO-3802); Settings >
+  Intelligence, which has its own Connect, points to the Connection tab.
+  The note sits in the disconnected block, so it goes once connected. It
+  is always drawn there, hidden while a Storefront URL is saved, and a
+  successful Connection save shows or hides it by the Storefront URL it
+  posted (`panels.saveStep('connect')` in `panel/panels-js.phtml`,
+  PRO-3747): the Settings tabs and the setup steps switch without a
+  reload.
 
 ### Queue semantics (both queues)
 

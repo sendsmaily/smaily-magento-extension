@@ -235,7 +235,10 @@ $pages = [
  * with its behaviour (panel/panels-js.phtml), Campaign Intelligence not
  * connected yet: the initial setup's step and the Settings tab, where the
  * import cards render too (PRO-3741). No Storefront URL is saved, except on
- * the -storefront pages of each (PRO-3745).
+ * the -storefront pages of each (PRO-3745). The connection-setup page puts the
+ * initial setup's Connect step (panel/connection.phtml) in front of its
+ * Intelligence step: one store language, credentials saved, no Storefront URL
+ * (PRO-3802).
  */
 $intelligenceViewModel = static fn (string $storefrontUrl): object => new class ($storefrontUrl) {
     /**
@@ -251,6 +254,62 @@ $intelligenceViewModel = static fn (string $storefrontUrl): object => new class 
     public function getSavedStorefrontUrl(): string
     {
         return $this->storefrontUrl;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isApiOnlyStore(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isStorefrontDisclosureOpen(): bool
+    {
+        return $this->storefrontUrl !== '';
+    }
+
+    /**
+     * @return bool
+     */
+    public function isMultilingual(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function getDetectedLanguages(): array
+    {
+        return ['en'];
+    }
+
+    /**
+     * @return string
+     */
+    public function getMultilingualMode(): string
+    {
+        return 'single';
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getMultilingualAccounts(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return string
+     */
+    public function getFallbackLanguage(): string
+    {
+        return 'en';
     }
 
     /**
@@ -305,7 +364,7 @@ $intelligenceStrings = [
     'Held back: the catalog import is canceled. Start it any time under Marketing > Smaily Connect > Settings > Intelligence.',
     'Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.',
     'The catalog import had already finished, so there was nothing left to hold back.',
-    'Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: finish the setup without connecting, enter the address under Marketing > Smaily Connect > Settings > Connection > Using a separate storefront? > Storefront URL, then connect under Settings > Intelligence. Or connect now and press Hold back the import.',
+    'Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: go back to the Connect step, open Using a separate storefront? and enter the address as Storefront URL. Or connect now and press Hold back the import.',
     'Using a separate storefront? Set its Storefront URL under Settings > Connection > Using a separate storefront? before you connect, so that the catalog import sends the storefront\'s product links. Or connect now and press Hold back the import.',
 ];
 $intelligenceTemplates = [
@@ -327,6 +386,19 @@ $pages['intelligence-settings'] = [
     'viewModel' => $intelligence,
     'data' => ['context' => 'settings'],
     'strings' => $intelligenceStrings,
+];
+$pages['connection-setup'] = [
+    'template' => [
+        $root . '/view/adminhtml/templates/panel/connection.phtml',
+        $root . '/view/adminhtml/templates/panel/intelligence.phtml',
+        $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+    ],
+    'viewModel' => $intelligence,
+    'strings' => array_merge($intelligenceStrings, [
+        'Using a separate storefront?',
+        'Storefront URL',
+        'Enter the storefront\'s address only, starting with https:// — for example https://shop.example.com — without a path or a query.',
+    ]),
 ];
 $pages['intelligence-settings-storefront'] = [
     'template' => $intelligenceTemplates,

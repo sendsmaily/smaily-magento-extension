@@ -8,6 +8,25 @@ module out again. For a composer install, see the
 
 ## Before you start
 
+Check the Magento and PHP versions first:
+
+1. **Magento version.** The admin footer shows it on every admin page
+   ("Magento ver. 2.4.x"); on the server, `bin/magento --version` prints
+   it. It must be **2.4.4 or newer**. Magento 2.4.3 and older cannot run
+   Smaily Connect: they run only on PHP 7.x.
+2. **PHP version.** On the server, run `php -v` with the same PHP binary
+   that runs `bin/magento` (on a server with several PHP versions, the one
+   the cron line and the web server use too). It must be **8.1 – 8.4**.
+
+If either is below the minimum, stop and upgrade the store first (Magento
+2.4.7 or 2.4.8 on PHP 8.2 or 8.3 is a good target). A composer install
+refuses an unsupported store; the release ZIP does not check, and on an
+unsupported store `bin/magento setup:upgrade` and `setup:di:compile` fail
+once its files are in place — remove `app/code/Smaily/Connect` again if
+that happened.
+
+Then check the rest:
+
 - Magento Open Source / Adobe Commerce **2.4.4+** or Mage-OS.
 - PHP **8.1 – 8.4**.
 - These Magento modules enabled (they are on a standard install):

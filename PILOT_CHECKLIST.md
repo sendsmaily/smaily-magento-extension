@@ -27,7 +27,10 @@ uses, and that you cancel or refund it afterwards.
 
 The first pilot store runs a separate (headless) storefront, so the
 abandoned-cart reminder stays off until the product-link check passes (§0,
-the separate-storefront row). The steps run in this order:
+the separate-storefront row). This order needs the release candidate whose
+initial setup has the **Storefront URL** field on its **Connect** step
+(**Using a separate storefront?**); an older build has it only under
+**Settings > Connection**. The steps run in this order:
 
 1. Connect the Smaily account in the initial setup and set the
    **Storefront URL** on its **Connect** step (**Using a separate
@@ -51,12 +54,21 @@ the separate-storefront row). The steps run in this order:
 
 ## 0. Pre-flight
 
+**Versions first, before anything is installed.** Smaily Connect needs
+Magento **2.4.4 or newer** and PHP **8.1 – 8.4**. Magento 2.4.3 and older run
+only on PHP 7.x, so they cannot run it. If either is below the minimum, stop:
+the store upgrades first (Magento 2.4.7 or 2.4.8 on PHP 8.2 or 8.3), and the
+pilot day moves. Installing the ZIP on an unsupported store makes
+`setup:upgrade` and `setup:di:compile` fail.
+
 | What to do | Where to look / what good looks like |
 |---|---|
+| Confirm the Magento version. | The admin footer on any admin page: "Magento ver. 2.4.4" or newer (or `bin/magento --version` on the server). 2.4.3 or older: stop, see above. |
+| Confirm the PHP version. | The developer runs `php -v` with the same PHP binary that runs `bin/magento` (and the cron line): 8.1, 8.2, 8.3 or 8.4. 7.x or 8.0: stop, see above. |
 | Confirm the store has one website. | Stores > All Stores lists one website. More than one: Initial setup opens with "Which website are you setting up?" and Settings shows a **Website** selector — onboard each website, and note it in PRO-2474. |
 | Confirm the storefront theme is Luma-based, not Hyvä. | Content > Design > Configuration. A Hyvä theme needs the separate compat module (`compat/hyva`), which the ZIP does not carry — stop and raise it. |
 | Confirm shoppers buy on Magento's own theme, not on a separate (headless) storefront application. | Open a product page on the public shop: Magento's own theme loads `requirejs` (Luma) or Alpine.js (Hyvä). A headless storefront (PRO-3614): walk `docs/HEADLESS_STOREFRONTS.md` "Before switching anything on" first — keep the automations off until its product-link check passes, and set the Storefront URL on the initial setup's **Connect** step, before contact sync and Campaign Intelligence (§1); §5's `{{abandoned_cart_url}}`, the checkout checkbox and §6 do not apply until the storefront team's hand-off items are in place. |
-| Confirm the ZIP the developer installed is the release build. | Developer ran `sha256sum -c smaily-connect-magento2.zip.sha256` → `OK`. `bin/magento module:status Smaily_Connect` → `Module is enabled`. |
+| Confirm the ZIP the developer installed is the release build, and the release candidate that includes the initial setup's **Storefront URL** field (Pilot-day order). | Developer ran `sha256sum -c smaily-connect-magento2.zip.sha256` → `OK`. `bin/magento module:status Smaily_Connect` → `Module is enabled`. The initial setup's **Connect** step shows **Using a separate storefront?** under the account fields. |
 | List which modules send abandoned-cart emails today — for example a Magento extension such as Mageplaza SMTP or Avada Email Marketing, or Adobe Commerce's own email reminder rules. | Developer runs `bin/magento module:status --enabled`; the merchant says which of those send abandoned-cart emails. Each one's abandoned-cart emails are off before §1's **Automations** step ticks **Enabled** on **Abandoned cart**, or the test shopper in §5 gets two reminders. Note the list (or "none") in PRO-2474. |
 | Confirm the store's Magento cron is installed. | `crontab -l` on the server shows the `#~ MAGENTO START` block running `bin/magento cron:run` every minute. |
 

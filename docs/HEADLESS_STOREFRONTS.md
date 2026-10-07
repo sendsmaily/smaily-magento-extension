@@ -269,21 +269,29 @@ only in the same browser, while the storefront still holds the cart.
 
 ## Before switching anything on
 
-1. Install the module and connect it as usual; set the **Storefront URL**
-   on the initial setup's Connect step (**Using a separate storefront?**)
-   when shoppers cannot open the back-end host — connecting Campaign
-   Intelligence starts the catalog import with it. Leave contact sync and
-   automations off.
+Contact sync can go on from the initial setup; the automations wait until
+the product links are checked.
+
+1. Install the module and connect it as usual. On the initial setup's
+   Connect step, set the **Storefront URL** (**Using a separate
+   storefront?**) when shoppers cannot open the back-end host: it is saved
+   with the connection, before the Contacts step switches contact sync on,
+   and connecting Campaign Intelligence starts the catalog import with it.
+   On the Contacts step choose **Subscribers only (consent)** or **All
+   customers (legitimate interest)**, not **Checkout opt-in only** —
+   saving the step switches contact sync on in that mode. On the
+   Automations step map the workflows but leave **Enabled** unticked.
 2. Connect Campaign Intelligence (the initial setup's Intelligence step, or
-   **Settings > Intelligence**). Run one catalog sync and open a product's `product_url` and `image_url`
-   from **Log > Details**: the link opens the right product page on the
-   storefront, with an added `?probe=1` still in the address bar after any
-   redirect; the image loads.
-3. With the storefront team's work in place: a click on a test link with
+   **Settings > Intelligence**); connecting starts the catalog import. Open
+   a product's `product_url` and `image_url` from **Log > Details**: the
+   link opens the right product page on the storefront, with an added
+   `?probe=1` still in the address bar after any redirect; the image loads.
+3. Once the links check out, switch the automations on under **Settings >
+   Automations**, with the abandoned-cart email linking to the storefront's
+   cart page (see [Abandoned-cart link](#abandoned-cart-link)).
+4. With the storefront team's work in place: a click on a test link with
    `smaily_rec` and `smaily_vt` leaves the cookies of hand-off item 2; a test
    order shows them in the order's attribution (`smaily_order_attribution`
    table); a browse batch gets `{"ok":true,"accepted":…}` back from
    `smaily/relay` in the browser's network panel. Browse events are not
    queued, so they do not show in **Log**.
-4. Choose the contact sync mode (not **Checkout opt-in only**), then switch
-   on contact sync and the automations.

@@ -9,6 +9,8 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Engine;
 
 use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\Module\Manager as ModuleManager;
+use Magento\Framework\ObjectManagerInterface;
 use Magento\Framework\Stdlib\CookieManagerInterface;
 
 /**
@@ -22,6 +24,9 @@ use Magento\Framework\Stdlib\CookieManagerInterface;
  * cross-platform defaults below. Attribution is deliberately NOT gated on
  * analytics consent (first-party functional cookie for the merchant's own
  * email click), matching the Woo/Shopify behavior.
+ *
+ * Nothing is stamped on an order an admin places with "Login as Customer":
+ * the browser's cookies are then the admin's own.
  */
 class AttributionManager
 {
@@ -36,10 +41,22 @@ class AttributionManager
 
     private const ATTRIBUTION_TABLE = 'smaily_order_attribution';
 
+    /**
+     * Magento's "Login as Customer" (optional: no composer or module.xml
+     * dependency), resolved by name only while the module is enabled. Its
+     * API answers the admin id held in the customer session, the same check
+     * Magento_LoginAsCustomerSales marks such an order with. A string, not
+     * ::class: the interface may be absent.
+     */
+    private const LOGIN_AS_CUSTOMER_MODULE = 'Magento_LoginAsCustomer';
+    private const LOGGED_AS_CUSTOMER_ADMIN_ID = 'Magento\\LoginAsCustomerApi\\Api\\GetLoggedAsCustomerAdminIdInterface';
+
     public function __construct(
         private readonly Settings $settings,
         private readonly CookieManagerInterface $cookieManager,
-        private readonly ResourceConnection $resourceConnection
+        private readonly ResourceConnection $resourceConnection,
+        private readonly ModuleManager $moduleManager,
+        private readonly ObjectManagerInterface $objectManager
     ) {
     }
 
@@ -92,6 +109,8 @@ class AttributionManager
 
     /**
      * Stamp the current attribution cookies onto a placed order.
+     *
+     * Not on an order an admin places with "Login as Customer".
      */
     public function saveForOrder(int $orderId): void
     {
@@ -100,7 +119,7 @@ class AttributionManager
         }
 
         $cookies = $this->readCookies();
-        if (!array_filter($cookies)) {
+        if (!array_filter($cookies) || $this->isLoginAsCustomer()) {
             return;
         }
 
@@ -116,6 +135,18 @@ class AttributionManager
             ],
             ['rec_id', 'visitor_token', 'rec_ctx', 'anon_session_id']
         );
+    }
+
+    /**
+     * Whether an admin is logged in as the customer ("Login as Customer").
+     */
+    private function isLoginAsCustomer(): bool
+    {
+        if (!$this->moduleManager->isEnabled(self::LOGIN_AS_CUSTOMER_MODULE)) {
+            return false;
+        }
+
+        return (int)$this->objectManager->get(self::LOGGED_AS_CUSTOMER_ADMIN_ID)->execute() > 0;
     }
 
     /**

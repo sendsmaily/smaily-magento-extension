@@ -1254,7 +1254,10 @@ Its own card then offers only **Cancel import**.
   logs in, their earlier anonymous browsing is not linked to their account.
   An admin who opens a customer's account with Magento's **Login as
   Customer** links nothing either: the browsing in that browser is the
-  admin's own, not the shopper's.
+  admin's own, not the shopper's. An order the admin places that way
+  reaches Campaign Intelligence without that browser's browsing or
+  recommendation clicks, so the admin's clicks credit no recommendation
+  with it.
 - **Unsubscribing from marketing also stops profiling.** When Campaign
   Intelligence is connected, a newsletter unsubscribe — in the store, or in
   Smaily and mirrored back — also opts the shopper out of personalized

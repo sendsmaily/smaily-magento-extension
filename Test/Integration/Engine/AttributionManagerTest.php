@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Engine;
 
+use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\Framework\Stdlib\CookieManagerInterface;
 use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\Settings;
@@ -112,6 +113,8 @@ class AttributionManagerTest extends IntegrationTestCase
         return $this->objectManager->create(AttributionManager::class, [
             'settings' => $settings,
             'cookieManager' => $cookieManager,
+            // Magento_LoginAsCustomer is absent here.
+            'moduleManager' => $this->createMock(ModuleManager::class),
         ]);
     }
 

@@ -1042,6 +1042,18 @@ nor be stored cut short to the 64-character columns), and
 `OrderPayloadBuilder` omits an off-shape stored value. Each signal is
 dropped on its own.
 
+An order an admin places with "Login as Customer" is stamped with nothing
+(PRO-3925): that browser's cookies are the admin's own. By order time the
+admin is on the customer session, so `AttributionManager::saveForOrder()`
+asks `LoginAsCustomerApi`'s `GetLoggedAsCustomerAdminIdInterface` — the
+check Magento_LoginAsCustomerSales marks such an order with — resolved by
+name through the object manager only while Magento_LoginAsCustomer is
+enabled (`Module\Manager::isEnabled()`), because the module is optional
+(no composer or module.xml dependency). Nothing is stored, so the order
+goes to the engine without the four signals; a shopper's own order is
+stamped as before. An order created in the admin's own order screen is not
+covered.
+
 ### Browse tracking
 
 `view/frontend/web/js/tracker.js` (RequireJS; core is framework-free

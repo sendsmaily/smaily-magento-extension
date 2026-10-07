@@ -26,8 +26,7 @@ storefront; no consent-source notice for it), PRO-3914 (the Dashboard
 says when no nightly product list has gone out for three nights, and
 why), PRO-3915 (an import nothing has moved for an hour shows *Stalled*;
 Run again cancels it and starts a fresh one), PRO-3920 (an admin's
-"Login as Customer" links no browsing to the customer); the
-Run again cancels it and starts a fresh one), PRO-3923 (the command line
+"Login as Customer" links no browsing to the customer), PRO-3923 (the command line
 and connecting cancel a stalled import first too; an import waiting
 behind a stalled one names it on its card), PRO-3924 (the consent note
 under browse tracking follows a Storefront URL save without a reload); the

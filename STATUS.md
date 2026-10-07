@@ -5,7 +5,31 @@
 > status is a defect. If this file and your memory disagree, trust this file
 > and fix it.
 
-_Last updated: 2026-10-07 — **3.0.0-rc8 is released as a GitHub
+_Last updated: 2026-10-07 — **The move into
+`sendsmaily/smaily-magento-extension` is done (PRO-1198):** PR #126 was
+squash-merged into `master` as aa0c995, a tree identical to the fork's
+last `v3` (0179e95); CI and Contract staleness are green on `master` (the
+`ENGINE_CONTRACT_READ_TOKEN` secret is set there); local remotes are
+switched (`origin` = sendsmaily, `fork` = erkkimarkus/magento-connect).
+From now on every change reaches `master` through a squash-merged PR —
+there is no direct push to `master`. **The 3.0.0-rc9 cut is ready on
+branch `release/3.0.0-rc9` for a PR** (the first release candidate
+tagged in the official repository): the version is `3.0.0-rc9`
+(composer.json, `ModuleInfo::VERSION`, the ModuleVersion docblock, the
+upstream proposal; composer.lock content-hash only), and CHANGELOG's
+"Changes since 3.0.0-rc8" is the rc9 list in landed order — PRO-3927,
+PRO-3930 and the User Guide links in the official repository (PRO-3948
+and the docs moves have no bullet); the same branch drops `v3` from the
+`ci.yaml` and `contract-staleness.yaml` triggers and brings CLAUDE.md to
+`master`/PR wording. All gates pass on the branch (unit, phpcs, phpstan,
+integration, browser harnesses, PHP 8.1 syntax, the release-version
+check for `3.0.0-rc9`; the release ZIP verifies with 397 entries).
+**Queue:** merge the rc9 PR → tag `3.0.0-rc9` on `master` (Erkki's yes;
+a tag is a Packagist publish) → the release workflow and its checks →
+the clean-install check of the rc9 ZIP → archive the fork. The pilot
+installs the newest release candidate when a store is ready (the HC PRO
+store may be next week; the furniture store after its upgrade).
+Earlier the same day: **3.0.0-rc8 is released as a GitHub
 pre-release on the fork**
 (https://github.com/erkkimarkus/magento-connect/releases/tag/3.0.0-rc8),
 built by the release workflow (run 37615294088) from the version-cut commit
@@ -59,22 +83,12 @@ Landed after rc8: PRO-3930 (an order created in the admin's order screen
 carries no browser markers; reproduced on the sandbox first);
 PILOT_CHECKLIST's pilot-day order opens with switching off other Smaily
 subscriber/opt-out syncs when contact sync goes on (and HEADLESS_STOREFRONTS A3).
-**The move into `sendsmaily/smaily-magento-extension` is prepared
-(PRO-1198; owner decisions 2026-10-07: one squash-merged PR from the
-fork's `v3` into the official `master`, squash-only PRs there afterwards,
-no staged review, 2.8.x ends at its tags, release candidates tagged
-publicly, 3.0.0 after the pilot), on `v3`; it waits for Erkki's go to
-open the PR.** `v3` already descends from `upstream/master` (e2e5d45), so
-the merge is a no-op and the PR is conflict-free. The admin's User Guide
-links, README, INSTALLING, CONTRIBUTING, the PR template and
-UPSTREAM_PROPOSAL §5/§7 name the official repo; CLAUDE.md has "Changes
-reach `master`", "Release cut" and the after-the-move checklist (the
-official repo needs the `ENGINE_CONTRACT_READ_TOKEN` secret first).
-**Queue:** Erkki's go → open and squash-merge the move PR → the
-after-the-move checklist (CLAUDE.md) → rc9 cut in the official repo;
-the pilot (the furniture store after its upgrade in the new year, or
-another store as early as next week; the milestone date was dropped
-2026-10-07) installs the newest release candidate.
+The move was prepared on `v3` first (owner decisions 2026-10-07: one
+squash-merged PR from the fork's `v3` into the official `master`,
+squash-only PRs there afterwards, no staged review, 2.8.x ends at its
+tags, release candidates tagged publicly, 3.0.0 after the pilot): the
+admin's User Guide links, README, INSTALLING, CONTRIBUTING, the PR
+template and UPSTREAM_PROPOSAL §5/§7 name the official repo.
 PRO-3948: the release workflow fails, before attaching anything, on a
 tag that is not composer.json's version (`bin/check-release-version.sh`).
 Backlog: PRO-3790 (after the pilot), PRO-3746, PRO-3921 (waits on the
@@ -6877,7 +6891,7 @@ Earlier: 2026-09-11, 2026-09-10._
 
 | Issue | What | Priority |
 |---|---|---|
-| PRO-1198 | Release coordination with Smaily (upstream/Marketplace path) | High — waits on the pilot (the store upgrades first) |
+| PRO-1198 | Release coordination with Smaily (upstream/Marketplace path) | High — the move is done (PR #126); left: the rc9 tag, archiving the fork; 3.0.0 waits on the pilot |
 | PRO-3854 | Nightly catalog list (§3c manifest); the contract sync part is done | High — landed 2026-10-07, in rc8 |
 | PRO-1971 | `gender` → `user_gender` release-comms obligation — parked 2026-09-02, reopens when 3.0.0 has a date | High — Erkki's decision |
 | PRO-1400 | Clean-install confirmation of the cron group (release gate) | Todo |
@@ -6911,10 +6925,10 @@ PRO-1267 (engine: Magento product-identity contract note).
 
 ## Questions / tasks for Erkki
 
-1. PRO-1198 — decided 2026-10-07 (the official repo is taken over now;
-   `docs/UPSTREAM_PROPOSAL.md` §5/§7). Your go opens the move PR; then the
-   "After the move" checklist in CLAUDE.md (secret, merge, tag, archive the
-   fork, switch local `origin`).
+1. PRO-1198 — the move is done (PR #126 → aa0c995, secret set, master
+   green, remotes switched). Left: your yes to tag `3.0.0-rc9` once its PR
+   is merged, then archive the fork `erkkimarkus/magento-connect`
+   (CLAUDE.md "The move into sendsmaily").
 2. PRO-1201 — Hyvä boundary decisions (see "Open release decisions" in
    `docs/HYVA_SUPPORT.md`; the verification matrix itself is now fully
    executed and green): (a) confirm Hyvä Checkout (commercial, Magewire)

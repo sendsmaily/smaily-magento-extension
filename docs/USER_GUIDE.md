@@ -891,6 +891,63 @@ the context and the anonymous session id (letters, digits, `.`, `_` and
 not fit is ignored on its own, and the order keeps every other attribution
 value.
 
+### Recommendations on your store's pages
+
+The **Smaily recommendations** widget shows a shopper their own
+recommendations from Campaign Intelligence — the same products as in their
+Smaily emails — on your store's pages, under the heading "Recommended for
+you", as your theme's own product cards. Nothing appears until you place
+the widget, and it has no settings.
+
+**Placing it.** Open a page under **Content > Pages** or a block under
+**Content > Blocks**, press **Insert Widget...** in the content editor,
+pick **Smaily recommendations** as the **Widget Type** and press **Insert
+Widget**. In Page Builder, insert it the same way in a **Text** element,
+or put `{{widget type="Smaily\Connect\Block\Widget\Recommendations"}}` in
+an **HTML Code** element. Save the page or block.
+
+**Who sees what.**
+
+- A signed-in customer sees their recommendations, unless they opted out
+  of personalized recommendations (**My Account > Personalization**) or
+  unsubscribed from your newsletter.
+- A guest sees recommendations only when their browser holds the visitor
+  token from an earlier Smaily email click (see
+  [Recommendation attribution](#recommendation-attribution)).
+- A shopper Campaign Intelligence has no recommendations for, a new
+  visitor, or a shopper without marketing consent sees nothing — not even
+  the heading.
+- Up to four products, with your store's own name, image and price in the
+  current store view. A product that is disabled, not visible in the
+  catalog, not in this website or not for sale is left out; nothing takes
+  its place.
+- Each card links to the product with the recommendation's id and the
+  context `storefront`, so a purchase after the click is credited to your
+  store's pages.
+
+**Consent.** The widget asks for recommendations only when the shopper
+has given marketing consent, by the same rules as the browse tracker (see
+[Connecting your cookie consent tool](#connecting-your-cookie-consent-tool)):
+your own `window.smailyConnect.consentOverride()`, else Magento's cookie
+notice under Cookie Restriction Mode, else no consent. Consent given on the
+page (the cookie notice, or `smaily:consent-changed`) shows the
+recommendations at once. With Cookie Restriction Mode on, the store also
+checks the cookie notice itself before it asks about a guest.
+
+**Speed and caching.** The page itself is the same for every visitor and
+stays in the full-page cache; the cards are asked for after the page has
+loaded, so the page never waits for them. Campaign Intelligence's answer
+is kept for an hour per shopper, so a new recommendation can take up to an
+hour to show. When Campaign Intelligence does not answer, the shopper sees
+nothing and is asked about again after 10 minutes; when it times out or
+fails, no shopper is asked about for 2 minutes.
+
+Nothing shows while Campaign Intelligence is not connected or the account
+is deactivated. A Hyvä store needs the Hyvä compatibility module (see
+[HYVA_SUPPORT.md](HYVA_SUPPORT.md)). A separate (headless)
+storefront does not get the widget (see
+[HEADLESS_STOREFRONTS.md](HEADLESS_STOREFRONTS.md#what-works-and-what-does-not)).
+
 ### If your Campaign Intelligence account is deactivated
 
 If Smaily deactivates the Campaign Intelligence account behind this store —
@@ -1376,9 +1433,9 @@ For Mageplaza One Step Checkout, see
 [Third-party one-step checkouts](#third-party-one-step-checkouts).
 
 **My store runs a headless storefront.** The server-side features work as
-they are; the browse tracker, campaign-click capture, checkout checkbox and
-personalization page are Magento theme parts a separate storefront does not
-draw, and product links need a check before recommendation emails go out —
+they are; the browse tracker, campaign-click capture, checkout checkbox,
+personalization page and recommendations widget are Magento theme parts a
+separate storefront does not draw, and product links need a check before recommendation emails go out —
 the **Storefront URL** setting puts them on the storefront's address (see
 [A separate storefront](#a-separate-storefront)).
 See [HEADLESS_STOREFRONTS.md](HEADLESS_STOREFRONTS.md) for the full list

@@ -15,9 +15,10 @@ autoloader maps `Smaily\Connect\*` to the module root.
 
 ```
 Api/                service contracts (queue handler interface)
-Block/              adminhtml config renderers
+Block/              adminhtml config renderers, the recommendations widget
 Console/Command/    CLI (backfill, engine ping/disconnect, GDPR)
-Controller/         frontend: rss, relay, checkout optin, cart restore, privacy
+Controller/         frontend: rss, relay, recommendations, checkout optin,
+                    cart restore, privacy
 Controller/Adminhtml/  dashboard, wizard, settings, unified log, JSON api
 Cron/               queue flushers, abandoned cart, reconcile, backfill tick,
                     janitor, health check
@@ -1149,6 +1150,72 @@ send the events itself (`DashboardData::hasSeparateStorefront()`,
 PRO-3918). Both notes are drawn, one hidden, and a successful Connection
 save switches them by the Storefront URL it posted, as it does the
 separate-storefront hint (`panels.saveStep('connect')`, PRO-3924).
+
+### Storefront recommendations
+
+A shopper's own recommendations (contract §15) on the store's pages,
+behind the CMS widget **Smaily recommendations** (`etc/widget.xml`,
+`Block\Widget\Recommendations`, no parameters); the WooCommerce plugin's
+`StorefrontRecommendations` + `RecommendationsEndpoint` (PRO-3835/3857)
+in Magento's shape (PRO-3790). Nothing is placed automatically.
+
+- **FPC-safe by construction.** The widget renders an empty container
+  (`[data-smaily-connect-recs]`), the same for every visitor, and nothing
+  while `Settings::isSendingAllowed()` is false. `default.xml` adds
+  `engine/recommendations.phtml` (same gate, `ViewModel\EngineState`):
+  an `x-magento-init` keyed on the container, so RequireJS loads
+  `js/recommendations.js` only on a page that has one. After `load`, and
+  only with marketing consent (the tracker's rule, copied: override, else
+  the cookie notice accepted on this website, else none; later consent via
+  `user:allowed:save:cookie` / `smaily:consent-changed`), it asks the store
+  route once per page and puts the HTML into every container. Hyvä:
+  `compat/hyva` swaps the bootstrap for a JSON config + deferred
+  `smaily-recommendations.js` (loaded on every page, inert without a
+  container) and the cards template for Hyvä product cards
+  (`hyva_smaily_recommendations_index.xml`).
+- **The route** `Controller\Recommendations\Index` (GET
+  `smaily/recommendations`) — guards in the Woo order: not
+  `isSendingAllowed()` → bare 404; the per-address limit
+  (`FixedWindowCounter`, 120 a minute, as the relay counts); a
+  `Sec-Fetch-Site` of `cross-site` or `same-site` → empty 200. Then a
+  layout result (`smaily_recommendations_index`: the `smaily.recommendations`
+  block, `cacheable="false"`, so the answer never enters the FPC and the
+  customer session is not depersonalized; plus the
+  `product.price.render.default` block Magento_Catalog declares only in its
+  default handle), or an empty 200 when there is nothing to show — no
+  heading. Every answer carries `Cache-Control: no-store, private`.
+- **Who is asked about** (`Model\Engine\StorefrontRecommendations`, server
+  state only; nothing in the request names the shopper): a logged-in
+  customer by the customer id (`customer_external_id`), only while
+  `ProfilingConsent::isAllowed()` holds at the current store view — an
+  objector is asked about by nothing, the token included; else a guest by
+  the shape-checked visitor-token cookie (`AttributionManager::readCookies()`,
+  `smaily_visitor_token`), unless Magento's cookie helper says the cookie
+  notice holds consent back (`isUserNotAllowSaveCookie()`: restriction mode
+  on and not accepted on this website — the half of the script's rule the
+  server can see); else nobody. One identifier per request.
+- **Engine call and caching.** `Client::customerRecommendations()` /
+  `visitorRecommendations()`: map key `recommendations_customer`, falling
+  back to the contract path for a connection set up before v1.9.0; one
+  attempt, 10 s timeout. The answer's usable slots (well-formed rec id, an
+  `external_id` or `sku`, at most 4) are cached in the application cache
+  for an hour under `smaily_recs_` + sha256(tenant | identifier type |
+  identifier), an empty answer included (§15: do not retry). Any failure
+  is cached empty for 10 minutes; a timeout, network failure or 5xx also
+  sets `smaily_recs_paused` for 2 minutes, during which every cache miss
+  answers empty without a call (Woo PRO-3857). The engine connection is
+  the installation's one tenant (`Engine\Settings`, default scope), as for
+  every other engine call.
+- **Cards** (`Model\Engine\RecommendedProducts`): one product collection
+  at the current store view — enabled, visible in the catalog, in the
+  store's website, with the listing attributes, prices and URL rewrites —
+  matching each slot by `external_id` (the product id the catalog sync
+  sends), else by `sku` (`mag-<id>` names the id). A product the collection
+  does not return or that is not salable is dropped, nothing takes its
+  place. The store's own name, image and price render; each link is the
+  product URL + `smaily_rec=<rec_id>&smaily_ctx=storefront` (parameter
+  names from the engine config, as the landing capture reads them), never
+  `utm_*` or `smaily_vt`.
 
 ### Profiling consent
 

@@ -24,6 +24,7 @@ swaps the storefront templates that depend on Luma's JS stack.
 |---|---|
 | Attribution script | AMD/`x-magento-init` bootstrap replaced by an inert JSON config block + a plain static JS file (`js/smaily-attribution.js`). No inline executable script — safe under strict CSP without whitelisting. |
 | Browse tracker | Same delivery pattern (`js/smaily-tracker.js`); jQuery removed (`fetch` keepalive fallback instead of `$.ajax`); `cart_add` captured from the `checkout/cart/add` form submit instead of Luma's `ajax:addToCart` jQuery event. |
+| Smaily recommendations widget | Same delivery pattern (`js/smaily-recommendations.js`), jQuery-free; the cards the store answers render as Hyvä product cards (`templates/recommendations/cards.phtml`). |
 | Personalization opt-out form (My Account) | Tailwind-styled template (base template is functional but Luma-styled). |
 | Tailwind build | `Observer/RegisterModuleForHyvaConfig` registers the module for `bin/magento hyva:config:generate`, so the theme's Tailwind content scan picks up this module's templates. |
 

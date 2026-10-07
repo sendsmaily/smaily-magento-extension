@@ -343,6 +343,33 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3790 — a shopper's recommendations on the store's pages
+  (2026-10-08; branch `erkki/pro-3790-storefront-recommendations` for a
+  PR; design approved by Erkki 2026-10-08, after the WooCommerce plugin).**
+  CMS widget **Smaily recommendations** (`etc/widget.xml`, an empty
+  container; FPC-safe) + `js/recommendations.js` (x-magento-init keyed on
+  the container; after `load`, with the tracker's consent rule, asks once)
+  + `Controller\Recommendations\Index` (GET `smaily/recommendations`:
+  sending gate 404, per-IP limit, `Sec-Fetch-Site` cross/same-site empty,
+  `no-store, private`, layout result with a non-cacheable block) +
+  `Engine\StorefrontRecommendations` (customer id under profiling consent,
+  else the visitor-token cookie unless the cookie notice holds it back;
+  1 h cache per tenant + hashed identity, 10 min failure cache, 2 min
+  pause after a timeout/5xx) + `Engine\RecommendedProducts` (the store's
+  products at the store view by `external_id`, else `sku`; not visible or
+  not salable dropped; links `smaily_rec` + `smaily_ctx=storefront`) +
+  `Client::customerRecommendations()/visitorRecommendations()` (map key
+  `recommendations_customer`, contract-path fallback, one attempt, 10 s).
+  Hyvä: compat bootstrap + Hyvä product cards (`hyva_smaily_recommendations_index`).
+  New dependency `magento/module-widget` (already in the lock through
+  module-catalog; lock hash refreshed). Tests: unit, an integration test of
+  the route against a stubbed engine transport, `Test/Js/recommendations.html`
+  (Luma + Hyvä). Sandbox walk (Luma, mock engine): the cards render; Hyvä
+  not run on a Hyvä store. Estonian strings "Sulle soovitatud" / "Smaily
+  soovitused" and the widget description wait for Erkki's proofread.
+  ARCHITECTURE (Storefront recommendations), USER_GUIDE, site (EN + ET),
+  HEADLESS_STOREFRONTS (not available), HYVA_SUPPORT, CHANGELOG.
+
 - **PRO-3961 — a queue row's failure, delivery or skip moves its
   last-changed time (2026-10-07; branch
   `erkki/pro-3961-queue-row-updated-at` for a PR).** The defect PRO-1964

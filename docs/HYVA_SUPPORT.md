@@ -39,6 +39,7 @@ changes), **OUT-OF-SCOPE**.
 | Checkout opt-in and guest email capture on Hyvä Checkout | Hyvä Checkout is a separate commercial product with its own component system (Magewire), a different integration surface entirely. | **OUT-OF-SCOPE** (see boundary below) |
 | My Account personalization page | `view/frontend/templates/privacy/form.phtml` — plain HTML POST form, zero JS (the Hyvä twin mirrors its known / could-not-load states); `view/frontend/layout/smaily_privacy_index.xml:13` — standard `content` container; `customer_account.xml:12` — nav entry via `Block\Account\PersonalizationLink` (a core `SortLink` that renders nothing without live Campaign Intelligence), which Hyvä's account navigation renders. Functional as-is; only the Luma CSS classes (`fieldset`/`legend`/`actions-toolbar`) render unstyled. | **WORKS-AS-IS** functionally; **NEEDS-COMPAT-TEMPLATE** for styling |
 | Native newsletter block | No template override in this module; subscription is consumed server-side (`Observer/SubscriberSaveAfter.php` on `newsletter_subscriber_save_after`). Hyvä ships its own newsletter form template posting to the same core controller. | **WORKS-AS-IS** (verified) |
+| Smaily recommendations widget | `Block/Widget/Recommendations.php` + `templates/widget/recommendations.phtml` — an empty container, theme-independent; `templates/engine/recommendations.phtml` — `x-magento-init` bootstrap of the AMD script `js/recommendations.js` (jQuery for Luma's consent event); `smaily_recommendations_index.xml` + `templates/recommendations/cards.phtml` — the cards the store route answers, in Luma's product-list markup. | **NEEDS-JS-PORT** (script) + **NEEDS-COMPAT-TEMPLATE** (cards) |
 | RSS product feed | `Controller/Rss/Feed.php` — server-rendered XML, no frontend assets. | **WORKS-AS-IS** |
 | Abandoned-cart restore link | `Controller/Cart/Restore.php` — server-side redirect, no frontend assets. | **WORKS-AS-IS** |
 
@@ -55,8 +56,8 @@ path repository until the separate package exists (see
 `compat/hyva/README.md`).
 
 - `view/frontend/layout/hyva_default.xml` — `hyva_`-prefixed handle (loads
-  only when a Hyvä theme is active) swaps the attribution and tracker
-  templates on the blocks defined by the base module.
+  only when a Hyvä theme is active) swaps the attribution, tracker and
+  recommendations templates on the blocks defined by the base module.
 - `view/frontend/templates/engine/{attribution,tracker}.phtml` — bootstrap
   without `x-magento-init`: config in an inert
   `<script type="application/json">` block + a static same-origin JS file
@@ -98,6 +99,23 @@ path repository until the separate package exists (see
   none either. Checked with the real script in a browser harness with
   stubbed globals (`Test/Js/tracker-consent.html`); not yet re-run on a
   Hyvä store.
+- `view/frontend/web/js/smaily-recommendations.js` — jQuery-free port of
+  the recommendations script, delivered like the tracker (inert JSON config
+  `#smaily-recommendations-config` + a deferred same-origin file, swapped
+  in by `hyva_default.xml`). It loads on every page while Campaign
+  Intelligence may be called and does nothing on a page without the
+  widget's container (the Luma bootstrap is keyed on the container, so
+  RequireJS loads its script only there). Same consent gate as the
+  tracker; consent given later arrives as `user-allowed-save-cookie`
+  (window) or `smaily:consent-changed`. Checked with the real script in a
+  browser harness with stubbed globals (`Test/Js/recommendations.html`);
+  not yet run on a Hyvä store.
+- `view/frontend/layout/hyva_smaily_recommendations_index.xml` +
+  `templates/recommendations/cards.phtml` — the cards the store route
+  `smaily/recommendations` answers, as Hyvä product cards (Tailwind `card`
+  classes, the theme's own image and price renderers, no Alpine or
+  script). The route answers a layout result, not a page; that Hyvä adds
+  its `hyva_` handle to it is not yet checked on a Hyvä store.
 - `view/frontend/layout/hyva_smaily_privacy_index.xml` +
   `templates/privacy/form.phtml` — Tailwind-styled personalization form
   (same behaviour and translated phrases; classes only).
@@ -174,6 +192,7 @@ were confirmed received by the engine (`ingest/browse`), not just relayed.
 | Checkout opt-in checkbox (Luma-fallback checkout; toggle persists, order placed) | pass | pass (checkout + success render `Magento/luma` via theme fallback) | n/a (the fallback checkout renders Luma; a no-inline CSP across Luma is a store-wide theme decision, not a module surface — Magento's default enforced checkout CSP was verified in the Luma pass) |
 | Personalization page: nav link, Tailwind styling, save + persist | pass (after the FPC fix below) | pass (computed styles confirm the Tailwind classes resolved) | pass by construction (plain HTML form, zero scripts) |
 | Newsletter form subscribe fires our observers (contact.sync + welcome automation enqueued) | pass (earlier pass) | pass (Hyvä's own Alpine form → core controller) | n/a (server-side) |
+| Smaily recommendations widget: nothing asked without consent, one request after load with consent, the cards inserted, an empty answer shows nothing | Luma sandbox walk against a mock engine (2026-10-08): pass; browser harness: pass | not run on a Hyvä store (browser harness with the real script: pass; the Hyvä cards template is not yet rendered on a Hyvä store) | not run (no inline script; same delivery as the tracker) |
 | RSS feed | pass (earlier pass) | n/a (no theme surface) | n/a |
 | Tailwind build includes compat templates after `hyva:config:generate` | n/a | pass (`@source` entry present; computed 24px padding / `btn-primary` styles on the rendered form) | pass (same, CSP theme build) |
 | `setup:upgrade` + `setup:di:compile` with `Hyva_SmailyConnect` enabled | pass | pass | pass |

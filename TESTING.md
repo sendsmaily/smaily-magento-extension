@@ -85,6 +85,13 @@ landing capture the same way (the query and document.cookie stubbed) and
 checks the context cookie rule: a recommendation link with a context sets
 it, one without clears it, and any other landing leaves both cookies alone;
 and that a visitor token is written in either form the contract allows.
+`Test/Js/recommendations.html` runs the real Luma and Hyvä recommendations
+scripts the same way (document.cookie, fetch and the Luma script's jQuery
+stubbed, two widget containers per page) and checks that nothing is asked
+without consent, that the store route is asked once and only after `load`
+with consent (the cookie notice, the override, or the notice accepted on the
+page), that the answer fills every container, and that an empty or failed
+answer shows nothing.
 
 The admin screens that save through the browser are checked the same way,
 from their real templates. `Test/Js/render-admin.php` (run by

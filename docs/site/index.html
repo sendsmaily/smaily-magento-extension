@@ -276,6 +276,7 @@ pre code{background:none; border:0; padding:0; font-size:inherit}
         <li><a href="#set-intelligence" data-lang="en">Intelligence</a><a href="#set-intelligence" data-lang="et">Intelligence</a></li>
         <li><a href="#connecting-your-cookie-consent-tool" data-lang="en">Cookie consent tool</a><a href="#connecting-your-cookie-consent-tool" data-lang="et">Küpsiste nõusoleku tööriist</a></li>
         <li><a href="#set-attribution" data-lang="en">Recommendation attribution</a><a href="#set-attribution" data-lang="et">Soovituste omistamine</a></li>
+        <li><a href="#set-storefront-recs" data-lang="en">Recommendations on your pages</a><a href="#set-storefront-recs" data-lang="et">Soovitused poe lehtedel</a></li>
         <li><a href="#set-engine-automations" data-lang="en">Campaign Intelligence automations</a><a href="#set-engine-automations" data-lang="et">Campaign Intelligence'i automaatikad</a></li>
         <li><a href="#set-deactivated" data-lang="en">A deactivated account</a><a href="#set-deactivated" data-lang="et">Deaktiveeritud konto</a></li>
         <li><a href="#set-rss" data-lang="en">RSS feed</a><a href="#set-rss" data-lang="et">RSS-voog</a></li>
@@ -1037,6 +1038,40 @@ window.smailyConnect.consentOverride = function () {
     </div>
   </div>
 
+  <div class="sub" id="set-storefront-recs">
+    <h2><span data-lang="en">Recommendations on your store's pages</span><span data-lang="et">Soovitused poe lehtedel</span></h2>
+    <div data-lang="en">
+      <p>The <strong>Smaily recommendations</strong> widget shows a shopper their own recommendations from Campaign Intelligence — the same products as in their Smaily emails — on your store's pages, under the heading <strong>Recommended for you</strong>, as your theme's own product cards. Nothing appears until you place the widget, and it has no settings.</p>
+      <ol>
+        <li>Open a page under <span class="path">Content &gt; Pages</span> or a block under <span class="path">Content &gt; Blocks</span>.</li>
+        <li>In the content editor press <strong>Insert Widget...</strong>, pick <strong>Smaily recommendations</strong> as the <strong>Widget Type</strong> and press <strong>Insert Widget</strong>. In Page Builder do the same in a <strong>Text</strong> element, or put <code>{{widget type="Smaily\Connect\Block\Widget\Recommendations"}}</code> in an <strong>HTML Code</strong> element.</li>
+        <li>Save the page or block.</li>
+      </ol>
+      <ul>
+        <li><strong>Who sees what:</strong> a signed-in customer sees their recommendations unless they opted out of personalized recommendations or unsubscribed from your newsletter; a guest sees them only after an earlier click on a Smaily email link. A shopper Campaign Intelligence has nothing for, a new visitor or a shopper without marketing consent sees nothing — not even the heading.</li>
+        <li><strong>The cards:</strong> up to four products with your store's own name, image and price. A product that is disabled, not visible in the catalog or not for sale is left out. A purchase after a click on a card is credited to your store's pages.</li>
+        <li><strong>Consent:</strong> the same rules as the browse tracker (<a href="#connecting-your-cookie-consent-tool">Cookie consent tool</a>). Consent given on the page shows the recommendations at once.</li>
+        <li><strong>Speed:</strong> the page stays in the full-page cache and the cards are asked for after it has loaded, so the page never waits. A shopper's recommendations are kept for an hour, so a new one can take up to an hour to show. When Campaign Intelligence does not answer, nothing shows and the store asks again after 10 minutes.</li>
+        <li>Nothing shows while Campaign Intelligence is not connected or the account is deactivated. Hyvä needs the <a href="#st-hyva">Hyvä compatibility module</a>; a <a href="#st-headless">separate storefront</a> does not get the widget.</li>
+      </ul>
+    </div>
+    <div data-lang="et">
+      <p>Vidin <strong>Smaily soovitused</strong> näitab ostjale poe lehtedel tema enda soovitusi Campaign Intelligence'ist — samu tooteid, mis on tema Smaily e-kirjades — pealkirja <strong>Sulle soovitatud</strong> all, sinu teema enda tootekaartidena. Midagi ei ilmu enne, kui vidina lehele paigutad, ja sellel pole seadeid.</p>
+      <ol>
+        <li>Ava leht menüüs <span class="path">Content &gt; Pages</span> või plokk menüüs <span class="path">Content &gt; Blocks</span>.</li>
+        <li>Vajuta sisuredaktoris <strong>Insert Widget...</strong>, vali <strong>Widget Type</strong> väärtuseks <strong>Smaily soovitused</strong> ja vajuta <strong>Insert Widget</strong>. Page Builderis tee sama elemendis <strong>Text</strong> või pane <code>{{widget type="Smaily\Connect\Block\Widget\Recommendations"}}</code> elementi <strong>HTML Code</strong>.</li>
+        <li>Salvesta leht või plokk.</li>
+      </ol>
+      <ul>
+        <li><strong>Kes mida näeb:</strong> sisse logitud klient näeb oma soovitusi, kui ta pole personaalsetest soovitustest loobunud ega uudiskirjast lahkunud; külaline näeb neid ainult pärast varasemat klikki Smaily e-kirja lingil. Ostja, kellele Campaign Intelligence'il soovitusi pole, uus külastaja või turundusnõusolekuta ostja ei näe midagi — ka pealkirja mitte.</li>
+        <li><strong>Kaardid:</strong> kuni neli toodet sinu poe enda nime, pildi ja hinnaga. Toode, mis on välja lülitatud, kataloogis nähtamatu või pole müügil, jäetakse välja. Ost pärast kaardil klikkimist omistatakse sinu poe lehtedele.</li>
+        <li><strong>Nõusolek:</strong> samad reeglid nagu sirvimise jälgijal (<a href="#connecting-your-cookie-consent-tool">Küpsiste nõusoleku tööriist</a>). Lehel antud nõusoleku järel ilmuvad soovitused kohe.</li>
+        <li><strong>Kiirus:</strong> leht jääb lehevahemällu ja kaarte küsitakse pärast lehe laadimist, nii et leht ei oota kunagi. Ostja soovitusi hoitakse tund aega, seega võib uue soovituse ilmumiseks kuluda kuni tund. Kui Campaign Intelligence ei vasta, ei näidata midagi ja pood küsib uuesti 10 minuti pärast.</li>
+        <li>Midagi ei näidata, kui Campaign Intelligence pole ühendatud või konto on deaktiveeritud. Hyvä vajab <a href="#st-hyva">Hyvä ühilduvusmoodulit</a>; <a href="#st-headless">eraldi poe veebileht</a> vidinat ei saa.</li>
+      </ul>
+    </div>
+  </div>
+
   <div class="sub" id="set-engine-automations">
     <h2><span data-lang="en">Campaign Intelligence automations</span><span data-lang="et">Campaign Intelligence'i automaatikad</span></h2>
     <div data-lang="en">
@@ -1468,14 +1503,14 @@ window.smailyConnect.consentOverride = function () {
   <div class="sub" id="st-hyva">
     <h2><span data-lang="en">Hyvä</span><span data-lang="et">Hyvä</span></h2>
     <div data-lang="en">
-      <p>A Hyvä storefront also needs the Hyvä compatibility module, the composer package <code>smaily/module-connect-hyva</code>. It brings the browse tracker, recommendation attribution and the styled Personalization page to Hyvä; installation is described in <a href="https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/HYVA_SUPPORT.md">HYVA_SUPPORT.md</a>.</p>
+      <p>A Hyvä storefront also needs the Hyvä compatibility module, the composer package <code>smaily/module-connect-hyva</code>. It brings the browse tracker, recommendation attribution, the Smaily recommendations widget and the styled Personalization page to Hyvä; installation is described in <a href="https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/HYVA_SUPPORT.md">HYVA_SUPPORT.md</a>.</p>
       <ul>
         <li>Hyvä's free theme uses a Luma-based checkout, where the newsletter checkbox and the guest email capture work as on Luma.</li>
         <li>The commercial <strong>Hyvä Checkout</strong> is not supported: it shows no Smaily newsletter checkbox, and a guest's cart gets its email only when that checkout saves it.</li>
       </ul>
     </div>
     <div data-lang="et">
-      <p>Hyvä poe veebileht vajab lisaks Hyvä ühilduvusmoodulit, composeri paketti <code>smaily/module-connect-hyva</code>. See toob Hyväle sirvimise jälgija, soovituste omistamise ja kujundatud personaliseerimise lehe; paigaldust kirjeldab <a href="https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/HYVA_SUPPORT.md">HYVA_SUPPORT.md</a> (inglise keeles).</p>
+      <p>Hyvä poe veebileht vajab lisaks Hyvä ühilduvusmoodulit, composeri paketti <code>smaily/module-connect-hyva</code>. See toob Hyväle sirvimise jälgija, soovituste omistamise, vidina Smaily soovitused ja kujundatud personaliseerimise lehe; paigaldust kirjeldab <a href="https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/HYVA_SUPPORT.md">HYVA_SUPPORT.md</a> (inglise keeles).</p>
       <ul>
         <li>Hyvä tasuta teema kasutab Luma-põhist kassat, kus uudiskirja märkeruut ja külalise e-posti salvestamine töötavad nagu Lumas.</li>
         <li>Tasulist <strong>Hyvä Checkouti</strong> ei toetata: selles pole Smaily uudiskirja märkeruutu ja külalise ostukorv saab e-posti alles siis, kui see kassa selle salvestab.</li>
@@ -1490,7 +1525,7 @@ window.smailyConnect.consentOverride = function () {
       <ul>
         <li><strong>Works as is:</strong> contact sync, the first-order and abandoned-cart automations, the catalog, customer and order sync, the imports, the nightly check, the Log, and the GDPR command.</li>
         <li><strong>Needs the storefront team:</strong> the checkout newsletter checkbox, putting a guest's email on the cart, campaign-click capture, browse tracking and the cookies at login and order placement.</li>
-        <li><strong>Not available:</strong> the Welcome automation for signups made on the storefront (they arrive through Magento's API), the <strong>Checkout opt-in only</strong> sync mode, the <strong>My Account &gt; Personalization</strong> page, and the <code>abandoned_cart_url</code> link (link to the storefront's cart page in the template instead).</li>
+        <li><strong>Not available:</strong> the Welcome automation for signups made on the storefront (they arrive through Magento's API), the <strong>Checkout opt-in only</strong> sync mode, the <strong>My Account &gt; Personalization</strong> page, the <strong>Smaily recommendations</strong> widget, and the <code>abandoned_cart_url</code> link (link to the storefront's cart page in the template instead).</li>
       </ul>
       <p>Set the <a href="#set-storefront">Storefront URL</a> before connecting Campaign Intelligence. The full checklist and the hand-off for the storefront team are in <a href="https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/HEADLESS_STOREFRONTS.md">HEADLESS_STOREFRONTS.md</a>.</p>
     </div>
@@ -1499,7 +1534,7 @@ window.smailyConnect.consentOverride = function () {
       <ul>
         <li><strong>Töötab nii, nagu on:</strong> kontaktide sünkroonimine, esimese tellimuse ja hüljatud ostukorvi automaatikad, kataloogi, klientide ja tellimuste sünkroonimine, impordid, öine kontroll, logi ja GDPR-käsk.</li>
         <li><strong>Vajab poe veebilehe meeskonna tööd:</strong> kassa uudiskirja märkeruut, külalise e-posti panemine ostukorvile, kampaaniaklikkide salvestamine, sirvimise jälgimine ning küpsised sisselogimisel ja tellimuse esitamisel.</li>
-        <li><strong>Pole saadaval:</strong> automaatika Tervitus poe veebilehel tehtud liitumistele (need tulevad Magento API kaudu), sünkroonimisrežiim <strong>Ainult kassas turunduskirjade nõusoleku andnud kontaktid</strong>, leht <strong>Minu konto &gt; Personaliseerimine</strong> ja link <code>abandoned_cart_url</code> (lingi mallis selle asemel poe veebilehe ostukorvi lehele).</li>
+        <li><strong>Pole saadaval:</strong> automaatika Tervitus poe veebilehel tehtud liitumistele (need tulevad Magento API kaudu), sünkroonimisrežiim <strong>Ainult kassas turunduskirjade nõusoleku andnud kontaktid</strong>, leht <strong>Minu konto &gt; Personaliseerimine</strong>, vidin <strong>Smaily soovitused</strong> ja link <code>abandoned_cart_url</code> (lingi mallis selle asemel poe veebilehe ostukorvi lehele).</li>
       </ul>
       <p>Sisesta <a href="#set-storefront">poe veebilehe aadress</a> enne Campaign Intelligence'i ühendamist. Täielik kontrollnimekiri ja üleandmisjuhend poe veebilehe meeskonnale on dokumendis <a href="https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/HEADLESS_STOREFRONTS.md">HEADLESS_STOREFRONTS.md</a> (inglise keeles).</p>
     </div>

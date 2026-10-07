@@ -120,6 +120,7 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
         $verified = $viewModel->isSmailyVerified();
         $savedSubdomain = $viewModel->getSavedSubdomain();
         $savedUsername = $viewModel->getSavedUsername();
+        $savedStorefrontUrl = $viewModel->getSavedStorefrontUrl();
         ?>
         <div class="smaily-setup-summary" id="smaily-w-summary">
             <div class="smaily-setup-summary__row">
@@ -130,6 +131,12 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
                 <span class="smaily-setup-summary__label"><?= $escaper->escapeHtml(__('API username')) ?></span>
                 <span class="smaily-setup-summary__value"><?= $escaper->escapeHtml($savedUsername !== '' ? $savedUsername : '—') ?></span>
             </div>
+            <?php if ($savedStorefrontUrl !== ''): ?>
+            <div class="smaily-setup-summary__row" id="smaily-w-summary-storefront">
+                <span class="smaily-setup-summary__label"><?= $escaper->escapeHtml(__('Storefront URL')) ?></span>
+                <code class="smaily-setup-summary__value"><?= $escaper->escapeHtml($savedStorefrontUrl) ?></code>
+            </div>
+            <?php endif; ?>
             <div class="smaily-setup-summary__row">
                 <span class="smaily-setup-summary__label"><?= $escaper->escapeHtml(__('Status')) ?></span>
                 <span class="smaily-pill smaily-pill--<?= $verified ? 'active' : 'off' ?>">
@@ -267,7 +274,12 @@ require(['jquery'], function ($) {
         var $panel = $('.smaily-step-panel[data-step=' + step + ']');
         panels.clearFormErrors($panel);
         panels.result('#smaily-w-save-result', '<?= $escaper->escapeJs(__('Saving…')) ?>', true);
-        stepSavers[step]().then(function () {
+        stepSavers[step]().then(function (response) {
+            // A changed Storefront URL reaches a connected Campaign
+            // Intelligence only with the next catalog import: the step the
+            // setup moves on to says so beside its Continue, in the words of
+            // Settings > Connection (PRO-3913).
+            var reimport = !!(response && response.storefrontUrlChanged) && panels.isIntelligenceConnected();
             panels.result('#smaily-w-save-result', '', true);
             step += 1;
             maxStep = Math.max(maxStep, step);
@@ -275,6 +287,9 @@ require(['jquery'], function ($) {
                 panels.loadWorkflows('#smaily-w-save-result');
             }
             render();
+            if (reimport) {
+                panels.result('#smaily-w-save-result', '<?= $escaper->escapeJs(__('Saved. Run the catalog import again under Intelligence > Historical imports, so that Campaign Intelligence gets the new product links.')) ?>', true);
+            }
         }).catch(function (error) {
             // Banner above the step's form + the field that caused it (PRO-3562).
             panels.showFormErrors($panel, error);

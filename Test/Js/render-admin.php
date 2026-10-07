@@ -69,8 +69,10 @@ $escaper = new Escaper();
 });
 
 /**
- * The template's $block: the view model, the block's other data, an admin URL
- * and a child template rendered the way Magento's Template block renders one.
+ * The template's $block: the view model, the block's other data, an admin URL,
+ * the store's base URL and a child template rendered the way Magento's
+ * Template block renders one (the block's 'children' data maps a child's name
+ * to its template; a child not listed renders empty).
  */
 $block = static fn (object $viewModel, array $data = []): object => new class ($viewModel, $data, $escaper, $root) {
     /**
@@ -120,12 +122,32 @@ $block = static fn (object $viewModel, array $data = []): object => new class ($
     }
 
     /**
-     * @param string $route
+     * @param string $name
      * @return string
      */
-    public function getUrl(string $route): string
+    public function getChildHtml(string $name): string
+    {
+        $template = $this->data['children'][$name] ?? null;
+
+        return $template === null ? '' : $this->fetchView($template);
+    }
+
+    /**
+     * @param string $route
+     * @param array<string, mixed> $params
+     * @return string
+     */
+    public function getUrl(string $route, array $params = []): string
     {
         return 'https://store.example/admin/' . $route . '/';
+    }
+
+    /**
+     * @return string
+     */
+    public function getBaseUrl(): string
+    {
+        return 'https://store.example/';
     }
 };
 
@@ -238,14 +260,95 @@ $pages = [
  * the -storefront pages of each (PRO-3745). The connection-setup page puts the
  * initial setup's Connect step (panel/connection.phtml) in front of its
  * Intelligence step: one store language, credentials saved, no Storefront URL
- * (PRO-3802).
+ * (PRO-3802). The setup-completed pages render the initial setup itself
+ * (wizard/index.phtml) with its Connect and Intelligence steps, reopened after
+ * it was finished: with a Storefront URL saved and Campaign Intelligence
+ * connected, and with neither (PRO-3913).
  */
-$intelligenceViewModel = static fn (string $storefrontUrl): object => new class ($storefrontUrl) {
+$intelligenceViewModel = static fn (
+    string $storefrontUrl,
+    bool $intelligenceConnected = false
+): object => new class ($storefrontUrl, $intelligenceConnected) {
     /**
      * @param string $storefrontUrl
+     * @param bool $intelligenceConnected
      */
-    public function __construct(private readonly string $storefrontUrl)
+    public function __construct(
+        private readonly string $storefrontUrl,
+        private readonly bool $intelligenceConnected
+    ) {
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasMultipleWebsites(): bool
     {
+        return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasSelectedWebsite(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function getWebsiteOptions(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSetupCompleted(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return int
+     */
+    public function getStartStep(): int
+    {
+        return 1;
+    }
+
+    /**
+     * @return int
+     */
+    public function getReachedStep(): int
+    {
+        return 5;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSmailyVerified(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSavedSubdomain(): string
+    {
+        return 'demo';
+    }
+
+    /**
+     * @return string
+     */
+    public function getSavedUsername(): string
+    {
+        return 'api';
     }
 
     /**
@@ -352,7 +455,12 @@ $intelligenceViewModel = static fn (string $storefrontUrl): object => new class 
             'multilingual' => ['languages' => ['en'], 'fallbackLanguage' => 'en'],
             'subscribers' => [],
             'automations' => [],
-            'intelligence' => ['connected' => false, 'tenantName' => '', 'engineVersion' => '', 'browseTracking' => false],
+            'intelligence' => [
+                'connected' => $this->intelligenceConnected,
+                'tenantName' => $this->intelligenceConnected ? 'Pilot' : '',
+                'engineVersion' => $this->intelligenceConnected ? '1.12.0' : '',
+                'browseTracking' => false,
+            ],
             'rss' => ['enabled' => false],
             'totals' => [],
         ]);
@@ -406,6 +514,22 @@ $pages['intelligence-settings-storefront'] = [
     'data' => ['context' => 'settings'],
     'strings' => $intelligenceStrings,
 ];
+$setupCompleted = [
+    'template' => $root . '/view/adminhtml/templates/wizard/index.phtml',
+    'data' => ['children' => [
+        'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
+        'panel.intelligence' => $root . '/view/adminhtml/templates/panel/intelligence.phtml',
+        'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+    ]],
+    'strings' => [
+        'Storefront URL',
+        'Saved. Run the catalog import again under Intelligence > Historical imports,'
+            . ' so that Campaign Intelligence gets the new product links.',
+    ],
+];
+$pages['setup-completed-storefront'] = $setupCompleted
+    + ['viewModel' => $intelligenceViewModel('https://shop.example.com', true)];
+$pages['setup-completed'] = $setupCompleted + ['viewModel' => $intelligence];
 
 $render = static function (string $template, object $block, Escaper $escaper): string {
     ob_start();

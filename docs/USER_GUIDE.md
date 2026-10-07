@@ -133,7 +133,8 @@ bar across the top on narrow screens), so you
 can move back and forward between them freely — also when
 revisiting the initial setup after finishing it. A finished setup reopens on
 the Connect step as a read-only summary marked *Completed*: the subdomain,
-the API username and the connection status. **Edit credentials** opens the
+the API username, the Storefront URL when one is saved, and the connection
+status. **Edit credentials** opens the
 form there (Settings > Connection edits the same values), and **Continue**
 or the step list leads through the other steps as before. The Overview step says
 that Smaily Connect is syncing only when Smaily accepted the saved
@@ -236,7 +237,9 @@ query or a fragment is refused on save, with the message under the field
 way. After a save on **Settings > Connection** that changes the address, the
 result beside the button asks you to run the catalog import again under
 **Settings > Intelligence > Historical imports**, so that Campaign
-Intelligence gets the new links. The RSS feed shows them within 15 minutes.
+Intelligence gets the new links. In the initial setup, a Connect-step save
+that changes the address while Campaign Intelligence is connected asks the
+same beside the next step's **Continue**. The RSS feed shows them within 15 minutes.
 The storefront must open Magento's product paths, or redirect them keeping
 the query string — see
 [HEADLESS_STOREFRONTS.md](HEADLESS_STOREFRONTS.md#product-links-and-images).

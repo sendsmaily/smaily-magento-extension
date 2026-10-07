@@ -46,6 +46,9 @@ window.smailyPanelsInit = function ($) {
     var boot = <?= /* @noEscape */ $viewModel->getBootJson() ?>;
     var urls = <?= /* @noEscape */ json_encode(array_map('strval', $urls)) ?>;
     var connected = boot.connected;
+    // Campaign Intelligence connected: from the page load, then from a
+    // Connect (engineConnected()).
+    var intelligenceConnected = false;
     var mlLanguages = (boot.multilingual || {}).languages || [];
     var isMultilingual = mlLanguages.length > 1;
     var mlModeCurrent = isMultilingual ? (boot.connection.multilingualMode || 'single') : 'single';
@@ -595,6 +598,7 @@ window.smailyPanelsInit = function ($) {
     }
 
     function engineConnected(tenantName, engineVersion) {
+        intelligenceConnected = true;
         $('#smaily-w-engine-disconnected').hide();
         // Settings only: the setup step renders the introduction without this id.
         $('#smaily-w-engine-intro').hide();
@@ -1072,7 +1076,8 @@ window.smailyPanelsInit = function ($) {
         loadWorkflows: loadWorkflows,
         initAll: initAll,
         collect: collect,
-        isConnected: function () { return connected; }
+        isConnected: function () { return connected; },
+        isIntelligenceConnected: function () { return intelligenceConnected; }
     };
 };
 </script>

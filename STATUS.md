@@ -13,12 +13,15 @@ PHP 8.2/8.3); Erkki sets the new date once the store's developer estimates
 the upgrade; the "Pilot store live" milestone (2026-10-09) no longer holds.
 Landed today, unreleased: PRO-3854 (the nightly catalog manifest, §3c, sent
 at 03:30; and the contract copy 1.12.0), PRO-3798,
-PRO-3802 (the pilot-day order needs it, so the pilot installs rc8); the
+PRO-3802 (the pilot-day order needs it, so the pilot installs rc8),
+PRO-3913 (a reopened setup asks for the catalog import again after a
+Storefront URL change while Campaign Intelligence is connected; its summary
+lists the Storefront URL); the
 version check is now step one of INSTALLING and PILOT_CHECKLIST §0;
 HEADLESS_STOREFRONTS opens with a setup checklist (admin / back end /
 storefront developer), audited against the code.
 **Queue:** rc8 cut + clean-install check (not urgent) → pilot once the store has upgraded.
-Backlog: PRO-3913, PRO-3911, PRO-3912, PRO-3790 (after the pilot), PRO-3746, PRO-3774._
+Backlog: PRO-3911, PRO-3912, PRO-3790 (after the pilot), PRO-3746, PRO-3774._
 
 _Today in detail: PRO-3802 (the initial setup's Connect step
 takes the Storefront URL, saved before the Contacts step switches contact

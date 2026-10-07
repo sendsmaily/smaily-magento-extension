@@ -15,7 +15,10 @@
   the storefront hint of PRO-3745; on Settings a Connection save shows or
   hides it without a reload, PRO-3747), and the initial setup's Connect step
   (panel/connection.phtml) in front of its Intelligence step, for the setup's
-  Storefront URL field (PRO-3802), run with jQuery from vendor/, one fresh frame per
+  Storefront URL field (PRO-3802), and the initial setup itself
+  (wizard/index.phtml) reopened after it was finished, for its summary's
+  Storefront URL and the catalog import prompt after a Storefront URL change
+  (PRO-3913), run with jQuery from vendor/, one fresh frame per
   scenario. Stubbed: only the requests (fetch) — the Connect answers with
   the EngineExchange endpoint's answer, the import requests with the
   BackfillState endpoint's, a Connection save with the SaveStep endpoint's. Run it with bin/test-js.sh (it renders the pages
@@ -35,6 +38,10 @@
     <script src="build/intelligence-settings-storefront.et_EE.js"></script>
     <script src="build/connection-setup.en_US.js"></script>
     <script src="build/connection-setup.et_EE.js"></script>
+    <script src="build/setup-completed.en_US.js"></script>
+    <script src="build/setup-completed.et_EE.js"></script>
+    <script src="build/setup-completed-storefront.en_US.js"></script>
+    <script src="build/setup-completed-storefront.et_EE.js"></script>
 </head>
 <body>
 <pre id="log"></pre>
@@ -49,6 +56,7 @@
     var SETTINGS_STOREFRONT_HINT = 'Using a separate storefront? Set its Storefront URL under Settings > Connection > Using a separate storefront? before you connect, so that the catalog import sends the storefront\'s product links. Or connect now and press Hold back the import.';
     var REFUSED_STOREFRONT = 'Enter the storefront\'s address only, starting with https:// — for example https://shop.example.com — without a path or a query.';
     var FINISHED ='The catalog import had already finished, so there was nothing left to hold back.';
+    var REIMPORT = 'Saved. Run the catalog import again under Intelligence > Historical imports, so that Campaign Intelligence gets the new product links.';
     var failures = 0;
     var passes = 0;
 
@@ -88,13 +96,15 @@
         });
     }
 
-    // Runs in the frame before the page: the admin's form key and the
-    // requests, answered from window.answers (exchange, status, cancel),
-    // which a scenario changes as the server's state changes.
+    // Runs in the frame before the page: the admin's form key, RequireJS's
+    // require() for a page script that asks for jQuery, and the requests,
+    // answered from window.answers (exchange, status, cancel, save), which a
+    // scenario changes as the server's state changes.
     function stubs(answers) {
         return [
             '<script>',
             'window.FORM_KEY = "form-key";',
+            'window.require = function (deps, callback) { callback(window.jQuery); };',
             'window.requests = [];',
             'window.answers = ' + JSON.stringify(answers) + ';',
             'window.fetch = function (url, options) {',
@@ -110,8 +120,9 @@
         ].join('\n');
     }
 
-    // Opens the panel as the page boots it.
-    function open(page, answers) {
+    // Opens the panel as the page boots it; a page with its own script (the
+    // initial setup) boots itself.
+    function open(page, answers, ownScript) {
         return new Promise(function (resolve, reject) {
             var frame = document.createElement('iframe'),
                 rendered = (window.smailyAdminPages || {})[page];
@@ -128,7 +139,8 @@
             };
             frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs(answers)
                 + '</head><body>' + rendered.html
-                + '<script>window.panels = window.smailyPanelsInit(window.jQuery); window.panels.initAll();<\/script>'
+                + (ownScript ? ''
+                    : '<script>window.panels = window.smailyPanelsInit(window.jQuery); window.panels.initAll();<\/script>')
                 + '</body></html>';
             document.body.appendChild(frame);
         });
@@ -199,6 +211,33 @@
 
             return saves.length ? saves[saves.length - 1].body : null;
         });
+    }
+
+    // In the initial setup reopened after it was finished: Edit credentials,
+    // this Storefront URL typed into the Connect step's field, and Continue;
+    // the server saves it and answers whether the address changed. Answers
+    // the request the step posted.
+    function continueReopened(frame, storefrontUrl, changed) {
+        var win = frame.contentWindow,
+            doc = frame.contentDocument;
+
+        win.answers.save = {saved: true, errors: [], verified: true, accountName: 'demo', storefrontUrlChanged: changed};
+        doc.getElementById('smaily-w-edit-credentials').click();
+        doc.getElementById('smaily-w-storefront').open = true;
+        doc.getElementById('smaily-w-storefront-url').value = storefrontUrl;
+        doc.getElementById('smaily-w-next').click();
+
+        return wait(50).then(function () {
+            var saves = win.requests.filter(function (request) {
+                return request.url.indexOf('savestep') !== -1;
+            });
+
+            return saves.length ? saves[saves.length - 1].body : null;
+        });
+    }
+
+    function onStep(doc, step) {
+        return doc.querySelector('.smaily-step-panel[data-step="' + step + '"]').classList.contains('active');
     }
 
     function holdBack(frame, statusAfter) {
@@ -332,6 +371,46 @@
             && save.data.subdomain === 'demo' && save.data.username === 'api');
         check(locale + ', setup Connect: an address saved, the Intelligence step drops its storefront hint',
             visible(doc, 'smaily-w-engine-connect') && !visible(doc, 'smaily-w-engine-storefront-hint'));
+        frame.remove();
+
+        // The initial setup reopened after it was finished (PRO-3913): its
+        // summary lists a saved Storefront URL; a Storefront URL changed
+        // through Edit credentials while Campaign Intelligence is connected
+        // asks for the catalog import again on the step the setup moves on
+        // to, in the words of Settings > Connection; unchanged, or with
+        // Campaign Intelligence not connected, it does not.
+        strings = window.smailyAdminPages['setup-completed-storefront.' + locale].strings;
+        if (locale !== 'en_US') {
+            check(locale + ': the catalog import prompt is translated', strings[REIMPORT] !== REIMPORT);
+        }
+        frame = await open('setup-completed-storefront.' + locale, {status: catalog('idle', 0)}, true);
+        doc = frame.contentDocument;
+        check(locale + ', reopened setup: the summary lists the saved Storefront URL',
+            visible(doc, 'smaily-w-summary-storefront')
+            && doc.querySelector('#smaily-w-summary-storefront .smaily-setup-summary__label').textContent
+                === strings['Storefront URL']
+            && doc.querySelector('#smaily-w-summary-storefront .smaily-setup-summary__value').textContent
+                === 'https://shop.example.com');
+        save = await continueReopened(frame, 'https://new.example.com', true);
+        check(locale + ', reopened setup: the changed Storefront URL is saved with the connection',
+            !!save && save.step === 'connect' && save.data.storefront_url === 'https://new.example.com');
+        check(locale + ', reopened setup: Campaign Intelligence connected and the Storefront URL changed, the next step asks for the catalog import again',
+            onStep(doc, 2) && visible(doc, 'smaily-w-save-result')
+            && doc.getElementById('smaily-w-save-result').textContent === strings[REIMPORT]);
+        frame.remove();
+        frame = await open('setup-completed-storefront.' + locale, {status: catalog('idle', 0)}, true);
+        doc = frame.contentDocument;
+        await continueReopened(frame, 'https://shop.example.com', false);
+        check(locale + ', reopened setup: the Storefront URL unchanged, no catalog import prompt',
+            onStep(doc, 2) && doc.getElementById('smaily-w-save-result').textContent === '');
+        frame.remove();
+        frame = await open('setup-completed.' + locale, {status: catalog('idle', 0)}, true);
+        doc = frame.contentDocument;
+        check(locale + ', reopened setup: without a Storefront URL, the summary has no Storefront URL row',
+            visible(doc, 'smaily-w-summary') && !doc.getElementById('smaily-w-summary-storefront'));
+        await continueReopened(frame, 'https://shop.example.com', true);
+        check(locale + ', reopened setup: Campaign Intelligence not connected, no catalog import prompt',
+            onStep(doc, 2) && doc.getElementById('smaily-w-save-result').textContent === '');
         frame.remove();
         strings = window.smailyAdminPages[setup].strings;
 

@@ -121,7 +121,12 @@ Intelligence step too: it checks that the step draws the Storefront URL
 field collapsed, that its save posts the field with the credentials —
 empty, a refused address (marked on the field with the server's message,
 the hint left as it was) and an accepted one (the Intelligence step's hint
-gone without a reload). To
+gone without a reload). The initial setup itself (`wizard/index.phtml`) is
+rendered reopened after it was finished: it checks that its summary lists a
+saved Storefront URL (and has no such row without one), and that a
+Storefront URL changed through **Edit credentials** while Campaign
+Intelligence is connected asks, beside the next step's Continue, for the
+catalog import again — unchanged, or not connected, it does not. To
 check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.

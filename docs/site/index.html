@@ -204,6 +204,12 @@ td code{white-space:nowrap}
 pre{background:var(--code-bg); color:var(--code-fg); border:1px solid var(--line-soft); border-radius:var(--radius);
   padding:12px 14px; margin:14px 0; overflow-x:auto; font-family:var(--mono); font-size:13.5px; line-height:1.55}
 pre code{background:none; border:0; padding:0; font-size:inherit}
+/* long inline code (paths, function names) wraps instead of widening the page */
+.doc p code,.doc li code{overflow-wrap:anywhere}
+/* masthead: the product line stays on one line; narrow screens drop the subtitle */
+.brand .bn,.brand .bs{white-space:nowrap}
+@media (max-width:600px){.brand .bs{display:none}}
+@media (max-width:480px){.brand .names{display:none}}
 </style>
 </head>
 <body>

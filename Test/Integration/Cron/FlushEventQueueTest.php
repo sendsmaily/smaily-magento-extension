@@ -368,6 +368,181 @@ class FlushEventQueueTest extends IntegrationTestCase
         );
     }
 
+    /**
+     * PRO-1964: Smaily's one answer to a group is recorded in one UPDATE,
+     * not one per row — and each row still ends on its own step of the
+     * ladder, with its own part of the request body.
+     */
+    public function testAGroupFailureIsRecordedInOneWriteWithEachRowOnItsOwnStep(): void
+    {
+        $this->enqueueContacts(5);
+        // f-c5 failed three times before: this failure is its fourth.
+        $this->connection->update(EventResource::TABLE_NAME, ['attempts' => 3], ['event_uuid = ?' => 'f-c5']);
+
+        $writes = $this->failureWrites(fn () => $this->runCron(['contact.sync' => $this->realContactSync([
+            new Response(503, [], 'Service unavailable'),
+        ])]));
+
+        self::assertSame(1, $writes, 'One statement for the five rows');
+        $rows = array_column($this->fetchAll(EventResource::TABLE_NAME), null, 'event_uuid');
+        foreach ([1, 2, 3, 4, 5] as $n) {
+            $row = $rows['f-c' . $n];
+            self::assertSame(Event::STATUS_PENDING, $row['status']);
+            self::assertSame($n === 5 ? '4' : '1', (string)$row['attempts']);
+            self::assertSame(
+                $this->clockDate(EventQueue::BACKOFF_SECONDS[$n === 5 ? 3 : 0]),
+                $row['next_retry_at'],
+                'Each row on its own step of the ladder'
+            );
+            self::assertSame('Smaily API request failed with HTTP 503: Service unavailable', $row['last_error']);
+            self::assertSame($this->contacts($n), json_decode((string)$row['sent_payload'], true));
+            self::assertSame(
+                ['http_status' => 503, 'body' => 'Service unavailable'],
+                json_decode((string)$row['last_response'], true)
+            );
+            self::assertNull($row['claim_token'], 'The claim is cleared as a single failure clears it');
+        }
+    }
+
+    /**
+     * PRO-1964: a group that reaches the last step parks the rows whose
+     * attempts are spent and reschedules the others, in the same write.
+     */
+    public function testAGroupFailureParksOnlyTheRowsWhoseAttemptsAreSpent(): void
+    {
+        $this->enqueueContacts(3);
+        $this->connection->update(
+            EventResource::TABLE_NAME,
+            ['attempts' => EventQueue::MAX_ATTEMPTS - 1],
+            ['event_uuid = ?' => 'f-c2']
+        );
+
+        $writes = $this->failureWrites(fn () => $this->runCron(['contact.sync' => $this->realContactSync([
+            new Response(503, [], 'Service unavailable'),
+        ])]));
+
+        self::assertSame(1, $writes);
+        $rows = array_column($this->fetchAll(EventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(Event::STATUS_FAILED, $rows['f-c2']['status']);
+        self::assertSame((string)EventQueue::MAX_ATTEMPTS, (string)$rows['f-c2']['attempts']);
+        self::assertNull($rows['f-c2']['next_retry_at']);
+        foreach (['f-c1', 'f-c3'] as $uuid) {
+            self::assertSame(Event::STATUS_PENDING, $rows[$uuid]['status']);
+            self::assertSame('1', (string)$rows[$uuid]['attempts']);
+            self::assertSame($this->clockDate(EventQueue::BACKOFF_SECONDS[0]), $rows[$uuid]['next_retry_at']);
+        }
+    }
+
+    /**
+     * PRO-1964: rows that fail for reasons of their own keep them — one
+     * write per reason, the rows of a shared reason together.
+     */
+    public function testRowsThatFailForDifferentReasonsKeepTheirOwn(): void
+    {
+        foreach (['f-a', 'f-b', 'f-c', 'f-ok'] as $uuid) {
+            $this->queue->enqueue('contact.sync', [], null, 0, $uuid);
+        }
+        $reasons = ['f-a' => 'recipient rejected', 'f-b' => 'mailbox full', 'f-c' => 'recipient rejected'];
+
+        $writes = $this->failureWrites(fn () => $this->runCron(['contact.sync' => new RecordingHandler(
+            static function (array $events) use ($reasons): array {
+                $results = [];
+                foreach ($events as $event) {
+                    $results[(int)$event->getId()] = $reasons[$event->getEventUuid()] ?? true;
+                }
+
+                return $results;
+            }
+        )]));
+
+        self::assertSame(2, $writes, 'One write per reason');
+        $rows = array_column($this->fetchAll(EventResource::TABLE_NAME), null, 'event_uuid');
+        foreach ($reasons as $uuid => $reason) {
+            self::assertSame(Event::STATUS_PENDING, $rows[$uuid]['status'], $uuid);
+            self::assertSame('1', (string)$rows[$uuid]['attempts'], $uuid);
+            self::assertSame($reason, $rows[$uuid]['last_error'], $uuid);
+        }
+        self::assertSame(Event::STATUS_SENT, $rows['f-ok']['status']);
+        self::assertNull($rows['f-ok']['last_error']);
+    }
+
+    /**
+     * PRO-1964 with PRO-3753: the contacts of a 203 group go again one by
+     * one, and each refused contact keeps its own answer — two refused
+     * with the same answer are written together, each with its own
+     * request body.
+     */
+    public function testContactsSentAloneAfterA203KeepTheirOwnAnswers(): void
+    {
+        $this->enqueueContacts(4);
+
+        $writes = $this->failureWrites(fn () => $this->runCron(['contact.sync' => $this->realContactSync([
+            new Response(200, [], '{"code":203,"message":"Invalid data"}'),
+            new Response(200, [], '{"code":203,"message":"Invalid email"}'),
+            new Response(200, [], '{"code":101,"message":"OK"}'),
+            new Response(200, [], '{"code":203,"message":"Invalid email"}'),
+            new Response(200, [], '{"code":203,"message":"Invalid phone"}'),
+        ])]));
+
+        self::assertSame(2, $writes, 'The two "Invalid email" rows together, the other alone');
+        $rows = array_column($this->fetchAll(EventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(Event::STATUS_SENT, $rows['f-c2']['status']);
+        $answers = ['f-c1' => 'Invalid email', 'f-c3' => 'Invalid email', 'f-c4' => 'Invalid phone'];
+        foreach ($answers as $uuid => $message) {
+            $row = $rows[$uuid];
+            self::assertSame(Event::STATUS_FAILED, $row['status'], $uuid);
+            self::assertSame('1', (string)$row['attempts'], $uuid);
+            self::assertNull($row['next_retry_at'], $uuid);
+            self::assertSame('permanent_envelope_203: Smaily API returned code 203: ' . $message, $row['last_error']);
+            self::assertSame(
+                $this->contacts((int)substr($uuid, 3)),
+                json_decode((string)$row['sent_payload'], true),
+                $uuid . ' keeps only its own contact'
+            );
+            self::assertSame(
+                ['http_status' => 200, 'body' => ['code' => 203, 'message' => $message]],
+                json_decode((string)$row['last_response'], true)
+            );
+        }
+    }
+
+    /**
+     * How many statements recorded a failed attempt while $run ran: the
+     * UPDATEs of the queue table that set last_error and a failed
+     * outcome (a claim sets no error, a delivery no failed status).
+     */
+    private function failureWrites(callable $run): int
+    {
+        $connection = $this->connection;
+        if (!$connection instanceof \Zend_Db_Adapter_Abstract) {
+            self::fail('The test connection keeps no query profile');
+        }
+        $profiler = $connection->getProfiler();
+        $profiler->clear();
+        $profiler->setEnabled(true);
+        try {
+            $run();
+        } finally {
+            $profiler->setEnabled(false);
+        }
+
+        $writes = 0;
+        foreach ($profiler->getQueryProfiles() ?: [] as $profile) {
+            $query = $profile->getQuery();
+            $failed = str_contains($query, 'CASE')
+                || array_intersect([Event::STATUS_PENDING, Event::STATUS_FAILED], $profile->getQueryParams());
+            if (str_starts_with($query, 'UPDATE `' . EventResource::TABLE_NAME . '`')
+                && str_contains($query, '`last_error`')
+                && $failed
+            ) {
+                $writes++;
+            }
+        }
+        $profiler->clear();
+
+        return $writes;
+    }
+
     public function testAnotherErrorEnvelopeOnAGroupKeepsTheGroupOnTheLadder(): void
     {
         $this->enqueueContacts(5);

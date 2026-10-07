@@ -634,8 +634,17 @@ below.
   handler's own verdict that a row can never be sent (a malformed payload,
   an event type no handler takes), parked on its first attempt with that
   reason and its real attempt count. `Cron\FlushEventQueue` applies it
-  through `EventQueue::markFailed()`. `Engine\Client` +
-  `Cron\FlushIngestQueue` do the same for the ingest queue.
+  through `EventQueue::markFailedMany()`, once per verdict (PRO-1964): the
+  rows that share one — Smaily's one answer to a contact-sync group, the
+  same refusal of several automations, a type no handler takes — are
+  recorded in one UPDATE (CASE on the row id for the values that differ)
+  and, for the rows it parks, one error-log line ("Queue events failed
+  permanently", with their count and ids). Each row still takes its own
+  step on the ladder — attempts, status and next retry follow its own
+  attempt count — and keeps its own exchange; a row with a verdict of its
+  own (among them each contact a 203 group sends again alone) goes
+  through `markFailed()` as before. `Engine\Client` +
+  `Cron\FlushIngestQueue` do the same for the ingest queue, row by row.
 - **Smaily envelope codes (PRO-1962; proposed as the cross-platform
   canon for the WooCommerce and Shopify plugins).** Smaily can refuse a
   request with HTTP 200 and a non-101 code in the body (an

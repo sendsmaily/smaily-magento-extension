@@ -335,6 +335,26 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-1964 — a batch that fails for one reason is recorded in one
+  write and one log line (2026-10-07; branch
+  `erkki/pro-1964-batch-failure-write` for a PR).** `Cron\FlushEventQueue`
+  groups a flush's failed rows by verdict (reason, Retry-After,
+  permanent) and hands each group to the new
+  `EventQueue::markFailedMany()`: one UPDATE (CASE on the id for values
+  that differ; 200 rows a statement) and one error line "Queue events
+  failed permanently" with count and ids for the rows it parks. Each row
+  keeps its own ladder step and exchange; a single-row group goes through
+  `markFailed()` unchanged, so mixed reasons and the PRO-3753 one-by-one
+  resend keep a reason per row. The batch writes the claim and timestamp
+  columns as the model holds them, as the model's own save does, so a
+  batched row ends exactly like a single one. Found on the way, not
+  changed: that save writes back `updated_at` (and `claimed_at`) as the
+  claim read them, so `updated_at` never moves on markFailed/markSent/
+  markSkipped and Details dates the latest failure or the delivery at the
+  row's previous change. Marketing queue only — `IngestQueue` has its own
+  `markFailed()` and is unchanged. CHANGELOG bullet for the log line.
+  Gates: unit, phpcs, phpstan, integration, PHP 8.1 syntax.
+
 - **PRO-3936 — the rc8 package installs on a clean store by the install
   guide (2026-10-07; docs only, no CHANGELOG bullet).** As PRO-3769 for
   rc7: the ZIP and its .sha256 were downloaded from the 3.0.0-rc8 GitHub

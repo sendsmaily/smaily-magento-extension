@@ -59,10 +59,7 @@ class FlushEventQueue
         $handler = $this->handlerPool->get($eventType);
         if ($handler === null) {
             // Retrying cannot make a handler appear (PRO-1961).
-            $failure = Failure::permanent(sprintf('No handler registered for "%s"', $eventType));
-            foreach ($events as $event) {
-                $this->fail($event, $failure);
-            }
+            $this->failAll($events, Failure::permanent(sprintf('No handler registered for "%s"', $eventType)));
 
             return;
         }
@@ -70,10 +67,7 @@ class FlushEventQueue
         try {
             $results = $handler->handle($events);
         } catch (SmailyClientException $exception) {
-            $failure = Failure::of($exception);
-            foreach ($events as $event) {
-                $this->fail($event, $failure);
-            }
+            $this->failAll($events, Failure::of($exception));
             $this->logger->info('Queue batch failed', [
                 'event_type' => $eventType,
                 'count' => count($events),
@@ -84,6 +78,7 @@ class FlushEventQueue
         }
 
         $waiting = [];
+        $failed = [];
         foreach ($events as $event) {
             $result = $results[(int)$event->getId()] ?? 'Handler returned no result for event';
             if ($result instanceof Pending) {
@@ -93,27 +88,47 @@ class FlushEventQueue
             } elseif ($result instanceof Skipped) {
                 $this->eventQueue->markSkipped($event, $result->reason);
             } elseif ($result instanceof Failure) {
-                $this->fail($event, $result);
+                $this->collect($failed, $event, $result->reason, $result->retryAfter, $result->permanent);
             } elseif ($result instanceof \Throwable) {
                 // A failed send handed on whole: its type says retry or stop.
-                $this->fail($event, Failure::of($result));
+                $failure = Failure::of($result);
+                $this->collect($failed, $event, $failure->reason, $failure->retryAfter, $failure->permanent);
             } else {
-                $this->eventQueue->markFailed($event, (string)$result);
+                $this->collect($failed, $event, (string)$result, null, false);
             }
+        }
+        // One write per verdict (PRO-1964): the rows of one shared refusal
+        // are recorded together, a row with a reason of its own alone.
+        foreach ($failed as $group) {
+            $this->eventQueue->markFailedMany(
+                $group['events'],
+                $group['reason'],
+                $group['retryAfter'],
+                $group['terminal']
+            );
         }
         $this->eventQueue->release($waiting);
     }
 
     /**
-     * Park the row for good, or reschedule it, as the failure says.
+     * Park the rows for good, or reschedule them, as their one failure says.
+     *
+     * @param Event[] $events
      */
-    private function fail(Event $event, Failure $failure): void
+    private function failAll(array $events, Failure $failure): void
     {
-        $this->eventQueue->markFailed(
-            $event,
-            $failure->reason,
-            retryAfter: $failure->retryAfter,
-            terminal: $failure->permanent
-        );
+        $this->eventQueue->markFailedMany($events, $failure->reason, $failure->retryAfter, $failure->permanent);
+    }
+
+    /**
+     * Group a failed row with the rows of the same verdict.
+     *
+     * @param array<string, array{reason: string, retryAfter: ?int, terminal: bool, events: Event[]}> $failed
+     */
+    private function collect(array &$failed, Event $event, string $reason, ?int $retryAfter, bool $terminal): void
+    {
+        $key = ($terminal ? 'T' : 'R') . ($retryAfter ?? '') . '|' . $reason;
+        $failed[$key] ??= ['reason' => $reason, 'retryAfter' => $retryAfter, 'terminal' => $terminal, 'events' => []];
+        $failed[$key]['events'][] = $event;
     }
 }

@@ -285,16 +285,30 @@ below.
   setup step and Settings tab) and the config save behind `bin/magento
   config:set smaily_connect/intelligence/setup_token`
   (`Model/Config/Backend/EngineSetupToken`) — call
-  `Model/Backfill/CatalogImportOnConnect::start()` after a successful
-  setup exchange. It queues the job through `JobManager::startIfIdle()`, as
+  `Model/Backfill/ImportsOnConnect::start()` after a successful
+  setup exchange. It queues the catalog job, then the customers job
+  (PRO-3790), each through `JobManager::startIfIdle()`, as
   the admin Start import does, so the one-active-job lock keeps a reconnect
   from starting a second import while one is queued or running (a
   reconnect after it ended starts a fresh one, which the engine
   deduplicates); a config save without a token exchanges nothing and
-  starts nothing. EngineExchange answers `catalogImportStarted`, and
-  `panels-js.phtml` then shows an info banner with **Hold back the
+  starts nothing. The customers import is there for the engine's
+  customer id: storefront recommendations ask by the Magento customer id
+  (`external_id`, contract §4), which live sync sends only on a customer
+  save, so an account that existed before connecting, a customer the
+  engine knows only from orders (§5 names the customer by email) and an
+  account created by Magento's ImportExport customer import are unknown
+  by id until the import runs. The catalog job is queued first, so it has the
+  lower id and the tick (`nextActive()`, oldest first) runs it first; right
+  after a connect both jobs are `pending`. The orders import stays the
+  merchant's to start (PRO-3742). EngineExchange answers
+  `catalogImportStarted` and `customersImportStarted`, and
+  `panels-js.phtml` then shows an info banner for each import started —
+  the catalog one with **Hold back the
   import**, which posts the BackfillState `cancel` (`requestCancel()`);
-  the Settings tab's Catalog card renders the cancel's answer, which
+  the customers one points to its card's **Cancel import** — and asks
+  the Settings tab's Catalog and Customers cards for their state; the
+  Catalog card renders the Hold back's cancel answer, which
   carries the import's state.
   The window: the job is `pending` until the next `smaily_backfill_tick`
   (every minute) picks it up, and its first page can be flushed in that
@@ -307,7 +321,7 @@ below.
   through. The banner's answer says "Held back" when the cancel answer
   counts nothing processed, else how many were queued (read before the
   worker's current page is recorded, so it can lag by one page).
-  EngineSetupToken adds a notice message instead, which `config:set`
+  EngineSetupToken adds a notice message per import instead, which `config:set`
   does not print; the user guide points CLI users to
   `smaily:backfill:status` and the card's Cancel import. The merchant
   starts the import again on the card or with `smaily:backfill:start
@@ -325,7 +339,7 @@ below.
   no cron — is answered with `stalled: true` (`JobManager::isStalled()`:
   `isActiveAndMoving()`'s rule, `JobManager::STALLED_SECONDS`), shown on
   the card as *Stalled* with **Run again**; every start — the card, the
-  command, connecting Campaign Intelligence (`CatalogImportOnConnect`) —
+  command, connecting Campaign Intelligence (`ImportsOnConnect`) —
   goes through `JobManager::startIfIdle()`, which cancels it first
   (`requestCancel()`), so the one-active-job lock cannot keep the new one
   from starting (PRO-3915, PRO-3923). The tick takes the oldest active job

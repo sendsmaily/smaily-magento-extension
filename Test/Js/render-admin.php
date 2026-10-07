@@ -261,7 +261,7 @@ $pages = [
  * The Campaign Intelligence panel (view/adminhtml/templates/panel/intelligence.phtml)
  * with its behaviour (panel/panels-js.phtml), Campaign Intelligence not
  * connected yet: the initial setup's step and the Settings tab, where the
- * import cards render too (PRO-3741). No Storefront URL is saved, except on
+ * import cards render too (PRO-3741, PRO-3790). No Storefront URL is saved, except on
  * the -storefront pages of each (PRO-3745). The connection-setup page puts the
  * initial setup's Connect step (panel/connection.phtml) in front of its
  * Intelligence step: one store language, credentials saved, no Storefront URL
@@ -533,6 +533,9 @@ $intelligenceViewModel = static fn (
 $intelligence = $intelligenceViewModel('');
 $intelligenceStrings = [
     'The catalog import has started',
+    'The customers import has started',
+    'Your existing customer accounts go to Campaign Intelligence once, in the background, after the catalog import.'
+        . ' To hold it back, press Cancel import on the Customers card under Marketing > Smaily Connect > Settings > Intelligence.',
     'Held back: the catalog import is canceled. Start it any time under Marketing > Smaily Connect > Settings > Intelligence.',
     'Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.',
     'The catalog import had already finished, so there was nothing left to hold back.',

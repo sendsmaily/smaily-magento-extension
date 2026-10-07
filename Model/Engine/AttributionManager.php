@@ -8,13 +8,9 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Engine;
 
-use Magento\Framework\App\Area;
 use Magento\Framework\App\ResourceConnection;
-use Magento\Framework\App\State;
-use Magento\Framework\Exception\LocalizedException;
-use Magento\Framework\Module\Manager as ModuleManager;
-use Magento\Framework\ObjectManagerInterface;
 use Magento\Framework\Stdlib\CookieManagerInterface;
+use Smaily\Connect\Model\OrderPlacer;
 
 /**
  * Recommendation attribution: campaign-click URL params are written into
@@ -46,23 +42,11 @@ class AttributionManager
 
     private const ATTRIBUTION_TABLE = 'smaily_order_attribution';
 
-    /**
-     * Magento's "Login as Customer" (optional: no composer or module.xml
-     * dependency), resolved by name only while the module is enabled. Its
-     * API answers the admin id held in the customer session, the same check
-     * Magento_LoginAsCustomerSales marks such an order with. A string, not
-     * ::class: the interface may be absent.
-     */
-    private const LOGIN_AS_CUSTOMER_MODULE = 'Magento_LoginAsCustomer';
-    private const LOGGED_AS_CUSTOMER_ADMIN_ID = 'Magento\\LoginAsCustomerApi\\Api\\GetLoggedAsCustomerAdminIdInterface';
-
     public function __construct(
         private readonly Settings $settings,
         private readonly CookieManagerInterface $cookieManager,
         private readonly ResourceConnection $resourceConnection,
-        private readonly ModuleManager $moduleManager,
-        private readonly ObjectManagerInterface $objectManager,
-        private readonly State $appState
+        private readonly OrderPlacer $orderPlacer
     ) {
     }
 
@@ -125,7 +109,7 @@ class AttributionManager
         }
 
         $cookies = $this->readCookies();
-        if (!array_filter($cookies) || $this->isPlacedByAdmin()) {
+        if (!array_filter($cookies) || $this->orderPlacer->isAdmin()) {
             return;
         }
 
@@ -141,28 +125,6 @@ class AttributionManager
             ],
             ['rec_id', 'visitor_token', 'rec_ctx', 'anon_session_id']
         );
-    }
-
-    /**
-     * Whether an admin places the order: in the admin's order screen (any
-     * order saved in an admin request, PRO-3930), or on the storefront while
-     * logged in as the customer ("Login as Customer", PRO-3925).
-     */
-    private function isPlacedByAdmin(): bool
-    {
-        try {
-            $area = $this->appState->getAreaCode();
-        } catch (LocalizedException) {
-            $area = null; // No area set: not an admin request.
-        }
-        if ($area === Area::AREA_ADMINHTML) {
-            return true;
-        }
-        if (!$this->moduleManager->isEnabled(self::LOGIN_AS_CUSTOMER_MODULE)) {
-            return false;
-        }
-
-        return (int)$this->objectManager->get(self::LOGGED_AS_CUSTOMER_ADMIN_ID)->execute() > 0;
     }
 
     /**

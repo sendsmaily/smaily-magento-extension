@@ -24,8 +24,13 @@ use Magento\Framework\Stdlib\DateTime\DateTime;
  *
  * - an API order: placed through GraphQL, or through REST without Magento's
  *   own storefront session (no `form_key` cookie on the request);
- * - a storefront order: every other order — Luma's checkout places its order
- *   through REST from a Magento page, which carries the `form_key` cookie.
+ * - a storefront order: every other order a shopper places — Luma's checkout
+ *   places its order through REST from a Magento page, which carries the
+ *   `form_key` cookie.
+ *
+ * An order an admin places that is not an API order — in the admin's order
+ * screen, or on Magento's pages with "Login as Customer" — stamps neither
+ * flag (PRO-3949): it says nothing about where the shoppers buy.
  *
  * The flags are installation-wide `smaily_connect_*` rows, removed by the
  * module's uninstall with the other flags.
@@ -42,17 +47,24 @@ class OrderOrigin
         private readonly State $appState,
         private readonly CookieManagerInterface $cookieManager,
         private readonly FlagManager $flagManager,
-        private readonly DateTime $dateTime
+        private readonly DateTime $dateTime,
+        private readonly OrderPlacer $orderPlacer
     ) {
     }
 
     /**
      * Stamp the order being placed in this request as an API or a storefront
-     * order.
+     * order; an order an admin places outside the API stamps nothing.
      */
     public function record(): void
     {
-        $flag = $this->isApiRequest() ? self::FLAG_LAST_API_ORDER : self::FLAG_LAST_STOREFRONT_ORDER;
+        if ($this->isApiRequest()) {
+            $flag = self::FLAG_LAST_API_ORDER;
+        } elseif ($this->orderPlacer->isAdmin()) {
+            return;
+        } else {
+            $flag = self::FLAG_LAST_STOREFRONT_ORDER;
+        }
         $this->flagManager->saveFlag($flag, (int)$this->dateTime->gmtTimestamp());
     }
 

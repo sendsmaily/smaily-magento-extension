@@ -11,17 +11,22 @@ namespace Smaily\Connect\Test\Unit\Model;
 use Magento\Framework\App\State;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\FlagManager;
+use Magento\Framework\Module\Manager as ModuleManager;
+use Magento\Framework\ObjectManagerInterface;
 use Magento\Framework\Phrase;
 use Magento\Framework\Stdlib\CookieManagerInterface;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\OrderOrigin;
+use Smaily\Connect\Model\OrderPlacer;
 
 /**
  * PRO-3660 (owner decision 2026-10-02): an order placed through GraphQL, or
  * through REST without Magento's storefront `form_key` cookie, is an API
- * order; every other order is a storefront order. The Storefront URL field
- * opens when the last 30 days had API orders and no storefront order.
+ * order; every other order a shopper places is a storefront order. An order
+ * an admin places outside the API — in the admin's order screen or with
+ * "Login as Customer" — is neither (PRO-3949). The Storefront URL field opens
+ * when the last 30 days had API orders and no storefront order.
  */
 class OrderOriginTest extends TestCase
 {
@@ -33,28 +38,43 @@ class OrderOriginTest extends TestCase
     /**
      * @dataProvider originProvider
      */
-    public function testAnOrderIsStampedByWhereItCameFrom(?string $area, ?string $formKey, string $expectedFlag): void
-    {
-        $this->orderOrigin($area, $formKey)->record();
+    public function testAnOrderIsStampedByWhereItCameFrom(
+        ?string $area,
+        ?string $formKey,
+        ?int $loggedAsCustomerAdminId,
+        ?string $expectedFlag
+    ): void {
+        $this->orderOrigin($area, $formKey, $loggedAsCustomerAdminId)->record();
 
-        self::assertSame([$expectedFlag => self::NOW], $this->flags);
+        self::assertSame($expectedFlag === null ? [] : [$expectedFlag => self::NOW], $this->flags);
     }
 
     /**
-     * @return array<string, array{?string, ?string, string}>
+     * Area, form key cookie, the "Login as Customer" admin id (null: the
+     * module is off), the flag stamped (null: none).
+     *
+     * @return array<string, array{?string, ?string, ?int, ?string}>
      */
     public static function originProvider(): array
     {
+        $api = OrderOrigin::FLAG_LAST_API_ORDER;
+        $storefront = OrderOrigin::FLAG_LAST_STOREFRONT_ORDER;
+
         return [
-            'GraphQL' => ['graphql', null, OrderOrigin::FLAG_LAST_API_ORDER],
-            'GraphQL with a form key cookie' => ['graphql', 'abc', OrderOrigin::FLAG_LAST_API_ORDER],
-            'REST without a form key cookie' => ['webapi_rest', null, OrderOrigin::FLAG_LAST_API_ORDER],
-            'REST with an empty form key cookie' => ['webapi_rest', '', OrderOrigin::FLAG_LAST_API_ORDER],
-            'REST from a Magento page (Luma checkout)' =>
-                ['webapi_rest', 'abc', OrderOrigin::FLAG_LAST_STOREFRONT_ORDER],
-            'storefront controller' => ['frontend', null, OrderOrigin::FLAG_LAST_STOREFRONT_ORDER],
-            'admin order' => ['adminhtml', null, OrderOrigin::FLAG_LAST_STOREFRONT_ORDER],
-            'no area' => [null, null, OrderOrigin::FLAG_LAST_STOREFRONT_ORDER],
+            'GraphQL' => ['graphql', null, null, $api],
+            'GraphQL with a form key cookie' => ['graphql', 'abc', null, $api],
+            'REST without a form key cookie' => ['webapi_rest', null, null, $api],
+            'REST with an empty form key cookie' => ['webapi_rest', '', null, $api],
+            'REST from a Magento page (Luma checkout)' => ['webapi_rest', 'abc', null, $storefront],
+            'REST from a Magento page, Login as Customer on, a shopper' => ['webapi_rest', 'abc', 0, $storefront],
+            'storefront controller' => ['frontend', null, null, $storefront],
+            'no area' => [null, null, null, $storefront],
+            'admin order screen' => ['adminhtml', null, null, null],
+            'admin order screen with a form key cookie' => ['adminhtml', 'abc', 0, null],
+            'Login as Customer, Luma checkout' => ['webapi_rest', 'abc', 7, null],
+            'Login as Customer, storefront controller' => ['frontend', null, 7, null],
+            'GraphQL while logged in as the customer' => ['graphql', null, 7, $api],
+            'REST without a form key cookie while logged in as the customer' => ['webapi_rest', null, 7, $api],
         ];
     }
 
@@ -74,7 +94,7 @@ class OrderOriginTest extends TestCase
             $this->flags[OrderOrigin::FLAG_LAST_STOREFRONT_ORDER] = self::NOW - $storefrontAgo * $day;
         }
 
-        self::assertSame($expected, $this->orderOrigin('adminhtml', null)->isApiOnly());
+        self::assertSame($expected, $this->orderOrigin('adminhtml', null, null)->isApiOnly());
     }
 
     /**
@@ -93,7 +113,7 @@ class OrderOriginTest extends TestCase
         ];
     }
 
-    private function orderOrigin(?string $area, ?string $formKey): OrderOrigin
+    private function orderOrigin(?string $area, ?string $formKey, ?int $loggedAsCustomerAdminId): OrderOrigin
     {
         $state = $this->createMock(State::class);
         if ($area === null) {
@@ -115,6 +135,30 @@ class OrderOriginTest extends TestCase
         $dateTime = $this->createMock(DateTime::class);
         $dateTime->method('gmtTimestamp')->willReturn(self::NOW);
 
-        return new OrderOrigin($state, $cookies, $flagManager, $dateTime);
+        $moduleManager = $this->createMock(ModuleManager::class);
+        $moduleManager->method('isEnabled')->with('Magento_LoginAsCustomer')
+            ->willReturn($loggedAsCustomerAdminId !== null);
+        $getAdminId = new class ((int)$loggedAsCustomerAdminId) {
+            public function __construct(private readonly int $adminId)
+            {
+            }
+
+            public function execute(): int
+            {
+                return $this->adminId;
+            }
+        };
+        $objectManager = $this->createMock(ObjectManagerInterface::class);
+        $objectManager->method('get')
+            ->with('Magento\\LoginAsCustomerApi\\Api\\GetLoggedAsCustomerAdminIdInterface')
+            ->willReturn($getAdminId);
+
+        return new OrderOrigin(
+            $state,
+            $cookies,
+            $flagManager,
+            $dateTime,
+            new OrderPlacer($moduleManager, $objectManager, $state)
+        );
     }
 }

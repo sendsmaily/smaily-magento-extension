@@ -145,6 +145,18 @@ bin/magento cron:run --group smaily_connect
   until it is completed once. Continue with
   [Connecting your Smaily account](USER_GUIDE.md#connecting-your-smaily-account).
 
+## If your store has a separate storefront
+
+On a headless store — shoppers buy on a separate storefront application,
+not on Magento's own theme — the module installs on the Magento back end
+exactly as above. A few things are then set up beyond a normal install:
+in the admin, the **Storefront URL** on the initial setup's **Connect**
+step before Campaign Intelligence is connected; on the back end, two public
+paths; and on the storefront, the parts Magento's theme would otherwise
+draw. Follow the checklist at the top of
+[HEADLESS_STOREFRONTS.md](HEADLESS_STOREFRONTS.md#setting-up-a-store-with-a-separate-storefront)
+before switching the automations on.
+
 ## Updating to a newer release
 
 Settings, queues and the log are kept in the database, so an update only

@@ -14,7 +14,9 @@ the upgrade; the "Pilot store live" milestone (2026-10-09) no longer holds.
 Landed today, unreleased: PRO-3854 (the nightly catalog manifest, §3c, sent
 at 03:30; and the contract copy 1.12.0), PRO-3798,
 PRO-3802 (the pilot-day order needs it, so the pilot installs rc8); the
-version check is now step one of INSTALLING and PILOT_CHECKLIST §0.
+version check is now step one of INSTALLING and PILOT_CHECKLIST §0;
+HEADLESS_STOREFRONTS opens with a setup checklist (admin / back end /
+storefront developer), audited against the code.
 **Queue:** rc8 cut + clean-install check (not urgent) → pilot once the store has upgraded.
 Backlog: PRO-3913, PRO-3911, PRO-3912, PRO-3790 (after the pilot), PRO-3746, PRO-3774._
 

@@ -47,10 +47,13 @@ class EngineCatalogProcessor implements ProcessorInterface
             return; // Let the flusher drain before enqueueing more.
         }
 
+        // Taken up before the count, which can die on a large store: a job
+        // that dies before its first page is then running and not moved,
+        // so the tick sets it aside like any other (PRO-3950).
+        $this->jobManager->markRunning($job);
         if ($job->getData('total_count') === null) {
             $job->setData('total_count', $this->countProducts());
         }
-        $this->jobManager->markRunning($job);
 
         $deadline = microtime(true) + self::TIME_BUDGET_SECONDS;
         do {

@@ -335,16 +335,18 @@ below.
   `STALLED_SECONDS`; it is taken again only when no other active job
   waits, so a lone one is retried every tick and recovers by itself after
   a passing failure. A `pending` job is never set aside — the tick has not
-  taken it up, so a wait in line never counts against it.
+  taken it up, so a wait in line never counts against it. The processors
+  call `markRunning()` before they count the import's total (PRO-3950), so
+  a worker that dies counting leaves a `running` job this rule sets aside,
+  not a `pending` one that blocks the line.
   `isStalled()` is true for an import with a set-aside job, or by
   the rule above, so its card stays *Stalled* and **Run again** cancels it
   first while the tick runs the imports behind it. An import waits behind
   another only while no active job moves at all — the job at the front is
-  `pending` and the tick never gets it going (no cron, or it dies before
-  `markRunning()`); the endpoint then answers the waiting import with
-  `blocked_by` (the type of the job `nextActive()` takes) and the card
-  names the blocking import's card instead of offering **Run again**
-  (PRO-3923). There
+  `pending` and the tick never gets it going (no cron); the endpoint then
+  answers the waiting import with `blocked_by` (the type of the job
+  `nextActive()` takes) and the card names the blocking import's card
+  instead of offering **Run again** (PRO-3923). There
   is no periodic full re-sync any more — the nightly `Cron/CatalogResync`
   of PRO-1951 is removed. A change no event sees (a CSV / `bin/magento
   import` run, an ERP link or any other direct write to the catalog
@@ -421,8 +423,10 @@ below.
   import counts only while some queued or running job was written within
   the last hour (`CatalogManifest::STALLED_IMPORT_SECONDS`, which is
   `JobManager::STALLED_SECONDS`); one the
-  worker no longer moves holds nothing back. A store with more than 50,000
-  enabled products sends nothing (§3c forbids a partial list); its Log row
+  worker no longer moves holds nothing back, and neither does a catalog
+  job the tick has set aside (`nextActive()`'s rule), however busy the
+  imports behind it keep the worker (PRO-3950). A store with more than
+  50,000 enabled products sends nothing (§3c forbids a partial list); its Log row
   is `failed` with `CatalogManifest::TOO_MANY_PRODUCTS`, shown in the
   admin's language (`Log\FailureMessage`). Each night no list goes out —
   skipped, not built, over the limit, or not taken by the engine — adds

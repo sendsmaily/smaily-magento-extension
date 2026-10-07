@@ -36,7 +36,8 @@ use Smaily\Connect\Model\Logger\Logger;
  * A partial or premature list would remove real products, so nothing is
  * sent — only logged — while sending to the engine is not allowed (not
  * connected, or the remembered refusal), while the catalog import is queued
- * or running (unless nothing has moved it for STALLED_IMPORT_SECONDS), while
+ * or running (unless nothing has moved it for STALLED_IMPORT_SECONDS, or the
+ * backfill tick has set it aside — JobManager::isActiveAndMoving()), while
  * catalog rows, removals or stock-change markers still wait in the queue,
  * or when building the list fails. A store with more than MAX_PRODUCTS
  * enabled products sends nothing either, and gets a failed Log row saying

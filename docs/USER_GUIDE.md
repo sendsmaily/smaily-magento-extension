@@ -663,16 +663,24 @@ connected.
    many were queued. Either way
    you can start the import later under **Settings > Intelligence >
    Historical imports** (see [Historical import](#historical-import-backfill)).
-   A catalog import that is already queued or running when you connect
+4. Connecting starts the **Customers** import too, which sends your
+   existing customer accounts once, after the catalog import (imports run
+   one at a time). Campaign Intelligence then knows every customer by
+   their Magento customer account — also one it knew only from orders, or
+   one created by Magento's own customer import. A notice says "The
+   customers import has started"; to hold it back, press **Cancel
+   import** on the **Customers** card under **Settings > Intelligence >
+   Historical imports**.
+5. An import that is already queued or running when you connect
    again is left as it is — connecting does not start a second one. The
-   **Customers** and **Orders** imports are not started by connecting:
-   start them there when Campaign Intelligence should get your history.
+   **Orders** import is not started by connecting:
+   start it there when Campaign Intelligence should get your order history.
    A connection made from the command line (`bin/magento config:set
    smaily_connect/intelligence/setup_token <setup URL>`) starts the
-   catalog import as well, but the command prints no notice:
-   `bin/magento smaily:backfill:status` lists the import, and
-   **Cancel import** on the **Catalog** card under **Settings >
-   Intelligence > Historical imports** holds it back.
+   catalog and customers imports as well, but the command prints no notice:
+   `bin/magento smaily:backfill:status` lists the imports, and
+   **Cancel import** on the **Catalog** or **Customers** card under **Settings >
+   Intelligence > Historical imports** holds one back.
 
 While no Storefront URL is saved for the website, the setup URL field
 says that a store with a separate storefront sets its Storefront URL
@@ -1054,7 +1062,8 @@ traffic:
   **Intelligence** tab, one card per import.
   Campaign Intelligence gets the whole catalog once, from the **Catalog**
   import: connecting starts it (see [Connecting](#connecting) — it can be
-  held back right after connecting).
+  held back right after connecting). Connecting starts the **Customers**
+  import too; the **Orders** import is yours to start.
   After that, product saves, stock changes and deletions reach Campaign
   Intelligence on their own within a minute or two; nothing re-sends the
   whole catalog periodically. If your store changes products outside
@@ -1117,8 +1126,8 @@ hour — for example one whose run fails on the same products every time, or
 a store whose cron does not run — shows **"Stalled"**, with how far it got
 and **Run again**. **Run again** cancels the stalled import and starts a
 fresh one; **Cancel import** only stops it. Starting the import with
-`smaily:backfill:start`, and the catalog import that connecting Campaign
-Intelligence starts, do the same. If the fresh import stalls
+`smaily:backfill:start`, and the catalog and customers imports that
+connecting Campaign Intelligence starts, do the same. If the fresh import stalls
 too, check that Magento's cron runs (see [INSTALLING.md](INSTALLING.md#4-cron))
 and look in `var/log/smaily_connect.log` and Magento's own logs for the
 error.

@@ -17,7 +17,7 @@ use Magento\Framework\Model\Context;
 use Magento\Framework\Registry;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Smaily\Connect\Model\Backfill\CatalogImportOnConnect;
+use Smaily\Connect\Model\Backfill\ImportsOnConnect;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Config\Backend\EngineSetupToken;
@@ -26,9 +26,10 @@ use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
 
 /**
- * PRO-3741: connecting Campaign Intelligence by saving the setup token in
- * Stores > Configuration (or `bin/magento config:set`) starts the catalog
- * import and says so; a save without a token is no connection and starts
+ * PRO-3741, PRO-3790: connecting Campaign Intelligence by saving the setup
+ * token in Stores > Configuration (or `bin/magento config:set`) starts the
+ * catalog import, then the customers import, and says so for each; never
+ * the orders import. A save without a token is no connection and starts
  * nothing.
  */
 class EngineSetupTokenTest extends TestCase
@@ -46,24 +47,53 @@ class EngineSetupTokenTest extends TestCase
         $this->messageManager = $this->createMock(ManagerInterface::class);
     }
 
-    public function testConnectingStartsTheCatalogImportAndSaysSo(): void
+    public function testConnectingStartsTheCatalogAndCustomersImportsAndSaysSo(): void
     {
         $this->client->method('setupExchange')->willReturn(['tenant_name' => 'Pilot', 'engine_version' => '1.8.2']);
-        $this->jobManager->expects(self::once())->method('startIfIdle')
-            ->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID)
-            ->willReturn($this->createMock(Job::class));
-        $this->messageManager->expects(self::once())->method('addNoticeMessage')
-            ->with(self::stringStartsWith('The catalog import has started:'));
+        $started = [];
+        $this->jobManager->expects(self::exactly(2))->method('startIfIdle')
+            ->willReturnCallback(function (string $jobType, string $target, int $websiteId) use (&$started) {
+                $started[] = [$jobType, $target, $websiteId];
+
+                return $this->createMock(Job::class);
+            });
+        $notices = [];
+        $this->messageManager->method('addNoticeMessage')
+            ->willReturnCallback(function (string $message) use (&$notices) {
+                $notices[] = $message;
+
+                return $this->messageManager;
+            });
+
+        $this->model('tok_abc123')->beforeSave();
+
+        self::assertSame([
+            [Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID],
+            [Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID],
+        ], $started);
+        self::assertCount(2, $notices);
+        self::assertStringStartsWith('The catalog import has started:', $notices[0]);
+        self::assertStringStartsWith('The customers import has started:', $notices[1]);
+    }
+
+    public function testAReconnectWhileBothImportsAreQueuedOrRunningStartsNoSecond(): void
+    {
+        $this->client->method('setupExchange')->willReturn(['tenant_name' => 'Pilot', 'engine_version' => '1.8.2']);
+        $this->jobManager->expects(self::exactly(2))->method('startIfIdle')
+            ->willReturn(null);
+        $this->messageManager->expects(self::never())->method('addNoticeMessage');
 
         $this->model('tok_abc123')->beforeSave();
     }
 
-    public function testAReconnectWhileACatalogImportIsQueuedOrRunningStartsNoSecond(): void
+    public function testOnlyTheImportThatStartedIsAnnounced(): void
     {
         $this->client->method('setupExchange')->willReturn(['tenant_name' => 'Pilot', 'engine_version' => '1.8.2']);
-        $this->jobManager->expects(self::once())->method('startIfIdle')
-            ->willReturn(null);
-        $this->messageManager->expects(self::never())->method('addNoticeMessage');
+        $this->jobManager->method('startIfIdle')->willReturnCallback(
+            fn (string $jobType) => $jobType === Job::TYPE_CUSTOMERS ? $this->createMock(Job::class) : null
+        );
+        $this->messageManager->expects(self::once())->method('addNoticeMessage')
+            ->with(self::stringStartsWith('The customers import has started:'));
 
         $this->model('tok_abc123')->beforeSave();
     }
@@ -98,7 +128,7 @@ class EngineSetupTokenTest extends TestCase
             $this->client,
             $this->createMock(Settings::class),
             $this->messageManager,
-            new CatalogImportOnConnect($this->jobManager)
+            new ImportsOnConnect($this->jobManager)
         );
         $model->setValue($value);
 

@@ -126,9 +126,8 @@ admin's User Guide links, README, INSTALLING, CONTRIBUTING, the PR
 template and UPSTREAM_PROPOSAL §5/§7 name the official repo.
 PRO-3948: the release workflow fails, before attaching anything, on a
 tag that is not composer.json's version (`bin/check-release-version.sh`).
-In review: PRO-3790 (storefront recommendations, PR #142) with the
-on-connect customers import (PR #141). Backlog: PRO-3746, PRO-3921
-(waits on the engine's answer, PRO-3941), PRO-3916 (waits on PRO-3919)._
+Backlog: PRO-3790 (after the pilot), PRO-3746, PRO-3921 (waits on the
+engine's answer, PRO-3941), PRO-3916 (waits on PRO-3919)._
 
 _Today in detail: PRO-3802 (the initial setup's Connect step
 takes the Storefront URL, saved before the Contacts step switches contact
@@ -344,35 +343,42 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
-- **PRO-3790 — a shopper's recommendations on the store's pages
-  (2026-10-08; branch `erkki/pro-3790-storefront-recommendations` for a
-  PR; design approved by Erkki 2026-10-08, after the WooCommerce plugin).**
-  CMS widget **Smaily recommendations** (`etc/widget.xml`, an empty
-  container; FPC-safe) + `js/recommendations.js` (x-magento-init keyed on
-  the container; after `load`, with the tracker's consent rule — one
-  module `js/consent.js`, Hyvä `window.smailyConsent` — asks once)
-  + `Controller\Recommendations\Index` (GET `smaily/recommendations`:
-  sending gate 404, per-IP limit (`RateLimit\PerAddressLimiter`, shared
-  with the relay and the guest cart email), `Sec-Fetch-Site`
-  cross/same-site empty,
-  `no-store, private`, layout result with a non-cacheable block) +
-  `Engine\StorefrontRecommendations` (customer id under profiling consent,
-  else the visitor-token cookie unless the cookie notice holds it back;
-  1 h cache per tenant + hashed identity, 10 min failure cache, 2 min
-  pause after a timeout/5xx) + `Engine\RecommendedProducts` (the store's
-  products at the store view by `external_id`, else `sku`; not visible or
-  not salable dropped; links `smaily_rec` + `smaily_ctx=storefront`,
-  `AttributionManager::landingUrl()`) + `Client::recommendations()` (map key
-  `recommendations_customer`, contract-path fallback, one attempt, 10 s).
-  Hyvä: compat bootstrap + Hyvä product cards (`hyva_smaily_recommendations_index`).
-  New dependency `magento/module-widget` (already in the lock through
-  module-catalog; lock hash refreshed). Tests: unit, an integration test of
-  the route against a stubbed engine transport, `Test/Js/recommendations.html`
-  (Luma + Hyvä). Sandbox walk (Luma, mock engine): the cards render; Hyvä
-  not run on a Hyvä store. Estonian strings "Sulle soovitatud" / "Smaily
-  soovitused" and the widget description wait for Erkki's proofread.
-  ARCHITECTURE (Storefront recommendations), USER_GUIDE, site (EN + ET),
-  HEADLESS_STOREFRONTS (not available), HYVA_SUPPORT, CHANGELOG.
+- **PRO-3790 — connecting Campaign Intelligence also starts the
+  customers import (2026-10-08, owner decision; branch
+  `erkki/pro-3790-customers-import-on-connect` for a PR).** Storefront
+  recommendations ask by the Magento customer id (`external_id`, §4),
+  which live sync sends only on a customer save. `CatalogImportOnConnect`
+  is now `Model/Backfill/ImportsOnConnect`: `start()` queues the catalog
+  job, then the customers job, each through `JobManager::startIfIdle()`
+  (engine target, website 0), and answers per type; both connect paths
+  use it. After a connect the queue holds catalog (lower id, run first)
+  then customers, both `pending`; no orders job (PRO-3742 unchanged; the
+  not-connected guard is untouched). EngineExchange answers
+  `customersImportStarted`; the panel shows "The customers import has
+  started" (no Hold back — the card's Cancel import) and refreshes the
+  Customers card; the config save adds a notice. Setup step copy says
+  both imports start (EN + ET). Tests: unit (both paths), integration
+  `ImportsOnConnectTest` (catalog then customers queued, no orders,
+  `nextActive()` = catalog), `intelligence-connect.html`. Docs:
+  ARCHITECTURE, USER_GUIDE, site (EN + ET), PILOT_CHECKLIST, CHANGELOG.
+  Gates: unit, phpcs, phpstan, integration, test-js, PHP 8.1 syntax.
+- **PRO-3963 — erasing a shopper's data keeps their queue rows on their
+  retention schedule (2026-10-07; branch
+  `erkki/pro-3963-erasure-keeps-retention` for a PR).** Found with
+  PRO-3961: `Model\Privacy\LocalEraser` anonymised a kept (`sent` /
+  `failed`) row of either queue with a direct UPDATE, which fired MySQL's
+  `ON UPDATE CURRENT_TIMESTAMP` on `updated_at` — the time
+  `Cron\QueueJanitor` counts retention from — so an erased shopper's rows
+  stayed up to 30/90 days past their schedule. The UPDATE now writes
+  `updated_at = updated_at`; confirmed on MySQL 8.4 by a new integration
+  test (`GdprEraseTest::testAnAnonymisedRowKeepsItsRetentionSchedule`,
+  fails without the fix): backdated rows keep their time through the
+  erasure and the janitor removes them. Every other direct UPDATE on the
+  queue tables (claim, unclaim/requeue, retry, cancel, pending-payload
+  replace, outcomes) is a state change, not erasure — unchanged. What is
+  erased and the retention periods are unchanged; no schema change.
+  ARCHITECTURE (Art. 17 erasure), CHANGELOG "Changes since 3.0.0-rc10".
+  Gates: unit, phpcs, phpstan, integration, PHP 8.1 syntax.
 
 - **PRO-3961 — a queue row's failure, delivery or skip moves its
   last-changed time (2026-10-07; branch

@@ -13,17 +13,19 @@ use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
-use Smaily\Connect\Model\Backfill\CatalogImportOnConnect;
+use Smaily\Connect\Model\Backfill\ImportsOnConnect;
+use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Settings;
 
 /**
- * POST {setup_url} -> {connected: true, tenantName, engineVersion, catalogImportStarted}
+ * POST {setup_url} -> {connected: true, tenantName, engineVersion, catalogImportStarted, customersImportStarted}
  *                   | {connected: false, message}
  *
- * A successful connection starts the catalog import (PRO-3741);
- * catalogImportStarted is false when one was already queued or running.
+ * A successful connection starts the catalog import (PRO-3741) and the
+ * customers import (PRO-3790); each *ImportStarted is false when that
+ * import was already queued or running.
  */
 class EngineExchange extends AbstractJsonAction implements HttpPostActionInterface
 {
@@ -33,7 +35,7 @@ class EngineExchange extends AbstractJsonAction implements HttpPostActionInterfa
         JsonSerializer $serializer,
         private readonly Client $client,
         private readonly Settings $settings,
-        private readonly CatalogImportOnConnect $catalogImport
+        private readonly ImportsOnConnect $importsOnConnect
     ) {
         parent::__construct($context, $jsonFactory, $serializer);
     }
@@ -54,12 +56,14 @@ class EngineExchange extends AbstractJsonAction implements HttpPostActionInterfa
         try {
             $response = $this->client->setupExchange($setupUrl);
             $this->settings->storeExchange($response);
+            $started = $this->importsOnConnect->start();
 
             return $this->jsonResponse([
                 'connected' => true,
                 'tenantName' => (string)($response['tenant_name'] ?? $response['tenant_id'] ?? ''),
                 'engineVersion' => (string)($response['engine_version'] ?? ''),
-                'catalogImportStarted' => $this->catalogImport->start(),
+                'catalogImportStarted' => $started[Job::TYPE_CATALOG],
+                'customersImportStarted' => $started[Job::TYPE_CUSTOMERS],
             ]);
         } catch (EngineException $exception) {
             // Frame the (possibly technical) engine message in a translated

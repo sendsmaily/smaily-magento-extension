@@ -915,7 +915,8 @@ bin/magento cache:flush</code></pre>
         <li>Get a one-time setup link from Smaily.</li>
         <li>Paste it into <strong>Setup URL or token from Smaily</strong> and press <strong>Connect</strong>. The token is exchanged at once and never stored; the status shows the connected account.</li>
         <li>Connecting starts the <strong>Catalog</strong> import: your whole catalog goes to Campaign Intelligence once, from the next cron run (usually within a minute). The notice <strong>The catalog import has started</strong> offers <strong>Hold back the import</strong> — press it before then and nothing is sent. Pressed later, the products already queued still go and the rest do not. Either way, you can start it again under <span class="path">Settings &gt; Intelligence</span>.</li>
-        <li>The <strong>Customers</strong> and <strong>Orders</strong> imports do not start by themselves — start them when Campaign Intelligence should learn your history (see <a href="#importing">Importing existing data</a>).</li>
+        <li>Connecting starts the <strong>Customers</strong> import too: your existing customer accounts go to Campaign Intelligence once, after the catalog import, so that it knows every customer by their customer account. The notice <strong>The customers import has started</strong> says so; to hold it back, press <strong>Cancel import</strong> on the <strong>Customers</strong> card under <span class="path">Settings &gt; Intelligence</span>.</li>
+        <li>The <strong>Orders</strong> import does not start by itself — start it when Campaign Intelligence should learn your order history (see <a href="#importing">Importing existing data</a>).</li>
       </ol>
       <p>The setup link must be an <code>https</code> address on <code>intelligence.smaily.com</code>; anything else is refused before anything is sent. From then on, product saves, stock changes, deletions, customer accounts and orders (including refunds) reach Campaign Intelligence on their own. There is no per-type switch.</p>
       <h3>Browse tracking</h3>
@@ -932,7 +933,8 @@ bin/magento cache:flush</code></pre>
         <li>Hangi Smailylt ühekordne seadistuslink.</li>
         <li>Kleebi see väljale <strong>Smailylt saadud seadistus-URL või -võti</strong> ja vajuta <strong>Ühenda</strong>. Võti vahetatakse kohe ja seda ei salvestata; olek näitab ühendatud kontot.</li>
         <li>Ühendamine käivitab <strong>Kataloog</strong>-impordi: kogu sinu kataloog saadetakse Campaign Intelligence'i üks kord, alates järgmisest cron-käivitusest (tavaliselt minuti jooksul). Teade <strong>Kataloogi import käivitus</strong> pakub nuppu <strong>Peata import</strong> — vajuta seda enne ja midagi ei saadeta. Hiljem vajutades lähevad juba järjekorras olevad tooted siiski teele, ülejäänud mitte. Mõlemal juhul saad impordi uuesti käivitada jaotises <span class="path">Seaded &gt; Intelligence</span>.</li>
-        <li>Importid <strong>Kliendid</strong> ja <strong>Tellimused</strong> ise ei käivitu — käivita need, kui Campaign Intelligence peaks sinu ajaloo teada saama (vt <a href="#importing">Olemasolevate andmete import</a>).</li>
+        <li>Ühendamine käivitab ka <strong>Kliendid</strong>-impordi: sinu olemasolevad kliendikontod saadetakse Campaign Intelligence'i üks kord, pärast kataloogi importi, et see tunneks iga klienti tema kliendikonto järgi. Seda ütleb teade <strong>Klientide import käivitus</strong>; selle peatamiseks vajuta kaardil <strong>Kliendid</strong> nuppu <strong>Katkesta import</strong> jaotises <span class="path">Seaded &gt; Intelligence</span>.</li>
+        <li>Import <strong>Tellimused</strong> ise ei käivitu — käivita see, kui Campaign Intelligence peaks sinu tellimuste ajaloo teada saama (vt <a href="#importing">Olemasolevate andmete import</a>).</li>
       </ol>
       <p>Seadistuslink peab olema <code>https</code>-aadress domeenil <code>intelligence.smaily.com</code>; kõik muu lükatakse tagasi enne, kui midagi saadetakse. Edaspidi jõuavad toodete salvestused, laoseisu muutused, kustutamised, kliendikontod ja tellimused (koos tagasimaksetega) Campaign Intelligence'i ise. Andmetüübipõhist lülitit pole.</p>
       <h3>Sirvimise jälgimine</h3>
@@ -1355,7 +1357,7 @@ window.smailyConnect.consentOverride = function () {
           <tbody>
             <tr><td><strong>Initial contact import</strong> → Smaily</td><td><span class="path">Settings &gt; Contacts</span>, per website</td><td>The contacts the website's sync mode covers. <strong>Subscribers only</strong>: newsletter subscribers, subscribed and unsubscribed. <strong>All customers</strong>: those subscribers, then every other registered customer. <strong>Checkout opt-in only</strong>: nobody (it finishes at 0). Guest-order emails are not imported.</td></tr>
             <tr><td><strong>Catalog</strong> → Campaign Intelligence</td><td><span class="path">Settings &gt; Intelligence</span></td><td>Every product of every website. Starts by itself when you connect.</td></tr>
-            <tr><td><strong>Customers</strong> → Campaign Intelligence</td><td><span class="path">Settings &gt; Intelligence</span></td><td>Registered customers.</td></tr>
+            <tr><td><strong>Customers</strong> → Campaign Intelligence</td><td><span class="path">Settings &gt; Intelligence</span></td><td>Registered customers. Starts by itself when you connect, after the catalog import.</td></tr>
             <tr><td><strong>Orders</strong> → Campaign Intelligence</td><td><span class="path">Settings &gt; Intelligence</span></td><td>Order history, with refunds.</td></tr>
           </tbody>
         </table>
@@ -1374,7 +1376,7 @@ window.smailyConnect.consentOverride = function () {
           <tbody>
             <tr><td><strong>Esmane kontaktide import</strong> → Smaily</td><td><span class="path">Seaded &gt; Kontaktid</span>, veebisaidi kaupa</td><td>Kontaktid, mida veebisaidi sünkroonimisrežiim hõlmab. <strong>Ainult turunduskirjade tellijad</strong>: uudiskirja tellijad, nii tellinud kui ka loobunud. <strong>Kõik kliendid</strong>: need tellijad ja seejärel kõik teised registreeritud kliendid. <strong>Ainult kassas nõusoleku andnud</strong>: mitte keegi (lõpeb 0-ga). Külalistellimuste e-posti aadresse ei impordita.</td></tr>
             <tr><td><strong>Kataloog</strong> → Campaign Intelligence</td><td><span class="path">Seaded &gt; Intelligence</span></td><td>Iga veebisaidi kõik tooted. Käivitub ühendamisel ise.</td></tr>
-            <tr><td><strong>Kliendid</strong> → Campaign Intelligence</td><td><span class="path">Seaded &gt; Intelligence</span></td><td>Registreeritud kliendid.</td></tr>
+            <tr><td><strong>Kliendid</strong> → Campaign Intelligence</td><td><span class="path">Seaded &gt; Intelligence</span></td><td>Registreeritud kliendid. Käivitub ühendamisel ise, pärast kataloogi importi.</td></tr>
             <tr><td><strong>Tellimused</strong> → Campaign Intelligence</td><td><span class="path">Seaded &gt; Intelligence</span></td><td>Tellimuste ajalugu koos tagasimaksetega.</td></tr>
           </tbody>
         </table>

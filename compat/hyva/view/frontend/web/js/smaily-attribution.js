@@ -3,7 +3,8 @@
  * See LICENSE.txt for license details.
  *
  * Hyvä port of Smaily_Connect/js/attribution — identical logic, delivered
- * as a plain script instead of an AMD module (Hyvä ships no RequireJS).
+ * as a plain script instead of an AMD module (Hyvä ships no RequireJS) —
+ * and of Smaily_Connect/js/consent (window.smailyConsent).
  * Config is read from the inert <script type="application/json"> block
  * rendered by Hyva_SmailyConnect::engine/attribution.phtml.
  *
@@ -115,7 +116,49 @@
         };
     }
 
+    // The cookie notice's cookie is a JSON map of the website ids the
+    // shopper accepted on ({"1":1}); one cookie domain can serve several
+    // websites, so only this website's entry is consent — as Magento's
+    // cookie helper and Hyvä's cookie notice read it. A value that does not
+    // parse is no consent, as in the cookie helper.
+    function cookieNoticeAccepted(config) {
+        var accepted;
+
+        try {
+            accepted = JSON.parse(getCookie('user_allowed_save_cookie'));
+        } catch (e) {
+            return false;
+        }
+
+        return !!(accepted && accepted[config.websiteId]);
+    }
+
+    /**
+     * The shopper's marketing consent, one rule for smaily-tracker.js and
+     * smaily-recommendations.js (Luma: Smaily_Connect/js/consent): (1) the
+     * store's own window.smailyConnect.consentOverride() when it is a
+     * function — its answer, true or false, decides; (2) otherwise, under
+     * Magento cookie restriction mode (config.cookieRestriction), the
+     * user_allowed_save_cookie cookie accepted for this website
+     * (config.websiteId); (3) otherwise no consent. Exposed as
+     * window.smailyConsent; this script loads before both (layout order,
+     * and `defer` keeps document order).
+     */
+    function consentGiven(config) {
+        var site = window.smailyConnect;
+
+        if (site && typeof site.consentOverride === 'function') {
+            return site.consentOverride() === true;
+        }
+        if (config.cookieRestriction) {
+            return cookieNoticeAccepted(config);
+        }
+
+        return false;
+    }
+
     window.smailyAttribution = capture;
+    window.smailyConsent = consentGiven;
 
     var configEl = document.getElementById('smaily-attribution-config');
 

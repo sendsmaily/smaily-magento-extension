@@ -44,6 +44,7 @@ use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\OrderPlacer;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
+use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
 use Smaily\Connect\Model\StorefrontScript;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 
@@ -189,9 +190,11 @@ class StorefrontRecommendationsTest extends IntegrationTestCase
             $settings,
             $this->recommendations($settings, $engineResponses),
             $this->cardsPerSlot(),
-            new FixedWindowCounter($this->cache()),
-            $this->clock,
-            $this->createMock(RemoteAddress::class)
+            new PerAddressLimiter(
+                new FixedWindowCounter($this->cache()),
+                $this->clock,
+                $this->createMock(RemoteAddress::class)
+            )
         );
     }
 

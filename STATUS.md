@@ -126,8 +126,9 @@ admin's User Guide links, README, INSTALLING, CONTRIBUTING, the PR
 template and UPSTREAM_PROPOSAL §5/§7 name the official repo.
 PRO-3948: the release workflow fails, before attaching anything, on a
 tag that is not composer.json's version (`bin/check-release-version.sh`).
-Backlog: PRO-3790 (after the pilot), PRO-3746, PRO-3921 (waits on the
-engine's answer, PRO-3941), PRO-3916 (waits on PRO-3919)._
+In review: PRO-3790 (storefront recommendations, PR #142) with the
+on-connect customers import (PR #141). Backlog: PRO-3746, PRO-3921
+(waits on the engine's answer, PRO-3941), PRO-3916 (waits on PRO-3919)._
 
 _Today in detail: PRO-3802 (the initial setup's Connect step
 takes the Storefront URL, saved before the Contacts step switches contact
@@ -348,17 +349,20 @@ Earlier: 2026-09-11, 2026-09-10._
   PR; design approved by Erkki 2026-10-08, after the WooCommerce plugin).**
   CMS widget **Smaily recommendations** (`etc/widget.xml`, an empty
   container; FPC-safe) + `js/recommendations.js` (x-magento-init keyed on
-  the container; after `load`, with the tracker's consent rule, asks once)
+  the container; after `load`, with the tracker's consent rule — one
+  module `js/consent.js`, Hyvä `window.smailyConsent` — asks once)
   + `Controller\Recommendations\Index` (GET `smaily/recommendations`:
-  sending gate 404, per-IP limit, `Sec-Fetch-Site` cross/same-site empty,
+  sending gate 404, per-IP limit (`RateLimit\PerAddressLimiter`, shared
+  with the relay and the guest cart email), `Sec-Fetch-Site`
+  cross/same-site empty,
   `no-store, private`, layout result with a non-cacheable block) +
   `Engine\StorefrontRecommendations` (customer id under profiling consent,
   else the visitor-token cookie unless the cookie notice holds it back;
   1 h cache per tenant + hashed identity, 10 min failure cache, 2 min
   pause after a timeout/5xx) + `Engine\RecommendedProducts` (the store's
   products at the store view by `external_id`, else `sku`; not visible or
-  not salable dropped; links `smaily_rec` + `smaily_ctx=storefront`) +
-  `Client::customerRecommendations()/visitorRecommendations()` (map key
+  not salable dropped; links `smaily_rec` + `smaily_ctx=storefront`,
+  `AttributionManager::landingUrl()`) + `Client::recommendations()` (map key
   `recommendations_customer`, contract-path fallback, one attempt, 10 s).
   Hyvä: compat bootstrap + Hyvä product cards (`hyva_smaily_recommendations_index`).
   New dependency `magento/module-widget` (already in the lock through

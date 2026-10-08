@@ -17,12 +17,9 @@
  * relay (smaily/relay), which forwards them to the Campaign Intelligence
  * engine — the API key never reaches the browser. Loss-tolerant by design.
  *
- * Consent (marketing), as in the WooCommerce plugin: (1) the store's own
- * window.smailyConnect.consentOverride() when it is a function — its
- * answer, true or false, decides; (2) otherwise, under Magento cookie
- * restriction mode, the user_allowed_save_cookie cookie accepted for this
- * website (config.websiteId), as Magento reads it; (3) otherwise no
- * consent. Without consent the tracker sends nothing and writes no session
+ * Consent (marketing) is the rule window.smailyConsent applies
+ * (smaily-attribution.js: the store's consentOverride, else Magento's
+ * cookie notice accepted for this website, else none). Without consent the tracker sends nothing and writes no session
  * cookie; consent that arrives later on the page (Hyvä's
  * user-allowed-save-cookie, or smaily:consent-changed fired by the store's
  * consent adapter) starts it. Every flush asks again and drops the queue
@@ -43,7 +40,8 @@
         flushTimer = null,
         started = false;
 
-    if (!configEl || typeof window.smailyAttribution !== 'function') {
+    if (!configEl || typeof window.smailyAttribution !== 'function'
+        || typeof window.smailyConsent !== 'function') {
         return;
     }
 
@@ -55,34 +53,8 @@
 
     helper = window.smailyAttribution(config.attribution);
 
-    // The cookie notice's cookie is a JSON map of the website ids the shopper
-    // accepted on ({"1":1}); one cookie domain can serve several websites, so
-    // only this website's entry is consent — as Magento's cookie helper and
-    // Hyvä's cookie notice read it. A value that does not parse is no
-    // consent, as in the cookie helper.
-    function cookieNoticeAccepted() {
-        var accepted;
-
-        try {
-            accepted = JSON.parse(helper.getCookie('user_allowed_save_cookie'));
-        } catch (e) {
-            return false;
-        }
-
-        return !!(accepted && accepted[config.websiteId]);
-    }
-
     function consentGiven() {
-        var site = window.smailyConnect;
-
-        if (site && typeof site.consentOverride === 'function') {
-            return site.consentOverride() === true;
-        }
-        if (config.cookieRestriction) {
-            return cookieNoticeAccepted();
-        }
-
-        return false;
+        return window.smailyConsent(config);
     }
 
     function sessionId() {

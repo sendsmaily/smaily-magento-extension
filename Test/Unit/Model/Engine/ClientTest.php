@@ -325,7 +325,7 @@ class ClientTest extends TestCase
             ->willReturn('https://engine.example/api/v1/recommendations/customer');
         $client = $this->createClient([new Response(200, [], '{"slots":[]}')]);
 
-        $response = $client->customerRecommendations('1042', 4);
+        $response = $client->recommendations(['customer_external_id' => '1042'], 4);
 
         self::assertSame(['slots' => []], $response);
         $request = $this->history[0]['request'];
@@ -344,7 +344,7 @@ class ClientTest extends TestCase
         $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/recommendations/customer');
         $client = $this->createClient([new Response(200, [], '{"slots":[]}')]);
 
-        $client->visitorRecommendations('vt_8f3k2a', 4);
+        $client->recommendations(['smaily_visitor_token' => 'vt_8f3k2a'], 4);
 
         self::assertSame(
             '{"smaily_visitor_token":"vt_8f3k2a","limit":4}',
@@ -362,7 +362,7 @@ class ClientTest extends TestCase
         $this->settings->method('getEngineBaseUrl')->willReturn('https://engine.example/');
         $client = $this->createClient([new Response(200, [], '{"slots":[]}')]);
 
-        $client->customerRecommendations('7', 4);
+        $client->recommendations(['customer_external_id' => '7'], 4);
 
         self::assertSame(
             'https://engine.example/api/v1/recommendations/customer',
@@ -379,7 +379,7 @@ class ClientTest extends TestCase
         $client = $this->createClient([new Response(503, [], '{"error":"unavailable"}')]);
 
         try {
-            $client->customerRecommendations('7', 4);
+            $client->recommendations(['customer_external_id' => '7'], 4);
             self::fail('A 503 is a transport failure');
         } catch (EngineTransportException $exception) {
             self::assertSame(503, $exception->getHttpStatus());

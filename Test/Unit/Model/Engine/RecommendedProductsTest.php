@@ -73,6 +73,15 @@ class RecommendedProductsTest extends TestCase
         );
     }
 
+    public function testOnlyTheKindOfKeyTheSlotsUseIsAskedFor(): void
+    {
+        $this->products([])->forSlots([$this->slot(self::REC_1, '7', 'MJ07')]);
+        $this->products([])->forSlots([$this->slot(self::REC_2, '', 'MJ30')]);
+
+        self::assertSame([['attribute' => 'entity_id', 'in' => ['7']]], $this->filters[1][0]);
+        self::assertSame([['attribute' => 'sku', 'in' => ['MJ30']]], $this->filters[3][0]);
+    }
+
     public function testOnlyEnabledProductsVisibleInTheCatalogOfThisStoreAreAskedFor(): void
     {
         $this->products([])->forSlots([$this->slot(self::REC_1, '7', 'MJ07')]);
@@ -183,7 +192,7 @@ class RecommendedProductsTest extends TestCase
         $storeManager = $this->createMock(StoreManagerInterface::class);
         $storeManager->method('getStore')->willReturn($store);
 
-        $attribution = $this->createMock(AttributionManager::class);
+        $attribution = $this->createPartialMock(AttributionManager::class, ['getClientConfig']);
         $attribution->method('getClientConfig')->willReturn($params + [
             'paramRecId' => 'smaily_rec',
             'paramContext' => 'smaily_ctx',

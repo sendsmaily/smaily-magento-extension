@@ -24,6 +24,7 @@ use Smaily\Connect\Model\Engine\RecommendedProducts;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\StorefrontRecommendations;
 use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
+use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
 
 /**
  * PRO-3790: the store route the recommendations script asks — its guards,
@@ -190,9 +191,7 @@ class IndexTest extends TestCase
             $settings,
             $recommendations,
             $products,
-            new FixedWindowCounter($cache),
-            $dateTime,
-            $remoteAddress
+            new PerAddressLimiter(new FixedWindowCounter($cache), $dateTime, $remoteAddress)
         );
     }
 }

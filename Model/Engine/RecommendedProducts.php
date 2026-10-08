@@ -58,6 +58,14 @@ class RecommendedProducts
             return [];
         }
 
+        $anyOf = [];
+        if ($ids !== []) {
+            $anyOf[] = ['attribute' => 'entity_id', 'in' => $ids];
+        }
+        if ($skus !== []) {
+            $anyOf[] = ['attribute' => 'sku', 'in' => $skus];
+        }
+
         $storeId = (int)$this->storeManager->getStore()->getId();
         $collection = $this->collectionFactory->create();
         $collection->setStoreId($storeId)
@@ -69,10 +77,7 @@ class RecommendedProducts
             ->addUrlRewrite()
             ->setVisibility($this->visibility->getVisibleInCatalogIds())
             ->addAttributeToFilter('status', ['eq' => Status::STATUS_ENABLED])
-            ->addAttributeToFilter([
-                ['attribute' => 'entity_id', 'in' => $ids === [] ? [0] : $ids],
-                ['attribute' => 'sku', 'in' => $skus === [] ? [''] : $skus],
-            ]);
+            ->addAttributeToFilter($anyOf);
 
         $byId = [];
         $bySku = [];
@@ -82,7 +87,6 @@ class RecommendedProducts
             $bySku[(string)$product->getSku()] = $product;
         }
 
-        $config = $this->landingParams();
         $items = [];
         foreach ($slots as $index => $slot) {
             [$by, $value] = $keys[$index];
@@ -92,7 +96,11 @@ class RecommendedProducts
             }
             $items[] = [
                 'product' => $product,
-                'url' => $this->link((string)$product->getProductUrl(), $slot['rec_id'], $config),
+                'url' => $this->attributionManager->landingUrl(
+                    (string)$product->getProductUrl(),
+                    $slot['rec_id'],
+                    self::CONTEXT_STOREFRONT
+                ),
             ];
         }
 
@@ -115,28 +123,5 @@ class RecommendedProducts
         }
 
         return ['sku', $slot['sku']];
-    }
-
-    /**
-     * The landing parameter names the capture script reads (engine config wins).
-     *
-     * @return array{rec: string, context: string}
-     */
-    private function landingParams(): array
-    {
-        $config = $this->attributionManager->getClientConfig();
-
-        return ['rec' => (string)$config['paramRecId'], 'context' => (string)$config['paramContext']];
-    }
-
-    /**
-     * @param array{rec: string, context: string} $params
-     */
-    private function link(string $productUrl, string $recId, array $params): string
-    {
-        return $productUrl . (str_contains($productUrl, '?') ? '&' : '?') . http_build_query([
-            $params['rec'] => $recId,
-            $params['context'] => self::CONTEXT_STOREFRONT,
-        ]);
     }
 }

@@ -66,7 +66,9 @@ path repository until the separate package exists (see
 - `view/frontend/web/js/smaily-attribution.js` — 1:1 vanilla port of the
   attribution module (AMD wrapper removed; exposes
   `window.smailyAttribution` for the tracker, mirroring the old AMD
-  dependency).
+  dependency) and of the consent module `js/consent.js` (exposes
+  `window.smailyConsent`, the one consent rule of the tracker and the
+  recommendations script; it loads before both).
 - `view/frontend/web/js/smaily-tracker.js` — jQuery-free tracker port:
   `fetch(keepalive)` replaces the `$.ajax` fallback; `cart_add` is captured
   from the `checkout/cart/add` form submit (capture phase + immediate
@@ -106,7 +108,7 @@ path repository until the separate package exists (see
   Intelligence may be called and does nothing on a page without the
   widget's container (the Luma bootstrap is keyed on the container, so
   RequireJS loads its script only there). Same consent gate as the
-  tracker; consent given later arrives as `user-allowed-save-cookie`
+  tracker (`window.smailyConsent`); consent given later arrives as `user-allowed-save-cookie`
   (window) or `smaily:consent-changed`. Checked with the real script in a
   browser harness with stubbed globals (`Test/Js/recommendations.html`);
   not yet run on a Hyvä store.

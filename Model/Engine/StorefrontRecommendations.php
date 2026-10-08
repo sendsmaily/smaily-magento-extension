@@ -105,9 +105,7 @@ class StorefrontRecommendations
         }
 
         try {
-            $answer = $identity['type'] === self::ID_CUSTOMER
-                ? $this->client->customerRecommendations($identity['id'], self::LIMIT)
-                : $this->client->visitorRecommendations($identity['id'], self::LIMIT);
+            $answer = $this->client->recommendations([$identity['key'] => $identity['id']], self::LIMIT);
         } catch (EngineException $exception) {
             $this->logger->debug('Storefront recommendations: the engine call failed', [
                 'error' => $exception->getMessage(),
@@ -129,9 +127,10 @@ class StorefrontRecommendations
     }
 
     /**
-     * Who to ask about, or null for nobody.
+     * Who to ask about, or null for nobody: the identifier type (in the
+     * cache key), the request body's key for it, and the value.
      *
-     * @return array{type: string, id: string}|null
+     * @return array{type: string, key: string, id: string}|null
      */
     private function identity(): ?array
     {
@@ -148,7 +147,7 @@ class StorefrontRecommendations
                 return null;
             }
 
-            return ['type' => self::ID_CUSTOMER, 'id' => (string)$customerId];
+            return ['type' => self::ID_CUSTOMER, 'key' => 'customer_external_id', 'id' => (string)$customerId];
         }
 
         if ($this->cookieHelper->isUserNotAllowSaveCookie()) {
@@ -156,7 +155,7 @@ class StorefrontRecommendations
         }
         $token = $this->attributionManager->readCookies()['visitor_token'];
 
-        return $token === null ? null : ['type' => self::ID_VISITOR, 'id' => $token];
+        return $token === null ? null : ['type' => self::ID_VISITOR, 'key' => 'smaily_visitor_token', 'id' => $token];
     }
 
     /**

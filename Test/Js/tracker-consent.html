@@ -8,7 +8,7 @@
 <!--
   Headless harness for the browse tracker's consent under Magento cookie
   restriction mode (PRO-3724): the Luma tracker (view/frontend/web/js/tracker.js
-  with attribution.js) and the Hyvä tracker (compat/hyva/.../smaily-tracker.js
+  with attribution.js and consent.js) and the Hyvä tracker (compat/hyva/.../smaily-tracker.js
   with smaily-attribution.js), the real scripts, each scenario in a fresh
   frame. Stubbed: document.cookie (file:// pages keep no cookies),
   navigator.sendBeacon, and jQuery as far as the Luma tracker uses it. The
@@ -99,11 +99,13 @@
             '<\/script>',
             '<script>pendingName = "Smaily_Connect/js/attribution";<\/script>',
             '<script src="../../view/frontend/web/js/attribution.js"><\/script>',
+            '<script>pendingName = "Smaily_Connect/js/consent";<\/script>',
+            '<script src="../../view/frontend/web/js/consent.js"><\/script>',
             '<script>pendingName = "Smaily_Connect/js/tracker";<\/script>',
             '<script src="../../view/frontend/web/js/tracker.js"><\/script>',
             '<script>',
             'var att = factories["Smaily_Connect/js/attribution"].factory();',
-            'factories["Smaily_Connect/js/tracker"].factory($, att)(' + JSON.stringify(trackerConfig(websiteId)) + ');',
+            'factories["Smaily_Connect/js/tracker"].factory($, att, factories["Smaily_Connect/js/consent"].factory())(' + JSON.stringify(trackerConfig(websiteId)) + ');',
             '<\/script>'
         ].join('\n');
     }

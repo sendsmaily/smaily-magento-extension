@@ -10,53 +10,18 @@
  * session and cookies; this sends nothing about the shopper. An empty
  * answer, an error or a timeout leaves the containers empty.
  *
- * Consent (marketing) is the browse tracker's rule (tracker.js): (1) the
- * store's own window.smailyConnect.consentOverride() when it is a function
- * — its answer, true or false, decides; (2) otherwise, under Magento cookie
- * restriction mode, the user_allowed_save_cookie cookie accepted for this
- * website (config.websiteId); (3) otherwise no consent. Consent that
+ * Consent (marketing) is the browse tracker's rule, consent.js: the
+ * store's consentOverride, else Magento's cookie notice accepted for this
+ * website (config.websiteId), else none. Consent that
  * arrives later on the page (Magento's user:allowed:save:cookie, or
  * smaily:consent-changed fired by the store's consent adapter) asks then.
  */
-define(['jquery'], function ($) {
+define(['jquery', 'Smaily_Connect/js/consent'], function ($, consent) {
     'use strict';
 
     var SLOT_SELECTOR = '[data-smaily-connect-recs]',
         CONSENT_CHANGED_EVENT = 'smaily:consent-changed',
         booted = false;
-
-    function getCookie(name) {
-        var match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
-
-        return match ? decodeURIComponent(match[1]) : null;
-    }
-
-    // The cookie notice's cookie is a JSON map of the website ids the
-    // shopper accepted on ({"1":1}); only this website's entry is consent.
-    function cookieNoticeAccepted(config) {
-        var accepted;
-
-        try {
-            accepted = JSON.parse(getCookie('user_allowed_save_cookie'));
-        } catch (e) {
-            return false;
-        }
-
-        return !!(accepted && accepted[config.websiteId]);
-    }
-
-    function consentGiven(config) {
-        var site = window.smailyConnect;
-
-        if (site && typeof site.consentOverride === 'function') {
-            return site.consentOverride() === true;
-        }
-        if (config.cookieRestriction) {
-            return cookieNoticeAccepted(config);
-        }
-
-        return false;
-    }
 
     function fill(url) {
         fetch(url, {
@@ -86,7 +51,7 @@ define(['jquery'], function ($) {
         booted = true;
 
         function ask() {
-            if (asked || !consentGiven(config)) {
+            if (asked || !consent.consentGiven(config)) {
                 return;
             }
             asked = true;

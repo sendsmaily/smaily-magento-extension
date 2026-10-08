@@ -7,8 +7,10 @@
 -->
 <!--
   Headless harness for the storefront recommendations scripts (PRO-3790): the
-  Luma script (view/frontend/web/js/recommendations.js) and the Hyvä script
-  (compat/hyva/.../smaily-recommendations.js), the real scripts, each
+  Luma script (view/frontend/web/js/recommendations.js with consent.js) and
+  the Hyvä script (compat/hyva/.../smaily-recommendations.js with
+  smaily-attribution.js, which defines window.smailyConsent), the real
+  scripts, each
   scenario in a fresh frame with two widget containers. Stubbed:
   document.cookie (file:// pages keep no cookies), window.fetch (answers the
   store route with the scenario's status and body), and jQuery as far as the
@@ -92,11 +94,14 @@
             'window.acceptCookieNotice = function () {',
             '  (handlers["user:allowed:save:cookie"] || []).forEach(function (h) { h({}); }); };',
             '<\/script>',
+            '<script>pendingName = "Smaily_Connect/js/consent";<\/script>',
+            '<script src="../../view/frontend/web/js/consent.js"><\/script>',
             '<script>pendingName = "Smaily_Connect/js/recommendations";<\/script>',
             '<script src="../../view/frontend/web/js/recommendations.js"><\/script>',
             '<script>',
             // x-magento-init calls the component once per matching container.
-            'var component = factories["Smaily_Connect/js/recommendations"].factory($);',
+            'var component = factories["Smaily_Connect/js/recommendations"]',
+            '  .factory($, factories["Smaily_Connect/js/consent"].factory());',
             'document.querySelectorAll("[data-smaily-connect-recs]").forEach(function (el) {',
             '  component(' + JSON.stringify(config()) + ', el); });',
             '<\/script>'
@@ -111,6 +116,7 @@
             '<\/script>',
             '<script type="application/json" id="smaily-recommendations-config">'
                 + JSON.stringify(config()) + '<\/script>',
+            '<script src="../../compat/hyva/view/frontend/web/js/smaily-attribution.js"><\/script>',
             '<script src="../../compat/hyva/view/frontend/web/js/smaily-recommendations.js"><\/script>'
         ].join('\n');
     }

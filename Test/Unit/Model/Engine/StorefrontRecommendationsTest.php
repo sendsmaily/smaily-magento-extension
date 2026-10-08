@@ -61,18 +61,16 @@ class StorefrontRecommendationsTest extends TestCase
         $this->settings->method('getTenantId')->willReturn('tenant-1');
 
         $this->client = $this->createMock(Client::class);
-        $answer = function (string $field): \Closure {
-            return function (string $id, int $limit) use ($field): array {
-                $this->engineCalls[] = [$field, $id, $limit];
+        $this->client->method('recommendations')->willReturnCallback(
+            function (array $identifier, int $limit): array {
+                $this->engineCalls[] = [(string)array_key_first($identifier), current($identifier), $limit];
                 if ($this->engineAnswer instanceof \Throwable) {
                     throw $this->engineAnswer;
                 }
 
                 return $this->engineAnswer;
-            };
-        };
-        $this->client->method('customerRecommendations')->willReturnCallback($answer('customer_external_id'));
-        $this->client->method('visitorRecommendations')->willReturnCallback($answer('smaily_visitor_token'));
+            }
+        );
 
         $this->profiling = $this->createMock(ProfilingConsent::class);
         $this->session = $this->createMock(CustomerSession::class);

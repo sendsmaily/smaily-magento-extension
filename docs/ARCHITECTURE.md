@@ -1120,7 +1120,9 @@ since v1.7.0), rate-limited per connection address (Magento's
 configuration names it, with its trusted proxies), stamps
 `source: plugin_magento` server-side, and forwards so the API key never
 reaches the browser. Consent (marketing) is resolved as in the WooCommerce
-plugin (F3-50, one standard signal, no per-vendor code): the store's own
+plugin (F3-50, one standard signal, no per-vendor code) by one module the
+storefront scripts share (`js/consent.js`; Hyvä: `window.smailyConsent`
+in `smaily-attribution.js`): the store's own
 `window.smailyConnect.consentOverride()` when defined, else
 `user_allowed_save_cookie` under Magento cookie restriction mode
 (`cookieRestriction` in the tracker config, from `ViewModel\EngineState`),
@@ -1165,8 +1167,10 @@ in Magento's shape (PRO-3790). Nothing is placed automatically.
   `engine/recommendations.phtml` (same gate, `ViewModel\EngineState`):
   an `x-magento-init` keyed on the container, so RequireJS loads
   `js/recommendations.js` only on a page that has one. After `load`, and
-  only with marketing consent (the tracker's rule, copied: override, else
-  the cookie notice accepted on this website, else none; later consent via
+  only with marketing consent (the tracker's rule, one module
+  `js/consent.js` — Hyvä: `window.smailyConsent` in
+  `smaily-attribution.js`: override, else the cookie notice accepted on
+  this website, else none; later consent via
   `user:allowed:save:cookie` / `smaily:consent-changed`), it asks the store
   route once per page and puts the HTML into every container. Hyvä:
   `compat/hyva` swaps the bootstrap for a JSON config + deferred
@@ -1176,7 +1180,7 @@ in Magento's shape (PRO-3790). Nothing is placed automatically.
 - **The route** `Controller\Recommendations\Index` (GET
   `smaily/recommendations`) — guards in the Woo order: not
   `isSendingAllowed()` → bare 404; the per-address limit
-  (`FixedWindowCounter`, 120 a minute, as the relay counts); a
+  (`RateLimit\PerAddressLimiter`, 120 a minute, as the relay counts); a
   `Sec-Fetch-Site` of `cross-site` or `same-site` → empty 200. Then a
   layout result (`smaily_recommendations_index`: the `smaily.recommendations`
   block, `cacheable="false"`, so the answer never enters the FPC and the
@@ -1194,10 +1198,9 @@ in Magento's shape (PRO-3790). Nothing is placed automatically.
   notice holds consent back (`isUserNotAllowSaveCookie()`: restriction mode
   on and not accepted on this website — the half of the script's rule the
   server can see); else nobody. One identifier per request.
-- **Engine call and caching.** `Client::customerRecommendations()` /
-  `visitorRecommendations()`: map key `recommendations_customer`, falling
-  back to the contract path for a connection set up before v1.9.0; one
-  attempt, 10 s timeout. The answer's usable slots (well-formed rec id, an
+- **Engine call and caching.** `Client::recommendations()`: map key
+  `recommendations_customer`, falling back to the contract path for a
+  connection set up before v1.9.0; one attempt, 10 s timeout. The answer's usable slots (well-formed rec id, an
   `external_id` or `sku`, at most 4) are cached in the application cache
   for an hour under `smaily_recs_` + sha256(tenant | identifier type |
   identifier), an empty answer included (§15: do not retry). Any failure
@@ -1214,8 +1217,8 @@ in Magento's shape (PRO-3790). Nothing is placed automatically.
   does not return or that is not salable is dropped, nothing takes its
   place. The store's own name, image and price render; each link is the
   product URL + `smaily_rec=<rec_id>&smaily_ctx=storefront` (parameter
-  names from the engine config, as the landing capture reads them), never
-  `utm_*` or `smaily_vt`.
+  names from the engine config, as the landing capture reads them;
+  `AttributionManager::landingUrl()`), never `utm_*` or `smaily_vt`.
 
 ### Profiling consent
 

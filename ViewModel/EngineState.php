@@ -58,18 +58,11 @@ class EngineState implements ArgumentInterface
 
     public function getTrackerConfigJson(): string
     {
-        return $this->serializer->serialize([
-            'relayUrl' => $this->urlBuilder->getUrl('smaily/relay'),
-            // Cast deliberately: the helper is annotated @return bool but
-            // actually returns the raw config value — the string "0" when
-            // restriction mode is off, which is truthy in JS and would make
-            // the tracker wait for a cookie notice the store never shows.
-            'cookieRestriction' => (bool)$this->cookieHelper->isCookieRestrictionModeEnabled(),
-            // The cookie notice's cookie lists the websites the shopper
-            // accepted on; the tracker reads it for this website only.
-            'websiteId' => (int)$this->storeManager->getWebsite()->getId(),
-            'attribution' => $this->attributionManager->getClientConfig(),
-        ]);
+        return $this->serializer->serialize(
+            ['relayUrl' => $this->urlBuilder->getUrl('smaily/relay')]
+            + $this->consentConfig()
+            + ['attribution' => $this->attributionManager->getClientConfig()]
+        );
     }
 
     /**
@@ -78,10 +71,28 @@ class EngineState implements ArgumentInterface
      */
     public function getRecommendationsConfigJson(): string
     {
-        return $this->serializer->serialize([
-            'url' => $this->urlBuilder->getUrl('smaily/recommendations'),
+        return $this->serializer->serialize(
+            ['url' => $this->urlBuilder->getUrl('smaily/recommendations')] + $this->consentConfig()
+        );
+    }
+
+    /**
+     * What the storefront scripts read the shopper's consent from
+     * (js/consent.js).
+     *
+     * @return array{cookieRestriction: bool, websiteId: int}
+     */
+    private function consentConfig(): array
+    {
+        return [
+            // Cast deliberately: the helper is annotated @return bool but
+            // actually returns the raw config value — the string "0" when
+            // restriction mode is off, which is truthy in JS and would make
+            // the scripts wait for a cookie notice the store never shows.
             'cookieRestriction' => (bool)$this->cookieHelper->isCookieRestrictionModeEnabled(),
+            // The cookie notice's cookie lists the websites the shopper
+            // accepted on; the scripts read it for this website only.
             'websiteId' => (int)$this->storeManager->getWebsite()->getId(),
-        ]);
+        ];
     }
 }

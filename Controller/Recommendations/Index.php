@@ -13,14 +13,12 @@ use Magento\Framework\App\Request\Http as HttpRequest;
 use Magento\Framework\Controller\AbstractResult;
 use Magento\Framework\Controller\Result\Raw;
 use Magento\Framework\Controller\ResultFactory;
-use Magento\Framework\HTTP\PhpEnvironment\RemoteAddress;
-use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\View\Element\AbstractBlock;
 use Magento\Framework\View\Result\Layout;
 use Smaily\Connect\Model\Engine\RecommendedProducts;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\StorefrontRecommendations;
-use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
+use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
 
 /**
  * The shopper's recommendation cards (GET smaily/recommendations), asked
@@ -55,9 +53,7 @@ class Index implements HttpGetActionInterface
         private readonly Settings $settings,
         private readonly StorefrontRecommendations $recommendations,
         private readonly RecommendedProducts $products,
-        private readonly FixedWindowCounter $counter,
-        private readonly DateTime $dateTime,
-        private readonly RemoteAddress $remoteAddress
+        private readonly PerAddressLimiter $limiter
     ) {
     }
 
@@ -69,7 +65,8 @@ class Index implements HttpGetActionInterface
         if (!$this->settings->isSendingAllowed()) {
             return $this->empty(404);
         }
-        if (!$this->allowRequest()) {
+        // The browse relay's per-address limit, on its own key.
+        if (!$this->limiter->allow('smaily_recs_', self::RATE_LIMIT_PER_MINUTE)) {
             return $this->empty(429);
         }
         $site = (string)$this->request->getHeader('Sec-Fetch-Site');
@@ -102,17 +99,5 @@ class Index implements HttpGetActionInterface
         $result->setHeader('Cache-Control', self::CACHE_CONTROL, true);
 
         return $result;
-    }
-
-    /**
-     * The browse relay's per-address limit, on its own key: the connection's
-     * own address, through Magento's RemoteAddress.
-     */
-    private function allowRequest(): bool
-    {
-        $ip = (string)$this->remoteAddress->getRemoteAddress();
-        $window = intdiv($this->dateTime->gmtTimestamp(), 60);
-
-        return $this->counter->allow('smaily_recs_' . sha1($ip) . '_' . $window, self::RATE_LIMIT_PER_MINUTE, 120);
     }
 }

@@ -317,11 +317,13 @@ is written in English.
   the first release candidate in the official repository; the pilot
   milestone has no date until a store is confirmed); 2026-10-07 evening:
   4/5 (3 fixes on master since rc9; pilot store not yet confirmed);
-  2026-10-07 night: 4/5 (rc10 released; pilot store not yet confirmed).
+  2026-10-07 night: 4/5 (rc10 released; pilot store not yet confirmed);
+  2026-10-08: 4/5 (rc10 released; widget and fixes on master; pilot store
+  not yet confirmed).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385
   canceled, PRO-3680 done); 2026-10-04: 0 open (PRO-1357 closed);
   2026-10-05: 0 open; 2026-10-07: 0 open; 2026-10-07 evening: 0 open
-  (PRO-3957 closed). Dates: none yet (2026-10-02 —
+  (PRO-3957 closed); 2026-10-08: 0 open. Dates: none yet (2026-10-02 —
   not asked; PRO-2456 is placed before the rc1 tag).

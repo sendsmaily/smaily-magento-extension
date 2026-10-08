@@ -24,8 +24,9 @@
 # included — it carries the engine contract vendored from a private
 # repository and internal audits, so
 # the documentation set lives on GitHub and the package links to it there
-# (Erkki's decision, 2026-09-10). What ships alongside the code: README.md,
-# CHANGELOG.md, LICENSE.txt.
+# (Erkki's decision, 2026-09-10), and the changelog fragments (changelog.d/)
+# the next version cut moves into CHANGELOG.md. What ships alongside the code:
+# README.md, CHANGELOG.md, LICENSE.txt.
 
 set -euo pipefail
 

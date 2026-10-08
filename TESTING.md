@@ -346,7 +346,8 @@ config, sandbox, tooling, static-analysis and phpunit config, `vendor/`,
 file a git worktree has in its place — any dot-file or dot-folder such as
 `.env` or `.idea/`, and the developer and working documents, this `TESTING.md` and
 `CONTRIBUTING.md` among them), none of the Hyvä companion (`compat/` — a
-separately published package) and no `docs/` at all, that the version in the
+separately published package), no changelog fragments (`changelog.d/`) and no
+`docs/` at all, that the version in the
 archived `composer.json` is the repo's, and that every shipped PHP file parses
 under `php -l`. It ends by printing a SHA-256 build hash and writing it to
 `<zip>.sha256`, so a package handed to a reviewer or a pilot store can be

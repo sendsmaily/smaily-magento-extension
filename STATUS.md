@@ -1,9 +1,11 @@
 # STATUS — Smaily Connect for Magento 2
 
-> **Rule (same as the sibling repos):** this file is updated in the SAME commit
-> that changes reality — a finished task, a new blocker, a changed plan. Stale
-> status is a defect. If this file and your memory disagree, trust this file
-> and fix it.
+> **Rule (since 2026-10-08):** this is the maintainer's handoff file. The
+> maintainer (orchestrator) updates it once per batch of merged PRs, or in
+> the version-cut PR; feature PRs never edit it, because parallel PRs all
+> edited its top lines and conflicted (CLAUDE.md, "Keeping the docs
+> current"). Stale status is a defect. If this file and your memory
+> disagree, trust this file and fix it.
 
 _Last updated: 2026-10-07 night — **3.0.0-rc10 is released from the official
 repository** (https://github.com/sendsmaily/smaily-magento-extension/releases/tag/3.0.0-rc10),

@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Integration\Privacy;
 
 use Smaily\Connect\Console\Command\GdprCommand;
+use Smaily\Connect\Cron\QueueJanitor;
 use Smaily\Connect\Model\AbandonedCart\StateManager;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
@@ -239,6 +240,61 @@ class GdprEraseTest extends IntegrationTestCase
     }
 
     /**
+     * PRO-3963: anonymising is not an outcome. A kept row keeps its
+     * last-changed time, so the janitor removes it on the schedule its
+     * delivery or failure set — 30 days after a send, 90 after a failure —
+     * and not 30 or 90 days after the erasure.
+     */
+    public function testAnAnonymisedRowKeepsItsRetentionSchedule(): void
+    {
+        $day = 86400;
+        $this->seedContactSync(self::SUBJECT, 'kept-sent');
+        $this->markRow(EventResource::TABLE_NAME, 'kept-sent', [
+            'status' => Event::STATUS_SENT,
+            'updated_at' => $this->clockDate(-31 * $day),
+        ]);
+        $this->ingestQueue->enqueue('orders', ['customer' => ['email' => self::SUBJECT]], '100000002', null, 'kept-failed');
+        $this->markRow(IngestEventResource::TABLE_NAME, 'kept-failed', [
+            'status' => IngestEvent::STATUS_FAILED,
+            'last_error' => 'rejected recipient ' . self::SUBJECT,
+            'updated_at' => $this->clockDate(-91 * $day),
+        ]);
+        // A delivery of yesterday: the sweep must not take it.
+        $this->seedContactSync(self::BYSTANDER, 'fresh-sent');
+        $this->markRow(EventResource::TABLE_NAME, 'fresh-sent', [
+            'status' => Event::STATUS_SENT,
+            'updated_at' => $this->clockDate(-$day),
+        ]);
+
+        $counts = $this->eraser->erase(self::SUBJECT);
+        self::assertSame(['removed' => 0, 'anonymised' => 1], $counts[self::QUEUE_LABEL]);
+        self::assertSame(['removed' => 0, 'anonymised' => 1], $counts[self::ENGINE_LABEL]);
+
+        $sent = $this->rowByUuid(EventResource::TABLE_NAME, 'kept-sent');
+        self::assertSame(Erasure::PLACEHOLDER, $sent['entity_id'], 'The row is anonymised as before');
+        self::assertStringNotContainsString(self::SUBJECT, (string)$sent['payload']);
+        self::assertSame($this->clockDate(-31 * $day), $sent['updated_at'], 'The sent row keeps its last-changed time');
+        $failed = $this->rowByUuid(IngestEventResource::TABLE_NAME, 'kept-failed');
+        self::assertSame(Erasure::PLACEHOLDER, $failed['last_error']);
+        self::assertSame($this->clockDate(-91 * $day), $failed['updated_at'], 'The failed row keeps its last-changed time');
+
+        /** @var QueueJanitor $janitor */
+        $janitor = $this->objectManager->create(QueueJanitor::class);
+        $janitor->execute();
+
+        self::assertSame(
+            ['fresh-sent'],
+            array_column($this->fetchAll(EventResource::TABLE_NAME), 'event_uuid'),
+            'The anonymised sent row goes on its own 30-day schedule'
+        );
+        self::assertSame(
+            [],
+            $this->fetchAll(IngestEventResource::TABLE_NAME),
+            'The anonymised failed row goes on its own 90-day schedule'
+        );
+    }
+
+    /**
      * The command's own job: the summary a merchant reads, in plain labels.
      */
     public function testTheCommandSummarisesTheErasureInPlainLabels(): void
@@ -367,6 +423,21 @@ class GdprEraseTest extends IntegrationTestCase
             $values,
             ['event_uuid = ?' => $uuid]
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function rowByUuid(string $table, string $uuid): array
+    {
+        $row = $this->connection->fetchRow(
+            $this->connection->select()
+                ->from($this->connection->getTableName($table))
+                ->where('event_uuid = ?', $uuid)
+        );
+        self::assertIsArray($row, sprintf('Expected row %s in %s', $uuid, $table));
+
+        return $row;
     }
 
     private function createdAt(string $uuid): string

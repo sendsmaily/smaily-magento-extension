@@ -7,25 +7,28 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-10-07 night — **3.0.0-rc10 is released from the official
-repository** (https://github.com/sendsmaily/smaily-magento-extension/releases/tag/3.0.0-rc10),
-created with `gh release create` (the CLI worked this time): the release workflow
-is green on 148cccd, the ZIP has 399 files, sha256 dd80633d6ece1b994971…, its
-composer.json says 3.0.0-rc10, and Packagist lists 3.0.0-rc10 next to 3.0.0-rc9
-and 2.8.1. It is the package a pilot store installs. **Queue:** PRO-3961 and
-PRO-3962 in progress; the pilot when a store is confirmed (the HC PRO store may
-be next week). **Open for Erkki:** HC PRO's Magento/PHP versions and storefront
-type; the Estonian proofread and upload of `docs/site/index.html`. **Waiting on
-the engine side:** PRO-3919, PRO-3941, PRO-3956._
+_Last updated: 2026-10-08 — session handoff. **Released:** 3.0.0-rc10
+(2026-10-07), the package a pilot store installs. **On master, unreleased**
+(CHANGELOG "Changes since 3.0.0-rc10" + `changelog.d/`): PRO-3961 (#138, rows
+date their outcome), PRO-3962 (#139, a failed engine batch in one write),
+PRO-3963 (#140, erasure keeps retention), PRO-3790 (#141, connecting starts
+the customers import; #142, the "Smaily recommendations" widget — Luma
+verified, Hyvä awaits a Hyvä store), #143 (changelog fragments; this file
+maintainer-owned). **Queue:** first the 2.8.x upgrade walk (PRO-3967, High:
+HC PRO runs the old 2.8.x module); rc11 when Erkki wants it
+(`bin/collect-changelog.sh`); the pilot when a store is confirmed (HC PRO may
+be next week; check Magento ≥ 2.4.4 / PHP ≥ 8.1 and storefront type first).
+**Open for Erkki:** "Questions / tasks for Erkki" item 16. **Engine:**
+PRO-3919, PRO-3941, PRO-3956. **Backlog:** PRO-3746 (after the pilot),
+PRO-3921 / PRO-3916 (after PRO-3941 / PRO-3919), PRO-2461 (`mag-<id>` answer)._
 
-_Earlier the same evening: the rc10 version cut merged (#136) —
-CHANGELOG's "Changes since 3.0.0-rc9" lists PRO-3949 (#130), PRO-3957
-(#131), PRO-3950 (#132), PRO-1970 (#134) and PRO-1964 (#135); no bullet
-asks for a catalog import; all gates passed on the branch. **The move into
-`sendsmaily/smaily-magento-extension` is complete (PRO-1198):** `master`
-is the only line, every change reaches it through a squash-merged PR, and
-the fork `erkkimarkus/magento-connect` is archived read-only (rc1–rc8
-stay)._
+_Earlier (2026-10-07): 3.0.0-rc10 released from the official repository
+(https://github.com/sendsmaily/smaily-magento-extension/releases/tag/3.0.0-rc10;
+`gh release create` worked; workflow green on 148cccd, 399 files, sha256
+dd80633d6ece1b994971…; Packagist lists it). The rc10 cut (#136) holds
+PRO-3949, PRO-3957, PRO-3950, PRO-1970, PRO-1964. The move into
+`sendsmaily/smaily-magento-extension` is complete (PRO-1198); the fork is
+archived read-only (rc1–rc8 stay)._
 
 _Earlier on 2026-10-07: **3.0.0-rc9 is released from the official
 repository**
@@ -345,25 +348,32 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
-- **PRO-3790 — connecting Campaign Intelligence also starts the
-  customers import (2026-10-08, owner decision; branch
-  `erkki/pro-3790-customers-import-on-connect` for a PR).** Storefront
-  recommendations ask by the Magento customer id (`external_id`, §4),
-  which live sync sends only on a customer save. `CatalogImportOnConnect`
-  is now `Model/Backfill/ImportsOnConnect`: `start()` queues the catalog
-  job, then the customers job, each through `JobManager::startIfIdle()`
-  (engine target, website 0), and answers per type; both connect paths
-  use it. After a connect the queue holds catalog (lower id, run first)
-  then customers, both `pending`; no orders job (PRO-3742 unchanged; the
-  not-connected guard is untouched). EngineExchange answers
-  `customersImportStarted`; the panel shows "The customers import has
-  started" (no Hold back — the card's Cancel import) and refreshes the
-  Customers card; the config save adds a notice. Setup step copy says
-  both imports start (EN + ET). Tests: unit (both paths), integration
-  `ImportsOnConnectTest` (catalog then customers queued, no orders,
-  `nextActive()` = catalog), `intelligence-connect.html`. Docs:
-  ARCHITECTURE, USER_GUIDE, site (EN + ET), PILOT_CHECKLIST, CHANGELOG.
-  Gates: unit, phpcs, phpstan, integration, test-js, PHP 8.1 syntax.
+- **PRO-3790 — a shopper's own recommendations on the store's pages
+  (2026-10-08; merged as #141 and #142, unreleased; In Review in Linear
+  until a Hyvä store run).** #141: connecting Campaign Intelligence (admin
+  or CLI token save) queues the catalog import, then the customers import,
+  through `Model/Backfill/ImportsOnConnect` (formerly
+  `CatalogImportOnConnect`; same idle/stalled rule, no orders job), so the
+  engine knows every customer by `external_id`; the admin says the
+  customers import has started. #142: the CMS widget **Smaily
+  recommendations** (`Block\Widget\Recommendations`, `etc/widget.xml`)
+  prints an empty, FPC-safe container; after `load`, with marketing
+  consent, `js/recommendations.js` (Hyvä: `smaily-recommendations.js`)
+  asks the route `smaily/recommendations` (`Controller\Recommendations\
+  Index`: 404 while sending is not allowed, 120 a minute per address,
+  cross-site → empty, `no-store`) once and fills every container with up
+  to four of the store's own salable products as the theme's cards, links
+  `smaily_rec` + `smaily_ctx=storefront`. `StorefrontRecommendations` asks
+  about a customer by id while profiling consent holds, else a guest by
+  the visitor token — refused server-side when cookie restriction mode is
+  on and the notice is not accepted on this website (Erkki, 2026-10-08).
+  Cache: an answer 1 h, a failure 10 min, a timeout/5xx pauses all calls
+  2 min. Verified: unit, integration (stubbed engine), browser harness for
+  both themes, a Luma sandbox walk against a mock engine; Hyvä only by the
+  harness. Simplification pass: one consent module (`js/consent.js` /
+  `window.smailyConsent`) for tracker and widget, `RateLimit\
+  PerAddressLimiter` for relay, widget route and guest cart email,
+  `AttributionManager::landingUrl()`, one `Client::recommendations()`.
 - **PRO-3963 — erasing a shopper's data keeps their queue rows on their
   retention schedule (2026-10-07; branch
   `erkki/pro-3963-erasure-keeps-retention` for a PR).** Found with
@@ -7032,7 +7042,10 @@ Earlier: 2026-09-11, 2026-09-10._
 
 | Issue | What | Priority |
 |---|---|---|
-| PRO-1198 | Release coordination with Smaily (upstream/Marketplace path) | High — the move is complete (PR #126; the fork archived 2026-10-07), rc9 tagged 2026-10-07; 3.0.0 waits on the pilot |
+| PRO-1198 | Release coordination with Smaily (upstream/Marketplace path) | High — the move is complete (PR #126; the fork archived 2026-10-07), rc10 released 2026-10-07; 3.0.0 and the Marketplace submission come after a pilot |
+| PRO-3790 | A shopper's own recommendations on the store's pages (customers import on connect #141, widget #142) | In Review — merged, unreleased; waits on a Hyvä store run |
+| PRO-3964 | Retention of an erased shopper's abandoned-cart purchase marker | Question for Erkki |
+| PRO-3966 | Start the customers import once on stores connected before PRO-3790? | Question for Erkki |
 | PRO-3854 | Nightly catalog list (§3c manifest); the contract sync part is done | High — landed 2026-10-07, in rc8 |
 | PRO-1971 | `gender` → `user_gender` release-comms obligation — parked 2026-09-02, reopens when 3.0.0 has a date | High — Erkki's decision |
 | PRO-1400 | Clean-install confirmation of the cron group (release gate) | Todo |
@@ -7067,9 +7080,9 @@ PRO-1267 (engine: Magento product-identity contract note).
 ## Questions / tasks for Erkki
 
 1. PRO-1198 — the move is done (PR #126 → aa0c995, secret set, master
-   green, remotes switched) and 3.0.0-rc9 is tagged and released there.
-   The fork `erkkimarkus/magento-connect` is archived read-only
-   (2026-10-07); nothing of the move is left open.
+   green, remotes switched); 3.0.0-rc9 and rc10 are released there. The
+   fork `erkkimarkus/magento-connect` is archived read-only (2026-10-07).
+   Left: 3.0.0 and the Marketplace submission, after a pilot.
 2. PRO-1201 — Hyvä boundary decisions (see "Open release decisions" in
    `docs/HYVA_SUPPORT.md`; the verification matrix itself is now fully
    executed and green): (a) confirm Hyvä Checkout (commercial, Magewire)
@@ -7250,3 +7263,14 @@ PRO-1267 (engine: Magento product-identity contract note).
     default scope's, else the config.xml default
     (`LegacyConfigMapper::MODULE_SWITCH_DEFAULTS`, unit-checked against
     `etc/config.xml`); the UPGRADING guide step is gone.
+
+16. Open 2026-10-08 (session handoff): (a) HC PRO's Magento and PHP
+    versions and storefront type (Luma, Hyvä or headless); it runs the
+    old 2.8.x module. (b) The Estonian proofread of the guide site
+    (`docs/site/index.html`) and of the new admin/widget texts ("Sulle
+    soovitatud", "Smaily soovitused", the customers-import banner, "See
+    import saadab …"), then the site upload to smaily.com/connect-magento/.
+    (c) A Hyvä store to run the recommendations widget on (PRO-3790).
+    (d) PRO-3964 — how long an erased shopper's abandoned-cart marker is
+    kept. (e) PRO-3966 — start the customers import once on stores that
+    connected Campaign Intelligence before PRO-3790?

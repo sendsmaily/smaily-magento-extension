@@ -69,7 +69,14 @@ a payload builder or client. End-to-end verification steps live in
 - Pull requests are squash-merged: the PR title and description become the
   one commit on `master`, so write them as the record of the change.
 - Describe the merchant-visible behavior change in the PR description and
-  add a `CHANGELOG.md` entry under the unreleased version.
+  add a changelog fragment: one new file, `changelog.d/<ISSUE>.md` (for
+  example `changelog.d/PRO-1234.md`), holding the one Markdown bullet the
+  change gets in the changelog — written for the merchant, and telling them
+  to start a catalog import when the change adds or corrects a catalog field.
+  Do not edit `CHANGELOG.md` itself: every open pull request would edit the
+  same lines and conflict with the others. A change no merchant can see adds
+  no fragment. [changelog.d/README.md](changelog.d/README.md) has the format
+  and an example.
 - New settings need `etc/adminhtml/system.xml` + `etc/config.xml` defaults
   and, when replacing a legacy 2.8.x option, a mapping in
   `Model/Migration/LegacyConfigMapper` (with a unit test).
@@ -77,8 +84,11 @@ a payload builder or client. End-to-end verification steps live in
 ## Releasing
 
 A version cut is a pull request like any other: it sets the version in
-`composer.json` and `Model/ModuleInfo.php` (keep them in sync) and names it
-in `CHANGELOG.md`. After it is merged, publish a GitHub release on `master`
+`composer.json` and `Model/ModuleInfo.php` (keep them in sync), names it
+in `CHANGELOG.md`, and moves every fragment in `changelog.d/` into the
+"Changes since <previous version>" list, oldest first —
+`bin/collect-changelog.sh` prints them in the order they landed on `master` —
+then deletes the fragments. After it is merged, publish a GitHub release on `master`
 whose tag is the plain version (`3.0.0`, no `v` prefix); a release candidate
 (`3.0.0-rc9`) is published as a pre-release. Publishing the release
 triggers `.github/workflows/release.yaml`, which first checks that the tag

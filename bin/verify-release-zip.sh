@@ -114,6 +114,7 @@ forbid "agent guide"      'CLAUDE\.md$'
 forbid "testing guide"    'TESTING\.md$'
 forbid "pilot checklist"  'PILOT_CHECKLIST\.md$'
 forbid "documentation"    'docs/'
+forbid "changelog fragments" 'changelog\.d/'
 
 # --- 3. The archive states the repo's version -------------------------------
 repo_version="$( php -r 'echo json_decode(file_get_contents($argv[1]), true)["version"] ?? "";' "$ROOT/composer.json" )"

@@ -42,7 +42,8 @@ internal process talk (phases, agents, Linear) lives here and in STATUS.md only.
   reversible technical decisions (record significant ones as you go).
 - **Queue for Erkki, don't block:** non-urgent strategic questions and
   human-only tasks — collect them in STATUS.md under "Questions / tasks for
-  Erkki"; batch them, don't drip.
+  Erkki" (the maintainer writes them there; a worker hands them over in its
+  report); batch them, don't drip.
 - **Stop and ask first:** spending money; anything published externally
   (Marketplace submission, a public release, contact with the Smaily or engine
   team); proposing breaking changes to the engine contract; deleting store
@@ -52,8 +53,23 @@ internal process talk (phases, agents, Linear) lives here and in STATUS.md only.
 
 Same rule as the sibling repos, same wording on purpose: if your change makes a
 doc wrong, your change isn't finished until the doc is fixed in the same
-commit. **STATUS.md updates in the same commit that changes reality.** New
-operational gotchas go into this file. `docs/USER_GUIDE.md` is a doc too — a
+commit. Two files are the exception, because every PR used to edit the same
+top lines of both and parallel PRs always conflicted (owner decision,
+2026-10-08):
+- **CHANGELOG.md — fragments.** A PR with a merchant-visible change adds ONE
+  file, `changelog.d/<ISSUE>.md` (e.g. `changelog.d/PRO-1234.md`), holding
+  exactly the bullet it would have added — one Markdown bullet, merchant
+  language, same rules as before (incl. "start a catalog import", see
+  Contract discipline). It does not edit CHANGELOG.md. No merchant-visible
+  effect, no fragment. Format: `changelog.d/README.md`; the version cut
+  collects them (Release cut below).
+- **STATUS.md — the maintainer's handoff file.** Only the maintainer
+  (orchestrator) updates it: once per batch of merged PRs, or in the
+  version-cut PR. Feature PRs never edit STATUS.md; a worker puts what
+  STATUS should say (state, gotchas, questions for Erkki) in its report and
+  PR description instead.
+
+New operational gotchas go into this file. `docs/USER_GUIDE.md` is a doc too — a
 user-visible behaviour change updates it in the same commit.
 
 **Merchant guide site (`docs/site/index.html`)** — the bilingual (EN/ET)
@@ -95,7 +111,7 @@ is real). Datetimes are Z-suffix only; engine URL placeholders are `{email}`
 style (str_replace, never sprintf). There is no scheduled catalog re-sync
 (PRO-1968; contract v1.8.3 §3 *Catalog sync lifecycle*): a change that adds
 a catalog field, or corrects what one holds, reaches the rows already sent
-only through a catalog import, so its CHANGELOG bullet tells the merchant to
+only through a catalog import, so its changelog fragment tells the merchant to
 start one.
 
 ## Build / test commands
@@ -167,6 +183,9 @@ merge or cherry-pick batch too), not on `master` afterwards:
    version cut uses `release/<version>`.
 2. Open a PR whose title and description follow `github:writing-change-records`
    — the description becomes the merge message, so it is the permanent record.
+   A feature PR touches neither CHANGELOG.md nor STATUS.md: its changelog
+   bullet is a `changelog.d/<ISSUE>.md` fragment, and STATUS.md is the
+   maintainer's ("Keeping the docs current" above).
 3. **Erkki merges every PR himself, always with Squash and merge.** Its
    default message is the list of commit messages, NOT the PR description,
    so the merger passes it explicitly (`gh pr merge <n> --squash --subject
@@ -188,7 +207,13 @@ do not change it.
 
 1. The version-cut PR sets the version in `composer.json`,
    `Model/ModuleInfo.php` and the ModuleVersion docblock, and names it in
-   CHANGELOG; squash-merge it.
+   CHANGELOG. It collects the fragments: `bin/collect-changelog.sh` prints
+   every `changelog.d/` bullet in the order it landed on `master` (oldest
+   first; `-l` lists the files with their landing dates); paste them into
+   the "Changes since <previous version>" list in that order, merge or
+   reword a bullet a later change made untrue (wording may be edited by
+   hand), and `git rm` the fragments (`changelog.d/README.md` stays). The
+   same PR updates STATUS.md. Squash-merge it.
 2. `gh release create 3.0.0-rc9 --repo sendsmaily/smaily-magento-extension
    --target master --title "…" --notes-file … --prerelease` (a release
    candidate; 3.0.0 itself without `--prerelease`). **Tag = the PLAIN

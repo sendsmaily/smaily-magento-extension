@@ -102,8 +102,19 @@ $isRefused = $viewModel->isEngineRefused();
                 </div>
             </div>
         </div>
+        <?php // A Connect starts the customers import too (PRO-3790);
+        // panels-js shows this banner when it did. No Hold back: no setting
+        // made before connecting changes what it sends, as the Storefront
+        // URL does for the catalog; the Customers card's Cancel import
+        // stops it. ?>
+        <div class="smaily-banner smaily-banner--info" id="smaily-w-engine-customers-import" role="status" style="display:none;">
+            <div class="smaily-banner__body">
+                <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('The customers import has started')) ?></div>
+                <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Your existing customer accounts go to Campaign Intelligence once, in the background, after the catalog import. To hold it back, press Cancel import on the Customers card under Marketing > Smaily Connect > Settings > Intelligence.')) ?></div>
+            </div>
+        </div>
         <?php if (!$isSettings): ?>
-        <p><?= $escaper->escapeHtml(__('Catalog, customer and order sync started automatically. Connecting also starts the catalog import, which sends your whole catalog once. Customer and order history can be imported, and the catalog import run again, any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?></p>
+        <p><?= $escaper->escapeHtml(__('Catalog, customer and order sync started automatically. Connecting also starts the catalog and customers imports, which send your whole catalog and your existing customer accounts once. Order history can be imported, and both imports run again, any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?></p>
         <?php endif; ?>
         <div class="smaily-inline-toggle">
             <label><input type="checkbox" id="smaily-w-browse"/>

@@ -16,7 +16,7 @@ use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Controller\Adminhtml\Api\EngineExchange;
-use Smaily\Connect\Model\Backfill\CatalogImportOnConnect;
+use Smaily\Connect\Model\Backfill\ImportsOnConnect;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\Client;
@@ -24,9 +24,10 @@ use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
 
 /**
- * PRO-3741: connecting Campaign Intelligence in the admin starts the catalog
- * import, and the answer says whether it did, so the page can show the
- * notice with its Hold back action.
+ * PRO-3741, PRO-3790: connecting Campaign Intelligence in the admin starts
+ * the catalog import, then the customers import — never the orders import —
+ * and the answer says which of them it started, so the page can show their
+ * notices (the catalog one with its Hold back action).
  */
 class EngineExchangeTest extends TestCase
 {
@@ -43,29 +44,52 @@ class EngineExchangeTest extends TestCase
         $this->jobManager = $this->createMock(JobManager::class);
     }
 
-    public function testConnectingStartsTheCatalogImport(): void
+    public function testConnectingStartsTheCatalogImportThenTheCustomersImport(): void
     {
         $this->client->method('setupExchange')->willReturn(['tenant_name' => 'Pilot', 'engine_version' => '1.8.2']);
-        $this->jobManager->expects(self::once())->method('startIfIdle')
-            ->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID)
-            ->willReturn($this->createMock(Job::class));
+        $started = [];
+        $this->jobManager->expects(self::exactly(2))->method('startIfIdle')
+            ->willReturnCallback(function (string $jobType, string $target, int $websiteId) use (&$started) {
+                $started[] = [$jobType, $target, $websiteId];
+
+                return $this->createMock(Job::class);
+            });
 
         $this->controller()->execute();
 
+        self::assertSame([
+            [Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID],
+            [Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID],
+        ], $started);
         self::assertTrue($this->response['connected']);
         self::assertTrue($this->response['catalogImportStarted']);
+        self::assertTrue($this->response['customersImportStarted']);
     }
 
-    public function testAReconnectWhileACatalogImportIsQueuedOrRunningStartsNoSecond(): void
+    public function testAReconnectWhileBothImportsAreQueuedOrRunningStartsNoSecond(): void
     {
         $this->client->method('setupExchange')->willReturn(['tenant_name' => 'Pilot', 'engine_version' => '1.8.2']);
-        $this->jobManager->expects(self::once())->method('startIfIdle')
+        $this->jobManager->expects(self::exactly(2))->method('startIfIdle')
             ->willReturn(null);
 
         $this->controller()->execute();
 
         self::assertTrue($this->response['connected']);
         self::assertFalse($this->response['catalogImportStarted']);
+        self::assertFalse($this->response['customersImportStarted']);
+    }
+
+    public function testTheAnswerSaysWhichImportStarted(): void
+    {
+        $this->client->method('setupExchange')->willReturn(['tenant_name' => 'Pilot', 'engine_version' => '1.8.2']);
+        $this->jobManager->method('startIfIdle')->willReturnCallback(
+            fn (string $jobType) => $jobType === Job::TYPE_CUSTOMERS ? $this->createMock(Job::class) : null
+        );
+
+        $this->controller()->execute();
+
+        self::assertFalse($this->response['catalogImportStarted']);
+        self::assertTrue($this->response['customersImportStarted']);
     }
 
     public function testAFailedConnectionStartsNothing(): void
@@ -77,6 +101,7 @@ class EngineExchangeTest extends TestCase
 
         self::assertFalse($this->response['connected']);
         self::assertArrayNotHasKey('catalogImportStarted', $this->response);
+        self::assertArrayNotHasKey('customersImportStarted', $this->response);
     }
 
     private function controller(): EngineExchange
@@ -101,7 +126,7 @@ class EngineExchangeTest extends TestCase
             new JsonSerializer(),
             $this->client,
             $this->createMock(Settings::class),
-            new CatalogImportOnConnect($this->jobManager)
+            new ImportsOnConnect($this->jobManager)
         );
     }
 }

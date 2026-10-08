@@ -343,6 +343,25 @@ Earlier: 2026-09-11, 2026-09-10._
 
 ## Where we are
 
+- **PRO-3790 — connecting Campaign Intelligence also starts the
+  customers import (2026-10-08, owner decision; branch
+  `erkki/pro-3790-customers-import-on-connect` for a PR).** Storefront
+  recommendations ask by the Magento customer id (`external_id`, §4),
+  which live sync sends only on a customer save. `CatalogImportOnConnect`
+  is now `Model/Backfill/ImportsOnConnect`: `start()` queues the catalog
+  job, then the customers job, each through `JobManager::startIfIdle()`
+  (engine target, website 0), and answers per type; both connect paths
+  use it. After a connect the queue holds catalog (lower id, run first)
+  then customers, both `pending`; no orders job (PRO-3742 unchanged; the
+  not-connected guard is untouched). EngineExchange answers
+  `customersImportStarted`; the panel shows "The customers import has
+  started" (no Hold back — the card's Cancel import) and refreshes the
+  Customers card; the config save adds a notice. Setup step copy says
+  both imports start (EN + ET). Tests: unit (both paths), integration
+  `ImportsOnConnectTest` (catalog then customers queued, no orders,
+  `nextActive()` = catalog), `intelligence-connect.html`. Docs:
+  ARCHITECTURE, USER_GUIDE, site (EN + ET), PILOT_CHECKLIST, CHANGELOG.
+  Gates: unit, phpcs, phpstan, integration, test-js, PHP 8.1 syntax.
 - **PRO-3963 — erasing a shopper's data keeps their queue rows on their
   retention schedule (2026-10-07; branch
   `erkki/pro-3963-erasure-keeps-retention` for a PR).** Found with

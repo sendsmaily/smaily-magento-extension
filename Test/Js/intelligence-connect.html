@@ -6,8 +6,9 @@
  */
 -->
 <!--
-  Headless harness for the notice a Campaign Intelligence Connect shows when
-  it started the catalog import, and its Hold back action (PRO-3741): the
+  Headless harness for the notices a Campaign Intelligence Connect shows when
+  it started the catalog import, with its Hold back action (PRO-3741), and
+  the customers import (PRO-3790): the
   real templates (view/adminhtml/templates/panel/intelligence.phtml and
   panel/panels-js.phtml), rendered in en_US and et_EE by
   Test/Js/render-admin.php into Test/Js/build/ as the initial setup's step
@@ -59,6 +60,7 @@
     var REFUSED_STOREFRONT = 'Enter the storefront\'s address only, starting with https:// — for example https://shop.example.com — without a path or a query.';
     var MAGENTO_CONSENT = 'Consent comes from Magento’s cookie notice: browse events are sent only after the visitor allows cookies.';
     var STOREFRONT_CONSENT = 'Your separate storefront sends the browse events itself, so its own cookie consent banner decides when they are sent.';
+    var CUSTOMERS_STARTED = 'Your existing customer accounts go to Campaign Intelligence once, in the background, after the catalog import. To hold it back, press Cancel import on the Customers card under Marketing > Smaily Connect > Settings > Intelligence.';
     var FINISHED ='The catalog import had already finished, so there was nothing left to hold back.';
     var REIMPORT = 'Saved. Run the catalog import again under Intelligence > Historical imports, so that Campaign Intelligence gets the new product links.';
     var failures = 0;
@@ -70,10 +72,17 @@
     var keepAlive = setInterval(function () {}, 10);
 
     // The endpoints' answers. EngineExchange: connected, and whether the
-    // Connect started the catalog import. BackfillState: the aggregated
-    // catalog import after a status read or a cancel.
-    function connected(started) {
-        return {connected: true, tenantName: 'Pilot', engineVersion: '1.8.2', catalogImportStarted: started};
+    // Connect started the catalog import and the customers import (as the
+    // catalog one unless given). BackfillState: the aggregated import after
+    // a status read or a cancel.
+    function connected(started, customersStarted) {
+        return {
+            connected: true,
+            tenantName: 'Pilot',
+            engineVersion: '1.8.2',
+            catalogImportStarted: started,
+            customersImportStarted: customersStarted === undefined ? started : customersStarted
+        };
     }
 
     function catalog(status, processed) {
@@ -303,6 +312,9 @@
         if (locale !== 'en_US') {
             check(locale + ': the page is translated',
                 strings['The catalog import has started'] !== 'The catalog import has started');
+            check(locale + ': the customers import notice is translated',
+                strings['The customers import has started'] !== 'The customers import has started'
+                && strings[CUSTOMERS_STARTED] !== CUSTOMERS_STARTED);
         }
 
         // Before a Connect: without a saved Storefront URL the setup step and
@@ -453,6 +465,12 @@
             shown(doc, 'smaily-w-engine-catalog-import')
             && doc.querySelector('#smaily-w-engine-catalog-import .smaily-banner__title').textContent
                 === strings['The catalog import has started']);
+        check(locale + ', setup: the notice says the customers import has started',
+            shown(doc, 'smaily-w-engine-customers-import')
+            && doc.querySelector('#smaily-w-engine-customers-import .smaily-banner__title').textContent
+                === strings['The customers import has started']
+            && doc.querySelector('#smaily-w-engine-customers-import .smaily-banner__message').textContent
+                === strings[CUSTOMERS_STARTED]);
         check(locale + ', setup: Hold back is offered', shown(doc, 'smaily-w-engine-catalog-holdback'));
         await holdBack(frame, catalog('cancelled', 0));
         cancels = cancelRequests(frame);
@@ -461,12 +479,23 @@
         check(locale + ', setup: held back before it began, the import is canceled',
             holdBackResult(doc) === strings[HELD_BACK]);
         check(locale + ', setup: Hold back is not offered again', !shown(doc, 'smaily-w-engine-catalog-holdback'));
+        check(locale + ', setup: Hold back leaves the customers import notice',
+            shown(doc, 'smaily-w-engine-customers-import'));
         frame.remove();
 
         // A Connect that started no import (one already queued or running).
         frame = await connect(setup, {exchange: connected(false), status: catalog('pending', 0), cancel: null});
         check(locale + ', setup: no notice when the Connect started no import',
-            !shown(frame.contentDocument, 'smaily-w-engine-catalog-import'));
+            !shown(frame.contentDocument, 'smaily-w-engine-catalog-import')
+            && !shown(frame.contentDocument, 'smaily-w-engine-customers-import'));
+        frame.remove();
+
+        // A Connect that started only the customers import (a catalog import
+        // already queued or running).
+        frame = await connect(setup, {exchange: connected(false, true), status: catalog('pending', 0), cancel: null});
+        check(locale + ', setup: only the customers import started, only its notice',
+            !shown(frame.contentDocument, 'smaily-w-engine-catalog-import')
+            && shown(frame.contentDocument, 'smaily-w-engine-customers-import'));
         frame.remove();
 
         // Held back after the import began sending.
@@ -483,7 +512,8 @@
             holdBackResult(frame.contentDocument) === strings[FINISHED]);
         frame.remove();
 
-        // Settings > Intelligence: the Catalog card follows the Connect and the Hold back.
+        // Settings > Intelligence: the Catalog and Customers cards follow the
+        // Connect, the Catalog card the Hold back too.
         frame = await connect(settings, {
             exchange: connected(true),
             status: catalog('idle', 0),
@@ -498,6 +528,12 @@
             !!doc.getElementById('smaily-w-engine-storefront-hint')
             && !visible(doc, 'smaily-w-engine-storefront-hint'));
         check(locale + ', settings: the Catalog card shows the queued import', card.getAttribute('data-state') === 'pending');
+        check(locale + ', settings: the notice says the customers import has started',
+            shown(doc, 'smaily-w-engine-customers-import'));
+        check(locale + ', settings: the Customers card shows the queued import',
+            doc.querySelector('.smaily-backfill-card[data-job-type="customers"]').getAttribute('data-state') === 'pending');
+        check(locale + ', settings: the Orders card is not refreshed by the Connect',
+            doc.querySelector('.smaily-backfill-card[data-job-type="orders"]').getAttribute('data-state') === 'idle');
         // The card renders the cancel's own answer: a status read after it
         // would answer the import still queued here.
         await holdBack(frame, catalog('pending', 0));

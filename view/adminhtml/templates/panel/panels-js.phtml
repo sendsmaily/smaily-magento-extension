@@ -610,18 +610,19 @@ window.smailyPanelsInit = function ($) {
         pollBackfill(jobType, ui, 'cancel');
     }
 
-    // The Catalog card on Settings > Intelligence follows a Connect and a
-    // Hold back (PRO-3741); the setup step has no card. The Hold back's
-    // cancel answers with the import's state, which the card renders as is;
-    // after a Connect the card asks for it.
-    function refreshCatalogCard(data) {
-        var $card = $('.smaily-backfill-card[data-job-type="catalog"]');
+    // The Catalog and Customers cards on Settings > Intelligence follow a
+    // Connect (PRO-3741, PRO-3790), the Catalog card a Hold back too; the
+    // setup step has no cards. The Hold back's cancel answers with the
+    // import's state, which the card renders as is; after a Connect the
+    // card asks for it.
+    function refreshImportCard(jobType, data) {
+        var $card = $('.smaily-backfill-card[data-job-type="' + jobType + '"]');
         if ($card.length) {
-            clearTimeout(backfillTimers.catalog);
+            clearTimeout(backfillTimers[jobType]);
             if (data) {
-                renderBackfill('catalog', data, backfillUi($card));
+                renderBackfill(jobType, data, backfillUi($card));
             } else {
-                pollBackfill('catalog', backfillUi($card), 'status');
+                pollBackfill(jobType, backfillUi($card), 'status');
             }
         }
     }
@@ -902,7 +903,7 @@ window.smailyPanelsInit = function ($) {
                 }
                 $button.hide();
                 result('#smaily-w-engine-catalog-holdback-result', text, true);
-                refreshCatalogCard(data);
+                refreshImportCard('catalog', data);
             });
         });
 
@@ -914,7 +915,11 @@ window.smailyPanelsInit = function ($) {
                     engineConnected(data.tenantName, data.engineVersion);
                     if (data.catalogImportStarted) {
                         $('#smaily-w-engine-catalog-import').show();
-                        refreshCatalogCard();
+                        refreshImportCard('catalog');
+                    }
+                    if (data.customersImportStarted) {
+                        $('#smaily-w-engine-customers-import').show();
+                        refreshImportCard('customers');
                     }
                 } else {
                     result('#smaily-w-engine-result',

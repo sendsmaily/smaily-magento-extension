@@ -781,7 +781,11 @@ below.
   (`pending`, `sending`) is DELETED, a row that is over (`sent`, `failed`)
   is ANONYMIZED in place — `entity_id`, `payload`, `sent_payload`,
   `last_response` and `last_error` become one placeholder, keys and
-  structure kept, so the merchant keeps the record of the send. A row is
+  structure kept, so the merchant keeps the record of the send. The
+  anonymizing UPDATE writes `updated_at` as itself, which keeps MySQL's
+  `ON UPDATE CURRENT_TIMESTAMP` from moving it (PRO-3963): anonymizing is
+  not an outcome, so the row leaves on the 30- or 90-day schedule its send
+  or failure set, not that long after the erasure. A row is
   matched by its `entity_id` (the address, or for a profiling-consent row,
   and a contact row of an address longer than the column, the opt-out
   record's keyed hash of it — PRO-3765, PRO-3767) or by DECODING the stored JSON (`Model\Privacy\PayloadAnonymizer`),

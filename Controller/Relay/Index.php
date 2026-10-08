@@ -15,13 +15,12 @@ use Magento\Framework\App\Request\InvalidRequestException;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
-use Magento\Framework\HTTP\PhpEnvironment\RemoteAddress;
 use Smaily\Connect\Model\Engine\BrowseEventValidator;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
-use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
+use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
 
 /**
  * Public browse-beacon proxy (POST smaily/relay): the storefront tracker
@@ -45,10 +44,8 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
         private readonly Settings $settings,
         private readonly Client $client,
         private readonly BrowseEventValidator $validator,
-        private readonly FixedWindowCounter $counter,
-        private readonly \Magento\Framework\Stdlib\DateTime\DateTime $dateTime,
-        private readonly Logger $logger,
-        private readonly RemoteAddress $remoteAddress
+        private readonly PerAddressLimiter $limiter,
+        private readonly Logger $logger
     ) {
     }
 
@@ -67,7 +64,9 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
             return $result->setData(['ok' => false]);
         }
 
-        if (!$this->allowRequest()) {
+        // Cheap per-address limit: the store must not be usable as an
+        // authenticated amplifier against the engine.
+        if (!$this->limiter->allow('smaily_relay_', self::RATE_LIMIT_PER_MINUTE)) {
             $result->setHttpResponseCode(429);
 
             return $result->setData(['ok' => false, 'error' => 'rate limited']);
@@ -103,21 +102,6 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
         }
 
         return $result->setData(['ok' => true, 'accepted' => count($events)]);
-    }
-
-    /**
-     * Cheap per-IP request limiter: the store must not be usable as an
-     * authenticated amplifier against the engine. The address is the
-     * connection's own, read through Magento's RemoteAddress: forwarding
-     * headers count only where the store itself is configured to trust them.
-     */
-    private function allowRequest(): bool
-    {
-        $ip = (string)$this->remoteAddress->getRemoteAddress();
-        $window = intdiv($this->dateTime->gmtTimestamp(), 60);
-        $key = 'smaily_relay_' . sha1($ip) . '_' . $window;
-
-        return $this->counter->allow($key, self::RATE_LIMIT_PER_MINUTE, 120);
     }
 
     /**

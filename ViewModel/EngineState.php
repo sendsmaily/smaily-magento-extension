@@ -17,7 +17,8 @@ use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\Settings;
 
 /**
- * Storefront view model for the attribution and browse-tracking scripts.
+ * Storefront view model for the attribution, browse-tracking and
+ * recommendations scripts.
  */
 class EngineState implements ArgumentInterface
 {
@@ -41,6 +42,15 @@ class EngineState implements ArgumentInterface
         return $this->settings->isBrowseTrackingEnabled();
     }
 
+    /**
+     * The recommendations script loads only where the engine may be called;
+     * the widget's container renders under the same gate.
+     */
+    public function isRecommendationsActive(): bool
+    {
+        return $this->settings->isSendingAllowed();
+    }
+
     public function getAttributionConfigJson(): string
     {
         return $this->serializer->serialize($this->attributionManager->getClientConfig());
@@ -48,17 +58,41 @@ class EngineState implements ArgumentInterface
 
     public function getTrackerConfigJson(): string
     {
-        return $this->serializer->serialize([
-            'relayUrl' => $this->urlBuilder->getUrl('smaily/relay'),
+        return $this->serializer->serialize(
+            ['relayUrl' => $this->urlBuilder->getUrl('smaily/relay')]
+            + $this->consentConfig()
+            + ['attribution' => $this->attributionManager->getClientConfig()]
+        );
+    }
+
+    /**
+     * The recommendations script's config: the store route it asks and what
+     * it reads consent from, as the tracker does.
+     */
+    public function getRecommendationsConfigJson(): string
+    {
+        return $this->serializer->serialize(
+            ['url' => $this->urlBuilder->getUrl('smaily/recommendations')] + $this->consentConfig()
+        );
+    }
+
+    /**
+     * What the storefront scripts read the shopper's consent from
+     * (js/consent.js).
+     *
+     * @return array{cookieRestriction: bool, websiteId: int}
+     */
+    private function consentConfig(): array
+    {
+        return [
             // Cast deliberately: the helper is annotated @return bool but
             // actually returns the raw config value — the string "0" when
             // restriction mode is off, which is truthy in JS and would make
-            // the tracker wait for a cookie notice the store never shows.
+            // the scripts wait for a cookie notice the store never shows.
             'cookieRestriction' => (bool)$this->cookieHelper->isCookieRestrictionModeEnabled(),
             // The cookie notice's cookie lists the websites the shopper
-            // accepted on; the tracker reads it for this website only.
+            // accepted on; the scripts read it for this website only.
             'websiteId' => (int)$this->storeManager->getWebsite()->getId(),
-            'attribution' => $this->attributionManager->getClientConfig(),
-        ]);
+        ];
     }
 }

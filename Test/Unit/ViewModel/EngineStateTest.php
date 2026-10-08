@@ -53,13 +53,32 @@ class EngineStateTest extends TestCase
         self::assertSame(2, $config['websiteId']);
     }
 
+    /**
+     * PRO-3790: the recommendations script asks the store's own route and
+     * reads consent as the tracker does.
+     */
+    public function testRecommendationsConfigNamesTheRouteAndTheConsentSources(): void
+    {
+        $cookieHelper = $this->createMock(CookieHelper::class);
+        $cookieHelper->method('isCookieRestrictionModeEnabled')->willReturn('0');
+
+        $config = json_decode($this->viewModel($cookieHelper, '2')->getRecommendationsConfigJson(), true);
+
+        self::assertSame(
+            ['url' => 'https://store.example/smaily/recommendations/', 'cookieRestriction' => false, 'websiteId' => 2],
+            $config
+        );
+    }
+
     private function viewModel(CookieHelper $cookieHelper, string $websiteId): EngineState
     {
         $attributionManager = $this->createMock(AttributionManager::class);
         $attributionManager->method('getClientConfig')->willReturn([]);
 
         $urlBuilder = $this->createMock(UrlInterface::class);
-        $urlBuilder->method('getUrl')->willReturn('https://store.example/smaily/relay/');
+        $urlBuilder->method('getUrl')->willReturnCallback(
+            static fn (string $route): string => 'https://store.example/' . $route . '/'
+        );
 
         $website = $this->createMock(WebsiteInterface::class);
         $website->method('getId')->willReturn($websiteId);

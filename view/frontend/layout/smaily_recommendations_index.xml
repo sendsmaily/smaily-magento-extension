@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!-- The shopper's recommendation cards (Controller\Recommendations\Index):
+     only the cards, no page around them. The block is not cacheable, so the
+     answer never enters the full-page cache and the customer session is
+     not cleared before the cards are rendered. The price renderer is the one
+     Magento_Catalog declares in its default handle, which a layout answer
+     does not load. -->
+<layout xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/layout_generic.xsd">
+    <container name="root">
+        <block class="Magento\Catalog\Block\Product\AbstractProduct"
+               name="smaily.recommendations"
+               template="Smaily_Connect::recommendations/cards.phtml"
+               cacheable="false"/>
+    </container>
+    <block class="Magento\Framework\Pricing\Render" name="product.price.render.default">
+        <arguments>
+            <argument name="price_render_handle" xsi:type="string">catalog_product_prices</argument>
+            <argument name="use_link_for_as_low_as" xsi:type="boolean">true</argument>
+        </arguments>
+    </block>
+</layout>

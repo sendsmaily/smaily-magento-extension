@@ -75,6 +75,21 @@ class AttributionManager
     }
 
     /**
+     * A link that lands on $url as a click on recommendation $recId in
+     * $context: the landing parameters the capture script reads (engine
+     * config wins) appended to the URL's own query.
+     */
+    public function landingUrl(string $url, string $recId, string $context): string
+    {
+        $config = $this->getClientConfig();
+
+        return $url . (str_contains($url, '?') ? '&' : '?') . http_build_query([
+            (string)$config['paramRecId'] => $recId,
+            (string)$config['paramContext'] => $context,
+        ]);
+    }
+
+    /**
      * Read the attribution cookies from the current request.
      *
      * Each value is shape-checked on its own (RecId, AttributionShape): an

@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!-- The shopper's recommendation cards as Hyvä product cards (the base
+     template uses Luma's product-list markup). -->
+<layout xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/layout_generic.xsd">
+    <referenceBlock name="smaily.recommendations"
+                    template="Hyva_SmailyConnect::recommendations/cards.phtml"/>
+</layout>

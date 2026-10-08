@@ -32,6 +32,7 @@ use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\SleeperInterface;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
+use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
 use Smaily\Connect\Model\StorefrontScript;
 
 /**
@@ -186,10 +187,8 @@ class IndexTest extends TestCase
             $settings,
             $client,
             new BrowseEventValidator(),
-            new FixedWindowCounter($cache),
-            $dateTime,
-            $this->createMock(Logger::class),
-            new RemoteAddress($request)
+            new PerAddressLimiter(new FixedWindowCounter($cache), $dateTime, new RemoteAddress($request)),
+            $this->createMock(Logger::class)
         );
     }
 }

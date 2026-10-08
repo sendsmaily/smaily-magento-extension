@@ -23,7 +23,8 @@ with the Smaily Connect plugins for WooCommerce and Shopify.
   limit and sort parameters and storefront-accurate pricing.
 - **Campaign Intelligence** *(optional)* — catalog, customer, order and
   browse data power personalized recommendations, attribution and
-  engine-run automations (replenishment, win-back, …).
+  engine-run automations (replenishment, win-back, …); a CMS widget shows
+  each shopper their recommendations on the store's pages.
 - **Operational visibility** — durable delivery queues with automatic
   retries, admin event logs with one-click retry, health notices, and
   chunked historical imports that never block live traffic.

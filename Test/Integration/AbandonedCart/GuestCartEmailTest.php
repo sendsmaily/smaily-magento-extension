@@ -17,6 +17,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use Smaily\Connect\Model\AbandonedCart\GuestCartEmail;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
+use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\FakeCache;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
@@ -319,7 +320,7 @@ class GuestCartEmailTest extends IntegrationTestCase
             $storeManager,
             new FixedWindowCounter($this->cache),
             $this->clock,
-            $this->remoteAddress
+            new PerAddressLimiter(new FixedWindowCounter($this->cache), $this->clock, $this->remoteAddress)
         );
     }
 

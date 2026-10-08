@@ -10,13 +10,13 @@ namespace Smaily\Connect\Model\AbandonedCart;
 
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Exception\NoSuchEntityException;
-use Magento\Framework\HTTP\PhpEnvironment\RemoteAddress;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\Validator\EmailAddress;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Api\GuestCartEmailInterface;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
+use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
 
 /**
  * Magento's checkout keeps a guest's email in the browser until the payment
@@ -71,7 +71,7 @@ class GuestCartEmail implements GuestCartEmailInterface
         private readonly StoreManagerInterface $storeManager,
         private readonly FixedWindowCounter $counter,
         private readonly DateTime $dateTime,
-        private readonly RemoteAddress $remoteAddress
+        private readonly PerAddressLimiter $limiter
     ) {
     }
 
@@ -80,7 +80,12 @@ class GuestCartEmail implements GuestCartEmailInterface
      */
     public function set(string $cartId, string $email): bool
     {
-        if (!$this->allowRequest()) {
+        if (!$this->limiter->allow(
+            'smaily_cart_email_',
+            self::RATE_LIMIT_PER_WINDOW,
+            self::RATE_WINDOW_SECONDS,
+            true
+        )) {
             return false;
         }
 
@@ -165,37 +170,5 @@ class GuestCartEmail implements GuestCartEmailInterface
         }
 
         return $this->config->isAbandonedCartEnabled($websiteId);
-    }
-
-    /**
-     * Fixed-window counter per connection address, as the browse relay's.
-     */
-    private function allowRequest(): bool
-    {
-        $caller = $this->callerKey((string)$this->remoteAddress->getRemoteAddress());
-        $window = intdiv($this->dateTime->gmtTimestamp(), self::RATE_WINDOW_SECONDS);
-        $key = 'smaily_cart_email_' . sha1($caller) . '_' . $window;
-
-        return $this->counter->allow($key, self::RATE_LIMIT_PER_WINDOW, 2 * self::RATE_WINDOW_SECONDS);
-    }
-
-    /**
-     * What the per-address limit counts by: an IPv4 address as it is, an
-     * IPv6 address by its /64 — one subscriber holds a whole /64 and can
-     * pick a fresh address in it for every request. An IPv4-mapped IPv6
-     * address (::ffff:a.b.c.d) is its IPv4 address: its /64 is the same for
-     * every IPv4 caller.
-     */
-    private function callerKey(string $ip): string
-    {
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false) {
-            return $ip;
-        }
-        $packed = (string)inet_pton($ip);
-        if (str_starts_with($packed, str_repeat("\0", 10) . "\xff\xff")) {
-            return (string)inet_ntop(substr($packed, 12));
-        }
-
-        return bin2hex(substr($packed, 0, 8)) . '/64';
     }
 }

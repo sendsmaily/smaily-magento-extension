@@ -31,8 +31,9 @@ use Smaily\Connect\Model\StorefrontScript;
  * - Endpoint URLs come from the stored endpoints map, never concatenated.
  * - Retry policy per contract: exponential backoff 1/2/4/8/16s (max 5) on
  *   429 (honouring retry_after_seconds from the body, up to 60 s) and 5xx;
- *   other 4xx never retry. The storefront browse relay is the exception:
- *   one short attempt, never a retry or a wait (relayBrowse()).
+ *   other 4xx never retry. The storefront calls are the exception: one
+ *   attempt, never a retry or a wait (relayBrowse(), and the shopper's
+ *   recommendations, recommendations()).
  * - D6 ingest responses are per-item: a 200 is never all-or-nothing.
  * - Exception messages are translated with __(): they surface in the admin
  *   UI (wizard step 4, automations form, health notices).
@@ -96,6 +97,13 @@ class Client
     /** The storefront relay's one attempt: short enough for a shopper's request. */
     private const RELAY_TIMEOUT_SECONDS = 3;
     private const RELAY_CONNECT_TIMEOUT_SECONDS = 2;
+
+    /**
+     * The shopper's recommendations (§15): asked from a background request
+     * after the page has loaded, so the page never waits; the engine ends a
+     * request after 10 s, so the client waits no longer.
+     */
+    private const RECOMMENDATIONS_TIMEOUT_SECONDS = 10;
 
     /**
      * @var array{request: array<int|string, mixed>, response: array{http_status: int, body: mixed}|null}|null
@@ -209,8 +217,8 @@ class Client
             'POST',
             $this->endpoint('ingest_' . self::DOMAIN_BROWSE),
             [self::DOMAIN_WRAPPERS[self::DOMAIN_BROWSE] => array_values($events)],
-            true,
-            true
+            singleAttempt: true,
+            timeoutSeconds: self::RELAY_TIMEOUT_SECONDS
         );
     }
 
@@ -269,6 +277,30 @@ class Client
             $this->endpoint('ingest_catalog_manifest', '/api/v1/ingest/catalog/manifest'),
             ['products' => $products],
             timeoutSeconds: self::MANIFEST_TIMEOUT_SECONDS
+        );
+    }
+
+    /**
+     * A shopper's current recommendations — POST
+     * /api/v1/recommendations/customer (contract §15): a logged-in shopper
+     * named by the store's customer id (`customer_external_id`), a guest by
+     * the visitor token (`smaily_visitor_token`, v1.10.0; only for a shopper
+     * with marketing consent). One attempt, no retry and no wait. Response:
+     * {slots: [...]}, empty for every shopper the engine has nothing for.
+     * The endpoints map carries `recommendations_customer` since v1.9.0; a
+     * connection set up earlier falls back to the contract's path.
+     *
+     * @param array<string, string> $identifier exactly one identifier, keyed as the body names it
+     * @return array<string, mixed>
+     */
+    public function recommendations(array $identifier, int $limit): array
+    {
+        return $this->request(
+            'POST',
+            $this->endpoint('recommendations_customer', '/api/v1/recommendations/customer'),
+            $identifier + ['limit' => $limit],
+            singleAttempt: true,
+            timeoutSeconds: self::RECOMMENDATIONS_TIMEOUT_SECONDS
         );
     }
 
@@ -403,8 +435,8 @@ class Client
 
     /**
      * @param array<string, mixed>|null $body
-     * @param bool $singleAttempt one short attempt, no retry and no wait (the storefront relay)
-     * @param int $timeoutSeconds the whole request's bound, unless $singleAttempt sets the relay's
+     * @param bool $singleAttempt one short attempt, no retry and no wait (the storefront calls)
+     * @param int $timeoutSeconds the whole request's bound
      * @return array<string, mixed>
      */
     private function request(
@@ -418,7 +450,7 @@ class Client
         $this->lastExchange = null;
         $retryDelays = $singleAttempt ? [] : self::RETRY_DELAYS_SECONDS;
         $options = [
-            RequestOptions::TIMEOUT => $singleAttempt ? self::RELAY_TIMEOUT_SECONDS : $timeoutSeconds,
+            RequestOptions::TIMEOUT => $timeoutSeconds,
             RequestOptions::CONNECT_TIMEOUT => $singleAttempt
                 ? self::RELAY_CONNECT_TIMEOUT_SECONDS
                 : self::CONNECT_TIMEOUT_SECONDS,

@@ -1,0 +1,26 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Bootstrap of the recommendations script. Keyed on the widget's container,
+ * so RequireJS loads the script only on a page that carries the "Smaily
+ * recommendations" widget.
+ *
+ * @var \Magento\Framework\View\Element\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\EngineState $viewModel */
+$viewModel = $block->getData('view_model');
+if (!$viewModel->isRecommendationsActive()) {
+    return;
+}
+?>
+<script type="text/x-magento-init">
+{
+    "[data-smaily-connect-recs]": {
+        "Smaily_Connect/js/recommendations": <?= /* @noEscape */ $viewModel->getRecommendationsConfigJson() ?>
+    }
+}
+</script>

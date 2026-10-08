@@ -18,5 +18,7 @@
                         template="Hyva_SmailyConnect::engine/attribution.phtml"/>
         <referenceBlock name="smaily.connect.tracker"
                         template="Hyva_SmailyConnect::engine/tracker.phtml"/>
+        <referenceBlock name="smaily.connect.recommendations"
+                        template="Hyva_SmailyConnect::engine/recommendations.phtml"/>
     </body>
 </page>

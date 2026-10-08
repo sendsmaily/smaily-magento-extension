@@ -82,6 +82,7 @@ available** — no headless path today.
 | Browse tracking (product views, searches, cart adds, checkout) | Storefront script posting to `smaily/relay` | **Needs storefront work** — see [hand-off item 4](#4-send-browse-events) |
 | Identity merge on login | Server: Magento's login event, reads the shopper's cookies | **Needs storefront work** — a GraphQL `generateCustomerToken` or REST `integration/customer/token` login links the shopper's earlier browsing to their account, as a login on Magento's own pages does, when the login request carries the cookies; see [hand-off item 3](#3-carry-the-cookies-to-order-placement) |
 | My Account > Personalization (profiling opt-out) | Magento customer account page | **Not available** — the module has no API for this choice |
+| Smaily recommendations widget (a shopper's recommendations on the store's pages) | Magento CMS widget; its script asks the back-end page `smaily/recommendations` | **Not available** — the storefront cannot call that page for it either: the page names the shopper by Magento's own customer session or the visitor-token cookie on the back-end host, answers a request from another site (`Sec-Fetch-Site: cross-site` or `same-site`) with nothing, and returns the Magento theme's product cards |
 | GDPR erase command | Server: CLI | **Works** |
 
 ## Product links and images

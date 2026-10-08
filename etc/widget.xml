@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<widgets xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Widget:etc/widget.xsd">
+    <widget id="smaily_connect_recommendations"
+            class="Smaily\Connect\Block\Widget\Recommendations"
+            is_email_compatible="false">
+        <label translate="true">Smaily recommendations</label>
+        <description translate="true">The shopper's own product recommendations from Smaily Campaign Intelligence, shown after the page has loaded.</description>
+    </widget>
+</widgets>

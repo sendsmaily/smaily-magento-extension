@@ -1,7 +1,7 @@
 # Upgrading from Smaily for Magento 2.8.x
 
 Version 3 is a ground-up rewrite (module `Smaily_Connect`, replacing
-`Smaily_SmailyForMagento`), but upgrading is a normal composer update — the
+`Smaily_SmailyForMagento`), but upgrading is a normal composer upgrade — the
 package name is unchanged and your settings migrate automatically.
 
 ## Before you upgrade: what to note down
@@ -11,8 +11,9 @@ v3 after the upgrade (the upgrade deletes the 2.8.x values, see below).
 Open **Stores > Configuration > Smaily Email Marketing and Automation >
 Module Configuration** and read the fields below at **Default Config**,
 then at **each website** in the scope switcher. The 2.8.x admin has no
-store-view settings. In v3, compare them under **Smaily Connect >
-Settings** with the same website selected.
+store-view settings. In v3, compare them in the initial setup and under
+**Smaily Connect > Settings** with the same website selected (see
+*After the upgrade: the initial setup*).
 
 | 2.8.x group > field | Read at | In v3 |
 |---|---|---|
@@ -52,15 +53,65 @@ keeps it that way, so there is nothing to do before you upgrade:
 
 ## Steps
 
+Check the Magento and PHP versions first: version 3 needs Magento
+**2.4.4 or newer** and PHP **8.1 – 8.4** (see
+[INSTALLING.md](INSTALLING.md#before-you-start)). Run every command below
+from the Magento root, as the user that owns the Magento files.
+
+`composer update smaily/smailyformagento` alone keeps 2.8.x: the
+constraint that the 2.8.x install wrote into `composer.json` (`^2.8`) does
+not allow version 3. Require version 3 instead, as below. Until 3.0.0 is
+released, give the release candidate's exact version, as the
+[releases page](https://github.com/sendsmaily/smaily-magento-extension/releases)
+names it — for example `composer require smaily/smailyformagento:3.0.0-rc10`.
+`^3.0` does not install a release candidate on a standard Magento project,
+which accepts stable versions only.
+
+**Production mode** (check with `bin/magento deploy:mode:show`):
+
 ```bash
-composer update smaily/smailyformagento
+bin/magento maintenance:enable
+composer require smaily/smailyformagento:^3.0
 bin/magento setup:upgrade
-bin/magento setup:di:compile   # production mode
+bin/magento setup:di:compile
+bin/magento setup:static-content:deploy en_US   # list every locale your admin and storefront use, e.g. en_US et_EE
+bin/magento maintenance:disable
 bin/magento cache:flush
 ```
 
-That's it. The old module is replaced by `Smaily_Connect` in the same
-package; `setup:upgrade` runs the migration.
+Keep maintenance mode on until the last command. `setup:upgrade` empties
+`pub/static`, and until `setup:static-content:deploy` has run, every
+storefront and admin page fails with "Unable to retrieve deployment
+version of static files".
+
+**Developer or default mode:**
+
+```bash
+composer require smaily/smailyformagento:^3.0
+bin/magento setup:upgrade
+bin/magento cache:flush
+```
+
+The old module is replaced by `Smaily_Connect` in the same package:
+`setup:upgrade` enables `Smaily_Connect` (no `module:enable` is needed)
+and runs the migration. `bin/magento module:status Smaily_Connect` then
+answers `Module is enabled`.
+
+## After the upgrade: the initial setup
+
+Every **Marketing > Smaily Connect** page (Dashboard, Settings, Log) opens
+**Initial setup** until the initial setup is finished for the website
+selected. On a store with more than one website, it first asks which
+website to set up; run it once for each website. The migrated settings are
+filled in: when the website's Smaily account carried over, the setup opens
+on the Contacts step, and the Automations step shows the migrated
+workflows and wait time. Compare each step with your notes, in
+particular each automation's *Enabled* tick, then finish the setup.
+
+Finishing the Contacts step switches contact synchronization on for that
+website. For a website where 2.8.x had *Enable Module = No*, switch it off
+again afterwards: untick **Sync contacts to Smaily** under **Settings >
+Contacts** and save.
 
 ## What migrates automatically
 

@@ -54,8 +54,9 @@ module.
 
 ### Upgrading from Smaily for Magento 2.8.x
 
-Just update the package and run `bin/magento setup:upgrade` — see
-[UPGRADING.md](UPGRADING.md) for exactly what is migrated and what changed.
+Require version 3 with composer (`composer update` alone stays on 2.8.x)
+and run the Magento setup commands — see [UPGRADING.md](UPGRADING.md) for
+the commands, exactly what is migrated and what changed.
 
 ---
 

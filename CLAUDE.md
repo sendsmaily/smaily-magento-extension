@@ -186,15 +186,27 @@ merge or cherry-pick batch too), not on `master` afterwards:
    A feature PR touches neither CHANGELOG.md nor STATUS.md: its changelog
    bullet is a `changelog.d/<ISSUE>.md` fragment, and STATUS.md is the
    maintainer's ("Keeping the docs current" above).
-3. **Erkki merges every PR himself, always with Squash and merge.** Its
-   default message is the list of commit messages, NOT the PR description,
-   so the merger passes it explicitly (`gh pr merge <n> --squash --subject
-   "<title>" --body-file <description file>`) and removes any
-   `Co-authored-by` lines GitHub proposes.
+3. **The session orchestrator squash-merges it once CI is green** (Erkki,
+   2026-10-09 — as in the Woo repo; until then Erkki merged by hand). Squash
+   is the only merge method; its default message is the list of commit
+   messages, NOT the PR description, so the merger passes it explicitly:
+   `gh pr merge <n> --squash --admin --subject "<title> (#<n>)" --body-file
+   <description file>`, after checking the body has no attribution and no
+   "Depends on" note. Then check the PR reads MERGED before removing its
+   worktree or branch. A PR stacked on another is rebased onto `master`
+   (only its own commits) and CI-green again before its merge.
 
-No branch rule is configured on `master` and none is planned (owner decision
-2026-10-07): agents push only topic branches, never `master`. No staged
-review by the Smaily team — Erkki maintains the repo.
+`master` requires a review (a Smaily organisation rule, not a repository
+ruleset — `rules/branches/master` is empty), so a merge goes through only
+with `--admin`, which Erkki's account holds. Erkki allowed it (2026-10-09)
+with `Bash(gh pr merge:*)` in this repo's `.claude/settings.local.json`
+(local, excluded in `.git/info/exclude`). If the auto-mode classifier still
+refuses a merge, hand Erkki the PR link — never work around it. In a merge
+script every guard is an explicit `if …; then exit 1; fi` (a `! cmd` guard
+does not abort under `set -e`), and the PR state is read back after the
+merge: on 2026-10-09 a refused merge printed "merged". Agents push only
+topic branches, never `master`. No staged review by the Smaily team —
+Erkki maintains the repo.
 
 **No attribution (Erkki, 2026-10-07).** Commit messages, PR titles and
 bodies, and merge commits carry NO `Co-Authored-By` trailer and NO AI
@@ -326,4 +338,5 @@ is written in English.
   canceled, PRO-3680 done); 2026-10-04: 0 open (PRO-1357 closed);
   2026-10-05: 0 open; 2026-10-07: 0 open; 2026-10-07 evening: 0 open
   (PRO-3957 closed); 2026-10-08: 0 open. Dates: none yet (2026-10-02 —
-  not asked; PRO-2456 is placed before the rc1 tag).
+  not asked; PRO-2456 is placed before the rc1 tag). **The Epic is
+  Completed (2026-10-05)**; new admin UI work goes into the v3 rewrite Epic.

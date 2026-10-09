@@ -201,6 +201,7 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
             'smaily/subscribe/workflowId' => '55',
             'smaily/sync/enableCronSync' => '1',
             'smaily/abandoned/enableAbandonedCart' => '1',
+            'smaily/abandoned/autoresponderId' => '77',
         ]);
         // Website 2: its own Yes and its own values for all three.
         $this->seed('websites', 2, [
@@ -269,6 +270,57 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
         self::assertSame(101, $this->config->getWelcomeWorkflow(2));
         foreach ([1, 3, 4] as $websiteId) {
             self::assertFalse($this->config->isWelcomeEnabled($websiteId), 'Website ' . $websiteId);
+        }
+    }
+
+    public function testAWebsiteWithAbandonedCartOffKeepsItOffUnderADefaultScopeWithItOn(): void
+    {
+        // PRO-4013: 2.8.x read the abandoned-cart settings per website.
+        $this->env->resetState();
+        $this->seed('default', 0, [
+            'smaily/abandoned/enableAbandonedCart' => '1',
+            'smaily/abandoned/autoresponderId' => '77',
+            'smaily/abandoned/syncTime' => '2:hour',
+        ]);
+        $this->seed('websites', 1, ['smaily/abandoned/enableAbandonedCart' => '0']);
+        // "No automation workflow selected": 2.8.x sent no reminder there.
+        $this->seed('websites', 3, ['smaily/abandoned/autoresponderId' => '']);
+
+        $this->migrate();
+
+        self::assertFalse($this->config->isAbandonedCartEnabled(1));
+        self::assertFalse($this->config->isAbandonedCartEnabled(3));
+        foreach ([2, 4] as $websiteId) {
+            self::assertTrue($this->config->isAbandonedCartEnabled($websiteId), 'Website ' . $websiteId);
+            self::assertSame(77, $this->config->getAbandonedCartWorkflow($websiteId));
+            self::assertSame(120, $this->config->getAbandonedCutoffMinutes($websiteId));
+        }
+    }
+
+    public function testAWebsiteWithAbandonedCartOnUsesTheDefaultWorkflowAndDelayUnderADefaultScopeWithItOff(): void
+    {
+        $this->env->resetState();
+        $this->seed('default', 0, [
+            'smaily/abandoned/enableAbandonedCart' => '0',
+            'smaily/abandoned/autoresponderId' => '77',
+            'smaily/abandoned/syncTime' => '2:hour',
+        ]);
+        $this->seed('websites', 2, ['smaily/abandoned/enableAbandonedCart' => '1']);
+        $this->seed('websites', 3, [
+            'smaily/abandoned/enableAbandonedCart' => '1',
+            'smaily/abandoned/syncTime' => '1:hour',
+        ]);
+
+        $this->migrate();
+
+        self::assertTrue($this->config->isAbandonedCartEnabled(2));
+        self::assertSame(77, $this->config->getAbandonedCartWorkflow(2));
+        self::assertSame(120, $this->config->getAbandonedCutoffMinutes(2));
+        self::assertTrue($this->config->isAbandonedCartEnabled(3));
+        self::assertSame(77, $this->config->getAbandonedCartWorkflow(3));
+        self::assertSame(60, $this->config->getAbandonedCutoffMinutes(3));
+        foreach ([1, 4] as $websiteId) {
+            self::assertFalse($this->config->isAbandonedCartEnabled($websiteId), 'Website ' . $websiteId);
         }
     }
 

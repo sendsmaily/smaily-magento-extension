@@ -38,10 +38,10 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
  * there in 2.8.x — its own value, else the default scope's, else the
  * config.xml default — so it runs as it did in 2.8.x.
  *
- * Welcome: a scope with its own 2.8.x opt-in switch or Autoresponder ID
- * gets its own welcome switch, on when 2.8.x sent the welcome email there —
- * the opt-in switch on and an Autoresponder ID set, each the website's own
- * value else the default scope's (LegacyConfigMapper).
+ * Welcome and abandoned cart: a scope with its own 2.8.x switch or
+ * Autoresponder ID for one of them gets its own v3 switch for it, on when
+ * 2.8.x sent that email there — the switch on and an Autoresponder ID set,
+ * each the website's own value else the default scope's (LegacyConfigMapper).
  *
  * Store-view rows: 2.8.x read every setting per website, so it never read a
  * store-view row. v3 reads the Smaily account per store view, so the

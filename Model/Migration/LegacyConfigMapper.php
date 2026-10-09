@@ -29,11 +29,6 @@ class LegacyConfigMapper
     public const FLAG_ENCRYPT = 'encrypt';
 
     /**
-     * The 2.8.x settings that decided whether the welcome email was sent.
-     */
-    private const OPT_IN_PATHS = ['subscribe/enableNewsletterSubscriptions', 'subscribe/workflowId'];
-
-    /**
      * Legacy 2.8.x sync-field name => the v3 field id (which is also the
      * Smaily wire key). Only `gender` moved: v3 sends it under the
      * cross-platform canon `user_gender` (see Config\Source\SyncFields).
@@ -101,22 +96,19 @@ class LegacyConfigMapper
             $set(Config::XML_PATH_PASSWORD, (string)$legacy['general/password'], [self::FLAG_ENCRYPT]);
         }
 
-        // Newsletter opt-in autoresponder -> welcome automation. 2.8.x sent
-        // the welcome email where the opt-in switch and the Autoresponder ID,
-        // each the scope's own value else the inherited one, were both set.
+        // Newsletter opt-in autoresponder -> welcome automation.
         $welcomeWorkflow = (int)($legacy['subscribe/workflowId'] ?? 0);
         if ($welcomeWorkflow > 0) {
             $set(Config::XML_PATH_WELCOME_WORKFLOW, (string)$welcomeWorkflow);
         }
-        $optIn = array_filter(
-            array_intersect_key($legacy, array_flip(self::OPT_IN_PATHS)),
-            static fn (?string $value): bool => $value !== null
+        $welcomeSent = $this->sent(
+            $legacy,
+            $inherited,
+            'subscribe/enableNewsletterSubscriptions',
+            'subscribe/workflowId'
         );
-        if ($optIn) {
-            $resolved = $optIn + $inherited;
-            $sent = $this->flag($resolved, 'subscribe/enableNewsletterSubscriptions')
-                && (int)($resolved['subscribe/workflowId'] ?? 0) > 0;
-            $set(Config::XML_PATH_WELCOME_ENABLED, $sent ? '1' : '0');
+        if ($welcomeSent !== null) {
+            $set(Config::XML_PATH_WELCOME_ENABLED, $welcomeSent);
         }
 
         // Subscriber synchronization.
@@ -141,11 +133,9 @@ class LegacyConfigMapper
         }
 
         // Abandoned cart.
-        if (isset($legacy['abandoned/enableAbandonedCart'])) {
-            $set(
-                Config::XML_PATH_ABANDONED_ENABLED,
-                $this->flag($legacy, 'abandoned/enableAbandonedCart') ? '1' : '0'
-            );
+        $abandonedSent = $this->sent($legacy, $inherited, 'abandoned/enableAbandonedCart', 'abandoned/autoresponderId');
+        if ($abandonedSent !== null) {
+            $set(Config::XML_PATH_ABANDONED_ENABLED, $abandonedSent);
         }
         $abandonedWorkflow = (int)($legacy['abandoned/autoresponderId'] ?? 0);
         if ($abandonedWorkflow > 0) {
@@ -223,6 +213,29 @@ class LegacyConfigMapper
         $minutes = (int)$amount * (str_starts_with(trim($unit), 'hour') ? 60 : 1);
 
         return max(Config::MIN_ABANDONED_CUTOFF_MINUTES, min(1440, $minutes));
+    }
+
+    /**
+     * Whether 2.8.x sent the automation's email at this scope: its switch on
+     * and its Autoresponder ID set, each the scope's own value else the
+     * inherited one ('1' or '0'); null when the scope has neither value of
+     * its own, so it keeps following the scope above it.
+     *
+     * @param array<string, string|null> $legacy
+     * @param array<string, string|null> $inherited
+     */
+    private function sent(array $legacy, array $inherited, string $switchPath, string $workflowPath): ?string
+    {
+        $own = array_filter(
+            array_intersect_key($legacy, array_flip([$switchPath, $workflowPath])),
+            static fn (?string $value): bool => $value !== null
+        );
+        if (!$own) {
+            return null;
+        }
+        $resolved = $own + $inherited;
+
+        return $this->flag($resolved, $switchPath) && (int)($resolved[$workflowPath] ?? 0) > 0 ? '1' : '0';
     }
 
     /**

@@ -334,6 +334,9 @@ class GdprEraseTest extends IntegrationTestCase
             );
         }
 
+        // Both carts are ordered: a marker of an active cart stays (PRO-4008).
+        $this->connection->update('quote', ['is_active' => 0], ['entity_id IN (?)' => [31, 32]]);
+
         /** @var QueueJanitor $janitor */
         $janitor = $this->objectManager->create(QueueJanitor::class);
         $janitor->execute();

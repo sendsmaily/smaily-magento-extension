@@ -155,6 +155,21 @@ class JobManager
     }
 
     /**
+     * Whether an import of this kind has ever completed, for any website —
+     * the customers-import notice (Model/Adminhtml/CustomersImportNotice,
+     * PRO-4007) reads it.
+     */
+    public function hasCompleted(string $jobType, string $target): bool
+    {
+        $collection = $this->collectionFactory->create();
+        $collection->addFieldToFilter('status', Job::STATUS_COMPLETED)
+            ->addFieldToFilter('job_type', $jobType)
+            ->addFieldToFilter('target', $target);
+
+        return $collection->getSize() > 0;
+    }
+
+    /**
      * Whether an import of this kind is queued or running and the import
      * worker still moves (PRO-3854): some queued or running job — this one,
      * or the one ahead of it in line — was written within $stalledAfterSeconds.

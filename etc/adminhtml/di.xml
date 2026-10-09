@@ -11,6 +11,15 @@
         <plugin name="smaily_connect_validate_connection" type="Smaily\Connect\Plugin\Adminhtml\ValidateConnectionOnSave"/>
     </type>
 
+    <!-- The customers-import notice in the admin's system messages (PRO-4007). -->
+    <type name="Magento\Framework\Notification\MessageList">
+        <arguments>
+            <argument name="messages" xsi:type="array">
+                <item name="smaily_connect_customers_import" xsi:type="string">Smaily\Connect\Model\Adminhtml\CustomersImportNotice</item>
+            </argument>
+        </arguments>
+    </type>
+
     <!-- Admin grid data sources. -->
     <type name="Magento\Framework\View\Element\UiComponent\DataProvider\CollectionFactory">
         <arguments>

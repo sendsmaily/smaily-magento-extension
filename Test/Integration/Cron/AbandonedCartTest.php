@@ -20,6 +20,7 @@ use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
 use Smaily\Connect\Cron\AbandonedCart;
+use Smaily\Connect\Cron\QueueJanitor;
 use Smaily\Connect\Model\AbandonedCart\PayloadBuilder;
 use Smaily\Connect\Model\AbandonedCart\StateManager;
 use Smaily\Connect\Model\Config;
@@ -243,6 +244,39 @@ class AbandonedCartTest extends IntegrationTestCase
         self::assertSame(StateManager::STATUS_MAILED, $this->statusOf(5), 'The older cart of the address');
         self::assertSame(StateManager::STATUS_SKIPPED, $this->statusOf(6));
         self::assertSame(StateManager::STATUS_MAILED, $this->statusOf(7));
+    }
+
+    /**
+     * PRO-4008: the retention sweep keeps an erased marker past its 30 days
+     * while the cart is active, and the cart, still holding the erased
+     * address, changing again gets no reminder.
+     */
+    public function testAnActiveCartKeepsItsErasedMarkerAndChangingAgainSendsNoReminder(): void
+    {
+        $this->idleCarts([8 => 'erased-shopper@example.com']);
+        $this->connection->insert(self::CART_TABLE, [
+            'quote_id' => 8,
+            'store_id' => 1,
+            'email' => null,
+            'status' => StateManager::STATUS_ERASED,
+        ]);
+        $this->connection->update(
+            self::CART_TABLE,
+            ['updated_at' => $this->clockDate(-31 * 86400)],
+            ['quote_id = ?' => 8]
+        );
+
+        $this->objectManager->create(QueueJanitor::class)->execute();
+        self::assertSame(StateManager::STATUS_ERASED, $this->statusOf(8), 'The marker of the active cart stays');
+
+        // The shopper changes the cart again; it idles past the cutoff.
+        $this->clock->travel(86400);
+        $this->idleCarts([8 => 'erased-shopper@example.com']);
+        $this->cron()->execute();
+
+        self::assertSame(StateManager::STATUS_ERASED, $this->statusOf(8));
+        self::assertSame([], $this->builds, 'The cart is not weighed for a reminder');
+        self::assertSame([], $this->fetchAll(EventResource::TABLE_NAME), 'No reminder is queued');
     }
 
     private function cron(?Emulation $emulation = null): AbandonedCart

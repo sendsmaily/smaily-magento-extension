@@ -1281,7 +1281,8 @@ waiting import follows. Its own card then offers only **Cancel import**.
 - Sent queue rows are pruned after 30 days, failed rows after 90. The same
   nightly job also tidies the abandoned-cart tracker — the small table that
   remembers which carts the extension has already dealt with: a finished
-  record (reminded, skipped, purchased, expired, erased) is dropped 30 days on, and
+  record (reminded, skipped, purchased, expired, erased) is dropped 30 days on
+  (an erased one only once its cart is ordered or closed, see below), and
   so is any record whose cart Magento has already deleted. A cart that is
   still in the store and still being watched is never touched.
 
@@ -1381,11 +1382,12 @@ waiting import follows. Its own card then offers only **Cancel import**.
   dealt with yet (idle for less than the cutoff, or a guest's typed email), so
   no abandoned-cart reminder goes out for it after the erasure; the cart
   itself is not changed, and it counts among the anonymized carts the command
-  prints. The erased record is not kept
-  forever: it goes with the ordinary 30-day tidy-up above, counted from the
-  record's last change before the erasure (the erasure does not restart it),
-  or sooner if the cart itself is deleted. If that shopper's cart later
-  turns into an order, the record stays marked erased. If they come back,
+  prints. The erased record stays as long as the cart is still open in the
+  store, because the cart itself still holds the address. Once the cart is
+  ordered or closed, the record goes with the ordinary 30-day tidy-up above,
+  counted from the record's last change before the erasure (the erasure does
+  not restart it); it goes sooner if the cart itself is deleted. If that
+  shopper's cart later turns into an order, the record stays marked erased. If they come back,
   type their address at
   checkout and tick the newsletter box themselves, that new address is
   stored — it is their own fresh choice — but the record stays erased, so

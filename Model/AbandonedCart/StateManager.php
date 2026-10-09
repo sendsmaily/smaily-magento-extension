@@ -388,14 +388,30 @@ class StateManager
     /**
      * Retention sweep, driven by Cron\QueueJanitor: drop terminal rows —
      * including the Art. 17 tombstone — last touched before the cutoff.
+     *
+     * A tombstone stays while its quote is active (PRO-4008): the quote still
+     * carries the erased address, and without the tombstone the reminder
+     * cron would mail it the next time the cart changes. Once the quote is
+     * ordered, closed or gone, the tombstone goes on the cutoff like any
+     * other terminal row. A LEFT JOIN on the quote's primary key, as in
+     * pruneOrphans().
      */
     public function pruneTerminal(string $cutoff): int
     {
         $connection = $this->resourceConnection->getConnection(self::CONNECTION);
         $select = $connection->select()
-            ->from($this->table(), ['id'])
-            ->where('status IN (?)', self::TERMINAL_STATUSES)
-            ->where('updated_at < ?', $cutoff)
+            ->from(['cart' => $this->table()], ['id'])
+            ->joinLeft(
+                ['quote_table' => $this->resourceConnection->getTableName('quote', self::CONNECTION)],
+                'quote_table.entity_id = cart.quote_id',
+                []
+            )
+            ->where('cart.status IN (?)', self::TERMINAL_STATUSES)
+            ->where('cart.updated_at < ?', $cutoff)
+            ->where(
+                'cart.status <> ? OR quote_table.is_active IS NULL OR quote_table.is_active <> 1',
+                self::STATUS_ERASED
+            )
             ->limit(self::DELETE_CHUNK);
 
         return $this->deleteInChunks($select);

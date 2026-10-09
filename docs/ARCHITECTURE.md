@@ -785,7 +785,8 @@ below.
   and the window, while the SQL stays with the table's owner
   (`StateManager::pruneTerminal()` / `pruneOrphans()`): a terminal row
   (`mailed`, `skipped`, `completed`, `expired`, `erased`) older than the 30-day window
-  goes, and so does any row whose `quote_id` is no longer in `quote`,
+  goes — an `erased` one only once its quote is no longer active (below) —
+  and so does any row whose `quote_id` is no longer in `quote`,
   whatever its status; Magento's own quote cleanup does not cascade onto the
   side table, and a marker with nothing left to mark is dead weight. A live
   quote in a non-terminal status is never touched: that row is what keeps
@@ -824,12 +825,18 @@ below.
   `StateManager::STATUS_ERASED` — which `excludeHandled()` covers like
   any other terminal status, so `Cron\AbandonedCart` neither mails that
   quote nor tracks it afresh, and the status no longer reads `mailed`, so the
-  PRO-2453 purchase marker never fires for an erased contact either. The
-  tombstone carries no special retention — it leaves on the ordinary 30-day
-  cart sweep, like any other terminal row. Both writes that make it (the
+  PRO-2453 purchase marker never fires for an erased contact either. **The
+  tombstone stays while its quote is active (PRO-4008):** the quote still
+  carries the erased address, so without the tombstone the next change to
+  that cart would make it a reminder candidate again. `pruneTerminal()`
+  LEFT JOINs `quote` on its primary key and skips an `erased` row whose
+  `quote.is_active` is 1; once the quote is ordered or closed (`is_active`
+  0) or gone, the tombstone leaves on the ordinary 30-day cart sweep, like
+  any other terminal row (a gone quote's row leaves at once, as an orphan).
+  Both writes that make it (the
   UPDATE and the upsert below) write `updated_at` as itself, as the queue
   rows do (PRO-3964): an existing row keeps its last-changed time, so the
-  sweep takes it 30 days after that time, not 30 days after the erasure.
+  sweep counts the 30 days from that time, not from the erasure.
   The export lists cart rows by address, so a tombstone is by construction
   unlisted — there is no address left to match, and the row holds nothing
   else personal. Two writes may

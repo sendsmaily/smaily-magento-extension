@@ -77,7 +77,8 @@ class QueueJanitorTest extends IntegrationTestCase
     public function testAbandonedCartRowsGoOnRetentionAndOnAVanishedQuote(): void
     {
         foreach (range(1, 5) as $entityId) {
-            $this->schema->seedQuote($entityId);
+            // Quote 3 is ordered: its erased marker is not held (PRO-4008).
+            $this->schema->seedQuote($entityId, ['is_active' => $entityId === 3 ? 0 : 1]);
         }
         // Quotes 6 and 7 are gone from the store (Magento's own cleanup).
 
@@ -100,6 +101,43 @@ class QueueJanitorTest extends IntegrationTestCase
             $remaining,
             'A fresh terminal row and a live non-terminal row survive; everything else goes'
         );
+    }
+
+    /**
+     * PRO-4008: an erased marker past the retention window stays while its
+     * quote is active — the quote still carries the erased address, and the
+     * marker is what keeps the reminder cron off it. Once the quote is
+     * ordered or closed, or gone, the marker goes as any terminal row does.
+     * The hold is the marker's alone: another terminal row of an active
+     * quote still goes.
+     */
+    public function testAnErasedMarkerStaysWhileItsCartIsActive(): void
+    {
+        $this->schema->seedQuote(11, ['is_active' => 1]);
+        $this->schema->seedQuote(12, ['is_active' => 0]);
+        $this->schema->seedQuote(14, ['is_active' => 1]);
+        // Quote 13 is gone from the store.
+
+        $this->seedCartRow(11, StateManager::STATUS_ERASED, 31);
+        $this->seedCartRow(12, StateManager::STATUS_ERASED, 31);
+        $this->seedCartRow(13, StateManager::STATUS_ERASED, 31);
+        $this->seedCartRow(14, StateManager::STATUS_COMPLETED, 31);
+
+        /** @var QueueJanitor $janitor */
+        $janitor = $this->objectManager->create(QueueJanitor::class);
+        $janitor->execute();
+
+        self::assertSame(
+            [11],
+            array_map('intval', array_column($this->fetchAll(self::CART_TABLE), 'quote_id')),
+            'Only the marker of the active cart stays'
+        );
+
+        // The cart is ordered: the next run takes the marker.
+        $this->connection->update('quote', ['is_active' => 0], ['entity_id = ?' => 11]);
+        $janitor->execute();
+
+        self::assertSame([], $this->fetchAll(self::CART_TABLE));
     }
 
     private function seedCartRow(int $quoteId, string $status, int $ageDays): void

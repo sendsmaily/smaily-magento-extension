@@ -85,7 +85,11 @@ a payload builder or client. End-to-end verification steps live in
 
 A version cut is a pull request like any other: it sets the version in
 `composer.json` and `Model/ModuleInfo.php` (keep them in sync), names it
-in `CHANGELOG.md`, and moves every fragment in `changelog.d/` into the
+in `CHANGELOG.md`, updates the release-candidate version in the merchant
+install and upgrade commands (README "Installation", `docs/UPGRADING.md`
+"Steps", and the `#install` and `#upgrading` sections of
+`docs/site/index.html` in both languages; at 3.0.0 they drop the exact
+version), and moves every fragment in `changelog.d/` into the
 "Changes since <previous version>" list, oldest first —
 `bin/collect-changelog.sh` prints them in the order they landed on `master` —
 then deletes the fragments. After it is merged, publish a GitHub release on `master`

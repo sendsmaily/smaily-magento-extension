@@ -61,17 +61,17 @@ from the Magento root, as the user that owns the Magento files.
 `composer update smaily/smailyformagento` alone keeps 2.8.x: the
 constraint that the 2.8.x install wrote into `composer.json` (`^2.8`) does
 not allow version 3. Require version 3 instead, as below. Until 3.0.0 is
-released, give the release candidate's exact version, as the
+released, the commands give the release candidate's exact version, as the
 [releases page](https://github.com/sendsmaily/smaily-magento-extension/releases)
-names it — for example `composer require smaily/smailyformagento:3.0.0-rc10`.
-`^3.0` does not install a release candidate on a standard Magento project,
-which accepts stable versions only.
+names it: `^3.0` does not install a release candidate on a standard Magento
+project, which accepts stable versions only. From 3.0.0 on,
+`composer require smaily/smailyformagento:^3.0` is enough.
 
 **Production mode** (check with `bin/magento deploy:mode:show`):
 
 ```bash
 bin/magento maintenance:enable
-composer require smaily/smailyformagento:^3.0
+composer require smaily/smailyformagento:3.0.0-rc10
 bin/magento setup:upgrade
 bin/magento setup:di:compile
 bin/magento setup:static-content:deploy en_US   # list every locale your admin and storefront use, e.g. en_US et_EE
@@ -87,7 +87,7 @@ version of static files".
 **Developer or default mode:**
 
 ```bash
-composer require smaily/smailyformagento:^3.0
+composer require smaily/smailyformagento:3.0.0-rc10
 bin/magento setup:upgrade
 bin/magento cache:flush
 ```

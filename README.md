@@ -59,8 +59,9 @@ run the same `bin/magento` commands. Each release also carries a `.sha256`
 file next to the ZIP — `sha256sum -c smaily-connect-magento2.zip.sha256`
 confirms you downloaded the archive we built.
 
-**Upgrading from 2.8.x?** It's seamless — settings migrate automatically.
-See [UPGRADING.md](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/UPGRADING.md).
+**Upgrading from 2.8.x?** Settings migrate automatically, but
+`composer update` alone stays on 2.8.x — follow the commands in
+[UPGRADING.md](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/UPGRADING.md).
 
 ## Documentation
 

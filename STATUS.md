@@ -7,20 +7,46 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-10-08 — session handoff. **Released:** 3.0.0-rc10
-(2026-10-07), the package a pilot store installs. **On master, unreleased**
-(CHANGELOG "Changes since 3.0.0-rc10" + `changelog.d/`): PRO-3961 (#138, rows
-date their outcome), PRO-3962 (#139, a failed engine batch in one write),
-PRO-3963 (#140, erasure keeps retention), PRO-3790 (#141, connecting starts
-the customers import; #142, the "Smaily recommendations" widget — Luma
-verified, Hyvä awaits a Hyvä store), #143 (changelog fragments; this file
-maintainer-owned). **Queue:** first the 2.8.x upgrade walk (PRO-3967, High:
-HC PRO runs the old 2.8.x module); rc11 when Erkki wants it
-(`bin/collect-changelog.sh`); the pilot when a store is confirmed (HC PRO may
-be next week; check Magento ≥ 2.4.4 / PHP ≥ 8.1 and storefront type first).
-**Open for Erkki:** "Questions / tasks for Erkki" item 16. **Engine:**
-PRO-3919, PRO-3941, PRO-3956. **Backlog:** PRO-3746 (after the pilot),
-PRO-3921 / PRO-3916 (after PRO-3941 / PRO-3919), PRO-2461 (`mag-<id>` answer)._
+_Last updated: 2026-10-09 — the 3.0.0-rc11 version cut. **Released:**
+3.0.0-rc10 (2026-10-07). **This PR** (`release/3.0.0-rc11`) cuts 3.0.0-rc11:
+the version in composer.json, `ModuleInfo::VERSION`, the ModuleVersion
+docblock and the merchant commands (README, UPGRADING, the guide site's
+install, upgrade and Hyvä sections, `compat/hyva/README.md`); CHANGELOG's
+"Changes since 3.0.0-rc10" collects the `changelog.d/` fragments; the tag
+waits for Erkki's yes. **Merged to master on 2026-10-09:** #145 PRO-3964 and
+#147 PRO-4008 (an erased cart marker keeps its earlier time and stays while
+its cart is active); #149 PRO-3967 (the 2.8.x upgrade walk on Magento
+2.4.8-p4 / PHP 8.3 with two websites — the guide corrected, the settings
+carried over); #150 PRO-4009 and #153 PRO-4013 (the welcome and
+abandoned-cart carry-over follow what 2.8.x resolved per website); #151
+PRO-4010 (the setup's Contacts step keeps sync off); #152 PRO-4012 (the
+setup redirect keeps the website); #146 PRO-3953 (the guide site is live at
+https://smaily.com/connect-magento/, the admin links point there,
+`docs/USER_GUIDE.md` is a pointer); #148 PRO-4007 (a system message for a
+customers import that never completed, also when it is stalled); #154 (the
+orchestrator merges with `--admin`); #155 PRO-4011 (the exact release
+candidate in the install and upgrade commands); #156 PRO-4015 (upgrade
+notices for a welcome or abandoned cart without a workflow); #157 PRO-4018
+(a working Hyvä companion install from a clone). The live sandbox check on
+2026-10-09 passed for PRO-4007, PRO-4010 and PRO-4012. **Queue:** tag
+3.0.0-rc11 (Erkki's yes) → the HC PRO pilot when it is confirmed (check
+Magento ≥ 2.4.4 / PHP ≥ 8.1 and the storefront type first); PRO-4020 (the
+Hyvä companion on Packagist and a companion ZIP; waits for Erkki to create
+the sendsmaily repository and register it on Packagist); PRO-4019 (the
+Estonian proofread, Erkki); backlog PRO-4016, PRO-4017 (Low). **Open for
+Erkki:** "Questions / tasks for Erkki" item 16 — HC PRO's Magento/PHP
+versions and storefront type, a Hyvä store for the widget (PRO-3790),
+PRO-4019, PRO-4020's repository. **Engine:** PRO-3919, PRO-3941, PRO-3956
+unchanged. **Gotcha (sandbox):** an old pending contacts→Smaily backfill job
+(id 1, 2026-10-02) and 2 ingest rows wait in the sandbox; `cron:run` there
+sends them to the smailydemo account and the synthetic engine tenant._
+
+_Earlier (2026-10-08): session handoff after rc10 — PRO-3961 (#138),
+PRO-3962 (#139), PRO-3963 (#140) and PRO-3790 (#141 connecting starts the
+customers import; #142 the "Smaily recommendations" widget, Luma verified)
+merged; #143 brought changelog fragments and a maintainer-owned STATUS.
+Backlog then: PRO-3746 (after the pilot), PRO-3921 / PRO-3916 (after
+PRO-3941 / PRO-3919), PRO-2461 (`mag-<id>` answer)._
 
 _Earlier (2026-10-07): 3.0.0-rc10 released from the official repository
 (https://github.com/sendsmaily/smaily-magento-extension/releases/tag/3.0.0-rc10;
@@ -7264,13 +7290,18 @@ PRO-1267 (engine: Magento product-identity contract note).
     (`LegacyConfigMapper::MODULE_SWITCH_DEFAULTS`, unit-checked against
     `etc/config.xml`); the UPGRADING guide step is gone.
 
-16. Open 2026-10-08 (session handoff): (a) HC PRO's Magento and PHP
-    versions and storefront type (Luma, Hyvä or headless); it runs the
-    old 2.8.x module. (b) The Estonian proofread of the guide site
-    (`docs/site/index.html`) and of the new admin/widget texts ("Sulle
-    soovitatud", "Smaily soovitused", the customers-import banner, "See
-    import saadab …"), then the site upload to smaily.com/connect-magento/.
-    (c) A Hyvä store to run the recommendations widget on (PRO-3790).
-    (d) PRO-3964 — how long an erased shopper's abandoned-cart marker is
-    kept. (e) PRO-3966 — start the customers import once on stores that
-    connected Campaign Intelligence before PRO-3790?
+16. Open 2026-10-08 (session handoff), updated 2026-10-09: (a) HC PRO's
+    Magento and PHP versions and storefront type (Luma, Hyvä or headless);
+    it runs the old 2.8.x module — still open. (b) The Estonian proofread
+    of the guide site (`docs/site/index.html`) and of the new admin/widget
+    texts — now PRO-4019; the site upload to smaily.com/connect-magento/ is
+    done, and the orchestrator publishes each later change over FTPS
+    (CLAUDE.md "Merchant guide site"). (c) A Hyvä store to run the
+    recommendations widget on (PRO-3790) — still open. (d) PRO-3964 — how
+    long an erased shopper's abandoned-cart marker is kept: answered, done
+    (#145; with PRO-4008, #147, the marker also stays while its cart is
+    active). (e) PRO-3966 — start the customers import once on stores that
+    connected Campaign Intelligence before PRO-3790? Answered: PRO-4007
+    (#148), done — a system message asks the merchant to start it; nothing
+    starts it automatically. (f) PRO-4020 — create the sendsmaily
+    repository for the Hyvä companion module and register it on Packagist.

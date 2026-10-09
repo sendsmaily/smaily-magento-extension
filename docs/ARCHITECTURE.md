@@ -299,7 +299,18 @@ below.
   save, so an account that existed before connecting, a customer the
   engine knows only from orders (§5 names the customer by email) and an
   account created by Magento's ImportExport customer import are unknown
-  by id until the import runs. The catalog job is queued first, so it has the
+  by id until the import runs. A connected store whose customers import
+  has never completed (connected before connecting started it, or the
+  import cancelled or failed) gets an admin system message asking the
+  merchant to start it
+  (`Model/Adminhtml/CustomersImportNotice`, PRO-4007; registered on
+  `Magento\Framework\Notification\MessageList` in `etc/adminhtml/di.xml`):
+  shown while `Engine\Settings::isConnected()` and no customers job is
+  `completed` (`JobManager::hasCompleted()`), hidden while one is queued
+  or running (`findActive()`) unless it has stalled (`isStalled()`), and
+  linked to the Settings tab
+  (`?tab=intelligence`); nothing starts the import automatically.
+  The catalog job is queued first, so it has the
   lower id and the tick (`nextActive()`, oldest first) runs it first; right
   after a connect both jobs are `pending`. The orders import stays the
   merchant's to start (PRO-3742). EngineExchange answers

@@ -178,6 +178,28 @@ class JobManagerTest extends IntegrationTestCase
     }
 
     /**
+     * PRO-4007: the customers-import notice asks for the import until one
+     * has completed; a queued, running, cancelled or failed one does not
+     * count, nor does a completed import of another type.
+     */
+    public function testHasCompletedOnlyOnceAnImportOfThatKindHasCompleted(): void
+    {
+        $completed = $this->jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0);
+        $this->jobManager->complete($completed);
+        $this->jobManager->start(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, 0);
+        $this->jobManager->requestCancel(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE);
+        $this->jobManager->fail($this->jobManager->start(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, 0), 'down');
+        $running = $this->jobManager->start(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, 0);
+        $this->jobManager->markRunning($running);
+
+        self::assertFalse($this->jobManager->hasCompleted(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE));
+
+        $this->jobManager->complete($running);
+
+        self::assertTrue($this->jobManager->hasCompleted(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE));
+    }
+
+    /**
      * PRO-3854: what the nightly catalog manifest waits for. An import is in
      * progress while it is queued or running and the import worker still
      * moves; one nothing has moved for the bound is stalled and holds

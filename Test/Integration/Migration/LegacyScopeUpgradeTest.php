@@ -37,14 +37,16 @@ use Smaily\Connect\Test\Unit\Support\StoreLocale;
  * cart off at its scope (a website's own Yes under it keeps its 2.8.x
  * values), and a store-view account row is not carried over.
  *
- * PRO-4015: a website where 2.8.x had the opt-in on with no Autoresponder
- * ID keeps the welcome off, and an admin notice names it.
+ * PRO-4015: a website where 2.8.x had the opt-in, or abandoned cart, on with
+ * no Autoresponder ID keeps that automation off, and an admin notice names it.
  */
 class LegacyScopeUpgradeTest extends IntegrationTestCase
 {
     private const NOTICE_TITLE = 'Smaily Connect upgrade: store-view Smaily account not carried over';
 
     private const WELCOME_NOTICE_TITLE = 'Smaily Connect upgrade: the welcome automation has no workflow';
+
+    private const ABANDONED_CART_NOTICE_TITLE = 'Smaily Connect upgrade: the abandoned-cart automation has no workflow';
 
     /**
      * Store view id => [website id, locale].
@@ -400,15 +402,92 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
         self::assertSame([], $this->noticeDescriptions(self::WELCOME_NOTICE_TITLE));
     }
 
-    public function testTheWelcomeNoticeIsPostedOnceAndARerunDoesNotBringItBack(): void
+    public function testAWebsiteWithAbandonedCartOnAndNoWorkflowKeepsItOffAndTheNoticeNamesIt(): void
     {
         $this->env->resetState();
-        $this->seed('default', 0, ['smaily/subscribe/enableNewsletterSubscriptions' => '1']);
+        $this->seed('default', 0, [
+            'smaily/abandoned/enableAbandonedCart' => '1',
+            'smaily/abandoned/autoresponderId' => '77',
+        ]);
+        // "No automation workflow selected": 2.8.x sent no reminder there.
+        $this->seed('websites', 2, ['smaily/abandoned/autoresponderId' => '']);
+        $this->seed('websites', 3, [
+            'smaily/abandoned/enableAbandonedCart' => '0',
+            'smaily/abandoned/autoresponderId' => '',
+        ]);
+        $this->seed('websites', 4, ['smaily/general/enable' => '0', 'smaily/abandoned/autoresponderId' => '']);
+
+        $this->migrate();
+
+        foreach ([2, 3, 4] as $websiteId) {
+            self::assertFalse($this->config->isAbandonedCartEnabled($websiteId), 'Website ' . $websiteId);
+        }
+        self::assertTrue($this->config->isAbandonedCartEnabled(1));
+        self::assertSame(
+            [
+                'Smaily for Magento 2.8.x sent no abandoned-cart reminder on these websites, because Enable'
+                . ' Abandoned Cart was on there with no Autoresponder ID: Website 2. The abandoned-cart automation'
+                . ' stays off there. To send one, open Marketing > Smaily Connect > Initial setup for each of these'
+                . ' websites and, on the Automations step, tick Enabled for Abandoned cart and pick a Smaily'
+                . ' Workflow.',
+            ],
+            $this->noticeDescriptions(self::ABANDONED_CART_NOTICE_TITLE)
+        );
+        self::assertSame([], $this->noticeDescriptions(self::WELCOME_NOTICE_TITLE));
+    }
+
+    public function testADefaultScopeAbandonedCartWithNoWorkflowNamesEveryWebsiteThatFollowsIt(): void
+    {
+        $this->env->resetState();
+        $this->seed('default', 0, ['smaily/abandoned/enableAbandonedCart' => '1']);
+        $this->seed('websites', 2, ['smaily/abandoned/autoresponderId' => '88']);
+        StoreLocale::use('et_EE');
+
+        $this->migrate();
+
+        self::assertTrue($this->config->isAbandonedCartEnabled(2));
+        foreach ([1, 3, 4] as $websiteId) {
+            self::assertFalse($this->config->isAbandonedCartEnabled($websiteId), 'Website ' . $websiteId);
+        }
+        self::assertSame(
+            [
+                'Smaily for Magento 2.8.x ei saatnud nendel veebisaitidel hüljatud ostukorvi meeldetuletust, sest'
+                . ' seal oli Enable Abandoned Cart sees, kuid Autoresponder ID puudus: Website 1, Website 3,'
+                . ' Website 4. Hüljatud ostukorvi automaatika jääb seal välja. Meeldetuletuse saatmiseks ava iga'
+                . ' nimetatud veebisaidi jaoks Turundus > Smaily Connect > Algseadistus ning märgi sammul'
+                . ' Automaatikad sündmuse Hüljatud ostukorv juures Lubatud ja vali Smaily töövoog.',
+            ],
+            $this->noticeDescriptions('Smaily Connecti uuendus: hüljatud ostukorvi automaatikal pole töövoogu')
+        );
+    }
+
+    public function testNoAbandonedCartNoticeWhereEveryWebsiteHasAWorkflowOrItOff(): void
+    {
+        // setUp: every website has a workflow (website 3: off; website 4: Enable Module = No).
+        self::assertSame([], $this->noticeDescriptions(self::ABANDONED_CART_NOTICE_TITLE));
+
+        $this->env->resetState();
+        $this->seed('default', 0, ['smaily/abandoned/enableAbandonedCart' => '0']);
+        $this->seed('websites', 2, ['smaily/abandoned/autoresponderId' => '88']);
+
+        $this->migrate();
+
+        self::assertSame([], $this->noticeDescriptions(self::ABANDONED_CART_NOTICE_TITLE));
+    }
+
+    public function testTheNoWorkflowNoticesArePostedOnceAndARerunDoesNotBringThemBack(): void
+    {
+        $this->env->resetState();
+        $this->seed('default', 0, [
+            'smaily/subscribe/enableNewsletterSubscriptions' => '1',
+            'smaily/abandoned/enableAbandonedCart' => '1',
+        ]);
 
         $this->migrate();
         $this->migrate();
 
         self::assertCount(1, $this->noticeDescriptions(self::WELCOME_NOTICE_TITLE));
+        self::assertCount(1, $this->noticeDescriptions(self::ABANDONED_CART_NOTICE_TITLE));
     }
 
     public function testEveryStoreViewLanguageResolvesAndRoutesToItsWebsiteWorkflowThroughTheOneAccount(): void

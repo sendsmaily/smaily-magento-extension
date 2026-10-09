@@ -123,6 +123,15 @@ initial setup for the website and, on its **Automations** step, tick
 *Enable Module = No* is not named: its welcome automation is off for that
 reason.
 
+The abandoned-cart automation works the same way. For a website where
+2.8.x had *Enable Abandoned Cart* on with no *Autoresponder ID* — each the
+website's own value, else the Default Config value — 2.8.x sent no
+abandoned-cart reminder, and the abandoned-cart automation stays off. An
+admin notice (*Smaily Connect upgrade: the abandoned-cart automation has no
+workflow*) names those websites. To send reminders there, tick **Enabled**
+for **Abandoned cart** and pick a **Smaily Workflow** on the setup's
+**Automations** step. A website with *Enable Module = No* is not named.
+
 ## What migrates automatically
 
 | Legacy setting | Where it lands in v3 |

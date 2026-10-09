@@ -214,11 +214,31 @@ class LegacyConfigMapper
      */
     public function welcomeWithoutWorkflow(array $legacy, array $inherited): bool
     {
-        $resolved = array_filter($legacy, static fn (?string $value): bool => $value !== null) + $inherited;
+        return $this->onWithoutWorkflow(
+            $legacy,
+            $inherited,
+            'subscribe/enableNewsletterSubscriptions',
+            'subscribe/workflowId'
+        );
+    }
 
-        return $this->moduleSwitch($resolved) !== false
-            && $this->flag($resolved, 'subscribe/enableNewsletterSubscriptions')
-            && (int)($resolved['subscribe/workflowId'] ?? 0) <= 0;
+    /**
+     * Whether 2.8.x had Enable Abandoned Cart on at a website with no
+     * Autoresponder ID, so it sent no reminder there and the abandoned-cart
+     * automation stays off: each value the website's own, else the default
+     * scope's. Enable Module = No there leaves nothing to tell.
+     *
+     * @param array<string, string|null> $legacy the website's legacy values
+     * @param array<string, string|null> $inherited the default scope's
+     */
+    public function abandonedCartWithoutWorkflow(array $legacy, array $inherited): bool
+    {
+        return $this->onWithoutWorkflow(
+            $legacy,
+            $inherited,
+            'abandoned/enableAbandonedCart',
+            'abandoned/autoresponderId'
+        );
     }
 
     /**
@@ -254,6 +274,27 @@ class LegacyConfigMapper
         $resolved = $own + $inherited;
 
         return $this->flag($resolved, $switchPath) && (int)($resolved[$workflowPath] ?? 0) > 0 ? '1' : '0';
+    }
+
+    /**
+     * Whether an automation's 2.8.x switch is on at a website with no
+     * Autoresponder ID and Enable Module is not No there, each value the
+     * website's own, else the inherited one.
+     *
+     * @param array<string, string|null> $legacy
+     * @param array<string, string|null> $inherited
+     */
+    private function onWithoutWorkflow(
+        array $legacy,
+        array $inherited,
+        string $switchPath,
+        string $workflowPath
+    ): bool {
+        $resolved = array_filter($legacy, static fn (?string $value): bool => $value !== null) + $inherited;
+
+        return $this->moduleSwitch($resolved) !== false
+            && $this->flag($resolved, $switchPath)
+            && (int)($resolved[$workflowPath] ?? 0) <= 0;
     }
 
     /**

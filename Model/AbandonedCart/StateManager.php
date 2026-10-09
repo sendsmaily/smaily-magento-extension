@@ -279,6 +279,12 @@ class StateManager
      * picked up again and mailed to the erased address. `erased` is a
      * terminal status like `completed` — excludeHandled() covers it,
      * so the cron neither mails the quote nor tracks it afresh.
+     *
+     * `updated_at` is written as itself (PRO-3964, as the queue rows since
+     * PRO-3963): the column moves on every UPDATE unless it is set
+     * explicitly, and the retention sweep counts from it. Erasing is not a
+     * change to the cart, so the marker leaves 30 days after the row's
+     * earlier time, not 30 days after the erasure.
      */
     public function anonymizeForEmail(string $email): int
     {
@@ -286,7 +292,11 @@ class StateManager
 
         return $connection->update(
             $this->table(),
-            ['email' => null, 'status' => self::STATUS_ERASED],
+            [
+                'email' => null,
+                'status' => self::STATUS_ERASED,
+                'updated_at' => new \Zend_Db_Expr('updated_at'),
+            ],
             ['LOWER(email) = ?' => $email]
         );
     }
@@ -304,7 +314,8 @@ class StateManager
      * tombstone is what makes excludeHandled() skip them.
      *
      * A cart already erased is left out in SQL, with a LEFT JOIN on the
-     * unique quote_id as excludeHandled() does.
+     * unique quote_id as excludeHandled() does. An existing row turned into
+     * the marker keeps its `updated_at`, as in anonymizeForEmail().
      *
      * @return int the carts newly marked
      */
@@ -347,7 +358,11 @@ class StateManager
             ];
         }
         if ($rows) {
-            $connection->insertOnDuplicate($this->table(), $rows, ['email', 'status']);
+            $connection->insertOnDuplicate(
+                $this->table(),
+                $rows,
+                ['email', 'status', 'updated_at' => new \Zend_Db_Expr('updated_at')]
+            );
         }
 
         return count($rows);

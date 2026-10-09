@@ -826,9 +826,13 @@ below.
   quote nor tracks it afresh, and the status no longer reads `mailed`, so the
   PRO-2453 purchase marker never fires for an erased contact either. The
   tombstone carries no special retention — it leaves on the ordinary 30-day
-  cart sweep, like any other terminal row. The export lists cart rows by
-  address, so a tombstone is by construction unlisted — there is no address
-  left to match, and the row holds nothing else personal. Two writes may
+  cart sweep, like any other terminal row. Both writes that make it (the
+  UPDATE and the upsert below) write `updated_at` as itself, as the queue
+  rows do (PRO-3964): an existing row keeps its last-changed time, so the
+  sweep takes it 30 days after that time, not 30 days after the erasure.
+  The export lists cart rows by address, so a tombstone is by construction
+  unlisted — there is no address left to match, and the row holds nothing
+  else personal. Two writes may
   still reach a tombstone, and neither revives it (PRO-2469): a converting
   quote keeps the row `erased` instead of marking it `completed`, and a
   later checkout opt-in may write the address the shopper types afresh onto

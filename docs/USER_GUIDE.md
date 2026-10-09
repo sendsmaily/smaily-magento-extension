@@ -1381,9 +1381,11 @@ waiting import follows. Its own card then offers only **Cancel import**.
   no abandoned-cart reminder goes out for it after the erasure; the cart
   itself is not changed, and it counts among the anonymized carts the command
   prints. The erased record is not kept
-  forever: it goes with the ordinary 30-day tidy-up above, or sooner if the
-  cart itself is deleted. If that shopper's cart later turns into an order,
-  the record stays marked erased. If they come back, type their address at
+  forever: it goes with the ordinary 30-day tidy-up above, counted from the
+  record's last change before the erasure (the erasure does not restart it),
+  or sooner if the cart itself is deleted. If that shopper's cart later
+  turns into an order, the record stays marked erased. If they come back,
+  type their address at
   checkout and tick the newsletter box themselves, that new address is
   stored — it is their own fresh choice — but the record stays erased, so
   no abandoned-cart reminder is sent for it.

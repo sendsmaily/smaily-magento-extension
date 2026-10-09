@@ -113,6 +113,16 @@ synchronization stays off: its Contacts step shows **Sync contacts to
 Smaily** unticked, and **Continue** keeps it off. Tick it there to switch
 contact synchronization on.
 
+For a website where 2.8.x had *Enable Subscribers Collection* on with no
+*Autoresponder ID* — each the website's own value, else the Default Config
+value — 2.8.x sent no welcome email, and the welcome automation stays off.
+An admin notice (*Smaily Connect upgrade: the welcome automation has no
+workflow*) names those websites. To send a welcome email there, open the
+initial setup for the website and, on its **Automations** step, tick
+**Enabled** for **Welcome** and pick a **Smaily Workflow**. A website with
+*Enable Module = No* is not named: its welcome automation is off for that
+reason.
+
 ## What migrates automatically
 
 | Legacy setting | Where it lands in v3 |

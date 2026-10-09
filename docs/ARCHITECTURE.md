@@ -886,7 +886,10 @@ empty settings. A legacy *Enable Module = No* (default or website)
 becomes contact sync, welcome and abandoned cart off at that scope (a
 website with its own Yes under a default No gets the three at its scope with
 their 2.8.x values); a store-view Smaily account row (2.8.x never read it) is not carried over, and
-an admin notice names those store views.
+an admin notice names those store views. A website where 2.8.x had the
+opt-in on with no Autoresponder ID keeps the welcome automation off, and an
+admin notice names those websites
+(`LegacyConfigMapper::welcomeWithoutWorkflow()`).
 
 Uninstalling removes what declarative schema does not: `Setup\Uninstall`
 deletes the `smaily_connect/*` and legacy `smaily/*` config rows at every

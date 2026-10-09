@@ -43,6 +43,10 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
  * 2.8.x sent that email there — the switch on and an Autoresponder ID set,
  * each the website's own value else the default scope's (LegacyConfigMapper).
  *
+ * A website where 2.8.x had the opt-in on with no Autoresponder ID sent no
+ * welcome email; its welcome automation stays off, and an admin notice
+ * names those websites so the merchant can pick a workflow.
+ *
  * Store-view rows: 2.8.x read every setting per website, so it never read a
  * store-view row. v3 reads the Smaily account per store view, so the
  * store-view account rows (and Enable Module) are not carried over, and an
@@ -157,6 +161,7 @@ class MigrateLegacyConfig implements DataPatchInterface
             $this->notifier->addNotice((string)__('Smaily Connect upgrade'), $notice);
         }
         $this->noticeStoreViewAccounts($storeViewAccountIds);
+        $this->noticeWelcomeWithoutWorkflow($byScope, $defaultLegacy);
         // AddSetupNotice, next in this run, says the settings were migrated.
         $this->migrationOutcome->markMigrated();
 
@@ -192,6 +197,39 @@ class MigrateLegacyConfig implements DataPatchInterface
                 'The Smaily subdomain, API username or API password saved for these store views was not'
                 . ' carried over, because Smaily for Magento 2.8.x did not use it: %1.'
                 . ' These store views use their website\'s Smaily account, as they did in 2.8.x.',
+                implode(', ', $names)
+            )
+        );
+    }
+
+    /**
+     * Name the websites where 2.8.x had the newsletter opt-in on with no
+     * Autoresponder ID: it sent no welcome email there, and the welcome
+     * automation stays off until the merchant picks a workflow.
+     *
+     * @param array<string, array<string, string|null>> $byScope "scope:id" => legacy values
+     * @param array<string, string|null> $defaultLegacy
+     */
+    private function noticeWelcomeWithoutWorkflow(array $byScope, array $defaultLegacy): void
+    {
+        $names = [];
+        foreach ($this->storeManager->getWebsites() as $website) {
+            $legacy = $byScope['websites:' . $website->getId()] ?? [];
+            if ($this->mapper->welcomeWithoutWorkflow($legacy, $defaultLegacy)) {
+                $names[] = $website->getName();
+            }
+        }
+        if (!$names) {
+            return;
+        }
+
+        $this->notifier->addNotice(
+            (string)__('Smaily Connect upgrade: the welcome automation has no workflow'),
+            (string)__(
+                'Smaily for Magento 2.8.x sent no welcome email on these websites, because Enable Subscribers'
+                . ' Collection was on there with no Autoresponder ID: %1. The welcome automation stays off there.'
+                . ' To send one, open Marketing > Smaily Connect > Initial setup for each of these websites and,'
+                . ' on the Automations step, tick Enabled for Welcome and pick a Smaily Workflow.',
                 implode(', ', $names)
             )
         );

@@ -204,6 +204,24 @@ class LegacyConfigMapper
     }
 
     /**
+     * Whether 2.8.x had the newsletter opt-in on at a website with no
+     * Autoresponder ID, so it sent no welcome email there and the welcome
+     * automation stays off: each value the website's own, else the default
+     * scope's. Enable Module = No there leaves nothing to tell.
+     *
+     * @param array<string, string|null> $legacy the website's legacy values
+     * @param array<string, string|null> $inherited the default scope's
+     */
+    public function welcomeWithoutWorkflow(array $legacy, array $inherited): bool
+    {
+        $resolved = array_filter($legacy, static fn (?string $value): bool => $value !== null) + $inherited;
+
+        return $this->moduleSwitch($resolved) !== false
+            && $this->flag($resolved, 'subscribe/enableNewsletterSubscriptions')
+            && (int)($resolved['subscribe/workflowId'] ?? 0) <= 0;
+    }
+
+    /**
      * Convert the legacy "N:minutes" / "N:hour" interval to minutes,
      * clamped to the v3 safe range (10 min .. 24 h).
      */

@@ -253,7 +253,7 @@ class MigrateLegacyConfigTest extends IntegrationTestCase
         /** @var MigrateLegacyConfig $patch */
         $patch = $this->objectManager->create(MigrateLegacyConfig::class, $arguments + [
             'moduleDataSetup' => new DataSetup($resourceConnection),
-            'storeManager' => $this->createMock(StoreManagerInterface::class),
+            'storeManager' => $this->createConfiguredMock(StoreManagerInterface::class, ['getWebsites' => []]),
         ]);
         $patch->apply();
     }

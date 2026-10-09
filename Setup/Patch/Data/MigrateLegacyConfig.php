@@ -43,6 +43,11 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
  * 2.8.x sent that email there — the switch on and an Autoresponder ID set,
  * each the website's own value else the default scope's (LegacyConfigMapper).
  *
+ * A website where 2.8.x had the opt-in, or Enable Abandoned Cart, on with
+ * no Autoresponder ID sent no email for it; that automation stays off, and
+ * an admin notice per automation names those websites so the merchant can
+ * pick a workflow.
+ *
  * Store-view rows: 2.8.x read every setting per website, so it never read a
  * store-view row. v3 reads the Smaily account per store view, so the
  * store-view account rows (and Enable Module) are not carried over, and an
@@ -157,6 +162,7 @@ class MigrateLegacyConfig implements DataPatchInterface
             $this->notifier->addNotice((string)__('Smaily Connect upgrade'), $notice);
         }
         $this->noticeStoreViewAccounts($storeViewAccountIds);
+        $this->noticeAutomationsWithoutWorkflow($byScope, $defaultLegacy);
         // AddSetupNotice, next in this run, says the settings were migrated.
         $this->migrationOutcome->markMigrated();
 
@@ -195,6 +201,56 @@ class MigrateLegacyConfig implements DataPatchInterface
                 implode(', ', $names)
             )
         );
+    }
+
+    /**
+     * Name the websites where 2.8.x had the newsletter opt-in, or Enable
+     * Abandoned Cart, on with no Autoresponder ID: it sent no email for it
+     * there, and the automation stays off until the merchant picks a
+     * workflow. One notice per automation.
+     *
+     * @param array<string, array<string, string|null>> $byScope "scope:id" => legacy values
+     * @param array<string, string|null> $defaultLegacy
+     */
+    private function noticeAutomationsWithoutWorkflow(array $byScope, array $defaultLegacy): void
+    {
+        $welcome = [];
+        $abandonedCart = [];
+        foreach ($this->storeManager->getWebsites() as $website) {
+            $legacy = $byScope['websites:' . $website->getId()] ?? [];
+            if ($this->mapper->welcomeWithoutWorkflow($legacy, $defaultLegacy)) {
+                $welcome[] = $website->getName();
+            }
+            if ($this->mapper->abandonedCartWithoutWorkflow($legacy, $defaultLegacy)) {
+                $abandonedCart[] = $website->getName();
+            }
+        }
+
+        if ($welcome) {
+            $this->notifier->addNotice(
+                (string)__('Smaily Connect upgrade: the welcome automation has no workflow'),
+                (string)__(
+                    'Smaily for Magento 2.8.x sent no welcome email on these websites, because Enable Subscribers'
+                    . ' Collection was on there with no Autoresponder ID: %1. The welcome automation stays off there.'
+                    . ' To send one, open Marketing > Smaily Connect > Initial setup for each of these websites and,'
+                    . ' on the Automations step, tick Enabled for Welcome and pick a Smaily Workflow.',
+                    implode(', ', $welcome)
+                )
+            );
+        }
+        if ($abandonedCart) {
+            $this->notifier->addNotice(
+                (string)__('Smaily Connect upgrade: the abandoned-cart automation has no workflow'),
+                (string)__(
+                    'Smaily for Magento 2.8.x sent no abandoned-cart reminder on these websites, because Enable'
+                    . ' Abandoned Cart was on there with no Autoresponder ID: %1. The abandoned-cart automation stays'
+                    . ' off there. To send one, open Marketing > Smaily Connect > Initial setup for each of these'
+                    . ' websites and, on the Automations step, tick Enabled for Abandoned cart and pick a Smaily'
+                    . ' Workflow.',
+                    implode(', ', $abandonedCart)
+                )
+            );
+        }
     }
 
     /**

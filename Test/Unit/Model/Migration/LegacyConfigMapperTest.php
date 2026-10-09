@@ -138,6 +138,95 @@ class LegacyConfigMapperTest extends TestCase
     }
 
     /**
+     * PRO-4015: a website where 2.8.x had the opt-in on with no Autoresponder
+     * ID gets the upgrade notice; one with a workflow, with the opt-in off or
+     * with Enable Module = No does not.
+     *
+     * @dataProvider welcomeWithoutWorkflowProvider
+     *
+     * @param array<string, string> $website
+     * @param array<string, string> $default
+     */
+    public function testWelcomeWithoutWorkflowIsTheOptInOnWithNoAutoresponderId(
+        array $website,
+        array $default,
+        bool $expected
+    ): void {
+        self::assertSame($expected, $this->mapper->welcomeWithoutWorkflow($website, $default));
+    }
+
+    /**
+     * @return array<string, array{array<string, string>, array<string, string>, bool}>
+     */
+    public static function welcomeWithoutWorkflowProvider(): array
+    {
+        $onWithoutWorkflow = ['subscribe/enableNewsletterSubscriptions' => '1'];
+        $on = ['subscribe/enableNewsletterSubscriptions' => '1', 'subscribe/workflowId' => '101'];
+
+        return [
+            'own on, no workflow anywhere' => [$onWithoutWorkflow, [], true],
+            'own workflow empty, default on with a workflow' => [['subscribe/workflowId' => ''], $on, true],
+            'nothing of its own, default on without a workflow' => [[], $onWithoutWorkflow, true],
+            'own Enable Module Yes, default No and on without a workflow' => [
+                ['general/enable' => '1'], ['general/enable' => '0'] + $onWithoutWorkflow, true,
+            ],
+            'own on, default workflow' => [$onWithoutWorkflow, ['subscribe/workflowId' => '101'], false],
+            'nothing of its own, default on with a workflow' => [[], $on, false],
+            'own off, default on without a workflow' => [
+                ['subscribe/enableNewsletterSubscriptions' => '0'], $onWithoutWorkflow, false,
+            ],
+            'own Enable Module No' => [['general/enable' => '0'] + $onWithoutWorkflow, [], false],
+            'nothing of its own, default Enable Module No' => [[], ['general/enable' => '0'] + $onWithoutWorkflow, false],
+        ];
+    }
+
+    /**
+     * PRO-4015: a website where 2.8.x had Enable Abandoned Cart on with no
+     * Autoresponder ID gets the upgrade notice; one with a workflow, with it
+     * off or with Enable Module = No does not.
+     *
+     * @dataProvider abandonedCartWithoutWorkflowProvider
+     *
+     * @param array<string, string> $website
+     * @param array<string, string> $default
+     */
+    public function testAbandonedCartWithoutWorkflowIsTheSwitchOnWithNoAutoresponderId(
+        array $website,
+        array $default,
+        bool $expected
+    ): void {
+        self::assertSame($expected, $this->mapper->abandonedCartWithoutWorkflow($website, $default));
+    }
+
+    /**
+     * @return array<string, array{array<string, string>, array<string, string>, bool}>
+     */
+    public static function abandonedCartWithoutWorkflowProvider(): array
+    {
+        $onWithoutWorkflow = ['abandoned/enableAbandonedCart' => '1'];
+        $on = ['abandoned/enableAbandonedCart' => '1', 'abandoned/autoresponderId' => '77'];
+
+        return [
+            'own on, no workflow anywhere' => [$onWithoutWorkflow, [], true],
+            'own workflow empty, default on with a workflow' => [['abandoned/autoresponderId' => ''], $on, true],
+            'nothing of its own, default on without a workflow' => [[], $onWithoutWorkflow, true],
+            'own Enable Module Yes, default No and on without a workflow' => [
+                ['general/enable' => '1'], ['general/enable' => '0'] + $onWithoutWorkflow, true,
+            ],
+            'own on, default workflow' => [$onWithoutWorkflow, ['abandoned/autoresponderId' => '77'], false],
+            'nothing of its own, default on with a workflow' => [[], $on, false],
+            'own off, default on without a workflow' => [
+                ['abandoned/enableAbandonedCart' => '0'], $onWithoutWorkflow, false,
+            ],
+            'own Enable Module No' => [['general/enable' => '0'] + $onWithoutWorkflow, [], false],
+            'nothing of its own, default Enable Module No' => [[], ['general/enable' => '0'] + $onWithoutWorkflow, false],
+            'the opt-in on without a workflow is not abandoned cart' => [
+                ['subscribe/enableNewsletterSubscriptions' => '1'], [], false,
+            ],
+        ];
+    }
+
+    /**
      * PRO-4013: 2.8.x sent the abandoned-cart reminder at a website when
      * Enable Abandoned Cart and the Autoresponder ID, each the website's own
      * value else the default scope's, were both set.

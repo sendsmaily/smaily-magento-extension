@@ -63,7 +63,7 @@ class AddSetupNoticeTest extends IntegrationTestCase
         $this->objectManager->create(MigrateLegacyConfig::class, [
             'moduleDataSetup' => new DataSetup($resourceConnection),
             'migrationOutcome' => $outcome,
-            'storeManager' => $this->createMock(StoreManagerInterface::class),
+            'storeManager' => $this->createConfiguredMock(StoreManagerInterface::class, ['getWebsites' => []]),
         ])->apply();
         $this->objectManager->create(AddSetupNotice::class, ['migrationOutcome' => $outcome])->apply();
     }

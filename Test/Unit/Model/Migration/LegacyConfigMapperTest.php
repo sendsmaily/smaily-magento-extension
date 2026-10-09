@@ -84,6 +84,59 @@ class LegacyConfigMapperTest extends TestCase
         self::assertArrayNotHasKey(Config::XML_PATH_WELCOME_WORKFLOW, $configs);
     }
 
+    /**
+     * PRO-4009: 2.8.x sent the welcome email at a website when the opt-in
+     * switch and the Autoresponder ID, each the website's own value else the
+     * default scope's, were both set.
+     *
+     * @dataProvider welcomeAtAWebsiteProvider
+     *
+     * @param array<string, string> $website
+     * @param array<string, string> $default
+     */
+    public function testAWebsiteWelcomeSwitchIsWhat28xResolvedThere(
+        array $website,
+        array $default,
+        ?string $expected
+    ): void {
+        $configs = [];
+        foreach ($this->mapper->map($website, $default)['configs'] as $config) {
+            $configs[$config['path']] = $config['value'];
+        }
+
+        self::assertSame($expected, $configs[Config::XML_PATH_WELCOME_ENABLED] ?? null);
+    }
+
+    /**
+     * @return array<string, array{array<string, string>, array<string, string>, ?string}>
+     */
+    public static function welcomeAtAWebsiteProvider(): array
+    {
+        $on = ['subscribe/enableNewsletterSubscriptions' => '1', 'subscribe/workflowId' => '101'];
+        $offWithWorkflow = ['subscribe/enableNewsletterSubscriptions' => '0', 'subscribe/workflowId' => '101'];
+
+        return [
+            'own off, default on with a workflow' => [
+                ['subscribe/enableNewsletterSubscriptions' => '0'], $on, '0',
+            ],
+            'own on, default off with a workflow' => [
+                ['subscribe/enableNewsletterSubscriptions' => '1'], $offWithWorkflow, '1',
+            ],
+            'own on, no workflow anywhere' => [
+                ['subscribe/enableNewsletterSubscriptions' => '1'], [], '0',
+            ],
+            'own workflow, default on' => [
+                ['subscribe/workflowId' => '202'], ['subscribe/enableNewsletterSubscriptions' => '1'], '1',
+            ],
+            'own workflow 0, default on with a workflow' => [
+                ['subscribe/workflowId' => '0'], $on, '0',
+            ],
+            'nothing of its own: follows the default' => [
+                ['sync/enableCronSync' => '1'], $on, null,
+            ],
+        ];
+    }
+
     public function testEnableModuleNoSwitchesSyncWelcomeAndAbandonedCartOffAtThatScope(): void
     {
         $result = $this->mapper->map([

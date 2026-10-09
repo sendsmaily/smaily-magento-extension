@@ -29,6 +29,11 @@ class LegacyConfigMapper
     public const FLAG_ENCRYPT = 'encrypt';
 
     /**
+     * The 2.8.x settings that decided whether the welcome email was sent.
+     */
+    private const OPT_IN_PATHS = ['subscribe/enableNewsletterSubscriptions', 'subscribe/workflowId'];
+
+    /**
      * Legacy 2.8.x sync-field name => the v3 field id (which is also the
      * Smaily wire key). Only `gender` moved: v3 sends it under the
      * cross-platform canon `user_gender` (see Config\Source\SyncFields).
@@ -68,12 +73,14 @@ class LegacyConfigMapper
      *
      * @param array<string, string|null> $legacy legacy path => value
      *     (paths relative, e.g. "general/subdomain")
+     * @param array<string, string|null> $inherited the values the scope fell
+     *     back to in 2.8.x (a website's: the default scope's), same keys
      * @return array{
      *     configs: array<int, array{path: string, value: string, flags: string[]}>,
      *     notices: string[]
      * }
      */
-    public function map(array $legacy): array
+    public function map(array $legacy, array $inherited = []): array
     {
         $configs = [];
         $notices = [];
@@ -94,13 +101,22 @@ class LegacyConfigMapper
             $set(Config::XML_PATH_PASSWORD, (string)$legacy['general/password'], [self::FLAG_ENCRYPT]);
         }
 
-        // Newsletter opt-in autoresponder -> welcome automation.
+        // Newsletter opt-in autoresponder -> welcome automation. 2.8.x sent
+        // the welcome email where the opt-in switch and the Autoresponder ID,
+        // each the scope's own value else the inherited one, were both set.
         $welcomeWorkflow = (int)($legacy['subscribe/workflowId'] ?? 0);
         if ($welcomeWorkflow > 0) {
             $set(Config::XML_PATH_WELCOME_WORKFLOW, (string)$welcomeWorkflow);
-            if ($this->flag($legacy, 'subscribe/enableNewsletterSubscriptions')) {
-                $set(Config::XML_PATH_WELCOME_ENABLED, '1');
-            }
+        }
+        $optIn = array_filter(
+            array_intersect_key($legacy, array_flip(self::OPT_IN_PATHS)),
+            static fn (?string $value): bool => $value !== null
+        );
+        if ($optIn) {
+            $resolved = $optIn + $inherited;
+            $sent = $this->flag($resolved, 'subscribe/enableNewsletterSubscriptions')
+                && (int)($resolved['subscribe/workflowId'] ?? 0) > 0;
+            $set(Config::XML_PATH_WELCOME_ENABLED, $sent ? '1' : '0');
         }
 
         // Subscriber synchronization.

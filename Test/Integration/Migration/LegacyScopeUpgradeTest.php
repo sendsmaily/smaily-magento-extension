@@ -233,6 +233,45 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
         self::assertTrue($this->config->isAbandonedCartEnabled(3));
     }
 
+    public function testAWebsiteWithTheOptInOffKeepsTheWelcomeOffUnderADefaultScopeWithItOn(): void
+    {
+        // PRO-4009: 2.8.x read the opt-in switch per website.
+        $this->env->resetState();
+        $this->seed('default', 0, [
+            'smaily/subscribe/enableNewsletterSubscriptions' => '1',
+            'smaily/subscribe/workflowId' => '101',
+        ]);
+        $this->seed('websites', 1, ['smaily/subscribe/enableNewsletterSubscriptions' => '0']);
+        // A store-view row: 2.8.x never read it, and v3 does not either.
+        $this->seed('stores', 4, ['smaily/subscribe/enableNewsletterSubscriptions' => '0']);
+
+        $this->migrate();
+
+        self::assertFalse($this->config->isWelcomeEnabled(1));
+        foreach ([2, 3, 4] as $websiteId) {
+            self::assertTrue($this->config->isWelcomeEnabled($websiteId), 'Website ' . $websiteId);
+            self::assertSame(101, $this->config->getWelcomeWorkflow($websiteId));
+        }
+    }
+
+    public function testAWebsiteWithTheOptInOnSendsTheDefaultWorkflowUnderADefaultScopeWithItOff(): void
+    {
+        $this->env->resetState();
+        $this->seed('default', 0, [
+            'smaily/subscribe/enableNewsletterSubscriptions' => '0',
+            'smaily/subscribe/workflowId' => '101',
+        ]);
+        $this->seed('websites', 2, ['smaily/subscribe/enableNewsletterSubscriptions' => '1']);
+
+        $this->migrate();
+
+        self::assertTrue($this->config->isWelcomeEnabled(2));
+        self::assertSame(101, $this->config->getWelcomeWorkflow(2));
+        foreach ([1, 3, 4] as $websiteId) {
+            self::assertFalse($this->config->isWelcomeEnabled($websiteId), 'Website ' . $websiteId);
+        }
+    }
+
     public function testEveryStoreViewLanguageResolvesAndRoutesToItsWebsiteWorkflowThroughTheOneAccount(): void
     {
         /** @var LanguageResolver $languages */

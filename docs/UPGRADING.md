@@ -19,7 +19,7 @@ store-view settings. In v3, compare them in the initial setup and under
 |---|---|---|
 | General Settings > Enable Module | default, each website | *No* switches Subscriber Synchronization, the welcome automation and the abandoned-cart automation off, same scope — see *What migrates automatically* |
 | General Settings > Subdomain, API Username | default, each website | Settings > Connection, same scope. The API Password carries over too (encrypted); you do not need to note it |
-| Newsletter Subscription Form > Enable Subscribers Collection, Autoresponder ID | default, each website | Welcome automation, same scope: on when both are set |
+| Newsletter Subscription Form > Enable Subscribers Collection, Autoresponder ID | default, each website | Welcome automation, same scope: on where both are set — a website's own value, else the Default Config value |
 | Newsletter Subscription Form > Enable CAPTCHA, CAPTCHA Type | default, each website | Not carried over — see *Captcha* below |
 | Subscribers Syncronization > Enable Syncronization, Syncronize Additional Fields | default, each website | Subscriber Synchronization, same scope (Gender is sent as `user_gender`) |
 | Subscribers Syncronization > Frequency | default | Not carried over — v3 syncs as changes happen |
@@ -118,7 +118,7 @@ Contacts** and save.
 | Legacy setting | Where it lands in v3 |
 |---|---|
 | API subdomain / username / password (all websites) | API Connection (the previously **plaintext** password is now stored **encrypted**; the subdomain is normalized) |
-| Newsletter opt-in autoresponder (`workflowId`) | Welcome automation (enabled if opt-in triggering was enabled) + a fallback row in the automation mapping table |
+| Newsletter opt-in autoresponder (`workflowId`) | Welcome automation (on at each website where 2.8.x sent the opt-in email: opt-in triggering on and an autoresponder set, each the website's own value else the Default Config value) + a fallback row in the automation mapping table |
 | Subscriber cron sync toggle + field selection | Subscriber Synchronization (every tick carries over) |
 | Abandoned cart toggle / autoresponder / interval | Automations group (`2:hour` → 120 minutes) + a mapping fallback row |
 | *Enable Module = No* (Default Config or a website) | Subscriber Synchronization, the welcome automation and the abandoned-cart automation **off** at that scope. *Yes*, or no saved value, changes nothing — except under a Default Config with *No*, see below |

@@ -67,4 +67,25 @@ class SetupGuardTest extends TestCase
 
         $this->assertFalse($this->guard->isSetupCompleted());
     }
+
+    /**
+     * PRO-4012: a page opened for a website that is not set up yet sends the
+     * merchant to the initial setup of that website, not to the chooser,
+     * which starts on the first website.
+     */
+    public function testTheWizardRedirectKeepsTheWebsiteTheRequestNamed(): void
+    {
+        $this->websiteContext->method('isExplicit')->willReturn(true);
+        $this->websiteContext->method('getWebsiteId')->willReturn(2);
+
+        $this->assertSame(['_query' => ['website' => 2]], $this->guard->getWizardRouteParams());
+    }
+
+    public function testTheWizardRedirectNamesNoWebsiteWhenTheRequestNamedNone(): void
+    {
+        $this->websiteContext->method('isExplicit')->willReturn(false);
+        $this->websiteContext->method('getWebsiteId')->willReturn(1);
+
+        $this->assertSame([], $this->guard->getWizardRouteParams());
+    }
 }

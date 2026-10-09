@@ -17,21 +17,17 @@ use Magento\Store\Model\ScopeInterface;
 use Smaily\Connect\Model\ModuleVersion;
 
 /**
- * Wizard-first gating for the Smaily Connect admin pages:
- * - On a fresh install (setup not completed) every Smaily Connect page
- *   redirects to the setup wizard.
+ * Wizard-first gating for the Smaily Connect admin pages
+ * (docs/internal/RFC_MULTI_WEBSITE.md §2):
+ * - The initial setup's Finish step saves the setup-completed flag for its
+ *   one website (website scope). Dashboard, Settings and Log redirect a
+ *   website without the flag to the initial setup of that website. A
+ *   website has no flag on a fresh install, when it is newly added, and,
+ *   after an upgrade from 2.8.x, on every website: the legacy migration
+ *   does not write the flag, so each website goes through the initial
+ *   setup (intended, owner decision 2026-10-09).
  * - After a MAJOR version upgrade a one-time "review what's new" notice is
- *   posted instead of a hard redirect — the store keeps running on the
- *   migrated settings.
- *
- * The completed flag is website-scoped (docs/internal/RFC_MULTI_WEBSITE.md §2, Phase 2):
- * it reads via the normal website-falls-back-to-default chain, so an
- * existing single-website install is unaffected (its default-scope flag
- * still resolves as "completed" for its one website), while a newly added
- * second website that inherits the same value via fallback is treated as
- * already set up too — consistent with every other field in this module,
- * which the merchant can still give its own distinct settings via the
- * Settings page's website selector or by revisiting the wizard's steps.
+ *   also posted; it does not replace the redirect.
  */
 class SetupGuard
 {
@@ -54,6 +50,21 @@ class SetupGuard
             ScopeInterface::SCOPE_WEBSITE,
             $this->websiteContext->getWebsiteId()
         );
+    }
+
+    /**
+     * The route params of a page's redirect to the initial setup: the
+     * website the request named, so the setup opens for that website
+     * instead of on its website chooser, which starts on the first website
+     * (PRO-4012). A request that named no website gets the chooser.
+     *
+     * @return array<string, mixed>
+     */
+    public function getWizardRouteParams(): array
+    {
+        return $this->websiteContext->isExplicit()
+            ? ['_query' => ['website' => $this->websiteContext->getWebsiteId()]]
+            : [];
     }
 
     /**

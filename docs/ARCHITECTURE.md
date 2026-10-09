@@ -1513,13 +1513,18 @@ Initial setup, Settings, Log. Design rules:
   `log_id` (`smaily-<id>` / `intelligence-<id>`) that
   `Model\Log\SelectionRetry` splits to route the mass retry back to the
   right queue. Grid filters/sorting apply to the outer select.
-- **Wizard-first gating.** `Model\Adminhtml\SetupGuard`: while
-  `smaily_connect/internal/setup_completed` is unset for the current
-  `WebsiteContext` target, Dashboard/Settings/Log redirect to the wizard.
-  The guard also tracks
+- **Wizard-first gating.** `Model\Adminhtml\SetupGuard`: the wizard's
+  Finish step saves `smaily_connect/internal/setup_completed` for its one
+  website (website scope). While the flag is unset for the current
+  `WebsiteContext` target, Dashboard/Settings/Log redirect to the wizard,
+  keeping a `?website=<id>` the request named, so the wizard opens for that
+  website instead of on its chooser (`SetupGuard::getWizardRouteParams()`).
+  A newly added website has no flag, and after an upgrade from 2.8.x no
+  website has one (the legacy migration does not write it), so each such
+  website goes through the wizard — intended. The guard also tracks
   `smaily_connect/internal/last_seen_version` (module version read from
   composer.json via `Model\ModuleVersion`) and posts a one-time admin
-  notice after a MAJOR version jump instead of any hard redirect.
+  notice after a MAJOR version jump, in addition to the redirect.
 
 ## Wire contracts
 

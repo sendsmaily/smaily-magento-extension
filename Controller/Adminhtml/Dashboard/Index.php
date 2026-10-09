@@ -41,7 +41,7 @@ class Index extends Action implements HttpGetActionInterface
             /** @var Redirect $redirect */
             $redirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
 
-            return $redirect->setPath('smaily_connect/wizard');
+            return $redirect->setPath('smaily_connect/wizard', $this->setupGuard->getWizardRouteParams());
         }
 
         /** @var Page $page */

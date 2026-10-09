@@ -108,10 +108,10 @@ on the Contacts step, and the Automations step shows the migrated
 workflows and wait time. Compare each step with your notes, in
 particular each automation's *Enabled* tick, then finish the setup.
 
-Finishing the Contacts step switches contact synchronization on for that
-website. For a website where 2.8.x had *Enable Module = No*, switch it off
-again afterwards: untick **Sync contacts to Smaily** under **Settings >
-Contacts** and save.
+For a website where 2.8.x had *Enable Module = No*, contact
+synchronization stays off: its Contacts step shows **Sync contacts to
+Smaily** unticked, and **Continue** keeps it off. Tick it there to switch
+contact synchronization on.
 
 ## What migrates automatically
 

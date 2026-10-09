@@ -302,8 +302,9 @@ class WizardData implements ArgumentInterface
     /**
      * The selected website's stored contact-sync answer — the same one the
      * live paths and the contacts import read (PRO-1764). Read by the WIZARD
-     * only: Settings carries the switch itself, so panel/panels-js.phtml owns
-     * the import control's state there, from `subscribers.syncEnabled` above.
+     * only, which renders the switch when it is off (PRO-4010): Settings
+     * carries the switch itself, so panel/panels-js.phtml owns the import
+     * control's state there, from `subscribers.syncEnabled` above.
      */
     public function isSyncEnabled(): bool
     {

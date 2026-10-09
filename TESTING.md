@@ -157,7 +157,14 @@ card and offers only **Cancel import**; an
 import that moves shows its progress as before. It renders the Contacts
 tab too: before its import starts, the contacts card quotes the number of
 contacts the import sends for the mode picked on the panel, in the
-singular for one, and no other total. To
+singular for one, and no other total.
+`Test/Js/contacts-step.html` renders the initial setup's Contacts step
+(`panel/subscribers.phtml` without the Settings context) and saves it the
+way **Continue** does, in both languages: for a website whose contact sync
+is on, the step shows no **Sync contacts to Smaily** switch and its save
+posts no sync answer, so the stored one stays; for a website whose sync is
+off, the step shows the switch unticked with the import button disabled,
+an unchanged save posts sync off, and a ticked switch posts it on. To
 check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.

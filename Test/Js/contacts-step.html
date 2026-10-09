@@ -1,0 +1,172 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the initial setup's Contacts step (PRO-4010): the real
+  templates (view/adminhtml/templates/panel/subscribers.phtml and
+  panel/panels-js.phtml), rendered in en_US and et_EE by
+  Test/Js/render-admin.php into Test/Js/build/ without the Settings context,
+  run with jQuery from vendor/, one fresh frame per scenario. Stubbed: only
+  the requests (fetch), each answered as saved. For a website whose contact
+  sync is on, the step shows no Sync contacts to Smaily switch and its save
+  posts no sync answer, so the stored one stays. For a website whose sync is
+  off, the step shows the switch unticked: Continue without a change saves
+  it off, and ticking it saves it on.
+  Run it with bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>contacts step harness</title>
+    <script src="build/contacts-setup.en_US.js"></script>
+    <script src="build/contacts-setup.et_EE.js"></script>
+    <script src="build/contacts-setup-off.en_US.js"></script>
+    <script src="build/contacts-setup-off.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var SWITCH = 'Sync contacts to Smaily';
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    // Runs in the frame before the page: the admin's form key, and the
+    // requests, each recorded and answered as saved.
+    function stubs() {
+        return [
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.requests = [];',
+            'window.fetch = function (url, options) {',
+            '  window.requests.push({url: url, body: JSON.parse(options.body || "{}")});',
+            '  return Promise.resolve(new Response(JSON.stringify({saved: true, status: "idle"}),',
+            '    {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>'
+        ].join('\n');
+    }
+
+    function open(page) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.onload = function () {
+                wait(50).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs()
+                + '</head><body>' + rendered.html
+                + '<script>window.panels = window.smailyPanelsInit(window.jQuery); window.panels.initAll();<\/script>'
+                + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    // What the step's Continue posts, as the wizard saves the step
+    // (wizard/index.phtml: panels.saveStep with panels.collect.subscribers).
+    async function save(frame) {
+        var panels = frame.contentWindow.panels,
+            saves;
+
+        await panels.saveStep('subscribers', panels.collect.subscribers());
+        saves = frame.contentWindow.requests.filter(function (request) {
+            return request.body.step === 'subscribers';
+        });
+
+        return saves[saves.length - 1].body.data;
+    }
+
+    async function run(locale) {
+        var label = window.smailyAdminPages['contacts-setup-off.' + locale].strings[SWITCH],
+            frame,
+            doc,
+            toggle,
+            data;
+
+        log('# ' + locale);
+
+        // A website whose contact sync is on: no switch, no sync answer.
+        frame = await open('contacts-setup.' + locale);
+        doc = frame.contentDocument;
+        check(locale + ', sync on: the step shows no Sync contacts to Smaily switch',
+            doc.getElementById('smaily-w-sync-enabled') === null);
+        data = await save(frame);
+        check(locale + ', sync on: Continue posts no sync answer, so the stored one stays',
+            !Object.prototype.hasOwnProperty.call(data, 'sync_enabled') && data.sync_mode === 'consent');
+        frame.remove();
+
+        // A website whose contact sync is off: the switch, unticked.
+        frame = await open('contacts-setup-off.' + locale);
+        doc = frame.contentDocument;
+        toggle = doc.getElementById('smaily-w-sync-enabled');
+        check(locale + ', sync off: the step shows Sync contacts to Smaily, unticked',
+            toggle !== null && !toggle.checked && toggle.parentNode.textContent.trim() === label);
+        check(locale + ', sync off: the import button is disabled and says why',
+            doc.getElementById('smaily-w-backfill').disabled
+            && doc.getElementById('smaily-w-backfill-off').style.display !== 'none');
+        data = await save(frame);
+        check(locale + ', sync off: Continue without a change saves it off', data.sync_enabled === false);
+        toggle.checked = true;
+        frame.contentWindow.jQuery(toggle).trigger('change');
+        check(locale + ', sync off, switched on: the import button is enabled',
+            !doc.getElementById('smaily-w-backfill').disabled);
+        data = await save(frame);
+        check(locale + ', sync off, switched on: Continue saves it on', data.sync_enabled === true);
+        frame.remove();
+    }
+
+    run('en_US').then(function () {
+        return run('et_EE');
+    }).then(function () {
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    }).catch(function (error) {
+        document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }).then(function () {
+        clearInterval(keepAlive);
+    });
+</script>
+</body>
+</html>

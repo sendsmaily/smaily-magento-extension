@@ -336,6 +336,11 @@ password field.
 
 **Settings > Contacts** (or Initial setup step 2)
 
+**Sync contacts to Smaily** switches contact sync on or off for the
+website. Initial setup step 2 shows it only for a website whose contact
+sync is off (for example after an upgrade from 2.8.x with *Enable Module =
+No*): **Continue** keeps sync off unless you tick it.
+
 Contacts sync in near-real-time through a durable queue (no lost events
 if Smaily is briefly unreachable — deliveries retry with backoff). When one
 store action saves the same contact more than once, a save that changes

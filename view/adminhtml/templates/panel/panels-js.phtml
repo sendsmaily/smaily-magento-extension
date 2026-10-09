@@ -1040,14 +1040,18 @@ window.smailyPanelsInit = function ($) {
         },
         subscribers: function () {
             var data = {
-                sync_enabled: $('#smaily-w-sync-enabled').length
-                    ? $('#smaily-w-sync-enabled').is(':checked')
-                    : true,
                 sync_mode: $('input[name=smaily-w-mode]:checked').val(),
                 sync_fields: $('#smaily-w-fields input:checked').map(function () { return $(this).val(); }).get(),
                 checkout_optin_enabled: $('#smaily-w-checkout-optin').is(':checked'),
                 suppress_optin_emails: $('#smaily-w-suppress').is(':checked')
             };
+            // The sync switch renders on Settings, and in the wizard only for
+            // a website whose sync is off (PRO-4010); without it the merchant
+            // saw no answer, so the key is omitted and the stored one stays.
+            var $syncEnabled = $('#smaily-w-sync-enabled');
+            if ($syncEnabled.length) {
+                data.sync_enabled = $syncEnabled.is(':checked');
+            }
             // Settings-only controls (not rendered in the wizard) — omit the
             // keys entirely there so the wizard's save never touches them.
             var $includeGuests = $('#smaily-w-include-guests');

@@ -271,19 +271,23 @@ $pages = [
  * connected, and with neither (PRO-3913). Magento's cookie restriction mode
  * is on, except where a Storefront URL is saved (PRO-3918). The Settings
  * tab's import cards serve the stalled import harness too (PRO-3915,
- * PRO-3923). The same view model serves the Contacts tab (PRO-1970).
+ * PRO-3923). The same view model serves the Contacts tab (PRO-1970) and the
+ * initial setup's Contacts step (PRO-4010).
  */
 $intelligenceViewModel = static fn (
     string $storefrontUrl,
-    bool $intelligenceConnected = false
-): object => new class ($storefrontUrl, $intelligenceConnected) {
+    bool $intelligenceConnected = false,
+    bool $syncEnabled = true
+): object => new class ($storefrontUrl, $intelligenceConnected, $syncEnabled) {
     /**
      * @param string $storefrontUrl
      * @param bool $intelligenceConnected
+     * @param bool $syncEnabled
      */
     public function __construct(
         private readonly string $storefrontUrl,
-        private readonly bool $intelligenceConnected
+        private readonly bool $intelligenceConnected,
+        private readonly bool $syncEnabled
     ) {
     }
 
@@ -462,13 +466,14 @@ $intelligenceViewModel = static fn (
     }
 
     /**
-     * The Contacts tab (PRO-1970): contact sync on, Subscribers only saved.
+     * The Contacts tab (PRO-1970): contact sync on, Subscribers only saved;
+     * off on the contacts-setup-off page (PRO-4010).
      *
      * @return bool
      */
     public function isSyncEnabled(): bool
     {
-        return true;
+        return $this->syncEnabled;
     }
 
     /**
@@ -513,7 +518,7 @@ $intelligenceViewModel = static fn (
             'websiteAccount' => ['subdomain' => 'demo', 'username' => 'api'],
             'multilingual' => ['languages' => ['en'], 'fallbackLanguage' => 'en'],
             'subscribers' => [
-                'syncEnabled' => true,
+                'syncEnabled' => $this->syncEnabled,
                 'syncMode' => 'consent',
                 'checkoutOptin' => true,
                 'suppressOptinEmails' => true,
@@ -614,6 +619,25 @@ $pages['contacts-settings'] = [
         'This import sends %1 contacts from this website. It runs in the background,'
             . ' a chunk per minute, and never slows the storefront down.',
     ],
+];
+/*
+ * The initial setup's Contacts step (the same panel without the Settings
+ * context), for a website whose contact sync is on and for one whose sync is
+ * off, as a 2.8.x Enable Module = No leaves it (PRO-4010).
+ */
+$contactsSetupTemplates = [
+    $root . '/view/adminhtml/templates/panel/subscribers.phtml',
+    $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+];
+$pages['contacts-setup'] = [
+    'template' => $contactsSetupTemplates,
+    'viewModel' => $intelligence,
+    'strings' => ['Sync contacts to Smaily'],
+];
+$pages['contacts-setup-off'] = [
+    'template' => $contactsSetupTemplates,
+    'viewModel' => $intelligenceViewModel('', false, false),
+    'strings' => ['Sync contacts to Smaily'],
 ];
 $setupCompleted = [
     'template' => $root . '/view/adminhtml/templates/wizard/index.phtml',

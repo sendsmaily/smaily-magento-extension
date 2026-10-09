@@ -4,9 +4,10 @@
  * See LICENSE.txt for license details.
  *
  * Subscribers panel — shared by the setup wizard (step 2) and the Settings
- * page (Subscribers tab). The Settings context adds the master sync toggle
- * the wizard implies. The contacts import (backfill) lives here on both
- * surfaces; behavior lives in panel/panels-js.phtml.
+ * page (Subscribers tab). The Settings context adds the master sync toggle;
+ * the wizard adds it only for a website whose sync is off. The contacts
+ * import (backfill) lives here on both surfaces; behavior lives in
+ * panel/panels-js.phtml.
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
@@ -17,12 +18,14 @@ $viewModel = $block->getData('view_model');
 $isSettings = $block->getData('context') === 'settings';
 // The import obeys this website's subscriber-sync switch exactly like the
 // live paths do (PRO-1764), so with the switch off the control is disabled
-// and says why instead of quoting numbers it will not send. Settings renders
-// the switch itself, so panels-js.phtml owns that state live there (boot JSON
-// at init, then every change) and this render must not second-guess it; the
-// wizard renders no switch, its handler early-returns, so the wizard is the
-// only context that answers server-side.
+// and says why instead of quoting numbers it will not send. Where the switch
+// renders, panels-js.phtml owns that state live (boot JSON at init, then
+// every change) and this render must not second-guess it. Settings always
+// renders it; the wizard only for a website whose sync is off (PRO-4010), so
+// the merchant can switch it on there and Continue never saves an answer the
+// merchant did not see. A wizard without the switch answers server-side.
 $syncEnabled = $isSettings || $viewModel->isSyncEnabled();
+$showSyncSwitch = $isSettings || !$syncEnabled;
 
 // Optional contact fields, server-rendered (same values the system.xml
 // multiselect edits).
@@ -43,7 +46,7 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
     <?php // Settings has its own "Contacts" heading + description above the card
     // (settings/index.phtml); the wizard puts the step title above the card
     // (wizard/index.phtml, PRO-3561). ?>
-    <?php if ($isSettings): ?>
+    <?php if ($showSyncSwitch): ?>
     <div class="smaily-inline-toggle">
         <label><input type="checkbox" id="smaily-w-sync-enabled"/>
             <?= $escaper->escapeHtml(__('Sync contacts to Smaily')) ?></label>

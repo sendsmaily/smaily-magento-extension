@@ -49,10 +49,10 @@ is not on Packagist yet, and neither the `smaily/smailyformagento` package
 nor the release ZIP contains it (`/compat` is export-ignored, so GitHub's
 "Source code" downloads leave it out too). Take it from a git clone of the
 Smaily Connect version the store runs — the tag is the version,
-`3.0.0-rc10` here:
+`3.0.0-rc11` here:
 
 ```bash
-git clone --depth 1 --branch 3.0.0-rc10 https://github.com/sendsmaily/smaily-magento-extension.git /tmp/smaily-connect
+git clone --depth 1 --branch 3.0.0-rc11 https://github.com/sendsmaily/smaily-magento-extension.git /tmp/smaily-connect
 ```
 
 Smaily Connect installed with composer — copy the module into the project

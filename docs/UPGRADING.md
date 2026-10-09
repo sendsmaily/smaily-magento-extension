@@ -71,7 +71,7 @@ project, which accepts stable versions only. From 3.0.0 on,
 
 ```bash
 bin/magento maintenance:enable
-composer require smaily/smailyformagento:3.0.0-rc10
+composer require smaily/smailyformagento:3.0.0-rc11
 bin/magento setup:upgrade
 bin/magento setup:di:compile
 bin/magento setup:static-content:deploy en_US   # list every locale your admin and storefront use, e.g. en_US et_EE
@@ -87,7 +87,7 @@ version of static files".
 **Developer or default mode:**
 
 ```bash
-composer require smaily/smailyformagento:3.0.0-rc10
+composer require smaily/smailyformagento:3.0.0-rc11
 bin/magento setup:upgrade
 bin/magento cache:flush
 ```

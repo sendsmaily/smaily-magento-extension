@@ -42,7 +42,7 @@ with the Smaily Connect plugins for WooCommerce and Shopify.
 ## Installation
 
 ```bash
-composer require smaily/smailyformagento:3.0.0-rc10
+composer require smaily/smailyformagento:3.0.0-rc11
 bin/magento module:enable Smaily_Connect
 bin/magento setup:upgrade
 ```

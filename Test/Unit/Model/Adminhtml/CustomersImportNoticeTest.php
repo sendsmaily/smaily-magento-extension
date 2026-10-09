@@ -23,7 +23,7 @@ use Smaily\Connect\Model\Engine\Settings as EngineSettings;
  * import has never completed is asked to start it, with a link to the
  * Intelligence tab where it starts; never while the store is not
  * connected, once an import has completed, or while one is queued or
- * running.
+ * running and has not stalled.
  */
 class CustomersImportNoticeTest extends TestCase
 {
@@ -87,15 +87,50 @@ class CustomersImportNoticeTest extends TestCase
         self::assertFalse($this->notice->isDisplayed());
     }
 
-    public function testHiddenWhileACustomersImportIsQueuedOrRunning(): void
+    /**
+     * @dataProvider activeStatusProvider
+     */
+    public function testHiddenWhileACustomersImportIsQueuedOrRunning(string $status): void
     {
+        $job = $this->createMock(Job::class);
+        $job->method('getStatus')->willReturn($status);
         $this->engineSettings->method('isConnected')->willReturn(true);
         $this->jobManager->method('hasCompleted')->willReturn(false);
         $this->jobManager->method('findActive')
             ->with(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID)
-            ->willReturn($this->createMock(Job::class));
+            ->willReturn($job);
+        $this->jobManager->method('isStalled')
+            ->with(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE)
+            ->willReturn(false);
 
         self::assertFalse($this->notice->isDisplayed());
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function activeStatusProvider(): array
+    {
+        return [
+            'queued' => [Job::STATUS_PENDING],
+            'running' => [Job::STATUS_RUNNING],
+        ];
+    }
+
+    /**
+     * A stalled import does not move on by itself; the card's Run again
+     * starts a fresh one, so the notice asks for it.
+     */
+    public function testShowsWhileTheCustomersImportHasStalled(): void
+    {
+        $this->engineSettings->method('isConnected')->willReturn(true);
+        $this->jobManager->method('hasCompleted')->willReturn(false);
+        $this->jobManager->method('findActive')->willReturn($this->createMock(Job::class));
+        $this->jobManager->method('isStalled')
+            ->with(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE)
+            ->willReturn(true);
+
+        self::assertTrue($this->notice->isDisplayed());
     }
 
     public function testTextLinksToTheIntelligenceTabWhereTheImportStarts(): void

@@ -28,9 +28,11 @@ use Smaily\Connect\Model\Engine\Settings as EngineSettings;
  * Shown on every admin page while Campaign Intelligence is connected (one
  * tenant per installation, Engine\Settings::isConnected() — the same gate
  * as EngineImportGuard) and no customers import has ever completed;
- * hidden while one is queued or running. Magento evaluates it on each
- * page, so it disappears once the import completes. Registered in
- * etc/adminhtml/di.xml.
+ * hidden while one is queued or running, unless it has stalled
+ * (JobManager::isStalled(), the card's Stalled) — a stalled import does
+ * not move on by itself, and the card's Run again starts a fresh one.
+ * Magento evaluates it on each page, so it disappears once the import
+ * completes. Registered in etc/adminhtml/di.xml.
  */
 class CustomersImportNotice implements MessageInterface
 {
@@ -57,7 +59,10 @@ class CustomersImportNotice implements MessageInterface
     {
         return $this->engineSettings->isConnected()
             && !$this->jobManager->hasCompleted(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE)
-            && $this->jobManager->findActive(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID) === null;
+            && (
+                $this->jobManager->findActive(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID) === null
+                || $this->jobManager->isStalled(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE)
+            );
     }
 
     /**

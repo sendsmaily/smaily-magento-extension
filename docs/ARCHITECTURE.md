@@ -307,7 +307,8 @@ below.
   `Magento\Framework\Notification\MessageList` in `etc/adminhtml/di.xml`):
   shown while `Engine\Settings::isConnected()` and no customers job is
   `completed` (`JobManager::hasCompleted()`), hidden while one is queued
-  or running (`findActive()`), and linked to the Settings tab
+  or running (`findActive()`) unless it has stalled (`isStalled()`), and
+  linked to the Settings tab
   (`?tab=intelligence`); nothing starts the import automatically.
   The catalog job is queued first, so it has the
   lower id and the tick (`nextActive()`, oldest first) runs it first; right

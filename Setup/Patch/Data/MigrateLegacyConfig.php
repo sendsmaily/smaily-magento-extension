@@ -38,6 +38,11 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
  * there in 2.8.x — its own value, else the default scope's, else the
  * config.xml default — so it runs as it did in 2.8.x.
  *
+ * Welcome: a scope with its own 2.8.x opt-in switch or Autoresponder ID
+ * gets its own welcome switch, on when 2.8.x sent the welcome email there —
+ * the opt-in switch on and an Autoresponder ID set, each the website's own
+ * value else the default scope's (LegacyConfigMapper).
+ *
  * Store-view rows: 2.8.x read every setting per website, so it never read a
  * store-view row. v3 reads the Smaily account per store view, so the
  * store-view account rows (and Enable Module) are not carried over, and an
@@ -120,7 +125,7 @@ class MigrateLegacyConfig implements DataPatchInterface
                 unset($legacy['general/enable']);
                 $legacy = array_diff_key($legacy, $account);
             }
-            $result = $this->mapper->map($legacy);
+            $result = $this->mapper->map($legacy, $scope === 'websites' ? $defaultLegacy : []);
 
             foreach ($result['configs'] as $config) {
                 $value = in_array(LegacyConfigMapper::FLAG_ENCRYPT, $config['flags'], true)

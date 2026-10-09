@@ -295,6 +295,57 @@ class GdprEraseTest extends IntegrationTestCase
     }
 
     /**
+     * PRO-3964: erasing is not a change to the cart either. A cart row turned
+     * into the erased marker keeps its last-changed time — a row tracked
+     * under the address and a row of a cart that holds the address under
+     * another one alike — so the janitor removes the marker 30 days after
+     * that time, not 30 days after the erasure.
+     */
+    public function testAnErasedCartMarkerKeepsItsRetentionSchedule(): void
+    {
+        $day = 86400;
+        $schema = new SchemaInstaller($this->connection);
+        // Tracked under the address.
+        $schema->seedQuote(31);
+        $this->stateManager->markMailed(31, 1, self::SUBJECT);
+        $this->backdateCart(31, $this->clockDate(-31 * $day));
+        // Tracked under an earlier address, the subject's on the active cart.
+        $schema->seedQuote(32, ['is_active' => 1, 'items_count' => 1, 'customer_email' => self::SUBJECT]);
+        $this->stateManager->markMailed(32, 1, 'earlier@example.test');
+        $this->backdateCart(32, $this->clockDate(-31 * $day));
+        // A reminder of yesterday: the sweep must not take it.
+        $schema->seedQuote(33);
+        $this->stateManager->markMailed(33, 1, self::BYSTANDER);
+        $this->backdateCart(33, $this->clockDate(-$day));
+
+        self::assertSame(
+            ['removed' => 0, 'anonymised' => 2],
+            $this->eraser->erase(self::SUBJECT)[self::CART_LABEL]
+        );
+
+        $rows = array_column($this->fetchAll(self::CART_TABLE, 'quote_id'), null, 'quote_id');
+        foreach ([31, 32] as $quoteId) {
+            self::assertSame(StateManager::STATUS_ERASED, $rows[$quoteId]['status'], 'The row is the erased marker');
+            self::assertNull($rows[$quoteId]['email']);
+            self::assertSame(
+                $this->clockDate(-31 * $day),
+                $rows[$quoteId]['updated_at'],
+                'The marker keeps its last-changed time'
+            );
+        }
+
+        /** @var QueueJanitor $janitor */
+        $janitor = $this->objectManager->create(QueueJanitor::class);
+        $janitor->execute();
+
+        self::assertSame(
+            ['33'],
+            array_map('strval', array_column($this->fetchAll(self::CART_TABLE, 'quote_id'), 'quote_id')),
+            'The erased markers go on their own 30-day schedule'
+        );
+    }
+
+    /**
      * The command's own job: the summary a merchant reads, in plain labels.
      */
     public function testTheCommandSummarisesTheErasureInPlainLabels(): void
@@ -438,6 +489,15 @@ class GdprEraseTest extends IntegrationTestCase
         self::assertIsArray($row, sprintf('Expected row %s in %s', $uuid, $table));
 
         return $row;
+    }
+
+    private function backdateCart(int $quoteId, string $updatedAt): void
+    {
+        $this->connection->update(
+            $this->connection->getTableName(self::CART_TABLE),
+            ['updated_at' => $updatedAt],
+            ['quote_id = ?' => $quoteId]
+        );
     }
 
     private function createdAt(string $uuid): string

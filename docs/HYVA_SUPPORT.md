@@ -48,12 +48,12 @@ changes), **OUT-OF-SCOPE**.
 Module `Hyva_SmailyConnect`, composer `smaily/module-connect-hyva` (the
 module name keeps the Hyvä compat-module naming convention; the composer
 package is published under Smaily's own vendor namespace — decided, see
-"Open release decisions"). It lives in this repository and will eventually
-be published as its own package. It is excluded from the release ZIP artifact
-but kept in the composer package on purpose: it is inert there — nothing
-loads `compat/hyva/registration.php` — while enabling installation via a
-path repository until the separate package exists (see
-`compat/hyva/README.md`).
+"Open release decisions"). It lives in this repository and is not yet
+published as its own package. Neither the release ZIP nor the
+`smaily/smailyformagento` package contains it (`/compat` is
+export-ignored), so a store takes it from a git clone of the Smaily Connect
+version it runs — the commands are in `compat/hyva/README.md`
+("Installation").
 
 - `view/frontend/layout/hyva_default.xml` — `hyva_`-prefixed handle (loads
   only when a Hyvä theme is active) swaps the attribution, tracker and
@@ -156,8 +156,8 @@ scratch:
    `app/code/Smaily/Connect`) a symlink is enough —
    `ln -s app/code/Smaily/Connect/compat/hyva app/code/Hyva/SmailyConnect`
    (the project autoloader's `psr-0 "": app/code/` covers the classes);
-   real stores install it as a composer package (see
-   `compat/hyva/README.md`). Then `bin/magento module:enable
+   real stores install it as `compat/hyva/README.md` ("Installation")
+   describes. Then `bin/magento module:enable
    Hyva_SmailyConnect && bin/magento setup:upgrade`.
 4. `bin/magento hyva:config:generate` (our registration observer adds the
    module to `app/etc/hyva-themes.json`), then build the theme CSS with

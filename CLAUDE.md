@@ -235,7 +235,10 @@ do not change it.
    first; `-l` lists the files with their landing dates); paste them into
    the "Changes since <previous version>" list in that order, merge or
    reword a bullet a later change made untrue (wording may be edited by
-   hand), and `git rm` the fragments (`changelog.d/README.md` stays). The
+   hand), and `git rm` the fragments (`changelog.d/README.md` stays). It
+   sets the new version in the Hyvä companion's `git clone --branch
+   <version>` commands (`compat/hyva/README.md` "Installation" and
+   `docs/site/index.html` `#st-hyva`, EN and ET; PRO-4018). The
    same PR updates STATUS.md. Squash-merge it.
 2. `gh release create 3.0.0-rc9 --repo sendsmaily/smaily-magento-extension
    --target master --title "…" --notes-file … --prerelease` (a release

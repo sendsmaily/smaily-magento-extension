@@ -488,23 +488,35 @@ pre code{background:none; border:0; padding:0; font-size:inherit}
   <div class="sub" id="install">
     <h2><span data-lang="en">Install the extension</span><span data-lang="et">Laienduse paigaldus</span></h2>
     <div data-lang="en">
-      <p>The recommended way is composer. From the Magento root, as the user that owns the Magento files:</p>
-<pre><code>composer require smaily/smailyformagento
+      <p>The recommended way is composer. Until 3.0.0 is released, give the release candidate's exact version, as the <a href="https://github.com/sendsmaily/smaily-magento-extension/releases">releases page</a> names it: <code>composer require smaily/smailyformagento</code> without a version installs the old 2.8.1, and <code>^3.0</code> does not install a release candidate on a standard Magento project, which accepts stable versions only. From 3.0.0 on, <code>composer require smaily/smailyformagento</code> is enough.</p>
+      <p>Run the commands from the Magento root, as the user that owns the Magento files. <code>bin/magento deploy:mode:show</code> shows the mode. In production mode:</p>
+<pre><code>bin/magento maintenance:enable
+composer require smaily/smailyformagento:3.0.0-rc10
 bin/magento module:enable Smaily_Connect
 bin/magento setup:upgrade
-bin/magento setup:di:compile   # production mode
+bin/magento setup:di:compile
+bin/magento setup:static-content:deploy en_US   # every locale your store uses
+bin/magento maintenance:disable
 bin/magento cache:flush</code></pre>
+      <p>Keep maintenance mode on until the last command: until <code>setup:static-content:deploy</code> has run, every storefront and admin page fails.</p>
+      <p>In developer or default mode, <code>composer require</code>, <code>module:enable</code>, <code>setup:upgrade</code> and <code>cache:flush</code> are enough.</p>
       <p>Without composer, install the release ZIP into <code>app/code/Smaily/Connect</code>. The full steps — checking the download, production and developer mode, cron, updating and removing — are in <a href="https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/INSTALLING.md">INSTALLING.md</a>.</p>
       <p>After the install, the admin notifications show <strong>Smaily Connect is ready to set up</strong>, with a <strong>Read Details</strong> link to this guide. Finishing the initial setup marks it read.</p>
       <p>Upgrading from Smaily for Magento 2.8.x? See <a href="#upgrading">Upgrading from 2.8.x</a> first.</p>
     </div>
     <div data-lang="et">
-      <p>Soovitatav viis on composer. Käivita Magento juurkaustas, Magento failide omaniku kasutajana:</p>
-<pre><code>composer require smaily/smailyformagento
+      <p>Soovitatav viis on composer. Kuni 3.0.0 väljalaskeni anna väljalaskekandidaadi täpne versioon, nagu <a href="https://github.com/sendsmaily/smaily-magento-extension/releases">väljalasete leht</a> selle nimetab: <code>composer require smaily/smailyformagento</code> ilma versioonita paigaldab vana 2.8.1 ja <code>^3.0</code> ei paigalda tavalises Magento projektis väljalaskekandidaati, sest see lubab ainult stabiilseid versioone. Alates versioonist 3.0.0 piisab käsust <code>composer require smaily/smailyformagento</code>.</p>
+      <p>Käivita käsud Magento juurkaustas, Magento failide omaniku kasutajana. Režiimi näitab <code>bin/magento deploy:mode:show</code>. Tootmisrežiimis:</p>
+<pre><code>bin/magento maintenance:enable
+composer require smaily/smailyformagento:3.0.0-rc10
 bin/magento module:enable Smaily_Connect
 bin/magento setup:upgrade
-bin/magento setup:di:compile   # tootmisrežiimis
+bin/magento setup:di:compile
+bin/magento setup:static-content:deploy en_US   # kõik poe keeleseaded
+bin/magento maintenance:disable
 bin/magento cache:flush</code></pre>
+      <p>Hoia hooldusrežiim sees viimase käsuni: kuni <code>setup:static-content:deploy</code> pole käivitunud, annab iga poe ja halduse leht vea.</p>
+      <p>Arendus- või vaikerežiimis piisab käskudest <code>composer require</code>, <code>module:enable</code>, <code>setup:upgrade</code> ja <code>cache:flush</code>.</p>
       <p>Ilma composerita paigalda väljalaske ZIP kausta <code>app/code/Smaily/Connect</code>. Kõik sammud — allalaaditud faili kontroll, tootmis- ja arendusrežiim, cron, uuendamine ja eemaldamine — on juhendis <a href="https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/INSTALLING.md">INSTALLING.md</a> (inglise keeles).</p>
       <p>Pärast paigaldust näitavad halduse teated <strong>Smaily Connect on seadistamiseks valmis</strong> koos lingiga <strong>Read Details</strong>, mis viib sellesse juhendisse. Algseadistuse lõpetamine märgib teate loetuks.</p>
       <p>Uuendad versioonilt Smaily for Magento 2.8.x? Vaata kõigepealt jaotist <a href="#upgrading">Uuendamine versioonilt 2.8.x</a>.</p>

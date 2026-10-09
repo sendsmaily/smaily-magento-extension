@@ -222,7 +222,15 @@ do not change it.
 
 1. The version-cut PR sets the version in `composer.json`,
    `Model/ModuleInfo.php` and the ModuleVersion docblock, and names it in
-   CHANGELOG. It collects the fragments: `bin/collect-changelog.sh` prints
+   CHANGELOG. It also updates every merchant command that quotes the
+   release-candidate version — the `composer require
+   smaily/smailyformagento:<version>` lines in README "Installation",
+   `docs/UPGRADING.md` "Steps" (both modes) and `docs/site/index.html`
+   `#install` and `#upgrading` (EN and ET twins); at 3.0.0 they become the
+   plain `composer require smaily/smailyformagento` (install) and `:^3.0`
+   (upgrade), and the "until 3.0.0 is released" notes beside them go
+   (`grep -rn '<previous version>' --exclude-dir=vendor .` finds them). It
+   collects the fragments: `bin/collect-changelog.sh` prints
    every `changelog.d/` bullet in the order it landed on `master` (oldest
    first; `-l` lists the files with their landing dates); paste them into
    the "Changes since <previous version>" list in that order, merge or

@@ -42,18 +42,26 @@ with the Smaily Connect plugins for WooCommerce and Shopify.
 ## Installation
 
 ```bash
-composer require smaily/smailyformagento
+composer require smaily/smailyformagento:3.0.0-rc10
 bin/magento module:enable Smaily_Connect
 bin/magento setup:upgrade
 ```
 
-Manual install: extract the release ZIP to `app/code/Smaily/Connect` and
-run the same commands. Each release also carries a `.sha256` file next to
-the ZIP — `sha256sum -c smaily-connect-magento2.zip.sha256` confirms you
-downloaded the archive we built.
+Until 3.0.0 is released, require the release candidate's exact version, as
+the [releases page](https://github.com/sendsmaily/smaily-magento-extension/releases)
+names it: without a version, composer installs the old 2.8.1. A store in
+production mode also needs maintenance mode, `setup:di:compile` and
+`setup:static-content:deploy` — the full sequence is in the
+[User Guide](https://smaily.com/connect-magento/#install).
 
-**Upgrading from 2.8.x?** It's seamless — settings migrate automatically.
-See [UPGRADING.md](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/UPGRADING.md).
+Manual install: extract the release ZIP to `app/code/Smaily/Connect` and
+run the same `bin/magento` commands. Each release also carries a `.sha256`
+file next to the ZIP — `sha256sum -c smaily-connect-magento2.zip.sha256`
+confirms you downloaded the archive we built.
+
+**Upgrading from 2.8.x?** Settings migrate automatically, but
+`composer update` alone stays on 2.8.x — follow the commands in
+[UPGRADING.md](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/UPGRADING.md).
 
 ## Documentation
 

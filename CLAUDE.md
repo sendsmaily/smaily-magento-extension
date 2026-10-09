@@ -83,11 +83,27 @@ pair together, and quote admin labels exactly as `i18n/en_US.csv` /
 `et_EE.csv` show them. `Test/Js/user-guide-site.html` (in `bin/test-js.sh`)
 fails on a broken in-page link, a missing twin or twins whose structure
 drifted. The email-field reference lives there (`#email-fields`).
-**Publishing:** Erkki uploads the file to https://smaily.com/connect-magento/
-(as for Woo's smaily.com/connect-woo/) after each merged change to it; it is
-not in the package (`/docs` is export-ignored). The first upload went out
-without an Estonian proofread (Erkki, 2026-10-09); changed Estonian text is
-proofread after it is published. **The admin links the site** (PRO-3953):
+**Publishing it live (FTPS)** (owner decision 2026-10-09): the session
+orchestrator uploads the file to https://smaily.com/connect-magento/ after
+each merged change to `docs/site/index.html`; it is not in the package
+(`/docs` is export-ignored). The credentials file lives at
+`~/smaily_ftp_magento` on Erkki's Mac (3 lines: host / username / password,
+mode 600). Erkki keeps that file: agents use it, never print its contents,
+never commit, copy or delete it. The account is chrooted directly into the
+connect-magento web root. Upload recipe: build a curl `-K` config
+(`user = "<username>:<password>"`) from that file at runtime in a private
+temp file (`umask 077` + `mktemp`) — never put the credentials on the
+command line — upload with explicit TLS, the cert check relaxed (the FTP
+service cert does not match the hostname) and the passive-mode workaround,
+then delete the config:
+```
+curl --ssl-reqd -k --disable-epsv -K <cfg> -T docs/site/index.html ftp://<host>/index.html
+```
+Verify the publish: `curl -sL https://smaily.com/connect-magento/ | md5 -q`
+must equal `git show origin/master:docs/site/index.html | md5 -q`. The
+Estonian proofread follows publishing (the first upload went out without
+one, Erkki, 2026-10-09): changed Estonian text is proofread after it is
+live (PRO-4019). **The admin links the site** (PRO-3953):
 `Model/UserGuide.php::URL` is the site URL, every earlier guide URL is in
 `SetupNotice::PREVIOUS_URLS` (the setup notice an install wrote keeps its
 link), and `docs/USER_GUIDE.md` is only a pointer at the site — do not add
@@ -345,12 +361,13 @@ is written in English.
   4/5 (3 fixes on master since rc9; pilot store not yet confirmed);
   2026-10-07 night: 4/5 (rc10 released; pilot store not yet confirmed);
   2026-10-08: 4/5 (rc10 released; widget and fixes on master; pilot store
-  not yet confirmed).
+  not yet confirmed); 2026-10-09: 4/5 (rc11 cut; the 2.8.x upgrade path
+  walked and fixed; pilot store not yet confirmed).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385
   canceled, PRO-3680 done); 2026-10-04: 0 open (PRO-1357 closed);
   2026-10-05: 0 open; 2026-10-07: 0 open; 2026-10-07 evening: 0 open
-  (PRO-3957 closed); 2026-10-08: 0 open. Dates: none yet (2026-10-02 —
+  (PRO-3957 closed); 2026-10-08: 0 open; 2026-10-09: 0 open. Dates: none yet (2026-10-02 —
   not asked; PRO-2456 is placed before the rc1 tag). **The Epic is
   Completed (2026-10-05)**; new admin UI work goes into the v3 rewrite Epic.

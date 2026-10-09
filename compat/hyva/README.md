@@ -44,14 +44,44 @@ Tailwind v4) — via the free license key from the
 [Hyvä portal](https://www.hyva.io/) (private Packagist repo) or from source
 at [github.com/hyva-themes](https://github.com/hyva-themes).
 
-This module ships inside the Smaily Connect repository under `compat/hyva`
-for now (inert there — nothing loads its `registration.php`; it is excluded
-from the release ZIP artifact) and will be published as its own composer
-package. Until then, install it with a path repository:
+This module lives in the Smaily Connect repository under `compat/hyva`. It
+is not on Packagist yet, and neither the `smaily/smailyformagento` package
+nor the release ZIP contains it (`/compat` is export-ignored, so GitHub's
+"Source code" downloads leave it out too). Take it from a git clone of the
+Smaily Connect version the store runs — the tag is the version,
+`3.0.0-rc10` here:
 
 ```bash
-composer config repositories.smaily-hyva path vendor/smaily/smailyformagento/compat/hyva
+git clone --depth 1 --branch 3.0.0-rc10 https://github.com/sendsmaily/smaily-magento-extension.git /tmp/smaily-connect
+```
+
+Smaily Connect installed with composer — copy the module into the project
+and install it from there with a path repository:
+
+```bash
+mkdir -p packages
+cp -R /tmp/smaily-connect/compat/hyva packages/module-connect-hyva
+composer config repositories.smaily-hyva path packages/module-connect-hyva
 composer require smaily/module-connect-hyva:@alpha
+```
+
+`@alpha` is needed: the module's version is `1.0.0-alpha1`, and a standard
+Magento project installs only stable versions. Keep
+`packages/module-connect-hyva` with the project (in its version control):
+every `composer install` installs the module from that folder.
+
+Smaily Connect installed from the release ZIP (`app/code/Smaily/Connect`)
+— copy the module to `app/code` instead; requiring it with composer would
+look for Smaily Connect as a composer package:
+
+```bash
+mkdir -p app/code/Hyva
+cp -R /tmp/smaily-connect/compat/hyva app/code/Hyva/SmailyConnect
+```
+
+Then, in both cases:
+
+```bash
 bin/magento module:enable Hyva_SmailyConnect
 bin/magento setup:upgrade
 bin/magento hyva:config:generate
@@ -61,8 +91,12 @@ npm --prefix app/design/frontend/<Vendor>/<theme>/web/tailwind run build-prod
 bin/magento cache:flush
 ```
 
-> The composer package is published under Smaily's own vendor namespace as
-> `smaily/module-connect-hyva`; the Magento module name keeps the Hyvä
+When Smaily Connect is updated, replace the module folder the same way from
+the new version's tag (composer: then `composer update
+smaily/module-connect-hyva`), and run `bin/magento setup:upgrade`.
+
+> The composer package name is `smaily/module-connect-hyva`, in Smaily's own
+> vendor namespace; the Magento module name keeps the Hyvä
 > compat-module convention (`Hyva_SmailyConnect`) — see
 > `docs/HYVA_SUPPORT.md`.
 

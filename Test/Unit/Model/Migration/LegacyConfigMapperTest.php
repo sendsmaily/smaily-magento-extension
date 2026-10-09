@@ -137,6 +137,59 @@ class LegacyConfigMapperTest extends TestCase
         ];
     }
 
+    /**
+     * PRO-4013: 2.8.x sent the abandoned-cart reminder at a website when
+     * Enable Abandoned Cart and the Autoresponder ID, each the website's own
+     * value else the default scope's, were both set.
+     *
+     * @dataProvider abandonedCartAtAWebsiteProvider
+     *
+     * @param array<string, string> $website
+     * @param array<string, string> $default
+     */
+    public function testAWebsiteAbandonedCartSwitchIsWhat28xResolvedThere(
+        array $website,
+        array $default,
+        ?string $expected
+    ): void {
+        $configs = [];
+        foreach ($this->mapper->map($website, $default)['configs'] as $config) {
+            $configs[$config['path']] = $config['value'];
+        }
+
+        self::assertSame($expected, $configs[Config::XML_PATH_ABANDONED_ENABLED] ?? null);
+    }
+
+    /**
+     * @return array<string, array{array<string, string>, array<string, string>, ?string}>
+     */
+    public static function abandonedCartAtAWebsiteProvider(): array
+    {
+        $on = ['abandoned/enableAbandonedCart' => '1', 'abandoned/autoresponderId' => '77'];
+        $offWithWorkflow = ['abandoned/enableAbandonedCart' => '0', 'abandoned/autoresponderId' => '77'];
+
+        return [
+            'own off, default on with a workflow' => [
+                ['abandoned/enableAbandonedCart' => '0'], $on, '0',
+            ],
+            'own on, default off with a workflow' => [
+                ['abandoned/enableAbandonedCart' => '1'], $offWithWorkflow, '1',
+            ],
+            'own on, no workflow anywhere' => [
+                ['abandoned/enableAbandonedCart' => '1'], [], '0',
+            ],
+            'own workflow, default on' => [
+                ['abandoned/autoresponderId' => '88'], ['abandoned/enableAbandonedCart' => '1'], '1',
+            ],
+            'own "No automation workflow selected", default on with a workflow' => [
+                ['abandoned/autoresponderId' => ''], $on, '0',
+            ],
+            'own delay only: follows the default' => [
+                ['abandoned/syncTime' => '1:hour'], $on, null,
+            ],
+        ];
+    }
+
     public function testEnableModuleNoSwitchesSyncWelcomeAndAbandonedCartOffAtThatScope(): void
     {
         $result = $this->mapper->map([
@@ -208,6 +261,7 @@ class LegacyConfigMapperTest extends TestCase
             $this->mapper->moduleSwitchValues([
                 'general/enable' => '0',
                 'abandoned/enableAbandonedCart' => '1',
+                'abandoned/autoresponderId' => '77',
             ])
         );
         self::assertSame(LegacyConfigMapper::MODULE_SWITCH_DEFAULTS, $this->mapper->moduleSwitchValues([]));

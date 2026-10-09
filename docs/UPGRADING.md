@@ -23,7 +23,7 @@ store-view settings. In v3, compare them in the initial setup and under
 | Newsletter Subscription Form > Enable CAPTCHA, CAPTCHA Type | default, each website | Not carried over — see *Captcha* below |
 | Subscribers Syncronization > Enable Syncronization, Syncronize Additional Fields | default, each website | Subscriber Synchronization, same scope (Gender is sent as `user_gender`) |
 | Subscribers Syncronization > Frequency | default | Not carried over — v3 syncs as changes happen |
-| Abandoned Cart > Enable Abandoned Cart, Autoresponder ID, Trigger Abandoned Cart Automation | default, each website | Automations, same scope |
+| Abandoned Cart > Enable Abandoned Cart, Autoresponder ID, Trigger Abandoned Cart Automation | default, each website | Automations, same scope: on where Enable Abandoned Cart and an Autoresponder ID are both set — a website's own value, else the Default Config value |
 | Abandoned Cart > Add Template Parameters | default, each website | Not carried over — every product field is sent |
 
 Also note what in Smaily depends on the store's data, because some of it
@@ -120,7 +120,7 @@ Contacts** and save.
 | API subdomain / username / password (all websites) | API Connection (the previously **plaintext** password is now stored **encrypted**; the subdomain is normalized) |
 | Newsletter opt-in autoresponder (`workflowId`) | Welcome automation (on at each website where 2.8.x sent the opt-in email: opt-in triggering on and an autoresponder set, each the website's own value else the Default Config value) + a fallback row in the automation mapping table |
 | Subscriber cron sync toggle + field selection | Subscriber Synchronization (every tick carries over) |
-| Abandoned cart toggle / autoresponder / interval | Automations group (`2:hour` → 120 minutes) + a mapping fallback row |
+| Abandoned cart toggle / autoresponder / interval | Automations group (on at each website where 2.8.x sent the reminder: the toggle on and an autoresponder set, each the website's own value else the Default Config value; `2:hour` → 120 minutes) + a mapping fallback row |
 | *Enable Module = No* (Default Config or a website) | Subscriber Synchronization, the welcome automation and the abandoned-cart automation **off** at that scope. *Yes*, or no saved value, changes nothing — except under a Default Config with *No*, see below |
 
 Each value keeps the scope it was saved at: a website's own value stays

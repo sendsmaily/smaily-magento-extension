@@ -255,4 +255,4 @@ The contact fields Smaily receives change too:
 Contact sync modes, two-way consent sync, welcome/first-order automations,
 checkout opt-in checkbox, event log with retry, historical imports,
 multilingual routing and the optional Campaign Intelligence integration —
-see the [User Guide](USER_GUIDE.md).
+see the [User Guide](https://smaily.com/connect-magento/).

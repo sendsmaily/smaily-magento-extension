@@ -59,7 +59,7 @@ See [UPGRADING.md](https://github.com/sendsmaily/smaily-magento-extension/blob/m
 
 | | |
 |---|---|
-| [User Guide](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/USER_GUIDE.md) | Setup, every setting explained, CLI reference, FAQ |
+| [User Guide](https://smaily.com/connect-magento/) | Setup, every setting explained, CLI reference, FAQ — in English and Estonian |
 | [Installing from the ZIP](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/INSTALLING.md) | Manual install without composer: verify, extract, set up, update, remove |
 | [Upgrading](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/UPGRADING.md) | Migrating from Smaily for Magento 2.8.x |
 | [Architecture](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/ARCHITECTURE.md) | How the module works inside (for developers) |

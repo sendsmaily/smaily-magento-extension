@@ -7,7 +7,7 @@ squash-merged: this title and description become the commit on `master`.
 
 - [ ] CI is green (unit, integration, phpcs, phpstan, PHP 8.1 syntax, JS harnesses, release ZIP)
 - [ ] A merchant-visible change adds one `changelog.d/<ISSUE>.md` fragment (`changelog.d/README.md`); `CHANGELOG.md` itself is not edited
-- [ ] `docs/USER_GUIDE.md` and the other docs describe the new behaviour
+- [ ] The guide site (`docs/site/index.html`, in English and Estonian) and the other docs describe the new behaviour
 - [ ] New settings have `etc/config.xml` defaults (and a `LegacyConfigMapper` mapping when they replace a 2.8.x option)
 
 **Version cut only**

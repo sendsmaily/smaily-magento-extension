@@ -1511,7 +1511,9 @@ Initial setup, Settings, Log. Design rules:
   right queue. Grid filters/sorting apply to the outer select.
 - **Wizard-first gating.** `Model\Adminhtml\SetupGuard`: while
   `smaily_connect/internal/setup_completed` is unset for the current
-  `WebsiteContext` target, Dashboard/Settings/Log redirect to the wizard.
+  `WebsiteContext` target, Dashboard/Settings/Log redirect to the wizard,
+  keeping a `?website=<id>` the request named, so the wizard opens for that
+  website instead of on its chooser (`SetupGuard::getWizardRouteParams()`).
   The guard also tracks
   `smaily_connect/internal/last_seen_version` (module version read from
   composer.json via `Model\ModuleVersion`) and posts a one-time admin

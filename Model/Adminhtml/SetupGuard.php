@@ -57,6 +57,21 @@ class SetupGuard
     }
 
     /**
+     * The route params of a page's redirect to the initial setup: the
+     * website the request named, so the setup opens for that website
+     * instead of on its website chooser, which starts on the first website
+     * (PRO-4012). A request that named no website gets the chooser.
+     *
+     * @return array<string, mixed>
+     */
+    public function getWizardRouteParams(): array
+    {
+        return $this->websiteContext->isExplicit()
+            ? ['_query' => ['website' => $this->websiteContext->getWebsiteId()]]
+            : [];
+    }
+
+    /**
      * Record the running module version; on a major-version jump post the
      * one-time upgrade notice. Called from every Smaily Connect admin page.
      */

@@ -595,7 +595,7 @@ bin/magento cache:flush</code></pre>
         <li><strong>All customers (legitimate interest)</strong> — every registered customer is synced (soft opt-in).</li>
         <li><strong>Checkout opt-in only</strong> — only shoppers who tick the newsletter checkbox at checkout.</li>
       </ul>
-      <p>Then pick the extra fields and the checkout options, and press <strong>Continue</strong>. Saving this step switches contact sync on. Each option is explained under <a href="#set-contacts">Settings › Contacts</a>.</p>
+      <p>Then pick the extra fields and the checkout options, and press <strong>Continue</strong>. Saving this step switches contact sync on — except for a website whose contact sync is off: there the step shows <strong>Sync contacts to Smaily</strong> unticked, and saving keeps sync off unless you tick it. Each option is explained under <a href="#set-contacts">Settings › Contacts</a>.</p>
       <div class="note warn">
         <span class="k">Another integration already syncs subscribers?</span>
         <p>If another module or service already sends your newsletter subscribers or opt-outs to Smaily, switch it off once this step is saved — not before, so no opt-out is missed in between.</p>
@@ -608,7 +608,7 @@ bin/magento cache:flush</code></pre>
         <li><strong>Kõik kliendid (õigustatud huvi)</strong> — sünkroonitakse iga registreeritud klient (pehme nõusolek).</li>
         <li><strong>Ainult kassas turunduskirjade nõusoleku andnud kontaktid</strong> — ainult ostjad, kes märgivad kassas uudiskirja märkeruudu.</li>
       </ul>
-      <p>Seejärel vali lisaväljad ja kassa valikud ning vajuta <strong>Jätka</strong>. Selle sammu salvestamine lülitab kontaktide sünkroonimise sisse. Iga valikut selgitab jaotis <a href="#set-contacts">Seaded › Kontaktid</a>.</p>
+      <p>Seejärel vali lisaväljad ja kassa valikud ning vajuta <strong>Jätka</strong>. Selle sammu salvestamine lülitab kontaktide sünkroonimise sisse — välja arvatud veebisaidil, kus kontaktide sünkroonimine on väljas: seal näitab samm valikut <strong>Sünkrooni kontaktid Smailysse</strong> ilma linnukeseta ja salvestamine jätab sünkroonimise välja, kui sa linnukest ei pane. Iga valikut selgitab jaotis <a href="#set-contacts">Seaded › Kontaktid</a>.</p>
       <div class="note warn">
         <span class="k">Kas mõni teine lõiming juba sünkroonib tellijaid?</span>
         <p>Kui mõni teine moodul või teenus saadab juba sinu uudiskirja tellijaid või loobumisi Smailysse, lülita see välja pärast selle sammu salvestamist — mitte varem, et vahepeal ükski loobumine kaduma ei läheks.</p>
@@ -2224,7 +2224,7 @@ bin/magento maintenance:disable
 bin/magento cache:flush</code></pre>
       <p>In developer or default mode, <code>composer require</code>, <code>setup:upgrade</code> and <code>cache:flush</code> are enough.</p>
       <ul>
-        <li>The admin notification says the earlier settings were migrated. Every <span class="path">Marketing &gt; Smaily Connect</span> page opens the <strong>Initial setup</strong> until it is finished for the website; it shows the migrated settings — check them against your notes. Finishing the <strong>Contacts</strong> step switches contact sync on: for a website where 2.8.x had <em>Enable Module = No</em>, untick <strong>Sync contacts to Smaily</strong> under <span class="path">Settings &gt; Contacts</span> afterwards.</li>
+        <li>The admin notification says the earlier settings were migrated. Every <span class="path">Marketing &gt; Smaily Connect</span> page opens the <strong>Initial setup</strong> until it is finished for the website; it shows the migrated settings — check them against your notes. For a website where 2.8.x had <em>Enable Module = No</em>, contact sync stays off: its <strong>Contacts</strong> step shows <strong>Sync contacts to Smaily</strong> unticked, and <strong>Continue</strong> keeps it off. Tick it there to switch contact sync on.</li>
         <li>The old newsletter captcha is not carried over — use Magento's own reCAPTCHA for newsletter forms.</li>
         <li>The sync-frequency setting is gone: changes sync as they happen.</li>
         <li>Switch off any other abandoned-cart emails before switching the Smaily one on.</li>
@@ -2242,7 +2242,7 @@ bin/magento maintenance:disable
 bin/magento cache:flush</code></pre>
       <p>Arendus- või vaikerežiimis piisab käskudest <code>composer require</code>, <code>setup:upgrade</code> ja <code>cache:flush</code>.</p>
       <ul>
-        <li>Halduse teade ütleb, et varasemad seaded migreeriti. Iga <span class="path">Turundus &gt; Smaily Connect</span> leht avab <strong>Algseadistuse</strong>, kuni see on veebilehe jaoks lõpetatud; see näitab migreeritud seadeid — võrdle neid oma märkmetega. <strong>Kontaktid</strong> sammu lõpetamine lülitab kontaktide sünkroonimise sisse: veebilehel, kus 2.8.x-is oli <em>Enable Module = No</em>, eemalda seejärel linnuke <strong>Sünkrooni kontaktid Smailysse</strong> menüüs <span class="path">Seaded &gt; Kontaktid</span>.</li>
+        <li>Halduse teade ütleb, et varasemad seaded migreeriti. Iga <span class="path">Turundus &gt; Smaily Connect</span> leht avab <strong>Algseadistuse</strong>, kuni see on veebilehe jaoks lõpetatud; see näitab migreeritud seadeid — võrdle neid oma märkmetega. Veebisaidil, kus 2.8.x-is oli <em>Enable Module = No</em>, jääb kontaktide sünkroonimine välja: selle <strong>Kontaktid</strong> samm näitab valikut <strong>Sünkrooni kontaktid Smailysse</strong> ilma linnukeseta ja <strong>Jätka</strong> jätab selle välja. Sünkroonimise sisselülitamiseks pane sinna linnuke.</li>
         <li>Vana uudiskirja captcha't üle ei tooda — kasuta uudiskirja vormidel Magento enda reCAPTCHA-t.</li>
         <li>Sünkroonimise sageduse seadet enam pole: muudatused sünkroonitakse kohe.</li>
         <li>Lülita muud hüljatud ostukorvi kirjad välja enne, kui Smaily oma sisse lülitad.</li>

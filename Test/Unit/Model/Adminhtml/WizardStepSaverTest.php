@@ -260,6 +260,26 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
+     * PRO-4010: the initial setup's Contacts step renders no contact-sync
+     * switch for a website whose sync is on, so its save carries no
+     * sync_enabled; the stored answer stays as it is. A website whose sync
+     * is off gets the switch, and its answer is saved as posted.
+     */
+    public function testContactSyncIsUntouchedWhenTheStepPostsNoAnswer(): void
+    {
+        $this->saver->save('subscribers', ['sync_mode' => SyncMode::MODE_CONSENT, 'sync_fields' => []]);
+
+        self::assertFalse($this->wasSaved(Config::XML_PATH_SYNC_ENABLED));
+    }
+
+    public function testContactSyncIsSavedOffWhenTheStepPostsOff(): void
+    {
+        $this->saver->save('subscribers', ['sync_enabled' => false, 'sync_mode' => SyncMode::MODE_CONSENT]);
+
+        self::assertSame('0', $this->savedValue(Config::XML_PATH_SYNC_ENABLED));
+    }
+
+    /**
      * PRO-1460: connection credentials and the multilingual mode write at
      * website scope (docs/internal/RFC_MULTI_WEBSITE.md §1) — no website chooser exists
      * yet, so this is the installation's default website (id 0 with a bare

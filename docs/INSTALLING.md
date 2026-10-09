@@ -4,7 +4,7 @@ A step-by-step guide for installing Smaily Connect by hand, without
 composer: download the release ZIP, put it in `app/code`, run the Magento
 setup commands. It also covers updating to a newer release and taking the
 module out again. For a composer install, see the
-[User Guide](USER_GUIDE.md#installation).
+[User Guide](https://smaily.com/connect-magento/#install).
 
 ## Before you start
 
@@ -145,7 +145,7 @@ bin/magento cron:run --group smaily_connect
   System Messages. Finishing the initial setup marks it as read.
 - On a fresh install every Smaily Connect page opens **Initial setup**
   until it is completed once. Continue with
-  [Connecting your Smaily account](USER_GUIDE.md#connecting-your-smaily-account).
+  [Connecting your Smaily account](https://smaily.com/connect-magento/#setup-connect).
 
 ## If your store has a separate storefront
 

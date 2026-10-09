@@ -29,12 +29,13 @@ class SetupNotice
 
     /**
      * Read Details links that earlier versions wrote into the notice
-     * (3.0.0-rc1 to 3.0.0-rc8). The install writes the notice once, so a store
+     * (3.0.0-rc1 to 3.0.0-rc10). The install writes the notice once, so a store
      * that installed one of them keeps that link; the notice is still found.
      * When UserGuide::URL changes, its old value is added here.
      */
     public const PREVIOUS_URLS = [
         'https://github.com/erkkimarkus/magento-connect/blob/v3/docs/USER_GUIDE.md',
+        'https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/USER_GUIDE.md',
     ];
 
     /** Every Read Details link the notice can carry: the current one first. */

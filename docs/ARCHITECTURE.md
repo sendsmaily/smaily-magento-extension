@@ -1045,7 +1045,7 @@ an IPv4-mapped one — 5 writes per cart (24 h, the scan's age limit), and 2000
 accepted writes per hour for the whole installation, which bounds a caller
 spread over many addresses. Behind a proxy whose forwarding header Magento is
 not configured to read, every shopper shares the proxy's address, so the
-per-caller limit becomes one limit for the whole store (USER_GUIDE, Abandoned
+per-caller limit becomes one limit for the whole store (the user guide, Abandoned
 cart, says how to configure it). Hyvä's Luma-based checkout runs the same checkout JS, so the mixin
 applies there; Hyvä Checkout and other third-party checkouts are not covered.
 Who is reminded does not change: the automation still goes with

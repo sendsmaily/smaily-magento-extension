@@ -4,7 +4,7 @@ The documents in this folder are working papers of the extension's
 maintainers. They are not merchant documentation: they record plans, checks
 and reviews while the work is in progress, and they can be out of date. For
 how to install, set up and use Smaily Connect, read the
-[User Guide](../USER_GUIDE.md), [Installing](../INSTALLING.md) and
+[User Guide](https://smaily.com/connect-magento/), [Installing](../INSTALLING.md) and
 [Upgrading](../UPGRADING.md).
 
 | Document | What it is |

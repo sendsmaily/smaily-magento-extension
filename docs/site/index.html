@@ -11,7 +11,6 @@
   data-lang="en" / data-lang="et" elements; edit the pair together.
   No build step and no external resources. Published at
   https://smaily.com/connect-magento/.
-  The Estonian text awaits a proofread before it is published.
 -->
 <style>
 :root{
@@ -549,11 +548,11 @@ bin/magento cache:flush</code></pre>
   <div class="sub" id="setup-website">
     <h2><span data-lang="en">If your store has several websites</span><span data-lang="et">Kui poel on mitu veebisaiti</span></h2>
     <div data-lang="en">
-      <p>With more than one Magento <strong>website</strong>, the initial setup opens with <strong>Which website are you setting up?</strong> Pick the website and press <strong>Continue</strong>. Each website has its own Smaily connection, contact sync and automations; run the initial setup again for each website you want to connect. On <strong>Settings</strong>, a <strong>Website</strong> selector next to the tabs picks the website whose values you see and edit. A store with one website never sees either.</p>
+      <p>With more than one Magento <strong>website</strong>, the initial setup opens with <strong>Which website are you setting up?</strong> Pick the website and press <strong>Continue</strong>. Each website has its own Smaily connection, contact sync and automations; run the initial setup again for each website you want to connect. On <strong>Settings</strong>, a <strong>Website</strong> selector next to the tabs picks the website whose values you see and edit; picking a website that has not finished the initial setup opens that website's initial setup, and so does a link to <strong>Dashboard</strong> or <strong>Log</strong> for it. A store with one website never sees either.</p>
       <p>Campaign Intelligence is one connection for the whole installation, whichever website is selected. Each product is sent to it once, with the price and link of your default website (or of the first website the product is sold on).</p>
     </div>
     <div data-lang="et">
-      <p>Kui sul on rohkem kui üks Magento <strong>veebisait</strong>, algab algseadistus küsimusega <strong>Millist veebisaiti seadistad?</strong> Vali veebisait ja vajuta <strong>Jätka</strong>. Igal veebisaidil on oma Smaily ühendus, kontaktide sünkroonimine ja automaatikad; läbi algseadistus uuesti iga veebisaidi jaoks, mida soovid ühendada. Lehel <strong>Seaded</strong> valib vahekaartide kõrval olev valik <strong>Veebisait</strong>, mille veebisaidi väärtusi näed ja muudad. Ühe veebisaidiga pood kumbagi ei näe.</p>
+      <p>Kui sul on rohkem kui üks Magento <strong>veebisait</strong>, algab algseadistus küsimusega <strong>Millist veebisaiti seadistad?</strong> Vali veebisait ja vajuta <strong>Jätka</strong>. Igal veebisaidil on oma Smaily ühendus, kontaktide sünkroonimine ja automaatikad; läbi algseadistus uuesti iga veebisaidi jaoks, mida soovid ühendada. Lehel <strong>Seaded</strong> valib vahekaartide kõrval olev valik <strong>Veebisait</strong>, mille veebisaidi väärtusi näed ja muudad; veebisaidi valimine, mille algseadistus pole lõpetatud, avab selle veebisaidi algseadistuse, nagu ka selle veebisaidi link lehele <strong>Töölaud</strong> või <strong>Logi</strong>. Ühe veebisaidiga pood kumbagi ei näe.</p>
       <p>Campaign Intelligence on kogu paigalduse peale üks ühendus, olenemata valitud veebisaidist. Iga toode saadetakse sinna üks kord, vaikimisi veebisaidi hinna ja lingiga (või esimese veebisaidi omaga, kus toodet müüakse).</p>
     </div>
   </div>
@@ -915,7 +914,7 @@ bin/magento cache:flush</code></pre>
         <li>Get a one-time setup link from Smaily.</li>
         <li>Paste it into <strong>Setup URL or token from Smaily</strong> and press <strong>Connect</strong>. The token is exchanged at once and never stored; the status shows the connected account.</li>
         <li>Connecting starts the <strong>Catalog</strong> import: your whole catalog goes to Campaign Intelligence once, from the next cron run (usually within a minute). The notice <strong>The catalog import has started</strong> offers <strong>Hold back the import</strong> — press it before then and nothing is sent. Pressed later, the products already queued still go and the rest do not. Either way, you can start it again under <span class="path">Settings &gt; Intelligence</span>.</li>
-        <li>Connecting starts the <strong>Customers</strong> import too: your existing customer accounts go to Campaign Intelligence once, after the catalog import, so that it knows every customer by their customer account. The notice <strong>The customers import has started</strong> says so; to hold it back, press <strong>Cancel import</strong> on the <strong>Customers</strong> card under <span class="path">Settings &gt; Intelligence</span>.</li>
+        <li>Connecting starts the <strong>Customers</strong> import too: your existing customer accounts go to Campaign Intelligence once, after the catalog import, so that it knows every customer by their customer account. The notice <strong>The customers import has started</strong> says so; to hold it back, press <strong>Cancel import</strong> on the <strong>Customers</strong> card under <span class="path">Settings &gt; Intelligence</span>. A customers import already queued or running is left as it is. If your store was connected before connecting started this import, press <strong>Start import</strong> on the <strong>Customers</strong> card if it has never run.</li>
         <li>The <strong>Orders</strong> import does not start by itself — start it when Campaign Intelligence should learn your order history (see <a href="#importing">Importing existing data</a>).</li>
       </ol>
       <p>The setup link must be an <code>https</code> address on <code>intelligence.smaily.com</code>; anything else is refused before anything is sent. From then on, product saves, stock changes, deletions, customer accounts and orders (including refunds) reach Campaign Intelligence on their own. There is no per-type switch.</p>
@@ -933,7 +932,7 @@ bin/magento cache:flush</code></pre>
         <li>Hangi Smailylt ühekordne seadistuslink.</li>
         <li>Kleebi see väljale <strong>Smailylt saadud seadistus-URL või -võti</strong> ja vajuta <strong>Ühenda</strong>. Võti vahetatakse kohe ja seda ei salvestata; olek näitab ühendatud kontot.</li>
         <li>Ühendamine käivitab <strong>Kataloog</strong>-impordi: kogu sinu kataloog saadetakse Campaign Intelligence'i üks kord, alates järgmisest cron-käivitusest (tavaliselt minuti jooksul). Teade <strong>Kataloogi import käivitus</strong> pakub nuppu <strong>Peata import</strong> — vajuta seda enne ja midagi ei saadeta. Hiljem vajutades lähevad juba järjekorras olevad tooted siiski teele, ülejäänud mitte. Mõlemal juhul saad impordi uuesti käivitada jaotises <span class="path">Seaded &gt; Intelligence</span>.</li>
-        <li>Ühendamine käivitab ka <strong>Kliendid</strong>-impordi: sinu olemasolevad kliendikontod saadetakse Campaign Intelligence'i üks kord, pärast kataloogi importi, et see tunneks iga klienti tema kliendikonto järgi. Seda ütleb teade <strong>Klientide import käivitus</strong>; selle peatamiseks vajuta kaardil <strong>Kliendid</strong> nuppu <strong>Katkesta import</strong> jaotises <span class="path">Seaded &gt; Intelligence</span>.</li>
+        <li>Ühendamine käivitab ka <strong>Kliendid</strong>-impordi: sinu olemasolevad kliendikontod saadetakse Campaign Intelligence'i üks kord, pärast kataloogi importi, et see tunneks iga klienti tema kliendikonto järgi. Seda ütleb teade <strong>Klientide import käivitus</strong>; selle peatamiseks vajuta kaardil <strong>Kliendid</strong> nuppu <strong>Katkesta import</strong> jaotises <span class="path">Seaded &gt; Intelligence</span>. Juba järjekorras olev või töötav klientide import jäetakse nii, nagu see on. Kui pood ühendati enne, kui ühendamine selle impordi käivitas, ja see import pole kunagi töötanud, vajuta kaardil <strong>Kliendid</strong> nuppu <strong>Alusta importi</strong>.</li>
         <li>Import <strong>Tellimused</strong> ise ei käivitu — käivita see, kui Campaign Intelligence peaks sinu tellimuste ajaloo teada saama (vt <a href="#importing">Olemasolevate andmete import</a>).</li>
       </ol>
       <p>Seadistuslink peab olema <code>https</code>-aadress domeenil <code>intelligence.smaily.com</code>; kõik muu lükatakse tagasi enne, kui midagi saadetakse. Edaspidi jõuavad toodete salvestused, laoseisu muutused, kustutamised, kliendikontod ja tellimused (koos tagasimaksetega) Campaign Intelligence'i ise. Andmetüübipõhist lülitit pole.</p>
@@ -1051,7 +1050,7 @@ window.smailyConnect.consentOverride = function () {
       </ol>
       <ul>
         <li><strong>Who sees what:</strong> a signed-in customer sees their recommendations unless they opted out of personalized recommendations or unsubscribed from your newsletter; a guest sees them only after an earlier click on a Smaily email link. A shopper Campaign Intelligence has nothing for, a new visitor or a shopper without marketing consent sees nothing — not even the heading.</li>
-        <li><strong>The cards:</strong> up to four products with your store's own name, image and price. A product that is disabled, not visible in the catalog or not for sale is left out. A purchase after a click on a card is credited to your store's pages.</li>
+        <li><strong>The cards:</strong> up to four products with your store's own name, image and price. A product that is disabled, not visible in the catalog, not in this website or not for sale is left out. A purchase after a click on a card is credited to your store's pages.</li>
         <li><strong>Consent:</strong> the same rules as the browse tracker (<a href="#connecting-your-cookie-consent-tool">Cookie consent tool</a>). Consent given on the page shows the recommendations at once.</li>
         <li><strong>Speed:</strong> the page stays in the full-page cache and the cards are asked for after it has loaded, so the page never waits. A shopper's recommendations are kept for an hour, so a new one can take up to an hour to show. When Campaign Intelligence does not answer, nothing shows and the store asks again after 10 minutes.</li>
         <li>Nothing shows while Campaign Intelligence is not connected or the account is deactivated. Hyvä needs the <a href="#st-hyva">Hyvä compatibility module</a>; a <a href="#st-headless">separate storefront</a> does not get the widget.</li>
@@ -1066,7 +1065,7 @@ window.smailyConnect.consentOverride = function () {
       </ol>
       <ul>
         <li><strong>Kes mida näeb:</strong> sisse logitud klient näeb oma soovitusi, kui ta pole personaalsetest soovitustest loobunud ega uudiskirjast lahkunud; külaline näeb neid ainult pärast varasemat klikki Smaily e-kirja lingil. Ostja, kellele Campaign Intelligence'il soovitusi pole, uus külastaja või turundusnõusolekuta ostja ei näe midagi — ka pealkirja mitte.</li>
-        <li><strong>Kaardid:</strong> kuni neli toodet sinu poe enda nime, pildi ja hinnaga. Toode, mis on välja lülitatud, kataloogis nähtamatu või pole müügil, jäetakse välja. Ost pärast kaardil klikkimist omistatakse sinu poe lehtedele.</li>
+        <li><strong>Kaardid:</strong> kuni neli toodet sinu poe enda nime, pildi ja hinnaga. Toode, mis on välja lülitatud, kataloogis nähtamatu, pole selles veebisaidis või pole müügil, jäetakse välja. Ost pärast kaardil klikkimist omistatakse sinu poe lehtedele.</li>
         <li><strong>Nõusolek:</strong> samad reeglid nagu sirvimise jälgijal (<a href="#connecting-your-cookie-consent-tool">Küpsiste nõusoleku tööriist</a>). Lehel antud nõusoleku järel ilmuvad soovitused kohe.</li>
         <li><strong>Kiirus:</strong> leht jääb lehevahemällu ja kaarte küsitakse pärast lehe laadimist, nii et leht ei oota kunagi. Ostja soovitusi hoitakse tund aega, seega võib uue soovituse ilmumiseks kuluda kuni tund. Kui Campaign Intelligence ei vasta, ei näidata midagi ja pood küsib uuesti 10 minuti pärast.</li>
         <li>Midagi ei näidata, kui Campaign Intelligence pole ühendatud või konto on deaktiveeritud. Hyvä vajab <a href="#st-hyva">Hyvä ühilduvusmoodulit</a>; <a href="#st-headless">eraldi poe veebileht</a> vidinat ei saa.</li>
@@ -1441,7 +1440,7 @@ window.smailyConnect.consentOverride = function () {
           </tbody>
         </table>
       </div>
-      <p>A running import set aside as stalled lets the imports behind it go first, and is tried again whenever nothing else waits — one that failed for a passing reason carries on by itself.</p>
+      <p>A running import that nothing has moved for over an hour — also one that fails before its first page — is set aside: the imports behind it go first, and it is tried again whenever nothing else waits, so one that failed for a passing reason carries on by itself.</p>
     </div>
     <div data-lang="et">
       <div class="tw">
@@ -1454,7 +1453,7 @@ window.smailyConnect.consentOverride = function () {
           </tbody>
         </table>
       </div>
-      <p>Seiskunuks märgitud töötav import laseb oma taga ootavad impordid ette ja seda proovitakse uuesti, kui midagi muud ei oota — mööduval põhjusel ebaõnnestunud import jätkab ise.</p>
+      <p>Töötav import, mida pole üle tunni edasi viidud — ka selline, mis ebaõnnestub enne esimest osa —, pannakse kõrvale: tema taga ootavad impordid lähevad ette ja teda proovitakse uuesti, kui midagi muud ei oota, nii et mööduval põhjusel ebaõnnestunud import jätkab ise.</p>
     </div>
   </div>
 
@@ -1467,7 +1466,7 @@ window.smailyConnect.consentOverride = function () {
         <li>takes the stock from the list where it differs (a product found back in stock this way sends no back-in-stock email);</li>
         <li>counts products it does not have, so Smaily's team sees that a catalog import is needed.</li>
       </ul>
-      <p>Disabled products are left out, so they stop being recommended. If the list would remove more than a fifth of your products, or is empty, nothing is removed and Smaily's team checks it. The check waits for another night while the catalog import is running, while product changes still wait in the Log, or while Campaign Intelligence is not connected or active. A store with more than 50,000 enabled products cannot use it yet.</p>
+      <p>Disabled products are left out, so they stop being recommended. If the list would remove more than a fifth of your products, or is empty, nothing is removed and Smaily's team checks it. The check waits for another night while the catalog import is running (a catalog import set aside as stalled does not hold it back, even while other imports run), while product changes still wait in the Log, or while Campaign Intelligence is not connected or active. A store with more than 50,000 enabled products cannot use it yet.</p>
       <p>Each list sent shows in the Log as one <code>catalog_manifest</code> row; <strong>Details</strong> shows Campaign Intelligence's answer. If no list has gone out for three nights, the Dashboard says so and why.</p>
     </div>
     <div data-lang="et">
@@ -1477,7 +1476,7 @@ window.smailyConnect.consentOverride = function () {
         <li>võtab erineva laoseisu loendist (nii laos tagasi olevaks leitud toote kohta ei saadeta „taas laos“ kirja);</li>
         <li>loendab tooted, mida tal pole, et Smaily meeskond näeks, et kataloogi import on vajalik.</li>
       </ul>
-      <p>Keelatud tooted jäetakse välja, nii et neid enam ei soovitata. Kui loend eemaldaks üle viiendiku sinu toodetest või on tühi, ei eemaldata midagi ja Smaily meeskond kontrollib seda. Kontroll ootab järgmist ööd, kui kataloogi import töötab, kui tootemuudatused ootavad logis veel saatmist või kui Campaign Intelligence pole ühendatud või aktiivne. Pood, kus on üle 50 000 lubatud toote, ei saa seda veel kasutada.</p>
+      <p>Keelatud tooted jäetakse välja, nii et neid enam ei soovitata. Kui loend eemaldaks üle viiendiku sinu toodetest või on tühi, ei eemaldata midagi ja Smaily meeskond kontrollib seda. Kontroll ootab järgmist ööd, kui kataloogi import töötab (seiskunuks märgitud kataloogi import seda ei takista, ka siis, kui teised impordid töötavad), kui tootemuudatused ootavad logis veel saatmist või kui Campaign Intelligence pole ühendatud või aktiivne. Pood, kus on üle 50 000 lubatud toote, ei saa seda veel kasutada.</p>
       <p>Iga saadetud loend on logis üks rida <code>catalog_manifest</code>; <strong>Üksikasjad</strong> näitab Campaign Intelligence'i vastust. Kui kolm ööd järjest pole loendit saadetud, ütleb töölaud seda koos põhjusega.</p>
     </div>
   </div>
@@ -1591,7 +1590,7 @@ window.smailyConnect.consentOverride = function () {
           </tbody>
         </table>
       </div>
-      <p><strong>Details</strong> opens a panel with the attempt history, the payload as it was (or will be) sent, the last error and the last answer from Smaily or Campaign Intelligence. Passwords and API keys are never shown; contact data is shown in full so you can debug a delivery — treat it as personal data. Sent rows are kept for 30 days, failed rows for 90.</p>
+      <p><strong>Details</strong> opens a panel with the attempt history, the payload as it was (or will be) sent, the last error and the last answer from Smaily or Campaign Intelligence. Passwords and API keys are never shown; contact data is shown in full so you can debug a delivery — treat it as personal data. <strong>Details</strong>, the Log's <strong>Updated</strong> column and the Dashboard's <strong>Recent activity</strong> show when a row's latest attempt happened: its delivery, its latest failure or its skip. Sent rows are kept for 30 days from that time, failed rows for 90.</p>
       <div class="note">
         <span class="k">The log file</span>
         <p>The extension also writes errors to <code>var/log/smaily_connect.log</code> on the server. For troubleshooting, a developer can raise the detail with <code>bin/magento config:set smaily_connect/logging/verbosity debug</code> (or <code>info</code>) and must set it back with <code>… verbosity error</code> afterwards: the detailed levels write more about your contacts (with email addresses masked) to the file.</p>
@@ -1612,7 +1611,7 @@ window.smailyConnect.consentOverride = function () {
           </tbody>
         </table>
       </div>
-      <p><strong>Üksikasjad</strong> avab paneeli katsete ajaloo, andmesisuga nii, nagu see saadeti (või saadetakse), viimase vea ja Smaily või Campaign Intelligence'i viimase vastusega. Paroole ja API võtmeid ei näidata kunagi; kontaktiandmed näidatakse täielikult, et saaksid saadetist siluda — käsitle neid isikuandmetena. Saadetud ridu hoitakse 30 päeva, ebaõnnestunuid 90.</p>
+      <p><strong>Üksikasjad</strong> avab paneeli katsete ajaloo, andmesisuga nii, nagu see saadeti (või saadetakse), viimase vea ja Smaily või Campaign Intelligence'i viimase vastusega. Paroole ja API võtmeid ei näidata kunagi; kontaktiandmed näidatakse täielikult, et saaksid saadetist siluda — käsitle neid isikuandmetena. <strong>Üksikasjad</strong>, logi veerg <strong>Uuendatud</strong> ja töölaua <strong>Viimane tegevus</strong> näitavad, millal toimus rea viimane katse: selle kohaletoimetamine, viimane ebaõnnestumine või vahelejätmine. Saadetud ridu hoitakse sellest ajast 30 päeva, ebaõnnestunuid 90.</p>
       <div class="note">
         <span class="k">Logifail</span>
         <p>Laiendus kirjutab vead ka serveris faili <code>var/log/smaily_connect.log</code>. Tõrkeotsinguks saab arendaja detailsust tõsta käsuga <code>bin/magento config:set smaily_connect/logging/verbosity debug</code> (või <code>info</code>) ja peab selle pärast tagasi seadma käsuga <code>… verbosity error</code>: detailsemad tasemed kirjutavad faili rohkem sinu kontaktide kohta (e-posti aadressid maskeeritult).</p>
@@ -2074,8 +2073,8 @@ bin/magento smaily:gdpr erase shopper@example.com --force   # Art. 17</code></pr
       <p>Both cover the shopper's record in Campaign Intelligence <strong>and</strong> the extension's own tables — the two delivery queues and the abandoned-cart tracker. The erasure:</p>
       <ul>
         <li><strong>deletes</strong> queued messages not yet sent, so nothing more goes out;</li>
-        <li><strong>anonymizes</strong> sent and failed rows — they keep their type, status and times as your record, with the address and contents replaced by <code>[erased]</code>, and can no longer be retried;</li>
-        <li>marks the shopper's carts as erased, so no abandoned-cart reminder goes out for them;</li>
+        <li><strong>anonymizes</strong> sent and failed rows — they keep their type, status and times as your record, with the address and contents replaced by <code>[erased]</code>, and can no longer be retried. They are removed on their normal schedule: 30 days after the delivery, 90 days after the failure;</li>
+        <li>marks the shopper's carts as erased, so no abandoned-cart reminder goes out for them. The mark stays while the cart is still open in the store; once the cart is ordered or closed, the nightly tidy-up removes it 30 days after its last change before the erasure, or sooner if Magento deletes the cart;</li>
         <li>erases the shopper in Campaign Intelligence.</li>
       </ul>
       <p>It prints one line per place it reached. The local part runs first; if Campaign Intelligence is unreachable or the account is deactivated, the command says so — run it again later to finish. Running it twice is harmless.</p>
@@ -2088,8 +2087,8 @@ bin/magento smaily:gdpr erase shopper@example.com --force   # art 17</code></pre
       <p>Mõlemad hõlmavad ostja kirjet Campaign Intelligence'is <strong>ja</strong> laienduse enda tabeleid — kahte saatmisjärjekorda ja hüljatud ostukorvide jälgijat. Kustutamine:</p>
       <ul>
         <li><strong>kustutab</strong> järjekorras olevad saatmata kirjed, nii et midagi enam teele ei lähe;</li>
-        <li><strong>anonüümib</strong> saadetud ja ebaõnnestunud read — need säilitavad sinu tõendina tüübi, oleku ja ajad, aadress ja sisu asendatakse väärtusega <code>[erased]</code> ning neid ei saa enam uuesti proovida;</li>
-        <li>märgib ostja ostukorvid kustutatuks, nii et nende kohta hüljatud ostukorvi meeldetuletust ei saadeta;</li>
+        <li><strong>anonüümib</strong> saadetud ja ebaõnnestunud read — need säilitavad sinu tõendina tüübi, oleku ja ajad, aadress ja sisu asendatakse väärtusega <code>[erased]</code> ning neid ei saa enam uuesti proovida. Need eemaldatakse tavapärase ajakava järgi: 30 päeva pärast kohaletoimetamist, 90 päeva pärast ebaõnnestumist;</li>
+        <li>märgib ostja ostukorvid kustutatuks, nii et nende kohta hüljatud ostukorvi meeldetuletust ei saadeta. Märge jääb alles, kuni ostukorv on poes veel avatud; kui ostukorv on tellitud või suletud, eemaldab öine korrastus selle 30 päeva pärast viimast muudatust enne kustutamist, või varem, kui Magento ostukorvi kustutab;</li>
         <li>kustutab ostja Campaign Intelligence'ist.</li>
       </ul>
       <p>See väljastab ühe rea iga koha kohta, kuhu jõudis. Kohalik osa käib esimesena; kui Campaign Intelligence on kättesaamatu või konto deaktiveeritud, ütleb käsk seda — käivita see hiljem uuesti, et lõpetada. Kahekordne käivitamine ei tee kahju.</p>

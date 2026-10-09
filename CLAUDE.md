@@ -69,11 +69,11 @@ top lines of both and parallel PRs always conflicted (owner decision,
   STATUS should say (state, gotchas, questions for Erkki) in its report and
   PR description instead.
 
-New operational gotchas go into this file. `docs/USER_GUIDE.md` is a doc too — a
-user-visible behaviour change updates it in the same commit.
+New operational gotchas go into this file. The merchant guide site (below) is
+a doc too — a user-visible behaviour change updates it in the same commit.
 
-**Merchant guide site (`docs/site/index.html`)** — the bilingual (EN/ET)
-merchant user guide, one self-contained page (no build step, no external
+**Merchant guide site (`docs/site/index.html`)** — the merchant user guide,
+bilingual (EN/ET), one self-contained page (no build step, no external
 resources; open it in a browser), laid out like the Woo guide
 (`../connect/docs/site/`). A user-visible change — a label, a step, a
 setting, an error or notice text, an import's behaviour, a requirement —
@@ -84,14 +84,17 @@ pair together, and quote admin labels exactly as `i18n/en_US.csv` /
 fails on a broken in-page link, a missing twin or twins whose structure
 drifted. The email-field reference lives there (`#email-fields`).
 **Publishing:** Erkki uploads the file to https://smaily.com/connect-magento/
-(as for Woo's smaily.com/connect-woo/), after an Estonian proofread of
-changed text; it is not in the package (`/docs` is export-ignored). Until it
-is live, the admin links the GitHub `docs/USER_GUIDE.md`. **Switching the
-admin to the site** is one change: `Model/UserGuide.php::URL` → the site
-URL, the old URL appended to `SetupNotice::PREVIOUS_URLS`, and
-`docs/USER_GUIDE.md` cut to a pointer at the site (drop the Markdown check
-in `Test/Unit/Model/UserGuideTest.php` with it; the `UserGuide` anchors exist
-on the site too).
+(as for Woo's smaily.com/connect-woo/) after each merged change to it; it is
+not in the package (`/docs` is export-ignored). The first upload went out
+without an Estonian proofread (Erkki, 2026-10-09); changed Estonian text is
+proofread after it is published. **The admin links the site** (PRO-3953):
+`Model/UserGuide.php::URL` is the site URL, every earlier guide URL is in
+`SetupNotice::PREVIOUS_URLS` (the setup notice an install wrote keeps its
+link), and `docs/USER_GUIDE.md` is only a pointer at the site — do not add
+content there. A section the admin deep-links to (`UserGuide::SECTION_*`) is
+an id on the site; `Test/Unit/Model/UserGuideTest.php` and the harness check
+it. Other docs link the site's anchors (`https://smaily.com/connect-magento/#…`),
+so renaming a site id breaks them — search the repo first.
 
 ## Contract discipline
 

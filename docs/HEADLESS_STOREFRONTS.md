@@ -210,7 +210,7 @@ below:
   header (`alternativeHeaders`, `trustedProxies`) in `app/etc/di.xml`.
 - **Nothing else.** Contact sync, the automations, the order, customer and
   catalog sync, the historical imports, the abandoned-cart scan and the
-  [nightly product check](USER_GUIDE.md#the-nightly-product-check) run on
+  [nightly product check](https://smaily.com/connect-magento/#imp-nightly) run on
   the server and do not depend on the storefront.
 
 ## What the storefront team must add
@@ -316,7 +316,7 @@ cart activity)** is on in the module's settings; the relay answers 404
 otherwise. And only for a shopper who allowed **marketing** cookies in the
 storefront's consent banner — without that consent send no event and set
 no `smaily_anon_sid`, as Magento's own tracker does (see the User Guide,
-[Connecting your cookie consent tool](USER_GUIDE.md#connecting-your-cookie-consent-tool)).
+[Connecting your cookie consent tool](https://smaily.com/connect-magento/#connecting-your-cookie-consent-tool)).
 With consent, when the cookie `smaily_anon_sid` is missing, set it to a new
 random UUID v4 for 30 days.
 

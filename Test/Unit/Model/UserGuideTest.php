@@ -15,8 +15,7 @@ use Smaily\Connect\Model\UserGuide;
 
 /**
  * The user guide's address is set in one place, and the section the admin
- * deep-links to exists in both copies of the guide, so moving the address
- * to the guide site is one change.
+ * deep-links to exists on the guide site.
  */
 class UserGuideTest extends TestCase
 {
@@ -43,17 +42,5 @@ class UserGuideTest extends TestCase
         $site = (string)file_get_contents(self::ROOT . '/docs/site/index.html');
 
         self::assertStringContainsString('id="' . UserGuide::SECTION_CONSENT_TOOL . '"', $site);
-    }
-
-    public function testTheConsentToolSectionIsInTheMarkdownGuide(): void
-    {
-        $guide = (string)file_get_contents(self::ROOT . '/docs/USER_GUIDE.md');
-
-        // GitHub's heading slug: lowercase, spaces to hyphens.
-        self::assertMatchesRegularExpression('/^#+ Connecting your cookie consent tool$/m', $guide);
-        self::assertSame(
-            UserGuide::SECTION_CONSENT_TOOL,
-            str_replace(' ', '-', strtolower('Connecting your cookie consent tool'))
-        );
     }
 }

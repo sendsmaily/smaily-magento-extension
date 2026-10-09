@@ -15,17 +15,15 @@ namespace Smaily\Connect\Model;
  * consent-tool links (Engine\ConsentSource::GUIDE_URL).
  *
  * The guide is the bilingual page docs/site/index.html, published at
- * https://smaily.com/connect-magento/. Until it is live there, URL is the
- * GitHub copy of docs/USER_GUIDE.md. Moving the URL is this one change plus
+ * https://smaily.com/connect-magento/. Moving the URL is this one change plus
  * one line in SetupNotice::PREVIOUS_URLS (the old address), because a store
  * keeps the notice the install wrote with the old link.
  *
- * A section anchor below is an id on the site page and a heading slug in
- * docs/USER_GUIDE.md alike, so a deep link works at either address.
+ * A section anchor below is an id on the site page.
  */
 class UserGuide
 {
-    public const URL = 'https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/USER_GUIDE.md';
+    public const URL = 'https://smaily.com/connect-magento/';
 
     /** Section "Connecting your cookie consent tool". */
     public const SECTION_CONSENT_TOOL = 'connecting-your-cookie-consent-tool';

@@ -7,39 +7,57 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-10-09 — the 3.0.0-rc11 version cut. **Released:**
-3.0.0-rc10 (2026-10-07). **This PR** (`release/3.0.0-rc11`) cuts 3.0.0-rc11:
-the version in composer.json, `ModuleInfo::VERSION`, the ModuleVersion
-docblock and the merchant commands (README, UPGRADING, the guide site's
-install, upgrade and Hyvä sections, `compat/hyva/README.md`); CHANGELOG's
-"Changes since 3.0.0-rc10" collects the `changelog.d/` fragments; the tag
-waits for Erkki's yes. **Merged to master on 2026-10-09:** #145 PRO-3964 and
-#147 PRO-4008 (an erased cart marker keeps its earlier time and stays while
-its cart is active); #149 PRO-3967 (the 2.8.x upgrade walk on Magento
-2.4.8-p4 / PHP 8.3 with two websites — the guide corrected, the settings
-carried over); #150 PRO-4009 and #153 PRO-4013 (the welcome and
-abandoned-cart carry-over follow what 2.8.x resolved per website); #151
-PRO-4010 (the setup's Contacts step keeps sync off); #152 PRO-4012 (the
-setup redirect keeps the website); #146 PRO-3953 (the guide site is live at
-https://smaily.com/connect-magento/, the admin links point there,
-`docs/USER_GUIDE.md` is a pointer); #148 PRO-4007 (a system message for a
-customers import that never completed, also when it is stalled); #154 (the
-orchestrator merges with `--admin`); #155 PRO-4011 (the exact release
-candidate in the install and upgrade commands); #156 PRO-4015 (upgrade
-notices for a welcome or abandoned cart without a workflow); #157 PRO-4018
-(a working Hyvä companion install from a clone). The live sandbox check on
-2026-10-09 passed for PRO-4007, PRO-4010 and PRO-4012. **Queue:** tag
-3.0.0-rc11 (Erkki's yes) → the HC PRO pilot when it is confirmed (check
-Magento ≥ 2.4.4 / PHP ≥ 8.1 and the storefront type first); PRO-4020 (the
-Hyvä companion on Packagist and a companion ZIP; waits for Erkki to create
-the sendsmaily repository and register it on Packagist); PRO-4019 (the
-Estonian proofread, Erkki); backlog PRO-4016, PRO-4017 (Low). **Open for
-Erkki:** "Questions / tasks for Erkki" item 16 — HC PRO's Magento/PHP
-versions and storefront type, a Hyvä store for the widget (PRO-3790),
-PRO-4019, PRO-4020's repository. **Engine:** PRO-3919, PRO-3941, PRO-3956
-unchanged. **Gotcha (sandbox):** an old pending contacts→Smaily backfill job
-(id 1, 2026-10-02) and 2 ingest rows wait in the sandbox; `cron:run` there
-sends them to the smailydemo account and the synthetic engine tenant._
+_Last updated: 2026-10-11 — after the 3.0.0-rc11 release and the Hyvä
+companion on Packagist. **Released:** 3.0.0-rc11 (tagged 2026-10-09 evening
+with `gh release create`, no HTTP 500;
+https://github.com/sendsmaily/smaily-magento-extension/releases/tag/3.0.0-rc11;
+the release workflow is green on b711b0b, the main ZIP has 417 entries,
+Packagist lists 3.0.0-rc11). **Merged to master since the cut:** #159
+PRO-4020 part 1 — the release workflow also builds, verifies and attaches
+`smaily-connect-magento2-hyva.zip` + `.sha256` and pushes `compat/hyva` to
+the mirror repository https://github.com/sendsmaily/smaily-magento-hyva,
+tagged with the release version, with the deploy-key secret
+`HYVA_SPLIT_DEPLOY_KEY`; a `workflow_dispatch` with a `tag` input publishes
+the companion for an existing release (run once for 3.0.0-rc11 on
+2026-10-11, green). Erkki merged #159 in the web UI, so its squash message
+is the commit list, not the PR description. #160 PRO-4020 part 2 — the Hyvä
+install is one command, `composer require
+smaily/smailyformagento:3.0.0-rc11 smaily/module-connect-hyva:3.0.0-rc11`
+(plain `composer require smaily/module-connect-hyva` from 3.0.0), or the
+release's two ZIPs; the clone route is gone; `compat/hyva/composer.json`
+has no `version` field. **Packagist:** `smaily/module-connect-hyva` is
+listed (3.0.0-rc11, dev-main), submitted from the Packagist account
+`smaily`, which owns the `smaily` vendor (Erkki has access; his own account
+is not a maintainer of the vendor). Auto-update: a GitHub webhook on the
+mirror repository → `https://packagist.org/api/github?username=smaily`
+(push events), set by Erkki 2026-10-11. **Gotcha:** the mirror's README (=
+the Packagist page) shows the pre-#160 install text until the next release
+publishes — a published tag is never moved. The guide site was re-uploaded
+after #160 (md5 matches master). **Unverified:** the Hyvä Tailwind build
+script name — `npm run build-prod` in the docs vs `npm run build` in
+HYVA_SUPPORT's sandbox recipe; check it on a real Hyvä store. **Queue:** a
+simplify pass over the 2026-10-09/11 functionality (next); PRO-4016,
+PRO-4017 (in progress); rc12 waits for the HC PRO date; the HC PRO pilot
+when it is confirmed (check Magento ≥ 2.4.4 / PHP ≥ 8.1 and the storefront
+type first — Erkki does not know them yet, 2026-10-11). **Open for Erkki:**
+"Questions / tasks for Erkki" item 16 — HC PRO's versions and storefront
+type, PRO-4019 (the Estonian proofread), a Hyvä store for the widget
+(PRO-3790) and the Tailwind check. **Engine:** PRO-3919, PRO-3941,
+PRO-3956 unchanged. **Gotcha (sandbox):** an old pending contacts→Smaily
+backfill job (id 1, 2026-10-02) and 2 ingest rows wait in the sandbox;
+`cron:run` there sends them to the smailydemo account and the synthetic
+engine tenant._
+
+_Earlier (2026-10-09): the 3.0.0-rc11 version cut (#158) — the version in
+composer.json, `ModuleInfo::VERSION`, the docblock and the merchant
+commands; CHANGELOG collects the fragments. Merged that day: #145 PRO-3964
+and #147 PRO-4008 (erased cart marker), #149 PRO-3967 (2.8.x upgrade walk on
+2.4.8-p4 / PHP 8.3, two websites), #150 PRO-4009 and #153 PRO-4013 (welcome
+and abandoned-cart carry-over per website), #151 PRO-4010, #152 PRO-4012,
+#146 PRO-3953 (the guide site live at https://smaily.com/connect-magento/),
+#148 PRO-4007, #154 (orchestrator merges with `--admin`), #155 PRO-4011,
+#156 PRO-4015, #157 PRO-4018 (Hyvä companion from a clone; replaced by #160).
+The live sandbox check passed for PRO-4007, PRO-4010 and PRO-4012._
 
 _Earlier (2026-10-08): session handoff after rc10 — PRO-3961 (#138),
 PRO-3962 (#139), PRO-3963 (#140) and PRO-3790 (#141 connecting starts the
@@ -7290,9 +7308,9 @@ PRO-1267 (engine: Magento product-identity contract note).
     (`LegacyConfigMapper::MODULE_SWITCH_DEFAULTS`, unit-checked against
     `etc/config.xml`); the UPGRADING guide step is gone.
 
-16. Open 2026-10-08 (session handoff), updated 2026-10-09: (a) HC PRO's
-    Magento and PHP versions and storefront type (Luma, Hyvä or headless);
-    it runs the old 2.8.x module — still open. (b) The Estonian proofread
+16. Open 2026-10-08 (session handoff), updated 2026-10-09 and
+    2026-10-11: (a) HC PRO's Magento and PHP versions and storefront type
+    (Luma, Hyvä or headless); it runs the old 2.8.x module — still open. (b) The Estonian proofread
     of the guide site (`docs/site/index.html`) and of the new admin/widget
     texts — now PRO-4019; the site upload to smaily.com/connect-magento/ is
     done, and the orchestrator publishes each later change over FTPS
@@ -7304,4 +7322,11 @@ PRO-1267 (engine: Magento product-identity contract note).
     connected Campaign Intelligence before PRO-3790? Answered: PRO-4007
     (#148), done — a system message asks the merchant to start it; nothing
     starts it automatically. (f) PRO-4020 — create the sendsmaily
-    repository for the Hyvä companion module and register it on Packagist.
+    repository for the Hyvä companion module and register it on Packagist:
+    done 2026-10-11 — https://github.com/sendsmaily/smaily-magento-hyva,
+    `smaily/module-connect-hyva` on Packagist (submitted from the `smaily`
+    account, auto-updated by the mirror's webhook); the release workflow
+    publishes it (#159, #160). Updated 2026-10-11: (a), (b) PRO-4019 and
+    (c) are still open; (g) the Hyvä Tailwind build script name
+    (`npm run build-prod` in the docs vs `npm run build` in HYVA_SUPPORT's
+    sandbox recipe) — check it on the Hyvä store of (c).

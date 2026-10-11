@@ -58,6 +58,27 @@ class LegacyConfigMapper
         Config::XML_PATH_ABANDONED_ENABLED => '0',
     ];
 
+    /**
+     * The 2.8.x switch and Autoresponder ID of the newsletter opt-in
+     * (the welcome automation).
+     *
+     * @var array{switch: string, workflow: string}
+     */
+    private const WELCOME_PATHS = [
+        'switch' => 'subscribe/enableNewsletterSubscriptions',
+        'workflow' => 'subscribe/workflowId',
+    ];
+
+    /**
+     * The 2.8.x switch and Autoresponder ID of the abandoned cart.
+     *
+     * @var array{switch: string, workflow: string}
+     */
+    private const ABANDONED_PATHS = [
+        'switch' => 'abandoned/enableAbandonedCart',
+        'workflow' => 'abandoned/autoresponderId',
+    ];
+
     public function __construct(
         private readonly SubdomainNormalizer $subdomainNormalizer
     ) {
@@ -97,16 +118,11 @@ class LegacyConfigMapper
         }
 
         // Newsletter opt-in autoresponder -> welcome automation.
-        $welcomeWorkflow = (int)($legacy['subscribe/workflowId'] ?? 0);
+        $welcomeWorkflow = (int)($legacy[self::WELCOME_PATHS['workflow']] ?? 0);
         if ($welcomeWorkflow > 0) {
             $set(Config::XML_PATH_WELCOME_WORKFLOW, (string)$welcomeWorkflow);
         }
-        $welcomeSent = $this->sent(
-            $legacy,
-            $inherited,
-            'subscribe/enableNewsletterSubscriptions',
-            'subscribe/workflowId'
-        );
+        $welcomeSent = $this->sent($legacy, $inherited, self::WELCOME_PATHS);
         if ($welcomeSent !== null) {
             $set(Config::XML_PATH_WELCOME_ENABLED, $welcomeSent);
         }
@@ -133,11 +149,11 @@ class LegacyConfigMapper
         }
 
         // Abandoned cart.
-        $abandonedSent = $this->sent($legacy, $inherited, 'abandoned/enableAbandonedCart', 'abandoned/autoresponderId');
+        $abandonedSent = $this->sent($legacy, $inherited, self::ABANDONED_PATHS);
         if ($abandonedSent !== null) {
             $set(Config::XML_PATH_ABANDONED_ENABLED, $abandonedSent);
         }
-        $abandonedWorkflow = (int)($legacy['abandoned/autoresponderId'] ?? 0);
+        $abandonedWorkflow = (int)($legacy[self::ABANDONED_PATHS['workflow']] ?? 0);
         if ($abandonedWorkflow > 0) {
             $set(Config::XML_PATH_ABANDONED_WORKFLOW, (string)$abandonedWorkflow);
         }
@@ -214,12 +230,7 @@ class LegacyConfigMapper
      */
     public function welcomeWithoutWorkflow(array $legacy, array $inherited): bool
     {
-        return $this->onWithoutWorkflow(
-            $legacy,
-            $inherited,
-            'subscribe/enableNewsletterSubscriptions',
-            'subscribe/workflowId'
-        );
+        return $this->onWithoutWorkflow($legacy, $inherited, self::WELCOME_PATHS);
     }
 
     /**
@@ -233,12 +244,7 @@ class LegacyConfigMapper
      */
     public function abandonedCartWithoutWorkflow(array $legacy, array $inherited): bool
     {
-        return $this->onWithoutWorkflow(
-            $legacy,
-            $inherited,
-            'abandoned/enableAbandonedCart',
-            'abandoned/autoresponderId'
-        );
+        return $this->onWithoutWorkflow($legacy, $inherited, self::ABANDONED_PATHS);
     }
 
     /**
@@ -261,19 +267,16 @@ class LegacyConfigMapper
      *
      * @param array<string, string|null> $legacy
      * @param array<string, string|null> $inherited
+     * @param array{switch: string, workflow: string} $paths
      */
-    private function sent(array $legacy, array $inherited, string $switchPath, string $workflowPath): ?string
+    private function sent(array $legacy, array $inherited, array $paths): ?string
     {
-        $own = array_filter(
-            array_intersect_key($legacy, array_flip([$switchPath, $workflowPath])),
-            static fn (?string $value): bool => $value !== null
-        );
-        if (!$own) {
+        if (!isset($legacy[$paths['switch']]) && !isset($legacy[$paths['workflow']])) {
             return null;
         }
-        $resolved = $own + $inherited;
+        $resolved = $this->resolve($legacy, $inherited);
 
-        return $this->flag($resolved, $switchPath) && (int)($resolved[$workflowPath] ?? 0) > 0 ? '1' : '0';
+        return $this->flag($resolved, $paths['switch']) && (int)($resolved[$paths['workflow']] ?? 0) > 0 ? '1' : '0';
     }
 
     /**
@@ -283,18 +286,28 @@ class LegacyConfigMapper
      *
      * @param array<string, string|null> $legacy
      * @param array<string, string|null> $inherited
+     * @param array{switch: string, workflow: string} $paths
      */
-    private function onWithoutWorkflow(
-        array $legacy,
-        array $inherited,
-        string $switchPath,
-        string $workflowPath
-    ): bool {
-        $resolved = array_filter($legacy, static fn (?string $value): bool => $value !== null) + $inherited;
+    private function onWithoutWorkflow(array $legacy, array $inherited, array $paths): bool
+    {
+        $resolved = $this->resolve($legacy, $inherited);
 
         return $this->moduleSwitch($resolved) !== false
-            && $this->flag($resolved, $switchPath)
-            && (int)($resolved[$workflowPath] ?? 0) <= 0;
+            && $this->flag($resolved, $paths['switch'])
+            && (int)($resolved[$paths['workflow']] ?? 0) <= 0;
+    }
+
+    /**
+     * Each value the scope's own when it has one (not null), else the
+     * inherited one.
+     *
+     * @param array<string, string|null> $legacy
+     * @param array<string, string|null> $inherited
+     * @return array<string, string|null>
+     */
+    private function resolve(array $legacy, array $inherited): array
+    {
+        return array_filter($legacy, static fn (?string $value): bool => $value !== null) + $inherited;
     }
 
     /**

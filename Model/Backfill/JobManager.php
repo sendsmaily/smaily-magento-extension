@@ -164,9 +164,10 @@ class JobManager
         $collection = $this->collectionFactory->create();
         $collection->addFieldToFilter('status', Job::STATUS_COMPLETED)
             ->addFieldToFilter('job_type', $jobType)
-            ->addFieldToFilter('target', $target);
+            ->addFieldToFilter('target', $target)
+            ->setPageSize(1);
 
-        return $collection->getSize() > 0;
+        return (bool)$collection->getFirstItem()->getId();
     }
 
     /**

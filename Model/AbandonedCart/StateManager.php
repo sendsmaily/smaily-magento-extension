@@ -322,7 +322,7 @@ class StateManager
     private function tombstoneActiveQuotesForEmail(string $email): int
     {
         $connection = $this->resourceConnection->getConnection(self::CONNECTION);
-        $quoteTable = $this->resourceConnection->getTableName('quote', self::CONNECTION);
+        $quoteTable = $this->quoteTable();
         $erasedJoin = static fn (string $quoteIdColumn): string => $connection->quoteInto(
             'erased_state.quote_id = ' . $quoteIdColumn . ' AND erased_state.status = ?',
             self::STATUS_ERASED
@@ -402,7 +402,7 @@ class StateManager
         $select = $connection->select()
             ->from(['cart' => $this->table()], ['id'])
             ->joinLeft(
-                ['quote_table' => $this->resourceConnection->getTableName('quote', self::CONNECTION)],
+                ['quote_table' => $this->quoteTable()],
                 'quote_table.entity_id = cart.quote_id',
                 []
             )
@@ -428,7 +428,7 @@ class StateManager
         $select = $connection->select()
             ->from(['cart' => $this->table()], ['id'])
             ->joinLeft(
-                ['quote_table' => $this->resourceConnection->getTableName('quote', self::CONNECTION)],
+                ['quote_table' => $this->quoteTable()],
                 'quote_table.entity_id = cart.quote_id',
                 []
             )
@@ -459,5 +459,10 @@ class StateManager
     private function table(): string
     {
         return $this->resourceConnection->getTableName(self::TABLE_NAME, self::CONNECTION);
+    }
+
+    private function quoteTable(): string
+    {
+        return $this->resourceConnection->getTableName('quote', self::CONNECTION);
     }
 }

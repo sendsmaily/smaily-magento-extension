@@ -4,6 +4,8 @@
 /var/
 /smaily-connect-magento2.zip
 /smaily-connect-magento2.zip.sha256
+/smaily-connect-magento2-hyva.zip
+/smaily-connect-magento2-hyva.zip.sha256
 .phpunit.result.cache
 phpcs.xml
 phpstan.neon

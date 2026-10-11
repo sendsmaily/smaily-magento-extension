@@ -370,6 +370,19 @@ identified later.
 CI runs it on every push (the `package` job) and keeps the ZIP plus its hash
 as a build artifact for 5 days.
 
+The Hyvä companion ships as its own ZIP, built from `compat/hyva` of `HEAD`
+by `bin/build-hyva-zip.sh` and checked by `bin/verify-hyva-zip.sh`:
+
+```bash
+bin/verify-hyva-zip.sh               # writes ./smaily-connect-magento2-hyva.zip
+```
+
+It asserts that `registration.php`, `composer.json` and `etc/module.xml` are
+present, that no dot-file ships, that `composer.json` names
+`smaily/module-connect-hyva` and states no version (the release tag gives the
+version), and that every PHP file parses, and it writes `<zip>.sha256`. The
+`package` job runs it on every push too.
+
 **`docs/` does not ship** (Erkki's decision, 2026-09-10). The folder vendors
 the engine contract from a private repository and carries internal audits, so
 the package would leak both to anyone who unzips it. The documentation set

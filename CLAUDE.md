@@ -265,11 +265,26 @@ do not change it.
    step, `bin/check-release-version.sh <tag>` (PRO-3948), fails the run before
    anything is attached when the tag is not composer.json's `version` (a `v`
    prefix fails too) — then delete the release and its tag and publish again.
+   The same run publishes the Hyvä companion (PRO-4020): it builds, verifies
+   and attaches `smaily-connect-magento2-hyva.zip` + `.sha256`
+   (`bin/verify-hyva-zip.sh`, laid out for `app/code/Hyva/SmailyConnect`)
+   and pushes `compat/hyva` to the mirror `sendsmaily/smaily-magento-hyva`
+   (`bin/publish-hyva-mirror.sh`: a commit on `main`, tagged with the same
+   plain version; composer.json loses its `version` there, so Packagist takes
+   the version from the tag). It pushes with the deploy key in the Actions
+   secret `HYVA_SPLIT_DEPLOY_KEY`. A re-run for the same tag leaves the
+   mirror as it is; a mirror tag that holds other content fails the run and
+   is never moved.
+   A tag published before the workflow did this (3.0.0-rc11) gets its
+   companion from the manual trigger: Actions → "Build a release" → Run
+   workflow on `master` with the tag; it checks that the tag and its release
+   exist and that the tag is composer.json's `version` at that tag.
    If the CLI answers HTTP 500 (it did for rc9; rc10 went through the CLI
    without it), create the release and tag in the GitHub web UI instead —
    a fallback, not the default path.
 3. **A tag on the official repo is a Packagist publish** of
-   `smaily/smailyformagento` — a one-way door, Erkki's to run. Release
+   `smaily/smailyformagento`, and through the mirror of
+   `smaily/module-connect-hyva` — a one-way door, Erkki's to run. Release
    candidates are tagged publicly; 3.0.0 waits for a pilot store.
    `dev-master` on Packagist has been v3 since the move PR merged.
 

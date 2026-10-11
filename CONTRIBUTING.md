@@ -111,7 +111,7 @@ repository `sendsmaily/smaily-magento-hyva` as a commit on `main` tagged
 with the same version (`bin/publish-hyva-mirror.sh`). Packagist reads the
 companion from that mirror and takes its version from the tag, so the
 mirror's `composer.json` has no `version` field. Running the workflow again
-for the same tag changes nothing. For a release published before the
-workflow did this, run "Build a release" by hand (Actions → Run workflow,
-on `master`) with the release's tag: it checks that the tag is the version
-in `composer.json` at that tag, then publishes only the companion.
+for the same tag leaves the mirror as it is. For a release published before
+the workflow did this, run "Build a release" by hand (Actions → Run
+workflow, on `master`) with the release's tag: it checks that the tag is the
+version in `composer.json` at that tag, then publishes only the companion.

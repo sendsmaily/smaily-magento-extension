@@ -272,8 +272,9 @@ do not change it.
    (`bin/publish-hyva-mirror.sh`: a commit on `main`, tagged with the same
    plain version; composer.json loses its `version` there, so Packagist takes
    the version from the tag). It pushes with the deploy key in the Actions
-   secret `HYVA_SPLIT_DEPLOY_KEY`. A re-run for the same tag changes nothing;
-   a mirror tag that holds other content fails the run and is never moved.
+   secret `HYVA_SPLIT_DEPLOY_KEY`. A re-run for the same tag leaves the
+   mirror as it is; a mirror tag that holds other content fails the run and
+   is never moved.
    A tag published before the workflow did this (3.0.0-rc11) gets its
    companion from the manual trigger: Actions → "Build a release" → Run
    workflow on `master` with the tag; it checks that the tag and its release

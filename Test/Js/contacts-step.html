@@ -15,7 +15,10 @@
   sync is on, the step shows no Sync contacts to Smaily switch and its save
   posts no sync answer, so the stored one stays. For a website whose sync is
   off, the step shows the switch unticked: Continue without a change saves
-  it off, and ticking it saves it on.
+  it off, and ticking it saves it on. On that step and on the Settings
+  Contacts tab of such a website, Start import stays disabled while the
+  switch is ticked but not saved, and is available once it is saved on
+  (PRO-4016).
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
 -->
@@ -27,6 +30,8 @@
     <script src="build/contacts-setup.et_EE.js"></script>
     <script src="build/contacts-setup-off.en_US.js"></script>
     <script src="build/contacts-setup-off.et_EE.js"></script>
+    <script src="build/contacts-settings-off.en_US.js"></script>
+    <script src="build/contacts-settings-off.et_EE.js"></script>
 </head>
 <body>
 <pre id="log"></pre>
@@ -117,6 +122,22 @@
         return saves[saves.length - 1].body.data;
     }
 
+    // Start import as the merchant meets it: pressable, and quoting the
+    // estimate rather than the "sync is off" note.
+    function importable(doc) {
+        return !doc.getElementById('smaily-w-backfill').disabled
+            && doc.getElementById('smaily-w-backfill-estimate').style.display !== 'none'
+            && doc.getElementById('smaily-w-backfill-off').style.display === 'none';
+    }
+
+    // Ticks Sync contacts to Smaily as the merchant does, without saving.
+    function tickOn(frame) {
+        var toggle = frame.contentDocument.getElementById('smaily-w-sync-enabled');
+
+        toggle.checked = true;
+        frame.contentWindow.jQuery(toggle).trigger('change');
+    }
+
     async function run(locale) {
         var label = window.smailyAdminPages['contacts-setup-off.' + locale].strings[SWITCH],
             frame,
@@ -147,12 +168,29 @@
             && doc.getElementById('smaily-w-backfill-off').style.display !== 'none');
         data = await save(frame);
         check(locale + ', sync off: Continue without a change saves it off', data.sync_enabled === false);
-        toggle.checked = true;
-        frame.contentWindow.jQuery(toggle).trigger('change');
-        check(locale + ', sync off, switched on: the import button is enabled',
-            !doc.getElementById('smaily-w-backfill').disabled);
+        tickOn(frame);
+        check(locale + ', sync off, switched on but not saved: the import button stays disabled and says why',
+            doc.getElementById('smaily-w-backfill').disabled
+            && doc.getElementById('smaily-w-backfill-off').style.display !== 'none');
         data = await save(frame);
         check(locale + ', sync off, switched on: Continue saves it on', data.sync_enabled === true);
+        check(locale + ', sync off, switched on and saved: the import button is enabled', importable(doc));
+        frame.remove();
+
+        // The Settings Contacts tab of a website whose contact sync is off.
+        frame = await open('contacts-settings-off.' + locale);
+        doc = frame.contentDocument;
+        check(locale + ', Settings, sync off: the import button is disabled and says why',
+            !doc.getElementById('smaily-w-sync-enabled').checked
+            && doc.getElementById('smaily-w-backfill').disabled
+            && doc.getElementById('smaily-w-backfill-off').style.display !== 'none');
+        tickOn(frame);
+        check(locale + ', Settings, switched on but not saved: the import button stays disabled and says why',
+            doc.getElementById('smaily-w-backfill').disabled
+            && doc.getElementById('smaily-w-backfill-off').style.display !== 'none');
+        data = await save(frame);
+        check(locale + ', Settings, switched on and saved: the import button is enabled',
+            data.sync_enabled === true && importable(doc));
         frame.remove();
     }
 

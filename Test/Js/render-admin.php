@@ -467,7 +467,8 @@ $intelligenceViewModel = static fn (
 
     /**
      * The Contacts tab (PRO-1970): contact sync on, Subscribers only saved;
-     * off on the contacts-setup-off page (PRO-4010).
+     * off on the contacts-setup-off (PRO-4010) and contacts-settings-off
+     * (PRO-4016) pages.
      *
      * @return bool
      */
@@ -637,6 +638,16 @@ $pages['contacts-setup'] = [
 $pages['contacts-setup-off'] = [
     'template' => $contactsSetupTemplates,
     'viewModel' => $intelligenceViewModel('', false, false),
+    'strings' => ['Sync contacts to Smaily'],
+];
+/*
+ * The Contacts tab for a website whose contact sync is off: Start import
+ * waits for the switch to be saved on (PRO-4016).
+ */
+$pages['contacts-settings-off'] = [
+    'template' => $contactsSetupTemplates,
+    'viewModel' => $intelligenceViewModel('', false, false),
+    'data' => ['context' => 'settings'],
     'strings' => ['Sync contacts to Smaily'],
 ];
 $setupCompleted = [

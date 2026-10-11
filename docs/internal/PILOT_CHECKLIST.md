@@ -34,15 +34,16 @@ initial setup has the **Storefront URL** field on its **Connect** step
 
 1. Confirm with the store owner which other integrations sync newsletter
    subscribers or opt-outs between the store and Smaily. Switch each one
-   off at the moment the extension's contact sync goes on (the **Contacts**
-   step's save, step 2), not before: until then it carries the opt-outs.
+   off at the moment the extension's contact sync goes on (the **Connect**
+   step's save, step 2: contact sync is on from installation), not before:
+   until then it carries the opt-outs.
    Left on, it and the extension would write the same contacts.
 2. Connect the Smaily account in the initial setup and set the
    **Storefront URL** on its **Connect** step (**Using a separate
-   storefront?**) — §1. It is saved with the connection, before the
-   **Contacts** step switches contact sync on. Choose the consent contact
-   mode (**Subscribers only (consent)**) on the **Contacts** step: saving it
-   switches contact sync on in that mode — §1.
+   storefront?**) — §1. It is saved with the connection, the save from
+   which contact sync runs, in the default consent mode. Choose the consent
+   contact mode (**Subscribers only (consent)**) on the **Contacts** step:
+   saving it keeps contact sync on in that mode — §1.
 3. Connect Campaign Intelligence on the initial setup's **Intelligence**
    step; connecting starts the catalog import with the storefront's product
    links, then the customers import — §2.
@@ -85,7 +86,7 @@ pilot day moves. Installing the ZIP on an unsupported store makes
 | Open **Marketing > Smaily Connect**. | A fresh install lands on **Initial setup**, step bar: **Connect, Contacts, Automations, Intelligence, Overview**. |
 | **Connect** step: fill **Subdomain**, **API username**, **API password**; press **Test connection**. | "Connected!" and a green status with the account name; **Continue** goes to **Contacts**. A failure shows the Smaily-side reason — fix the credentials, do not continue. |
 | Separate storefront (the pilot): on the same **Connect** step, open **Using a separate storefront?** under the account fields and enter the storefront's https address (host only, e.g. `https://shop.example.com`) as **Storefront URL**, then **Continue**. | **Continue** saves it with the connection and goes to **Contacts**. An address with a path, a query or `http://` is refused with a message under the field; fix it, do not continue without it. After the setup, **Settings > Connection** shows it under **Using a separate storefront?**. |
-| **Contacts** step: mode **Subscribers only (consent)** — the pilot store's decided mode; keep **Show a newsletter checkbox at checkout** on. **Continue**. | The step saves ("Saving…" then the next step). Saving switches contact sync on, in the consent mode. On a separate storefront the Storefront URL is already saved (the **Connect** step), so contact sync stays on. Now switch off the other integrations that sync subscribers or opt-outs with Smaily (Pilot-day order, step 1). |
+| **Contacts** step: mode **Subscribers only (consent)** — the pilot store's decided mode; keep **Show a newsletter checkbox at checkout** on. **Continue**. | The step saves ("Saving…" then the next step). Contact sync already runs since the **Connect** step's save, in the consent mode; this save keeps it on in that mode. On a separate storefront the Storefront URL is already saved (the **Connect** step), so contact sync stays on. Switch off the other integrations that sync subscribers or opt-outs with Smaily once the **Connect** step is saved, if not done yet (Pilot-day order, step 1). |
 | **Automations** step: map **Abandoned cart** to the merchant's Smaily workflow and tick **Enabled** (needed for §5). On a separate storefront, leave **Enabled** unticked here: it goes on under **Settings > Automations** once the product-link check passes (Pilot-day order, step 5). Map **Welcome** / **First order** only if the merchant has those workflows. **Wait (minutes)** stays at **30** unless the merchant asked otherwise. | Workflow dropdowns list the Smaily account's workflows (**Refresh workflows** if one is missing). |
 
 ## 2. Engine setup exchange (Intelligence step)

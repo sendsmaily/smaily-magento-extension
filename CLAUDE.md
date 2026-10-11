@@ -252,10 +252,13 @@ do not change it.
    the "Changes since <previous version>" list in that order, merge or
    reword a bullet a later change made untrue (wording may be edited by
    hand), and `git rm` the fragments (`changelog.d/README.md` stays). It
-   sets the new version in the Hyvä companion's `git clone --branch
-   <version>` commands (`compat/hyva/README.md` "Installation" and
-   `docs/site/index.html` `#st-hyva`, EN and ET; PRO-4018). The
-   same PR updates STATUS.md. Squash-merge it.
+   sets the new version in the Hyvä companion's install command
+   `composer require smaily/smailyformagento:<version>
+   smaily/module-connect-hyva:<version>` (`compat/hyva/README.md`
+   "Installation" and `docs/site/index.html` `#st-hyva`, EN and ET;
+   PRO-4020); at 3.0.0 it becomes the plain `composer require
+   smaily/module-connect-hyva`, and the "until 3.0.0 is released" notes
+   beside it go. The same PR updates STATUS.md. Squash-merge it.
 2. `gh release create 3.0.0-rc9 --repo sendsmaily/smaily-magento-extension
    --target master --title "…" --notes-file … --prerelease` (a release
    candidate; 3.0.0 itself without `--prerelease`). **Tag = the PLAIN
@@ -270,8 +273,8 @@ do not change it.
    (`bin/verify-hyva-zip.sh`, laid out for `app/code/Hyva/SmailyConnect`)
    and pushes `compat/hyva` to the mirror `sendsmaily/smaily-magento-hyva`
    (`bin/publish-hyva-mirror.sh`: a commit on `main`, tagged with the same
-   plain version; composer.json loses its `version` there, so Packagist takes
-   the version from the tag). It pushes with the deploy key in the Actions
+   plain version; the companion's composer.json states no `version`, so
+   Packagist takes the version from the tag). It pushes with the deploy key in the Actions
    secret `HYVA_SPLIT_DEPLOY_KEY`. A re-run for the same tag leaves the
    mirror as it is; a mirror tag that holds other content fails the run and
    is never moved.

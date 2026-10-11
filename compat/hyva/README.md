@@ -1,6 +1,7 @@
 # Hyva_SmailyConnect — Hyvä theme compatibility for Smaily Connect
 
-Compatibility module that makes the [Smaily Connect](../../README.md)
+Compatibility module that makes the
+[Smaily Connect](https://github.com/sendsmaily/smaily-magento-extension)
 storefront work on [Hyvä themes](https://www.hyva.io/) (free/open-source
 since November 2025, OSL-3.0). It follows the standard Hyvä compat-module
 pattern: a small separate module, `hyva_`-prefixed layout handles, no
@@ -8,15 +9,25 @@ RequireJS/jQuery/Knockout, strict-CSP-safe script delivery, and Tailwind
 registration via `hyva:config:generate`.
 
 The main `Smaily_Connect` module stays theme-agnostic; this module only
-swaps the storefront templates that depend on Luma's JS stack.
+swaps the storefront templates that depend on Luma's JS stack. It is
+versioned with Smaily Connect: install the same version of both.
+
+The module is developed in the Smaily Connect repository
+([`compat/hyva`](https://github.com/sendsmaily/smaily-magento-extension/tree/master/compat/hyva));
+every Smaily Connect release publishes it to
+[sendsmaily/smaily-magento-hyva](https://github.com/sendsmaily/smaily-magento-hyva),
+which Packagist reads as `smaily/module-connect-hyva`, and attaches it to
+the release as its own ZIP. Report issues and send changes to the Smaily
+Connect repository.
 
 > **Status: verified on Hyvä 1.5.2** (default theme AND the strict-CSP
 > variant `Hyva/default-csp` with enforced no-inline `script-src`), with a
-> Luma store view as the regression control — see `docs/HYVA_SUPPORT.md`
-> in the repository root for the audit and the executed verification
-> matrix. Known remaining gap: third-party AJAX-add-to-cart modules that
-> submit programmatically bypass the `cart_add` form-submit capture (a
-> `private-content-loaded` cart-diff fallback is the documented plan B).
+> Luma store view as the regression control — see
+> [HYVA_SUPPORT.md](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/HYVA_SUPPORT.md)
+> for the audit and the executed verification matrix. Known remaining gap:
+> third-party AJAX-add-to-cart modules that submit programmatically bypass
+> the `cart_add` form-submit capture (a `private-content-loaded` cart-diff
+> fallback is the documented plan B).
 
 ## What it does
 
@@ -37,68 +48,91 @@ are server-side), and the RSS feed (no frontend assets). The commercial
 **Hyvä Checkout** product is a separate integration surface and is out of
 scope for this module.
 
-## Installation (Hyvä dev/store)
+## Installation
 
-Prerequisites: Magento 2.4.4+, Hyvä theme 1.3+ (1.4+ recommended,
-Tailwind v4) — via the free license key from the
+Prerequisites: Magento 2.4.4+, PHP 8.1–8.4, Hyvä theme 1.3+ (1.4+
+recommended, Tailwind v4) — via the free license key from the
 [Hyvä portal](https://www.hyva.io/) (private Packagist repo) or from source
-at [github.com/hyva-themes](https://github.com/hyva-themes).
+at [github.com/hyva-themes](https://github.com/hyva-themes), and Node.js 20+
+for the theme's Tailwind build. The
+[user guide](https://smaily.com/connect-magento/#st-hyva) has the same
+steps.
 
-This module lives in the Smaily Connect repository under `compat/hyva`. It
-is not on Packagist yet, and neither the `smaily/smailyformagento` package
-nor the release ZIP contains it (`/compat` is export-ignored, so GitHub's
-"Source code" downloads leave it out too). Take it from a git clone of the
-Smaily Connect version the store runs — the tag is the version,
-`3.0.0-rc11` here:
+Install both modules the same way. A store that installed Smaily Connect
+from the release ZIP takes this module from the release too: the composer
+command would install a second copy of Smaily Connect.
 
-```bash
-git clone --depth 1 --branch 3.0.0-rc11 https://github.com/sendsmaily/smaily-magento-extension.git /tmp/smaily-connect
-```
+### With composer
 
-Smaily Connect installed with composer — copy the module into the project
-and install it from there with a path repository:
+One command installs Smaily Connect and this module. Until 3.0.0 is
+released, give the release candidate's exact version for both packages, as
+the [releases page](https://github.com/sendsmaily/smaily-magento-extension/releases)
+names it — `3.0.0-rc11` below: a standard Magento project accepts stable
+versions only. From 3.0.0 on, `composer require smaily/module-connect-hyva`
+is enough; it installs Smaily Connect too.
 
-```bash
-mkdir -p packages
-cp -R /tmp/smaily-connect/compat/hyva packages/module-connect-hyva
-composer config repositories.smaily-hyva path packages/module-connect-hyva
-composer require smaily/module-connect-hyva:@alpha
-```
-
-`@alpha` is needed: the module's version is `1.0.0-alpha1`, and a standard
-Magento project installs only stable versions. Keep
-`packages/module-connect-hyva` with the project (in its version control):
-every `composer install` installs the module from that folder.
-
-Smaily Connect installed from the release ZIP (`app/code/Smaily/Connect`)
-— copy the module to `app/code` instead; requiring it with composer would
-look for Smaily Connect as a composer package:
+Run the commands from the Magento root, as the user that owns the Magento
+files. `<Vendor>/<theme>` is the Hyvä theme your store uses. In production
+mode (`bin/magento deploy:mode:show`):
 
 ```bash
-mkdir -p app/code/Hyva
-cp -R /tmp/smaily-connect/compat/hyva app/code/Hyva/SmailyConnect
-```
-
-Then, in both cases:
-
-```bash
-bin/magento module:enable Hyva_SmailyConnect
+bin/magento maintenance:enable
+composer require smaily/smailyformagento:3.0.0-rc11 smaily/module-connect-hyva:3.0.0-rc11
+bin/magento module:enable Smaily_Connect Hyva_SmailyConnect
 bin/magento setup:upgrade
+bin/magento setup:di:compile
 bin/magento hyva:config:generate
-# rebuild the theme's Tailwind CSS (Node 20+):
 npm --prefix app/design/frontend/<Vendor>/<theme>/web/tailwind ci
 npm --prefix app/design/frontend/<Vendor>/<theme>/web/tailwind run build-prod
+bin/magento setup:static-content:deploy en_US   # every locale your store uses
+bin/magento maintenance:disable
 bin/magento cache:flush
 ```
 
-When Smaily Connect is updated, replace the module folder the same way from
-the new version's tag (composer: then `composer update
-smaily/module-connect-hyva`), and run `bin/magento setup:upgrade`.
+In developer or default mode, `composer require`, `module:enable`,
+`setup:upgrade`, `hyva:config:generate`, the two `npm` commands and
+`cache:flush` are enough.
+
+### From the release ZIPs
+
+Every release on the
+[releases page](https://github.com/sendsmaily/smaily-magento-extension/releases)
+carries two ZIPs, each with its `.sha256` file:
+`smaily-connect-magento2.zip` (Smaily Connect) and
+`smaily-connect-magento2-hyva.zip` (this module). Download all four files
+into one folder and check both archives there — each must answer `OK`:
+
+```bash
+sha256sum -c smaily-connect-magento2.zip.sha256           # macOS: shasum -a 256 -c
+sha256sum -c smaily-connect-magento2-hyva.zip.sha256
+```
+
+Neither ZIP has a top-level folder. Extract each into its module folder
+(from the Magento root; give `unzip` the ZIP's full path if it is
+elsewhere):
+
+```bash
+mkdir -p app/code/Smaily/Connect app/code/Hyva/SmailyConnect
+unzip smaily-connect-magento2.zip -d app/code/Smaily/Connect
+unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect
+```
+
+Then run the commands above for your mode, without the `composer require`
+line. The full ZIP steps for Smaily Connect — cron, updating, removing —
+are in
+[INSTALLING.md](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/INSTALLING.md).
+
+### Updating
+
+Update this module together with Smaily Connect, to the same version:
+with composer, run the `composer require` command with the new version;
+from the ZIPs, replace both module folders (remove the old files first).
+Then run the commands for your mode again.
 
 > The composer package name is `smaily/module-connect-hyva`, in Smaily's own
 > vendor namespace; the Magento module name keeps the Hyvä
 > compat-module convention (`Hyva_SmailyConnect`) — see
-> `docs/HYVA_SUPPORT.md`.
+> [HYVA_SUPPORT.md](https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/HYVA_SUPPORT.md).
 
 ## License
 

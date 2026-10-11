@@ -1516,40 +1516,56 @@ window.smailyConnect.consentOverride = function () {
   <div class="sub" id="st-hyva">
     <h2><span data-lang="en">Hyvä</span><span data-lang="et">Hyvä</span></h2>
     <div data-lang="en">
-      <p>A Hyvä storefront also needs the Hyvä compatibility module, the composer package <code>smaily/module-connect-hyva</code>. It brings the browse tracker, recommendation attribution, the Smaily recommendations widget and the styled Personalization page to Hyvä. It is not on Packagist yet, and neither the Smaily Connect package nor the release ZIP contains it: take it from the source of the Smaily Connect version you install — <code>3.0.0-rc11</code> in the commands below. From the Magento root:</p>
-<pre><code>git clone --depth 1 --branch 3.0.0-rc11 https://github.com/sendsmaily/smaily-magento-extension.git /tmp/smaily-connect</code></pre>
-      <p>If Smaily Connect is installed with composer, install the module from a folder in the project, and keep that folder in the project's version control:</p>
-<pre><code>mkdir -p packages
-cp -R /tmp/smaily-connect/compat/hyva packages/module-connect-hyva
-composer config repositories.smaily-hyva path packages/module-connect-hyva
-composer require smaily/module-connect-hyva:@alpha</code></pre>
-      <p>If Smaily Connect is installed from the release ZIP, copy the module to <code>app/code</code> instead:</p>
-<pre><code>mkdir -p app/code/Hyva
-cp -R /tmp/smaily-connect/compat/hyva app/code/Hyva/SmailyConnect</code></pre>
-      <p>Then enable it and rebuild the Hyvä theme's Tailwind CSS; the <a href="https://github.com/sendsmaily/smaily-magento-extension/blob/master/compat/hyva/README.md">module's README</a> has these steps and how to update the module:</p>
-<pre><code>bin/magento module:enable Hyva_SmailyConnect
+      <p>A Hyvä storefront also needs the Hyvä compatibility module, the composer package <code>smaily/module-connect-hyva</code>. It brings the browse tracker, recommendation attribution, the Smaily recommendations widget and the styled Personalization page to Hyvä. It has the same version as Smaily Connect: install the same version of both, the same way — a store that installed Smaily Connect from the release ZIP takes the Hyvä module from the release too, because the composer command would install a second copy of Smaily Connect.</p>
+      <p><strong>With composer</strong>, one command installs both modules. Until 3.0.0 is released, give the release candidate's exact version for both packages — <code>3.0.0-rc11</code> below; a standard Magento project accepts stable versions only. From 3.0.0 on, <code>composer require smaily/module-connect-hyva</code> is enough: it installs Smaily Connect too. Run the commands from the Magento root, as the user that owns the Magento files; <code>&lt;Vendor&gt;/&lt;theme&gt;</code> is the Hyvä theme your store uses, and its Tailwind build needs Node.js 20 or newer. In production mode:</p>
+<pre><code>bin/magento maintenance:enable
+composer require smaily/smailyformagento:3.0.0-rc11 smaily/module-connect-hyva:3.0.0-rc11
+bin/magento module:enable Smaily_Connect Hyva_SmailyConnect
 bin/magento setup:upgrade
-bin/magento hyva:config:generate</code></pre>
+bin/magento setup:di:compile
+bin/magento hyva:config:generate
+npm --prefix app/design/frontend/&lt;Vendor&gt;/&lt;theme&gt;/web/tailwind ci
+npm --prefix app/design/frontend/&lt;Vendor&gt;/&lt;theme&gt;/web/tailwind run build-prod
+bin/magento setup:static-content:deploy en_US   # every locale your store uses
+bin/magento maintenance:disable
+bin/magento cache:flush</code></pre>
+      <p>In developer or default mode, <code>composer require</code>, <code>module:enable</code>, <code>setup:upgrade</code>, <code>hyva:config:generate</code>, the two <code>npm</code> commands and <code>cache:flush</code> are enough.</p>
+      <p><strong>From the release ZIPs:</strong> every release on the <a href="https://github.com/sendsmaily/smaily-magento-extension/releases">releases page</a> carries <code>smaily-connect-magento2.zip</code> (Smaily Connect) and <code>smaily-connect-magento2-hyva.zip</code> (the Hyvä module), each with its <code>.sha256</code> file. Download all four files into one folder and check both archives there — each must answer <code>OK</code>:</p>
+<pre><code>sha256sum -c smaily-connect-magento2.zip.sha256           # macOS: shasum -a 256 -c
+sha256sum -c smaily-connect-magento2-hyva.zip.sha256</code></pre>
+      <p>Extract each into its module folder (from the Magento root; give <code>unzip</code> the ZIP's full path if it is elsewhere), then run the commands above for your mode, without the <code>composer require</code> line:</p>
+<pre><code>mkdir -p app/code/Smaily/Connect app/code/Hyva/SmailyConnect
+unzip smaily-connect-magento2.zip -d app/code/Smaily/Connect
+unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pre>
+      <p>Update the Hyvä module together with Smaily Connect, to the same version. The <a href="https://github.com/sendsmaily/smaily-magento-hyva">module's README</a> has these steps too.</p>
       <ul>
         <li>Hyvä's free theme uses a Luma-based checkout, where the newsletter checkbox and the guest email capture work as on Luma.</li>
         <li>The commercial <strong>Hyvä Checkout</strong> is not supported: it shows no Smaily newsletter checkbox, and a guest's cart gets its email only when that checkout saves it.</li>
       </ul>
     </div>
     <div data-lang="et">
-      <p>Hyvä poe veebileht vajab lisaks Hyvä ühilduvusmoodulit, composeri paketti <code>smaily/module-connect-hyva</code>. See toob Hyväle sirvimise jälgija, soovituste omistamise, vidina Smaily soovitused ja kujundatud personaliseerimise lehe. Seda pole veel Packagistis ning see ei ole Smaily Connecti paketis ega väljalaske ZIP-is: võta see selle Smaily Connecti versiooni lähtekoodist, mille paigaldad — allolevates käskudes <code>3.0.0-rc11</code>. Käivita Magento juurkaustas:</p>
-<pre><code>git clone --depth 1 --branch 3.0.0-rc11 https://github.com/sendsmaily/smaily-magento-extension.git /tmp/smaily-connect</code></pre>
-      <p>Kui Smaily Connect on paigaldatud composeriga, paigalda moodul projekti kaustast ja hoia see kaust projekti versioonihalduses:</p>
-<pre><code>mkdir -p packages
-cp -R /tmp/smaily-connect/compat/hyva packages/module-connect-hyva
-composer config repositories.smaily-hyva path packages/module-connect-hyva
-composer require smaily/module-connect-hyva:@alpha</code></pre>
-      <p>Kui Smaily Connect on paigaldatud väljalaske ZIP-ist, kopeeri moodul hoopis kausta <code>app/code</code>:</p>
-<pre><code>mkdir -p app/code/Hyva
-cp -R /tmp/smaily-connect/compat/hyva app/code/Hyva/SmailyConnect</code></pre>
-      <p>Seejärel lülita moodul sisse ja ehita Hyvä teema Tailwind CSS uuesti; need sammud ja mooduli uuendamise kirjeldab <a href="https://github.com/sendsmaily/smaily-magento-extension/blob/master/compat/hyva/README.md">mooduli README</a> (inglise keeles):</p>
-<pre><code>bin/magento module:enable Hyva_SmailyConnect
+      <p>Hyvä poe veebileht vajab lisaks Hyvä ühilduvusmoodulit, composeri paketti <code>smaily/module-connect-hyva</code>. See toob Hyväle sirvimise jälgija, soovituste omistamise, vidina Smaily soovitused ja kujundatud personaliseerimise lehe. Selle versioon on sama mis Smaily Connectil: paigalda mõlemast sama versioon ja samal viisil — pood, mis paigaldas Smaily Connecti väljalaske ZIP-ist, võtab ka Hyvä mooduli väljalaskest, sest composeri käsk paigaldaks Smaily Connectist teise koopia.</p>
+      <p><strong>Composeriga</strong> paigaldab mõlemad moodulid üks käsk. Kuni 3.0.0 väljalaskeni anna mõlemale paketile väljalaskekandidaadi täpne versioon — allpool <code>3.0.0-rc11</code>; tavaline Magento projekt lubab ainult stabiilseid versioone. Alates versioonist 3.0.0 piisab käsust <code>composer require smaily/module-connect-hyva</code>: see paigaldab ka Smaily Connecti. Käivita käsud Magento juurkaustas, Magento failide omaniku kasutajana; <code>&lt;Vendor&gt;/&lt;theme&gt;</code> on sinu poe Hyvä teema ja selle Tailwindi ehitus vajab Node.js 20 või uuemat. Tootmisrežiimis:</p>
+<pre><code>bin/magento maintenance:enable
+composer require smaily/smailyformagento:3.0.0-rc11 smaily/module-connect-hyva:3.0.0-rc11
+bin/magento module:enable Smaily_Connect Hyva_SmailyConnect
 bin/magento setup:upgrade
-bin/magento hyva:config:generate</code></pre>
+bin/magento setup:di:compile
+bin/magento hyva:config:generate
+npm --prefix app/design/frontend/&lt;Vendor&gt;/&lt;theme&gt;/web/tailwind ci
+npm --prefix app/design/frontend/&lt;Vendor&gt;/&lt;theme&gt;/web/tailwind run build-prod
+bin/magento setup:static-content:deploy en_US   # kõik poe keeleseaded
+bin/magento maintenance:disable
+bin/magento cache:flush</code></pre>
+      <p>Arendus- või vaikerežiimis piisab käskudest <code>composer require</code>, <code>module:enable</code>, <code>setup:upgrade</code>, <code>hyva:config:generate</code>, kahest <code>npm</code>-käsust ja <code>cache:flush</code>.</p>
+      <p><strong>Väljalaske ZIP-idest:</strong> igal väljalaskel <a href="https://github.com/sendsmaily/smaily-magento-extension/releases">väljalasete lehel</a> on <code>smaily-connect-magento2.zip</code> (Smaily Connect) ja <code>smaily-connect-magento2-hyva.zip</code> (Hyvä moodul), kumbki koos oma <code>.sha256</code>-failiga. Laadi kõik neli faili ühte kausta ja kontrolli seal mõlemat arhiivi — kumbki peab vastama <code>OK</code>:</p>
+<pre><code>sha256sum -c smaily-connect-magento2.zip.sha256           # macOS: shasum -a 256 -c
+sha256sum -c smaily-connect-magento2-hyva.zip.sha256</code></pre>
+      <p>Paki kumbki lahti oma mooduli kausta (Magento juurkaustas; kui ZIP on mujal, anna käsule <code>unzip</code> selle täielik tee), seejärel käivita oma režiimi jaoks ülaltoodud käsud ilma reata <code>composer require</code>:</p>
+<pre><code>mkdir -p app/code/Smaily/Connect app/code/Hyva/SmailyConnect
+unzip smaily-connect-magento2.zip -d app/code/Smaily/Connect
+unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pre>
+      <p>Uuenda Hyvä moodulit koos Smaily Connectiga, samale versioonile. Need sammud on ka <a href="https://github.com/sendsmaily/smaily-magento-hyva">mooduli README-s</a> (inglise keeles).</p>
       <ul>
         <li>Hyvä tasuta teema kasutab Luma-põhist kassat, kus uudiskirja märkeruut ja külalise e-posti salvestamine töötavad nagu Lumas.</li>
         <li>Tasulist <strong>Hyvä Checkouti</strong> ei toetata: selles pole Smaily uudiskirja märkeruutu ja külalise ostukorv saab e-posti alles siis, kui see kassa selle salvestab.</li>

@@ -89,7 +89,10 @@ in `CHANGELOG.md`, updates the release-candidate version in the merchant
 install and upgrade commands (README "Installation", `docs/UPGRADING.md`
 "Steps", and the `#install` and `#upgrading` sections of
 `docs/site/index.html` in both languages; at 3.0.0 they drop the exact
-version), and moves every fragment in `changelog.d/` into the
+version) and in the Hyvä companion's install command (`compat/hyva/README.md`
+"Installation" and the `#st-hyva` section of `docs/site/index.html` in both
+languages; at 3.0.0 it becomes `composer require smaily/module-connect-hyva`),
+and moves every fragment in `changelog.d/` into the
 "Changes since <previous version>" list, oldest first —
 `bin/collect-changelog.sh` prints them in the order they landed on `master` —
 then deletes the fragments. After it is merged, publish a GitHub release on `master`

@@ -8,8 +8,8 @@ Tailwind v4) and against the strict-CSP variant
 view as the regression control — every cell passed. The compat module
 (`compat/hyva/`, `Hyva_SmailyConnect`) works as designed; one latent bug it
 surfaced in the base module (personalization page vs full-page cache) is
-fixed. Remaining before release: package publication (vendor/name decision)
-and the Hyvä Checkout boundary confirmation — see "Open release decisions".
+fixed. Remaining before release: the Hyvä Checkout boundary confirmation —
+see "Open release decisions".
 
 [Hyvä](https://www.hyva.io/) replaces Magento's Luma frontend stack
 (RequireJS, jQuery, Knockout, `x-magento-init`) with Alpine.js 3 + Tailwind
@@ -48,12 +48,27 @@ changes), **OUT-OF-SCOPE**.
 Module `Hyva_SmailyConnect`, composer `smaily/module-connect-hyva` (the
 module name keeps the Hyvä compat-module naming convention; the composer
 package is published under Smaily's own vendor namespace — decided, see
-"Open release decisions"). It lives in this repository and is not yet
-published as its own package. Neither the release ZIP nor the
+"Open release decisions"). It is developed in this repository and versioned
+with Smaily Connect; neither the main release ZIP nor the
 `smaily/smailyformagento` package contains it (`/compat` is
-export-ignored), so a store takes it from a git clone of the Smaily Connect
-version it runs — the commands are in `compat/hyva/README.md`
-("Installation").
+export-ignored). Every release publishes it on its own, and a store
+installs the same version of both modules, the same way:
+
+- **Composer:** one command installs both modules —
+  `composer require smaily/smailyformagento:<version>
+  smaily/module-connect-hyva:<version>` while 3.0.0 is a release
+  candidate, `composer require smaily/module-connect-hyva` from 3.0.0 on (it
+  installs Smaily Connect too). Packagist reads the package from the mirror
+  repository
+  [sendsmaily/smaily-magento-hyva](https://github.com/sendsmaily/smaily-magento-hyva).
+- **Release ZIPs:** the release carries `smaily-connect-magento2-hyva.zip`
+  and its `.sha256` next to Smaily Connect's own ZIP; it is extracted into
+  `app/code/Hyva/SmailyConnect`, Smaily Connect's into
+  `app/code/Smaily/Connect`.
+
+The exact commands, with the `bin/magento` sequence for production and
+developer mode, are in `compat/hyva/README.md` ("Installation") and the
+[user guide](https://smaily.com/connect-magento/#st-hyva).
 
 - `view/frontend/layout/hyva_default.xml` — `hyva_`-prefixed handle (loads
   only when a Hyvä theme is active) swaps the attribution, tracker and
@@ -238,6 +253,7 @@ needs the frontend half.
    adoption into the Hyvä compat-module tracker). The Magento module name
    stays `Hyva_SmailyConnect` per the Hyvä compat convention.
 2. Hyvä Checkout: confirm the out-of-scope boundary above.
-3. Whether the compat module stays in this repo (current setup: developed
-   here, excluded from the main package artifacts) or moves to its own
-   repository when published.
+3. ~~Where the compat module lives~~ — **decided: developed here**
+   (excluded from the main package artifacts); every release publishes it
+   to the mirror repository `sendsmaily/smaily-magento-hyva`, which
+   Packagist reads, and attaches its own ZIP.

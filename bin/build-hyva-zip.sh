@@ -15,7 +15,8 @@
 #   bin/build-hyva-zip.sh [output.zip]   (default: ./smaily-connect-magento2-hyva.zip)
 #
 # The archive is compat/hyva of the committed tree (HEAD). Its composer.json
-# loses the "version" field: the companion is versioned with Smaily Connect,
+# states no "version" (the build drops one if it comes back): the companion
+# is versioned with Smaily Connect,
 # so Packagist takes the version from the mirror's tag (the release tag), and
 # a "version" that disagreed with the tag would make Packagist skip the tag.
 

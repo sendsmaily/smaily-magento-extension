@@ -3,30 +3,43 @@ name: Build a release
 on:
   release:
     types: [published]
+  # Publishes the Hyvä companion (mirror + ZIP) for a release that already
+  # exists — one published before the release workflow did that.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (the plain version, e.g. 3.0.0-rc11)
+        required: true
+        type: string
 
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
+      # A manual run checks out the tag it was given; a missing tag fails here.
       - name: Checkout tagged code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       # Packagist skips a tag whose version disagrees with composer.json, so a
       # mistyped tag must fail here, before a ZIP is built or attached.
       - name: Check the release tag matches the package version
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: bash bin/check-release-version.sh "$RELEASE_TAG"
 
       - name: Build and verify the release ZIP
+        if: github.event_name == 'release'
         run: bash bin/verify-release-zip.sh smaily-connect-magento2.zip
 
       # The checksum ships beside the ZIP so a store can prove the archive it
       # unpacked is the one this workflow built (bin/verify-release-zip.sh
       # writes the .sha256 next to the archive it verified).
       - name: Upload release assets
+        if: github.event_name == 'release'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -34,3 +47,47 @@ jobs:
             smaily-connect-magento2.zip \
             smaily-connect-magento2.zip.sha256 \
             --clobber
+
+      - name: Check the release exists
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release view "$RELEASE_TAG" --json tagName > /dev/null
+
+      # An older tag predates the companion scripts: a manual run takes them
+      # from the commit it runs on, and the companion from the tag (HEAD).
+      - name: Take the companion scripts from the workflow's commit
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git fetch -q --depth=1 origin "$GITHUB_SHA"
+          git checkout "$GITHUB_SHA" -- bin/build-hyva-zip.sh bin/verify-hyva-zip.sh bin/publish-hyva-mirror.sh
+
+      - name: Build and verify the Hyvä companion ZIP
+        run: bash bin/verify-hyva-zip.sh smaily-connect-magento2-hyva.zip
+
+      - name: Upload the Hyvä companion ZIP
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            smaily-connect-magento2-hyva.zip \
+            smaily-connect-magento2-hyva.zip.sha256 \
+            --clobber
+
+      # Packagist reads smaily/module-connect-hyva from the mirror repository;
+      # the deploy key (write access to the mirror only) lives in the agent,
+      # never on disk.
+      - name: Publish the Hyvä companion to its mirror repository
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HYVA_SPLIT_DEPLOY_KEY: ${{ secrets.HYVA_SPLIT_DEPLOY_KEY }}
+        run: |
+          known_hosts="$RUNNER_TEMP/github_known_hosts"
+          gh api meta --jq '.ssh_keys[] | "github.com " + .' > "$known_hosts"
+          eval "$(ssh-agent -s)" > /dev/null
+          trap 'ssh-agent -k > /dev/null' EXIT
+          ssh-add -q - <<< "$HYVA_SPLIT_DEPLOY_KEY"
+          export GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=$known_hosts -o StrictHostKeyChecking=yes"
+          bash bin/publish-hyva-mirror.sh "$RELEASE_TAG" \
+            git@github.com:sendsmaily/smaily-magento-hyva.git \
+            smaily-connect-magento2-hyva.zip

@@ -101,3 +101,17 @@ mismatch the run fails and nothing is attached), then builds, verifies and
 attaches the installable ZIP and its `.sha256`. The composer package is
 `smaily/smailyformagento`: Packagist reads it from this repository, so every
 tag is a published version.
+
+The same workflow publishes the Hyvä companion module (`compat/hyva`, the
+composer package `smaily/module-connect-hyva`), which is versioned with the
+main module: it builds, verifies (`bin/verify-hyva-zip.sh`) and attaches
+`smaily-connect-magento2-hyva.zip` and its `.sha256`, laid out for
+`app/code/Hyva/SmailyConnect`, and pushes the module to the mirror
+repository `sendsmaily/smaily-magento-hyva` as a commit on `main` tagged
+with the same version (`bin/publish-hyva-mirror.sh`). Packagist reads the
+companion from that mirror and takes its version from the tag, so the
+mirror's `composer.json` has no `version` field. Running the workflow again
+for the same tag changes nothing. For a release published before the
+workflow did this, run "Build a release" by hand (Actions → Run workflow,
+on `master`) with the release's tag: it checks that the tag is the version
+in `composer.json` at that tag, then publishes only the companion.

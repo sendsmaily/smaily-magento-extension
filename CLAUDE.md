@@ -281,15 +281,28 @@ do not change it.
    A tag published before the workflow did this (3.0.0-rc11) gets its
    companion from the manual trigger: Actions → "Build a release" → Run
    workflow on `master` with the tag; it checks that the tag and its release
-   exist and that the tag is composer.json's `version` at that tag.
-   If the CLI answers HTTP 500 (it did for rc9; rc10 went through the CLI
-   without it), create the release and tag in the GitHub web UI instead —
+   exist and that the tag is composer.json's `version` at that tag (run for
+   3.0.0-rc11 on 2026-10-11, green).
+   If the CLI answers HTTP 500 (it did for rc9; rc10 and rc11 went through
+   the CLI without it), create the release and tag in the GitHub web UI instead —
    a fallback, not the default path.
 3. **A tag on the official repo is a Packagist publish** of
    `smaily/smailyformagento`, and through the mirror of
-   `smaily/module-connect-hyva` — a one-way door, Erkki's to run. Release
-   candidates are tagged publicly; 3.0.0 waits for a pilot store.
+   `smaily/module-connect-hyva` — one one-way door for both, Erkki's to
+   run. The mirror reaches Packagist through a GitHub webhook on the
+   mirror repository (push events →
+   `https://packagist.org/api/github?username=smaily`, set 2026-10-11). The
+   mirror's tag is never moved, so its README — the Packagist page — keeps
+   the text of the release that published it until the next release.
+   Release candidates are tagged publicly; 3.0.0 waits for a pilot store.
    `dev-master` on Packagist has been v3 since the move PR merged.
+
+**Packagist vendor `smaily` (gotcha, 2026-10-11):** the vendor namespace is
+owned by the Packagist account `smaily` (Erkki has access to it); Erkki's
+own Packagist account is not a maintainer of the vendor. A new package
+under `smaily/` is submitted from the `smaily` account, or from an account
+it adds as a maintainer — `smaily/module-connect-hyva` was submitted from
+it.
 
 ## The move into sendsmaily (PRO-1198) — done 2026-10-07
 
@@ -306,8 +319,8 @@ Done since: 3.0.0-rc9, the first release candidate there, tagged
 2026-10-07 (Release cut above). **Gotcha:** creating the tag from the CLI
 failed with HTTP 500 — both `gh release create` (the API) and `git push`
 of the tag; Erkki created it in the GitHub web UI, which worked. 3.0.0-rc10
-was created with `gh release create` without the HTTP 500, so the CLI stays
-the default and the web UI stays the fallback.
+and 3.0.0-rc11 were created with `gh release create` without the HTTP 500,
+so the CLI stays the default and the web UI stays the fallback.
 
 The fork `erkkimarkus/magento-connect` is archived read-only (Erkki,
 2026-10-07); its rc1–rc8 releases stay. Nothing of the move is left open.
@@ -380,7 +393,9 @@ is written in English.
   2026-10-07 night: 4/5 (rc10 released; pilot store not yet confirmed);
   2026-10-08: 4/5 (rc10 released; widget and fixes on master; pilot store
   not yet confirmed); 2026-10-09: 4/5 (rc11 cut; the 2.8.x upgrade path
-  walked and fixed; pilot store not yet confirmed).
+  walked and fixed; pilot store not yet confirmed); 2026-10-11: 4/5
+  (rc11 released; Hyvä companion on Packagist; pilot store not yet
+  confirmed).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

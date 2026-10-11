@@ -14,8 +14,6 @@ executed verification matrix (Luma / Hyvä / strict CSP — all pass) in
   AJAX-add-to-cart compat modules (programmatic `form.submit()` fires no
   submit event); fall back to a `private-content-loaded` cart diff if a
   real store shows gaps.
-- Publish the compat module as its own composer package
-  (`smaily/module-connect-hyva` — name decided; see HYVA_SUPPORT.md).
 - Checkout opt-in checkbox for Hyvä Checkout (commercial product, own
   Magewire integration surface) — declared out of scope for the first
   Hyvä-support release; the server-side opt-in endpoint is already

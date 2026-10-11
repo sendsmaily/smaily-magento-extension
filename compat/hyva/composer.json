@@ -1,7 +1,6 @@
 {
     "name": "smaily/module-connect-hyva",
     "description": "Hyvä theme compatibility for Smaily Connect (Smaily_Connect): framework-free browse tracker and attribution scripts, Tailwind storefront templates",
-    "version": "1.0.0-alpha1",
     "type": "magento2-module",
     "license": "GPL-3.0-only",
     "authors": [

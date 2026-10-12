@@ -13,6 +13,7 @@ use Magento\Catalog\Model\Product;
 use Magento\Framework\Registry;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
+use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 
 /**
  * Page context for the browse tracker on catalog pages. The rendered values
@@ -33,7 +34,7 @@ class ProductContext implements ArgumentInterface
         $product = $this->registry->registry('current_product');
 
         if ($product instanceof Product) {
-            $context = ['type' => 'product', 'sku' => (string)$product->getSku()];
+            $context = ['type' => 'product', 'sku' => CatalogPayloadBuilder::sku($product)];
             if ($category instanceof Category) {
                 $context['categoryPath'] = $this->categoryPath($category);
             }

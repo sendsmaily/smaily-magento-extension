@@ -22,10 +22,16 @@ use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
  * Saves the transactional-email settings of Settings (PRO-4062), for
- * WizardStepSaver: the separate Smaily account on the Connection tab and
- * the Order confirmation and Shipment confirmation triggers on the
- * Automations tab. Settings only; the initial setup posts neither. Nothing
- * here sends an email or changes Magento's own order and shipment emails.
+ * WizardStepSaver: the "Send transactional emails" switch and the separate
+ * Smaily account on the Connection tab, and the Order confirmation and
+ * Shipping confirmation triggers and the Customer details switch on the
+ * Automations tab, as the WooCommerce plugin has them. Settings only; the
+ * initial setup posts neither. Nothing here sends an email or changes
+ * Magento's own order and shipment emails.
+ *
+ * The switch is saved for the website. While it is off, the account fields
+ * are hidden and a save leaves the saved account as it is (the WooCommerce
+ * plugin keeps its credentials too).
  *
  * The account is saved for all websites (default scope). On an install with
  * more than one website, a website may use its own account instead
@@ -61,11 +67,14 @@ class TransactionalSettingsSaver
      * What is wrong with a posted account; empty when it can be saved. Each
      * error names its field as "transactional.<field>".
      *
-     * @param array<string, mixed> $posted {subdomain, username, password, website_account?}
+     * @param array<string, mixed> $posted {enabled, subdomain, username, password, website_account?}
      * @return array<int, array{field: string, message: string}>
      */
     public function accountErrors(array $posted, int $websiteId): array
     {
+        if (!$this->switchedOn($posted)) {
+            return [];
+        }
         [$subdomain, $username, $password] = $this->postedAccount($posted);
         if ($subdomain === '' && $username === '' && $password === '') {
             return [];
@@ -116,15 +125,25 @@ class TransactionalSettingsSaver
     }
 
     /**
-     * Saves a posted account that accountErrors() accepted, then asks Smaily
-     * whether it accepts it (isAccountAccepted()); the save never depends on
-     * the answer.
+     * Saves the "Send transactional emails" switch for the website and, when
+     * it is on, a posted account that accountErrors() accepted, then asks
+     * Smaily whether it accepts it (isAccountAccepted()); the save never
+     * depends on the answer.
      *
-     * @param array<string, mixed> $posted {subdomain, username, password, website_account?}
+     * @param array<string, mixed> $posted {enabled, subdomain, username, password, website_account?}
      */
     public function saveAccount(array $posted, int $websiteId): void
     {
         $this->accountAccepted = false;
+        $this->configWriter->save(
+            Config::XML_PATH_TRANSACTIONAL_ENABLED,
+            $this->switchedOn($posted) ? '1' : '0',
+            ScopeInterface::SCOPE_WEBSITES,
+            $websiteId
+        );
+        if (!$this->switchedOn($posted)) {
+            return;
+        }
         [$subdomain, $username, $password] = $this->postedAccount($posted);
         $ownAccount = $this->ownAccount($posted);
         $removing = $subdomain === '' && $username === '' && $password === '';
@@ -187,10 +206,12 @@ class TransactionalSettingsSaver
     }
 
     /**
-     * Saves a website's Order confirmation and Shipment confirmation
-     * switches and their workflows per store language.
+     * Saves a website's Order confirmation and Shipping confirmation
+     * switches and their workflows per store language, and its Customer
+     * details switch.
      *
-     * @param array<string, mixed> $posted {order_confirmation_enabled, shipment_confirmation_enabled, mappings}
+     * @param array<string, mixed> $posted {order_confirmation_enabled, shipment_confirmation_enabled,
+     *     personal_data_enabled, mappings}
      * @return array<int, array{field: string, message: string}> empty on success
      */
     public function saveTriggers(array $posted, int $websiteId): array
@@ -198,6 +219,7 @@ class TransactionalSettingsSaver
         foreach ([
             'order_confirmation_enabled' => Config::XML_PATH_ORDER_CONFIRMATION_ENABLED,
             'shipment_confirmation_enabled' => Config::XML_PATH_SHIPMENT_CONFIRMATION_ENABLED,
+            'personal_data_enabled' => Config::XML_PATH_TRANSACTIONAL_PERSONAL_DATA,
         ] as $key => $path) {
             if (array_key_exists($key, $posted)) {
                 $this->configWriter->save(
@@ -212,6 +234,17 @@ class TransactionalSettingsSaver
         return is_array($posted['mappings'] ?? null)
             ? $this->mappingSaver->saveTransactional($posted['mappings'], $websiteId)
             : [];
+    }
+
+    /**
+     * Whether the post has "Send transactional emails" switched on: only
+     * then does it carry the account.
+     *
+     * @param array<string, mixed> $posted
+     */
+    private function switchedOn(array $posted): bool
+    {
+        return !empty($posted['enabled']);
     }
 
     /**

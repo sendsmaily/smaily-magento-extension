@@ -45,6 +45,8 @@ class Config
     public const XML_PATH_TRANSACTIONAL_USERNAME = 'smaily_connect/transactional/username';
     public const XML_PATH_TRANSACTIONAL_PASSWORD = 'smaily_connect/transactional/password';
     public const XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT = 'smaily_connect/transactional/website_account';
+    public const XML_PATH_TRANSACTIONAL_ENABLED = 'smaily_connect/transactional/enabled';
+    public const XML_PATH_TRANSACTIONAL_PERSONAL_DATA = 'smaily_connect/transactional/personal_data_enabled';
     public const XML_PATH_ORDER_CONFIRMATION_ENABLED = 'smaily_connect/transactional/order_confirmation_enabled';
     public const XML_PATH_SHIPMENT_CONFIRMATION_ENABLED = 'smaily_connect/transactional/shipment_confirmation_enabled';
     public const XML_PATH_RSS_ENABLED = 'smaily_connect/rss/enabled';
@@ -331,6 +333,26 @@ class Config
     }
 
     /**
+     * The "Send transactional emails" switch of a website (off by default),
+     * the WooCommerce plugin's master switch. Nothing reads it to send yet.
+     */
+    public function isTransactionalEnabled(int $websiteId): bool
+    {
+        return $this->websiteFlag(self::XML_PATH_TRANSACTIONAL_ENABLED, $websiteId);
+    }
+
+    /**
+     * The Customer details switch of a website's transactional emails: the
+     * addresses, phone and order note go with both confirmations (off by
+     * default; the WooCommerce plugin's PRO-3190). Nothing reads it to send
+     * yet.
+     */
+    public function isTransactionalPersonalDataEnabled(int $websiteId): bool
+    {
+        return $this->websiteFlag(self::XML_PATH_TRANSACTIONAL_PERSONAL_DATA, $websiteId);
+    }
+
+    /**
      * The Order confirmation switch of a website's transactional emails
      * (off by default). Nothing reads it to send yet.
      */
@@ -340,7 +362,7 @@ class Config
     }
 
     /**
-     * The Shipment confirmation switch of a website's transactional emails
+     * The Shipping confirmation switch of a website's transactional emails
      * (off by default). Nothing reads it to send yet.
      */
     public function isShipmentConfirmationEnabled(int $websiteId): bool

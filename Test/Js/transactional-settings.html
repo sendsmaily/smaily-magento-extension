@@ -13,17 +13,21 @@
   into Test/Js/build/, run with jQuery from vendor/, one fresh frame per
   scenario. Stubbed: only the requests (fetch): the workflow list answers
   two workflows, a save answers saved and the transactional account
-  accepted, a test answers connected. Without a connected account the
-  Automations tab shows only the pointer to the Connection tab and asks for
-  no workflow list; a connection save that connects it shows the triggers,
-  off, with workflows listed from the transactional account. With one
-  connected, the triggers show at once with a workflow per language and the
-  saved default fallback, and Save Automations posts them; the account's
-  password is never drawn into the form; unticking "Use a separate account
-  for this website" shows the account saved for all websites, and a test of
-  an unchanged account asks for the saved one. Run it with bin/test-js.sh
-  (it renders the pages first); the page ends with "RESULT: PASS" or
-  "RESULT: FAIL".
+  accepted, a test answers connected. As in the WooCommerce plugin:
+  "Send transactional emails" is off by default and hides the account,
+  and Save Connection then posts only the switch; ticked, it shows the
+  account and the save posts it. Without a connected account the
+  Automations tab shows nothing transactional and asks for no workflow
+  list; a connection save that connects it shows the triggers, off, with
+  workflows listed from the transactional account, and Customer details,
+  off. With one connected, the triggers show at once with a workflow per
+  language and the saved default fallback, and Save Automations posts them
+  and Customer details; switching the account off leaves them shown; the
+  account's password is never drawn into the form; unticking "Use a
+  separate account for this website" shows the account saved for all
+  websites, and a test of an unchanged account asks for the saved one. Run
+  it with bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
 -->
 <html lang="en">
 <head>
@@ -41,7 +45,6 @@
     'use strict';
 
     var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
-    var POINTER = 'Connect your transactional Smaily account on the Connection tab to set up order and shipment confirmations.';
     var failures = 0;
     var passes = 0;
 
@@ -139,13 +142,30 @@
 
         log('# ' + locale);
 
-        // No transactional account: only the pointer.
+        // No transactional account, the switch off.
         frame = await open('transactional-off.' + locale);
         doc = frame.contentDocument;
         panels = frame.contentWindow.panels;
-        check(locale + ', not connected: the Automations tab shows only the pointer to the Connection tab',
-            shown(doc, 'smaily-tx-pointer') && !shown(doc, 'smaily-tx-triggers')
-            && doc.getElementById('smaily-tx-pointer').textContent.trim() === strings[POINTER]);
+        check(locale + ', not connected: the Automations tab shows nothing transactional',
+            !shown(doc, 'smaily-tx-triggers') && doc.getElementById('smaily-tx-pointer') === null);
+        check(locale + ', "Send transactional emails" is off by default and hides the account',
+            !doc.getElementById('smaily-tx-enabled').checked
+            && doc.getElementById('smaily-tx-enabled').parentNode.textContent.trim() === strings['Send transactional emails']
+            && !shown(doc, 'smaily-tx-account-fields'));
+        check(locale + ', switched off: Save Connection posts only the switch',
+            JSON.stringify(panels.collect.connect().transactional) === JSON.stringify({enabled: false}));
+        doc.getElementById('smaily-tx-enabled').checked = true;
+        frame.contentWindow.jQuery('#smaily-tx-enabled').trigger('change');
+        check(locale + ', switched on: the transactional Smaily account shows',
+            shown(doc, 'smaily-tx-account-fields')
+            && doc.querySelector('#smaily-tx-account-fields h3').textContent.trim() === strings['Transactional Smaily account']);
+        doc.getElementById('smaily-tx-subdomain').value = 'shop-tx';
+        doc.getElementById('smaily-tx-username').value = 'api';
+        doc.getElementById('smaily-tx-password').value = 'secret';
+        data = panels.collect.connect().transactional;
+        check(locale + ', switched on: Save Connection posts the switch and the account',
+            data.enabled === true && data.subdomain === 'shop-tx' && data.username === 'api'
+            && data.password === 'secret' && data.website_account === false);
         check(locale + ', not connected: the Connection tab says Not connected',
             doc.getElementById('smaily-tx-test-result').textContent.trim() === strings['Not connected']);
         check(locale + ', one website: no "Use a separate account for this website"',
@@ -161,11 +181,13 @@
         await panels.saveStep('connect', {
             subdomain: 'demo',
             username: 'api',
-            transactional: {subdomain: 'shop-tx', username: 'api', password: 'secret', website_account: false}
+            transactional: {enabled: true, subdomain: 'shop-tx', username: 'api', password: 'secret', website_account: false}
         });
         await wait(20);
-        check(locale + ', connected by a save: the triggers show and the pointer goes',
-            shown(doc, 'smaily-tx-triggers') && !shown(doc, 'smaily-tx-pointer'));
+        check(locale + ', connected by a save: the triggers show',
+            shown(doc, 'smaily-tx-triggers')
+            && doc.querySelector('.smaily-tx-trigger[data-trigger=shipment_confirmation] .smaily-engine-trigger__name')
+                .textContent.trim() === strings['Shipping confirmation']);
         check(locale + ', connected by a save: the Connection tab says Connected',
             doc.getElementById('smaily-tx-test-result').textContent.trim() === strings.Connected);
         requests = workflowRequests(frame);
@@ -184,14 +206,20 @@
             data.order_confirmation_enabled === true && data.shipment_confirmation_enabled === false
             && data.mappings.length === 1 && data.mappings[0].trigger_type === 'order_confirmation'
             && data.mappings[0].language === 'default' && data.mappings[0].workflow_id === 32);
+        check(locale + ', Customer details is off by default, below the triggers',
+            !doc.getElementById('smaily-tx-personal-data').checked && data.personal_data_enabled === false
+            && doc.querySelector('#smaily-tx-triggers h3').textContent.trim() === strings['Customer details']
+            && doc.getElementById('smaily-tx-personal-data').parentNode.textContent.trim()
+                === strings['Include addresses, phone and order note']);
         frame.remove();
 
         // A website of a multi-website install with its own account connected.
         frame = await open('transactional-connected.' + locale);
         doc = frame.contentDocument;
         panels = frame.contentWindow.panels;
-        check(locale + ', connected: the triggers show at once',
-            shown(doc, 'smaily-tx-triggers') && !shown(doc, 'smaily-tx-pointer'));
+        check(locale + ', connected: the switch is on and the triggers show at once',
+            doc.getElementById('smaily-tx-enabled').checked && shown(doc, 'smaily-tx-account-fields')
+            && shown(doc, 'smaily-tx-triggers'));
         check(locale + ', connected: the password is never drawn into the form',
             doc.getElementById('smaily-tx-password').value === ''
             && doc.getElementById('smaily-tx-account').outerHTML.indexOf('secret') === -1);
@@ -205,6 +233,8 @@
         check(locale + ', Save Automations posts both languages and the saved default fallback',
             data.mappings.length === 2 && data.mappings[0].is_default_fallback === true
             && data.mappings[1].is_default_fallback === false);
+        check(locale + ', Customer details saved on is shown and posted on',
+            doc.getElementById('smaily-tx-personal-data').checked && data.personal_data_enabled === true);
         check(locale + ', the website\'s own account is shown, its box ticked',
             doc.getElementById('smaily-tx-website-account').checked
             && doc.getElementById('smaily-tx-subdomain').value === 'ee-tx');
@@ -221,6 +251,11 @@
         check(locale + ', unticked: the account saved for all websites is shown',
             doc.getElementById('smaily-tx-subdomain').value === 'shop-tx'
             && doc.getElementById('smaily-tx-username').value === 'api');
+        doc.getElementById('smaily-tx-enabled').checked = false;
+        frame.contentWindow.jQuery('#smaily-tx-enabled').trigger('change');
+        check(locale + ', switched off: the account hides, the triggers stay and the save posts only the switch',
+            !shown(doc, 'smaily-tx-account-fields') && shown(doc, 'smaily-tx-triggers')
+            && JSON.stringify(panels.collect.connect().transactional) === JSON.stringify({enabled: false}));
         frame.remove();
     }
 

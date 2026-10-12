@@ -691,10 +691,11 @@ $pages['contacts-settings-new'] = [
  * block of the Connection tab (panel/transactional-account.phtml) and the
  * triggers of the Automations tab (panel/transactional-triggers.phtml) with
  * their behaviour (panel/panels-js.phtml). The -off page: one website, one
- * store language, no transactional account saved. The -connected page: two
- * websites, two store languages, the website's own account connected and
- * its Order confirmation workflows saved, the account saved for all
- * websites another one.
+ * store language, "Send transactional emails" off and no transactional
+ * account saved. The -connected page: two websites, two store languages,
+ * the switch on, the website's own account connected and its Order
+ * confirmation workflows saved, the account saved for all websites another
+ * one; Customer details on.
  */
 $transactionalViewModel = static fn (bool $connected): object => new class ($connected) {
     /**
@@ -731,6 +732,7 @@ $transactionalViewModel = static fn (bool $connected): object => new class ($con
 
         return $this->connected
             ? [
+                'enabled' => true,
                 'subdomain' => 'ee-tx',
                 'username' => 'api-ee',
                 'hasPassword' => true,
@@ -738,7 +740,15 @@ $transactionalViewModel = static fn (bool $connected): object => new class ($con
                 'verified' => true,
                 'shared' => $shared,
             ]
-            : ['websiteAccount' => false, 'verified' => false, 'shared' => $shared] + $shared;
+            : ['enabled' => false, 'websiteAccount' => false, 'verified' => false, 'shared' => $shared] + $shared;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isTransactionalPersonalDataEnabled(): bool
+    {
+        return $this->connected;
     }
 
     /**
@@ -780,7 +790,9 @@ $transactionalViewModel = static fn (bool $connected): object => new class ($con
             'setupCompleted' => true,
             'storeId' => 1,
             'connection' => ['subdomain' => 'demo', 'username' => 'api', 'hasPassword' => true, 'multilingualMode' => 'single'],
-            'websiteAccount' => ['subdomain' => 'demo', 'username' => 'api'],
+            // No Connection panel is rendered: an empty account lets
+            // collect.connect() post what the transactional card adds.
+            'websiteAccount' => ['subdomain' => '', 'username' => ''],
             'multilingual' => ['languages' => $this->getDetectedLanguages(), 'fallbackLanguage' => ''],
             'subscribers' => ['syncEnabled' => true, 'syncActive' => true, 'syncMode' => 'consent'],
             'automations' => [],
@@ -796,9 +808,12 @@ $transactionalTemplates = [
 ];
 $transactionalStrings = [
     'Transactional emails',
-    'Connect your transactional Smaily account on the Connection tab to set up order and shipment confirmations.',
+    'Send transactional emails',
+    'Transactional Smaily account',
     'Order confirmation',
-    'Shipment confirmation',
+    'Shipping confirmation',
+    'Customer details',
+    'Include addresses, phone and order note',
     'Use a separate account for this website',
     'Connected',
     'Not connected',

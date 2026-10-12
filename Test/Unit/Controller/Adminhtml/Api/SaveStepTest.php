@@ -100,12 +100,30 @@ class SaveStepTest extends TestCase
         $body = ['step' => 'connect', 'data' => [
             'subdomain' => 'demo',
             'username' => 'u',
-            'transactional' => ['subdomain' => 'demo-tx', 'username' => 'u', 'password' => 'p'],
+            'transactional' => ['enabled' => true, 'subdomain' => 'demo-tx', 'username' => 'u', 'password' => 'p'],
         ]];
 
         $this->controller($body, $this->createMock(VerifiedCredentials::class), [], true, false, true)->execute();
 
         self::assertTrue($this->response['transactionalVerified']);
+    }
+
+    /**
+     * PRO-4065: with "Send transactional emails" off the save carries no
+     * account, so it answers nothing about it and the triggers stay as
+     * they are.
+     */
+    public function testAConnectionSaveWithTransactionalEmailsOffAnswersNoCheck(): void
+    {
+        $body = ['step' => 'connect', 'data' => [
+            'subdomain' => 'demo',
+            'username' => 'u',
+            'transactional' => ['enabled' => false],
+        ]];
+
+        $this->controller($body, $this->createMock(VerifiedCredentials::class), [], true, false, true)->execute();
+
+        self::assertArrayNotHasKey('transactionalVerified', $this->response);
     }
 
     public function testARefusedConnectionSaveAnswersOnlyTheErrors(): void

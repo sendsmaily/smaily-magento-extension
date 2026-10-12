@@ -454,16 +454,19 @@ class WizardData implements ArgumentInterface
      * The transactional-email account as the selected website uses it
      * (PRO-4062): its own, else the one saved for all websites, which
      * `shared` holds as well (the fields show it when the website does not
-     * use its own). Passwords are never returned, only whether one is saved.
+     * use its own), and the website's "Send transactional emails" switch
+     * (`enabled`, PRO-4065). Passwords are never returned, only whether one
+     * is saved.
      *
-     * @return array{subdomain: string, username: string, hasPassword: bool, websiteAccount: bool, verified: bool,
-     *     shared: array{subdomain: string, username: string, hasPassword: bool}}
+     * @return array{enabled: bool, subdomain: string, username: string, hasPassword: bool, websiteAccount: bool,
+     *     verified: bool, shared: array{subdomain: string, username: string, hasPassword: bool}}
      */
     public function getTransactionalAccount(): array
     {
         $websiteId = $this->websiteContext->getWebsiteId();
 
         return [
+            'enabled' => $this->config->isTransactionalEnabled($websiteId),
             'subdomain' => $this->config->getTransactionalSubdomain($websiteId),
             'username' => $this->config->getTransactionalUsername($websiteId),
             'hasPassword' => $this->config->getTransactionalPassword($websiteId) !== '',
@@ -477,6 +480,15 @@ class WizardData implements ArgumentInterface
                 'hasPassword' => $this->config->getTransactionalPassword(null) !== '',
             ],
         ];
+    }
+
+    /**
+     * The selected website's Customer details switch of the transactional
+     * emails (PRO-4065, off by default).
+     */
+    public function isTransactionalPersonalDataEnabled(): bool
+    {
+        return $this->config->isTransactionalPersonalDataEnabled($this->websiteContext->getWebsiteId());
     }
 
     /**

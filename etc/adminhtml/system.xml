@@ -171,6 +171,11 @@
                    showInDefault="1" showInWebsite="1" showInStore="0">
                 <label>Transactional Emails</label>
                 <comment>A separate Smaily account for order and shipment emails, saved for all websites; a website may use its own. Nothing is sent through it yet.</comment>
+                <field id="enabled" translate="label" type="select" sortOrder="5"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Send Transactional Emails</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
                 <field id="subdomain" translate="label" type="text" sortOrder="10"
                        showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Subdomain</label>
@@ -192,7 +197,12 @@
                 </field>
                 <field id="shipment_confirmation_enabled" translate="label" type="select" sortOrder="50"
                        showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
-                    <label>Shipment Confirmation</label>
+                    <label>Shipping Confirmation</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="personal_data_enabled" translate="label" type="select" sortOrder="60"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Customer Details</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
             </group>

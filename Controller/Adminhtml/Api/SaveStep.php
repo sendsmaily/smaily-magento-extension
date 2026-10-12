@@ -30,8 +30,9 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * changes without a reload (PRO-3570), and whether it changed the
  * storefront address, so the result can ask for the catalog import again
  * (PRO-3660). A connection save that carried the transactional-email
- * account (Settings > Connection) answers whether Smaily accepted it, so the
- * Automations tab shows its triggers without a reload (PRO-4062).
+ * account (Settings > Connection, "Send transactional emails" on) answers
+ * whether Smaily accepted it, so the Automations tab shows its triggers
+ * without a reload (PRO-4062).
  *
  * Persists one wizard step. All writes go to the same system config paths
  * the Stores > Configuration page edits — the wizard is an onboarding view
@@ -70,7 +71,7 @@ class SaveStep extends AbstractJsonAction implements HttpPostActionInterface
             $response['verified'] = $this->stepSaver->isConnectionAccepted();
             $response['accountName'] = $this->normalizer->normalize((string)($data['subdomain'] ?? ''));
             $response['storefrontUrlChanged'] = $this->stepSaver->isStorefrontUrlChanged();
-            if (is_array($data['transactional'] ?? null)) {
+            if (is_array($data['transactional'] ?? null) && !empty($data['transactional']['enabled'])) {
                 $response['transactionalVerified'] = $this->stepSaver->isTransactionalAccepted();
             }
         }

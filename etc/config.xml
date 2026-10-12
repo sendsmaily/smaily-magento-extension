@@ -30,8 +30,10 @@
                 <abandoned_cutoff>30</abandoned_cutoff>
             </automations>
             <transactional>
+                <enabled>0</enabled>
                 <order_confirmation_enabled>0</order_confirmation_enabled>
                 <shipment_confirmation_enabled>0</shipment_confirmation_enabled>
+                <personal_data_enabled>0</personal_data_enabled>
             </transactional>
             <rss>
                 <enabled>1</enabled>

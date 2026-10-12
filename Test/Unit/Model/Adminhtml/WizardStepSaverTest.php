@@ -16,6 +16,7 @@ use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Adminhtml\SetupNotice;
+use Smaily\Connect\Model\Adminhtml\TransactionalSettingsSaver;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
@@ -64,6 +65,9 @@ class WizardStepSaverTest extends TestCase
     /** @var SetupNotice&\PHPUnit\Framework\MockObject\MockObject */
     private $setupNotice;
 
+    /** @var TransactionalSettingsSaver&\PHPUnit\Framework\MockObject\MockObject */
+    private $transactionalSaver;
+
     /** @var array<int, array{path: string, value: mixed, scope: string, scopeId: int}> */
     private array $saved = [];
 
@@ -88,6 +92,7 @@ class WizardStepSaverTest extends TestCase
         $this->mappingSaver = $this->createMock(MappingSaver::class);
         $this->websiteContext = $this->createMock(WebsiteContext::class);
         $this->setupNotice = $this->createMock(SetupNotice::class);
+        $this->transactionalSaver = $this->createMock(TransactionalSettingsSaver::class);
 
         $this->saved = [];
         $this->configWriter->method('save')->willReturnCallback(
@@ -116,7 +121,8 @@ class WizardStepSaverTest extends TestCase
             $this->clientProvider,
             new ConfigRowNormalizer(),
             new CredentialCheck($this->clientFactory, $this->config),
-            $this->setupNotice
+            $this->setupNotice,
+            $this->transactionalSaver
         );
     }
 
@@ -860,7 +866,8 @@ class WizardStepSaverTest extends TestCase
             $this->clientProvider,
             new ConfigRowNormalizer(),
             new CredentialCheck($this->clientFactory, $config),
-            $this->setupNotice
+            $this->setupNotice,
+            $this->createMock(TransactionalSettingsSaver::class)
         );
 
         $errors = $saver->save('connect', [
@@ -898,6 +905,70 @@ class WizardStepSaverTest extends TestCase
         self::assertSame($expectedScope, $this->savedScope(Config::XML_PATH_SYNC_ENABLED));
         self::assertSame($expectedScope, $this->savedScope(Config::XML_PATH_SYNC_MODE));
         self::assertSame($expectedScope, $this->savedScope(Config::XML_PATH_SYNC_FIELDS));
+    }
+
+    /**
+     * PRO-4062: the transactional-email account on Settings > Connection is
+     * checked before anything is saved; a refused one saves nothing.
+     */
+    public function testATransactionalAccountErrorSavesNothing(): void
+    {
+        $error = ['field' => 'transactional.password', 'message' => 'Enter it.'];
+        $this->transactionalSaver->method('accountErrors')->willReturn([$error]);
+        $this->transactionalSaver->expects(self::never())->method('saveAccount');
+
+        $errors = $this->saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'transactional' => ['subdomain' => 'other', 'username' => 'api', 'password' => ''],
+        ]);
+
+        self::assertSame([$error], $errors);
+        self::assertSame([], $this->saved);
+    }
+
+    public function testATransactionalAccountIsSavedWithTheConnection(): void
+    {
+        $this->websiteContext->method('getWebsiteId')->willReturn(4);
+        $account = ['subdomain' => 'demo-tx', 'username' => 'api', 'password' => 'secret'];
+        $this->transactionalSaver->method('accountErrors')->willReturn([]);
+        $this->transactionalSaver->expects(self::once())->method('saveAccount')->with($account, 4);
+        $this->transactionalSaver->method('isAccountAccepted')->willReturn(true);
+
+        $errors = $this->saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'transactional' => $account,
+        ]);
+
+        self::assertSame([], $errors);
+        self::assertSame('demo', $this->savedValue(Config::XML_PATH_SUBDOMAIN));
+        self::assertTrue($this->saver->isTransactionalAccepted());
+    }
+
+    /**
+     * The initial setup posts no transactional-email settings, and a save
+     * without them leaves them as they are.
+     */
+    public function testSavesWithoutTransactionalSettingsLeaveThem(): void
+    {
+        $this->transactionalSaver->expects(self::never())->method('accountErrors');
+        $this->transactionalSaver->expects(self::never())->method('saveAccount');
+        $this->transactionalSaver->expects(self::never())->method('saveTriggers');
+
+        $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'password' => 'secret']);
+        $this->saver->save('automations', ['welcome_enabled' => false]);
+    }
+
+    public function testTransactionalTriggersAreSavedWithTheAutomations(): void
+    {
+        $this->websiteContext->method('getWebsiteId')->willReturn(4);
+        $triggers = ['order_confirmation_enabled' => true, 'shipment_confirmation_enabled' => false, 'mappings' => []];
+        $this->transactionalSaver->expects(self::once())->method('saveTriggers')->with($triggers, 4)->willReturn([]);
+
+        self::assertSame([], $this->saver->save('automations', ['welcome_enabled' => false, 'transactional' => $triggers]));
     }
 
     public function testAutomationTogglesAndWorkflowsAreSavedAtWebsiteScope(): void

@@ -70,6 +70,22 @@ class SmailyClientTest extends TestCase
         self::assertSame('trigger_type=form_submitted', $request->getUri()->getQuery());
     }
 
+    /**
+     * PRO-4062: the transactional-email settings list the account's active
+     * workflows, as the WooCommerce plugin's transactional settings do.
+     */
+    public function testGetTransactionalWorkflowsListsTheActiveWorkflows(): void
+    {
+        $client = $this->createClient([
+            new Response(200, [], '[{"id": 4, "name": "Order confirmation", "status": "ACTIVE"}, {"name": "No id"}]'),
+        ]);
+
+        self::assertSame([['id' => 4, 'title' => 'Order confirmation']], $client->getTransactionalWorkflows());
+        $request = $this->request(0);
+        self::assertSame('/api/autoresponder.php', $request->getUri()->getPath());
+        self::assertSame('status=ACTIVE', $request->getUri()->getQuery());
+    }
+
     public function testGetAutomationWorkflowsFiltersDisabledWorkflows(): void
     {
         $client = $this->createClient([

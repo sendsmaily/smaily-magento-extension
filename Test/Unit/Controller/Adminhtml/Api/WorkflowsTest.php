@@ -15,6 +15,8 @@ use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Controller\Adminhtml\Api\Workflows;
+use Smaily\Connect\Model\Adminhtml\WebsiteContext;
+use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\SubdomainNormalizer;
@@ -59,7 +61,8 @@ class WorkflowsTest extends TestCase
             new JsonSerializer(),
             $clientFactory,
             $clientProvider,
-            new SubdomainNormalizer()
+            new SubdomainNormalizer(),
+            $this->createMock(WebsiteContext::class)
         ))->execute();
 
         self::assertSame([], $this->response['workflows']);
@@ -68,6 +71,48 @@ class WorkflowsTest extends TestCase
             . ' letters, digits and hyphens only.',
             $this->response['error']
         );
+    }
+
+    /**
+     * PRO-4062: the transactional-email triggers list the workflows of the
+     * transactional account saved for the selected website, never the
+     * marketing account's.
+     */
+    public function testTheTransactionalAccountListsItsOwnWorkflows(): void
+    {
+        $client = $this->createMock(SmailyClient::class);
+        $client->method('getTransactionalWorkflows')->willReturn([['id' => 4, 'title' => 'Order confirmation']]);
+        $client->expects(self::never())->method('getAutomationWorkflows');
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->expects(self::once())->method('forTransactional')->with(2)->willReturn($client);
+        $clientProvider->expects(self::never())->method('forStore');
+
+        $request = $this->createMock(HttpRequest::class);
+        $request->method('getContent')->willReturn((string)json_encode(['account' => 'transactional']));
+        $context = $this->createMock(Context::class);
+        $context->method('getRequest')->willReturn($request);
+        $result = $this->createMock(Json::class);
+        $result->method('setData')->willReturnCallback(function (array $data) use ($result) {
+            $this->response = $data;
+
+            return $result;
+        });
+        $jsonFactory = $this->createMock(JsonFactory::class);
+        $jsonFactory->method('create')->willReturn($result);
+        $websiteContext = $this->createMock(WebsiteContext::class);
+        $websiteContext->method('getWebsiteId')->willReturn(2);
+
+        (new Workflows(
+            $context,
+            $jsonFactory,
+            new JsonSerializer(),
+            $this->createMock(SmailyClientFactory::class),
+            $clientProvider,
+            new SubdomainNormalizer(),
+            $websiteContext
+        ))->execute();
+
+        self::assertSame(['workflows' => [['id' => '4', 'name' => 'Order confirmation']]], $this->response);
     }
 
     /**

@@ -170,6 +170,42 @@ class ModuleDefinitionTest extends TestCase
         $sensitive = array_map('strval', $items ?: []);
 
         self::assertContains(\Smaily\Connect\Model\Config::XML_PATH_PASSWORD, $sensitive);
+        self::assertContains(\Smaily\Connect\Model\Config::XML_PATH_TRANSACTIONAL_PASSWORD, $sensitive);
         self::assertContains(\Smaily\Connect\Model\Engine\Settings::XML_PATH_API_KEY, $sensitive);
+    }
+
+    /**
+     * The transactional-email settings (PRO-4062) send nothing yet, so
+     * Magento's own order and shipment emails go out as before: no plugin or
+     * preference on Magento's sales email senders or its mail transport, and
+     * no observer of an email event, in any area.
+     */
+    public function testNothingHooksMagentosOrderOrShipmentEmails(): void
+    {
+        $hooked = [];
+        $etc = self::PACKAGE_ROOT . '/etc';
+        foreach ([$etc . '/di.xml', ...(glob($etc . '/*/di.xml') ?: [])] as $file) {
+            $xml = simplexml_load_file($file);
+            self::assertNotFalse($xml);
+            foreach ($xml->xpath('//type[plugin]/@name | //preference/@for') ?: [] as $name) {
+                $class = ltrim((string)$name, '\\');
+                if (str_starts_with($class, 'Magento\\Sales\\Model\\Order\\Email\\')
+                    || str_starts_with($class, 'Magento\\Framework\\Mail\\')
+                ) {
+                    $hooked[] = basename(dirname($file)) . '/di.xml: ' . $name;
+                }
+            }
+        }
+        foreach ([$etc . '/events.xml', ...(glob($etc . '/*/events.xml') ?: [])] as $file) {
+            $xml = simplexml_load_file($file);
+            self::assertNotFalse($xml);
+            foreach ($xml->xpath('//event/@name') ?: [] as $name) {
+                if (str_starts_with((string)$name, 'email_')) {
+                    $hooked[] = basename(dirname($file)) . '/events.xml: ' . $name;
+                }
+            }
+        }
+
+        self::assertSame([], $hooked);
     }
 }

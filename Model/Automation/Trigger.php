@@ -23,6 +23,20 @@ class Trigger
         self::ABANDONED_CART,
     ];
 
+    public const ORDER_CONFIRMATION = 'order_confirmation';
+    public const SHIPMENT_CONFIRMATION = 'shipment_confirmation';
+
+    /**
+     * Transactional-email triggers (PRO-4062): their workflows are mapped per
+     * store language in smaily_automation_mapping under the account key
+     * Mapping::ACCOUNT_TRANSACTIONAL. Kept out of ALL, so the marketing
+     * automations save never touches their rows. Nothing sends them yet.
+     */
+    public const TRANSACTIONAL = [
+        self::ORDER_CONFIRMATION,
+        self::SHIPMENT_CONFIRMATION,
+    ];
+
     /**
      * Trigger slug => the Smaily contact field recording when this automation
      * last ran for the contact. Cross-platform canon (Erkki 2026-08-04): the

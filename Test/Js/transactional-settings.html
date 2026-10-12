@@ -1,0 +1,240 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the transactional-email settings of Settings
+  (PRO-4062): the real templates (view/adminhtml/templates/panel/
+  transactional-account.phtml, transactional-triggers.phtml and
+  panels-js.phtml), rendered in en_US and et_EE by Test/Js/render-admin.php
+  into Test/Js/build/, run with jQuery from vendor/, one fresh frame per
+  scenario. Stubbed: only the requests (fetch): the workflow list answers
+  two workflows, a save answers saved and the transactional account
+  accepted, a test answers connected. Without a connected account the
+  Automations tab shows only the pointer to the Connection tab and asks for
+  no workflow list; a connection save that connects it shows the triggers,
+  off, with workflows listed from the transactional account. With one
+  connected, the triggers show at once with a workflow per language and the
+  saved default fallback, and Save Automations posts them; the account's
+  password is never drawn into the form; unticking "Use a separate account
+  for this website" shows the account saved for all websites, and a test of
+  an unchanged account asks for the saved one. Run it with bin/test-js.sh
+  (it renders the pages first); the page ends with "RESULT: PASS" or
+  "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>transactional settings harness</title>
+    <script src="build/transactional-off.en_US.js"></script>
+    <script src="build/transactional-off.et_EE.js"></script>
+    <script src="build/transactional-connected.en_US.js"></script>
+    <script src="build/transactional-connected.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var POINTER = 'Connect your transactional Smaily account on the Connection tab to set up order and shipment confirmations.';
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    // Runs in the frame before the page: the admin's form key, and the
+    // requests, each recorded and answered by its endpoint.
+    function stubs() {
+        return [
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.requests = [];',
+            'window.fetch = function (url, options) {',
+            '  var body = JSON.parse(options.body || "{}"), answer;',
+            '  window.requests.push({url: url, body: body});',
+            '  if (url.indexOf("/workflows/") !== -1) {',
+            '    answer = {workflows: [{id: "31", name: "Tellimus"}, {id: "32", name: "Order"}]};',
+            '  } else if (url.indexOf("/testsmaily/") !== -1) {',
+            '    answer = {connected: true, checked: true};',
+            '  } else {',
+            '    answer = {saved: true, errors: [], verified: true, transactionalVerified: true};',
+            '  }',
+            '  return Promise.resolve(new Response(JSON.stringify(answer),',
+            '    {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>'
+        ].join('\n');
+    }
+
+    function open(page) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.onload = function () {
+                wait(50).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs()
+                + '</head><body>' + rendered.html
+                + '<script>window.panels = window.smailyPanelsInit(window.jQuery); window.panels.initAll();<\/script>'
+                + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function shown(doc, id) {
+        var element = doc.getElementById(id);
+
+        return element !== null && element.style.display !== 'none';
+    }
+
+    function workflowRequests(frame) {
+        return frame.contentWindow.requests.filter(function (request) {
+            return request.url.indexOf('/workflows/') !== -1 && request.body.account === 'transactional';
+        });
+    }
+
+    async function run(locale) {
+        var strings = window.smailyAdminPages['transactional-off.' + locale].strings,
+            frame,
+            doc,
+            panels,
+            data,
+            requests;
+
+        log('# ' + locale);
+
+        // No transactional account: only the pointer.
+        frame = await open('transactional-off.' + locale);
+        doc = frame.contentDocument;
+        panels = frame.contentWindow.panels;
+        check(locale + ', not connected: the Automations tab shows only the pointer to the Connection tab',
+            shown(doc, 'smaily-tx-pointer') && !shown(doc, 'smaily-tx-triggers')
+            && doc.getElementById('smaily-tx-pointer').textContent.trim() === strings[POINTER]);
+        check(locale + ', not connected: the Connection tab says Not connected',
+            doc.getElementById('smaily-tx-test-result').textContent.trim() === strings['Not connected']);
+        check(locale + ', one website: no "Use a separate account for this website"',
+            doc.getElementById('smaily-tx-website-account') === null);
+        await panels.loadWorkflows(null);
+        await wait(20);
+        check(locale + ', not connected: no transactional workflow list is asked for',
+            workflowRequests(frame).length === 0);
+        check(locale + ', not connected: Save Automations posts no transactional settings',
+            !Object.prototype.hasOwnProperty.call(panels.collect.automations(), 'transactional'));
+
+        // A connection save that connects the account shows the triggers.
+        await panels.saveStep('connect', {
+            subdomain: 'demo',
+            username: 'api',
+            transactional: {subdomain: 'shop-tx', username: 'api', password: 'secret', website_account: false}
+        });
+        await wait(20);
+        check(locale + ', connected by a save: the triggers show and the pointer goes',
+            shown(doc, 'smaily-tx-triggers') && !shown(doc, 'smaily-tx-pointer'));
+        check(locale + ', connected by a save: the Connection tab says Connected',
+            doc.getElementById('smaily-tx-test-result').textContent.trim() === strings.Connected);
+        requests = workflowRequests(frame);
+        check(locale + ', connected by a save: the workflows are listed from the transactional account',
+            requests.length === 1 && requests[0].body.account === 'transactional');
+        check(locale + ', connected by a save: both triggers are off by default',
+            !doc.getElementById('smaily-tx-order_confirmation-enabled').checked
+            && !doc.getElementById('smaily-tx-shipment_confirmation-enabled').checked);
+        check(locale + ', one language: each trigger has one workflow, listed from the account',
+            doc.querySelectorAll('.smaily-tx-workflow').length === 2
+            && doc.querySelector('.smaily-tx-workflow').options.length === 3);
+        doc.getElementById('smaily-tx-order_confirmation-enabled').checked = true;
+        doc.querySelector('.smaily-tx-workflow[data-trigger=order_confirmation]').value = '32';
+        data = panels.collect.automations().transactional;
+        check(locale + ', Save Automations posts the triggers and their workflow',
+            data.order_confirmation_enabled === true && data.shipment_confirmation_enabled === false
+            && data.mappings.length === 1 && data.mappings[0].trigger_type === 'order_confirmation'
+            && data.mappings[0].language === 'default' && data.mappings[0].workflow_id === 32);
+        frame.remove();
+
+        // A website of a multi-website install with its own account connected.
+        frame = await open('transactional-connected.' + locale);
+        doc = frame.contentDocument;
+        panels = frame.contentWindow.panels;
+        check(locale + ', connected: the triggers show at once',
+            shown(doc, 'smaily-tx-triggers') && !shown(doc, 'smaily-tx-pointer'));
+        check(locale + ', connected: the password is never drawn into the form',
+            doc.getElementById('smaily-tx-password').value === ''
+            && doc.getElementById('smaily-tx-account').outerHTML.indexOf('secret') === -1);
+        await panels.loadWorkflows(null);
+        await wait(20);
+        check(locale + ', two languages: a workflow per language, the saved ones selected',
+            doc.querySelectorAll('.smaily-tx-workflow[data-trigger=order_confirmation]').length === 2
+            && doc.querySelector('.smaily-tx-workflow[data-language=et][data-trigger=order_confirmation]').value === '31'
+            && doc.querySelector('.smaily-tx-workflow[data-language=en][data-trigger=order_confirmation]').value === '32');
+        data = panels.collect.automations().transactional;
+        check(locale + ', Save Automations posts both languages and the saved default fallback',
+            data.mappings.length === 2 && data.mappings[0].is_default_fallback === true
+            && data.mappings[1].is_default_fallback === false);
+        check(locale + ', the website\'s own account is shown, its box ticked',
+            doc.getElementById('smaily-tx-website-account').checked
+            && doc.getElementById('smaily-tx-subdomain').value === 'ee-tx');
+        doc.getElementById('smaily-tx-test').click();
+        await wait(20);
+        requests = frame.contentWindow.requests.filter(function (request) {
+            return request.url.indexOf('/testsmaily/') !== -1;
+        });
+        check(locale + ', an unchanged account is tested with its saved password',
+            requests.length === 1 && requests[0].body.account === 'transactional'
+            && requests[0].body.website_account === true && !('password' in requests[0].body));
+        doc.getElementById('smaily-tx-website-account').checked = false;
+        frame.contentWindow.jQuery('#smaily-tx-website-account').trigger('change');
+        check(locale + ', unticked: the account saved for all websites is shown',
+            doc.getElementById('smaily-tx-subdomain').value === 'shop-tx'
+            && doc.getElementById('smaily-tx-username').value === 'api');
+        frame.remove();
+    }
+
+    run('en_US').then(function () {
+        return run('et_EE');
+    }).then(function () {
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    }).catch(function (error) {
+        document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }).then(function () {
+        clearInterval(keepAlive);
+    });
+</script>
+</body>
+</html>

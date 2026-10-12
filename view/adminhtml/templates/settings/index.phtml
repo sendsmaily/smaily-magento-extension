@@ -60,6 +60,7 @@ $tabs = [
         <h3><?= $escaper->escapeHtml(__('Connection')) ?></h3>
         <p class="smaily-tab-desc"><?= $escaper->escapeHtml(__('Your Smaily API credentials for this store.')) ?></p>
         <?= $block->getChildHtml('panel.connection') ?>
+        <?= $block->getChildHtml('panel.transactional.account') ?>
         <div class="smaily-tab-footer">
             <button type="button" class="action-secondary" id="smaily-w-test">
                 <span><?= $escaper->escapeHtml(__('Test connection')) ?></span>
@@ -85,6 +86,7 @@ $tabs = [
         <h3><?= $escaper->escapeHtml(__('Automations')) ?></h3>
         <p class="smaily-tab-desc"><?= $escaper->escapeHtml(__('How store events and Campaign Intelligence triggers fire Smaily workflows.')) ?></p>
         <?= $block->getChildHtml('panel.automations') ?>
+        <?= $block->getChildHtml('panel.transactional.triggers') ?>
         <div class="smaily-tab-footer">
             <button type="button" class="action-primary" id="smaily-w-automations-save">
                 <span><?= $escaper->escapeHtml(__('Save Automations')) ?></span>

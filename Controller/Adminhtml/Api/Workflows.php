@@ -13,6 +13,7 @@ use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
+use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Client\Exception\InvalidSubdomainException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClientFactory;
@@ -28,6 +29,10 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * list is fetched with those; otherwise the saved credentials for the given
  * store scope are used. This is what lets the workflow dropdowns fill in
  * WITHOUT saving the configuration first.
+ *
+ * `{account: "transactional"}` lists the workflows of the transactional-email
+ * account saved for the selected website instead (PRO-4062): its trigger
+ * settings show only once that account is saved and connected.
  */
 class Workflows extends AbstractJsonAction implements HttpPostActionInterface
 {
@@ -37,7 +42,8 @@ class Workflows extends AbstractJsonAction implements HttpPostActionInterface
         JsonSerializer $serializer,
         private readonly SmailyClientFactory $clientFactory,
         private readonly SmailyClientProvider $clientProvider,
-        private readonly SubdomainNormalizer $normalizer
+        private readonly SubdomainNormalizer $normalizer,
+        private readonly WebsiteContext $websiteContext
     ) {
         parent::__construct($context, $jsonFactory, $serializer);
     }
@@ -53,6 +59,15 @@ class Workflows extends AbstractJsonAction implements HttpPostActionInterface
         $password = (string)($body['password'] ?? '');
 
         try {
+            if (($body['account'] ?? null) === 'transactional') {
+                $workflows = [];
+                $client = $this->clientProvider->forTransactional($this->websiteContext->getWebsiteId());
+                foreach ($client->getTransactionalWorkflows() as $workflow) {
+                    $workflows[] = ['id' => (string)$workflow['id'], 'name' => $workflow['title']];
+                }
+
+                return $this->jsonResponse(['workflows' => $workflows]);
+            }
             if ($subdomain !== '' && !SmailyUrl::isPlainSubdomain($subdomain)) {
                 throw new InvalidSubdomainException();
             }

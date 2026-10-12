@@ -73,6 +73,19 @@ class VerifiedCredentials
         return $this->isRemembered(self::PLAN_BLOCKED_FLAG_CODE, $this->websiteCredentials($websiteId));
     }
 
+    /**
+     * Whether Smaily accepted the transactional-email account saved for this
+     * website (PRO-4062) — the gate of its trigger settings.
+     */
+    public function isTransactionalVerified(int $websiteId): bool
+    {
+        return $this->isRemembered(self::FLAG_CODE, [
+            $this->config->getTransactionalSubdomain($websiteId),
+            $this->config->getTransactionalUsername($websiteId),
+            $this->config->getTransactionalPassword($websiteId),
+        ]);
+    }
+
     public function accept(string $subdomain, string $username, string $password): void
     {
         $fingerprint = $this->fingerprint($subdomain, $username, $password);

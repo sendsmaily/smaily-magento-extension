@@ -35,6 +35,13 @@ class VerifiedCredentialsTest extends TestCase
      */
     private array $websiteSaved = ['subdomain' => '', 'username' => '', 'password' => ''];
 
+    /**
+     * The transactional-email account saved for the website (PRO-4062).
+     *
+     * @var array{subdomain: string, username: string, password: string}
+     */
+    private array $transactionalSaved = ['subdomain' => '', 'username' => '', 'password' => ''];
+
     private VerifiedCredentials $verified;
 
     protected function setUp(): void
@@ -62,11 +69,41 @@ class VerifiedCredentialsTest extends TestCase
         $config->method('getWebsiteSubdomain')->willReturnCallback(fn () => $this->websiteSaved['subdomain']);
         $config->method('getWebsiteUsername')->willReturnCallback(fn () => $this->websiteSaved['username']);
         $config->method('getWebsitePassword')->willReturnCallback(fn () => $this->websiteSaved['password']);
+        $config->method('getTransactionalSubdomain')->willReturnCallback(
+            fn () => $this->transactionalSaved['subdomain']
+        );
+        $config->method('getTransactionalUsername')->willReturnCallback(
+            fn () => $this->transactionalSaved['username']
+        );
+        $config->method('getTransactionalPassword')->willReturnCallback(
+            fn () => $this->transactionalSaved['password']
+        );
         $config->method('isConnected')->willReturnCallback(
             fn () => !in_array('', $this->saved, true)
         );
 
         $this->verified = new VerifiedCredentials($flagManager, $encryptor, $config);
+    }
+
+    /**
+     * PRO-4062: the transactional-email account is connected only when
+     * Smaily accepted that account itself — not the marketing account.
+     */
+    public function testTheTransactionalAccountIsConnectedOnlyOnceSmailyAcceptedIt(): void
+    {
+        $this->save('demo', 'user', 'secret');
+        $this->verified->accept('demo', 'user', 'secret');
+        $this->transactionalSaved = ['subdomain' => 'demo-tx', 'username' => 'tx', 'password' => 'tx-secret'];
+
+        self::assertFalse($this->verified->isTransactionalVerified(1));
+
+        $this->verified->accept('demo-tx', 'tx', 'tx-secret');
+
+        self::assertTrue($this->verified->isTransactionalVerified(1));
+
+        $this->transactionalSaved = ['subdomain' => '', 'username' => '', 'password' => ''];
+
+        self::assertFalse($this->verified->isTransactionalVerified(1), 'A removed account is not connected');
     }
 
     public function testMissingCredentialsAreNotConnected(): void

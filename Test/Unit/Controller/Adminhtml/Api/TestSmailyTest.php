@@ -15,6 +15,7 @@ use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Controller\Adminhtml\Api\TestSmaily;
+use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
 use Smaily\Connect\Model\Client\Exception\PlanBlockedException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
@@ -219,12 +220,57 @@ class TestSmailyTest extends TestCase
     }
 
     /**
+     * PRO-4062: the transactional-email account block re-tests a saved
+     * account by `account` alone: the website's own with `website_account`,
+     * else the one saved for all websites.
+     *
+     * @dataProvider savedTransactionalProvider
+     * @param array<string, mixed> $body
+     */
+    public function testTheSavedTransactionalAccountIsTestedByAccountAlone(array $body, ?int $websiteId): void
+    {
+        $client = $this->createMock(SmailyClient::class);
+        $client->expects(self::once())->method('validateCredentials');
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->expects(self::once())->method('forTransactional')->with($websiteId)->willReturn($client);
+        $clientProvider->expects(self::never())->method('forStore');
+
+        $this->controller($body, $this->createMock(SmailyClientFactory::class), $clientProvider, 4)->execute();
+
+        self::assertTrue($this->response['connected']);
+    }
+
+    /**
+     * @return array<string, array{array<string, mixed>, ?int}>
+     */
+    public static function savedTransactionalProvider(): array
+    {
+        return [
+            'the account saved for all websites' => [['account' => 'transactional'], null],
+            'the own account of the website' => [['account' => 'transactional', 'website_account' => true], 4],
+        ];
+    }
+
+    public function testNoSavedTransactionalAccountAsksForTheCredentials(): void
+    {
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->method('forTransactional')->willThrowException(new SmailyClientException('not configured'));
+
+        $this->controller(['account' => 'transactional'], $this->createMock(SmailyClientFactory::class), $clientProvider)
+            ->execute();
+
+        self::assertFalse($this->response['checked']);
+        self::assertSame('Please fill in the subdomain, username and password.', $this->response['error']);
+    }
+
+    /**
      * @param array<string, mixed> $body
      */
     private function controller(
         array $body,
         SmailyClientFactory $clientFactory,
-        SmailyClientProvider $clientProvider
+        SmailyClientProvider $clientProvider,
+        int $websiteId = 1
     ): TestSmaily {
         $request = $this->createMock(HttpRequest::class);
         $request->method('getContent')->willReturn((string)json_encode($body));
@@ -239,6 +285,8 @@ class TestSmailyTest extends TestCase
         });
         $jsonFactory = $this->createMock(JsonFactory::class);
         $jsonFactory->method('create')->willReturn($result);
+        $websiteContext = $this->createMock(WebsiteContext::class);
+        $websiteContext->method('getWebsiteId')->willReturn($websiteId);
 
         return new TestSmaily(
             $context,
@@ -246,7 +294,8 @@ class TestSmailyTest extends TestCase
             new JsonSerializer(),
             $clientFactory,
             $clientProvider,
-            new SubdomainNormalizer()
+            new SubdomainNormalizer(),
+            $websiteContext
         );
     }
 
@@ -284,7 +333,8 @@ class TestSmailyTest extends TestCase
             new JsonSerializer(),
             $clientFactory,
             $this->createMock(SmailyClientProvider::class),
-            $normalizer
+            $normalizer,
+            $this->createMock(WebsiteContext::class)
         ))->execute();
     }
 }

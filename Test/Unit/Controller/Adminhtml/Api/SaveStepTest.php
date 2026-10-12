@@ -91,6 +91,23 @@ class SaveStepTest extends TestCase
         self::assertTrue($this->response['storefrontUrlChanged']);
     }
 
+    /**
+     * PRO-4062: a connection save that carried the transactional-email
+     * account answers whether Smaily accepted it.
+     */
+    public function testAConnectionSaveWithTheTransactionalAccountAnswersItsCheck(): void
+    {
+        $body = ['step' => 'connect', 'data' => [
+            'subdomain' => 'demo',
+            'username' => 'u',
+            'transactional' => ['subdomain' => 'demo-tx', 'username' => 'u', 'password' => 'p'],
+        ]];
+
+        $this->controller($body, $this->createMock(VerifiedCredentials::class), [], true, false, true)->execute();
+
+        self::assertTrue($this->response['transactionalVerified']);
+    }
+
     public function testARefusedConnectionSaveAnswersOnlyTheErrors(): void
     {
         $errors = [['field' => 'subdomain', 'message' => 'Subdomain and username are required.']];
@@ -123,7 +140,8 @@ class SaveStepTest extends TestCase
         VerifiedCredentials $verifiedCredentials,
         array $errors = [],
         bool $connectionAccepted = false,
-        bool $storefrontUrlChanged = false
+        bool $storefrontUrlChanged = false,
+        bool $transactionalAccepted = false
     ): SaveStep {
         $request = $this->createMock(HttpRequest::class);
         $request->method('getContent')->willReturn((string)json_encode($body));
@@ -143,6 +161,7 @@ class SaveStepTest extends TestCase
         $stepSaver->method('save')->willReturn($errors);
         $stepSaver->method('isConnectionAccepted')->willReturn($connectionAccepted);
         $stepSaver->method('isStorefrontUrlChanged')->willReturn($storefrontUrlChanged);
+        $stepSaver->method('isTransactionalAccepted')->willReturn($transactionalAccepted);
         $websiteContext = $this->createMock(WebsiteContext::class);
         $websiteContext->method('getWebsiteId')->willReturn(3);
 

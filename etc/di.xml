@@ -115,6 +115,7 @@
         <arguments>
             <argument name="sensitive" xsi:type="array">
                 <item name="smaily_connect/connection/password" xsi:type="string">1</item>
+                <item name="smaily_connect/transactional/password" xsi:type="string">1</item>
                 <item name="smaily_connect/intelligence/api_key" xsi:type="string">1</item>
             </argument>
         </arguments>

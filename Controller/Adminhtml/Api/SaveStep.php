@@ -21,7 +21,7 @@ use Smaily\Connect\Model\SubdomainNormalizer;
 /**
  * POST {step: connect|subscribers|automations|intelligence|finish, data: {...}}
  * -> {saved: bool, errors: [{field, message}], verified?: bool, accountName?: string,
- *     storefrontUrlChanged?: bool}
+ *     storefrontUrlChanged?: bool, transactionalVerified?: bool}
  *
  * The finish step also answers whether Smaily accepted the saved
  * credentials at the last check (PRO-3560), for the Overview step's copy.
@@ -29,7 +29,9 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * just saved, and the account they belong to, so the Connection status
  * changes without a reload (PRO-3570), and whether it changed the
  * storefront address, so the result can ask for the catalog import again
- * (PRO-3660).
+ * (PRO-3660). A connection save that carried the transactional-email
+ * account (Settings > Connection) answers whether Smaily accepted it, so the
+ * Automations tab shows its triggers without a reload (PRO-4062).
  *
  * Persists one wizard step. All writes go to the same system config paths
  * the Stores > Configuration page edits — the wizard is an onboarding view
@@ -68,6 +70,9 @@ class SaveStep extends AbstractJsonAction implements HttpPostActionInterface
             $response['verified'] = $this->stepSaver->isConnectionAccepted();
             $response['accountName'] = $this->normalizer->normalize((string)($data['subdomain'] ?? ''));
             $response['storefrontUrlChanged'] = $this->stepSaver->isStorefrontUrlChanged();
+            if (is_array($data['transactional'] ?? null)) {
+                $response['transactionalVerified'] = $this->stepSaver->isTransactionalAccepted();
+            }
         }
         if ($step === 'finish') {
             $response['verified'] = $this->verifiedCredentials->isWebsiteVerified(

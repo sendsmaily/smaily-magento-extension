@@ -151,8 +151,12 @@ window.smailyPanelsInit = function ($) {
             storefront_url: '#smaily-w-storefront-url'
         };
         var account = /^accounts\.([a-z]{2,3})\.(subdomain|username|password)$/.exec(String(key || ''));
+        var transactional = /^transactional\.(subdomain|username|password)$/.exec(String(key || ''));
         if (plain[key]) {
             return $(plain[key]);
+        }
+        if (transactional) {
+            return $('#smaily-tx-' + transactional[1]);
         }
         if (account) {
             return $('.smaily-ml-account[data-language=' + account[1] + '] .smaily-ml-' + account[2]);
@@ -252,6 +256,9 @@ window.smailyPanelsInit = function ($) {
             if (name === 'connect' && typeof response.verified === 'boolean') {
                 setConnectionStatus(response.verified, response.accountName);
             }
+            if (name === 'connect' && typeof response.transactionalVerified === 'boolean') {
+                transactionalSaved(data.transactional || {}, response.transactionalVerified);
+            }
             if (name === 'connect' && data) {
                 // The saved multilingual state is the new baseline: switching
                 // away again warns again, and saved account blocks may now
@@ -325,6 +332,7 @@ window.smailyPanelsInit = function ($) {
 
     function loadWorkflows(resultSelector) {
         loadMappingWorkflows();
+        loadTransactionalWorkflows();
         return post(urls.workflows, credentials()).then(function (data) {
             fillWorkflows(data.workflows);
             if (data.error && resultSelector) {
@@ -426,6 +434,120 @@ window.smailyPanelsInit = function ($) {
                 fillMappingSelects($selects, data.workflows || []);
             });
         });
+    }
+
+    // --- Transactional emails (Settings only, PRO-4062) ----------------------
+    // The optional transactional-email account on the Connection tab and its
+    // triggers on the Automations tab. The initial setup renders neither, so
+    // every function here finds nothing there.
+    function transactionalFields() {
+        return {
+            subdomain: $('#smaily-tx-subdomain').val(),
+            username: $('#smaily-tx-username').val(),
+            password: $('#smaily-tx-password').val()
+        };
+    }
+
+    // Whether the website uses its own account (installs with more than one
+    // website); otherwise the one saved for all websites.
+    function transactionalOwnAccount() {
+        return $('#smaily-tx-website-account').is(':checked');
+    }
+
+    // Test connection: what is typed, or the saved account when the form
+    // still shows it and the password is left empty (PRO-3690).
+    function transactionalRequestCreds() {
+        var $block = $('#smaily-tx-account');
+        var fields = transactionalFields();
+        if (!fields.password && $block.data('has-password')
+            && !accountChanged(fields, $block.data('saved-subdomain'), $block.data('saved-username'))) {
+            return {account: 'transactional', website_account: transactionalOwnAccount()};
+        }
+        return $.extend({account: 'transactional'}, fields);
+    }
+
+    // The fields show the account the save would write: the website's own,
+    // or the one saved for all websites.
+    function showTransactionalAccount(which) {
+        var $block = $('#smaily-tx-account');
+        var hasPassword = Number($block.data(which + '-has-password')) === 1;
+        $('#smaily-tx-subdomain').val(String($block.data(which + '-subdomain') || ''));
+        $('#smaily-tx-username').val(String($block.data(which + '-username') || ''));
+        $('#smaily-tx-password').val('');
+        $('#smaily-tx-password-note').toggle(hasPassword);
+        $block.data('saved-subdomain', String($block.data(which + '-subdomain') || ''))
+            .data('saved-username', String($block.data(which + '-username') || ''))
+            .data('has-password', hasPassword ? 1 : 0);
+    }
+
+    function transactionalStatus(verified) {
+        var $result = $('#smaily-tx-test-result');
+        if (verified) {
+            result($result, '<?= $escaper->escapeJs(__('Connected')) ?>', true);
+            return;
+        }
+        $result.empty().removeClass('ok err is-working is-saved is-error').addClass('smaily-inline-status is-idle')
+            .append($('<span></span>').text('<?= $escaper->escapeJs(__('Not connected')) ?>'));
+    }
+
+    // The trigger settings show only while Smaily accepts the saved
+    // transactional account; otherwise a pointer to the Connection tab.
+    function transactionalConnected(verified) {
+        $('#smaily-tx-pointer').toggle(!verified);
+        $('#smaily-tx-triggers').toggle(verified);
+        loadTransactionalWorkflows();
+    }
+
+    function transactionalTriggersShown() {
+        var $triggers = $('#smaily-tx-triggers');
+        return $triggers.length > 0 && $triggers[0].style.display !== 'none';
+    }
+
+    // After a connection save that carried the account: it is the saved one
+    // now, and its answer decides whether the triggers show.
+    function transactionalSaved(account, verified) {
+        var $block = $('#smaily-tx-account');
+        var removed = !account.subdomain && !account.username && !account.password;
+        var hasPassword = removed ? 0 : (account.password ? 1 : Number($block.data('has-password')));
+        // Saved for all websites, the website follows it; its own account is
+        // the website's alone. An emptied own account follows the shared one.
+        var targets = account.website_account ? ['own'] : ['shared', 'own'];
+        if (account.website_account && removed) {
+            showTransactionalAccount('shared');
+            $('#smaily-tx-website-account').prop('checked', false);
+            targets = ['own'];
+            account = {subdomain: $block.data('shared-subdomain'), username: $block.data('shared-username')};
+            hasPassword = Number($block.data('shared-has-password'));
+        }
+        targets.forEach(function (which) {
+            $block.data(which + '-subdomain', account.subdomain || '')
+                .data(which + '-username', account.username || '')
+                .data(which + '-has-password', hasPassword);
+        });
+        $block.data('saved-subdomain', account.subdomain || '')
+            .data('saved-username', account.username || '')
+            .data('has-password', hasPassword);
+        $('#smaily-tx-password').val('');
+        $('#smaily-tx-password-note').toggle(hasPassword === 1);
+        transactionalStatus(verified);
+        transactionalConnected(verified);
+    }
+
+    // The workflow lists come from the SAVED transactional account.
+    function loadTransactionalWorkflows() {
+        if (!transactionalTriggersShown()) {
+            return;
+        }
+        post(urls.workflows, {account: 'transactional'}).then(function (data) {
+            fillMappingSelects($('.smaily-tx-workflow'), data.workflows || []);
+        });
+    }
+
+    function withTransactional(data) {
+        if ($('#smaily-tx-account').length) {
+            data.transactional = $.extend(transactionalFields(), {website_account: transactionalOwnAccount()});
+        }
+        return data;
     }
 
     // --- Backfill progress polling (contacts + engine imports) -------------
@@ -783,6 +905,12 @@ window.smailyPanelsInit = function ($) {
         reactAutomationRow('#smaily-w-welcome-enabled', '#smaily-w-welcome-workflow');
         reactAutomationRow('#smaily-w-firstorder-enabled', '#smaily-w-firstorder-workflow');
         reactAutomationRow('#smaily-w-abandoned-enabled', '#smaily-w-abandoned-workflow, #smaily-w-cutoff');
+        ['order_confirmation', 'shipment_confirmation'].forEach(function (trigger) {
+            reactAutomationRow(
+                '#smaily-tx-' + trigger + '-enabled',
+                '.smaily-tx-trigger[data-trigger=' + trigger + '] select, .smaily-tx-trigger[data-trigger=' + trigger + '] input[type=radio]'
+            );
+        });
         reactSubscribersEnabled();
         reactRssEnabled();
 
@@ -869,6 +997,26 @@ window.smailyPanelsInit = function ($) {
                 }
                 showFormErrors($panel, testError(data, ''));
                 result('#smaily-w-test-result', '<?= $escaper->escapeJs(__('Connection failed.')) ?>', false);
+            });
+        });
+
+        $(document).on('change', '#smaily-tx-website-account', function () {
+            showTransactionalAccount($(this).is(':checked') ? 'own' : 'shared');
+        });
+
+        // Transactional-email account test (Settings > Connection, PRO-4062):
+        // shown like the per-language account tests.
+        $('#smaily-tx-test').on('click', function () {
+            var $panel = $(this).closest('.smaily-step-panel, .smaily-tab-panel');
+            clearFormErrors($panel);
+            result('#smaily-tx-test-result', '<?= $escaper->escapeJs(__('Testing…')) ?>', true);
+            post(urls.test, transactionalRequestCreds()).then(function (data) {
+                if (data.connected) {
+                    result('#smaily-tx-test-result', '<?= $escaper->escapeJs(__('Connected!')) ?>', true);
+                    return;
+                }
+                showFormErrors($panel, testError(data, 'transactional.'));
+                result('#smaily-tx-test-result', '<?= $escaper->escapeJs(__('Connection failed.')) ?>', false);
             });
         });
 
@@ -1035,7 +1183,7 @@ window.smailyPanelsInit = function ($) {
                         ['accounts.' + fallback + '.password']
                     );
                 }
-                return withStorefrontUrl({
+                return withTransactional(withStorefrontUrl({
                     // The fallback account's credentials double as the
                     // default-scope credentials (any unmatched scope uses
                     // them), Woo mode-A parity.
@@ -1045,7 +1193,7 @@ window.smailyPanelsInit = function ($) {
                     multilingual_mode: mode,
                     fallback_language: fallback,
                     accounts: accounts
-                });
+                }));
             }
             var creds = credentials();
             if (!connected && (!creds.subdomain || !creds.username || !creds.password)) {
@@ -1062,12 +1210,12 @@ window.smailyPanelsInit = function ($) {
                     ['password']
                 );
             }
-            return withStorefrontUrl({
+            return withTransactional(withStorefrontUrl({
                 subdomain: creds.subdomain,
                 username: creds.username,
                 password: creds.password,
                 multilingual_mode: mode
-            });
+            }));
         },
         subscribers: function () {
             var data = {
@@ -1123,6 +1271,33 @@ window.smailyPanelsInit = function ($) {
                     });
                 });
                 data.mappings = mappings;
+            }
+            // The transactional-email triggers (Settings, PRO-4062), only
+            // while they show: a workflow per store language, the full
+            // desired state. A list not loaded yet posts the saved workflow,
+            // so it is not cleared.
+            if (transactionalTriggersShown()) {
+                var transactionalMappings = [];
+                $('.smaily-tx-workflow').each(function () {
+                    var workflowId = this.options.length ? $(this).val() : String($(this).data('saved') || '');
+                    if (!workflowId) {
+                        return;
+                    }
+                    var trigger = String($(this).data('trigger'));
+                    var language = String($(this).data('language'));
+                    transactionalMappings.push({
+                        trigger_type: trigger,
+                        language: language,
+                        workflow_id: parseInt(workflowId, 10),
+                        is_default_fallback:
+                            $('input[name=smaily-tx-fallback-' + trigger + ']:checked').val() === language
+                    });
+                });
+                data.transactional = {
+                    order_confirmation_enabled: $('#smaily-tx-order_confirmation-enabled').is(':checked'),
+                    shipment_confirmation_enabled: $('#smaily-tx-shipment_confirmation-enabled').is(':checked'),
+                    mappings: transactionalMappings
+                };
             }
             return data;
         },

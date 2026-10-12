@@ -18,7 +18,8 @@
   it off, and ticking it saves it on. On that step and on the Settings
   Contacts tab of such a website, Start import stays disabled while the
   switch is ticked but not saved, and is available once it is saved on
-  (PRO-4016).
+  (PRO-4016). For a new website without the switch, the step says that
+  contacts start syncing when it is saved (PRO-4036).
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
 -->
@@ -41,6 +42,7 @@
 
     var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
     var SWITCH = 'Sync contacts to Smaily';
+    var STARTS = 'Contacts start syncing to Smaily when you save this step.';
     var failures = 0;
     var passes = 0;
 
@@ -152,6 +154,10 @@
         doc = frame.contentDocument;
         check(locale + ', sync on: the step shows no Sync contacts to Smaily switch',
             doc.getElementById('smaily-w-sync-enabled') === null);
+        check(locale + ', a new website: the step says that contacts start syncing with its save',
+            doc.getElementById('smaily-w-sync-starts') !== null
+            && doc.getElementById('smaily-w-sync-starts').textContent.trim()
+                === window.smailyAdminPages['contacts-setup.' + locale].strings[STARTS]);
         data = await save(frame);
         check(locale + ', sync on: Continue posts no sync answer, so the stored one stays',
             !Object.prototype.hasOwnProperty.call(data, 'sync_enabled') && data.sync_mode === 'consent');
@@ -163,6 +169,8 @@
         toggle = doc.getElementById('smaily-w-sync-enabled');
         check(locale + ', sync off: the step shows Sync contacts to Smaily, unticked',
             toggle !== null && !toggle.checked && toggle.parentNode.textContent.trim() === label);
+        check(locale + ', sync off: the switch, not the start sentence, says whether contacts sync',
+            doc.getElementById('smaily-w-sync-starts') === null);
         check(locale + ', sync off: the import button is disabled and says why',
             doc.getElementById('smaily-w-backfill').disabled
             && doc.getElementById('smaily-w-backfill-off').style.display !== 'none');

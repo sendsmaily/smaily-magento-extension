@@ -26,6 +26,9 @@ use Smaily\Connect\Observer\CustomerSaveAfter;
  * customer who unsubscribed in the store as unsubscribed. Smaily creates a
  * new contact sent without a status as subscribed, so the status is omitted
  * only where the store knows of no unsubscribe.
+ *
+ * PRO-4036: before contact sync is active for the website, a profile save
+ * sends nothing.
  */
 class CustomerSaveAfterTest extends TestCase
 {
@@ -68,10 +71,39 @@ class CustomerSaveAfterTest extends TestCase
         ];
     }
 
-    private function observer(string $mode, int $status, SyncDispatcher $dispatcher): CustomerSaveAfter
+    /**
+     * PRO-4036: a registration or profile save on a website whose Contacts
+     * settings were never saved queues nothing, in any mode.
+     *
+     * @dataProvider modeProvider
+     */
+    public function testNothingIsQueuedBeforeContactSyncIsActive(string $mode): void
     {
+        $dispatcher = $this->createMock(SyncDispatcher::class);
+        $dispatcher->expects(self::never())->method('dispatchContactSync');
+
+        $this->observer($mode, Subscriber::STATUS_SUBSCRIBED, $dispatcher, false)->execute($this->event());
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function modeProvider(): array
+    {
+        return [
+            'subscribers only (consent)' => [SyncMode::MODE_CONSENT],
+            'all customers (legitimate interest)' => [SyncMode::MODE_LEGITIMATE_INTEREST],
+        ];
+    }
+
+    private function observer(
+        string $mode,
+        int $status,
+        SyncDispatcher $dispatcher,
+        bool $active = true
+    ): CustomerSaveAfter {
         $config = $this->createMock(Config::class);
-        $config->method('isSyncEnabled')->willReturn(true);
+        $config->method('isContactSyncActive')->with(1)->willReturn($active);
         $config->method('isConnected')->willReturn(true);
         $config->method('getSyncMode')->willReturn($mode);
 

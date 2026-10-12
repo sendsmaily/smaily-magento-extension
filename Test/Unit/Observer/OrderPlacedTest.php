@@ -35,6 +35,10 @@ use Smaily\Connect\Observer\OrderPlaced;
  *
  * PRO-3616: an email the store knows as unsubscribed is never sent without
  * a status — Smaily would create it as a subscriber.
+ *
+ * PRO-4036: before contact sync is active for the website, an order sends
+ * no contact and saves no checkout opt-in; the abandoned-cart purchase
+ * marker, an automation's, still goes.
  */
 class OrderPlacedTest extends TestCase
 {
@@ -182,6 +186,64 @@ class OrderPlacedTest extends TestCase
         ];
     }
 
+    /**
+     * PRO-4036: an order on a website whose Contacts settings were never
+     * saved — an opt-in or a guest email under all customers — queues no
+     * contact and subscribes nobody.
+     *
+     * @dataProvider orderBeforeActiveProvider
+     */
+    public function testAnOrderQueuesNoContactBeforeContactSyncIsActive(
+        string $mode,
+        bool $optedIn,
+        int $customerId
+    ): void {
+        $dispatcher = $this->createMock(SyncDispatcher::class);
+        $dispatcher->method('websiteId')->willReturn(1);
+        $dispatcher->expects(self::never())->method('dispatchContactSync');
+        $subscriptionManager = $this->createMock(SubscriptionManagerInterface::class);
+        $subscriptionManager->expects(self::never())->method('subscribe');
+        $subscriptionManager->expects(self::never())->method('subscribeCustomer');
+
+        $this->observer($subscriptionManager, new StorefrontSubscription(), $mode, $optedIn, $dispatcher, 0, '', false)
+            ->execute($this->eventFor($customerId));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: bool, 2: int}>
+     */
+    public static function orderBeforeActiveProvider(): array
+    {
+        return [
+            'a guest\'s checkout opt-in' => [SyncMode::MODE_CONSENT, true, 0],
+            'a customer\'s checkout opt-in' => [SyncMode::MODE_CONSENT, true, 42],
+            'a guest email under all customers' => [SyncMode::MODE_LEGITIMATE_INTEREST, false, 0],
+        ];
+    }
+
+    /**
+     * PRO-4036: the abandoned-cart purchase marker is not contact sync, so
+     * it goes before contact sync is active too.
+     */
+    public function testTheCartPurchaseMarkerGoesBeforeContactSyncIsActive(): void
+    {
+        $dispatcher = $this->createMock(SyncDispatcher::class);
+        $dispatcher->method('websiteId')->willReturn(1);
+        $dispatcher->expects(self::once())->method('dispatchCartPurchase')->with('person@example.com', 1, false);
+        $dispatcher->expects(self::never())->method('dispatchContactSync');
+
+        $this->observer(
+            $this->createMock(SubscriptionManagerInterface::class),
+            new StorefrontSubscription(),
+            SyncMode::MODE_CONSENT,
+            false,
+            $dispatcher,
+            0,
+            StateManager::STATUS_MAILED,
+            false
+        )->execute($this->eventFor(42));
+    }
+
     private function observer(
         SubscriptionManagerInterface $subscriptionManager,
         StorefrontSubscription $storefrontSubscription,
@@ -189,11 +251,12 @@ class OrderPlacedTest extends TestCase
         bool $optedIn = true,
         ?SyncDispatcher $dispatcher = null,
         int $subscriberStatus = 0,
-        string $cartStatus = ''
+        string $cartStatus = '',
+        bool $active = true
     ): OrderPlaced {
         $config = $this->createMock(Config::class);
         $config->method('isConnected')->willReturn(true);
-        $config->method('isSyncEnabled')->willReturn(true);
+        $config->method('isContactSyncActive')->with(1)->willReturn($active);
         $config->method('getSyncMode')->willReturn($mode);
         $config->method('includeGuests')->willReturn(true);
         $config->method('isAbandonedCartEnabled')->willReturn(true);

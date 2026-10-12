@@ -51,7 +51,7 @@ class CustomerSaveAfter implements ObserverInterface
 
         $storeId = (int)$customer->getStoreId();
         $websiteId = (int)$customer->getWebsiteId();
-        if (!$this->config->isSyncEnabled($websiteId)
+        if (!$this->config->isContactSyncActive($websiteId)
             || !$this->config->isConnected($storeId ?: null)
             || !$this->mode->syncsAccounts($websiteId)
         ) {

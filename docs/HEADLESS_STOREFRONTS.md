@@ -28,7 +28,7 @@ install, in this order. Each line links to its details below.
 
 1. Check the versions first: Magento 2.4.4 or newer, PHP 8.1–8.4 — [INSTALLING.md](INSTALLING.md#before-you-start).
 2. On the initial setup's **Connect** step, enter the storefront's address as **Storefront URL** (**Using a separate storefront?**) — [Storefront URL](#storefront-url).
-3. Find out which other integrations sync newsletter subscribers or opt-outs with Smaily; switch them off once the **Connect** step's save (step 2) has saved the connection — contact sync is on from installation and runs from that save, not from the **Contacts** step — not before: until then they carry the opt-outs.
+3. Find out which other integrations sync newsletter subscribers or opt-outs with Smaily; switch them off once the **Contacts** step's save (step 4) has started contact sync — nothing reaches Smaily before it, the **Connect** step's save included — not before: until then they carry the opt-outs.
 4. On the **Contacts** step choose **Subscribers only (consent)** or **All customers (legitimate interest)**, never **Checkout opt-in only** — [Newsletter consent at checkout](#5-newsletter-consent-at-checkout).
 5. On the **Automations** step map the workflows but leave **Enabled** unticked — [Before switching anything on](#before-switching-anything-on).
 6. Connect Campaign Intelligence only once the Storefront URL is saved: connecting starts the catalog import with the storefront's links — [Storefront URL](#storefront-url).
@@ -433,18 +433,17 @@ only in the same browser, while the storefront still holds the cart.
 
 ## Before switching anything on
 
-Contact sync runs from the initial setup's Connect step on; the automations
+Contact sync starts with the initial setup's Contacts step; the automations
 wait until the product links are checked.
 
 1. Install the module and connect it as usual. On the initial setup's
    Connect step, set the **Storefront URL** (**Using a separate
    storefront?**) when shoppers cannot open the back-end host: it is saved
-   with the connection — the save from which contact sync runs, because it
-   is on from installation — and connecting Campaign Intelligence starts
-   the catalog import with it.
+   with the connection, before contact sync starts, and connecting
+   Campaign Intelligence starts the catalog import with it.
    On the Contacts step choose **Subscribers only (consent)** or **All
    customers (legitimate interest)**, not **Checkout opt-in only** —
-   contact sync runs in that mode from the step's save. On the
+   the step's save starts contact sync in that mode. On the
    Automations step map the workflows but leave **Enabled** unticked.
 2. Connect Campaign Intelligence (the initial setup's Intelligence step, or
    **Settings > Intelligence**); connecting starts the catalog import. Open

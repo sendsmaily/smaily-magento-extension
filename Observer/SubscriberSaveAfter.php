@@ -69,7 +69,7 @@ class SubscriberSaveAfter implements ObserverInterface
 
         $storeId = (int)$subscriber->getStoreId();
         $websiteId = $this->dispatcher->websiteId($storeId);
-        if (!$this->config->isSyncEnabled($websiteId)
+        if (!$this->config->isContactSyncActive($websiteId)
             || !$this->config->isConnected($storeId)
             || !$subscriber->isStatusChanged()
         ) {

@@ -72,7 +72,7 @@ class ContactReconcile
                 continue;
             }
             $websiteId = (int)$website->getId();
-            if (!$this->config->isSyncEnabled($websiteId) || !$this->mode->reconciles($websiteId)) {
+            if (!$this->config->isContactSyncActive($websiteId) || !$this->mode->reconciles($websiteId)) {
                 continue;
             }
 

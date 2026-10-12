@@ -212,7 +212,7 @@ class RegistrationSyncTest extends TestCase
     private function config(string $mode): Config
     {
         $config = $this->createMock(Config::class);
-        $config->method('isSyncEnabled')->willReturn(true);
+        $config->method('isContactSyncActive')->willReturn(true);
         $config->method('isConnected')->willReturn(true);
         $config->method('isWelcomeEnabled')->willReturn(true);
         $config->method('getSyncMode')->willReturn($mode);

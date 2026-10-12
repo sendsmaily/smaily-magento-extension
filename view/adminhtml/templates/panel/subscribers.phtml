@@ -20,7 +20,8 @@ $isSettings = $block->getData('context') === 'settings';
 // live paths do (PRO-1764), so with the switch off the control is disabled
 // and says why instead of quoting numbers it will not send. Where the switch
 // renders, panels-js.phtml owns that state live (boot JSON at init, then
-// every change) and this render must not second-guess it. Settings always
+// every change and every save; the switch ticked but not saved yet keeps the
+// control disabled, PRO-4016) and this render must not second-guess it. Settings always
 // renders it; the wizard only for a website whose sync is off (PRO-4010), so
 // the merchant can switch it on there and Continue never saves an answer the
 // merchant did not see. A wizard without the switch answers server-side.

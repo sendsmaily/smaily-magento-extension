@@ -164,8 +164,10 @@ way **Continue** does, in both languages: for a website whose contact sync
 is on, the step shows no **Sync contacts to Smaily** switch and its save
 posts no sync answer, so the stored one stays; for a website whose sync is
 off, the step shows the switch unticked with the import button disabled,
-an unchanged save posts sync off, and a ticked switch posts it on. To
-check another admin screen, add its template(s)
+an unchanged save posts sync off, and a ticked switch posts it on. There
+and on the Settings Contacts tab of such a website, the import button stays
+disabled while the switch is ticked but not saved, and is enabled once the
+save posts it on. To check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.
 `Test/Js/user-guide-site.html` checks the merchant user guide,

@@ -54,6 +54,9 @@ window.smailyPanelsInit = function ($) {
     var mlModeCurrent = isMultilingual ? (boot.connection.multilingualMode || 'single') : 'single';
     var mlModeSaved = mlModeCurrent;
     var mlSwitchConfirmed = false;
+    // The stored contact-sync answer: from the page load, then from a save
+    // of the Contacts panel (applySubscribersEnabled(), PRO-4016).
+    var syncSaved = boot.subscribers.syncEnabled;
 
     function post(url, data) {
         // Some URLs (Connection/Subscribers/Automations, docs/internal/RFC_MULTI_WEBSITE.md
@@ -235,6 +238,10 @@ window.smailyPanelsInit = function ($) {
                 var error = new Error(message || '<?= $escaper->escapeJs(__('Saving failed.')) ?>');
                 error.errors = response.errors || [];
                 throw error;
+            }
+            if (name === 'subscribers' && data && typeof data.sync_enabled === 'boolean') {
+                syncSaved = data.sync_enabled;
+                applySubscribersEnabled();
             }
             if (name === 'connect' && typeof response.verified === 'boolean') {
                 setConnectionStatus(response.verified, response.accountName);
@@ -661,23 +668,27 @@ window.smailyPanelsInit = function ($) {
         apply();
     }
 
-    function reactSubscribersEnabled() {
+    function applySubscribersEnabled() {
         if (!$('#smaily-w-sync-enabled').length) {
             return;
         }
-        var apply = function () {
-            var on = $('#smaily-w-sync-enabled').is(':checked');
-            $('#smaily-w-subscribers-body').toggleClass('smaily-muted', !on)
-                .find('input').prop('disabled', !on);
-            // The contacts import obeys the same switch (PRO-1764): with it
-            // off the control says so instead of quoting an estimate. Cancel
-            // stays available so a job already running can still be stopped.
-            $('#smaily-w-backfill').prop('disabled', !on);
-            $('#smaily-w-backfill-estimate').toggle(on);
-            $('#smaily-w-backfill-off').toggle(!on);
-        };
-        $(document).on('change', '#smaily-w-sync-enabled', apply);
-        apply();
+        var on = $('#smaily-w-sync-enabled').is(':checked');
+        // The contacts import obeys the stored answer (PRO-1764), and its
+        // job reads it only when it runs, so the switch ticked but not yet
+        // saved does not start it (PRO-4016): until the switch is on and
+        // saved, the control says so instead of quoting an estimate. Cancel
+        // stays available so a job already running can still be stopped.
+        var importable = on && syncSaved;
+        $('#smaily-w-subscribers-body').toggleClass('smaily-muted', !on)
+            .find('input').prop('disabled', !on);
+        $('#smaily-w-backfill').prop('disabled', !importable);
+        $('#smaily-w-backfill-estimate').toggle(importable);
+        $('#smaily-w-backfill-off').toggle(!importable);
+    }
+
+    function reactSubscribersEnabled() {
+        $(document).on('change', '#smaily-w-sync-enabled', applySubscribersEnabled);
+        applySubscribersEnabled();
     }
 
     function reactRssEnabled() {

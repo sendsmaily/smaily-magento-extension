@@ -56,8 +56,11 @@ class ContactsProcessorTest extends TestCase
         $job = $this->createJob();
         $job->expects(self::once())->method('setData')->with('total_count', 0);
 
+        // The job records why it sent nothing, for its card and the CLI
+        // status (PRO-4037).
         $jobManager = $this->createMock(JobManager::class);
-        $jobManager->expects(self::once())->method('complete')->with($job);
+        $jobManager->expects(self::once())->method('complete')
+            ->with($job, Job::REASON_CONTACT_SYNC_INACTIVE);
         $jobManager->expects(self::never())->method('recordProgress');
 
         $this->createProcessor($jobManager, $audience, $clientProvider, false)->process($job);
@@ -253,8 +256,9 @@ class ContactsProcessorTest extends TestCase
         $job = $this->createJob();
         $job->expects(self::once())->method('setData')->with('total_count', 0);
 
+        // Sync is active: no reason recorded (PRO-4037).
         $jobManager = $this->createMock(JobManager::class);
-        $jobManager->expects(self::once())->method('complete')->with($job);
+        $jobManager->expects(self::once())->method('complete')->with($job, null);
         $jobManager->expects(self::never())->method('recordProgress');
 
         $this->createProcessor($jobManager, $audience, $clientProvider, true, SyncMode::MODE_CHECKOUT_OPTIN)

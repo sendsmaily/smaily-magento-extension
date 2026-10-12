@@ -35,7 +35,8 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * (starting it again cancels it first: JobManager::startIfIdle(), the
  * integration JobManagerTest). PRO-3923: one that waits behind another
  * import names it. PRO-3927: one the tick has set aside reads as stalled
- * and waits behind nothing.
+ * and waits behind nothing. PRO-4037: a contacts import that sent nothing
+ * because the website's contact sync was not active names the website.
  */
 class BackfillStateTest extends TestCase
 {
@@ -230,6 +231,35 @@ class BackfillStateTest extends TestCase
         self::assertSame('', $this->response['blocked_by']);
     }
 
+    public function testAContactsImportThatSentNothingBecauseSyncWasNotActiveNamesTheWebsite(): void
+    {
+        $job = $this->createMock(Job::class);
+        $job->method('getWebsiteId')->willReturn(1);
+        $job->method('getStatus')->willReturn(Job::STATUS_COMPLETED);
+        $job->method('getData')->willReturnMap([
+            ['total_count', null, 0],
+            ['completed_at', null, null],
+            ['error_message', null, Job::REASON_CONTACT_SYNC_INACTIVE],
+        ]);
+
+        $this->controller(true, ['action' => 'status', 'job_type' => Job::TYPE_CONTACTS], [$job])->execute();
+
+        self::assertSame('completed', $this->response['status']);
+        self::assertSame(['Main Website'], $this->response['sync_inactive']);
+        self::assertSame('', $this->response['error'], 'Not an error: the import did what it should');
+    }
+
+    public function testAFinishedImportNamesNoWebsiteWhoseSyncWasNotActive(): void
+    {
+        $this->controller(
+            true,
+            ['action' => 'status', 'job_type' => Job::TYPE_CONTACTS],
+            [$this->job(Job::STATUS_COMPLETED, Job::TYPE_CONTACTS)]
+        )->execute();
+
+        self::assertSame([], $this->response['sync_inactive']);
+    }
+
     private function job(string $status, string $jobType = Job::TYPE_CATALOG): Job&MockObject
     {
         $job = $this->createMock(Job::class);
@@ -273,8 +303,10 @@ class BackfillStateTest extends TestCase
 
         $website = $this->createMock(\Magento\Store\Api\Data\WebsiteInterface::class);
         $website->method('getId')->willReturn(1);
+        $website->method('getName')->willReturn('Main Website');
         $storeManager = $this->createMock(StoreManagerInterface::class);
         $storeManager->method('getWebsites')->willReturn([$website]);
+        $storeManager->method('getWebsite')->with(1)->willReturn($website);
 
         return new BackfillState(
             $context,

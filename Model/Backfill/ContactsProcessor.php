@@ -75,12 +75,15 @@ class ContactsProcessor implements ProcessorInterface
         // admin cancel, so the total it discovered and the contacts it has
         // already sent are reported as they really are. "Checkout opt-in
         // only" imports nobody, so it ends the same way.
+        // A job that sent nothing because sync was not active records why,
+        // so its card and smaily:backfill:status can say so (PRO-4037).
         $websiteId = $job->getWebsiteId();
         $mode = $this->mode->mode($websiteId);
-        if (!$this->config->isContactSyncActive($websiteId) || $mode === SyncMode::MODE_CHECKOUT_OPTIN) {
+        $active = $this->config->isContactSyncActive($websiteId);
+        if (!$active || $mode === SyncMode::MODE_CHECKOUT_OPTIN) {
             if ($job->getData('total_count') === null) {
                 $job->setData('total_count', 0);
-                $this->jobManager->complete($job);
+                $this->jobManager->complete($job, $active ? null : Job::REASON_CONTACT_SYNC_INACTIVE);
             } else {
                 $this->jobManager->cancel($job);
             }

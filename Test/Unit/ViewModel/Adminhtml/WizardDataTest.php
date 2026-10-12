@@ -354,6 +354,22 @@ class WizardDataTest extends TestCase
     }
 
     /**
+     * PRO-4037: the contacts import card follows the selected website's
+     * answer, not the switch alone.
+     */
+    public function testTheBootDataCarriesWhetherTheSelectedWebsitesContactsSync(): void
+    {
+        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->config->method('isSyncEnabled')->with(2)->willReturn(true);
+        $this->config->method('isContactSyncActive')->with(2)->willReturn(false);
+
+        $decoded = json_decode($this->viewModel->getBootJson(), true);
+
+        self::assertTrue($decoded['subscribers']['syncEnabled']);
+        self::assertFalse($decoded['subscribers']['syncActive']);
+    }
+
+    /**
      * PRO-3582: the import estimate counts the audience the import sends,
      * for every mode the panel offers, on the selected website.
      */

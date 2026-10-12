@@ -25,7 +25,8 @@ use Symfony\Component\Console\Tester\CommandTester;
  * not start an import while Campaign Intelligence is not connected, and says
  * why; `smaily:backfill:start contacts` goes to Smaily and starts.
  * PRO-1970: a contacts import for a website whose contact sync is off still
- * starts, and the command says it will send nothing.
+ * starts, and the command says it will send nothing. PRO-4037: so does one
+ * for a website whose Contacts settings are not saved yet.
  */
 class BackfillStartCommandTest extends TestCase
 {
@@ -122,6 +123,23 @@ class BackfillStartCommandTest extends TestCase
         );
     }
 
+    public function testAContactsImportForAWebsiteWhoseContactsSettingsAreNotSavedSaysItSendsNothing(): void
+    {
+        $job = $this->createMock(Job::class);
+        $job->method('getId')->willReturn(11);
+        $this->jobManager->method('startIfIdle')->willReturn($job);
+
+        $tester = $this->startImport(Job::TYPE_CONTACTS, false, ['--website' => '3'], true, false);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString(
+            'The Contacts settings of website 3 are not saved yet, so its contacts do not sync and this import'
+            . ' sends nothing and finishes at 0. Save them under Settings > Contacts, then start the import again.',
+            $tester->getDisplay()
+        );
+        self::assertStringNotContainsString('Contact synchronization is off', $tester->getDisplay());
+    }
+
     public function testAContactsImportForAWebsiteWithContactSyncOnPrintsNoNotice(): void
     {
         $job = $this->createMock(Job::class);
@@ -132,6 +150,7 @@ class BackfillStartCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode());
         self::assertStringNotContainsString('Contact synchronization is off', $tester->getDisplay());
+        self::assertStringNotContainsString('not saved yet', $tester->getDisplay());
     }
 
     public function testAnImportAlreadyActiveIsNotStartedAgainAndSaysSo(): void
@@ -155,12 +174,14 @@ class BackfillStartCommandTest extends TestCase
         string $jobType,
         bool $connected,
         array $options = [],
-        bool $syncEnabled = true
+        bool $syncEnabled = true,
+        bool $contactsSaved = true
     ): CommandTester {
         $engineSettings = $this->createMock(EngineSettings::class);
         $engineSettings->method('isConnected')->willReturn($connected);
         $config = $this->createMock(Config::class);
         $config->method('isSyncEnabled')->willReturn($syncEnabled);
+        $config->method('isContactSyncActive')->willReturn($syncEnabled && $contactsSaved);
         $tester = new CommandTester(new BackfillStartCommand(
             $this->jobManager,
             $this->createMock(StoreManagerInterface::class),

@@ -54,9 +54,12 @@ window.smailyPanelsInit = function ($) {
     var mlModeCurrent = isMultilingual ? (boot.connection.multilingualMode || 'single') : 'single';
     var mlModeSaved = mlModeCurrent;
     var mlSwitchConfirmed = false;
-    // The stored contact-sync answer: from the page load, then from a save
-    // of the Contacts panel (applySubscribersEnabled(), PRO-4016).
+    // The stored contact-sync answer, and whether contacts sync — that
+    // answer and the saved Contacts settings (PRO-4036): from the page load,
+    // then from a save of the Contacts panel, which saves those settings
+    // (applySubscribersEnabled(), PRO-4016, PRO-4037).
     var syncSaved = boot.subscribers.syncEnabled;
+    var syncActive = boot.subscribers.syncActive;
 
     function post(url, data) {
         // Some URLs (Connection/Subscribers/Automations, docs/internal/RFC_MULTI_WEBSITE.md
@@ -239,8 +242,11 @@ window.smailyPanelsInit = function ($) {
                 error.errors = response.errors || [];
                 throw error;
             }
-            if (name === 'subscribers' && data && typeof data.sync_enabled === 'boolean') {
-                syncSaved = data.sync_enabled;
+            if (name === 'subscribers') {
+                if (data && typeof data.sync_enabled === 'boolean') {
+                    syncSaved = data.sync_enabled;
+                }
+                syncActive = syncSaved;
                 applySubscribersEnabled();
             }
             if (name === 'connect' && typeof response.verified === 'boolean') {
@@ -429,7 +435,9 @@ window.smailyPanelsInit = function ($) {
     // failed); "Stopped before an error" when the job itself aborted;
     // "Cancelled" after an admin cancel; "Stalled" for a queued or running
     // import nothing has moved for an hour (PRO-3915), naming the import it
-    // waits behind when that is another one (PRO-3923). The last outcome +
+    // waits behind when that is another one (PRO-3923). A contacts import
+    // names the websites it sent nothing from because their contact sync
+    // was not active (PRO-4037). The last outcome +
     // timestamp persist server-side and re-render on every page load.
     var backfillTimers = {};
 
@@ -590,6 +598,12 @@ window.smailyPanelsInit = function ($) {
             text = '<?= $escaper->escapeJs(__('Canceled — %1 of %2 synced. Starting again begins a fresh import.')) ?>'
                 .replace('%1', data.processed).replace('%2', data.total || '?');
         }
+        // A contacts import that sent nothing from a website whose contact
+        // sync was not active says so, naming the website (PRO-4037).
+        if (data.status === 'completed' && (data.sync_inactive || []).length) {
+            text += ' ' + '<?= $escaper->escapeJs(__('Contact sync was off for %1, so nothing was sent from there. Turn it on and save the Contacts settings, then press Run again.')) ?>'
+                .replace('%1', data.sync_inactive.join(', '));
+        }
         ui.verdict.attr('data-state', state).show();
         ui.verdict.find('.smaily-backfill-verdict__icon').text(look.icon);
         ui.verdict.find('.smaily-backfill-verdict__text').text(withDate(text, data));
@@ -669,21 +683,27 @@ window.smailyPanelsInit = function ($) {
     }
 
     function applySubscribersEnabled() {
-        if (!$('#smaily-w-sync-enabled').length) {
+        var $switch = $('#smaily-w-sync-enabled');
+        if (!$('#smaily-w-backfill').length) {
             return;
         }
-        var on = $('#smaily-w-sync-enabled').is(':checked');
-        // The contacts import obeys the stored answer (PRO-1764), and its
-        // job reads it only when it runs, so the switch ticked but not yet
-        // saved does not start it (PRO-4016): until the switch is on and
-        // saved, the control says so instead of quoting an estimate. Cancel
+        // The setup's Contacts step of a website whose sync is on has no switch.
+        var on = !$switch.length || $switch.is(':checked');
+        // The contacts import obeys whether contacts sync (PRO-1764,
+        // PRO-4036), and its job reads it only when it runs, so the switch
+        // ticked but not yet saved does not start it (PRO-4016), nor does a
+        // website whose Contacts settings were never saved (PRO-4037): until
+        // then the control says why instead of quoting an estimate. Cancel
         // stays available so a job already running can still be stopped.
-        var importable = on && syncSaved;
-        $('#smaily-w-subscribers-body').toggleClass('smaily-muted', !on)
-            .find('input').prop('disabled', !on);
+        var importable = on && syncActive;
+        if ($switch.length) {
+            $('#smaily-w-subscribers-body').toggleClass('smaily-muted', !on)
+                .find('input').prop('disabled', !on);
+        }
         $('#smaily-w-backfill').prop('disabled', !importable);
         $('#smaily-w-backfill-estimate').toggle(importable);
-        $('#smaily-w-backfill-off').toggle(!importable);
+        $('#smaily-w-backfill-off').toggle(!(on && syncSaved));
+        $('#smaily-w-backfill-unsaved').toggle(on && syncSaved && !syncActive);
     }
 
     function reactSubscribersEnabled() {

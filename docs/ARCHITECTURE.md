@@ -606,7 +606,8 @@ below.
   the initial setup's Connect step — the same `panel/connection.phtml`
   field, posted by `panels.collect.connect()` and checked and saved by
   `WizardStepSaver::saveConnect()`, PRO-3802; the setup saves it with the
-  connection, before its Contacts step switches contact sync on).
+  connection, the save from which a new install's contact sync runs — see
+  *Wizard-first gating*).
   `Model\StorefrontUrl::apply()` replaces the scheme, host and port of the
   product link with it — path and query string kept — read at the store the
   link was built for: `CatalogPayloadBuilder::productUrl()` after the
@@ -1543,7 +1544,16 @@ Initial setup, Settings, Log. Design rules:
   website instead of on its chooser (`SetupGuard::getWizardRouteParams()`).
   A newly added website has no flag, and after an upgrade from 2.8.x no
   website has one (the legacy migration does not write it), so each such
-  website goes through the wizard — intended. The guard also tracks
+  website goes through the wizard — intended. The flag gates these admin
+  pages only; contact sync never reads it. A website's contact sync (the
+  observers, `Cron\ContactReconcile`, the checkout checkbox) runs while
+  `smaily_connect/subscribers/sync_enabled` is on — `etc/config.xml`
+  defaults it to 1 — and its credentials are saved (`Config::isConnected()`,
+  non-empty values, not a Smaily check), so on a new install it runs from
+  the Connect step's save. The Contacts step saves `sync_enabled` only where
+  it shows the switch, a website whose sync is off (PRO-4010), and starts
+  no import: the contacts import starts only from **Start import**
+  (`Api\BackfillState`, `action: start`). The guard also tracks
   `smaily_connect/internal/last_seen_version` (module version read from
   composer.json via `Model\ModuleVersion`) and posts a one-time admin
   notice after a MAJOR version jump, in addition to the redirect.

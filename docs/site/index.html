@@ -491,7 +491,7 @@ pre code{background:none; border:0; padding:0; font-size:inherit}
       <p>The recommended way is composer. Until 3.0.0 is released, give the release candidate's exact version, as the <a href="https://github.com/sendsmaily/smaily-magento-extension/releases">releases page</a> names it: <code>composer require smaily/smailyformagento</code> without a version installs the old 2.8.1, and <code>^3.0</code> does not install a release candidate on a standard Magento project, which accepts stable versions only. From 3.0.0 on, <code>composer require smaily/smailyformagento</code> is enough.</p>
       <p>Run the commands from the Magento root, as the user that owns the Magento files. <code>bin/magento deploy:mode:show</code> shows the mode. In production mode:</p>
 <pre><code>bin/magento maintenance:enable
-composer require smaily/smailyformagento:3.0.0-rc11
+composer require smaily/smailyformagento:3.0.0-rc12
 bin/magento module:enable Smaily_Connect
 bin/magento setup:upgrade
 bin/magento setup:di:compile
@@ -508,7 +508,7 @@ bin/magento cache:flush</code></pre>
       <p>Soovitatav viis on composer. Kuni 3.0.0 väljalaskeni anna väljalaskekandidaadi täpne versioon, nagu <a href="https://github.com/sendsmaily/smaily-magento-extension/releases">väljalasete leht</a> selle nimetab: <code>composer require smaily/smailyformagento</code> ilma versioonita paigaldab vana 2.8.1 ja <code>^3.0</code> ei paigalda tavalises Magento projektis väljalaskekandidaati, sest see lubab ainult stabiilseid versioone. Alates versioonist 3.0.0 piisab käsust <code>composer require smaily/smailyformagento</code>.</p>
       <p>Käivita käsud Magento juurkaustas, Magento failide omaniku kasutajana. Režiimi näitab <code>bin/magento deploy:mode:show</code>. Tootmisrežiimis:</p>
 <pre><code>bin/magento maintenance:enable
-composer require smaily/smailyformagento:3.0.0-rc11
+composer require smaily/smailyformagento:3.0.0-rc12
 bin/magento module:enable Smaily_Connect
 bin/magento setup:upgrade
 bin/magento setup:di:compile
@@ -1517,9 +1517,9 @@ window.smailyConnect.consentOverride = function () {
     <h2><span data-lang="en">Hyvä</span><span data-lang="et">Hyvä</span></h2>
     <div data-lang="en">
       <p>A Hyvä storefront also needs the Hyvä compatibility module, the composer package <code>smaily/module-connect-hyva</code>. It brings the browse tracker, recommendation attribution, the Smaily recommendations widget and the styled Personalization page to Hyvä. It has the same version as Smaily Connect: install the same version of both, the same way — a store that installed Smaily Connect from the release ZIP takes the Hyvä module from the release too, because the composer command would install a second copy of Smaily Connect.</p>
-      <p><strong>With composer</strong>, one command installs both modules. Until 3.0.0 is released, give the release candidate's exact version for both packages — <code>3.0.0-rc11</code> below; a standard Magento project accepts stable versions only. From 3.0.0 on, <code>composer require smaily/module-connect-hyva</code> is enough: it installs Smaily Connect too. Run the commands from the Magento root, as the user that owns the Magento files; <code>&lt;Vendor&gt;/&lt;theme&gt;</code> is the Hyvä theme your store uses, and its Tailwind build needs Node.js 20 or newer. In production mode:</p>
+      <p><strong>With composer</strong>, one command installs both modules. Until 3.0.0 is released, give the release candidate's exact version for both packages — <code>3.0.0-rc12</code> below; a standard Magento project accepts stable versions only. From 3.0.0 on, <code>composer require smaily/module-connect-hyva</code> is enough: it installs Smaily Connect too. Run the commands from the Magento root, as the user that owns the Magento files; <code>&lt;Vendor&gt;/&lt;theme&gt;</code> is the Hyvä theme your store uses, and its Tailwind build needs Node.js 20 or newer. In production mode:</p>
 <pre><code>bin/magento maintenance:enable
-composer require smaily/smailyformagento:3.0.0-rc11 smaily/module-connect-hyva:3.0.0-rc11
+composer require smaily/smailyformagento:3.0.0-rc12 smaily/module-connect-hyva:3.0.0-rc12
 bin/magento module:enable Smaily_Connect Hyva_SmailyConnect
 bin/magento setup:upgrade
 bin/magento setup:di:compile
@@ -1545,9 +1545,9 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
     </div>
     <div data-lang="et">
       <p>Hyvä poe veebileht vajab lisaks Hyvä ühilduvusmoodulit, composeri paketti <code>smaily/module-connect-hyva</code>. See toob Hyväle sirvimise jälgija, soovituste omistamise, vidina Smaily soovitused ja kujundatud personaliseerimise lehe. Selle versioon on sama mis Smaily Connectil: paigalda mõlemast sama versioon ja samal viisil — pood, mis paigaldas Smaily Connecti väljalaske ZIP-ist, võtab ka Hyvä mooduli väljalaskest, sest composeri käsk paigaldaks Smaily Connectist teise koopia.</p>
-      <p><strong>Composeriga</strong> paigaldab mõlemad moodulid üks käsk. Kuni 3.0.0 väljalaskeni anna mõlemale paketile väljalaskekandidaadi täpne versioon — allpool <code>3.0.0-rc11</code>; tavaline Magento projekt lubab ainult stabiilseid versioone. Alates versioonist 3.0.0 piisab käsust <code>composer require smaily/module-connect-hyva</code>: see paigaldab ka Smaily Connecti. Käivita käsud Magento juurkaustas, Magento failide omaniku kasutajana; <code>&lt;Vendor&gt;/&lt;theme&gt;</code> on sinu poe Hyvä teema ja selle Tailwindi ehitus vajab Node.js 20 või uuemat. Tootmisrežiimis:</p>
+      <p><strong>Composeriga</strong> paigaldab mõlemad moodulid üks käsk. Kuni 3.0.0 väljalaskeni anna mõlemale paketile väljalaskekandidaadi täpne versioon — allpool <code>3.0.0-rc12</code>; tavaline Magento projekt lubab ainult stabiilseid versioone. Alates versioonist 3.0.0 piisab käsust <code>composer require smaily/module-connect-hyva</code>: see paigaldab ka Smaily Connecti. Käivita käsud Magento juurkaustas, Magento failide omaniku kasutajana; <code>&lt;Vendor&gt;/&lt;theme&gt;</code> on sinu poe Hyvä teema ja selle Tailwindi ehitus vajab Node.js 20 või uuemat. Tootmisrežiimis:</p>
 <pre><code>bin/magento maintenance:enable
-composer require smaily/smailyformagento:3.0.0-rc11 smaily/module-connect-hyva:3.0.0-rc11
+composer require smaily/smailyformagento:3.0.0-rc12 smaily/module-connect-hyva:3.0.0-rc12
 bin/magento module:enable Smaily_Connect Hyva_SmailyConnect
 bin/magento setup:upgrade
 bin/magento setup:di:compile
@@ -2275,7 +2275,7 @@ bin/magento smaily:gdpr erase shopper@example.com --force   # art 17</code></pre
     <div data-lang="en">
       <p>Version 3 replaces the 2.8.x module, but the composer package name is the same and your settings migrate automatically. Write down your 2.8.x settings first. <code>composer update</code> alone stays on 2.8.x, so require version 3. Until 3.0.0 is released, the commands give the release candidate's exact version, as the <a href="https://github.com/sendsmaily/smaily-magento-extension/releases">releases page</a> names it: <code>^3.0</code> does not install a release candidate on a standard Magento project, which accepts stable versions only. From 3.0.0 on, <code>composer require smaily/smailyformagento:^3.0</code> is enough. In production mode:</p>
 <pre><code>bin/magento maintenance:enable
-composer require smaily/smailyformagento:3.0.0-rc11
+composer require smaily/smailyformagento:3.0.0-rc12
 bin/magento setup:upgrade
 bin/magento setup:di:compile
 bin/magento setup:static-content:deploy en_US   # every locale your store uses
@@ -2295,7 +2295,7 @@ bin/magento cache:flush</code></pre>
     <div data-lang="et">
       <p>Versioon 3 asendab mooduli 2.8.x, kuid composeri paketi nimi on sama ja sinu seaded migreeritakse automaatselt. Pane kõigepealt kirja oma 2.8.x seaded. Ainult <code>composer update</code> jääb versioonile 2.8.x, seega nõua versiooni 3. Kuni 3.0.0 väljalaskeni annavad käsud väljalaskekandidaadi täpse versiooni, nagu <a href="https://github.com/sendsmaily/smaily-magento-extension/releases">väljalasete leht</a> selle nimetab: <code>^3.0</code> ei paigalda tavalises Magento projektis väljalaskekandidaati, sest see lubab ainult stabiilseid versioone. Alates versioonist 3.0.0 piisab käsust <code>composer require smaily/smailyformagento:^3.0</code>. Tootmisrežiimis:</p>
 <pre><code>bin/magento maintenance:enable
-composer require smaily/smailyformagento:3.0.0-rc11
+composer require smaily/smailyformagento:3.0.0-rc12
 bin/magento setup:upgrade
 bin/magento setup:di:compile
 bin/magento setup:static-content:deploy en_US   # kõik poe keeleseaded

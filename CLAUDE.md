@@ -395,7 +395,8 @@ is written in English.
   not yet confirmed); 2026-10-09: 4/5 (rc11 cut; the 2.8.x upgrade path
   walked and fixed; pilot store not yet confirmed); 2026-10-11: 4/5
   (rc11 released; Hyvä companion on Packagist; pilot store not yet
-  confirmed).
+  confirmed); 2026-10-12: 4/5 (rc12 cut; consent: new stores sync only
+  after the Contacts save; pilot store not yet confirmed).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

@@ -7,45 +7,96 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-10-12 later — **3.0.0-rc12 is released** (tagged
-2026-10-12 with `gh release create`, no HTTP 500): the release workflow is
-green and attached four assets (the main ZIP and the Hyvä ZIP, each with its
-`.sha256`); the Hyvä mirror got tag 3.0.0-rc12 by itself, and Packagist
-listed both `smaily/smailyformagento` and `smaily/module-connect-hyva`
-3.0.0-rc12 without a manual update — the first automatic companion publish,
-so the mirror's Packagist webhook works. **Merged after the cut:** #171
-PRO-4053 (UPGRADING and the guide site: a 2.8.x copied into
-`app/code/Smaily/SmailyForMagento` — delete only that folder, then install
-v3; never run `module:uninstall Smaily_SmailyForMagento` once v3 is
-required, because it composer-removes v3; walked end to end, Composer and
-ZIP). The internal pilot checklist's Hyvä row no longer says stop. The
-guide site is re-uploaded (its md5 matches `master`). **Pilot:** a pilot
-store is identified and pre-flighted from its admin — Magento 2.4.8, a
-Luma-based theme, four websites in four countries under one Smaily
-account, 2.8.x with abandoned cart on and contact sync explicitly saved
-No, so the migration keeps contact sync off and the Contacts step shows
-the switch unticked. Its developer upgrades on the server from a one-page
-guide (the Magento 2.4 admin cannot install modules); waiting for the
-developer. Details are in Linear PRO-2474 only. **Decided (Erkki,
-2026-10-12, PRO-3662 Done):** one shared Campaign Intelligence tenant for
-a four-website store is acceptable; a tenant per country stays with
-PRO-1463 / PRO-1464. **Confirmed (PRO-4015 wording):** 2.8.x posted
-opt-ins to Smaily's authenticated autoresponder API (a workflow id is
-required); the old "opt-in workflows are triggered" label described
-Smaily's legacy public form, which 2.8.x never used. **Rule (Erkki,
-2026-10-12):** no client details in the repository (CLAUDE.md "Public
-facade"); older client names in this file now read "the pilot store" /
-"the second pilot store". **Queue:** the pilot developer's upgrade →
-pilot day (the initial setup per website, PRO-3663's three
-one-step-checkout checks, a test order and cart with Erkki's own test
-contact, Campaign Intelligence with one tenant) → the second pilot store.
-**Open for Erkki:** the developer's reply; PRO-4019 (the Estonian
-proofread); the "Pilot store live" milestone date once the upgrade date
-is known. **Backlog:** PRO-3746 (after the pilot), PRO-3921 / PRO-3916
-(engine; after PRO-3941 / PRO-3919), PRO-2461. **Gotcha (sandbox):** an
-old pending contacts→Smaily backfill job (id 1, 2026-10-02) and 2 ingest
-rows wait in the sandbox; `cron:run` there sends them to the smailydemo
-account and the synthetic engine tenant._
+_Last updated: 2026-10-12 session end — **transactional emails, first
+slice (settings only, no send path) is on `master`**; 3.0.0-rc12 is still
+the latest release, and the pilot store waits for its developer's rc12
+upgrade. **Merged since #173:** #174 PRO-2461 (a product page view of a
+product with an empty SKU is keyed `mag-<id>`, the same as its catalog row
+and its orders; `CatalogPayloadBuilder::sku()` is now the single helper;
+Hyvä is covered because it reads the same server-side context). #175
+PRO-4057 (storefront-only translations ru_RU, fi_FI, lv_LV and lt_LT of the
+13 shopper texts — machine translations that wait for a native review,
+PRO-4058; `StorefrontTranslationsTest` keeps them complete; the admin stays
+EN/ET). #176 PRO-4062 and #177 PRO-4065 (transactional emails, settings
+only: Settings > Connection has a "Transactional emails" card with the
+"Send transactional emails" master switch, a separate Smaily account
+store-wide with an optional per-website account, and Test connection;
+Settings > Automations shows nothing transactional until that account is
+connected, then "Order confirmation" and "Shipping confirmation" with
+Enabled off by default and a workflow per store language, plus the
+Customer details switch — all in the WooCommerce plugin's wording; the
+mapping rows live in `smaily_automation_mapping` with account_key
+`transactional`, no schema change; `ModuleDefinitionTest` guards that
+nothing hooks Magento's order and shipment email senders). Sandbox
+`setup:upgrade` + `setup:di:compile` passed on `master` after #176 and
+#177; the guide site was re-uploaded after each (its md5 matches
+`master`). rc12 does not hold #171–#177; the next release candidate (or
+3.0.0) brings them.
+
+**Decided (Erkki, 2026-10-12, PRO-1766 transactional emails):** a
+separate Smaily account (store-wide; a website may override it); v1 is
+order confirmation and shipping confirmation; the first send attempt runs
+synchronously during checkout with a short time limit, then the queue
+retries; after a 1-hour ceiling Magento's own email goes out once; the
+admin "Send Email" resends through Smaily; only the connector's own
+Enabled decides (Magento's order-email setting does not, and there is no
+fallback when Enabled is off); the merchant's copy keeps coming from
+Magento's "Send Order Email Copy To", because Smaily's public message/send
+API has no CC (an unannounced newer API stays out of public docs).
+Shipping confirmation fires on a Magento shipment — a Magento-specific
+difference from Woo; PRO-4067 holds the two small Woo differences left
+(the wizard card; triggers after Test connection).
+
+**Gotchas:** (1) the synchronous first send attempt is a deliberate
+exception to "nothing user-facing waits on HTTP" — the sending slice
+records it in `docs/ARCHITECTURE.md` in the same PR. (2) Workers never
+clone a private Smaily repository without Erkki's OK. (3) Client details
+never go into this public repository (CLAUDE.md "Public facade"); say
+"the pilot store". (4) Sandbox: an old pending contacts→Smaily backfill
+job (id 1, 2026-10-02) and 2 ingest rows wait there; `cron:run` sends them
+to the smailydemo account and the synthetic engine tenant.
+
+**Pilot:** waiting for the pilot store's developer to upgrade to rc12
+(Erkki sent the one-page guide as a PDF); the pilot-day plan is in Erkki's
+private document. **Open for Erkki:** the developer's reply and pilot day;
+PRO-4019 (the Estonian proofread — now also the transactional texts);
+PRO-4058 (native review of the ru/fi/lv/lt storefront texts); a
+transactional Smaily test account in a local credentials file (like the
+FTPS one); the "Pilot store live" milestone date once the upgrade date is
+known.
+
+**Next session opens with:**
+1. Check for the pilot developer's reply. Upgrade done → pilot day (the
+   initial setup per website, PRO-3663's three one-step-checkout checks,
+   a test order and cart with Erkki's own test contact, Campaign
+   Intelligence with one tenant).
+2. Otherwise, if the transactional account file exists → the live test
+   with a real transactional Smaily account: which workflow kinds
+   message/send accepts (the settings list
+   `autoresponder.php?status=ACTIVE`, as Woo does), escaping, and the
+   response codes.
+3. Then the order-confirmation sending slice (PRO-1766; it updates
+   `docs/ARCHITECTURE.md`, gotcha 1).
+4. Cut rc13 when the pilot needs #171–#177.
+5. Backlog: PRO-4067, PRO-3746 (after the pilot), PRO-3921 / PRO-3916
+   (engine; after PRO-3941 / PRO-3919); the second pilot store after the
+   first._
+
+_Earlier (2026-10-12 later): **3.0.0-rc12 released** (`gh release
+create`, no HTTP 500; four assets — the main and the Hyvä ZIP, each with
+its `.sha256`); the Hyvä mirror tag and both Packagist packages followed
+automatically (the mirror's webhook works). #171 PRO-4053: a 2.8.x copied
+into `app/code/Smaily/SmailyForMagento` — delete only that folder, then
+install v3; never run `module:uninstall Smaily_SmailyForMagento` once v3
+is required (it composer-removes v3). A pilot store was identified and
+pre-flighted from its admin (Magento 2.4.8, a Luma-based theme, four
+websites under one Smaily account, 2.8.x with abandoned cart on and
+contact sync saved No, so the migration keeps contact sync off); its
+developer upgrades on the server from a one-page guide; details in Linear
+PRO-2474 only. Decided (PRO-3662): one shared Campaign Intelligence tenant
+for a four-website store; a tenant per country stays with PRO-1463 /
+PRO-1464. Confirmed (PRO-4015): 2.8.x posted opt-ins to Smaily's
+authenticated autoresponder API. #173: the no-client-details rule._
 
 _Earlier (2026-10-12): the 3.0.0-rc12 version cut (#170) — the version in
 composer.json, `ModuleInfo::VERSION`, the docblock and the merchant
@@ -7134,7 +7185,7 @@ Earlier: 2026-09-11, 2026-09-10._
 | PRO-2454 | Event Log "Send again", server-worded refusals, no double-send on retry (Woo PRO-2324/2368/1733 parity) | Medium — may slip to 3.1 |
 | PRO-2455 | Smaily landing page as a Magento CMS widget — decided for 3.1 | Low |
 | PRO-1748 | Terminology canon across admin copy and docs | Medium |
-| PRO-1766 | Feature: transactional emails (parity with Woo v3.9/v3.10) | Low |
+| PRO-1766 | Feature: transactional emails (parity with Woo v3.9/v3.10) | In progress — settings on `master` (#176, #177, unreleased); next the live message/send test, then the order-confirmation sending slice |
 | PRO-2456 | Fidelity check of the July design pack against the rendered admin (UI/UX parity project) | — |
 
 Closed 2026-07-11: PRO-1199 (integration suite), PRO-1200 (i18n), PRO-1202 /
@@ -7368,3 +7419,10 @@ PRO-1267 (engine: Magento product-identity contract note).
     still open; (g) the Hyvä Tailwind build script name
     (`npm run build-prod` in the docs vs `npm run build` in HYVA_SUPPORT's
     sandbox recipe) — check it on the Hyvä store of (c).
+    Updated 2026-10-12 session end: (a) still open — the developer's
+    reply (Erkki sent the guide as a PDF; the pilot-day plan is in Erkki's
+    private document). (b) PRO-4019 now also covers the transactional
+    settings texts (#176, #177). (h) PRO-4058 — a native review of the
+    ru/fi/lv/lt storefront translations (#175). (i) A transactional Smaily
+    test account in a local credentials file (like the FTPS one) for the
+    live message/send test (PRO-1766).

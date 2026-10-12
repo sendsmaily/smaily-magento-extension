@@ -39,6 +39,9 @@ use Smaily\Connect\Test\Unit\Support\StoreLocale;
  *
  * PRO-4015: a website where 2.8.x had the opt-in, or abandoned cart, on with
  * no Autoresponder ID keeps that automation off, and an admin notice names it.
+ *
+ * PRO-4036: a website whose 2.8.x contact sync was on keeps syncing without
+ * its Contacts step being saved again; any other website waits for it.
  */
 class LegacyScopeUpgradeTest extends IntegrationTestCase
 {
@@ -199,6 +202,34 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
         }
     }
 
+    public function testAWebsiteWhose28xContactSyncWasOnKeepsSyncing(): void
+    {
+        foreach ([1, 2, 3] as $websiteId) {
+            self::assertTrue($this->config->isContactSyncActive($websiteId), 'Website ' . $websiteId);
+        }
+        // Enable Module = No on website 4 stopped its sync in 2.8.x.
+        self::assertFalse($this->config->isContactSyncActive(4));
+    }
+
+    public function testWithoutA28xSynchronizationAnswerEveryWebsiteWaitsForItsContactsStep(): void
+    {
+        // 2.8.x had no default for Enable Synchronization: unanswered, it
+        // synced nothing.
+        $this->env->resetState();
+        $this->seed('default', 0, [
+            'smaily/general/subdomain' => 'shop',
+            'smaily/general/username' => 'api-user',
+            'smaily/general/password' => 'plain-secret',
+        ]);
+
+        $this->migrate();
+
+        foreach ([1, 2, 3, 4] as $websiteId) {
+            self::assertTrue($this->config->isSyncEnabled($websiteId), 'Website ' . $websiteId);
+            self::assertFalse($this->config->isContactSyncActive($websiteId), 'Website ' . $websiteId);
+        }
+    }
+
     public function testUnderADefaultScopeWithNoAWebsiteWithItsOwnYesRunsAsIn28x(): void
     {
         $this->env->resetState();
@@ -236,6 +267,10 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
         self::assertFalse($this->config->isAbandonedCartEnabled(2));
         // Website 3 runs on what it inherited from the default scope in 2.8.x.
         self::assertTrue($this->config->isSyncEnabled(3));
+        self::assertTrue($this->config->isContactSyncActive(3));
+        foreach ([1, 2, 4] as $websiteId) {
+            self::assertFalse($this->config->isContactSyncActive($websiteId), 'Website ' . $websiteId);
+        }
         self::assertTrue($this->config->isWelcomeEnabled(3));
         self::assertSame(55, $this->config->getWelcomeWorkflow(3));
         self::assertTrue($this->config->isAbandonedCartEnabled(3));

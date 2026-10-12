@@ -343,6 +343,17 @@ class WizardDataTest extends TestCase
     }
 
     /**
+     * PRO-4036: the Contacts step says that contacts start syncing with its
+     * save only for a website whose contacts do not sync yet.
+     */
+    public function testIsContactSyncActiveReadsAtTheSelectedWebsiteScope(): void
+    {
+        $this->config->expects(self::once())->method('isContactSyncActive')->with(2)->willReturn(true);
+
+        self::assertTrue($this->viewModel->isContactSyncActive());
+    }
+
+    /**
      * PRO-3582: the import estimate counts the audience the import sends,
      * for every mode the panel offers, on the selected website.
      */

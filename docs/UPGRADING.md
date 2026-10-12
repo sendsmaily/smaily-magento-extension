@@ -113,6 +113,12 @@ synchronization stays off: its Contacts step shows **Sync contacts to
 Smaily** unticked, and **Continue** keeps it off. Tick it there to switch
 contact synchronization on.
 
+A website where 2.8.x had *Enable Syncronization* on — the website's own
+value, else the Default Config value — keeps syncing contacts from the
+upgrade on, without its Contacts step being saved again. A website where
+it was off, or never saved, sends no contacts to Smaily until its Contacts
+step is saved, as on a new install.
+
 For a website where 2.8.x had *Enable Subscribers Collection* on with no
 *Autoresponder ID* — each the website's own value, else the Default Config
 value — 2.8.x sent no welcome email, and the welcome automation stays off.
@@ -171,8 +177,9 @@ are per website, on **Marketing > Smaily Connect > Settings > Contacts**
 (and in step 2 of the initial setup):
 
 - **The checkout newsletter checkbox is on.** 2.8.x had no checkout
-  checkbox. v3 adds one to the checkout payment step while contact sync is
-  on and the store view is connected to Smaily. To keep checkout as it
+  checkbox. v3 adds one to the checkout payment step while contact sync
+  runs for the website (see *After the upgrade*) and the store view is
+  connected to Smaily. To keep checkout as it
   was, untick **Show a newsletter checkbox at checkout**.
 - **Magento's own newsletter emails are suppressed.** Magento's
   subscription-confirmed ("confirmation success") email and its

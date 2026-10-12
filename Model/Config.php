@@ -29,6 +29,7 @@ class Config
     public const XML_PATH_STOREFRONT_URL = 'smaily_connect/connection/storefront_url';
     public const XML_PATH_SYNC_ENABLED = 'smaily_connect/subscribers/sync_enabled';
     public const XML_PATH_SYNC_MODE = 'smaily_connect/subscribers/sync_mode';
+    public const XML_PATH_CONTACTS_CONFIRMED = 'smaily_connect/internal/contacts_confirmed';
     public const XML_PATH_SYNC_FIELDS = 'smaily_connect/subscribers/sync_fields';
     public const XML_PATH_INCLUDE_GUESTS = 'smaily_connect/subscribers/include_guests';
     public const XML_PATH_CHECKOUT_OPTIN_ENABLED = 'smaily_connect/subscribers/checkout_optin_enabled';
@@ -191,6 +192,21 @@ class Config
     public function isSyncEnabled(?int $websiteId = null): bool
     {
         return $this->websiteFlag(self::XML_PATH_SYNC_ENABLED, $websiteId);
+    }
+
+    /**
+     * Whether contacts of a website go to Smaily: its contact sync is on
+     * and its Contacts settings were saved — the setup's Contacts step or
+     * Settings > Contacts (PRO-4036), or the upgrade marked them saved for a
+     * website that synced before. Every contact-sync path (the observers,
+     * the consent reconcile, the checkout checkbox, the contacts import)
+     * asks this; each still checks the credentials of the store it sends
+     * through.
+     */
+    public function isContactSyncActive(int $websiteId): bool
+    {
+        return $this->isSyncEnabled($websiteId)
+            && $this->websiteFlag(self::XML_PATH_CONTACTS_CONFIRMED, $websiteId);
     }
 
     /**

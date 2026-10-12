@@ -34,7 +34,7 @@ class AddNewsletterOptinToLayout
         $websiteId = (int)$this->storeManager->getWebsite()->getId();
         $storeId = (int)$this->storeManager->getStore()->getId();
         if (!$this->config->isCheckoutOptinEnabled($websiteId)
-            || !$this->config->isSyncEnabled($websiteId)
+            || !$this->config->isContactSyncActive($websiteId)
             || !$this->config->isConnected($storeId ?: null)
         ) {
             return $jsLayout;

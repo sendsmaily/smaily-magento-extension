@@ -115,7 +115,7 @@ class OrderPlaced implements ObserverInterface
         int $websiteId,
         bool $optedIn
     ): void {
-        if (!$this->config->isSyncEnabled($websiteId)) {
+        if (!$this->config->isContactSyncActive($websiteId)) {
             return;
         }
 

@@ -606,8 +606,8 @@ below.
   the initial setup's Connect step — the same `panel/connection.phtml`
   field, posted by `panels.collect.connect()` and checked and saved by
   `WizardStepSaver::saveConnect()`, PRO-3802; the setup saves it with the
-  connection, the save from which a new install's contact sync runs — see
-  *Wizard-first gating*).
+  connection, before the Contacts step's save starts a new install's
+  contact sync — see *Wizard-first gating*).
   `Model\StorefrontUrl::apply()` replaces the scheme, host and port of the
   product link with it — path and query string kept — read at the store the
   link was built for: `CatalogPayloadBuilder::productUrl()` after the
@@ -898,7 +898,10 @@ empty settings. A legacy *Enable Module = No* (default or website)
 becomes contact sync, welcome and abandoned cart off at that scope (a
 website with its own Yes under a default No gets the three at its scope with
 their 2.8.x values); a store-view Smaily account row (2.8.x never read it) is not carried over, and
-an admin notice names those store views. A website where 2.8.x had the
+an admin notice names those store views. A website whose migrated contact
+sync is on gets `smaily_connect/internal/contacts_confirmed`, so it keeps
+syncing without its Contacts step (PRO-4036; *Wizard-first gating*). A
+website where 2.8.x had the
 opt-in, or abandoned cart, on with no Autoresponder ID keeps that automation
 off, and an admin notice per automation names those websites
 (`LegacyConfigMapper::welcomeWithoutWorkflow()`,
@@ -1545,15 +1548,32 @@ Initial setup, Settings, Log. Design rules:
   A newly added website has no flag, and after an upgrade from 2.8.x no
   website has one (the legacy migration does not write it), so each such
   website goes through the wizard — intended. The flag gates these admin
-  pages only; contact sync never reads it. A website's contact sync (the
-  observers, `Cron\ContactReconcile`, the checkout checkbox) runs while
-  `smaily_connect/subscribers/sync_enabled` is on — `etc/config.xml`
-  defaults it to 1 — and its credentials are saved (`Config::isConnected()`,
-  non-empty values, not a Smaily check), so on a new install it runs from
-  the Connect step's save. The Contacts step saves `sync_enabled` only where
-  it shows the switch, a website whose sync is off (PRO-4010), and starts
-  no import: the contacts import starts only from **Start import**
-  (`Api\BackfillState`, `action: start`). The guard also tracks
+  pages only; contact sync never reads it. A website's contact sync — the
+  observers, `Cron\ContactReconcile`, the checkout checkbox and the
+  contacts import (`Backfill\ContactsProcessor`) — runs only while
+  `Config::isContactSyncActive()` says so: `smaily_connect/subscribers/sync_enabled`
+  is on (`etc/config.xml` defaults it to 1) AND
+  `smaily_connect/internal/contacts_confirmed` is set for the website
+  (PRO-4036); each path also needs the credentials of the store it sends
+  through (`Config::isConnected()`, non-empty values, not a Smaily check).
+  `WizardStepSaver::saveSubscribers()` writes `contacts_confirmed` at
+  website scope on every Contacts save — the setup's Contacts step and
+  **Settings > Contacts** — so on a new install nothing is sent or queued
+  for a website before its Contacts step is saved, the Connect step's save
+  included. An upgrade keeps a website that synced before syncing:
+  `MigrateLegacyConfig` sets the flag where the migrated `sync_enabled`
+  (the website's row, else the default scope's) is 1, and
+  `ConfirmContactsOfConnectedWebsites` sets it on a 3.0.0
+  release-candidate store for every website with credentials at its
+  website scope (it does nothing in a setup run that migrated 2.8.x
+  settings, nor on a new install, which has no credentials yet). Abandoned
+  cart, the first-order automation, the cart-purchase marker and Campaign
+  Intelligence never read the flag; the welcome automation fires from the
+  subscriber observer behind that gate, so it waits too, as it does while
+  sync is off. The Contacts step saves `sync_enabled`
+  only where it shows the switch, a website whose sync is off (PRO-4010),
+  and starts no import: the contacts import starts only from **Start
+  import** (`Api\BackfillState`, `action: start`). The guard also tracks
   `smaily_connect/internal/last_seen_version` (module version read from
   composer.json via `Model\ModuleVersion`) and posts a one-time admin
   notice after a MAJOR version jump, in addition to the redirect.

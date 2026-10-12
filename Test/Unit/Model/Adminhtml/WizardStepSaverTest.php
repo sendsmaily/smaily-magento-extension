@@ -280,6 +280,48 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
+     * PRO-4036: every save of the Contacts settings — the setup's step with
+     * or without the switch, and Settings > Contacts — marks them saved for
+     * the website, which starts its contact sync. No other step does.
+     *
+     * @dataProvider contactsSaveProvider
+     * @param array<string, mixed> $data
+     */
+    public function testAContactsSaveMarksTheWebsitesContactsSettingsSaved(array $data): void
+    {
+        $this->saver->save('subscribers', $data);
+
+        self::assertSame('1', $this->savedValue(Config::XML_PATH_CONTACTS_CONFIRMED));
+        self::assertSame(
+            ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 0],
+            $this->savedScope(Config::XML_PATH_CONTACTS_CONFIRMED)
+        );
+    }
+
+    /**
+     * @return array<string, array{0: array<string, mixed>}>
+     */
+    public static function contactsSaveProvider(): array
+    {
+        return [
+            'the setup step without the switch' => [['sync_mode' => SyncMode::MODE_CONSENT, 'sync_fields' => []]],
+            'the setup step with the switch off' => [['sync_enabled' => false, 'sync_mode' => SyncMode::MODE_CONSENT]],
+            'Settings > Contacts' => [[
+                'sync_enabled' => true,
+                'sync_mode' => SyncMode::MODE_LEGITIMATE_INTEREST,
+                'include_guests' => false,
+            ]],
+        ];
+    }
+
+    public function testAConnectionSaveDoesNotMarkTheContactsSettingsSaved(): void
+    {
+        $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'password' => 'secret']);
+
+        self::assertFalse($this->wasSaved(Config::XML_PATH_CONTACTS_CONFIRMED));
+    }
+
+    /**
      * PRO-1460: connection credentials and the multilingual mode write at
      * website scope (docs/internal/RFC_MULTI_WEBSITE.md §1) — no website chooser exists
      * yet, so this is the installation's default website (id 0 with a bare

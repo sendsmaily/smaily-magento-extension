@@ -478,6 +478,17 @@ $intelligenceViewModel = static fn (
     }
 
     /**
+     * A new website: its Contacts settings were never saved, so its
+     * contacts do not sync yet (PRO-4036).
+     *
+     * @return bool
+     */
+    public function isContactSyncActive(): bool
+    {
+        return false;
+    }
+
+    /**
      * @return string
      */
     public function getSyncMode(): string
@@ -633,7 +644,7 @@ $contactsSetupTemplates = [
 $pages['contacts-setup'] = [
     'template' => $contactsSetupTemplates,
     'viewModel' => $intelligence,
-    'strings' => ['Sync contacts to Smaily'],
+    'strings' => ['Sync contacts to Smaily', 'Contacts start syncing to Smaily when you save this step.'],
 ];
 $pages['contacts-setup-off'] = [
     'template' => $contactsSetupTemplates,

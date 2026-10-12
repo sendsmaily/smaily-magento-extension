@@ -29,6 +29,7 @@ use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
 use Smaily\Connect\Model\SubdomainNormalizer;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
 
 /**
  * WizardStepSaver's website-scoped writes (docs/internal/RFC_MULTI_WEBSITE.md §1) against
@@ -257,6 +258,29 @@ class WizardStepSaverTest extends IntegrationTestCase
         }
         self::assertNotNull($websiteRow);
         self::assertSame(self::WEBSITE_ID, (int)$websiteRow['scope_id']);
+    }
+
+    /**
+     * PRO-4036: on a new install the Connect step's save starts no contact
+     * sync, though sync is on by default; the Contacts step's save does,
+     * for its website only.
+     */
+    public function testContactSyncStartsWithTheContactsStepNotTheConnectStep(): void
+    {
+        $config = $this->objectManager->create(Config::class, [
+            'scopeConfig' => new DatabaseScopeConfig($this->connection, [1 => self::WEBSITE_ID]),
+        ]);
+
+        $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'password' => 'secret']);
+
+        self::assertTrue($config->isConnected(1));
+        self::assertTrue($config->isSyncEnabled(self::WEBSITE_ID));
+        self::assertFalse($config->isContactSyncActive(self::WEBSITE_ID));
+
+        $this->saver->save('subscribers', ['sync_mode' => 'consent', 'sync_fields' => []]);
+
+        self::assertTrue($config->isContactSyncActive(self::WEBSITE_ID));
+        self::assertFalse($config->isContactSyncActive(self::WEBSITE_ID + 1), 'Another website still waits');
     }
 
     /**

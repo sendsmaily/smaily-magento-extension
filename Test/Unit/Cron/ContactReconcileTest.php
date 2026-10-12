@@ -72,7 +72,7 @@ class ContactReconcileTest extends TestCase
      */
     public function testPollsEveryDistinctPerLanguageAccount(): void
     {
-        $this->config->method('isSyncEnabled')->willReturn(true);
+        $this->config->method('isContactSyncActive')->willReturn(true);
         $this->config->method('isConnected')->willReturn(true);
         $this->config->method('getSubdomain')->willReturnMap([
             [1, 'demo-default'],
@@ -101,7 +101,7 @@ class ContactReconcileTest extends TestCase
      */
     public function testDoesNotPollTheSameAccountTwice(): void
     {
-        $this->config->method('isSyncEnabled')->willReturn(true);
+        $this->config->method('isContactSyncActive')->willReturn(true);
         $this->config->method('isConnected')->willReturn(true);
         // Store 6 ('en') has no override and inherits the same credentials
         // as the website's default store (1).
@@ -129,7 +129,7 @@ class ContactReconcileTest extends TestCase
      */
     public function testDefaultAccountKeepsThePreExistingFlagKey(): void
     {
-        $this->config->method('isSyncEnabled')->willReturn(true);
+        $this->config->method('isContactSyncActive')->willReturn(true);
         $this->config->method('isConnected')->willReturn(true);
         $this->config->method('getSubdomain')->willReturn('demo');
         $this->config->method('getUsername')->willReturn('user');
@@ -152,7 +152,7 @@ class ContactReconcileTest extends TestCase
      */
     public function testPerLanguageAccountGetsItsOwnSuffixedFlagKey(): void
     {
-        $this->config->method('isSyncEnabled')->willReturn(true);
+        $this->config->method('isContactSyncActive')->willReturn(true);
         $this->config->method('isConnected')->willReturn(true);
         $this->config->method('getSubdomain')->willReturnMap([
             [1, 'demo-default'],
@@ -184,7 +184,7 @@ class ContactReconcileTest extends TestCase
      */
     public function testUnconfiguredAccountIsSkipped(): void
     {
-        $this->config->method('isSyncEnabled')->willReturn(true);
+        $this->config->method('isContactSyncActive')->willReturn(true);
         $this->config->method('isConnected')->willReturnMap([
             [1, true],
             [5, false],
@@ -198,6 +198,23 @@ class ContactReconcileTest extends TestCase
         $this->createCron()->execute();
 
         self::assertSame([1], array_column($this->historyCalls, 'store'));
+    }
+
+    /**
+     * PRO-4036: a website whose Contacts settings were never saved is not
+     * polled — no Smaily call, no cursor, no subscriber write.
+     */
+    public function testAWebsiteWhoseContactSyncIsNotActiveIsNotPolled(): void
+    {
+        $this->config->method('isContactSyncActive')->with(1)->willReturn(false);
+        $this->config->method('isConnected')->willReturn(true);
+        $this->config->method('getSubdomain')->willReturn('demo');
+        $this->config->method('getUsername')->willReturn('user');
+        $this->accountResolver->method('languageStoreIds')->willReturn([]);
+        $this->clientProvider->expects(self::never())->method('forStore');
+        $this->flagManager->expects(self::never())->method('saveFlag');
+
+        $this->createCron()->execute();
     }
 
     private function stubClientsWithEmptyHistory(): void

@@ -312,6 +312,17 @@ class WizardData implements ArgumentInterface
     }
 
     /**
+     * Whether the selected website's contacts already sync to Smaily (its
+     * Contacts settings were saved, or it synced before the update,
+     * PRO-4036). Read by the wizard, whose Contacts step says otherwise
+     * that contacts start syncing with its save.
+     */
+    public function isContactSyncActive(): bool
+    {
+        return $this->config->isContactSyncActive($this->websiteContext->getWebsiteId());
+    }
+
+    /**
      * Saved sync-field selection for the server-rendered step-2 checkboxes.
      *
      * @return string[]

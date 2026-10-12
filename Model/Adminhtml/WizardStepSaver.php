@@ -605,6 +605,15 @@ class WizardStepSaver
             );
         }
 
+        // The merchant has now chosen how this website's contacts sync:
+        // contact sync starts here, not with the connection (PRO-4036).
+        $this->configWriter->save(
+            Config::XML_PATH_CONTACTS_CONFIRMED,
+            '1',
+            ScopeInterface::SCOPE_WEBSITES,
+            $websiteId
+        );
+
         return [];
     }
 

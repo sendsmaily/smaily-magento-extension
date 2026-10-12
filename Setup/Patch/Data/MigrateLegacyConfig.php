@@ -48,6 +48,10 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
  * an admin notice per automation names those websites so the merchant can
  * pick a workflow.
  *
+ * A website whose migrated contact sync is on gets its Contacts settings
+ * marked saved, so it keeps syncing; on a new install contact sync waits
+ * for the Contacts step (PRO-4036).
+ *
  * Store-view rows: 2.8.x read every setting per website, so it never read a
  * store-view row. v3 reads the Smaily account per store view, so the
  * store-view account rows (and Enable Module) are not carried over, and an
@@ -148,6 +152,7 @@ class MigrateLegacyConfig implements DataPatchInterface
             $this->seedAutomationMappings($legacy, $scope, (int)$scopeId);
             $allNotices = array_merge($allNotices, $result['notices']);
         }
+        $this->confirmSyncingWebsites();
 
         // Every scope is migrated: the 2.8.x rows go, the plaintext password
         // among them. Only "smaily/" itself matches, not smaily_connect/*.
@@ -167,6 +172,35 @@ class MigrateLegacyConfig implements DataPatchInterface
         $this->migrationOutcome->markMigrated();
 
         return $this;
+    }
+
+    /**
+     * Mark the Contacts settings saved (PRO-4036) for every website whose
+     * migrated contact sync is on — its own row, else the default scope's —
+     * so it keeps syncing as in 2.8.x without its Contacts step being saved
+     * again. A website with neither row had no 2.8.x synchronization answer,
+     * so 2.8.x synced none of its contacts: it waits for its Contacts step,
+     * as on a new install.
+     */
+    private function confirmSyncingWebsites(): void
+    {
+        $connection = $this->moduleDataSetup->getConnection();
+        $syncEnabled = [];
+        foreach ($connection->fetchAll(
+            $connection->select()
+                ->from($this->moduleDataSetup->getTable('core_config_data'), ['scope', 'scope_id', 'value'])
+                ->where('path = ?', Config::XML_PATH_SYNC_ENABLED)
+                ->where('scope IN (?)', [ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 'websites'])
+        ) as $row) {
+            $syncEnabled[$row['scope'] . ':' . $row['scope_id']] = (string)$row['value'];
+        }
+
+        foreach ($this->storeManager->getWebsites() as $website) {
+            $websiteId = (int)$website->getId();
+            if (($syncEnabled['websites:' . $websiteId] ?? $syncEnabled['default:0'] ?? null) === '1') {
+                $this->configWriter->save(Config::XML_PATH_CONTACTS_CONFIRMED, '1', 'websites', $websiteId);
+            }
+        }
     }
 
     /**

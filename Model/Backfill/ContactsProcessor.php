@@ -35,9 +35,11 @@ use Smaily\Connect\Model\Logger\Logger;
  * until the time budget is spent, so a large base imports across several
  * cron runs without ever blocking the cron group.
  *
- * The website's stored "Enable subscriber synchronization" answer gates
- * this import exactly as it gates the live paths and the reconcile tick —
- * one stored answer owns every outbound contact path (PRO-1764). The mode is
+ * Whether the website's contact sync is active (Config::isContactSyncActive:
+ * the stored "Enable subscriber synchronization" answer and the saved
+ * Contacts settings, PRO-4036) gates this import exactly as it gates the
+ * live paths and the reconcile tick — one answer owns every outbound
+ * contact path (PRO-1764). The mode is
  * read on every tick, so a mode changed mid-import decides what the rest of
  * the walk sends.
  */
@@ -65,7 +67,7 @@ class ContactsProcessor implements ProcessorInterface
      */
     public function process(Job $job): void
     {
-        // Same stored answer, same website resolution as the live paths
+        // Same answer, same website resolution as the live paths
         // (Observer\SubscriberSaveAfter, Cron\ContactReconcile). A job that
         // never started completes having sent nothing, its total 0 rather
         // than a contact count promising a sync that will not happen; a
@@ -75,7 +77,7 @@ class ContactsProcessor implements ProcessorInterface
         // only" imports nobody, so it ends the same way.
         $websiteId = $job->getWebsiteId();
         $mode = $this->mode->mode($websiteId);
-        if (!$this->config->isSyncEnabled($websiteId) || $mode === SyncMode::MODE_CHECKOUT_OPTIN) {
+        if (!$this->config->isContactSyncActive($websiteId) || $mode === SyncMode::MODE_CHECKOUT_OPTIN) {
             if ($job->getData('total_count') === null) {
                 $job->setData('total_count', 0);
                 $this->jobManager->complete($job);

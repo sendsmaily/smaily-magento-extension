@@ -32,7 +32,8 @@ use Smaily\Connect\Model\Logger\Logger;
  * import exactly as it gates the live paths — with the switch off nothing
  * reaches the transport, a job that never started reports a total of 0
  * rather than promising a sync, and one already in flight is stopped with
- * the counts it really achieved.
+ * the counts it really achieved. The same holds before a website's Contacts
+ * settings are saved, when its contact sync is not active yet (PRO-4036).
  *
  * PRO-3582: the import sends the audience of the website's contact-sync mode,
  * and every contact goes with its real subscription status.
@@ -318,7 +319,7 @@ class ContactsProcessorTest extends TestCase
         JobManager&MockObject $jobManager,
         ContactAudience&MockObject $audience,
         SmailyClientProvider&MockObject $clientProvider,
-        bool $syncEnabled,
+        bool $active,
         string $mode = SyncMode::MODE_CONSENT
     ): ContactsProcessor {
         $payloadBuilder = $this->createMock(SubscriberPayloadBuilder::class);
@@ -330,7 +331,7 @@ class ContactsProcessorTest extends TestCase
         );
 
         $config = $this->createMock(Config::class);
-        $config->method('isSyncEnabled')->with(self::WEBSITE_ID)->willReturn($syncEnabled);
+        $config->method('isContactSyncActive')->with(self::WEBSITE_ID)->willReturn($active);
 
         $modeModel = $this->createMock(Mode::class);
         $modeModel->method('mode')->with(self::WEBSITE_ID)->willReturn($mode);

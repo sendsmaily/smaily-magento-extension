@@ -162,7 +162,9 @@ singular for one, and no other total.
 (`panel/subscribers.phtml` without the Settings context) and saves it the
 way **Continue** does, in both languages: for a website whose contact sync
 is on, the step shows no **Sync contacts to Smaily** switch and its save
-posts no sync answer, so the stored one stays; for a website whose sync is
+posts no sync answer, so the stored one stays, and a website whose contacts
+do not sync yet reads that contacts start syncing when the step is saved;
+for a website whose sync is
 off, the step shows the switch unticked with the import button disabled,
 an unchanged save posts sync off, and a ticked switch posts it on. There
 and on the Settings Contacts tab of such a website, the import button stays

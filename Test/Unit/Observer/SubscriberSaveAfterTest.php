@@ -35,6 +35,9 @@ use Smaily\Connect\Observer\SubscriberSaveAfter;
  * PRO-3606: in the checkout-opt-in-only mode only the checkout opt-in
  * creates or updates a Smaily contact; a newsletter-form signup alone does
  * not.
+ *
+ * PRO-4036: before contact sync is active for the website (its Contacts
+ * settings not saved yet), nothing goes to Smaily.
  */
 class SubscriberSaveAfterTest extends TestCase
 {
@@ -204,13 +207,39 @@ class SubscriberSaveAfterTest extends TestCase
         ];
     }
 
+    /**
+     * PRO-4036: a subscription or an unsubscribe on a website whose
+     * Contacts settings were never saved queues nothing, and no welcome.
+     *
+     * @dataProvider statusChangeProvider
+     */
+    public function testNothingIsQueuedBeforeContactSyncIsActive(int $status): void
+    {
+        $this->dispatcher->expects(self::never())->method('dispatchContactSync');
+        $this->dispatcher->expects(self::never())->method('dispatchAutomation');
+
+        $this->observer('frontend', null, SyncMode::MODE_CONSENT, false)->execute($this->eventFor($status));
+    }
+
+    /**
+     * @return array<string, array{0: int}>
+     */
+    public static function statusChangeProvider(): array
+    {
+        return [
+            'subscribe' => [Subscriber::STATUS_SUBSCRIBED],
+            'unsubscribe' => [Subscriber::STATUS_UNSUBSCRIBED],
+        ];
+    }
+
     private function observer(
         ?string $area,
         ?StorefrontSubscription $storefrontSubscription = null,
-        string $mode = SyncMode::MODE_CONSENT
+        string $mode = SyncMode::MODE_CONSENT,
+        bool $active = true
     ): SubscriberSaveAfter {
         $config = $this->createMock(Config::class);
-        $config->method('isSyncEnabled')->willReturn(true);
+        $config->method('isContactSyncActive')->with(1)->willReturn($active);
         $config->method('isConnected')->willReturn(true);
         $config->method('isWelcomeEnabled')->willReturn(true);
         $config->method('getSyncMode')->willReturn($mode);

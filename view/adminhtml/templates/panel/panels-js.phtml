@@ -491,9 +491,9 @@ window.smailyPanelsInit = function ($) {
     }
 
     // The trigger settings show only while Smaily accepts the saved
-    // transactional account; otherwise a pointer to the Connection tab.
+    // transactional account; otherwise nothing of them shows (as in the
+    // WooCommerce plugin, PRO-1540).
     function transactionalConnected(verified) {
-        $('#smaily-tx-pointer').toggle(!verified);
         $('#smaily-tx-triggers').toggle(verified);
         loadTransactionalWorkflows();
     }
@@ -543,10 +543,15 @@ window.smailyPanelsInit = function ($) {
         });
     }
 
+    // "Send transactional emails" (PRO-4065) off posts only the switch: the
+    // hidden account stays as it is saved.
     function withTransactional(data) {
-        if ($('#smaily-tx-account').length) {
-            data.transactional = $.extend(transactionalFields(), {website_account: transactionalOwnAccount()});
+        if (!$('#smaily-tx-account').length) {
+            return data;
         }
+        data.transactional = $('#smaily-tx-enabled').is(':checked')
+            ? $.extend({enabled: true}, transactionalFields(), {website_account: transactionalOwnAccount()})
+            : {enabled: false};
         return data;
     }
 
@@ -1000,6 +1005,10 @@ window.smailyPanelsInit = function ($) {
             });
         });
 
+        $(document).on('change', '#smaily-tx-enabled', function () {
+            $('#smaily-tx-account-fields').toggle($(this).is(':checked'));
+        });
+
         $(document).on('change', '#smaily-tx-website-account', function () {
             showTransactionalAccount($(this).is(':checked') ? 'own' : 'shared');
         });
@@ -1296,6 +1305,7 @@ window.smailyPanelsInit = function ($) {
                 data.transactional = {
                     order_confirmation_enabled: $('#smaily-tx-order_confirmation-enabled').is(':checked'),
                     shipment_confirmation_enabled: $('#smaily-tx-shipment_confirmation-enabled').is(':checked'),
+                    personal_data_enabled: $('#smaily-tx-personal-data').is(':checked'),
                     mappings: transactionalMappings
                 };
             }

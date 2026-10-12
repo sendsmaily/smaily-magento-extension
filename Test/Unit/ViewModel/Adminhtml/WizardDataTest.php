@@ -145,11 +145,13 @@ class WizardDataTest extends TestCase
         $this->config->method('getTransactionalPassword')->willReturnMap([[2, 'tx-secret'], [null, 'secret']]);
         $this->config->method('hasTransactionalWebsiteAccount')->with(2)->willReturn(true);
         $this->verifiedCredentials->method('isTransactionalVerified')->with(2)->willReturn(true);
+        $this->config->method('isTransactionalEnabled')->with(2)->willReturn(true);
 
         $account = $this->viewModel->getTransactionalAccount();
 
         self::assertSame(
             [
+                'enabled' => true,
                 'subdomain' => 'demo-tx',
                 'username' => 'tx',
                 'hasPassword' => true,

@@ -25,8 +25,9 @@ use Smaily\Connect\Model\SubdomainNormalizer;
 /**
  * The transactional-email settings of Settings (PRO-4062): the separate
  * account saved for all websites (default scope) with an optional website
- * account, its password stored encrypted, and the two triggers off unless
- * switched on.
+ * account, its password stored encrypted, behind the "Send transactional
+ * emails" switch (PRO-4065), and the two triggers and Customer details off
+ * unless switched on.
  */
 class TransactionalSettingsSaverTest extends TestCase
 {
@@ -102,7 +103,7 @@ class TransactionalSettingsSaverTest extends TestCase
 
     public function testTheAccountIsSavedForAllWebsitesWithItsPasswordEncrypted(): void
     {
-        $account = ['subdomain' => 'shop-tx', 'username' => 'api', 'password' => 'secret'];
+        $account = ['enabled' => true, 'subdomain' => 'shop-tx', 'username' => 'api', 'password' => 'secret'];
 
         self::assertSame([], $this->saver->accountErrors($account, self::WEBSITE_ID));
         $this->saver->saveAccount($account, self::WEBSITE_ID);
@@ -115,6 +116,25 @@ class TransactionalSettingsSaverTest extends TestCase
         self::assertContains(Config::XML_PATH_TRANSACTIONAL_PASSWORD . '@websites/3', $this->deleted);
         self::assertContains(Config::XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT . '@websites/3', $this->deleted);
         self::assertTrue($this->saver->isAccountAccepted());
+        self::assertSame('1', $this->saved[Config::XML_PATH_TRANSACTIONAL_ENABLED . '@websites/3']);
+    }
+
+    /**
+     * PRO-4065: "Send transactional emails" off (the WooCommerce plugin's
+     * master switch) is saved for the website; the hidden account is
+     * neither checked nor changed.
+     */
+    public function testWithTheSwitchOffTheAccountStaysAsItIs(): void
+    {
+        $this->client->expects(self::never())->method('validateCredentials');
+        $account = ['enabled' => false, 'subdomain' => 'half-typed', 'username' => '', 'password' => ''];
+
+        self::assertSame([], $this->saver->accountErrors($account, self::WEBSITE_ID));
+        $this->saver->saveAccount($account, self::WEBSITE_ID);
+
+        self::assertSame([Config::XML_PATH_TRANSACTIONAL_ENABLED . '@websites/3' => '0'], $this->saved);
+        self::assertSame([], $this->deleted);
+        self::assertFalse($this->saver->isAccountAccepted());
     }
 
     public function testAWebsiteOfAMultiWebsiteInstallMayUseItsOwnAccount(): void
@@ -122,7 +142,7 @@ class TransactionalSettingsSaverTest extends TestCase
         $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
 
         $this->saver->saveAccount(
-            ['subdomain' => 'ee-tx', 'username' => 'api', 'password' => 'secret', 'website_account' => true],
+            ['enabled' => true, 'subdomain' => 'ee-tx', 'username' => 'api', 'password' => 'secret', 'website_account' => true],
             self::WEBSITE_ID
         );
 
@@ -138,7 +158,7 @@ class TransactionalSettingsSaverTest extends TestCase
         $this->websiteContext->method('hasMultipleWebsites')->willReturn(false);
 
         $this->saver->saveAccount(
-            ['subdomain' => 'shop-tx', 'username' => 'api', 'password' => 'secret', 'website_account' => true],
+            ['enabled' => true, 'subdomain' => 'shop-tx', 'username' => 'api', 'password' => 'secret', 'website_account' => true],
             self::WEBSITE_ID
         );
 
@@ -149,7 +169,7 @@ class TransactionalSettingsSaverTest extends TestCase
     public function testAnEmptyPasswordKeepsTheSavedOneOfTheSameAccount(): void
     {
         $this->savedAccount('shop-tx', 'api', 'stored');
-        $account = ['subdomain' => 'SHOP-TX', 'username' => 'api', 'password' => '******'];
+        $account = ['enabled' => true, 'subdomain' => 'SHOP-TX', 'username' => 'api', 'password' => '******'];
 
         self::assertSame([], $this->saver->accountErrors($account, self::WEBSITE_ID));
         $this->saver->saveAccount($account, self::WEBSITE_ID);
@@ -168,7 +188,13 @@ class TransactionalSettingsSaverTest extends TestCase
         $this->config->method('getTransactionalSubdomain')->willReturnMap([[3, 'ee-tx'], [null, 'shop-tx']]);
         $this->config->method('getTransactionalUsername')->willReturnMap([[3, 'api-ee'], [null, 'api']]);
         $this->config->method('getTransactionalPassword')->willReturnMap([[3, 'ee-secret'], [null, 'secret']]);
-        $shared = ['subdomain' => 'shop-tx', 'username' => 'api', 'password' => '', 'website_account' => false];
+        $shared = [
+            'enabled' => true,
+            'subdomain' => 'shop-tx',
+            'username' => 'api',
+            'password' => '',
+            'website_account' => false,
+        ];
 
         self::assertSame([], $this->saver->accountErrors($shared, self::WEBSITE_ID));
         $this->saver->saveAccount($shared, self::WEBSITE_ID);
@@ -176,7 +202,7 @@ class TransactionalSettingsSaverTest extends TestCase
         self::assertSame('enc:secret', $this->saved[Config::XML_PATH_TRANSACTIONAL_PASSWORD . '@default/0']);
         self::assertContains(Config::XML_PATH_TRANSACTIONAL_SUBDOMAIN . '@websites/3', $this->deleted);
         // The website's own account, unchanged, keeps the website's password.
-        self::assertSame([], $this->saver->accountErrors(['website_account' => true] + [
+        self::assertSame([], $this->saver->accountErrors(['enabled' => true, 'website_account' => true] + [
             'subdomain' => 'ee-tx',
             'username' => 'api-ee',
             'password' => '',
@@ -192,7 +218,10 @@ class TransactionalSettingsSaverTest extends TestCase
                 'field' => 'transactional.password',
                 'message' => 'The subdomain or username changed — enter the password of this account.',
             ]],
-            $this->saver->accountErrors(['subdomain' => 'other', 'username' => 'api', 'password' => ''], 3)
+            $this->saver->accountErrors(
+                ['enabled' => true, 'subdomain' => 'other', 'username' => 'api', 'password' => ''],
+                3
+            )
         );
     }
 
@@ -203,7 +232,10 @@ class TransactionalSettingsSaverTest extends TestCase
         self::assertSame(
             ['transactional.password'],
             array_column(
-                $this->saver->accountErrors(['subdomain' => 'shop-tx', 'username' => 'api', 'password' => ''], 3),
+                $this->saver->accountErrors(
+                    ['enabled' => true, 'subdomain' => 'shop-tx', 'username' => 'api', 'password' => ''],
+                    3
+                ),
                 'field'
             )
         );
@@ -213,12 +245,18 @@ class TransactionalSettingsSaverTest extends TestCase
     {
         self::assertSame(
             ['transactional.username'],
-            array_column($this->saver->accountErrors(['subdomain' => 'shop-tx', 'password' => 'x'], 3), 'field')
+            array_column(
+                $this->saver->accountErrors(['enabled' => true, 'subdomain' => 'shop-tx', 'password' => 'x'], 3),
+                'field'
+            )
         );
         self::assertSame(
             ['transactional.subdomain'],
             array_column(
-                $this->saver->accountErrors(['subdomain' => 'shop.tx/', 'username' => 'api', 'password' => 'x'], 3),
+                $this->saver->accountErrors(
+                    ['enabled' => true, 'subdomain' => 'shop.tx/', 'username' => 'api', 'password' => 'x'],
+                    3
+                ),
                 'field'
             )
         );
@@ -226,12 +264,12 @@ class TransactionalSettingsSaverTest extends TestCase
 
     public function testEmptyFieldsRemoveTheAccount(): void
     {
-        $account = ['subdomain' => '', 'username' => '', 'password' => ''];
+        $account = ['enabled' => true, 'subdomain' => '', 'username' => '', 'password' => ''];
 
         self::assertSame([], $this->saver->accountErrors($account, self::WEBSITE_ID));
         $this->saver->saveAccount($account, self::WEBSITE_ID);
 
-        self::assertSame([], $this->saved);
+        self::assertSame(['1'], array_values($this->saved), 'Only the switch is saved');
         self::assertContains(Config::XML_PATH_TRANSACTIONAL_SUBDOMAIN . '@default/0', $this->deleted);
         self::assertContains(Config::XML_PATH_TRANSACTIONAL_PASSWORD . '@default/0', $this->deleted);
         self::assertContains(Config::XML_PATH_TRANSACTIONAL_SUBDOMAIN . '@websites/3', $this->deleted);
@@ -242,7 +280,10 @@ class TransactionalSettingsSaverTest extends TestCase
     {
         $this->client->method('validateCredentials')->willThrowException(new AuthenticationException());
 
-        $this->saver->saveAccount(['subdomain' => 'shop-tx', 'username' => 'api', 'password' => 'bad'], 3);
+        $this->saver->saveAccount(
+            ['enabled' => true, 'subdomain' => 'shop-tx', 'username' => 'api', 'password' => 'bad'],
+            3
+        );
 
         self::assertArrayHasKey(Config::XML_PATH_TRANSACTIONAL_PASSWORD . '@default/0', $this->saved);
         self::assertFalse($this->saver->isAccountAccepted());
@@ -257,10 +298,12 @@ class TransactionalSettingsSaverTest extends TestCase
         $errors = $this->saver->saveTriggers([
             'order_confirmation_enabled' => true,
             'shipment_confirmation_enabled' => false,
+            'personal_data_enabled' => true,
             'mappings' => $mappings,
         ], self::WEBSITE_ID);
 
         self::assertSame([], $errors);
+        self::assertSame('1', $this->saved[Config::XML_PATH_TRANSACTIONAL_PERSONAL_DATA . '@websites/3']);
         self::assertSame('1', $this->saved[Config::XML_PATH_ORDER_CONFIRMATION_ENABLED . '@websites/3']);
         self::assertSame('0', $this->saved[Config::XML_PATH_SHIPMENT_CONFIRMATION_ENABLED . '@websites/3']);
     }

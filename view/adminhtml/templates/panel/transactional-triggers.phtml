@@ -6,14 +6,15 @@
  * Transactional-email triggers (PRO-4062) on Settings > Automations, after
  * the WooCommerce plugin's TransactionalTriggersSection; the initial setup
  * does not show them. Until Smaily accepts the transactional account saved
- * on the Connection tab, only a pointer there shows; once it does, Order
- * confirmation and Shipment confirmation each show Enabled (off by default)
- * and their workflow, listed from that account: one row per store language
- * with a default fallback when the website has more than one language,
- * whatever the multilingual mode (Woo PRO-3187), else one workflow. A
- * connection save that connects the account shows them without a reload.
- * Saved with Save Automations. Behavior lives in panel/panels-js.phtml.
- * Nothing is sent yet.
+ * on the Connection tab, nothing of it shows (as in the WooCommerce plugin,
+ * PRO-1540); once it does, Order confirmation and Shipping confirmation
+ * each show Enabled (off by default) and their workflow, listed from that
+ * account: one row per store language with a default fallback when the
+ * website has more than one language, whatever the multilingual mode (Woo
+ * PRO-3187), else one workflow; below them the Customer details switch (off
+ * by default, Woo PRO-3190). A connection save that connects the account
+ * shows them without a reload. Saved with Save Automations. Behavior lives
+ * in panel/panels-js.phtml. Nothing is sent yet.
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
@@ -31,78 +32,82 @@ $triggers = [
         'desc' => __('Sent when a customer places an order.'),
     ],
     'shipment_confirmation' => [
-        'name' => __('Shipment confirmation'),
+        'name' => __('Shipping confirmation'),
         'desc' => __('Sent when a shipment is created for the order.'),
     ],
 ];
 ?>
-<div class="smaily-card" id="smaily-tx-triggers-card">
+<div class="smaily-card" id="smaily-tx-triggers" <?= $connected ? '' : 'style="display:none;"' ?>>
     <h2><?= $escaper->escapeHtml(__('Transactional emails')) ?></h2>
-    <p id="smaily-tx-pointer" <?= $connected ? 'style="display:none;"' : '' ?>><?= $escaper->escapeHtml(__('Connect your transactional Smaily account on the Connection tab to set up order and shipment confirmations.')) ?></p>
-    <div id="smaily-tx-triggers" <?= $connected ? '' : 'style="display:none;"' ?>>
-        <p><?= $escaper->escapeHtml(__('Send transactional emails via transactional Smaily account, which you can connect on the Connection tab. Transactional emails should be sent from a separate account than marketing emails.')) ?></p>
-        <p class="note"><?= $escaper->escapeHtml(__('Sending arrives in a later release: these settings send nothing yet, and Magento sends its own order and shipment emails as before.')) ?></p>
-        <div class="smaily-engine-triggers smaily-store-triggers">
-            <?php foreach ($triggers as $trigger => $labels): ?>
-            <?php $key = $escaper->escapeHtmlAttr($trigger); ?>
-            <?php $workflows = $saved[$trigger]['workflows']; ?>
-            <div class="smaily-engine-trigger smaily-store-trigger smaily-tx-trigger is-off" data-trigger="<?= /* @noEscape */ $key ?>">
-                <div class="smaily-engine-trigger__top">
-                    <div class="smaily-engine-trigger__head">
-                        <div class="smaily-engine-trigger__name-row">
-                            <span class="smaily-engine-trigger__name"><?= $escaper->escapeHtml($labels['name']) ?></span>
-                            <span class="smaily-pill smaily-pill--off smaily-store-pill"><span class="smaily-pill__dot"></span><span class="smaily-store-pill__text"><?= $escaper->escapeHtml(__('Off')) ?></span></span>
-                        </div>
-                        <div class="smaily-engine-trigger__desc"><?= $escaper->escapeHtml($labels['desc']) ?></div>
-                        <div class="smaily-engine-trigger__controls">
-                            <span class="smaily-engine-trigger__ctrl"><label><input type="checkbox" id="smaily-tx-<?= /* @noEscape */ $key ?>-enabled" <?= $saved[$trigger]['enabled'] ? 'checked' : '' ?>/> <?= $escaper->escapeHtml(__('Enabled')) ?></label></span>
-                        </div>
+    <p><?= $escaper->escapeHtml(__('Send transactional emails via transactional Smaily account, which you can connect on the Connection tab. Transactional emails should be sent from a separate account than marketing emails.')) ?></p>
+    <p class="note"><?= $escaper->escapeHtml(__('Sending arrives in a later release: these settings send nothing yet, and Magento sends its own order and shipment emails as before.')) ?></p>
+    <div class="smaily-engine-triggers smaily-store-triggers">
+        <?php foreach ($triggers as $trigger => $labels): ?>
+        <?php $key = $escaper->escapeHtmlAttr($trigger); ?>
+        <?php $workflows = $saved[$trigger]['workflows']; ?>
+        <div class="smaily-engine-trigger smaily-store-trigger smaily-tx-trigger is-off" data-trigger="<?= /* @noEscape */ $key ?>">
+            <div class="smaily-engine-trigger__top">
+                <div class="smaily-engine-trigger__head">
+                    <div class="smaily-engine-trigger__name-row">
+                        <span class="smaily-engine-trigger__name"><?= $escaper->escapeHtml($labels['name']) ?></span>
+                        <span class="smaily-pill smaily-pill--off smaily-store-pill"><span class="smaily-pill__dot"></span><span class="smaily-store-pill__text"><?= $escaper->escapeHtml(__('Off')) ?></span></span>
                     </div>
-                    <?php if (!$perLanguage): ?>
+                    <div class="smaily-engine-trigger__desc"><?= $escaper->escapeHtml($labels['desc']) ?></div>
                     <div class="smaily-engine-trigger__controls">
-                        <label class="smaily-engine-trigger__ctrl">
-                            <span><?= $escaper->escapeHtml(__('Smaily Workflow')) ?></span>
-                            <select class="smaily-tx-workflow"
-                                    data-trigger="<?= /* @noEscape */ $key ?>"
-                                    data-language="default"
-                                    data-saved="<?= $escaper->escapeHtmlAttr((string)($workflows['default']['workflowId'] ?? '')) ?>"></select>
-                        </label>
+                        <span class="smaily-engine-trigger__ctrl"><label><input type="checkbox" id="smaily-tx-<?= /* @noEscape */ $key ?>-enabled" <?= $saved[$trigger]['enabled'] ? 'checked' : '' ?>/> <?= $escaper->escapeHtml(__('Enabled')) ?></label></span>
                     </div>
-                    <?php endif; ?>
                 </div>
-                <?php if ($perLanguage): ?>
-                <table class="smaily-ml-table">
-                    <thead>
-                        <tr>
-                            <th><?= $escaper->escapeHtml(__('Language')) ?></th>
-                            <th><?= $escaper->escapeHtml(__('Workflow')) ?></th>
-                            <th><?= $escaper->escapeHtml(__('Default fallback')) ?></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($languages as $language): ?>
-                        <?php $row = $workflows[$language] ?? null; ?>
-                        <tr>
-                            <td><?= $escaper->escapeHtml(strtoupper($language)) ?></td>
-                            <td>
-                                <select class="smaily-tx-workflow"
-                                        data-trigger="<?= /* @noEscape */ $key ?>"
-                                        data-language="<?= $escaper->escapeHtmlAttr($language) ?>"
-                                        data-saved="<?= $escaper->escapeHtmlAttr((string)($row['workflowId'] ?? '')) ?>"></select>
-                            </td>
-                            <td>
-                                <input type="radio" class="smaily-tx-fallback"
-                                       name="smaily-tx-fallback-<?= /* @noEscape */ $key ?>"
-                                       value="<?= $escaper->escapeHtmlAttr($language) ?>"
-                                       <?= ($row['isDefaultFallback'] ?? false) ? 'checked' : '' ?>/>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+                <?php if (!$perLanguage): ?>
+                <div class="smaily-engine-trigger__controls">
+                    <label class="smaily-engine-trigger__ctrl">
+                        <span><?= $escaper->escapeHtml(__('Smaily Workflow')) ?></span>
+                        <select class="smaily-tx-workflow"
+                                data-trigger="<?= /* @noEscape */ $key ?>"
+                                data-language="default"
+                                data-saved="<?= $escaper->escapeHtmlAttr((string)($workflows['default']['workflowId'] ?? '')) ?>"></select>
+                    </label>
+                </div>
                 <?php endif; ?>
             </div>
-            <?php endforeach; ?>
+            <?php if ($perLanguage): ?>
+            <table class="smaily-ml-table">
+                <thead>
+                    <tr>
+                        <th><?= $escaper->escapeHtml(__('Language')) ?></th>
+                        <th><?= $escaper->escapeHtml(__('Workflow')) ?></th>
+                        <th><?= $escaper->escapeHtml(__('Default fallback')) ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($languages as $language): ?>
+                    <?php $row = $workflows[$language] ?? null; ?>
+                    <tr>
+                        <td><?= $escaper->escapeHtml(strtoupper($language)) ?></td>
+                        <td>
+                            <select class="smaily-tx-workflow"
+                                    data-trigger="<?= /* @noEscape */ $key ?>"
+                                    data-language="<?= $escaper->escapeHtmlAttr($language) ?>"
+                                    data-saved="<?= $escaper->escapeHtmlAttr((string)($row['workflowId'] ?? '')) ?>"></select>
+                        </td>
+                        <td>
+                            <input type="radio" class="smaily-tx-fallback"
+                                   name="smaily-tx-fallback-<?= /* @noEscape */ $key ?>"
+                                   value="<?= $escaper->escapeHtmlAttr($language) ?>"
+                                   <?= ($row['isDefaultFallback'] ?? false) ? 'checked' : '' ?>/>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php endif; ?>
         </div>
+        <?php endforeach; ?>
+    </div>
+    <h3><?= $escaper->escapeHtml(__('Customer details')) ?></h3>
+    <p class="note"><?= $escaper->escapeHtml(__('Personal data sent with both confirmation emails. Off by default — switch it on only if your email template shows these details.')) ?></p>
+    <div class="smaily-inline-toggle">
+        <label><input type="checkbox" id="smaily-tx-personal-data" <?= $viewModel->isTransactionalPersonalDataEnabled() ? 'checked' : '' ?>/>
+            <?= $escaper->escapeHtml(__('Include addresses, phone and order note')) ?></label>
+        <p class="note"><?= $escaper->escapeHtml(__('The billing and delivery address, the delivery name, the phone number and the customer\'s order note.')) ?></p>
     </div>
 </div>

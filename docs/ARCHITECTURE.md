@@ -1485,10 +1485,16 @@ Initial setup, Settings, Log. Design rules:
   the per-store-view credential overrides on save (confirmed in the UI
   first). Single-language installs are locked to `single` and see none of
   this.
-- **Transactional emails — settings only (PRO-4062).** Settings > Connection
-  has an optional second Smaily account for order and shipment emails
-  (`panel/transactional-account.phtml`), Settings > Automations its
-  **Order confirmation** / **Shipment confirmation** triggers
+- **Transactional emails — settings only (PRO-4062, PRO-4065).** They
+  work as the WooCommerce plugin's: Settings > Connection has the
+  **Send transactional emails** switch (website-scoped
+  `smaily_connect/transactional/enabled`, off) that shows an optional
+  second Smaily account for order and shipment emails
+  (`panel/transactional-account.phtml`; switched off, a connection save
+  posts only the switch and the saved account stays), Settings >
+  Automations its **Order confirmation** / **Shipping confirmation**
+  triggers and the **Customer details** switch (website-scoped
+  `smaily_connect/transactional/personal_data_enabled`, off)
   (`panel/transactional-triggers.phtml`); the wizard renders neither (its
   layout has no such blocks, and the shared panels-js posts the
   `transactional` keys only where the blocks exist). The account lives under
@@ -1502,9 +1508,9 @@ Initial setup, Settings, Log. Design rules:
   account before either account is written, applies the PRO-3690
   empty-password rule against the account the form was drawn with, and
   checks it once with Smaily; `VerifiedCredentials::isTransactionalVerified()`
-  is the gate of the triggers, which show only a pointer to the Connection
-  tab until it says yes (and appear without a reload after a save that
-  connects). The triggers' switches are website-scoped
+  is the gate of the triggers, which show nothing until it says yes (as
+  the WooCommerce plugin, PRO-1540; they appear without a reload after a
+  save that connects). The triggers' switches are website-scoped
   (`smaily_connect/transactional/{order,shipment}_confirmation_enabled`,
   off); their workflows are `smaily_automation_mapping` rows with
   `account_key = 'transactional'` and `Trigger::TRANSACTIONAL` types, one

@@ -12,6 +12,8 @@ use Magento\Framework\App\Cache\Type\Config as ConfigCache;
 use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Config\Storage\WriterInterface;
+use Magento\Framework\Controller\Result\Redirect;
+use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\Notification\NotifierInterface;
 use Magento\Store\Model\ScopeInterface;
 use Smaily\Connect\Model\ModuleVersion;
@@ -41,6 +43,23 @@ class SetupGuard
         private readonly ModuleVersion $moduleVersion,
         private readonly WebsiteContext $websiteContext
     ) {
+    }
+
+    /**
+     * The gate of Dashboard, Settings and Log: record the module version
+     * (checkVersionChange()), then the redirect to the initial setup when
+     * the website is not set up yet, else null so the page renders.
+     */
+    public function redirectIfNotSetUp(ResultFactory $resultFactory): ?Redirect
+    {
+        $this->checkVersionChange();
+        if ($this->isSetupCompleted()) {
+            return null;
+        }
+        /** @var Redirect $redirect */
+        $redirect = $resultFactory->create(ResultFactory::TYPE_REDIRECT);
+
+        return $redirect->setPath('smaily_connect/wizard', $this->getWizardRouteParams());
     }
 
     public function isSetupCompleted(): bool

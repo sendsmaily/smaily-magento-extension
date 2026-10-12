@@ -11,6 +11,8 @@ namespace Smaily\Connect\Test\Unit\Model\Adminhtml;
 use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Config\Storage\WriterInterface;
+use Magento\Framework\Controller\Result\Redirect;
+use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\Notification\NotifierInterface;
 use Magento\Store\Model\ScopeInterface;
 use PHPUnit\Framework\TestCase;
@@ -87,5 +89,29 @@ class SetupGuardTest extends TestCase
         $this->websiteContext->method('getWebsiteId')->willReturn(1);
 
         $this->assertSame([], $this->guard->getWizardRouteParams());
+    }
+
+    public function testAWebsiteSetUpGetsNoRedirect(): void
+    {
+        $this->scopeConfig->method('isSetFlag')->willReturn(true);
+        $resultFactory = $this->createMock(ResultFactory::class);
+        $resultFactory->expects($this->never())->method('create');
+
+        $this->assertNull($this->guard->redirectIfNotSetUp($resultFactory));
+    }
+
+    public function testAWebsiteNotSetUpRedirectsToTheSetupOfThatWebsite(): void
+    {
+        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->websiteContext->method('isExplicit')->willReturn(true);
+        $this->websiteContext->method('getWebsiteId')->willReturn(2);
+        $redirect = $this->createMock(Redirect::class);
+        $redirect->expects($this->once())->method('setPath')
+            ->with('smaily_connect/wizard', ['_query' => ['website' => 2]])
+            ->willReturnSelf();
+        $resultFactory = $this->createMock(ResultFactory::class);
+        $resultFactory->method('create')->with(ResultFactory::TYPE_REDIRECT)->willReturn($redirect);
+
+        $this->assertSame($redirect, $this->guard->redirectIfNotSetUp($resultFactory));
     }
 }

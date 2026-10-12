@@ -10,13 +10,19 @@ namespace Smaily\Connect\Test\Unit\Controller\Adminhtml;
 
 use Magento\Backend\App\Action;
 use Magento\Backend\App\Action\Context;
+use Magento\Framework\App\Cache\TypeListInterface;
+use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\Controller\Result\Redirect;
 use Magento\Framework\Controller\ResultFactory;
+use Magento\Framework\Notification\NotifierInterface;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Controller\Adminhtml\Dashboard\Index as DashboardIndex;
 use Smaily\Connect\Controller\Adminhtml\Log\Index as LogIndex;
 use Smaily\Connect\Controller\Adminhtml\Settings\Index as SettingsIndex;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
+use Smaily\Connect\Model\Adminhtml\WebsiteContext;
+use Smaily\Connect\Model\ModuleVersion;
 
 /**
  * PRO-4012: Settings, Dashboard or Log opened for a website that is not set
@@ -44,9 +50,19 @@ class SetupRedirectTest extends TestCase
     #[\PHPUnit\Framework\Attributes\DataProvider('pages')]
     public function testAPageForAWebsiteNotSetUpRedirectsToTheSetupOfThatWebsite(string $controllerClass): void
     {
-        $setupGuard = $this->createMock(SetupGuard::class);
-        $setupGuard->method('isSetupCompleted')->willReturn(false);
-        $setupGuard->method('getWizardRouteParams')->willReturn(['_query' => ['website' => 2]]);
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->method('isSetFlag')->willReturn(false);
+        $websiteContext = $this->createMock(WebsiteContext::class);
+        $websiteContext->method('isExplicit')->willReturn(true);
+        $websiteContext->method('getWebsiteId')->willReturn(2);
+        $setupGuard = new SetupGuard(
+            $scopeConfig,
+            $this->createMock(WriterInterface::class),
+            $this->createMock(TypeListInterface::class),
+            $this->createMock(NotifierInterface::class),
+            $this->createMock(ModuleVersion::class),
+            $websiteContext
+        );
 
         $redirect = $this->createMock(Redirect::class);
         $redirect->expects(self::once())->method('setPath')

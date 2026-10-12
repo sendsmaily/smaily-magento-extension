@@ -183,7 +183,8 @@ are per website, on **Marketing > Smaily Connect > Settings > Contacts**
   was, untick **Show a newsletter checkbox at checkout**.
 - **Magento's own newsletter emails are suppressed.** Magento's
   subscription-confirmed ("confirmation success") email and its
-  unsubscribe email are not sent for a store view connected to Smaily.
+  unsubscribe email are not sent while contact sync runs for the website
+  (see *After the upgrade*) and the store view is connected to Smaily.
   2.8.x suppressed them only on a website with *Enable Subscribers
   Collection* on. Magento's double opt-in confirmation *request* email is
   always sent. To have Magento send them again, untick **Let Smaily send

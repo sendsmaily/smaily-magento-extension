@@ -19,6 +19,10 @@ use Smaily\Connect\Model\ContactSync\SyncDispatcher;
  * Uses the legacy-proven setImportMode(true) trick: Subscriber::send*Email()
  * returns early in import mode. The double-opt-in confirmation REQUEST email
  * is deliberately never suppressed — it is part of the consent flow.
+ *
+ * Only while the website's contact sync is active (PRO-4040): before its
+ * Contacts settings are saved, or with contact sync off, the subscriber
+ * never reaches Smaily, so no Smaily automation would write to them.
  */
 class SuppressNewsletterEmails
 {
@@ -43,7 +47,10 @@ class SuppressNewsletterEmails
         $storeId = (int)$subscriber->getStoreId();
         $websiteId = $this->dispatcher->websiteId($storeId);
 
-        if ($this->config->isConnected($storeId ?: null) && $this->config->suppressOptinEmails($websiteId)) {
+        if ($this->config->isConnected($storeId ?: null)
+            && $this->config->isContactSyncActive($websiteId)
+            && $this->config->suppressOptinEmails($websiteId)
+        ) {
             $subscriber->setImportMode(true);
         }
     }

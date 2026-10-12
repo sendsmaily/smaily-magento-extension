@@ -7,46 +7,60 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-10-11 — after the 3.0.0-rc11 release and the Hyvä
-companion on Packagist. **Released:** 3.0.0-rc11 (tagged 2026-10-09 evening
-with `gh release create`, no HTTP 500;
-https://github.com/sendsmaily/smaily-magento-extension/releases/tag/3.0.0-rc11;
-the release workflow is green on b711b0b, the main ZIP has 417 entries,
-Packagist lists 3.0.0-rc11). **Merged to master since the cut:** #159
-PRO-4020 part 1 — the release workflow also builds, verifies and attaches
+_Last updated: 2026-10-12 — the 3.0.0-rc12 version cut (this PR): the
+version in composer.json, `ModuleInfo::VERSION`, the ModuleVersion docblock
+and the merchant commands (README, UPGRADING, the guide site's `#install`,
+`#upgrading` and `#st-hyva` in EN and ET, the Hyvä companion's README);
+CHANGELOG collects the six fragments into five bullets (PRO-4016 and
+PRO-4037 merged into one Start import bullet; none asks for a catalog
+import). **Merged to master since rc11:** #159/#160 PRO-4020 (the Hyvä
+companion on Packagist and as the release's second ZIP; the mirror's
+README, = the Packagist page, updates with this release), #161 STATUS,
+#162 PRO-4017 (docs: when contact sync starts), #163 PRO-4016 (**Start
+import** waits for the saved **Sync contacts to Smaily** switch), #164 a
+simplification tidy-up (no behaviour change), #166 PRO-4036 (on a new
+store, contact sync for a website starts when its Contacts settings are
+saved — per-website flag `smaily_connect/internal/contacts_confirmed`;
+2.8.x upgrades and release-candidate stores keep syncing through the
+migration and the new data patch `ConfirmContactsOfConnectedWebsites`),
+#167 PRO-4040 (Magento's newsletter emails are suppressed only while
+contact sync is active), #168 PRO-4041 (a 2.8.x website with its own
+Enable Module Yes and no synchronization value stays off), #169 PRO-4037
+(the import card and the CLI say why an import sent nothing; **Start
+import** waits for the Contacts save). **Queue:** tag 3.0.0-rc12 (Erkki's
+yes) → the release workflow also publishes the Hyvä companion (mirror +
+Packagist through the webhook — its first automatic run; check that
+Packagist picks up 3.0.0-rc12 for `smaily/module-connect-hyva` by itself)
+→ the HC PRO pilot when it is confirmed (check Magento ≥ 2.4.4 / PHP ≥ 8.1
+and the storefront type first). **Open for Erkki:** HC PRO's versions and
+storefront type (unknown as of 2026-10-11); PRO-4019 (the Estonian
+proofread — now also the new ET texts of PRO-4036, PRO-4037 and
+PRO-4040); a Hyvä store for the widget (PRO-3790) and the Tailwind build
+script check (`npm run build-prod` vs `npm run build`). **Backlog:**
+PRO-3746 (after the pilot), PRO-3921 / PRO-3916 (engine; after PRO-3941 /
+PRO-3919), PRO-2461. **Gotcha (sandbox):** an old pending
+contacts→Smaily backfill job (id 1, 2026-10-02) and 2 ingest rows wait in
+the sandbox; `cron:run` there sends them to the smailydemo account and the
+synthetic engine tenant._
+
+_Earlier (2026-10-11): after the 3.0.0-rc11 release (tagged 2026-10-09
+with `gh release create`, no HTTP 500; workflow green on b711b0b, main ZIP
+417 entries, Packagist lists it). #159 PRO-4020 part 1 — the release
+workflow also builds, verifies and attaches
 `smaily-connect-magento2-hyva.zip` + `.sha256` and pushes `compat/hyva` to
-the mirror repository https://github.com/sendsmaily/smaily-magento-hyva,
-tagged with the release version, with the deploy-key secret
-`HYVA_SPLIT_DEPLOY_KEY`; a `workflow_dispatch` with a `tag` input publishes
-the companion for an existing release (run once for 3.0.0-rc11 on
-2026-10-11, green). Erkki merged #159 in the web UI, so its squash message
-is the commit list, not the PR description. #160 PRO-4020 part 2 — the Hyvä
-install is one command, `composer require
-smaily/smailyformagento:3.0.0-rc11 smaily/module-connect-hyva:3.0.0-rc11`
-(plain `composer require smaily/module-connect-hyva` from 3.0.0), or the
-release's two ZIPs; the clone route is gone; `compat/hyva/composer.json`
-has no `version` field. **Packagist:** `smaily/module-connect-hyva` is
-listed (3.0.0-rc11, dev-main), submitted from the Packagist account
-`smaily`, which owns the `smaily` vendor (Erkki has access; his own account
-is not a maintainer of the vendor). Auto-update: a GitHub webhook on the
-mirror repository → `https://packagist.org/api/github?username=smaily`
-(push events), set by Erkki 2026-10-11. **Gotcha:** the mirror's README (=
-the Packagist page) shows the pre-#160 install text until the next release
-publishes — a published tag is never moved. The guide site was re-uploaded
-after #160 (md5 matches master). **Unverified:** the Hyvä Tailwind build
-script name — `npm run build-prod` in the docs vs `npm run build` in
-HYVA_SUPPORT's sandbox recipe; check it on a real Hyvä store. **Queue:** a
-simplify pass over the 2026-10-09/11 functionality (next); PRO-4016,
-PRO-4017 (in progress); rc12 waits for the HC PRO date; the HC PRO pilot
-when it is confirmed (check Magento ≥ 2.4.4 / PHP ≥ 8.1 and the storefront
-type first — Erkki does not know them yet, 2026-10-11). **Open for Erkki:**
-"Questions / tasks for Erkki" item 16 — HC PRO's versions and storefront
-type, PRO-4019 (the Estonian proofread), a Hyvä store for the widget
-(PRO-3790) and the Tailwind check. **Engine:** PRO-3919, PRO-3941,
-PRO-3956 unchanged. **Gotcha (sandbox):** an old pending contacts→Smaily
-backfill job (id 1, 2026-10-02) and 2 ingest rows wait in the sandbox;
-`cron:run` there sends them to the smailydemo account and the synthetic
-engine tenant._
+the mirror https://github.com/sendsmaily/smaily-magento-hyva, tagged with
+the release version (deploy-key secret `HYVA_SPLIT_DEPLOY_KEY`; a
+`workflow_dispatch` with a `tag` input publishes the companion for an
+existing release, run once for 3.0.0-rc11, green); Erkki merged #159 in the
+web UI, so its squash message is the commit list. #160 PRO-4020 part 2 —
+the Hyvä install is one composer command or the release's two ZIPs; the
+clone route is gone; `compat/hyva/composer.json` has no `version` field.
+`smaily/module-connect-hyva` is on Packagist, submitted from the Packagist
+account `smaily` (owns the `smaily` vendor; Erkki has access); auto-update
+through a GitHub webhook on the mirror →
+`https://packagist.org/api/github?username=smaily` (push events), set by
+Erkki 2026-10-11. A published tag is never moved, so the mirror's README
+showed the pre-#160 install text until the next release._
 
 _Earlier (2026-10-09): the 3.0.0-rc11 version cut (#158) — the version in
 composer.json, `ModuleInfo::VERSION`, the docblock and the merchant

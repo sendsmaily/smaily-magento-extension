@@ -58,6 +58,10 @@ Check the Magento and PHP versions first: version 3 needs Magento
 [INSTALLING.md](INSTALLING.md#before-you-start)). Run every command below
 from the Magento root, as the user that owns the Magento files.
 
+These steps are for a store that installed 2.8.x with composer. If 2.8.x
+was copied into `app/code` instead, follow
+[If 2.8.x was copied into `app/code`](#if-28x-was-copied-into-appcode).
+
 `composer update smaily/smailyformagento` alone keeps 2.8.x: the
 constraint that the 2.8.x install wrote into `composer.json` (`^2.8`) does
 not allow version 3. Require version 3 instead, as below. Until 3.0.0 is
@@ -96,6 +100,54 @@ The old module is replaced by `Smaily_Connect` in the same package:
 `setup:upgrade` enables `Smaily_Connect` (no `module:enable` is needed)
 and runs the migration. `bin/magento module:status Smaily_Connect` then
 answers `Module is enabled`.
+
+### If 2.8.x was copied into `app/code`
+
+The 2.8.x manual installation put the module into
+`app/code/Smaily/SmailyForMagento` instead of installing it with composer.
+On such a store, that folder exists and `composer show
+smaily/smailyformagento` answers `Package "smaily/smailyformagento" not
+found`.
+
+Delete that folder first, then install version 3. Version 3 does not
+replace a copy in `app/code`: installed beside it, the 2.8.x module stays
+enabled with its settings deleted by the upgrade, and the next
+`setup:upgrade` adds its columns back to the `quote` table. Delete the
+folder only — the 2.8.x settings stay in the database, and `setup:upgrade`
+migrates them as on a composer store. Do not run `bin/magento
+module:uninstall` for `Smaily_SmailyForMagento`: it is not needed, and once
+version 3 is installed, Magento takes the 2.8.x module for the
+`smaily/smailyformagento` package and uninstalling it removes version 3.
+
+**Production mode:**
+
+```bash
+bin/magento maintenance:enable
+rm -rf app/code/Smaily/SmailyForMagento
+composer require smaily/smailyformagento:3.0.0-rc12
+bin/magento setup:upgrade
+bin/magento setup:di:compile
+bin/magento setup:static-content:deploy en_US   # list every locale your admin and storefront use, e.g. en_US et_EE
+bin/magento maintenance:disable
+bin/magento cache:flush
+```
+
+**Developer or default mode:**
+
+```bash
+rm -rf app/code/Smaily/SmailyForMagento
+composer require smaily/smailyformagento:3.0.0-rc12
+bin/magento setup:upgrade
+bin/magento cache:flush
+```
+
+To install version 3 from the release ZIP instead of composer, replace the
+`composer require` line with steps 1 and 2 of
+[INSTALLING.md](INSTALLING.md#1-download-and-verify): download and verify
+the ZIP, then extract it into `app/code/Smaily/Connect`. The other commands
+stay the same. Afterwards `bin/magento module:status Smaily_Connect`
+answers `Module is enabled`, and `bin/magento module:status
+Smaily_SmailyForMagento` answers `Module does not exist`.
 
 ## After the upgrade: the initial setup
 

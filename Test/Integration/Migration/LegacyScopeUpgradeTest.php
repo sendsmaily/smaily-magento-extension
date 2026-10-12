@@ -276,6 +276,27 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
         self::assertTrue($this->config->isAbandonedCartEnabled(3));
     }
 
+    public function testUnderADefaultScopeWithNoAWebsiteWithItsOwnYesAndNoSynchronizationAnswerDoesNotSync(): void
+    {
+        // PRO-4041: 2.8.x had no default for Enable Synchronization, so it
+        // did not sync a website without one, its own or the default scope's.
+        $this->env->resetState();
+        $this->seed('default', 0, [
+            'smaily/general/enable' => '0',
+            'smaily/general/subdomain' => 'shop',
+            'smaily/general/username' => 'api-user',
+            'smaily/general/password' => 'plain-secret',
+        ]);
+        $this->seed('websites', 2, ['smaily/general/enable' => '1']);
+
+        $this->migrate();
+
+        foreach ([1, 2, 3, 4] as $websiteId) {
+            self::assertFalse($this->config->isSyncEnabled($websiteId), 'Website ' . $websiteId);
+            self::assertFalse($this->config->isContactSyncActive($websiteId), 'Website ' . $websiteId);
+        }
+    }
+
     public function testAWebsiteWithTheOptInOffKeepsTheWelcomeOffUnderADefaultScopeWithItOn(): void
     {
         // PRO-4009: 2.8.x read the opt-in switch per website.

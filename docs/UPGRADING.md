@@ -108,10 +108,11 @@ on the Contacts step, and the Automations step shows the migrated
 workflows and wait time. Compare each step with your notes, in
 particular each automation's *Enabled* tick, then finish the setup.
 
-For a website where 2.8.x had *Enable Module = No*, contact
-synchronization stays off: its Contacts step shows **Sync contacts to
-Smaily** unticked, and **Continue** keeps it off. Tick it there to switch
-contact synchronization on.
+For a website where 2.8.x had *Enable Module = No* — or its own *Yes*
+under a Default Config with *No*, and no *Enable Syncronization* value at
+the website or Default Config — contact synchronization stays off: its
+Contacts step shows **Sync contacts to Smaily** unticked, and **Continue**
+keeps it off. Tick it there to switch contact synchronization on.
 
 A website where 2.8.x had *Enable Syncronization* on — the website's own
 value, else the Default Config value — keeps syncing contacts from the
@@ -156,8 +157,8 @@ switched-off settings of a Default Config with *No*. A website with its
 own *Enable Module = Yes* under a Default Config with *No* runs as it did
 in 2.8.x: the upgrade saves the three settings at that website with the
 value they had there — the website's own 2.8.x value, else the Default
-Config value, else the v3 default (contact sync on, welcome and abandoned
-cart off).
+Config value, else off (2.8.x had no default for any of the three, so it
+did not sync contacts there without an *Enable Syncronization* value).
 
 Once the settings are migrated, the upgrade deletes the old 2.8.x settings
 (every `smaily/*` config row, at every scope — the plain-text password

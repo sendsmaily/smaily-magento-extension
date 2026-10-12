@@ -1156,8 +1156,10 @@ cases; `Model\OrderOrigin` asks the same rule (PRO-3949).
 
 `view/frontend/web/js/tracker.js` (RequireJS; core is framework-free
 vanilla for a future Hyvä path) reads page context from
-`window.smailyPageContext` (set by FPC-cached per-page templates), batches
-events for 5 s, and posts to `smaily/relay`. The relay
+`window.smailyPageContext` (set by FPC-cached per-page templates; a
+product page's `sku` is `CatalogPayloadBuilder::sku()`, the key its catalog
+row and order lines carry — `mag-<entity_id>` when the SKU is empty,
+PRO-2461), batches events for 5 s, and posts to `smaily/relay`. The relay
 (`Controller/Relay/Index`) is CSRF-exempt (anonymous beacon), strictly
 sanitized (`Engine\BrowseEventValidator` — UUID v4 event ids, event-type
 enum, **no client-asserted `customer_email` or `external_id`** — identity

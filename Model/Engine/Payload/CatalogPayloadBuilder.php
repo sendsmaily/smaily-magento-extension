@@ -115,7 +115,7 @@ class CatalogPayloadBuilder
             ?? $this->categoryPath($this->parentProductResolver->parentCategoryIds((int)$product->getId()));
 
         $item = [
-            'sku' => $this->sku($product),
+            'sku' => self::sku($product),
             'name' => $languageValues['name'],
             'category_path' => $categoryPath ?? self::PLACEHOLDER_CATEGORY,
             'price' => round(
@@ -200,12 +200,18 @@ class CatalogPayloadBuilder
         }
 
         return [
-            'sku' => $this->sku($product),
+            'sku' => self::sku($product),
             'in_stock' => $this->isIngestible($product) && $this->isInStock($product),
         ];
     }
 
-    private function sku(Product $product): string
+    /**
+     * The product's engine key: its SKU, or `mag-<entity_id>` when the SKU
+     * is empty (contract §3, "Same key from every path"). The storefront
+     * page context keys `product_view` with it too (PRO-2461), so a product
+     * browses under the key its catalog row and order lines carry.
+     */
+    public static function sku(Product $product): string
     {
         $sku = trim((string)$product->getSku());
 

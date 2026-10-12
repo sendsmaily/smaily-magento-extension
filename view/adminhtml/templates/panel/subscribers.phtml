@@ -24,7 +24,10 @@ $isSettings = $block->getData('context') === 'settings';
 // control disabled, PRO-4016) and this render must not second-guess it. Settings always
 // renders it; the wizard only for a website whose sync is off (PRO-4010), so
 // the merchant can switch it on there and Continue never saves an answer the
-// merchant did not see. A wizard without the switch answers server-side.
+// merchant did not see. A wizard without the switch answers server-side for
+// the switch. On both surfaces panels-js.phtml also keeps the control
+// disabled for a website whose Contacts settings were never saved, and says
+// so (PRO-4036, PRO-4037).
 $syncEnabled = $isSettings || $viewModel->isSyncEnabled();
 $showSyncSwitch = $isSettings || !$syncEnabled;
 
@@ -180,6 +183,7 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
             <p class="note" id="smaily-w-backfill-estimate"<?php foreach ($importEstimates as $countMode => $estimate): ?> data-estimate-<?= $escaper->escapeHtmlAttr($countMode) ?>="<?= $escaper->escapeHtmlAttr($estimate) ?>"<?php endforeach; ?><?= $syncEnabled ? '' : ' style="display:none;"' ?>><?= $escaper->escapeHtml($importEstimates[$savedSyncMode] ?? '') ?></p>
         </div>
         <p class="note" id="smaily-w-backfill-off"<?= $syncEnabled ? ' style="display:none;"' : '' ?>><?= $escaper->escapeHtml(__('Contact synchronization is off for this website, so an import would send nothing. Turn it on and save to import.')) ?></p>
+        <p class="note" id="smaily-w-backfill-unsaved" style="display:none;"><?= $escaper->escapeHtml(__('Contacts start syncing to Smaily once the Contacts settings are saved, so an import would send nothing yet. Save them to import.')) ?></p>
         <div class="smaily-backfill-verdict" style="display:none;"><span class="smaily-backfill-verdict__icon"></span><span class="smaily-backfill-verdict__text"></span></div>
         <div class="smaily-backfill-card__link" style="display:none;"></div>
         <div class="smaily-backfill-card__controls">

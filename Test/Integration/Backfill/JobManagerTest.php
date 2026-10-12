@@ -169,6 +169,14 @@ class JobManagerTest extends IntegrationTestCase
         self::assertSame(Job::STATUS_COMPLETED, $row['status']);
         self::assertSame(Job::STATUS_COMPLETED, $completing->getStatus());
         self::assertNotEmpty($row['completed_at']);
+        self::assertNull($row['error_message']);
+
+        // A job that sent nothing records why (PRO-4037).
+        $idle = $this->jobManager->start(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 2);
+        $this->jobManager->complete($idle, Job::REASON_CONTACT_SYNC_INACTIVE);
+        $row = $this->fetchRow(self::TABLE, (int)$idle->getId());
+        self::assertSame(Job::STATUS_COMPLETED, $row['status']);
+        self::assertSame(Job::REASON_CONTACT_SYNC_INACTIVE, $row['error_message']);
 
         $failing = $this->jobManager->start(Job::TYPE_ORDERS, Job::TARGET_ENGINE, 0);
         $this->jobManager->fail($failing, 'engine unreachable');

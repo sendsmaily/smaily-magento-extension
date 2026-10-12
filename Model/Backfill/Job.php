@@ -42,6 +42,14 @@ class Job extends AbstractModel
     ];
 
     /**
+     * Why a contacts import that completed sent nothing: the website's
+     * contact sync was not active when it ran (PRO-4037). Kept in the job's
+     * error_message, the job's one reason field; the import card tells the
+     * merchant in their language, smaily:backfill:status shows it as is.
+     */
+    public const REASON_CONTACT_SYNC_INACTIVE = 'Contact sync was not active for this website';
+
+    /**
      * @inheritDoc
      */
     protected function _construct()

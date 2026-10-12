@@ -19,7 +19,10 @@
   Contacts tab of such a website, Start import stays disabled while the
   switch is ticked but not saved, and is available once it is saved on
   (PRO-4016). For a new website without the switch, the step says that
-  contacts start syncing when it is saved (PRO-4036).
+  contacts start syncing when it is saved (PRO-4036). For a new website, on
+  the step and on the Settings Contacts tab, Start import stays disabled and
+  the import card says that contacts start syncing once the Contacts
+  settings are saved, until they are (PRO-4037).
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
 -->
@@ -33,6 +36,8 @@
     <script src="build/contacts-setup-off.et_EE.js"></script>
     <script src="build/contacts-settings-off.en_US.js"></script>
     <script src="build/contacts-settings-off.et_EE.js"></script>
+    <script src="build/contacts-settings-new.en_US.js"></script>
+    <script src="build/contacts-settings-new.et_EE.js"></script>
 </head>
 <body>
 <pre id="log"></pre>
@@ -43,6 +48,7 @@
     var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
     var SWITCH = 'Sync contacts to Smaily';
     var STARTS = 'Contacts start syncing to Smaily when you save this step.';
+    var UNSAVED = 'Contacts start syncing to Smaily once the Contacts settings are saved, so an import would send nothing yet. Save them to import.';
     var failures = 0;
     var passes = 0;
 
@@ -125,11 +131,24 @@
     }
 
     // Start import as the merchant meets it: pressable, and quoting the
-    // estimate rather than the "sync is off" note.
+    // estimate rather than a note saying why it would send nothing.
     function importable(doc) {
         return !doc.getElementById('smaily-w-backfill').disabled
             && doc.getElementById('smaily-w-backfill-estimate').style.display !== 'none'
-            && doc.getElementById('smaily-w-backfill-off').style.display === 'none';
+            && doc.getElementById('smaily-w-backfill-off').style.display === 'none'
+            && doc.getElementById('smaily-w-backfill-unsaved').style.display === 'none';
+    }
+
+    // Start import on a new website: not pressable, no estimate, and the
+    // card says that contacts start syncing once the Contacts settings are
+    // saved (PRO-4037).
+    function waitsForSave(doc, text) {
+        var note = doc.getElementById('smaily-w-backfill-unsaved');
+
+        return doc.getElementById('smaily-w-backfill').disabled
+            && doc.getElementById('smaily-w-backfill-estimate').style.display === 'none'
+            && doc.getElementById('smaily-w-backfill-off').style.display === 'none'
+            && note.style.display !== 'none' && note.textContent.trim() === text;
     }
 
     // Ticks Sync contacts to Smaily as the merchant does, without saving.
@@ -158,9 +177,16 @@
             doc.getElementById('smaily-w-sync-starts') !== null
             && doc.getElementById('smaily-w-sync-starts').textContent.trim()
                 === window.smailyAdminPages['contacts-setup.' + locale].strings[STARTS]);
+        if (locale !== 'en_US') {
+            check(locale + ': the note on a new website\'s import card is translated',
+                window.smailyAdminPages['contacts-setup.' + locale].strings[UNSAVED] !== UNSAVED);
+        }
+        check(locale + ', a new website: Start import waits for the step to be saved, and the card says so',
+            waitsForSave(doc, window.smailyAdminPages['contacts-setup.' + locale].strings[UNSAVED]));
         data = await save(frame);
         check(locale + ', sync on: Continue posts no sync answer, so the stored one stays',
             !Object.prototype.hasOwnProperty.call(data, 'sync_enabled') && data.sync_mode === 'consent');
+        check(locale + ', a new website, step saved: the import button is enabled', importable(doc));
         frame.remove();
 
         // A website whose contact sync is off: the switch, unticked.
@@ -198,6 +224,18 @@
             && doc.getElementById('smaily-w-backfill-off').style.display !== 'none');
         data = await save(frame);
         check(locale + ', Settings, switched on and saved: the import button is enabled',
+            data.sync_enabled === true && importable(doc));
+        frame.remove();
+
+        // The Settings Contacts tab of a new website: sync on, its Contacts
+        // settings never saved (PRO-4037).
+        frame = await open('contacts-settings-new.' + locale);
+        doc = frame.contentDocument;
+        check(locale + ', Settings, a new website: Start import waits for the Contacts settings to be saved, and the card says so',
+            doc.getElementById('smaily-w-sync-enabled').checked
+            && waitsForSave(doc, window.smailyAdminPages['contacts-settings-new.' + locale].strings[UNSAVED]));
+        data = await save(frame);
+        check(locale + ', Settings, a new website, saved: the import button is enabled',
             data.sync_enabled === true && importable(doc));
         frame.remove();
     }

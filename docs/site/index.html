@@ -1374,7 +1374,7 @@ window.smailyConnect.consentOverride = function () {
         </table>
       </div>
       <ul>
-        <li>The contact import follows <strong>Sync contacts to Smaily</strong>: its button is available once sync is on and saved. With sync off, or ticked but not saved yet, the button is disabled. A contact keeps its store status; under <strong>Subscribers only</strong> nobody becomes subscribed by being imported. The estimate above <strong>Start import</strong> says how many contacts the import sends from the website, for the mode picked on the panel.</li>
+        <li>The contact import follows <strong>Sync contacts to Smaily</strong>: its button is available once sync is on and saved. With sync off, or ticked but not saved yet, the button is disabled. On a new website it is disabled too until the website's Contacts settings are saved, and the card says "Contacts start syncing to Smaily once the Contacts settings are saved, so an import would send nothing yet. Save them to import." A contact keeps its store status; under <strong>Subscribers only</strong> nobody becomes subscribed by being imported. The estimate above <strong>Start import</strong> says how many contacts the import sends from the website, for the mode picked on the panel.</li>
         <li><strong>Run the Catalog import again</strong> after changing products outside Magento's own product save — an ERP or PIM link, a CSV or <code>bin/magento import</code> run, a database import — so Campaign Intelligence gets the new prices and products. Also run it when a release note asks you to.</li>
         <li>The catalog import does not remove products. Deletions reach Campaign Intelligence from Magento's own product delete and from Magento's import with the <strong>Delete</strong> behaviour; anything else is caught by the <a href="#imp-nightly">nightly product check</a>.</li>
         <li>Imports run one at a time, oldest first, and are safe to run again: the receiving side drops duplicates.</li>
@@ -1393,7 +1393,7 @@ window.smailyConnect.consentOverride = function () {
         </table>
       </div>
       <ul>
-        <li>Kontaktide import järgib lülitit <strong>Sünkrooni kontaktid Smailysse</strong>: selle nupp on kasutatav, kui sünkroonimine on sees ja salvestatud. Kui sünkroonimine on väljas või linnuke on pandud, aga salvestamata, on nupp keelatud. Kontakt säilitab oma oleku poes; režiimis <strong>Ainult turunduskirjade tellijad</strong> ei saa keegi importimise läbi tellijaks. Nupu <strong>Alusta importi</strong> kohal olev hinnang ütleb, mitu kontakti import veebisaidilt saadab, paneelil valitud režiimi järgi.</li>
+        <li>Kontaktide import järgib lülitit <strong>Sünkrooni kontaktid Smailysse</strong>: selle nupp on kasutatav, kui sünkroonimine on sees ja salvestatud. Kui sünkroonimine on väljas või linnuke on pandud, aga salvestamata, on nupp keelatud. Uuel veebisaidil on nupp keelatud ka seni, kuni veebisaidi kontaktide seaded on salvestatud, ja kaart ütleb: „Kontaktide sünkroonimine Smailysse algab, kui kontaktide seaded on salvestatud, seega import ei saadaks veel midagi. Salvesta need, et importida.“ Kontakt säilitab oma oleku poes; režiimis <strong>Ainult turunduskirjade tellijad</strong> ei saa keegi importimise läbi tellijaks. Nupu <strong>Alusta importi</strong> kohal olev hinnang ütleb, mitu kontakti import veebisaidilt saadab, paneelil valitud režiimi järgi.</li>
         <li><strong>Käivita Kataloog-import uuesti</strong> pärast toodete muutmist väljaspool Magento enda tootesalvestust — ERP- või PIM-liides, CSV või <code>bin/magento import</code>, andmebaasi import —, et Campaign Intelligence saaks uued hinnad ja tooted. Käivita see ka siis, kui väljalaskemärkmed seda paluvad.</li>
         <li>Kataloogi import tooteid ei eemalda. Kustutamised jõuavad Campaign Intelligence'i Magento enda toote kustutamisest ja Magento impordist käitumisega <strong>Delete</strong>; kõik muu püüab kinni <a href="#imp-nightly">öine tootekontroll</a>.</li>
         <li>Impordid töötavad ükshaaval, vanim enne, ja neid on ohutu uuesti käivitada: vastuvõtja pool jätab duplikaadid välja.</li>
@@ -1411,7 +1411,7 @@ window.smailyConnect.consentOverride = function () {
           <tbody>
             <tr><td><span class="pill pending">Pending</span></td><td>Queued for the next cron run.</td></tr>
             <tr><td><span class="pill pending">Running</span></td><td>Sending, a chunk per minute.</td></tr>
-            <tr><td><span class="pill ok">Done</span></td><td>"Done, X of Y synced." — or "… — N failed.", with a link to those rows in the Log. Rows still waiting for an automatic retry do not count as failed.</td></tr>
+            <tr><td><span class="pill ok">Done</span></td><td>"Done, X of Y synced." — or "… — N failed.", with a link to those rows in the Log. Rows still waiting for an automatic retry do not count as failed. A contact import that sent nothing from a website because its contact sync was off adds "Contact sync was off for <em>website</em>, so nothing was sent from there."</td></tr>
             <tr><td><span class="pill failed">Stopped</span></td><td>"Stopped before an error" — the import hit an error and stopped cleanly; nothing was lost. Press <strong>Run again</strong>.</td></tr>
             <tr><td><span class="pill failed">Stalled</span></td><td>Nothing has moved it for over an hour — see <a href="#imp-stalled">Stalled imports</a>.</td></tr>
             <tr><td><span class="pill">Canceled</span></td><td>Stopped on your request. Starting again begins a fresh import.</td></tr>
@@ -1428,7 +1428,7 @@ window.smailyConnect.consentOverride = function () {
           <tbody>
             <tr><td><span class="pill pending">Ootel</span></td><td>Järjekorras järgmise cron-käivituse jaoks.</td></tr>
             <tr><td><span class="pill pending">Töötab</span></td><td>Saadab, üks osa minutis.</td></tr>
-            <tr><td><span class="pill ok">Valmis</span></td><td>„Valmis, X / Y sünkroonitud.“ — või „… — N ebaõnnestus.“, koos lingiga nendele ridadele logis. Read, mis ootavad veel automaatset kordust, ei loe ebaõnnestunuks.</td></tr>
+            <tr><td><span class="pill ok">Valmis</span></td><td>„Valmis, X / Y sünkroonitud.“ — või „… — N ebaõnnestus.“, koos lingiga nendele ridadele logis. Read, mis ootavad veel automaatset kordust, ei loe ebaõnnestunuks. Kontaktide import, mis ei saatnud veebisaidilt midagi, sest seal oli kontaktide sünkroonimine väljas, lisab: „Kontaktide sünkroonimine oli väljas veebisaidil <em>veebisait</em>, seega sealt ei saadetud midagi.“</td></tr>
             <tr><td><span class="pill failed">Peatunud</span></td><td>„Peatus enne viga“ — import sai vea ja peatus korrektselt; midagi ei läinud kaduma. Vajuta <strong>Käivita uuesti</strong>.</td></tr>
             <tr><td><span class="pill failed">Seiskunud</span></td><td>Seda pole üle tunni edasi viidud — vt <a href="#imp-stalled">Seiskunud impordid</a>.</td></tr>
             <tr><td><span class="pill">Katkestatud</span></td><td>Peatatud sinu soovil. Uuesti alustamine käivitab värske impordi.</td></tr>
@@ -2238,7 +2238,7 @@ bin/magento smaily:gdpr erase shopper@example.com --force   # art 17</code></pre
         <table>
           <thead><tr><th scope="col">Command</th><th scope="col">What it does</th></tr></thead>
           <tbody>
-            <tr><td><code>bin/magento smaily:backfill:start [contacts|catalog|customers|orders] [--website=ID]</code></td><td>Starts an import (default <code>contacts</code>; without <code>--website</code>, for every website). For a website whose <strong>Sync contacts to Smaily</strong> is off it still starts the contacts import, and says that the import sends nothing.</td></tr>
+            <tr><td><code>bin/magento smaily:backfill:start [contacts|catalog|customers|orders] [--website=ID]</code></td><td>Starts an import (default <code>contacts</code>; without <code>--website</code>, for every website). For a website whose <strong>Sync contacts to Smaily</strong> is off, or whose Contacts settings are not saved yet, it still starts the contacts import, and says for that website that the import sends nothing.</td></tr>
             <tr><td><code>bin/magento smaily:backfill:status</code></td><td>Shows the imports and their progress.</td></tr>
             <tr><td><code>bin/magento smaily:engine:ping</code></td><td>Checks the Campaign Intelligence connection.</td></tr>
             <tr><td><code>bin/magento smaily:engine:disconnect --force</code></td><td>Removes the store's Campaign Intelligence connection.</td></tr>
@@ -2256,7 +2256,7 @@ bin/magento smaily:gdpr erase shopper@example.com --force   # art 17</code></pre
         <table>
           <thead><tr><th scope="col">Käsk</th><th scope="col">Mida see teeb</th></tr></thead>
           <tbody>
-            <tr><td><code>bin/magento smaily:backfill:start [contacts|catalog|customers|orders] [--website=ID]</code></td><td>Käivitab impordi (vaikimisi <code>contacts</code>; ilma <code>--website</code>-ta kõigi veebisaitide jaoks). Veebisaidil, kus <strong>Sünkrooni kontaktid Smailysse</strong> on väljas, käivitab ta kontaktide impordi ikkagi ja ütleb, et import ei saada midagi.</td></tr>
+            <tr><td><code>bin/magento smaily:backfill:start [contacts|catalog|customers|orders] [--website=ID]</code></td><td>Käivitab impordi (vaikimisi <code>contacts</code>; ilma <code>--website</code>-ta kõigi veebisaitide jaoks). Veebisaidil, kus <strong>Sünkrooni kontaktid Smailysse</strong> on väljas või kontaktide seaded pole veel salvestatud, käivitab ta kontaktide impordi ikkagi ja ütleb selle veebisaidi kohta, et import ei saada midagi.</td></tr>
             <tr><td><code>bin/magento smaily:backfill:status</code></td><td>Näitab importe ja nende edenemist.</td></tr>
             <tr><td><code>bin/magento smaily:engine:ping</code></td><td>Kontrollib Campaign Intelligence'i ühendust.</td></tr>
             <tr><td><code>bin/magento smaily:engine:disconnect --force</code></td><td>Eemaldab poe Campaign Intelligence'i ühenduse.</td></tr>

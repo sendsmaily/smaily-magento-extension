@@ -231,6 +231,10 @@ class WizardData implements ArgumentInterface
             ],
             'subscribers' => [
                 'syncEnabled' => $this->config->isSyncEnabled($websiteId),
+                // Whether contacts sync: the switch and the saved Contacts
+                // settings (PRO-4036). The contacts import card follows it
+                // (PRO-4037).
+                'syncActive' => $this->config->isContactSyncActive($websiteId),
                 'syncMode' => $this->mode->mode($websiteId),
                 'syncFields' => $this->config->getSyncFields($websiteId),
                 'includeGuests' => $this->config->includeGuests($websiteId),
@@ -304,7 +308,8 @@ class WizardData implements ArgumentInterface
      * live paths and the contacts import read (PRO-1764). Read by the WIZARD
      * only, which renders the switch when it is off (PRO-4010): Settings
      * carries the switch itself, so panel/panels-js.phtml owns the import
-     * control's state there, from `subscribers.syncEnabled` above.
+     * control's state there, from `subscribers.syncEnabled` and
+     * `subscribers.syncActive` above.
      */
     public function isSyncEnabled(): bool
     {

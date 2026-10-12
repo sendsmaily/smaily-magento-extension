@@ -25,9 +25,10 @@ use Symfony\Component\Console\Output\OutputInterface;
  * Queues a chunked historical import; the smaily_backfill_tick cron job
  * advances it. Progress: smaily:backfill:status. A catalog, customers or
  * orders import needs a Campaign Intelligence connection (PRO-1969, PRO-3742).
- * A contacts import for a website whose contact sync is off still starts —
- * it sends nothing and finishes at 0, as the import itself decides
- * (PRO-1764) — and the command says so (PRO-1970).
+ * A contacts import for a website whose contact sync is not active — off,
+ * or its Contacts settings not saved yet (PRO-4036) — still starts: it sends
+ * nothing and finishes at 0, as the import itself decides (PRO-1764), and
+ * the command says why for that website (PRO-1970, PRO-4037).
  */
 class BackfillStartCommand extends Command
 {
@@ -107,13 +108,20 @@ class BackfillStartCommand extends Command
                 (int)$job->getId(),
                 $websiteId
             ));
-            // The stored switch ContactsProcessor checks on every run
-            // (PRO-1764): a notice, not a refusal (PRO-1970).
+            // The answer ContactsProcessor checks on every run (PRO-1764):
+            // a notice, not a refusal (PRO-1970, PRO-4037).
             if ($jobType === Job::TYPE_CONTACTS && !$this->config->isSyncEnabled($websiteId)) {
                 $output->writeln(sprintf(
                     '<comment>Contact synchronization is off for website %d, so this import sends nothing and'
                     . ' finishes at 0. Turn on Sync contacts to Smaily under Settings > Contacts, then start'
                     . ' the import again.</comment>',
+                    $websiteId
+                ));
+            } elseif ($jobType === Job::TYPE_CONTACTS && !$this->config->isContactSyncActive($websiteId)) {
+                $output->writeln(sprintf(
+                    '<comment>The Contacts settings of website %d are not saved yet, so its contacts do not sync'
+                    . ' and this import sends nothing and finishes at 0. Save them under Settings > Contacts,'
+                    . ' then start the import again.</comment>',
                     $websiteId
                 ));
             }

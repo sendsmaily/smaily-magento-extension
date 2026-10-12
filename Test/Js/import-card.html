@@ -20,7 +20,8 @@
   languages (PRO-3957); an import that moves shows its progress as before.
   The contacts card (panel/subscribers.phtml, the Contacts tab) quotes the
   number of contacts its import sends for the mode picked on the panel, and
-  no other total (PRO-1970).
+  no other total (PRO-1970); a contacts import that sent nothing because a
+  website's contact sync was not active names that website (PRO-4037).
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
 -->
@@ -45,6 +46,7 @@
     var STOPPED = 'Stopped before an error — %1 of %2 synced so far. Press Run again to run it again.';
     var ONE_CONTACT = 'This import sends %1 contact from this website. It runs in the background, a chunk per minute, and never slows the storefront down.';
     var CONTACTS = 'This import sends %1 contacts from this website. It runs in the background, a chunk per minute, and never slows the storefront down.';
+    var SYNC_OFF = 'Contact sync was off for %1, so nothing was sent from there. Turn it on and save the Contacts settings, then press Run again.';
     var failures = 0;
     var passes = 0;
 
@@ -88,19 +90,21 @@
     }
 
     // Runs in the frame before the page: the admin's form key, RequireJS's
-    // require() for a page script that asks for jQuery, and the requests,
-    // answered from window.answers by action (status, start).
-    function stubs(answers) {
+    // require() for a page script that asks for jQuery, and the requests of
+    // one import (the catalog unless named), answered from window.answers by
+    // action (status, start); the other imports are idle.
+    function stubs(answers, jobType) {
         return [
             '<script>',
             'window.FORM_KEY = "form-key";',
             'window.require = function (deps, callback) { callback(window.jQuery); };',
             'window.requests = [];',
             'window.answers = ' + JSON.stringify(answers) + ';',
+            'window.answered = ' + JSON.stringify(jobType || 'catalog') + ';',
             'window.fetch = function (url, options) {',
             '  var body = JSON.parse(options.body || "{}");',
             '  window.requests.push({url: url, body: body});',
-            '  var answer = body.job_type === "catalog" ? window.answers[body.action] : {status: "idle"};',
+            '  var answer = body.job_type === window.answered ? window.answers[body.action] : {status: "idle"};',
             '  return Promise.resolve(new Response(JSON.stringify(answer),',
             '    {headers: {"Content-Type": "application/json"}})); };',
             '<\/script>',
@@ -108,7 +112,7 @@
         ].join('\n');
     }
 
-    function open(page, answers) {
+    function open(page, answers, jobType) {
         return new Promise(function (resolve, reject) {
             var frame = document.createElement('iframe'),
                 rendered = (window.smailyAdminPages || {})[page];
@@ -123,7 +127,7 @@
                     resolve(frame);
                 }, reject);
             };
-            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs(answers)
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs(answers, jobType)
                 + '</head><body>' + rendered.html
                 + '<script>window.panels = window.smailyPanelsInit(window.jQuery); window.panels.initAll();<\/script>'
                 + '</body></html>';
@@ -244,6 +248,7 @@
             strings = window.smailyAdminPages[page].strings,
             frame = await open(page, {}),
             doc = frame.contentDocument,
+            verdict,
             estimate = doc.getElementById('smaily-w-backfill-estimate'),
             pick = function (mode) {
                 var radio = doc.querySelector('input[name=smaily-w-mode][value=' + mode + ']');
@@ -270,6 +275,29 @@
             pick('checkout_optin') === strings[CONTACTS].replace('%1', '0'));
         check(locale + ', contacts: back on Subscribers only, its own count again',
             pick('consent') === strings[ONE_CONTACT].replace('%1', '1'));
+        frame.remove();
+
+        // An import that sent nothing from a website whose contact sync was
+        // not active says so, naming the website (PRO-4037).
+        if (locale !== 'en_US') {
+            check(locale + ': the sync-off outcome is translated', strings[SYNC_OFF] !== SYNC_OFF);
+        }
+        frame = await open(page, {status: {
+            status: 'completed',
+            processed: 0,
+            failed: 0,
+            total: 0,
+            percent: 0,
+            finished_at: '',
+            error: '',
+            stalled: false,
+            blocked_by: '',
+            sync_inactive: ['Main Website']
+        }}, 'contacts');
+        verdict = frame.contentDocument.querySelector('.smaily-backfill-card[data-job-type="contacts"] .smaily-backfill-verdict__text');
+        check(locale + ', contacts: an import that sent nothing names the website whose sync was off',
+            verdict.textContent === strings['Done, %1 of %2 synced.'].replace('%1', '0').replace('%2', '0')
+                + ' ' + strings[SYNC_OFF].replace('%1', 'Main Website'));
         frame.remove();
     }
 

@@ -23,7 +23,8 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
 
 /**
  * POST {action: start|status|cancel, job_type} -> aggregated progress:
- * {status, processed, failed, total, percent, finished_at, error, stalled, blocked_by}
+ * {status, processed, failed, total, percent, finished_at, error, stalled, blocked_by,
+ * sync_inactive}
  *
  * "start" starts jobs (per website for contacts, installation-wide for
  * engine types) and is idempotent — an already-active job is not an error.
@@ -39,7 +40,9 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * block the new one. `blocked_by` is the job type of the import a stalled
  * one waits behind — while no queued or running job moves, the job the
  * tick takes first (JobManager::nextActive()) — when that is another
- * import, else '' (PRO-3923, PRO-3927).
+ * import, else '' (PRO-3923, PRO-3927). `sync_inactive` names the websites
+ * whose latest contacts job sent nothing because their contact sync was not
+ * active (Job::REASON_CONTACT_SYNC_INACTIVE, PRO-4037).
  */
 class BackfillState extends AbstractJsonAction implements HttpPostActionInterface
 {
@@ -109,6 +112,7 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
         $seenWebsites = [];
         $finishedAt = '';
         $error = '';
+        $syncInactive = [];
         foreach ($collection->getItems() as $job) {
             if (!$job instanceof Job || isset($seenWebsites[$job->getWebsiteId()])) {
                 continue;
@@ -119,8 +123,11 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
             $total += (int)($job->getData('total_count') ?? 0);
             $statuses[] = $job->getStatus();
             $finishedAt = max($finishedAt, (string)($job->getData('completed_at') ?? ''));
-            if ($error === '' && (string)($job->getData('error_message') ?? '') !== '') {
-                $error = (string)$job->getData('error_message');
+            $reason = (string)($job->getData('error_message') ?? '');
+            if ($reason === Job::REASON_CONTACT_SYNC_INACTIVE) {
+                $syncInactive[] = $this->websiteName($job->getWebsiteId());
+            } elseif ($error === '' && $reason !== '') {
+                $error = $reason;
             }
         }
 
@@ -143,7 +150,20 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
             'error' => $error,
             'stalled' => $stalled,
             'blocked_by' => $ahead !== null && $ahead->getJobType() !== $jobType ? $ahead->getJobType() : '',
+            'sync_inactive' => $syncInactive,
         ];
+    }
+
+    /**
+     * The website's name as the admin shows it; its id when it is gone.
+     */
+    private function websiteName(int $websiteId): string
+    {
+        try {
+            return (string)$this->storeManager->getWebsite($websiteId)->getName();
+        } catch (\Exception) {
+            return (string)$websiteId;
+        }
     }
 
     /**

@@ -295,9 +295,17 @@ class JobManager
         );
     }
 
-    public function complete(Job $job): void
+    /**
+     * $reason says why a job that completed sent nothing
+     * (Job::REASON_CONTACT_SYNC_INACTIVE), stored as its error_message.
+     */
+    public function complete(Job $job, ?string $reason = null): void
     {
-        if ($this->finish($job, Job::STATUS_COMPLETED, ['total_count' => $job->getData('total_count')])) {
+        $extra = ['total_count' => $job->getData('total_count')];
+        if ($reason !== null) {
+            $extra['error_message'] = $reason;
+        }
+        if ($this->finish($job, Job::STATUS_COMPLETED, $extra)) {
             $job->setData('status', Job::STATUS_COMPLETED);
         }
     }

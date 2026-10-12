@@ -1573,7 +1573,14 @@ Initial setup, Settings, Log. Design rules:
   sync is off. The Contacts step saves `sync_enabled`
   only where it shows the switch, a website whose sync is off (PRO-4010),
   and starts no import: the contacts import starts only from **Start
-  import** (`Api\BackfillState`, `action: start`). The guard also tracks
+  import** (`Api\BackfillState`, `action: start`). The import card follows
+  the same answer (boot data `subscribers.syncActive`): **Start import**
+  stays disabled until the website's Contacts settings are saved. A
+  contacts job that ran while the answer was no completes at 0 with
+  `Job::REASON_CONTACT_SYNC_INACTIVE` in its `error_message`;
+  `BackfillState` returns those websites' names as `sync_inactive`, which
+  the card names, and `smaily:backfill:start` says it per website (PRO-4037).
+  The guard also tracks
   `smaily_connect/internal/last_seen_version` (module version read from
   composer.json via `Model\ModuleVersion`) and posts a one-time admin
   notice after a MAJOR version jump, in addition to the redirect.

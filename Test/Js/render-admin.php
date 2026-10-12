@@ -277,17 +277,20 @@ $pages = [
 $intelligenceViewModel = static fn (
     string $storefrontUrl,
     bool $intelligenceConnected = false,
-    bool $syncEnabled = true
-): object => new class ($storefrontUrl, $intelligenceConnected, $syncEnabled) {
+    bool $syncEnabled = true,
+    bool $contactSyncActive = false
+): object => new class ($storefrontUrl, $intelligenceConnected, $syncEnabled, $contactSyncActive) {
     /**
      * @param string $storefrontUrl
      * @param bool $intelligenceConnected
      * @param bool $syncEnabled
+     * @param bool $contactSyncActive
      */
     public function __construct(
         private readonly string $storefrontUrl,
         private readonly bool $intelligenceConnected,
-        private readonly bool $syncEnabled
+        private readonly bool $syncEnabled,
+        private readonly bool $contactSyncActive
     ) {
     }
 
@@ -479,13 +482,14 @@ $intelligenceViewModel = static fn (
 
     /**
      * A new website: its Contacts settings were never saved, so its
-     * contacts do not sync yet (PRO-4036).
+     * contacts do not sync yet (PRO-4036) — except on the contacts-settings
+     * page, whose contacts sync (PRO-4037).
      *
      * @return bool
      */
     public function isContactSyncActive(): bool
     {
-        return false;
+        return $this->contactSyncActive;
     }
 
     /**
@@ -531,6 +535,7 @@ $intelligenceViewModel = static fn (
             'multilingual' => ['languages' => ['en'], 'fallbackLanguage' => 'en'],
             'subscribers' => [
                 'syncEnabled' => $this->syncEnabled,
+                'syncActive' => $this->contactSyncActive,
                 'syncMode' => 'consent',
                 'checkoutOptin' => true,
                 'suppressOptinEmails' => true,
@@ -616,20 +621,24 @@ $pages['intelligence-settings-storefront'] = [
 ];
 /*
  * The Contacts tab (view/adminhtml/templates/panel/subscribers.phtml) with its
- * behaviour, for the contacts import card's estimate (PRO-1970).
+ * behaviour, for the contacts import card's estimate (PRO-1970) and its
+ * outcome for a website whose contact sync was not active (PRO-4037).
  */
 $pages['contacts-settings'] = [
     'template' => [
         $root . '/view/adminhtml/templates/panel/subscribers.phtml',
         $root . '/view/adminhtml/templates/panel/panels-js.phtml',
     ],
-    'viewModel' => $intelligence,
+    'viewModel' => $intelligenceViewModel('', false, true, true),
     'data' => ['context' => 'settings'],
     'strings' => [
         'This import sends %1 contact from this website. It runs in the background,'
             . ' a chunk per minute, and never slows the storefront down.',
         'This import sends %1 contacts from this website. It runs in the background,'
             . ' a chunk per minute, and never slows the storefront down.',
+        'Done, %1 of %2 synced.',
+        'Contact sync was off for %1, so nothing was sent from there.'
+            . ' Turn it on and save the Contacts settings, then press Run again.',
     ],
 ];
 /*
@@ -641,10 +650,16 @@ $contactsSetupTemplates = [
     $root . '/view/adminhtml/templates/panel/subscribers.phtml',
     $root . '/view/adminhtml/templates/panel/panels-js.phtml',
 ];
+$contactsUnsaved = 'Contacts start syncing to Smaily once the Contacts settings are saved,'
+    . ' so an import would send nothing yet. Save them to import.';
 $pages['contacts-setup'] = [
     'template' => $contactsSetupTemplates,
     'viewModel' => $intelligence,
-    'strings' => ['Sync contacts to Smaily', 'Contacts start syncing to Smaily when you save this step.'],
+    'strings' => [
+        'Sync contacts to Smaily',
+        'Contacts start syncing to Smaily when you save this step.',
+        $contactsUnsaved,
+    ],
 ];
 $pages['contacts-setup-off'] = [
     'template' => $contactsSetupTemplates,
@@ -660,6 +675,16 @@ $pages['contacts-settings-off'] = [
     'viewModel' => $intelligenceViewModel('', false, false),
     'data' => ['context' => 'settings'],
     'strings' => ['Sync contacts to Smaily'],
+];
+/*
+ * The Contacts tab of a new website: sync on, its Contacts settings never
+ * saved, so Start import waits for their save (PRO-4037).
+ */
+$pages['contacts-settings-new'] = [
+    'template' => $contactsSetupTemplates,
+    'viewModel' => $intelligence,
+    'data' => ['context' => 'settings'],
+    'strings' => [$contactsUnsaved],
 ];
 $setupCompleted = [
     'template' => $root . '/view/adminhtml/templates/wizard/index.phtml',

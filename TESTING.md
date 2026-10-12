@@ -157,7 +157,9 @@ card and offers only **Cancel import**; an
 import that moves shows its progress as before. It renders the Contacts
 tab too: before its import starts, the contacts card quotes the number of
 contacts the import sends for the mode picked on the panel, in the
-singular for one, and no other total.
+singular for one, and no other total; an import that sent nothing from a
+website whose contact sync was not active (`sync_inactive`) names that
+website after its outcome.
 `Test/Js/contacts-step.html` renders the initial setup's Contacts step
 (`panel/subscribers.phtml` without the Settings context) and saves it the
 way **Continue** does, in both languages: for a website whose contact sync
@@ -169,7 +171,10 @@ off, the step shows the switch unticked with the import button disabled,
 an unchanged save posts sync off, and a ticked switch posts it on. There
 and on the Settings Contacts tab of such a website, the import button stays
 disabled while the switch is ticked but not saved, and is enabled once the
-save posts it on. To check another admin screen, add its template(s)
+save posts it on. For a new website — on the step and on the Settings
+Contacts tab — the import button stays disabled and the card says that
+contacts start syncing once the Contacts settings are saved, until the save.
+To check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.
 `Test/Js/user-guide-site.html` checks the merchant user guide,

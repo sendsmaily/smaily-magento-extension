@@ -269,6 +269,7 @@ pre code{background:none; border:0; padding:0; font-size:inherit}
         <li><a href="#set-connection" data-lang="en">Connection</a><a href="#set-connection" data-lang="et">Ühendus</a></li>
         <li><a href="#set-storefront" data-lang="en">Using a separate storefront?</a><a href="#set-storefront" data-lang="et">Kas pood töötab eraldi veebilehel?</a></li>
         <li><a href="#set-multilingual" data-lang="en">Multilingual stores</a><a href="#set-multilingual" data-lang="et">Mitmekeelsed poed</a></li>
+        <li><a href="#set-transactional" data-lang="en">Transactional emails</a><a href="#set-transactional" data-lang="et">Tehingulised kirjad</a></li>
         <li><a href="#set-contacts" data-lang="en">Contacts</a><a href="#set-contacts" data-lang="et">Kontaktid</a></li>
         <li><a href="#set-automations" data-lang="en">Automations</a><a href="#set-automations" data-lang="et">Automaatikad</a></li>
         <li><a href="#set-abandoned" data-lang="en">Abandoned cart</a><a href="#set-abandoned" data-lang="et">Hüljatud ostukorv</a></li>
@@ -777,6 +778,36 @@ bin/magento cache:flush</code></pre>
     </div>
   </div>
 
+  <div class="sub" id="set-transactional">
+    <h2><span data-lang="en">Transactional emails</span><span data-lang="et">Tehingulised kirjad</span></h2>
+    <div data-lang="en">
+      <p>Order confirmations and shipment confirmations can go through a <strong>separate Smaily account</strong>, used only for these emails and kept apart from your marketing account, so that a marketing bounce or complaint never threatens their delivery. Contact Smaily support (support@smaily.com) to set up a transactional Smaily account.</p>
+      <div class="note warn">
+        <span class="k">Sending arrives in a later release</span>
+        <p>This release saves the account and the workflows only. Nothing is sent through the transactional account yet, and Magento sends its own order and shipment emails exactly as before.</p>
+      </div>
+      <h3>The account — Settings › Connection</h3>
+      <p>Below your Smaily account, the <strong>Transactional emails</strong> card holds <strong>Subdomain</strong>, <strong>API username</strong>, <strong>API password</strong> and its own <strong>Test connection</strong>. <strong>Save Connection</strong> saves it together with your Smaily account and asks Smaily once; <strong>Connected</strong> beside its <strong>Test connection</strong> means Smaily accepted it. The card is optional: leave the fields empty and nothing changes, empty them and save to remove the account. As with your Smaily account, the password is stored encrypted and never shown again; leave it empty to keep the saved one.</p>
+      <p>The account is saved once for all websites. On an installation with more than one website, tick <strong>Use a separate account for this website</strong> to give the selected website its own account; untick it to follow the shared one again.</p>
+      <h3>The triggers — Settings › Automations</h3>
+      <p>Until the transactional account is connected, the Automations tab shows only a pointer to the Connection tab. Once it is, <strong>Order confirmation</strong> and <strong>Shipment confirmation</strong> appear, each with <strong>Enabled</strong> (off by default) and the Smaily workflow it will use, listed from the transactional account. Press <strong>Save Automations</strong> to save them.</p>
+      <p><strong>Multilingual store:</strong> on a website with more than one store language, each trigger shows one workflow per language, whatever the multilingual mode, and a <strong>Default fallback</strong> for a language without a workflow.</p>
+    </div>
+    <div data-lang="et">
+      <p>Ostu ja tarne kinnituskirjad saavad minna läbi <strong>eraldi Smaily konto</strong>, mida kasutatakse ainult nende kirjade jaoks ja hoitakse turunduskontost lahus, et turunduskirjade tagasipõrked või kaebused ei ohustaks kunagi nende kohalejõudmist. Tehingulise Smaily konto seadistamiseks võta ühendust Smaily klienditoega (support@smaily.com).</p>
+      <div class="note warn">
+        <span class="k">Saatmine lisandub hilisemas versioonis</span>
+        <p>See versioon salvestab ainult konto ja töövood. Tehingulise konto kaudu ei saadeta veel midagi ning Magento saadab oma tellimuse- ja tarnekirju täpselt nagu varem.</p>
+      </div>
+      <h3>Konto — Seaded › Ühendus</h3>
+      <p>Sinu Smaily konto all on kaart <strong>Tehingulised kirjad</strong> väljadega <strong>Alamdomeen</strong>, <strong>API kasutajanimi</strong>, <strong>API parool</strong> ja oma nupuga <strong>Testi ühendust</strong>. <strong>Salvesta ühendus</strong> salvestab selle koos sinu Smaily kontoga ja küsib Smailylt üks kord; <strong>Ühendatud</strong> tema nupu <strong>Testi ühendust</strong> kõrval tähendab, et Smaily võttis konto vastu. Kaart on valikuline: jäta väljad tühjaks ja midagi ei muutu, tühjenda need ja salvesta, et konto eemaldada. Nagu sinu Smaily kontol, salvestatakse parool krüpteeritult ja seda ei näidata enam kunagi; jäta väli tühjaks, et salvestatud parool alles jääks.</p>
+      <p>Konto salvestatakse üks kord kõigi veebisaitide jaoks. Mitme veebisaidiga paigalduses märgi <strong>Kasuta selle veebisaidi jaoks eraldi kontot</strong>, et anda valitud veebisaidile oma konto; eemalda linnuke, et see kasutaks jälle ühist kontot.</p>
+      <h3>Päästikud — Seaded › Automaatikad</h3>
+      <p>Kuni tehinguline konto pole ühendatud, näitab vahekaart Automaatikad ainult viidet vahekaardile Ühendus. Kui see on ühendatud, ilmuvad <strong>Ostu kinnituskiri</strong> ja <strong>Tarne kinnituskiri</strong>, kummalgi <strong>Lubatud</strong> (vaikimisi väljas) ja Smaily töövoog, mida see kasutama hakkab, valituna tehingulise konto töövoogude loendist. Nende salvestamiseks vajuta <strong>Salvesta automaatikad</strong>.</p>
+      <p><strong>Mitmekeelne pood:</strong> veebisaidil, kus on rohkem kui üks poe keel, näitab iga päästik iga keele jaoks oma töövoogu, sõltumata mitmekeelsuse režiimist, ja valikut <strong>Vaikimisi varuvalik</strong> keele jaoks, millel töövoogu pole.</p>
+    </div>
+  </div>
+
   <div class="sub" id="set-contacts">
     <h2><span data-lang="en">Contacts</span><span data-lang="et">Kontaktid</span></h2>
     <div data-lang="en">
@@ -854,6 +885,7 @@ bin/magento cache:flush</code></pre>
         <li>Each run also writes a date field onto the contact, for segments such as "got the welcome letter" — see <a href="#ef-markers">When an automation last ran</a>.</li>
         <li><strong>Stop the abandoned-cart follow-ups once the shopper buys:</strong> on every follow-up step of the workflow, continue only while <code>abandoned_cart_purchased_at</code> is empty or earlier than <code>abandoned_cart_automation_at</code>. The extension writes the purchase time as soon as a reminded shopper places an order.</li>
         <li>Campaign Intelligence's own automations are on this tab too, under the store events — see <a href="#set-engine-automations">Campaign Intelligence automations</a>.</li>
+        <li>Order and shipment confirmations through a separate transactional account are set up here too, once that account is connected — see <a href="#set-transactional">Transactional emails</a>.</li>
       </ul>
     </div>
     <div data-lang="et">
@@ -873,6 +905,7 @@ bin/magento cache:flush</code></pre>
         <li>Iga käivitus kirjutab kontaktile ka kuupäevavälja, segmentide jaoks nagu „sai tervituskirja“ — vt <a href="#ef-markers">Automaatika viimane käivitus</a>.</li>
         <li><strong>Peata hüljatud ostukorvi järelkirjad, kui ostja ostab:</strong> töövoo igas järelsammus jätka ainult siis, kui <code>abandoned_cart_purchased_at</code> on tühi või varasem kui <code>abandoned_cart_automation_at</code>. Laiendus kirjutab ostu aja kohe, kui meeldetuletuse saanud ostja tellimuse esitab.</li>
         <li>Campaign Intelligence'i enda automaatikad on samuti sellel vahekaardil, poe sündmuste all — vt <a href="#set-engine-automations">Campaign Intelligence'i automaatikad</a>.</li>
+        <li>Ka ostu ja tarne kinnituskirjad eraldi tehingulise konto kaudu seadistatakse siin, kui see konto on ühendatud — vt <a href="#set-transactional">Tehingulised kirjad</a>.</li>
       </ul>
     </div>
   </div>

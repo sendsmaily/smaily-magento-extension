@@ -73,7 +73,8 @@ class WizardStepSaver
         private readonly SmailyClientProvider $smailyClientProvider,
         private readonly ConfigRowNormalizer $rowNormalizer,
         private readonly CredentialCheck $credentialCheck,
-        private readonly SetupNotice $setupNotice
+        private readonly SetupNotice $setupNotice,
+        private readonly TransactionalSettingsSaver $transactionalSaver
     ) {
     }
 
@@ -85,9 +86,10 @@ class WizardStepSaver
     {
         $websiteId = $this->websiteContext->getWebsiteId();
         $errors = match ($step) {
-            'connect' => $this->saveConnect($data, $websiteId),
+            'connect' => $this->saveConnection($data, $websiteId),
             'subscribers' => $this->saveSubscribers($data, $websiteId),
-            'automations' => $this->saveAutomations($data, $websiteId),
+            'automations' => $this->saveAutomations($data, $websiteId)
+                ?: $this->saveTransactionalTriggers($data, $websiteId),
             'intelligence' => $this->saveIntelligence($data),
             'rss' => $this->saveRss($data),
             'finish' => $this->saveFinish($websiteId),
@@ -112,6 +114,16 @@ class WizardStepSaver
     }
 
     /**
+     * Whether Smaily accepted the transactional-email account that the last
+     * connection save in this request checked (PRO-4062). False when the
+     * save made no check, or the post carried no such account.
+     */
+    public function isTransactionalAccepted(): bool
+    {
+        return $this->transactionalSaver->isAccountAccepted();
+    }
+
+    /**
      * Whether the last connection save in this request stored a storefront
      * address other than the one saved before — the product links Campaign
      * Intelligence holds then need the catalog import again (PRO-3660).
@@ -119,6 +131,46 @@ class WizardStepSaver
     public function isStorefrontUrlChanged(): bool
     {
         return $this->storefrontUrlChanged;
+    }
+
+    /**
+     * The connection save: the Smaily account, and on Settings > Connection
+     * the optional transactional-email account (`transactional`, PRO-4062),
+     * checked before either is written.
+     *
+     * @param array<string, mixed> $data
+     * @return array<int, array{field: string, message: string}>
+     */
+    private function saveConnection(array $data, int $websiteId): array
+    {
+        $transactional = is_array($data['transactional'] ?? null) ? $data['transactional'] : null;
+        if ($transactional !== null) {
+            $errors = $this->transactionalSaver->accountErrors($transactional, $websiteId);
+            if ($errors !== []) {
+                return $errors;
+            }
+        }
+
+        $errors = $this->saveConnect($data, $websiteId);
+        if ($errors === [] && $transactional !== null) {
+            $this->transactionalSaver->saveAccount($transactional, $websiteId);
+        }
+
+        return $errors;
+    }
+
+    /**
+     * The transactional-email triggers of Settings > Automations
+     * (`transactional`, PRO-4062); the initial setup posts none.
+     *
+     * @param array<string, mixed> $data
+     * @return array<int, array{field: string, message: string}>
+     */
+    private function saveTransactionalTriggers(array $data, int $websiteId): array
+    {
+        return is_array($data['transactional'] ?? null)
+            ? $this->transactionalSaver->saveTriggers($data['transactional'], $websiteId)
+            : [];
     }
 
     /**

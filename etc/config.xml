@@ -29,6 +29,10 @@
                 <abandoned_enabled>0</abandoned_enabled>
                 <abandoned_cutoff>30</abandoned_cutoff>
             </automations>
+            <transactional>
+                <order_confirmation_enabled>0</order_confirmation_enabled>
+                <shipment_confirmation_enabled>0</shipment_confirmation_enabled>
+            </transactional>
             <rss>
                 <enabled>1</enabled>
             </rss>

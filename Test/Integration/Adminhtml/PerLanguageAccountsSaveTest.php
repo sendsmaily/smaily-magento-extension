@@ -20,6 +20,7 @@ use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
 use Smaily\Connect\Model\Adminhtml\SetupNotice;
+use Smaily\Connect\Model\Adminhtml\TransactionalSettingsSaver;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
@@ -181,7 +182,8 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
             $this->createMock(SmailyClientProvider::class),
             new ConfigRowNormalizer(),
             new CredentialCheck($clientFactory, $requestConfig),
-            $this->createMock(SetupNotice::class)
+            $this->createMock(SetupNotice::class),
+            $this->createMock(TransactionalSettingsSaver::class)
         );
 
         // The other website's store view holds its own Estonian account.

@@ -27,6 +27,13 @@
                     </arguments>
                 </block>
                 <block class="Magento\Backend\Block\Template"
+                       name="smaily.panel.transactional.account" as="panel.transactional.account"
+                       template="Smaily_Connect::panel/transactional-account.phtml">
+                    <arguments>
+                        <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\WizardData</argument>
+                    </arguments>
+                </block>
+                <block class="Magento\Backend\Block\Template"
                        name="smaily.panel.subscribers" as="panel.subscribers"
                        template="Smaily_Connect::panel/subscribers.phtml">
                     <arguments>
@@ -37,6 +44,13 @@
                 <block class="Magento\Backend\Block\Template"
                        name="smaily.panel.automations" as="panel.automations"
                        template="Smaily_Connect::panel/automations.phtml">
+                    <arguments>
+                        <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\WizardData</argument>
+                    </arguments>
+                </block>
+                <block class="Magento\Backend\Block\Template"
+                       name="smaily.panel.transactional.triggers" as="panel.transactional.triggers"
+                       template="Smaily_Connect::panel/transactional-triggers.phtml">
                     <arguments>
                         <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\WizardData</argument>
                     </arguments>

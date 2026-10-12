@@ -252,6 +252,60 @@ class MappingSaverTest extends IntegrationTestCase
     }
 
     /**
+     * PRO-4062: the transactional-email workflows live in the same table
+     * under the transactional account key; each save keeps to its own
+     * triggers, so neither wipes the other's rows.
+     */
+    public function testTransactionalRowsAndAutomationRowsLeaveEachOtherAlone(): void
+    {
+        $this->saver->save([$this->row('welcome', 'et', 'default', 101)], 2);
+
+        self::assertSame([], $this->saver->saveTransactional([
+            $this->transactionalRow('order_confirmation', 'et', 301, true),
+            $this->transactionalRow('order_confirmation', 'en', 302, true),
+            $this->transactionalRow('shipment_confirmation', 'et', 401),
+        ], 2));
+        $this->saver->save([$this->row('welcome', 'et', 'default', 111)], 2);
+
+        $byKey = $this->indexRows($this->fetchAll(MappingResource::TABLE_NAME));
+        self::assertCount(4, $byKey);
+        self::assertSame('111', $byKey['welcome|et|default']['workflow_id']);
+        self::assertSame('301', $byKey['order_confirmation|et|transactional']['workflow_id']);
+        self::assertSame('1', $byKey['order_confirmation|et|transactional']['is_default_fallback']);
+        self::assertSame('0', $byKey['order_confirmation|en|transactional']['is_default_fallback'], 'One fallback');
+        self::assertSame('401', $byKey['shipment_confirmation|et|transactional']['workflow_id']);
+
+        // A cleared transactional workflow goes; the automation row stays.
+        $this->saver->saveTransactional([$this->transactionalRow('order_confirmation', 'et', 301)], 2);
+        $byKey = $this->indexRows($this->fetchAll(MappingResource::TABLE_NAME));
+        self::assertSame(
+            ['welcome|et|default', 'order_confirmation|et|transactional'],
+            array_keys($byKey)
+        );
+    }
+
+    public function testATransactionalSaveRefusesAnAutomationTrigger(): void
+    {
+        $errors = $this->saver->saveTransactional([$this->transactionalRow('welcome', 'et', 1)], 2);
+
+        self::assertSame('mappings', $errors[0]['field']);
+        self::assertSame([], $this->fetchAll(MappingResource::TABLE_NAME));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function transactionalRow(string $trigger, string $language, int $workflowId, bool $fallback = false): array
+    {
+        return [
+            'trigger_type' => $trigger,
+            'language' => $language,
+            'workflow_id' => $workflowId,
+            'is_default_fallback' => $fallback,
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function row(

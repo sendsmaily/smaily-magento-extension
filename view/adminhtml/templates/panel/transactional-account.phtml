@@ -1,0 +1,77 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * The optional transactional-email account (PRO-4062) on Settings >
+ * Connection, below the Smaily account, after the WooCommerce plugin's
+ * TransactionalEmailsSection (without its switch: empty fields are no
+ * account); the initial setup does not show it. A separate Smaily account
+ * for order and shipment emails, saved for all websites; on an install with
+ * more than one website, a website may use its own. Saved with Save
+ * Connection; its own Test connection checks what is typed. Behavior lives
+ * in panel/panels-js.phtml. Nothing is sent through it yet.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
+$viewModel = $block->getData('view_model');
+$account = $viewModel->getTransactionalAccount();
+?>
+<?php // The account the fields show (the saved-* values the form compares
+// with) is the one the website uses; on a multi-website install, unticking
+// "Use a separate account for this website" shows the one saved for all
+// websites (shared-*) instead, and ticking it the website's (own-*). ?>
+<div class="smaily-card" id="smaily-tx-account"
+     data-has-password="<?= $account['hasPassword'] ? '1' : '0' ?>"
+     data-saved-subdomain="<?= $escaper->escapeHtmlAttr($account['subdomain']) ?>"
+     data-saved-username="<?= $escaper->escapeHtmlAttr($account['username']) ?>"
+     data-own-has-password="<?= $account['hasPassword'] ? '1' : '0' ?>"
+     data-own-subdomain="<?= $escaper->escapeHtmlAttr($account['subdomain']) ?>"
+     data-own-username="<?= $escaper->escapeHtmlAttr($account['username']) ?>"
+     data-shared-has-password="<?= $account['shared']['hasPassword'] ? '1' : '0' ?>"
+     data-shared-subdomain="<?= $escaper->escapeHtmlAttr($account['shared']['subdomain']) ?>"
+     data-shared-username="<?= $escaper->escapeHtmlAttr($account['shared']['username']) ?>">
+    <h2><?= $escaper->escapeHtml(__('Transactional emails')) ?></h2>
+    <p><?= $escaper->escapeHtml(__('Create a connection with your transactional Smaily account to send order confirmations and shipping notifications. Contact Smaily support (support@smaily.com) to set up your transactional Smaily account.')) ?></p>
+    <p class="note"><?= $escaper->escapeHtml(__('A separate Smaily account used only for transactional sends.')) ?>
+        <?= $escaper->escapeHtml(__('Sending arrives in a later release: these settings send nothing yet, and Magento sends its own order and shipment emails as before.')) ?></p>
+    <?php if ($viewModel->hasMultipleWebsites()): ?>
+    <div class="smaily-inline-toggle">
+        <label>
+            <input type="checkbox" id="smaily-tx-website-account" <?= $account['websiteAccount'] ? 'checked' : '' ?>/>
+            <?= $escaper->escapeHtml(__('Use a separate account for this website')) ?>
+        </label>
+        <p class="note"><?= $escaper->escapeHtml(__('Otherwise this website uses the transactional-email account saved for all websites.')) ?></p>
+    </div>
+    <?php endif; ?>
+    <div class="smaily-field">
+        <label for="smaily-tx-subdomain"><?= $escaper->escapeHtml(__('Subdomain')) ?></label>
+        <div class="smaily-subdomain-row">
+        <input type="text" id="smaily-tx-subdomain" placeholder="demo"
+               value="<?= $escaper->escapeHtmlAttr($account['subdomain']) ?>"/>
+        <span class="smaily-subdomain-suffix">.sendsmaily.net</span></div>
+    </div>
+    <div class="smaily-field">
+        <label for="smaily-tx-username"><?= $escaper->escapeHtml(__('API username')) ?></label>
+        <input type="text" id="smaily-tx-username" value="<?= $escaper->escapeHtmlAttr($account['username']) ?>"/>
+    </div>
+    <div class="smaily-field">
+        <label for="smaily-tx-password"><?= $escaper->escapeHtml(__('API password')) ?></label>
+        <input type="password" id="smaily-tx-password" autocomplete="new-password"/>
+        <p class="note" id="smaily-tx-password-note" <?= $account['hasPassword'] ? '' : 'style="display:none;"' ?>><?= $escaper->escapeHtml(__('A password is already saved — leave this empty to keep it.')) ?></p>
+    </div>
+    <div class="smaily-ml-account__foot">
+        <button type="button" class="action-secondary" id="smaily-tx-test">
+            <span><?= $escaper->escapeHtml(__('Test connection')) ?></span>
+        </button>
+        <?php if ($account['verified']): ?>
+        <span class="smaily-result smaily-inline-status ok is-saved" id="smaily-tx-test-result"><span class="smaily-inline-status__check"></span><span><?= $escaper->escapeHtml(__('Connected')) ?></span></span>
+        <?php else: ?>
+        <span class="smaily-result smaily-inline-status is-idle" id="smaily-tx-test-result"><span><?= $escaper->escapeHtml(__('Not connected')) ?></span></span>
+        <?php endif; ?>
+    </div>
+    <p class="note"><?= $escaper->escapeHtml(__('Once connected, set up the Order confirmation and Shipment confirmation triggers on the Automations tab.')) ?></p>
+</div>

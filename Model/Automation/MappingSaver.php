@@ -110,6 +110,79 @@ class MappingSaver
         }
         unset($row);
 
+        $this->sync($desired, $websiteId, self::MANAGED_TRIGGERS, $availableByAccount);
+
+        return [];
+    }
+
+    /**
+     * Persists a website's transactional-email workflows (PRO-4062): one row
+     * per trigger and store language ('default' on a website with one
+     * language), under the transactional account key, at most one of them
+     * the trigger's default fallback. The caller sends the full desired
+     * state for the website, as save() does; rows of the other triggers are
+     * never touched.
+     *
+     * @param array<int, mixed> $rows desired rows:
+     *        {trigger_type, language, workflow_id, is_default_fallback?}
+     * @return array<int, array{field: string, message: string}> empty on success
+     */
+    public function saveTransactional(array $rows, int $websiteId): array
+    {
+        $desired = [];
+        $fallbackSeen = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $trigger = strtolower(trim((string)($row['trigger_type'] ?? '')));
+            if (!in_array($trigger, Trigger::TRANSACTIONAL, true)) {
+                return [[
+                    'field' => 'mappings',
+                    'message' => (string)__('Unknown automation trigger "%1".', $trigger),
+                ]];
+            }
+            $language = strtolower(trim((string)($row['language'] ?? '')));
+            if (!$this->isValidKey($language)) {
+                return [[
+                    'field' => 'mappings',
+                    'message' => (string)__('Invalid language or account key in the workflow mapping.'),
+                ]];
+            }
+            $workflowId = (int)($row['workflow_id'] ?? 0);
+            if ($workflowId <= 0) {
+                continue;
+            }
+            // At most one default-fallback row per trigger: the first wins.
+            $isFallback = !empty($row['is_default_fallback']) && !isset($fallbackSeen[$trigger]);
+            if ($isFallback) {
+                $fallbackSeen[$trigger] = true;
+            }
+            $desired[$trigger . '|' . $language . '|' . Mapping::ACCOUNT_TRANSACTIONAL] = [
+                'website_id' => $websiteId,
+                'trigger_type' => $trigger,
+                'language' => $language,
+                'account_key' => Mapping::ACCOUNT_TRANSACTIONAL,
+                'workflow_id' => $workflowId,
+                'is_default_fallback' => $isFallback ? 1 : 0,
+            ];
+        }
+
+        $this->sync($desired, $websiteId, Trigger::TRANSACTIONAL, null);
+
+        return [];
+    }
+
+    /**
+     * Deletes the website's rows of the given triggers that the desired state
+     * no longer contains, then upserts the desired rows.
+     *
+     * @param array<string, array<string, int|string>> $desired keyed "trigger|language|account"
+     * @param string[] $triggers
+     * @param array<string, array<int, string>>|null $availableByAccount see save()
+     */
+    private function sync(array $desired, int $websiteId, array $triggers, ?array $availableByAccount): void
+    {
         $connection = $this->resource->getConnection();
         $table = $this->resource->getMainTable();
 
@@ -117,7 +190,7 @@ class MappingSaver
             $connection->select()
                 ->from($table, ['id', 'trigger_type', 'language', 'account_key', 'workflow_id'])
                 ->where('website_id = ?', $websiteId)
-                ->where('trigger_type IN (?)', self::MANAGED_TRIGGERS)
+                ->where('trigger_type IN (?)', $triggers)
         );
         $staleIds = [];
         foreach ($existing as $row) {
@@ -142,8 +215,6 @@ class MappingSaver
                 ['workflow_id', 'is_default_fallback']
             );
         }
-
-        return [];
     }
 
     private function isValidKey(string $value): bool

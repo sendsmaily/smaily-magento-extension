@@ -13,6 +13,7 @@ use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
+use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
 use Smaily\Connect\Model\Client\Exception\InvalidSubdomainException;
 use Smaily\Connect\Model\Client\Exception\PlanBlockedException;
@@ -39,6 +40,11 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * this is what lets a per-language account block (multilingual mode A)
  * re-test a saved account without retyping its password. Empty fields, or no
  * saved credentials to fall back to, ask the merchant to fill them in.
+ *
+ * `account: "transactional"` without fields re-tests a saved
+ * transactional-email account (PRO-4062), the way a store_id re-tests a
+ * saved per-language account: the selected website's own with
+ * `website_account`, else the one saved for all websites.
  */
 class TestSmaily extends AbstractJsonAction implements HttpPostActionInterface
 {
@@ -48,7 +54,8 @@ class TestSmaily extends AbstractJsonAction implements HttpPostActionInterface
         JsonSerializer $serializer,
         private readonly SmailyClientFactory $clientFactory,
         private readonly SmailyClientProvider $clientProvider,
-        private readonly SubdomainNormalizer $normalizer
+        private readonly SubdomainNormalizer $normalizer,
+        private readonly WebsiteContext $websiteContext
     ) {
         parent::__construct($context, $jsonFactory, $serializer);
     }
@@ -81,7 +88,18 @@ class TestSmaily extends AbstractJsonAction implements HttpPostActionInterface
         $keepsSavedPassword = $password === '' && $storeId !== null
             && (!$fieldsPosted || ($subdomain !== '' && $username !== ''));
 
-        if ($keepsSavedPassword) {
+        $savedTransactional = ($body['account'] ?? null) === 'transactional' && !$fieldsPosted && $password === '';
+
+        if ($savedTransactional) {
+            try {
+                $client = $this->clientProvider->forTransactional(
+                    empty($body['website_account']) ? null : $this->websiteContext->getWebsiteId()
+                );
+                $subdomain = 'saved';
+            } catch (SmailyClientException) {
+                return $this->fillInCredentials($body);
+            }
+        } elseif ($keepsSavedPassword) {
             try {
                 $client = $this->clientProvider->forStore($storeId);
                 $subdomain = $subdomain !== '' ? $subdomain : 'saved';

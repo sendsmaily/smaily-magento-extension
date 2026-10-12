@@ -879,7 +879,7 @@ below.
 | `smaily_event_queue` | Marketing event queue |
 | `smaily_ingest_queue` | Engine ingest queue |
 | `smaily_abandoned_cart` | Per-quote send state (`open`/`mailed`/`skipped`/`completed`/`expired`/`erased`) + checkout opt-in flag (the core `quote` table is never altered) |
-| `smaily_automation_mapping` | (website, trigger, language, account) → workflow |
+| `smaily_automation_mapping` | (website, trigger, language, account) → workflow; also the transactional-email workflows (account `transactional`) |
 | `smaily_backfill_job` | Chunked import jobs (cursor-resumable) |
 | `smaily_order_attribution` | Recommendation attribution per order (sales connection) |
 
@@ -1485,6 +1485,39 @@ Initial setup, Settings, Log. Design rules:
   the per-store-view credential overrides on save (confirmed in the UI
   first). Single-language installs are locked to `single` and see none of
   this.
+- **Transactional emails — settings only (PRO-4062).** Settings > Connection
+  has an optional second Smaily account for order and shipment emails
+  (`panel/transactional-account.phtml`), Settings > Automations its
+  **Order confirmation** / **Shipment confirmation** triggers
+  (`panel/transactional-triggers.phtml`); the wizard renders neither (its
+  layout has no such blocks, and the shared panels-js posts the
+  `transactional` keys only where the blocks exist). The account lives under
+  `smaily_connect/transactional/{subdomain,username,password}`, saved at
+  default scope for all websites; on a 2+-website install a website may
+  use its own (`website_account`, written at website scope with the flag
+  `smaily_connect/transactional/website_account`), and `Config` reads it
+  website → default like any field. The password is encrypted and declared
+  sensitive. `Model\Adminhtml\TransactionalSettingsSaver` (called by
+  `WizardStepSaver` from the `connect` and `automations` steps) validates the
+  account before either account is written, applies the PRO-3690
+  empty-password rule against the account the form was drawn with, and
+  checks it once with Smaily; `VerifiedCredentials::isTransactionalVerified()`
+  is the gate of the triggers, which show only a pointer to the Connection
+  tab until it says yes (and appear without a reload after a save that
+  connects). The triggers' switches are website-scoped
+  (`smaily_connect/transactional/{order,shipment}_confirmation_enabled`,
+  off); their workflows are `smaily_automation_mapping` rows with
+  `account_key = 'transactional'` and `Trigger::TRANSACTIONAL` types, one
+  per store language (`default` on a one-language website) with a default
+  fallback, written by `MappingSaver::saveTransactional()` — each saver keeps
+  to its own triggers, so neither deletes the other's rows. The workflow
+  list is `SmailyClient::getTransactionalWorkflows()` (GET
+  `autoresponder.php?status=ACTIVE`, as the WooCommerce plugin's
+  transactional settings list it; which workflow kinds Smaily's message
+  sending accepts is not yet verified — that method is the one place to
+  change). Nothing reads these settings to send: no observer or plugin
+  touches Magento's order or shipment emails
+  (`ModuleDefinitionTest::testNothingHooksMagentosOrderOrShipmentEmails`).
 - **Dashboard is operational truth.** Every number on
   `dashboard/index.phtml` is a real local queue query
   (`Model\Adminhtml\DashboardStats`); the health verdict reuses the

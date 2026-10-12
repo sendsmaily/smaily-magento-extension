@@ -45,4 +45,27 @@ class SmailyClientProvider
             'password' => $this->config->getPassword($storeId),
         ]);
     }
+
+    /**
+     * Get a client for the transactional-email account saved for a website
+     * (its own, else the one saved for all websites; PRO-4062), or for the
+     * one saved for all websites (null).
+     *
+     * @throws SmailyClientException when that account is not configured
+     */
+    public function forTransactional(?int $websiteId): SmailyClient
+    {
+        $subdomain = $this->config->getTransactionalSubdomain($websiteId);
+        $username = $this->config->getTransactionalUsername($websiteId);
+        $password = $this->config->getTransactionalPassword($websiteId);
+        if ($subdomain === '' || $username === '' || $password === '') {
+            throw new SmailyClientException(__('The transactional-email account is not configured.'));
+        }
+
+        return $this->clientFactory->create([
+            'subdomain' => $subdomain,
+            'username' => $username,
+            'password' => $password,
+        ]);
+    }
 }

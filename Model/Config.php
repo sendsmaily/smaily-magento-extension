@@ -41,6 +41,12 @@ class Config
     public const XML_PATH_ABANDONED_ENABLED = 'smaily_connect/automations/abandoned_enabled';
     public const XML_PATH_ABANDONED_WORKFLOW = 'smaily_connect/automations/abandoned_workflow';
     public const XML_PATH_ABANDONED_CUTOFF = 'smaily_connect/automations/abandoned_cutoff';
+    public const XML_PATH_TRANSACTIONAL_SUBDOMAIN = 'smaily_connect/transactional/subdomain';
+    public const XML_PATH_TRANSACTIONAL_USERNAME = 'smaily_connect/transactional/username';
+    public const XML_PATH_TRANSACTIONAL_PASSWORD = 'smaily_connect/transactional/password';
+    public const XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT = 'smaily_connect/transactional/website_account';
+    public const XML_PATH_ORDER_CONFIRMATION_ENABLED = 'smaily_connect/transactional/order_confirmation_enabled';
+    public const XML_PATH_SHIPMENT_CONFIRMATION_ENABLED = 'smaily_connect/transactional/shipment_confirmation_enabled';
     public const XML_PATH_RSS_ENABLED = 'smaily_connect/rss/enabled';
     public const XML_PATH_LOG_VERBOSITY = 'smaily_connect/logging/verbosity';
 
@@ -286,6 +292,63 @@ class Config
     }
 
     /**
+     * The transactional-email Smaily account's subdomain for a website
+     * (PRO-4062): the website's own account when it has one, else the
+     * account saved for all websites — which null reads (default scope).
+     */
+    public function getTransactionalSubdomain(?int $websiteId): string
+    {
+        return trim((string)$this->transactionalValue(self::XML_PATH_TRANSACTIONAL_SUBDOMAIN, $websiteId));
+    }
+
+    /**
+     * The transactional-email account's API username for a website, or for
+     * all websites (null).
+     */
+    public function getTransactionalUsername(?int $websiteId): string
+    {
+        return trim((string)$this->transactionalValue(self::XML_PATH_TRANSACTIONAL_USERNAME, $websiteId));
+    }
+
+    /**
+     * The transactional-email account's decrypted API password for a
+     * website, or for all websites (null).
+     */
+    public function getTransactionalPassword(?int $websiteId): string
+    {
+        $encrypted = (string)$this->transactionalValue(self::XML_PATH_TRANSACTIONAL_PASSWORD, $websiteId);
+
+        return $encrypted === '' ? '' : $this->encryptor->decrypt($encrypted);
+    }
+
+    /**
+     * Whether a website uses its own transactional-email account instead of
+     * the one saved for all websites. Written at website scope only.
+     */
+    public function hasTransactionalWebsiteAccount(int $websiteId): bool
+    {
+        return $this->websiteFlag(self::XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT, $websiteId);
+    }
+
+    /**
+     * The Order confirmation switch of a website's transactional emails
+     * (off by default). Nothing reads it to send yet.
+     */
+    public function isOrderConfirmationEnabled(int $websiteId): bool
+    {
+        return $this->websiteFlag(self::XML_PATH_ORDER_CONFIRMATION_ENABLED, $websiteId);
+    }
+
+    /**
+     * The Shipment confirmation switch of a website's transactional emails
+     * (off by default). Nothing reads it to send yet.
+     */
+    public function isShipmentConfirmationEnabled(int $websiteId): bool
+    {
+        return $this->websiteFlag(self::XML_PATH_SHIPMENT_CONFIRMATION_ENABLED, $websiteId);
+    }
+
+    /**
      * Whether the public product RSS feed is enabled for the current store.
      */
     public function isRssEnabled(int|string|null $storeId = null): bool
@@ -295,6 +358,11 @@ class Config
             ScopeInterface::SCOPE_STORE,
             $storeId
         );
+    }
+
+    private function transactionalValue(string $path, ?int $websiteId): mixed
+    {
+        return $websiteId === null ? $this->scopeConfig->getValue($path) : $this->websiteValue($path, $websiteId);
     }
 
     private function websiteValue(string $path, ?int $websiteId): mixed

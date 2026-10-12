@@ -686,6 +686,133 @@ $pages['contacts-settings-new'] = [
     'data' => ['context' => 'settings'],
     'strings' => [$contactsUnsaved],
 ];
+/*
+ * The transactional-email settings of Settings (PRO-4062): the account
+ * block of the Connection tab (panel/transactional-account.phtml) and the
+ * triggers of the Automations tab (panel/transactional-triggers.phtml) with
+ * their behaviour (panel/panels-js.phtml). The -off page: one website, one
+ * store language, no transactional account saved. The -connected page: two
+ * websites, two store languages, the website's own account connected and
+ * its Order confirmation workflows saved, the account saved for all
+ * websites another one.
+ */
+$transactionalViewModel = static fn (bool $connected): object => new class ($connected) {
+    /**
+     * @param bool $connected
+     */
+    public function __construct(private readonly bool $connected)
+    {
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasMultipleWebsites(): bool
+    {
+        return $this->connected;
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getDetectedLanguages(): array
+    {
+        return $this->connected ? ['et', 'en'] : ['en'];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getTransactionalAccount(): array
+    {
+        $shared = $this->connected
+            ? ['subdomain' => 'shop-tx', 'username' => 'api', 'hasPassword' => true]
+            : ['subdomain' => '', 'username' => '', 'hasPassword' => false];
+
+        return $this->connected
+            ? [
+                'subdomain' => 'ee-tx',
+                'username' => 'api-ee',
+                'hasPassword' => true,
+                'websiteAccount' => true,
+                'verified' => true,
+                'shared' => $shared,
+            ]
+            : ['websiteAccount' => false, 'verified' => false, 'shared' => $shared] + $shared;
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    public function getTransactionalTriggers(): array
+    {
+        return [
+            'order_confirmation' => [
+                'enabled' => false,
+                'workflows' => $this->connected
+                    ? [
+                        'et' => ['workflowId' => 31, 'isDefaultFallback' => true],
+                        'en' => ['workflowId' => 32, 'isDefaultFallback' => false],
+                    ]
+                    : [],
+            ],
+            'shipment_confirmation' => ['enabled' => false, 'workflows' => []],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getWebsiteQuery(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return string
+     */
+    public function getBootJson(): string
+    {
+        return (string)json_encode([
+            'connected' => true,
+            'verified' => true,
+            'planBlocked' => false,
+            'setupCompleted' => true,
+            'storeId' => 1,
+            'connection' => ['subdomain' => 'demo', 'username' => 'api', 'hasPassword' => true, 'multilingualMode' => 'single'],
+            'websiteAccount' => ['subdomain' => 'demo', 'username' => 'api'],
+            'multilingual' => ['languages' => $this->getDetectedLanguages(), 'fallbackLanguage' => ''],
+            'subscribers' => ['syncEnabled' => true, 'syncActive' => true, 'syncMode' => 'consent'],
+            'automations' => [],
+            'intelligence' => ['connected' => false, 'tenantName' => '', 'engineVersion' => '', 'browseTracking' => false],
+            'rss' => ['enabled' => false],
+        ]);
+    }
+};
+$transactionalTemplates = [
+    $root . '/view/adminhtml/templates/panel/transactional-account.phtml',
+    $root . '/view/adminhtml/templates/panel/transactional-triggers.phtml',
+    $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+];
+$transactionalStrings = [
+    'Transactional emails',
+    'Connect your transactional Smaily account on the Connection tab to set up order and shipment confirmations.',
+    'Order confirmation',
+    'Shipment confirmation',
+    'Use a separate account for this website',
+    'Connected',
+    'Not connected',
+];
+$pages['transactional-off'] = [
+    'template' => $transactionalTemplates,
+    'viewModel' => $transactionalViewModel(false),
+    'strings' => $transactionalStrings,
+];
+$pages['transactional-connected'] = [
+    'template' => $transactionalTemplates,
+    'viewModel' => $transactionalViewModel(true),
+    'strings' => $transactionalStrings,
+];
 $setupCompleted = [
     'template' => $root . '/view/adminhtml/templates/wizard/index.phtml',
     'data' => ['children' => [

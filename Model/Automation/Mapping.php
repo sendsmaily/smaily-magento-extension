@@ -19,6 +19,9 @@ class Mapping extends AbstractModel
     public const LANGUAGE_DEFAULT = 'default';
     public const ACCOUNT_DEFAULT = 'default';
 
+    /** The transactional-email account's rows (Trigger::TRANSACTIONAL, PRO-4062). */
+    public const ACCOUNT_TRANSACTIONAL = 'transactional';
+
     /**
      * @inheritDoc
      */

@@ -15,6 +15,7 @@ use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Adminhtml\SetupNotice;
+use Smaily\Connect\Model\Adminhtml\TransactionalSettingsSaver;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
@@ -76,7 +77,8 @@ class WizardStepSaverTest extends IntegrationTestCase
                 $this->createMock(SmailyClientFactory::class),
                 $this->objectManager->get(Config::class)
             ),
-            $this->createMock(SetupNotice::class)
+            $this->createMock(SetupNotice::class),
+            $this->createMock(TransactionalSettingsSaver::class)
         );
     }
 

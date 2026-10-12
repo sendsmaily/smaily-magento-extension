@@ -134,8 +134,37 @@ class WizardDataTest extends TestCase
     }
 
     /**
-     * PRO-3719: each website shows its own default fallback language.
+     * PRO-4062: the transactional-email account is drawn for the selected
+     * website without its password — only whether one is saved.
      */
+    public function testTheTransactionalAccountNeverCarriesItsPassword(): void
+    {
+        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->config->method('getTransactionalSubdomain')->willReturnMap([[2, 'demo-tx'], [null, 'shop-tx']]);
+        $this->config->method('getTransactionalUsername')->willReturnMap([[2, 'tx'], [null, 'api']]);
+        $this->config->method('getTransactionalPassword')->willReturnMap([[2, 'tx-secret'], [null, 'secret']]);
+        $this->config->method('hasTransactionalWebsiteAccount')->with(2)->willReturn(true);
+        $this->verifiedCredentials->method('isTransactionalVerified')->with(2)->willReturn(true);
+
+        $account = $this->viewModel->getTransactionalAccount();
+
+        self::assertSame(
+            [
+                'subdomain' => 'demo-tx',
+                'username' => 'tx',
+                'hasPassword' => true,
+                'websiteAccount' => true,
+                'verified' => true,
+                'shared' => ['subdomain' => 'shop-tx', 'username' => 'api', 'hasPassword' => true],
+            ],
+            $account
+        );
+        self::assertStringNotContainsString('secret', (string)json_encode($account));
+        self::assertStringNotContainsString('secret', $this->viewModel->getBootJson());
+    }
+
+    /**
+     * PRO-3719: each website shows its own default fallback language.
     public function testTheFallbackLanguageIsTheSelectedWebsites(): void
     {
         $this->scopeConfig->method('isSetFlag')->willReturn(false);

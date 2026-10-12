@@ -133,6 +133,33 @@ class SmailyClient
     }
 
     /**
+     * List the workflows the transactional-email settings offer (PRO-4062).
+     *
+     * Uses GET autoresponder.php?status=ACTIVE, the list the WooCommerce
+     * plugin's transactional-email settings offer. ASSUMPTION, not verified
+     * against a live account: which workflow kinds Smaily's message sending
+     * accepts is unknown until the sending lands; if it accepts only some
+     * kinds, this is the one method to change.
+     *
+     * @return array<int, array{id: int, title: string}>
+     */
+    public function getTransactionalWorkflows(): array
+    {
+        $workflows = [];
+        foreach ($this->get(self::ENDPOINT_AUTORESPONDER, ['status' => 'ACTIVE']) as $workflow) {
+            if (!is_array($workflow) || empty($workflow['id'])) {
+                continue;
+            }
+            $workflows[] = [
+                'id' => (int)$workflow['id'],
+                'title' => (string)($workflow['name'] ?? $workflow['title'] ?? $workflow['id']),
+            ];
+        }
+
+        return $workflows;
+    }
+
+    /**
      * Validate credentials with a lightweight API call. A pass is remembered
      * as "Connected" for these credentials (PRO-3560).
      *

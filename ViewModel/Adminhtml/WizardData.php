@@ -451,6 +451,72 @@ class WizardData implements ArgumentInterface
     }
 
     /**
+     * The transactional-email account as the selected website uses it
+     * (PRO-4062): its own, else the one saved for all websites, which
+     * `shared` holds as well (the fields show it when the website does not
+     * use its own). Passwords are never returned, only whether one is saved.
+     *
+     * @return array{subdomain: string, username: string, hasPassword: bool, websiteAccount: bool, verified: bool,
+     *     shared: array{subdomain: string, username: string, hasPassword: bool}}
+     */
+    public function getTransactionalAccount(): array
+    {
+        $websiteId = $this->websiteContext->getWebsiteId();
+
+        return [
+            'subdomain' => $this->config->getTransactionalSubdomain($websiteId),
+            'username' => $this->config->getTransactionalUsername($websiteId),
+            'hasPassword' => $this->config->getTransactionalPassword($websiteId) !== '',
+            'websiteAccount' => $this->config->hasTransactionalWebsiteAccount($websiteId),
+            // Smaily accepted it at the last real check (PRO-3560): the gate
+            // of the trigger settings on the Automations tab.
+            'verified' => $this->verifiedCredentials->isTransactionalVerified($websiteId),
+            'shared' => [
+                'subdomain' => $this->config->getTransactionalSubdomain(null),
+                'username' => $this->config->getTransactionalUsername(null),
+                'hasPassword' => $this->config->getTransactionalPassword(null) !== '',
+            ],
+        ];
+    }
+
+    /**
+     * The selected website's transactional-email triggers: each one's switch
+     * and its saved workflows by store language ('default' on a website with
+     * one language).
+     *
+     * @return array<string, array{enabled: bool,
+     *     workflows: array<string, array{workflowId: int, isDefaultFallback: bool}>}>
+     */
+    public function getTransactionalTriggers(): array
+    {
+        $websiteId = $this->websiteContext->getWebsiteId();
+        $triggers = [
+            Trigger::ORDER_CONFIRMATION => [
+                'enabled' => $this->config->isOrderConfirmationEnabled($websiteId),
+                'workflows' => [],
+            ],
+            Trigger::SHIPMENT_CONFIRMATION => [
+                'enabled' => $this->config->isShipmentConfirmationEnabled($websiteId),
+                'workflows' => [],
+            ],
+        ];
+        $collection = $this->mappingCollectionFactory->create();
+        $collection->addFieldToFilter('website_id', ['eq' => $websiteId])
+            ->addFieldToFilter('trigger_type', ['in' => Trigger::TRANSACTIONAL])
+            ->addFieldToFilter('account_key', Mapping::ACCOUNT_TRANSACTIONAL);
+        /** @var Mapping $mapping */
+        foreach ($collection as $mapping) {
+            $trigger = (string)$mapping->getData('trigger_type');
+            $triggers[$trigger]['workflows'][(string)$mapping->getData('language')] = [
+                'workflowId' => $mapping->getWorkflowId(),
+                'isDefaultFallback' => (bool)$mapping->getData('is_default_fallback'),
+            ];
+        }
+
+        return $triggers;
+    }
+
+    /**
      * Saved workflow-mapping rows for the target website, keyed
      * "trigger|language" for template prefill. Legacy website_id=0 rows
      * (pre-Phase-3 saves, the 2.8.x migration's default-scope seeding) are

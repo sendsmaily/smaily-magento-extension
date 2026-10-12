@@ -31,7 +31,9 @@ with the Smaily Connect plugins for WooCommerce and Shopify.
 - **Privacy-first** — encrypted credentials, GDPR export/erase tooling and
   a shopper personalization opt-out page.
 - **Translated** — ships with English and Estonian (`et_EE`) translation
-  packs for the admin and the storefront.
+  packs for the admin and the storefront, and storefront texts in Russian,
+  Finnish, Latvian and Lithuanian (machine translations awaiting a native
+  review).
 
 ## Requirements
 

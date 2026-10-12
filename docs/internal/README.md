@@ -13,6 +13,7 @@ how to install, set up and use Smaily Connect, read the
 | [PILOT_CHECKLIST.md](PILOT_CHECKLIST.md) | The checklist for a pilot store install |
 | [RFC_MULTI_WEBSITE.md](RFC_MULTI_WEBSITE.md) | The design of multi-website support |
 | [ADMIN_UI_TARGET_SPEC.md](ADMIN_UI_TARGET_SPEC.md) | The target specification of the admin pages |
+| [TRANSLATIONS.md](TRANSLATIONS.md) | The storefront translations that wait for a native review |
 | [audits/](audits/) | Dated audits and reviews; each one describes the code as it was on its date |
 
 A finished document is deleted, not kept here; git history keeps its text.

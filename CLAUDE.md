@@ -409,7 +409,9 @@ is written in English.
   confirmed); 2026-10-12: 4/5 (rc12 cut; consent: new stores sync only
   after the Contacts save; pilot store not yet confirmed); 2026-10-12
   later: 4/5 (rc12 released; a pilot store pre-flighted; waiting for its
-  developer's upgrade).
+  developer's upgrade); 2026-10-12 session end: 4/5 (pilot store waiting
+  for its developer's rc12 upgrade; transactional emails settings shipped
+  on master).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

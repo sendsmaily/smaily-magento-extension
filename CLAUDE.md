@@ -141,6 +141,8 @@ start one.
   cannot run this module — a 2.4.3-p1 pilot store surfaced two days before
   pilot day (2026-10-07). docs/INSTALLING.md "Before you start" and
   `docs/internal/PILOT_CHECKLIST.md` §0 carry the check.
+  The Magento 2.4 admin cannot install or update modules; a pilot always
+  needs someone on the server.
 
 - Local PHP is 8.5 and this host is missing a few Magento PHP extensions, so:
   `composer install --ignore-platform-reqs`. Magento packages come from
@@ -396,7 +398,9 @@ is written in English.
   walked and fixed; pilot store not yet confirmed); 2026-10-11: 4/5
   (rc11 released; Hyvä companion on Packagist; pilot store not yet
   confirmed); 2026-10-12: 4/5 (rc12 cut; consent: new stores sync only
-  after the Contacts save; pilot store not yet confirmed).
+  after the Contacts save; pilot store not yet confirmed); 2026-10-12
+  later: 4/5 (rc12 released; pilot store Hotlips identified and
+  pre-flighted; waiting for its developer's upgrade).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

@@ -7,41 +7,72 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-10-12 — the 3.0.0-rc12 version cut (this PR): the
-version in composer.json, `ModuleInfo::VERSION`, the ModuleVersion docblock
-and the merchant commands (README, UPGRADING, the guide site's `#install`,
-`#upgrading` and `#st-hyva` in EN and ET, the Hyvä companion's README);
-CHANGELOG collects the six fragments into five bullets (PRO-4016 and
-PRO-4037 merged into one Start import bullet; none asks for a catalog
-import). **Merged to master since rc11:** #159/#160 PRO-4020 (the Hyvä
-companion on Packagist and as the release's second ZIP; the mirror's
-README, = the Packagist page, updates with this release), #161 STATUS,
-#162 PRO-4017 (docs: when contact sync starts), #163 PRO-4016 (**Start
-import** waits for the saved **Sync contacts to Smaily** switch), #164 a
-simplification tidy-up (no behaviour change), #166 PRO-4036 (on a new
-store, contact sync for a website starts when its Contacts settings are
-saved — per-website flag `smaily_connect/internal/contacts_confirmed`;
-2.8.x upgrades and release-candidate stores keep syncing through the
-migration and the new data patch `ConfirmContactsOfConnectedWebsites`),
-#167 PRO-4040 (Magento's newsletter emails are suppressed only while
-contact sync is active), #168 PRO-4041 (a 2.8.x website with its own
-Enable Module Yes and no synchronization value stays off), #169 PRO-4037
-(the import card and the CLI say why an import sent nothing; **Start
-import** waits for the Contacts save). **Queue:** tag 3.0.0-rc12 (Erkki's
-yes) → the release workflow also publishes the Hyvä companion (mirror +
-Packagist through the webhook — its first automatic run; check that
-Packagist picks up 3.0.0-rc12 for `smaily/module-connect-hyva` by itself)
-→ the HC PRO pilot when it is confirmed (check Magento ≥ 2.4.4 / PHP ≥ 8.1
-and the storefront type first). **Open for Erkki:** HC PRO's versions and
-storefront type (unknown as of 2026-10-11); PRO-4019 (the Estonian
-proofread — now also the new ET texts of PRO-4036, PRO-4037 and
-PRO-4040); a Hyvä store for the widget (PRO-3790) and the Tailwind build
-script check (`npm run build-prod` vs `npm run build`). **Backlog:**
-PRO-3746 (after the pilot), PRO-3921 / PRO-3916 (engine; after PRO-3941 /
-PRO-3919), PRO-2461. **Gotcha (sandbox):** an old pending
+_Last updated: 2026-10-12 later — after the 3.0.0-rc12 release and the
+pilot store's pre-flight. **3.0.0-rc12 is released** (2026-10-12,
+`gh release create`, no HTTP 500): the release workflow is green and
+attached four assets (`smaily-connect-magento2.zip`,
+`smaily-connect-magento2-hyva.zip` and both `.sha256`); the mirror
+https://github.com/sendsmaily/smaily-magento-hyva got tag 3.0.0-rc12
+automatically, and Packagist listed both `smaily/smailyformagento` and
+`smaily/module-connect-hyva` 3.0.0-rc12 by itself — the webhook works,
+the first automatic companion publish. **Merged since the cut:** #171
+PRO-4053 — the upgrade guide covers a 2.8.x copied into
+`app/code/Smaily/SmailyForMagento`: delete only that folder, then install
+v3; never run `module:uninstall Smaily_SmailyForMagento` after v3 is
+required (it composer-removes v3); walked end to end, Composer and ZIP
+routes, on 2.4.8-p4; the internal pilot checklist's Hyvä row no longer
+says stop. The guide site is re-uploaded (md5 matches master).
+**Pilot store: Hotlips** (hotlips.ee, HC Pro's sister company) goes
+first; HC Pro follows. Pre-flight read from its admin on 2026-10-12:
+Magento 2.4.8-p3; a Luma-based custom theme, production mode; four
+websites — Hotlips.ee (store views et, en, ru), Hotlips.fi, Hotlips.lv,
+Hotlips.lt; Amasty Cookie Consent; Mageplaza One Step Checkout with its
+own newsletter checkbox (PRO-3663's three live checks are due on pilot
+day); Mageplaza SMTP (mail transport only); a Custobar connector sending
+data from Hotlips.fi; an Erply connector. The old 2.8.x module: every
+website inherits Default Config — module on, contact sync off, opt-in
+collection off, abandoned cart on (one workflow, "all languages", 1 h).
+One Smaily account serves all four countries. **Gotcha:** their welcome
+email is built outside the module (a Make scenario on a "form submitted"
+trigger that also reads guest orders) — do not switch v3 contact sync and
+the welcome on while that scenario runs, or shoppers get two welcomes.
+**Install path:** the Magento 2.4 admin cannot install modules; Hotlips'
+developer upgrades on the server from a one-page Estonian guide Erkki sent
+(sent as PDF 2026-10-12). Still unknown: the PHP version, the install
+method (Composer or `app/code`) and cron. **Decided (Erkki, 2026-10-12,
+PRO-3662 Done):** one shared Campaign Intelligence tenant for all four
+websites is acceptable for HC Pro and Hotlips; tenant-per-country stays
+with PRO-1463 / PRO-1464. **PRO-4015 wording confirmed:** 2.8.x posted
+opt-ins to the authenticated autoresponder API, where the workflow id is
+required; the "opt-in workflows are triggered" label described Smaily's
+legacy public form, which 2.8.x never used. **Queue:** the Hotlips
+developer's upgrade → pilot day (initial setup on all four websites,
+PRO-3663's checks, a test order and an abandoned cart with Erkki's own
+test contact, Campaign Intelligence with one tenant) → HC Pro. **Open for
+Erkki:** the developer's reply; PRO-4019 (the Estonian proofread); the
+"Pilot store live" milestone date once the upgrade date is known; a Hyvä
+store for the widget (PRO-3790) and the Tailwind build script check.
+**Backlog:** PRO-3746 (after the pilot), PRO-3921 / PRO-3916 (engine;
+after PRO-3941 / PRO-3919), PRO-2461. **Gotcha (sandbox):** an old pending
 contacts→Smaily backfill job (id 1, 2026-10-02) and 2 ingest rows wait in
 the sandbox; `cron:run` there sends them to the smailydemo account and the
 synthetic engine tenant._
+
+_Earlier (2026-10-12): the 3.0.0-rc12 version cut (#170) — the version in
+composer.json, `ModuleInfo::VERSION`, the docblock and the merchant
+commands (README, UPGRADING, the guide site's `#install`, `#upgrading` and
+`#st-hyva` in EN and ET, the Hyvä companion's README); CHANGELOG collects
+six fragments into five bullets (none asks for a catalog import). Merged
+since rc11: #159/#160 PRO-4020 (the Hyvä companion on Packagist and as the
+release's second ZIP), #161 STATUS, #162 PRO-4017, #163 PRO-4016, #164 a
+tidy-up, #166 PRO-4036 (on a new store, contact sync for a website starts
+when its Contacts settings are saved — per-website flag
+`smaily_connect/internal/contacts_confirmed`; 2.8.x upgrades and
+release-candidate stores keep syncing through the migration and the data
+patch `ConfirmContactsOfConnectedWebsites`), #167 PRO-4040 (Magento's
+newsletter emails are suppressed only while contact sync is active), #168
+PRO-4041, #169 PRO-4037 (the import card and the CLI say why an import
+sent nothing; **Start import** waits for the Contacts save)._
 
 _Earlier (2026-10-11): after the 3.0.0-rc11 release (tagged 2026-10-09
 with `gh release create`, no HTTP 500; workflow green on b711b0b, main ZIP
@@ -7322,9 +7353,15 @@ PRO-1267 (engine: Magento product-identity contract note).
     (`LegacyConfigMapper::MODULE_SWITCH_DEFAULTS`, unit-checked against
     `etc/config.xml`); the UPGRADING guide step is gone.
 
-16. Open 2026-10-08 (session handoff), updated 2026-10-09 and
-    2026-10-11: (a) HC PRO's Magento and PHP versions and storefront type
-    (Luma, Hyvä or headless); it runs the old 2.8.x module — still open. (b) The Estonian proofread
+16. Open 2026-10-08 (session handoff), updated 2026-10-09, 2026-10-11
+    and 2026-10-12: (a) HC PRO's Magento and PHP versions and storefront
+    type — answered 2026-10-12: the pilot is Hotlips (HC Pro's sister
+    company) first, HC Pro after it. Hotlips runs Magento 2.4.8-p3, a
+    Luma-based custom theme in production mode, four websites and the old
+    2.8.x module (pre-flight in "Last updated"). Still open: its PHP
+    version, install method (Composer or `app/code`) and cron — its
+    developer upgrades on the server and has not replied yet; the
+    "Pilot store live" milestone date follows the upgrade date. (b) The Estonian proofread
     of the guide site (`docs/site/index.html`) and of the new admin/widget
     texts — now PRO-4019; the site upload to smaily.com/connect-magento/ is
     done, and the orchestrator publishes each later change over FTPS
@@ -7340,7 +7377,9 @@ PRO-1267 (engine: Magento product-identity contract note).
     done 2026-10-11 — https://github.com/sendsmaily/smaily-magento-hyva,
     `smaily/module-connect-hyva` on Packagist (submitted from the `smaily`
     account, auto-updated by the mirror's webhook); the release workflow
-    publishes it (#159, #160). Updated 2026-10-11: (a), (b) PRO-4019 and
-    (c) are still open; (g) the Hyvä Tailwind build script name
+    publishes it (#159, #160); the first automatic publish (3.0.0-rc12,
+    2026-10-12) reached the mirror and Packagist by itself. Updated
+    2026-10-11: (a), (b) PRO-4019 and (c) are still open (2026-10-12: (a)
+    answered, see above); (g) the Hyvä Tailwind build script name
     (`npm run build-prod` in the docs vs `npm run build` in HYVA_SUPPORT's
     sandbox recipe) — check it on the Hyvä store of (c).

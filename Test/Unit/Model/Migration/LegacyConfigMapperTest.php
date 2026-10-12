@@ -339,21 +339,31 @@ class LegacyConfigMapperTest extends TestCase
         ];
     }
 
-    public function testModuleSwitchValuesAreTheCarriedOverValueElseTheConfigXmlDefault(): void
+    public function testModuleSwitchValuesAreTheCarriedOverValueElseOffAs28xHadNoDefault(): void
     {
         self::assertSame(
             [
-                Config::XML_PATH_ABANDONED_ENABLED => '1',
                 Config::XML_PATH_SYNC_ENABLED => '1',
+                Config::XML_PATH_ABANDONED_ENABLED => '1',
                 Config::XML_PATH_WELCOME_ENABLED => '0',
             ],
             $this->mapper->moduleSwitchValues([
                 'general/enable' => '0',
+                'sync/enableCronSync' => '1',
                 'abandoned/enableAbandonedCart' => '1',
                 'abandoned/autoresponderId' => '77',
             ])
         );
-        self::assertSame(LegacyConfigMapper::MODULE_SWITCH_DEFAULTS, $this->mapper->moduleSwitchValues([]));
+        // PRO-4041: 2.8.x had no default for Enable Synchronization, so it
+        // did not sync without one; v3's default (on) does not apply.
+        self::assertSame(
+            [
+                Config::XML_PATH_SYNC_ENABLED => '0',
+                Config::XML_PATH_WELCOME_ENABLED => '0',
+                Config::XML_PATH_ABANDONED_ENABLED => '0',
+            ],
+            $this->mapper->moduleSwitchValues([])
+        );
     }
 
     public function testModuleSwitchDefaultsMatchConfigXml(): void

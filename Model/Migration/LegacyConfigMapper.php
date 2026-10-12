@@ -201,7 +201,9 @@ class LegacyConfigMapper
     /**
      * What contact sync, welcome and abandoned cart resolve to from one
      * scope's legacy values with Enable Module left aside: the carried-over
-     * value, else the etc/config.xml default.
+     * value, else the etc/config.xml default — except contact sync, which
+     * is off without an Enable Synchronization value: 2.8.x had no default
+     * for it, so it did not sync (PRO-4041).
      *
      * @param array<string, string|null> $legacy
      * @return array<string, string> v3 path => value
@@ -216,7 +218,7 @@ class LegacyConfigMapper
             }
         }
 
-        return $values + self::MODULE_SWITCH_DEFAULTS;
+        return $values + [Config::XML_PATH_SYNC_ENABLED => '0'] + self::MODULE_SWITCH_DEFAULTS;
     }
 
     /**

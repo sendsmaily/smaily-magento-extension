@@ -35,8 +35,8 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
  * Enable Module = No turns contact sync, welcome and abandoned cart off at
  * its scope (LegacyConfigMapper). Under a default scope with No, a website
  * with its own Yes also gets, at its own scope, what the three resolved to
- * there in 2.8.x — its own value, else the default scope's, else the
- * config.xml default — so it runs as it did in 2.8.x.
+ * there in 2.8.x — its own value, else the default scope's, else off (2.8.x
+ * had no default for any of the three) — so it runs as it did in 2.8.x.
  *
  * Welcome and abandoned cart: a scope with its own 2.8.x switch or
  * Autoresponder ID for one of them gets its own v3 switch for it, on when

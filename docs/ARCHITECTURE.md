@@ -1139,6 +1139,23 @@ nor be stored cut short to the 64-character columns), and
 `OrderPayloadBuilder` omits an off-shape stored value. Each signal is
 dropped on its own.
 
+**A store-created token travels only with marketing consent** (CON-181,
+the WooCommerce plugin's PRO-3857/PRO-3860 rule; contract §5: without
+marketing consent, send none). `AttributionManager::readCookies()` reads a
+`vs_` token as absent unless `Engine\MarketingConsent::isGiven()`, and
+every path that sends the token reads it there: the order stamp, the login
+identity merge, a guest's storefront recommendations and the browse relay.
+An engine `vt_` token from an email link is attribution and is read as
+before. `MarketingConsent` is the half of the storefront scripts' consent
+rule the server can see, as an explicit yes only (Woo's
+`MarketingConsent::given()`, PRO-3849): Magento's cookie restriction mode
+on in the store view and the cookie notice accepted on this website
+(Magento's cookie helper, `isCookieRestrictionModeEnabled()` and
+`isUserNotAllowSaveCookie()`). The store's `consentOverride()` lives only in
+the browser, so with restriction mode off the server sees no consent and a
+`vs_` token is not sent. The module creates no `vs_` tokens itself; one
+comes from a separate storefront or a customization.
+
 An order an admin places with "Login as Customer" is stamped with nothing
 (PRO-3925): that browser's cookies are the admin's own. By order time the
 admin is on the customer session, so `AttributionManager::saveForOrder()`
@@ -1168,10 +1185,14 @@ row and order lines carry — `mag-<entity_id>` when the SKU is empty,
 PRO-2461), batches events for 5 s, and posts to `smaily/relay`. The relay
 (`Controller/Relay/Index`) is CSRF-exempt (anonymous beacon), strictly
 sanitized (`Engine\BrowseEventValidator` — UUID v4 event ids, event-type
-enum, **no client-asserted `customer_email` or `external_id`** — identity
-comes only from the engine-issued visitor token and the login identity
-merge — and no `smaily_rec_id` / `smaily_ctx` hints the engine has ignored
-since v1.7.0), rate-limited per connection address (Magento's
+enum, **no client-asserted `customer_email`, `external_id` or
+`smaily_visitor_token`** — identity comes only from server-side state: the
+relay puts the visitor-token cookie's token (`AttributionManager::readCookies()`:
+in a valid form, a store-created `vs_` token only with marketing consent,
+CON-181, as the WooCommerce relay does since PRO-3860) on every event, and
+the login identity merge; without a token the events go anonymous — and
+no `smaily_rec_id` / `smaily_ctx` hints the engine has ignored since
+v1.7.0; the trackers send none of these), rate-limited per connection address (Magento's
 `RemoteAddress`: a forwarding header counts only where the store's own
 configuration names it, with its trusted proxies), stamps
 `source: plugin_magento` server-side, and forwards so the API key never
@@ -1253,7 +1274,9 @@ in Magento's shape (PRO-3790). Nothing is placed automatically.
   `smaily_visitor_token`), unless Magento's cookie helper says the cookie
   notice holds consent back (`isUserNotAllowSaveCookie()`: restriction mode
   on and not accepted on this website — the half of the script's rule the
-  server can see); else nobody. One identifier per request.
+  server can see); a store-created `vs_` token only with an explicit
+  marketing yes (`MarketingConsent`, see Attribution; CON-181, Woo
+  PRO-3857); else nobody. One identifier per request.
 - **Engine call and caching.** `Client::recommendations()`: map key
   `recommendations_customer`, falling back to the contract path for a
   connection set up before v1.9.0; one attempt, 10 s timeout. The answer's usable slots (well-formed rec id, an
@@ -1396,7 +1419,8 @@ or a subscription Smaily's consent mirror writes counts too.
   only after the engine confirmed the shopper, so it finds them.
 - **Identity merge.** `Observer\Engine\CustomerLogin` (`customer_login`)
   queues the row when the request carries the session or visitor cookie
-  (`AttributionManager::readCookies()`; no Magento session is needed).
+  (`AttributionManager::readCookies()`; no Magento session is needed; a
+  store-created `vs_` token only with marketing consent, CON-181).
   Magento's own login passes the customer model, a customer token login
   (`Integration\Model\CustomerTokenService`: GraphQL
   `generateCustomerToken`, REST `integration/customer/token`) the customer

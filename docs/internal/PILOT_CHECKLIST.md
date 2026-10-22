@@ -166,7 +166,7 @@ is sent at all (User Guide, *Connecting your cookie consent tool*).
 | What to do | Where to look / what good looks like |
 |---|---|
 | Send your test contact a Smaily email with a link to the store that carries the visitor token (an engine-rendered link such as a recommendation block — confirm with the engine side which links carry it), and click it in a desktop browser. | Browser dev tools > Application > Cookies: `smaily_rec_uid` (the default name; the engine can rename it) is set for the store domain. |
-| Open one product page and stay ~5 seconds (the tracker batches for 5 s, or sends on leaving the page). | Dev tools > Network: a `POST …/smaily/relay` answered **200** with `{"ok":true,"accepted":…}`; the request payload has `event_type: "product_view"` and a `smaily_visitor_token`. A **404** means browse tracking is off or the engine account is not active. |
+| Open one product page and stay ~5 seconds (the tracker batches for 5 s, or sends on leaving the page). | Dev tools > Network: a `POST …/smaily/relay` answered **200** with `{"ok":true,"accepted":…}`; the request payload has `event_type: "product_view"` (no `smaily_visitor_token`: the relay adds the cookie's token on the server). A **404** means browse tracking is off or the engine account is not active. |
 | Engine side. | The product view is recorded for the pilot tenant against the test contact's identity. |
 
 ## 7. Log reads clean

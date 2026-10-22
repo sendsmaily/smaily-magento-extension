@@ -80,7 +80,8 @@ runs the real Luma and Hyvä browse trackers, one fresh frame per scenario
 (document.cookie, sendBeacon and the Luma tracker's jQuery stubbed), and
 checks Magento's cookie notice consent: accepted on another website, on this
 website, not parseable, accepted later on the page, and the consent override
-first. `Test/Js/attribution-landing.html` runs the real Luma and Hyvä
+first; and that no event names the visitor token, which the relay reads from
+the cookie on the server. `Test/Js/attribution-landing.html` runs the real Luma and Hyvä
 landing capture the same way (the query and document.cookie stubbed) and
 checks the context cookie rule: a recommendation link with a context sets
 it, one without clears it, and any other landing leaves both cookies alone;

@@ -964,7 +964,7 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
     }
 
     /**
-     * @return array<string, int>
+     * @return array{_query: array{website: int}}
      */
     public function getWebsiteQuery(): array
     {

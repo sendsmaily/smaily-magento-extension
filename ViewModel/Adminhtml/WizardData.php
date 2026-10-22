@@ -206,6 +206,33 @@ class WizardData implements ArgumentInterface
     }
 
     /**
+     * The websites with a Smaily account of their own — an own subdomain or
+     * API username — that a finished setup's Connect summary lists at once
+     * when no store-wide Smaily account is saved (CON-185; a 2.8.x upgrade
+     * can leave only website logins). Empty when a store-wide account is
+     * saved, and on a single-website install.
+     *
+     * @return array<int, array{websiteId: int, name: string, values: array<int, array{0: string, 1: string}>, required: bool}>
+     */
+    public function getOwnAccountWebsites(): array
+    {
+        if ($this->getSavedSubdomain() !== '' && $this->getSavedUsername() !== '') {
+            return [];
+        }
+        $websites = $this->getWebsiteOverrides(WebsiteOverrides::CONNECTION);
+        if ($websites === []) {
+            return [];
+        }
+        $own = $this->overrides->ownValues(WebsiteOverrides::CONNECTION);
+
+        return array_values(array_filter(
+            $websites,
+            static fn (array $website): bool => isset($own[$website['websiteId']][Config::XML_PATH_SUBDOMAIN])
+                || isset($own[$website['websiteId']][Config::XML_PATH_USERNAME])
+        ));
+    }
+
+    /**
      * Every website's name, in website order — the websites a store-wide
      * Contacts save starts contact sync on.
      *

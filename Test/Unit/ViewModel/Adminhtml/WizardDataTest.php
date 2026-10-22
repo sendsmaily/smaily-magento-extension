@@ -421,6 +421,63 @@ class WizardDataTest extends TestCase
     }
 
     /**
+     * CON-185: a finished setup reopened on a store with no store-wide
+     * Smaily account lists at once the websites with a Smaily account of
+     * their own — not a website whose own value is only its Storefront URL.
+     */
+    public function testAReopenedSetupWithNoStoreWideAccountListsTheWebsitesWithTheirOwnAccounts(): void
+    {
+        $this->config->method('getWebsiteSubdomain')->with(WebsiteContext::STORE_WIDE)->willReturn('');
+        $this->config->method('getWebsiteUsername')->with(WebsiteContext::STORE_WIDE)->willReturn('');
+        $this->overrides->method('ownValues')->with(WebsiteOverrides::CONNECTION)->willReturn([
+            1 => [
+                Config::XML_PATH_SUBDOMAIN => 'ee-shop',
+                Config::XML_PATH_USERNAME => 'ee-api',
+                Config::XML_PATH_PASSWORD => 'encrypted',
+            ],
+            2 => [Config::XML_PATH_STOREFRONT_URL => 'https://lv.example.com'],
+            3 => [Config::XML_PATH_USERNAME => 'lt-api'],
+        ]);
+
+        $list = $this->storeWideViewModel()->getOwnAccountWebsites();
+
+        self::assertSame([1, 3], array_column($list, 'websiteId'));
+        self::assertSame(
+            [['Subdomain', 'ee-shop'], ['API username', 'ee-api'], ['API password', '••••••••']],
+            $list[0]['values']
+        );
+    }
+
+    /**
+     * CON-185: with a store-wide Smaily account saved, the reopened setup's
+     * summary shows that account and lists no website.
+     */
+    public function testAReopenedSetupWithAStoreWideAccountListsNoWebsites(): void
+    {
+        $this->config->method('getWebsiteSubdomain')->willReturn('shop');
+        $this->config->method('getWebsiteUsername')->willReturn('api');
+        $this->overrides->expects(self::never())->method('ownValues');
+
+        self::assertSame([], $this->storeWideViewModel()->getOwnAccountWebsites());
+    }
+
+    /**
+     * CON-185: a single-website store lists no website.
+     */
+    public function testAReopenedSetupOnASingleWebsiteStoreListsNoWebsites(): void
+    {
+        $context = $this->createMock(WebsiteContext::class);
+        $context->method('isStoreWide')->willReturn(true);
+        $context->method('hasMultipleWebsites')->willReturn(false);
+        $context->method('getWebsiteId')->willReturn(1);
+        $this->config->method('getWebsiteSubdomain')->willReturn('');
+        $this->config->method('getWebsiteUsername')->willReturn('');
+        $this->overrides->method('ownValues')->willReturn([1 => [Config::XML_PATH_SUBDOMAIN => 'shop']]);
+
+        self::assertSame([], $this->viewModel($context)->getOwnAccountWebsites());
+    }
+
+    /**
      * CON-190: the initial setup offers no "Use this step's values" for the
      * automations of a website with its own Smaily account.
      */

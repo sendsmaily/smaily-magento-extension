@@ -51,6 +51,7 @@
 "Last night product changes were still waiting to be sent in the Log, and the list waits for them.","Last night product changes were still waiting to be sent in the Log, and the list waits for them."
 "Last night the catalog import was running or waiting to start, and the list waits for it to finish.","Last night the catalog import was running or waiting to start, and the list waits for it to finish."
 "Last night the list could not be built; var/log/smaily_connect.log on the server says why.","Last night the list could not be built; var/log/smaily_connect.log on the server says why."
+"No Smaily account is saved for all websites, so each of these websites uses its own. Press Continue to keep them, or Edit credentials to save a Smaily account for all websites.","No Smaily account is saved for all websites, so each of these websites uses its own. Press Continue to keep them, or Edit credentials to save a Smaily account for all websites."
 "No nightly product list has gone to Campaign Intelligence for %1 nights","No nightly product list has gone to Campaign Intelligence for %1 nights"
 "None (use the default fallback account's language)","None (use the default fallback account's language)"
 "Once connected, set up the Order confirmation and Shipping confirmation triggers on the Automations tab.","Once connected, set up the Order confirmation and Shipping confirmation triggers on the Automations tab."

@@ -7,10 +7,32 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-10-22 evening — **both pilot stores run 3.0.0-rc12;
-pilot day is 2026-10-22/23, on rc12** (no rc13 before the pilot — Erkki's
-decision). 3.0.0-rc12 is still the latest release; unreleased on `master`
-since rc12: #171–#192; rc13 is cut after the pilot. Linear: since
+_Last updated: 2026-10-22 night — **the 3.0.0-rc13 version cut** (PR
+`release/3.0.0-rc13`, title "release: 3.0.0-rc13 — version cut"): the
+version in composer.json (and the lock's content-hash),
+`ModuleInfo::VERSION`, the ModuleVersion docblock and every merchant
+command that names the release candidate (README "Installation",
+`docs/UPGRADING.md` "Steps" in both modes, the guide site's `#install`,
+`#upgrading` and `#st-hyva` in EN and ET, `compat/hyva/README.md`
+"Installation"). rc13 holds everything merged since rc12: #171–#194. Its
+CHANGELOG section "Changes since 3.0.0-rc12" collects the 15 fragments in
+landing order; the cut edited three bullets: the CON-181 bullet says it
+narrows the rc8-era "a separate storefront or a customization that does
+is now supported" `vs_` bullet (marketing consent only; a `vs_` token in
+a landing link is ignored), the CON-179 bullet says that the setup is
+finished once for the store, so the Website selector no longer sends a
+website into the setup as rc10 did, and points at the CON-190 exception;
+the CON-188 bullet drops the sentence on keeping the other mode's
+workflows, which the CON-184 bullet already states. CON-176 + CON-187
+(admin delete → unsubscribe + profiling stop) were one fragment already.
+No bullet asks for a catalog import. **The tag and the GitHub release are
+Erkki's step** (one-way door: a Packagist publish of both packages):
+`gh release create 3.0.0-rc13 --repo sendsmaily/smaily-magento-extension
+--target master --title "…" --notes-file … --prerelease` — tag = the
+plain version, no `v`; `release.yaml` builds, verifies and attaches both
+ZIPs and pushes the Hyvä mirror tag. **Both pilot stores run
+3.0.0-rc12; pilot day is 2026-10-22/23, on rc12** (no rc13 before the
+pilot — Erkki's decision; the cut PR waits for his go). Linear: since
 2026-10-20 the project's issues live in team Connect (key `CON`, a
 sub-team of Growth (lab)); moved issues keep their `PRO-####` identifiers
 as redirects (CLAUDE.md "Linear discipline").
@@ -43,18 +65,26 @@ that language's account, else the run is Skipped with a Log reason;
 Settings warns on languages without a workflow; a save keeps the other
 mode's rows. #192 CON-189: a website with its own Smaily account starts
 its workflows through it (the audit found the other Smaily calls already
-website-scoped).
+website-scoped). #193 (STATUS). #194 CON-190: a website on another Smaily
+account than the store-wide one (subdomain or API username differ) always
+has its own automations; while it has none picked, its automations are
+Skipped with a Log reason that names the website; a website with its own
+login of the store-wide account, and a single-website store, are
+unchanged.
 
 **Decided (Erkki, 2026-10-22):** no rc13 before the pilot. A guest's
 recommendations by an engine `vt_` token keep the browser-side consent
 rule — a platform-forced difference from Woo (CON-181). A website with
-its own Smaily account uses only that account's workflows (CON-190, in
-work). CON-168 (contract §17–§23: start button, design links, brand kit,
-engine-email setup) waits for the WooCommerce build (CON-166/CON-173) and
-mirrors it; the email-creation design ("Add new" in the workflow
-dropdown, sender and subject fields, an "Edit template" modal, the
-default design otherwise) is recorded on CON-168. Transactional sends use
-the workflow id until the engine answers INT-146.
+its own Smaily account uses only that account's workflows (CON-190,
+merged in #194). CON-168 (contract §17–§23: start button, design links,
+brand kit, engine-email setup) waits for the WooCommerce build
+(CON-166/CON-173) and mirrors it; the email-creation design ("Add new" in
+the workflow dropdown, sender and subject fields, an "Edit template"
+modal, the default design otherwise) is recorded on CON-168. CON-168
+also waits for the engine ask INT-147 (the "Add new" email modal with the
+engine's editor inside it; Woo CON-191). Transactional sends use the
+workflow id until the engine answers INT-146 (transactional workflow
+ids).
 
 **Verified:** sandbox `setup:upgrade` + `setup:di:compile` passed after
 #191 (covers #183–#191); the initial setup opens on step 1 and Settings
@@ -66,7 +96,7 @@ second pilot store") upgraded them to 3.0.0-rc12; Erkki ran the initial
 setup in both. The pilot-day plan is in Erkki's private document; the
 gauge is CON-147 (4/5).
 
-**Open Stories:** CON-190 (in work); CON-185 (left: the account summary
+**Open Stories:** CON-185 (left: the account summary
 is empty when a finished setup is reopened on a store with only
 per-website accounts); CON-168 (after Woo); CON-151 Estonian proofread
 (now also all of today's guide and admin texts); CON-146 native review of
@@ -78,10 +108,10 @@ first; needs a transactional test account file).
 **Gotchas:** (1) pilot day on rc12: on a multi-website store the setup
 asks for a website, and when that website's Smaily login came over from
 2.8.x the setup opens on the Contacts step — go back to step 1 (language
-mode, storefront address, connection test) for every website. (2) Version
-cut: the CHANGELOG bullet that says `vs_` tokens from a separate
-storefront are "now supported" needs rewording next to the CON-181
-fragment. (3) The synchronous first send attempt of transactional emails
+mode, storefront address, connection test) for every website. (2) After
+the rc13 tag: check that the release run attached four assets (the main
+and the Hyvä ZIP, each with its `.sha256`) and pushed the Hyvä mirror
+tag, and that both Packagist packages list 3.0.0-rc13, as for rc12. (3) The synchronous first send attempt of transactional emails
 is a deliberate exception to "nothing user-facing waits on HTTP" — the
 sending slice records it in `docs/ARCHITECTURE.md` in the same PR. (4)
 Workers never clone a private Smaily repository without Erkki's OK. (5)
@@ -94,14 +124,17 @@ account and the synthetic engine tenant.
 **Open for Erkki:** the pilot-day results; CON-151 (the Estonian
 proofread); CON-146 (native ru/fi/lv/lt review); a transactional Smaily
 test account in a local credentials file (like the FTPS one); the "Pilot
-store live" milestone date; the go for rc13.
+store live" milestone date; the go for rc13 — the merge of the cut PR,
+then the tag and the release.
 
 **Next session opens with:**
-1. Pilot-day results, and the fixes they ask for.
-2. Merge CON-190, then the sandbox check (`setup:upgrade` +
-   `setup:di:compile`).
-3. Cut rc13 after the pilot (Erkki's go).
-4. CON-168 after Woo CON-173.
+1. Pilot-day results, and the fixes they ask for (a fix merged before the
+   tag goes into the rc13 CHANGELOG section, or waits for rc14).
+2. The sandbox check (`setup:upgrade` + `setup:di:compile`) covering
+   #192–#194.
+3. With Erkki's go: merge the rc13 cut PR; Erkki tags and releases
+   3.0.0-rc13; check the release run and Packagist (Gotcha 2).
+4. CON-168 after Woo CON-173 and the engine's INT-147.
 5. The rest of CON-185._
 
 _Earlier (2026-10-12 session end): transactional emails, first slice

@@ -11,7 +11,7 @@ If you are a fresh agent picking up this repo: read this first, then `STATUS.md`
 extension. Module `Smaily_Connect`, namespace `Smaily\Connect`, composer package
 `smaily/smailyformagento` (name unchanged on purpose — existing installs upgrade
 via a plain `composer update`). Target: feature parity with the UNION of the Woo
-(`../connect/`) and Shopify (`../shopify-connect/`) Smaily plugins, plus full
+(`../connect-woo/`) and Shopify (`../connect-shopify/`) Smaily plugins, plus full
 Campaign Intelligence support. Aim: become Smaily's official upstream extension.
 Magento 2.4.4+ / PHP 8.1–8.4. GPL-3.0. Public product name "Smaily Connect".
 
@@ -41,8 +41,8 @@ docs.
 
 | Path | What it is |
 |---|---|
-| `../connect/` | The WP/Woo plugin — richest reference (patterns + `docs/LESSONS.md`, `docs/DECISIONS.md`). Never edit from here. |
-| `../shopify-connect/` | The hosted Shopify app — second parity source. Not checked out on this machine (the path does not exist); its live guide is https://connect.smaily.com/docs. |
+| `../connect-woo/` | The WP/Woo plugin (`sendsmaily/smaily-wordpress-plugin`) — richest reference (patterns + `docs/LESSONS.md`, `docs/DECISIONS.md`). Never edit from here. (`../connect/` is an empty leftover folder.) |
+| `../connect-shopify/` | The hosted Shopify app (`erkkimarkus/shopify-connect`) — second parity source; its live guide is https://connect.smaily.com/docs. |
 | `../intelligence/` | The recommendation engine (`erkkimarkus/smaily-recommendations`). Engine team owns it; source of the contract. |
 
 ## Working mode — autonomous with checkpoints
@@ -84,7 +84,7 @@ a doc too — a user-visible behaviour change updates it in the same commit.
 **Merchant guide site (`docs/site/index.html`)** — the merchant user guide,
 bilingual (EN/ET), one self-contained page (no build step, no external
 resources; open it in a browser), laid out like the Woo guide
-(`../connect/docs/site/`). A user-visible change — a label, a step, a
+(`../connect-woo/docs/site/`). A user-visible change — a label, a step, a
 setting, an error or notice text, an import's behaviour, a requirement —
 updates it in the same commit **in both languages**: every unit is a
 `data-lang="en"` element followed by its `data-lang="et"` twin; edit the
@@ -134,7 +134,7 @@ engine repo) — in whichever repo runs it; the official repo has its own copy
 exist on this Mac — pass the path explicitly:
 `bin/check-contract-staleness.sh ../intelligence/docs/RECENGINE_API_CONTRACT.md`
 (a local checkout can lag engine main; pull it first). A sync is NOT code-complete: after any wire-shape change, carry
-it through code + test fixtures in the same pass (Woo LESSONS §2.7 — the scar
+it through code + test fixtures in the same pass (Woo `../connect-woo/docs/LESSONS.md` §2.7 — the scar
 is real). Datetimes are Z-suffix only; engine URL placeholders are `{email}`
 style (str_replace, never sprintf). There is no scheduled catalog re-sync
 (PRO-1968; contract v1.8.3 §3 *Catalog sync lifecycle*): a change that adds
@@ -203,7 +203,7 @@ start one.
 
 ## Changes reach `master` through pull requests — squash-merged (Erkki, 2026-10-07)
 
-Mirrors the WooCommerce repo (`../connect/` CLAUDE.md, PRO-2281). In
+Mirrors the WooCommerce repo (`../connect-woo/` CLAUDE.md, PRO-2281). In
 `sendsmaily/smaily-magento-extension` every change — code, docs, a contract
 sync, a version cut — goes to `master` as a PR; **there is no direct push to
 `master`**. Run the gates on the topic branch before it is pushed (after a
@@ -346,26 +346,34 @@ Estonian.
 This repository is engineering truth — STATUS/docs stay canonical here. Linear
 is the coordination and visibility layer. Full process: Outline → Processes →
 "Agent-Driven Development"; compact guide: Linear document "Linear workflow
-guide for AI agents" (attached to MGMT-5). Three rules for every agent working
-here:
+guide for AI agents" (attached to MGMT-5).
+
+Track: Growth · product owner: Erkki
+
+Since 2026-10-20 the project's issues live in the Linear team **Connect**
+(key `CON`), a sub-team of **Growth (lab)**. Issues moved from Product
+Development keep their old `PRO-####` identifiers as redirects, so a
+`PRO-1234` in a repo doc still resolves. The Linear model (since
+2026-10-19) is Initiative → Feature (a Linear project) → Epic (a top-level
+issue in the project) → Story (a sub-issue of the Epic). Three rules for
+every agent working here:
 
 1. **Anchor before work.** Work anchors on the initiative *Smaily E-Commerce
-   native integrations* (v3 also serves *Campaign Intelligence*) and on two
-   Epics (Linear projects, team "Product Development"):
-   - [Smaily Connect for Magento 2 — v3
-     rewrite](https://linear.app/smaily/project/smaily-connect-for-magento-2-v3-rewrite-34e9fd6ca889)
-     — outcome: 3.0.0 reaches real stores (pilot first, then the Smaily
-     upstream hand-over PRO-1198).
-   - [Magento Connect UI/UX
-     parity](https://linear.app/smaily/project/magento-connect-uiux-parity-2121de63e959)
-     — outcome: the admin matches its Woo/Shopify siblings and the design pack.
+   native integrations* (v3 also serves *Campaign Intelligence*) and on the
+   Feature [Smaily Connect for Magento 2 — v3
+   rewrite](https://linear.app/smaily/project/smaily-connect-for-magento-2-v3-rewrite-34e9fd6ca889)
+   (lead team Connect) — outcome: 3.0.0 reaches real stores (pilot first,
+   then the Smaily upstream hand-over PRO-1198). The Feature [Magento
+   Connect UI/UX
+   parity](https://linear.app/smaily/project/magento-connect-uiux-parity-2121de63e959)
+   is Completed (2026-10-05); new admin UI work goes into the v3 rewrite.
 
-   Work found in a session is filed as a Story (job story, problem Story or
-   spike) in the Epic whose outcome it serves (Story-first intake, PRO-3118).
-   Cross-repo asks are filed as issues in the sibling projects (Woo: "Smaily
-   Connect for WooCommerce — v3 rewrite", Shopify: "Smaily Connect for
-   Shopify — hosted app", engine: "Campaign Intelligence — recommendation
-   engine").
+   Work found in a session is filed in team Connect as a Story (job story,
+   problem Story or spike) under the Epic whose outcome it serves
+   (Story-first intake, PRO-3118). Cross-repo asks are filed as issues in
+   the sibling projects (Woo: "Smaily Connect for WooCommerce — v3
+   rewrite", Shopify: "Smaily Connect for Shopify — hosted app", engine:
+   "Campaign Intelligence — recommendation engine").
 
 2. **One-way doors interrupt.** Before any irreversible or expensive-to-undo
    commitment — persistent data schema, public/integration API contracts (e.g.
@@ -386,8 +394,9 @@ is written in English.
 
 ## Outcome gauges
 
-- **v3 rewrite** — shape: deadline. Gauge: PRO-2474 pilot-readiness
-  checklist, items ticked out of 5 (read from the Linear issue). Milestones
+- **v3 rewrite** — shape: deadline. Gauge: CON-147 (was PRO-2474)
+  pilot-readiness checklist, items ticked out of 5 (read from the Linear
+  issue). Milestones
   (set 2026-10-02): "rc1 tagged + pilot runbook" 2026-10-03, "Pilot store
   live" 2026-10-09. Values: 2026-10-02 morning 0/5, evening 4/5;
   2026-10-03 4/5 (rc4 released; only the pilot install is left);
@@ -411,12 +420,13 @@ is written in English.
   later: 4/5 (rc12 released; a pilot store pre-flighted; waiting for its
   developer's upgrade); 2026-10-12 session end: 4/5 (pilot store waiting
   for its developer's rc12 upgrade; transactional emails settings shipped
-  on master).
+  on master); 2026-10-22: 4/5 (both pilot stores upgraded to rc12 by
+  their developer; pilot day today or tomorrow, on rc12).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
-  Stories in the Epic (state not Done/Canceled). Values 2026-10-02: 4 open
+  Stories in the Feature (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385
   canceled, PRO-3680 done); 2026-10-04: 0 open (PRO-1357 closed);
   2026-10-05: 0 open; 2026-10-07: 0 open; 2026-10-07 evening: 0 open
   (PRO-3957 closed); 2026-10-08: 0 open; 2026-10-09: 0 open. Dates: none yet (2026-10-02 —
-  not asked; PRO-2456 is placed before the rc1 tag). **The Epic is
-  Completed (2026-10-05)**; new admin UI work goes into the v3 rewrite Epic.
+  not asked; PRO-2456 is placed before the rc1 tag). **The Feature is
+  Completed (2026-10-05)**; new admin UI work goes into the v3 rewrite Feature.

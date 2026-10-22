@@ -78,6 +78,8 @@ class AdminSubscriberDeleteTest extends IntegrationTestCase
 
     private EventManagerInterface $eventManager;
 
+    private SubscriberResource $subscriberResource;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -92,6 +94,10 @@ class AdminSubscriberDeleteTest extends IntegrationTestCase
         $this->seedStoreWideSetup();
 
         $this->storeManager = $this->storeManager();
+        $this->subscriberResource = $this->objectManager->create(
+            SubscriberResource::class,
+            ['storeManager' => $this->storeManager]
+        );
         $this->mark = new AdminSubscriberDelete();
         $config = $this->objectManager->create(Config::class, [
             'scopeConfig' => new DatabaseScopeConfig($this->connection, self::STORE_WEBSITES),
@@ -165,7 +171,10 @@ class AdminSubscriberDeleteTest extends IntegrationTestCase
     {
         $id = $this->seedSubscriber(1, 'customer@example.com', Subscriber::STATUS_SUBSCRIBED, 7);
 
-        $this->newSubscriber()->load($id)->delete();
+        // As a customer account's deletion does: through the subscriber's resource.
+        $subscriber = $this->newSubscriber();
+        $this->subscriberResource->load($subscriber, $id);
+        $this->subscriberResource->delete($subscriber);
 
         self::assertSame([], $this->subscriberIds());
         self::assertSame([], $this->fetchAll(EventResource::TABLE_NAME));
@@ -212,7 +221,7 @@ class AdminSubscriberDeleteTest extends IntegrationTestCase
             'customerRepository' => $this->createMock(CustomerRepositoryInterface::class),
             'customerAccountManagement' => $this->createMock(AccountManagementInterface::class),
             'inlineTranslation' => $this->createMock(StateInterface::class),
-            'resource' => $this->objectManager->create(SubscriberResource::class, ['storeManager' => $this->storeManager]),
+            'resource' => $this->subscriberResource,
             'customerFactory' => $this->createMock(CustomerInterfaceFactory::class),
             'dataObjectHelper' => $this->createMock(DataObjectHelper::class),
             'subscriptionManager' => $this->createMock(SubscriptionManagerInterface::class),
@@ -290,7 +299,9 @@ class AdminSubscriberDeleteTest extends IntegrationTestCase
             'subscriber_status' => $status,
         ]);
 
-        return (int)$this->connection->lastInsertId('newsletter_subscriber');
+        return (int)$this->connection->fetchOne(
+            $this->connection->select()->from('newsletter_subscriber', ['MAX(subscriber_id)'])
+        );
     }
 
     /**

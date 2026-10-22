@@ -24,7 +24,9 @@
  * account has: ticked, the tab's save writes the website's own values;
  * unticked, the tab shows and saves the values for all websites. Unticking
  * it on a website that holds its own values and saving removes them (the
- * page then reloads to show the values for all websites).
+ * page then reloads to show the values for all websites). A website with
+ * per-language Smaily accounts (mode A) keeps its own automations: their
+ * switch shows ticked and fixed (WizardData::isOwnRequired()).
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
@@ -42,12 +44,15 @@ $ownSwitch = static function (string $section, string $label) use ($viewModel, $
         return '';
     }
     $own = $viewModel->hasOwnValues($section);
+    $required = $viewModel->isOwnRequired($section);
 
     return '<div class="smaily-inline-toggle smaily-own-toggle">'
         . '<label><input type="checkbox" class="smaily-own-switch" id="smaily-own-' . $escaper->escapeHtmlAttr($section) . '"'
         . ' data-section="' . $escaper->escapeHtmlAttr($section) . '" data-own-saved="' . ($own ? '1' : '0') . '"'
-        . ($own ? ' checked' : '') . '/> ' . $escaper->escapeHtml($label) . '</label>'
-        . '<p class="note">' . $escaper->escapeHtml(__('Otherwise this website uses the settings saved for all websites, and a change here applies to every website that uses them.')) . '</p>'
+        . ($own ? ' checked' : '') . ($required ? ' disabled' : '') . '/> ' . $escaper->escapeHtml($label) . '</label>'
+        . '<p class="note">' . $escaper->escapeHtml($required
+            ? __('A website with per-language Smaily accounts keeps its own automations: their workflows come from those accounts.')
+            : __('Otherwise this website uses the settings saved for all websites, and a change here applies to every website that uses them.')) . '</p>'
         . '<p class="note smaily-own-return" style="display:none;">' . $escaper->escapeHtml(__('Save to remove this website\'s own values: it then uses the settings saved for all websites.')) . '</p>'
         . '</div>';
 };

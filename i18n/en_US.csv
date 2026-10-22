@@ -18,6 +18,7 @@
 "A single Smaily account, but each language triggers its own automation workflow. The most common setup.","A single Smaily account, but each language triggers its own automation workflow. The most common setup."
 "A single workflow that branches on the contact's language inside Smaily. The language is sent with every contact.","A single workflow that branches on the contact's language inside Smaily. The language is sent with every contact."
 "A website that keeps its own Contacts settings below syncs as those settings say.","A website that keeps its own Contacts settings below syncs as those settings say."
+"A website with per-language Smaily accounts keeps its own automations: their workflows come from those accounts.","A website with per-language Smaily accounts keeps its own automations: their workflows come from those accounts."
 "A workflow is required when this trigger is enabled.","A workflow is required when this trigger is enabled."
 "Abandoned cart","Abandoned cart"
 "Abandoned Cart Cutoff (Minutes)","Abandoned Cart Cutoff (Minutes)"

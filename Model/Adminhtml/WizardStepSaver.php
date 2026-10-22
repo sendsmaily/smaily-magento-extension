@@ -53,6 +53,14 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  *   without writes the store-wide values it shows.
  * - A single-website install writes the default scope and removes the
  *   website's own values: the store and its one website are one thing.
+ * - Per-language Smaily accounts (multilingual mode A) are always a
+ *   website's own (owner decision 2026-10-22): they live on its store
+ *   views, and its per-language workflow rows name those accounts. A
+ *   Smaily account saved in mode A, and the automations of a website in
+ *   mode A, are written at the website's scope — also by the initial setup
+ *   of a single-website install — so a website added later does not
+ *   inherit them. A store-wide save on a 2+-website install does not take
+ *   mode A (saveConnect()).
  * Store-wide mapping rows are website 0's. The setup-completed flag is one
  * mark for the store (default scope). Intelligence and RSS are default
  * scope as before.
@@ -174,22 +182,50 @@ class WizardStepSaver
     private function sectionTarget(string $section, array $data, int $websiteId): array
     {
         $withOwn = array_keys($this->overrides->ownValues($section));
+        $perLanguage = $this->isPerLanguageAccounts($section, $data, $websiteId);
         if (!$this->websiteContext->hasMultipleWebsites()) {
-            return [null, array_values(array_intersect($withOwn, [$websiteId])), true];
+            return $perLanguage
+                ? [$websiteId, [], true]
+                : [null, array_values(array_intersect($withOwn, [$websiteId])), true];
         }
         if ($this->websiteContext->isStoreWide()) {
             $chosen = array_map('intval', is_array($data['use_store_wide'] ?? null) ? $data['use_store_wide'] : []);
 
             return [null, array_values(array_intersect($withOwn, $chosen)), true];
         }
-        if (!empty($data['own'])) {
+        // A website in mode A keeps its own automations; unticking its own
+        // Smaily account still returns it (and so leaves mode A).
+        if (!empty($data['own']) || ($perLanguage && $section === WebsiteOverrides::AUTOMATIONS)) {
             return [$websiteId, [], true];
         }
         if (in_array($websiteId, $withOwn, true)) {
             return [null, [$websiteId], false];
         }
 
-        return [null, [], true];
+        return $perLanguage ? [$websiteId, [], true] : [null, [], true];
+    }
+
+    /**
+     * Whether the section's save belongs to a website's per-language Smaily
+     * accounts (mode A), which are always the website's own: a Smaily
+     * account posted in mode A, or the automations of a website saved in
+     * mode A. Never for the whole store of a 2+-website install (website 0).
+     *
+     * @param array<string, mixed> $data
+     */
+    private function isPerLanguageAccounts(string $section, array $data, int $websiteId): bool
+    {
+        if ($websiteId === WebsiteContext::STORE_WIDE) {
+            return false;
+        }
+
+        return match ($section) {
+            WebsiteOverrides::CONNECTION => strtolower((string)($data['multilingual_mode'] ?? ''))
+                === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS,
+            WebsiteOverrides::AUTOMATIONS => $this->config->getMultilingualMode($websiteId)
+                === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS,
+            default => false,
+        };
     }
 
     /**

@@ -113,9 +113,25 @@ class WizardData implements ArgumentInterface
      */
     public function hasOwnValues(string $section): bool
     {
-        return $this->websiteContext->hasMultipleWebsites()
+        return $this->isOwnRequired($section)
+            || ($this->websiteContext->hasMultipleWebsites()
+                && !$this->websiteContext->isStoreWide()
+                && $this->overrides->hasOwnValues($section, $this->websiteContext->getWebsiteId()));
+    }
+
+    /**
+     * Whether the selected website must keep its own values of a section
+     * on Settings: the automations of a website with per-language Smaily
+     * accounts (mode A), whose workflows come from those accounts
+     * (WizardStepSaver::sectionTarget()). Its switch shows ticked and fixed.
+     */
+    public function isOwnRequired(string $section): bool
+    {
+        return $section === WebsiteOverrides::AUTOMATIONS
+            && $this->websiteContext->hasMultipleWebsites()
             && !$this->websiteContext->isStoreWide()
-            && $this->overrides->hasOwnValues($section, $this->websiteContext->getWebsiteId());
+            && $this->config->getMultilingualMode($this->websiteContext->getWebsiteId())
+                === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS;
     }
 
     /**

@@ -12,11 +12,13 @@
  * picker. Single-language installations are locked to 'single' and see none
  * of it.
  *
- * Per-language accounts live on one website's store views, so on an install
- * with more than one website they are a website's own Smaily account
- * (CON-179): the initial setup, which sets the whole store up, does not
- * offer mode A and says where it is; Settings offers it while "Use its own
- * Smaily account on this website" is ticked (settings/index.phtml).
+ * Per-language accounts live on one website's store views, so they are
+ * always a website's own Smaily account (CON-179): on an install with more
+ * than one website the initial setup, which sets the whole store up, does
+ * not offer mode A and says where it is, and Settings offers it while "Use
+ * its own Smaily account on this website" is ticked (settings/index.phtml);
+ * on a single-website install the initial setup offers it and saves it as
+ * that website's own (WizardStepSaver::sectionTarget()).
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper

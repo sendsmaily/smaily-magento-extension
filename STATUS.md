@@ -34,8 +34,13 @@ CON-179 is in work (a PR follows). Guest newsletter subscribers already
 sync live and in the contacts import (rc12 and `master`); a guide
 sentence goes in with CON-179.
 
-**Engine contract 1.14–1.17, not built yet:** CON-143 (store deletion on
-disconnect, §16 + the retention text) is next. CON-168 (the start button
+**Engine contract 1.14–1.17, not built yet:** CON-143: decided (Erkki,
+2026-10-22, with Woo CON-51) that the extension never sends the §16
+store-deletion request. A disconnect or removal deletes only its own
+engine key, because a merchant may only be changing platform, and a
+store's data is deleted when the merchant closes the Smaily account
+(engine ask INT-145). What is left: the privacy text's retention periods,
+worded as the WooCommerce plugin words them, after CON-51/CON-52. CON-168 (the start button
 §21, design links §22/§23, the engine-email setup §17–§20, the brand kit
 §18) waits for the WooCommerce plugin's build (CON-166) and is mirrored
 after it (Erkki's decision, 2026-10-22). The engine's questions on CON-168
@@ -70,7 +75,7 @@ FTPS one); the "Pilot store live" milestone date.
 1. Pilot-day results, and the fixes they ask for.
 2. Merge CON-179, then the sandbox check (`setup:upgrade` +
    `setup:di:compile`).
-3. CON-143 (store deletion on disconnect, contract §16).
+3. CON-143 privacy text after Woo CON-51/CON-52.
 4. Cut rc13 after the pilot.
 5. Before transactional sending is built (PRO-1766), check it again
    against contract 1.17 §23._

@@ -117,6 +117,28 @@ class RouterTest extends TestCase
         self::assertSame('default', $match->accountKey);
     }
 
+    /**
+     * CON-184: a website that left per-language Smaily accounts for
+     * per-language workflows keeps its mode-A rows, but neither the language
+     * nor the fallback lookup of mode B reads them — only the rows of the
+     * website's one account. Mode A reads its own rows.
+     */
+    public function testEveryLookupReadsOnlyTheActiveModesRows(): void
+    {
+        $this->config->method('getMultilingualMode')->willReturnOnConsecutiveCalls('b', 'a');
+        $this->config->method('getWelcomeWorkflow')->willReturn(0);
+        $this->lookupResults = [null, null, null, null];
+
+        $this->router()->resolve(Trigger::WELCOME, 1, 'et');
+        $this->router()->resolve(Trigger::WELCOME, 1, 'et');
+
+        self::assertSame(
+            ['b', 'b', 'a', 'a'],
+            array_column($this->recordedFilters, 'mode'),
+            'The language and the fallback lookup each read only the active mode\'s rows'
+        );
+    }
+
     public function testEmptyLanguageLooksUpTheDefaultBucket(): void
     {
         $this->config->method('getMultilingualMode')->willReturn('b');
@@ -185,6 +207,13 @@ class RouterTest extends TestCase
                     $this->recordedFilters[$index][$field] = is_array($condition) && isset($condition['eq'])
                         ? $condition['eq']
                         : $condition;
+
+                    return $collection;
+                }
+            );
+            $collection->method('addModeFilter')->willReturnCallback(
+                function (string $mode) use ($collection, $index): Collection {
+                    $this->recordedFilters[$index]['mode'] = $mode;
 
                     return $collection;
                 }

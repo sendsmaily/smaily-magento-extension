@@ -24,7 +24,11 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory;
  *
  * Mapping rows are scoped by website: a row for the event's website wins
  * over a global row (website_id 0, written by the Settings/wizard mapping
- * editor and the 2.8.x migration's default-scope seeding).
+ * editor and the 2.8.x migration's default-scope seeding). Only the rows of
+ * the active mode's accounts are read (Collection::addModeFilter(),
+ * CON-184): after a website leaves mode A for mode B, its per-language
+ * accounts' workflow ids stay in the table but are never posted through the
+ * website's one account, and the other way round.
  *
  * A matched row's account_key travels with the workflow (WorkflowMatch), so
  * the dispatcher posts the workflow through the account the row names — a
@@ -54,29 +58,31 @@ class Router
 
         $effectiveLanguage = $language !== '' ? $language : Mapping::LANGUAGE_DEFAULT;
 
-        return $this->findMapping($trigger, $websiteId, $effectiveLanguage)
-            ?? $this->findFallbackMapping($trigger, $websiteId)
+        return $this->findMapping($trigger, $websiteId, $effectiveLanguage, $mode)
+            ?? $this->findFallbackMapping($trigger, $websiteId, $mode)
             ?? $this->configDefault($trigger, $websiteId);
     }
 
-    private function findMapping(string $trigger, int $websiteId, string $language): ?WorkflowMatch
+    private function findMapping(string $trigger, int $websiteId, string $language, string $mode): ?WorkflowMatch
     {
         $collection = $this->mappingCollectionFactory->create();
         $collection->addFieldToFilter('website_id', ['in' => [$websiteId, 0]])
             ->addFieldToFilter('trigger_type', $trigger)
             ->addFieldToFilter('language', $language)
+            ->addModeFilter($mode)
             ->setOrder('website_id', 'DESC')
             ->setPageSize(1);
 
         return $this->toMatch($collection->getFirstItem());
     }
 
-    private function findFallbackMapping(string $trigger, int $websiteId): ?WorkflowMatch
+    private function findFallbackMapping(string $trigger, int $websiteId, string $mode): ?WorkflowMatch
     {
         $collection = $this->mappingCollectionFactory->create();
         $collection->addFieldToFilter('website_id', ['in' => [$websiteId, 0]])
             ->addFieldToFilter('trigger_type', $trigger)
             ->addFieldToFilter('is_default_fallback', ['eq' => 1])
+            ->addModeFilter($mode)
             ->setOrder('website_id', 'DESC')
             ->setPageSize(1);
 

@@ -91,7 +91,7 @@ class WizardDataTest extends IntegrationTestCase
             'is_default_fallback' => 0,
         ]);
 
-        $mappings = $this->viewModel->getSavedMappings();
+        $mappings = $this->viewModel->getSavedMappings('b');
 
         self::assertSame(123, $mappings['welcome|default']['workflowId']);
     }
@@ -107,9 +107,34 @@ class WizardDataTest extends IntegrationTestCase
             'is_default_fallback' => 1,
         ]);
 
-        $mappings = $this->viewModel->getSavedMappings();
+        $mappings = $this->viewModel->getSavedMappings('b');
 
         self::assertSame(900, $mappings['abandoned_cart|default']['workflowId']);
         self::assertTrue($mappings['abandoned_cart|default']['isDefaultFallback']);
+    }
+
+    /**
+     * CON-184: a website that has been in both per-language modes holds
+     * both modes' rows for a language; the editor shows each mode its own,
+     * so a mode-B save never posts a per-language account's workflow id.
+     */
+    public function testEachModeShowsOnlyItsOwnRows(): void
+    {
+        foreach (['et' => 101, 'default' => 201] as $accountKey => $workflowId) {
+            $this->connection->insert(MappingResource::TABLE_NAME, [
+                'website_id' => self::WEBSITE_ID,
+                'trigger_type' => 'welcome',
+                'language' => 'et',
+                'account_key' => $accountKey,
+                'workflow_id' => $workflowId,
+                'is_default_fallback' => $accountKey === 'et' ? 1 : 0,
+            ]);
+        }
+
+        $modeA = $this->viewModel->getSavedMappings('a');
+        $modeB = $this->viewModel->getSavedMappings('b');
+
+        self::assertSame(['workflowId' => 101, 'isDefaultFallback' => true], $modeA['welcome|et']);
+        self::assertSame(['workflowId' => 201, 'isDefaultFallback' => false], $modeB['welcome|et']);
     }
 }

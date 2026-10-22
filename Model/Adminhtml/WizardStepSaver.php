@@ -460,8 +460,11 @@ class WizardStepSaver
         // Leaving mode A is destructive by design (the UI confirms first):
         // the per-store-view credential overrides written for this website's
         // per-language accounts are removed, so every store view of this
-        // website follows the single account again. Mapping rows are kept —
-        // the Router ignores them outside modes a/b.
+        // website follows the single account again. The per-language
+        // workflow rows are kept for a switch back to mode A; the Router and
+        // the mapping editor read only the active mode's rows (mode B never
+        // posts them through the single account,
+        // Mapping\Collection::addModeFilter(), CON-184).
         if ($previousMode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
             && $mode !== MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
             && $websiteId !== WebsiteContext::STORE_WIDE

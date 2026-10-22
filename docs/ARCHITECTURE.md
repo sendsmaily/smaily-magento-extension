@@ -92,7 +92,14 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   are looked up for the event's website with the store-wide rows
   (`website_id 0` — the initial setup's and a store-wide Settings save's,
   CON-179, and the 2.8.x migration's default-scope seeding) as the
-  fallback; a website's own row wins. A matched
+  fallback; a website's own row wins. Each lookup reads only the rows of
+  the active mode's accounts (`Mapping\Collection::addModeFilter()`,
+  CON-184): mode `b` the rows of the website's one account
+  (`account_key = default`), mode `a` the per-language accounts' rows
+  (`account_key` = the language) and the language-less `default` rows of
+  the 2.8.x migration. A website that switches between the two keeps both
+  modes' rows, so a switch back finds them, but a workflow id never goes
+  through an account it was not picked from. A matched
   row's `account_key` travels with the workflow (`WorkflowMatch`) and the
   handler posts through THAT account's credentials
   (`Multilingual\AccountResolver` maps the key to a store view; `default`
@@ -1606,7 +1613,13 @@ Initial setup, Settings, Log. Design rules:
   (workflow dropdowns loaded live per account). All sections show/hide
   live on mode change with no save round-trip; leaving mode `a` removes
   the per-store-view credential overrides on save (confirmed in the UI
-  first). Single-language installs are locked to `single` and see none of
+  first) and keeps its mapping rows. The editor shows each of modes `a`/`b`
+  its own rows, as the Router reads them (`WizardData::getSavedMappings($mode)`
+  renders both modes' rows on every select, `data-saved-a`/`data-saved-b`,
+  and each trigger's fallback, `data-fallback-a`/`-b`); a live switch of
+  the mode cards keeps the left mode's picks and shows the next mode's
+  (`switchMappingRows()` in panels-js), so a mode-`b` save never posts a
+  per-language account's workflow id (CON-184). Single-language installs are locked to `single` and see none of
   this.
 - **Transactional emails — settings only (PRO-4062, PRO-4065).** They
   work as the WooCommerce plugin's: Settings > Connection has the

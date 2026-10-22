@@ -1247,6 +1247,82 @@ $pages['settings-website'] = [
 ];
 
 /*
+ * The settings-modes page (CON-184) renders Settings with its Connection and
+ * Automations tabs for a one-website store with ET and LV store views, saved
+ * in per-language Smaily accounts (mode A), which holds rows of both
+ * per-language modes: mode A's Welcome workflow for ET (the fallback), and
+ * mode B's Welcome workflows for ET and LV (LV the fallback).
+ */
+$pages['settings-modes'] = [
+    'template' => $root . '/view/adminhtml/templates/settings/index.phtml',
+    'viewModel' => new class ($websitesViewModel(false)) {
+        /**
+         * @param object $inner
+         */
+        public function __construct(private readonly object $inner)
+        {
+        }
+
+        /**
+         * @param string $name
+         * @param array<int, mixed> $arguments
+         * @return mixed
+         */
+        public function __call(string $name, array $arguments): mixed
+        {
+            return $this->inner->$name(...$arguments);
+        }
+
+        /**
+         * @return bool
+         */
+        public function hasMultipleWebsites(): bool
+        {
+            return false;
+        }
+
+        /**
+         * @return string
+         */
+        public function getMultilingualMode(): string
+        {
+            return 'a';
+        }
+
+        /**
+         * @param string $mode
+         * @return array<string, array{workflowId: int, isDefaultFallback: bool}>
+         */
+        public function getSavedMappings(string $mode): array
+        {
+            return $mode === 'a'
+                ? ['welcome|et' => ['workflowId' => 101, 'isDefaultFallback' => true]]
+                : [
+                    'welcome|et' => ['workflowId' => 201, 'isDefaultFallback' => false],
+                    'welcome|lv' => ['workflowId' => 202, 'isDefaultFallback' => true],
+                ];
+        }
+
+        /**
+         * @return string
+         */
+        public function getBootJson(): string
+        {
+            $boot = json_decode($this->inner->getBootJson(), true, 512, JSON_THROW_ON_ERROR);
+            $boot['connection']['multilingualMode'] = 'a';
+
+            return (string)json_encode($boot);
+        }
+    },
+    'data' => ['context' => 'settings', 'children' => [
+        'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
+        'panel.automations' => $root . '/view/adminhtml/templates/panel/automations.phtml',
+        'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+    ]],
+    'strings' => [],
+];
+
+/*
  * The Dashboard (view/adminhtml/templates/dashboard/index.phtml): set up,
  * Smaily and Campaign Intelligence connected, browse tracking on, nothing
  * failed. The -storefront page has a Storefront URL saved (PRO-3918); the

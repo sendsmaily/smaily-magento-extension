@@ -1,0 +1,185 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the per-language workflow rows of the two
+  per-language modes (CON-184): the real Settings templates, rendered in
+  en_US and et_EE by Test/Js/render-admin.php into Test/Js/build/, run with
+  jQuery from vendor/, one fresh frame per locale. Stubbed: RequireJS's
+  require(), the browser's confirm (answered OK) and the requests (fetch),
+  each answered as saved with an empty workflow list.
+
+  The website is saved in per-language Smaily accounts (mode A) and holds
+  rows of both modes. The Automations tab shows mode A's rows. Picking
+  "One account, per-language workflows" (mode B) shows mode B's own rows,
+  and the Automations save posts only them, never mode A's workflow id.
+  Picking mode A again shows mode A's rows again.
+
+  Run it with bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>mapping modes harness</title>
+    <script src="build/settings-modes.en_US.js"></script>
+    <script src="build/settings-modes.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    function stubs() {
+        return [
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.require = function (deps, callback) { callback(window.jQuery); };',
+            'window.confirm = function () { return true; };',
+            'window.requests = [];',
+            'window.fetch = function (url, options) {',
+            '  window.requests.push({url: url, body: JSON.parse(options.body || "{}")});',
+            '  return Promise.resolve(new Response(JSON.stringify({saved: true, errors: [], workflows: [], status: "idle"}),',
+            '    {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>'
+        ].join('\n');
+    }
+
+    function open(page) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.onload = function () {
+                wait(50).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs()
+                + '</head><body>' + rendered.html + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function lastSave(frame, step) {
+        var saves = frame.contentWindow.requests.filter(function (request) {
+            return request.body.step === step;
+        });
+
+        return saves.length ? saves[saves.length - 1].body.data : null;
+    }
+
+    // The Welcome rows as "<language>=<workflow>", and the fallback language.
+    function welcomeRows(doc) {
+        return Array.prototype.map.call(
+            doc.querySelectorAll('.smaily-ml-workflow[data-trigger=welcome]'),
+            function (select) {
+                return select.getAttribute('data-language') + '=' + select.value;
+            }
+        ).join(' ') + ' fallback=' + doc.querySelector('input[name=smaily-ml-fallback-welcome]:checked').value;
+    }
+
+    function pickMode(frame, mode) {
+        var input = frame.contentDocument.querySelector('input[name=smaily-w-mlmode][value=' + mode + ']');
+        input.checked = true;
+        frame.contentWindow.jQuery(input).trigger('change');
+    }
+
+    async function saveAutomations(frame) {
+        var doc = frame.contentDocument;
+        doc.querySelector('.smaily-tabs li[data-tab=automations]').click();
+        doc.getElementById('smaily-w-automations-save').click();
+        await wait(100);
+
+        return (lastSave(frame, 'automations') || {}).mappings;
+    }
+
+    async function run(locale) {
+        var frame = await open('settings-modes.' + locale),
+            doc = frame.contentDocument,
+            mappings;
+
+        // Opening the tab loads its workflow lists.
+        doc.querySelector('.smaily-tabs li[data-tab=automations]').click();
+        await wait(100);
+        check(locale + ': mode A shows its own rows', welcomeRows(doc) === 'et=101 lv= fallback=et');
+
+        pickMode(frame, 'b');
+        await wait(100);
+        check(locale + ': mode B shows its own rows, not mode A\'s', welcomeRows(doc) === 'et=201 lv=202 fallback=lv');
+        mappings = await saveAutomations(frame);
+        check(locale + ': the mode B save posts only mode B\'s workflows, through the one account',
+            JSON.stringify(mappings) === JSON.stringify([
+                {trigger_type: 'welcome', language: 'et', account_key: 'default', workflow_id: 201, is_default_fallback: false},
+                {trigger_type: 'welcome', language: 'lv', account_key: 'default', workflow_id: 202, is_default_fallback: true}
+            ]));
+
+        pickMode(frame, 'a');
+        await wait(100);
+        check(locale + ': back in mode A, its own rows show again', welcomeRows(doc) === 'et=101 lv= fallback=et');
+        mappings = await saveAutomations(frame);
+        check(locale + ': the mode A save posts only mode A\'s workflow, through its language\'s account',
+            JSON.stringify(mappings) === JSON.stringify([
+                {trigger_type: 'welcome', language: 'et', account_key: 'et', workflow_id: 101, is_default_fallback: true}
+            ]));
+        frame.remove();
+    }
+
+    (async function () {
+        try {
+            for (var locale of ['en_US', 'et_EE']) {
+                log('# ' + locale);
+                await run(locale);
+            }
+        } catch (error) {
+            failures++;
+            log('FAIL ' + (error && error.stack ? error.stack : error));
+        }
+        clearInterval(keepAlive);
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    })();
+</script>
+</body>
+</html>

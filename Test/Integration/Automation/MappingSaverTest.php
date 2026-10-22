@@ -214,12 +214,13 @@ class MappingSaverTest extends IntegrationTestCase
             $this->row('welcome', 'et', 'et', 101),
             $this->row('welcome', 'en', 'en', 102, true),
         ]);
-        // A website-1 override for et (e.g. seeded by a website-scoped migration).
+        // Website 1's own mode-A row for et (mode A reads only per-language
+        // account rows, CON-184).
         $this->connection->insert(MappingResource::TABLE_NAME, [
             'website_id' => 1,
             'trigger_type' => 'welcome',
             'language' => 'et',
-            'account_key' => 'default',
+            'account_key' => 'et',
             'workflow_id' => 555,
             'is_default_fallback' => 0,
         ]);

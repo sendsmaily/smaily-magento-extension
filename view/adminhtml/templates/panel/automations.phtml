@@ -26,7 +26,14 @@ $viewModel = $block->getData('view_model');
 $isMultilingual = $viewModel->isMultilingual();
 $languages = $viewModel->getDetectedLanguages();
 $mode = $viewModel->getMultilingualMode();
-$savedMappings = $viewModel->getSavedMappings();
+// Each per-language mode keeps its own rows, for the accounts it sends
+// through (CON-184); a live switch between the mode cards shows the next
+// mode's rows (panels-js.phtml).
+$savedByMode = [
+    'a' => $viewModel->getSavedMappings('a'),
+    'b' => $viewModel->getSavedMappings('b'),
+];
+$savedMappings = $savedByMode[$mode] ?? [];
 $showMapping = $isMultilingual && ($mode === 'a' || $mode === 'b');
 
 $triggers = [
@@ -108,7 +115,20 @@ $storeTriggers = [
     <p class="note"><?= $escaper->escapeHtml(__('The default fallback handles contacts whose language is not mapped. Leave it on "None" to fall back to the default workflow above.')) ?></p>
 
     <?php foreach ($triggers as $triggerType => $triggerLabel): ?>
-    <div class="smaily-field smaily-ml-trigger" data-trigger="<?= $escaper->escapeHtmlAttr($triggerType) ?>">
+    <?php
+    $fallbackByMode = [];
+    foreach ($savedByMode as $savedMode => $rows) {
+        $fallbackByMode[$savedMode] = '';
+        foreach ($languages as $language) {
+            if ($rows[$triggerType . '|' . $language]['isDefaultFallback'] ?? false) {
+                $fallbackByMode[$savedMode] = $language;
+            }
+        }
+    }
+    ?>
+    <div class="smaily-field smaily-ml-trigger" data-trigger="<?= $escaper->escapeHtmlAttr($triggerType) ?>"
+         data-fallback-a="<?= $escaper->escapeHtmlAttr($fallbackByMode['a']) ?>"
+         data-fallback-b="<?= $escaper->escapeHtmlAttr($fallbackByMode['b']) ?>">
         <label><?= $escaper->escapeHtml($triggerLabel) ?></label>
         <table class="smaily-ml-table">
             <thead>
@@ -133,7 +153,9 @@ $storeTriggers = [
                         <select class="smaily-ml-workflow"
                                 data-trigger="<?= $escaper->escapeHtmlAttr($triggerType) ?>"
                                 data-language="<?= $escaper->escapeHtmlAttr($language) ?>"
-                                data-saved="<?= $escaper->escapeHtmlAttr((string)($saved['workflowId'] ?? '')) ?>"></select>
+                                data-saved="<?= $escaper->escapeHtmlAttr((string)($saved['workflowId'] ?? '')) ?>"
+                                data-saved-a="<?= $escaper->escapeHtmlAttr((string)($savedByMode['a'][$triggerType . '|' . $language]['workflowId'] ?? '')) ?>"
+                                data-saved-b="<?= $escaper->escapeHtmlAttr((string)($savedByMode['b'][$triggerType . '|' . $language]['workflowId'] ?? '')) ?>"></select>
                     </td>
                     <td>
                         <input type="radio"

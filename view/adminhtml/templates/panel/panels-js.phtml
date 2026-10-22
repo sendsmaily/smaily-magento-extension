@@ -23,10 +23,11 @@
 
 /** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
 $viewModel = $block->getData('view_model');
-// Connection/Subscribers/Automations are website-scoped (docs/internal/RFC_MULTI_WEBSITE.md
-// §2): every AJAX call those tabs make carries the currently selected website
-// so Model\Adminhtml\WebsiteContext resolves the same target the page was
-// rendered with, no further plumbing. Intelligence/backfill stay installation-
+// Connection/Subscribers/Automations: every AJAX call those tabs make carries
+// the target the page was rendered with — the selected website, or website 0
+// for the initial setup, which sets the whole store up (CON-179) — so
+// Model\Adminhtml\WebsiteContext resolves the same target, no further
+// plumbing. Intelligence/backfill stay installation-
 // wide in this phase (Phase 4/5), so their URLs are left as-is.
 $websiteQuery = $viewModel->getWebsiteQuery();
 $urls = [
@@ -816,6 +817,9 @@ window.smailyPanelsInit = function ($) {
         }
         // The setup's Contacts step of a website whose sync is on has no switch.
         var on = !$switch.length || $switch.is(':checked');
+        // The setup's step on a 2+-website install names the websites its
+        // save starts contact sync on, while sync is switched on (CON-179).
+        $('#smaily-w-sync-starts-websites').toggle(on);
         // The contacts import obeys whether contacts sync (PRO-1764,
         // PRO-4036), and its job reads it only when it runs, so the switch
         // ticked but not yet saved does not start it (PRO-4016), nor does a

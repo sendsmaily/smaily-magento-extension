@@ -331,6 +331,14 @@ $intelligenceViewModel = static fn (
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getOwnAccountWebsites(): array
+    {
+        return [];
+    }
+
+    /**
      * @return string[]
      */
     public function getWebsiteNames(): array
@@ -989,6 +997,14 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getOwnAccountWebsites(): array
+    {
+        return [];
+    }
+
+    /**
      * @return array{_query: array{website: int}}
      */
     public function getWebsiteQuery(): array
@@ -1253,6 +1269,112 @@ $pages['setup-websites'] = [
     ]],
     'strings' => $websitesStrings,
 ];
+
+/*
+ * The same store's initial setup reopened after it was finished (CON-185).
+ * The setup-websites-reopened page: no Smaily account is saved for all
+ * websites, Estonia and Latvia hold their own (a 2.8.x shape). The
+ * setup-websites-completed page: the Smaily account for all websites is
+ * saved, Latvia holds its own.
+ */
+$reopenedViewModel = static fn (bool $storeWideAccount): object => new class (
+    $websitesViewModel(true),
+    $storeWideAccount
+) {
+    /**
+     * @param object $inner
+     * @param bool $storeWideAccount
+     */
+    public function __construct(private readonly object $inner, private readonly bool $storeWideAccount)
+    {
+    }
+
+    /**
+     * @param string $name
+     * @param array<int, mixed> $arguments
+     * @return mixed
+     */
+    public function __call(string $name, array $arguments): mixed
+    {
+        return $this->inner->$name(...$arguments);
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSetupCompleted(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return int
+     */
+    public function getReachedStep(): int
+    {
+        return 5;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSavedSubdomain(): string
+    {
+        return $this->storeWideAccount ? 'shop' : '';
+    }
+
+    /**
+     * @return string
+     */
+    public function getSavedUsername(): string
+    {
+        return $this->storeWideAccount ? 'api' : '';
+    }
+
+    /**
+     * @param string $section
+     * @return array<int, array<string, mixed>>
+     */
+    public function getWebsiteOverrides(string $section): array
+    {
+        if ($this->storeWideAccount || $section !== 'connection') {
+            return $this->inner->getWebsiteOverrides($section);
+        }
+
+        return $this->getOwnAccountWebsites();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getOwnAccountWebsites(): array
+    {
+        if ($this->storeWideAccount) {
+            return [];
+        }
+
+        return [
+            ['websiteId' => 1, 'name' => 'Estonia', 'required' => false, 'values' => [
+                [(string)__('Subdomain'), 'ee-shop'],
+                [(string)__('API username'), 'ee-api'],
+                [(string)__('API password'), '••••••••'],
+            ]],
+            ['websiteId' => 2, 'name' => 'Latvia', 'required' => false, 'values' => [
+                [(string)__('Subdomain'), 'lv-shop'],
+                [(string)__('API username'), 'lv-api'],
+                [(string)__('API password'), '••••••••'],
+            ]],
+        ];
+    }
+};
+$reopenedStrings = array_merge($websitesStrings, [
+    'No Smaily account is saved for all websites, so each of these websites uses its own. Press Continue to keep'
+        . ' them, or Edit credentials to save a Smaily account for all websites.',
+]);
+foreach (['setup-websites-reopened' => false, 'setup-websites-completed' => true] as $page => $storeWideAccount) {
+    $pages[$page] = ['viewModel' => $reopenedViewModel($storeWideAccount), 'strings' => $reopenedStrings]
+        + $pages['setup-websites'];
+}
 $pages['settings-website'] = [
     'template' => $root . '/view/adminhtml/templates/settings/index.phtml',
     'viewModel' => $websitesViewModel(false),

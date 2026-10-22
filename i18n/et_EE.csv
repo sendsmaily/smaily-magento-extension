@@ -51,6 +51,7 @@
 "Last night product changes were still waiting to be sent in the Log, and the list waits for them.","Eile öösel ootasid tootemuudatused logis veel saatmist ning nimekiri ootab, kuni need on saadetud."
 "Last night the catalog import was running or waiting to start, and the list waits for it to finish.","Eile öösel kataloogi import käis või ootas käivitumist ning nimekiri ootab, kuni see lõpeb."
 "Last night the list could not be built; var/log/smaily_connect.log on the server says why.","Eile öösel ei õnnestunud nimekirja koostada; põhjus on serveris failis var/log/smaily_connect.log."
+"No Smaily account is saved for all websites, so each of these websites uses its own. Press Continue to keep them, or Edit credentials to save a Smaily account for all websites.","Kõigi veebisaitide jaoks pole Smaily kontot salvestatud, seega kasutab iga neist veebisaitidest oma kontot. Vajuta „Jätka“, et need alles jätta, või „Muuda kasutajaandmeid“, et salvestada Smaily konto kõigile veebisaitidele."
 "No nightly product list has gone to Campaign Intelligence for %1 nights","Öist tootenimekirja pole Campaign Intelligence'ile saadetud %1 ööd"
 "None (use the default fallback account's language)","Puudub (kasuta vaikimisi varukonto keelt)"
 "Once connected, set up the Order confirmation and Shipping confirmation triggers on the Automations tab.","Kui ühendus on loodud, seadista vahekaardil Automaatikad päästikud Ostu kinnituskiri ja Tarne kinnituskiri."

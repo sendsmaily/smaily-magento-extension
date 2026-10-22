@@ -1591,7 +1591,12 @@ Initial setup, Settings, Log. Design rules:
     writes. The initial setup writes the default scope (store-wide mapping
     rows under website 0); on a 2+-website install each step lists the
     websites with own values (`WizardData::getWebsiteOverrides()`), which
-    keep them unless the post names them in `use_store_wide`. Settings on a
+    keep them unless the post names them in `use_store_wide`. A finished
+    setup reopens on a summary of the store-wide Smaily account; where none
+    is saved (only website logins, a 2.8.x shape), the summary lists the
+    websites with a subdomain or API username of their own instead, with no
+    choice (`WizardData::getOwnAccountWebsites()`, CON-185), and "Edit
+    credentials" brings back the form with the step's list. Settings on a
     2+-website install has a "Use its own … on this website" switch per
     tab (`own`): ticked, the tab writes the website's own values; unticked
     on a website with own values, the save only removes them (the answer

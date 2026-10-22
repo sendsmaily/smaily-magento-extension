@@ -22,6 +22,13 @@
   offers no choice for the website on another Smaily account: it keeps
   its own automations, and says why (CON-190).
 
+  The finished setup reopened (CON-185): with no Smaily account saved for
+  all websites, the Connect step's summary lists at once the websites with
+  their own Smaily accounts, with their subdomain and API username and no
+  choice; Continue moves on and saves nothing, and Edit credentials brings
+  the form back with the list and its choices. With a Smaily account saved
+  for all websites, the summary shows that account, as before.
+
   Settings for one website: each tab's "Use its own … on this website"
   switch shows whether the website holds its own values; unticked on a
   website that holds them, the tab's settings are out of use and the tab
@@ -41,6 +48,10 @@
     <title>website exceptions harness</title>
     <script src="build/setup-websites.en_US.js"></script>
     <script src="build/setup-websites.et_EE.js"></script>
+    <script src="build/setup-websites-reopened.en_US.js"></script>
+    <script src="build/setup-websites-reopened.et_EE.js"></script>
+    <script src="build/setup-websites-completed.en_US.js"></script>
+    <script src="build/setup-websites-completed.et_EE.js"></script>
     <script src="build/settings-website.en_US.js"></script>
     <script src="build/settings-website.et_EE.js"></script>
     <script src="build/settings-own-account.en_US.js"></script>
@@ -71,6 +82,8 @@
     var PICK_WHY = 'This website uses another Smaily account than the one saved for all websites, so it starts only workflows'
         + ' picked from its own account.'
         + ' No automation starts on it until you pick its workflows below and save.';
+    var NO_STORE_WIDE = 'No Smaily account is saved for all websites, so each of these websites uses its own.'
+        + ' Press Continue to keep them, or Edit credentials to save a Smaily account for all websites.';
     var failures = 0;
     var passes = 0;
 
@@ -227,6 +240,47 @@
         frame.remove();
     }
 
+    async function reopened(locale) {
+        var strings = window.smailyAdminPages['setup-websites-reopened.' + locale].strings,
+            frame = await open('setup-websites-reopened.' + locale),
+            doc = frame.contentDocument,
+            summary = doc.getElementById('smaily-w-summary'),
+            card = summary && summary.querySelector('.smaily-website-overrides'),
+            form = doc.getElementById('smaily-w-connect-form');
+
+        check(locale + ', reopened, no account for all websites: the summary lists the websites with their own accounts',
+            shown(summary) && !shown(form) && !!card && text(card.querySelector('h2')) === strings[HEADING]
+            && ['Estonia', 'ee-shop', 'ee-api', 'Latvia', 'lv-shop', 'lv-api'].every(function (value) {
+                return text(card).indexOf(value) !== -1;
+            }));
+        check(locale + ', reopened, no account for all websites: no empty summary of the account for all websites',
+            summary.querySelector('.smaily-setup-summary__row') === null && text(summary).indexOf('—') === -1);
+        check(locale + ', reopened, no account for all websites: the list offers no choice, and says what to do',
+            card.querySelector('input') === null && text(card.querySelector('.note')) === strings[NO_STORE_WIDE]);
+        check(locale + ', reopened, no account for all websites: Edit credentials is offered',
+            shown(doc.getElementById('smaily-w-edit-credentials')));
+        doc.getElementById('smaily-w-next').click();
+        await wait(100);
+        check(locale + ', reopened, no account for all websites: Continue moves on and saves no connection',
+            activeStep(doc) === 2 && lastSave(frame, 'connect') === null);
+        doc.getElementById('smaily-w-back').click();
+        doc.getElementById('smaily-w-edit-credentials').click();
+        card = form.querySelector('.smaily-website-overrides[data-section=connection]');
+        check(locale + ', reopened, no account for all websites: Edit credentials brings the form back with the list and its choices',
+            !shown(summary) && shown(form) && !!card && text(card).indexOf('Latvia') !== -1
+            && card.querySelector('input[value=keep]').checked && !!card.querySelector('input[value=store]'));
+        frame.remove();
+
+        frame = await open('setup-websites-completed.' + locale);
+        doc = frame.contentDocument;
+        summary = doc.getElementById('smaily-w-summary');
+        check(locale + ', reopened, account for all websites: the summary shows that account, with no website list',
+            shown(summary) && summary.classList.contains('smaily-setup-summary')
+            && text(summary).indexOf('shop.sendsmaily.net') !== -1 && text(summary).indexOf('api') !== -1
+            && summary.querySelector('.smaily-website-overrides') === null);
+        frame.remove();
+    }
+
     async function ownAccount(locale) {
         var strings = window.smailyAdminPages['settings-own-account.' + locale].strings,
             frame = await open('settings-own-account.' + locale),
@@ -300,6 +354,7 @@
                         window.smailyAdminPages['setup-websites.' + locale].strings[HEADING] !== HEADING);
                 }
                 await setup(locale);
+                await reopened(locale);
                 await settings(locale);
                 await ownAccount(locale);
             }

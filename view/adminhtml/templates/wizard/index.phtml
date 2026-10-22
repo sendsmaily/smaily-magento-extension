@@ -37,16 +37,21 @@ $logUrl = $block->getUrl('smaily_connect/log');
 
 // The websites that hold their own values of a step's settings (CON-179),
 // under the step's own panel: each keeps them unless "Use this step's
-// values" is picked for it. Rendered on a 2+-website install only.
-$websiteOverrides = static function (string $section) use ($viewModel, $escaper): string {
-    $websites = $viewModel->getWebsiteOverrides($section);
+// values" is picked for it. Rendered on a 2+-website install only. Given
+// $summary, the websites of a finished setup's Connect summary, it lists
+// them with no choice (CON-185).
+$websiteOverrides = static function (string $section, ?array $summary = null) use ($viewModel, $escaper): string {
+    $websites = $summary ?? $viewModel->getWebsiteOverrides($section);
     if ($websites === []) {
         return '';
     }
+    $note = $summary === null
+        ? __('These websites hold their own values for the settings of this step, so the values you save here do not reach them. Each one keeps its own values unless you pick this step\'s values for it.')
+        : __('No Smaily account is saved for all websites, so each of these websites uses its own. Press Continue to keep them, or Edit credentials to save a Smaily account for all websites.');
     $html = '<div class="smaily-card smaily-website-overrides" data-section="'
         . $escaper->escapeHtmlAttr($section) . '">'
         . '<h2>' . $escaper->escapeHtml(__('Websites with their own values')) . '</h2>'
-        . '<p class="note">' . $escaper->escapeHtml(__('These websites hold their own values for the settings of this step, so the values you save here do not reach them. Each one keeps its own values unless you pick this step\'s values for it.')) . '</p>';
+        . '<p class="note">' . $escaper->escapeHtml($note) . '</p>';
     foreach ($websites as $website) {
         $name = 'smaily-ov-' . $section . '-' . $website['websiteId'];
         $html .= '<div class="smaily-website-override">'
@@ -59,6 +64,10 @@ $websiteOverrides = static function (string $section) use ($viewModel, $escaper)
         // A website on another Smaily account keeps its own automations (CON-190).
         if (!empty($website['required'])) {
             $html .= '<p class="note">' . $escaper->escapeHtml(__('A website with another Smaily account than the one saved for all websites keeps its own automations: their workflows come from its own account.')) . '</p></div>';
+            continue;
+        }
+        if ($summary !== null) {
+            $html .= '</div>';
             continue;
         }
         foreach (['keep' => __('Keep its own values'), 'store' => __('Use this step\'s values')] as $choice => $label) {
@@ -136,7 +145,13 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
         $savedSubdomain = $viewModel->getSavedSubdomain();
         $savedUsername = $viewModel->getSavedUsername();
         $savedStorefrontUrl = $viewModel->getSavedStorefrontUrl();
+        // No store-wide Smaily account, only websites' own: the summary
+        // lists those websites with their accounts instead (CON-185).
+        $ownAccountWebsites = $viewModel->getOwnAccountWebsites();
         ?>
+        <?php if ($ownAccountWebsites !== []): ?>
+        <div id="smaily-w-summary"><?= /* @noEscape */ $websiteOverrides('connection', $ownAccountWebsites) ?></div>
+        <?php else: ?>
         <div class="smaily-setup-summary" id="smaily-w-summary">
             <div class="smaily-setup-summary__row">
                 <span class="smaily-setup-summary__label"><?= $escaper->escapeHtml(__('Subdomain')) ?></span>
@@ -159,6 +174,7 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
                 </span>
             </div>
         </div>
+        <?php endif; ?>
         <?php endif; ?>
         <div id="smaily-w-connect-form"<?= $setupCompleted ? ' style="display:none"' : '' ?>><?= $block->getChildHtml('panel.connection') ?><?= /* @noEscape */ $websiteOverrides('connection') ?></div>
     </div>

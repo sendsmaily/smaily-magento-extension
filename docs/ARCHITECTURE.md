@@ -130,7 +130,8 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   delete queues the unsubscribe a store unsubscribe queues
   (`is_unsubscribed = 1`, the row's customer's fields), under the same gates
   (`Config::isContactSyncActive()` of the row's website, the store's
-  credentials); a row already unsubscribed sends nothing.
+  credentials); a row already unsubscribed sends nothing. The same delete
+  also stops profiling (CON-187, Profiling consent below).
 
 ### Engine ingest → Campaign Intelligence (`smaily_ingest_queue`)
 
@@ -1371,7 +1372,14 @@ mirror read back from Smaily keeps the origin too (`is_unsubscribed = 1`
 without `smaily_rec_profiling = 0` is by unsubscribing), and a record made
 by unsubscribing is never carried to the contact's profiling field. Both
 observers are deliberately outside the `ReconcileGuard`, so an unsubscribe
-or a subscription Smaily's consent mirror writes counts too.
+or a subscription Smaily's consent mirror writes counts too. A subscriber
+row deleted in the admin's Newsletter Subscribers grid is an unsubscribe
+here too (CON-187, Erkki 2026-10-22): `Observer\Engine\SubscriberDeleted`
+(`newsletter_subscriber_delete_after`) calls `optOutOnUnsubscribe()` under
+the same `ContactSync\AdminSubscriberDelete` mark as the delete's contact
+sync, so a customer account's deletion opts nobody out. A row already
+unsubscribed is skipped, and the gate is `Engine\Settings::isConnected()`,
+as for an unsubscribe — not the website's contact sync.
 
 - **The page** (My Account > Personalization: `Controller\Privacy\Index`
   and `Save`, the nav link `Block\Account\PersonalizationLink`) exists

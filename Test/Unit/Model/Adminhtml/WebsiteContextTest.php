@@ -137,4 +137,53 @@ class WebsiteContextTest extends TestCase
             $this->context()->getWebsiteOptions()
         );
     }
+
+    /**
+     * CON-179: the initial setup page sets the whole store up — website 0
+     * and store 0 on a store with more than one website, whose reads
+     * resolve the default scope.
+     */
+    public function testTheInitialSetupPageTargetsTheWholeStore(): void
+    {
+        $this->request->method('getParam')->with('website')->willReturn('2');
+        $context = $this->context();
+        $context->useStoreWide();
+
+        $this->assertTrue($context->isStoreWide());
+        $this->assertSame(WebsiteContext::STORE_WIDE, $context->getWebsiteId());
+        $this->assertSame(0, $context->getStoreId());
+    }
+
+    public function testACallForWebsiteZeroTargetsTheWholeStore(): void
+    {
+        $this->request->method('getParam')->with('website')->willReturn('0');
+
+        $this->assertTrue($this->context()->isStoreWide());
+        $this->assertSame(WebsiteContext::STORE_WIDE, $this->context()->getWebsiteId());
+    }
+
+    /**
+     * On a store with one website the store's values are that website's.
+     */
+    public function testTheWholeStoreOfAStoreWithOneWebsiteIsThatWebsite(): void
+    {
+        $this->storeManager = $this->createMock(StoreManagerInterface::class);
+        $defaultStoreView = $this->createMock(StoreInterface::class);
+        $defaultStoreView->method('getWebsiteId')->willReturn(1);
+        $this->storeManager->method('getDefaultStoreView')->willReturn($defaultStoreView);
+        $this->storeManager->method('getWebsites')->willReturn([1 => $this->websiteOne]);
+        $this->storeManager->method('getWebsite')->willReturn($this->websiteOne);
+        $this->request->method('getParam')->with('website')->willReturn('0');
+
+        $this->assertTrue($this->context()->isStoreWide());
+        $this->assertSame(1, $this->context()->getWebsiteId());
+        $this->assertSame(1, $this->context()->getStoreId());
+    }
+
+    public function testSettingsForAWebsiteIsNotStoreWide(): void
+    {
+        $this->request->method('getParam')->with('website')->willReturn('2');
+
+        $this->assertFalse($this->context()->isStoreWide());
+    }
 }

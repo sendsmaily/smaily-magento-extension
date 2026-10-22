@@ -22,9 +22,8 @@ use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\ModuleVersion;
 
 /**
- * The setup-completed gate reads at the currently targeted website's scope
- * (docs/internal/RFC_MULTI_WEBSITE.md §2) so it stays in step with the wizard's own
- * website-chooser step and the Settings page's website selector.
+ * The setup-completed gate (CON-179): one mark for the store, and an install
+ * whose website finished the setup before the update counts as set up.
  */
 class SetupGuardTest extends TestCase
 {
@@ -51,47 +50,47 @@ class SetupGuardTest extends TestCase
         );
     }
 
-    public function testIsSetupCompletedReadsAtTheTargetedWebsitesScope(): void
+    /**
+     * CON-179: the setup is one mark for the store, saved at the default
+     * scope.
+     */
+    public function testTheStoreIsSetUpWithTheStoresMark(): void
     {
-        $this->websiteContext->method('getWebsiteId')->willReturn(2);
-        $this->scopeConfig->expects($this->once())
-            ->method('isSetFlag')
-            ->with(WizardStepSaver::XML_PATH_SETUP_COMPLETED, ScopeInterface::SCOPE_WEBSITE, 2)
-            ->willReturn(true);
+        $this->websiteContext->method('getWebsiteOptions')->willReturn([1 => 'Main', 2 => 'Second']);
+        $this->scopeConfig->method('isSetFlag')->willReturnCallback(
+            static fn (string $path, string $scope = ScopeConfigInterface::SCOPE_TYPE_DEFAULT): bool =>
+                $path === WizardStepSaver::XML_PATH_SETUP_COMPLETED
+                && $scope === ScopeConfigInterface::SCOPE_TYPE_DEFAULT
+        );
 
         $this->assertTrue($this->guard->isSetupCompleted());
     }
 
-    public function testIsSetupCompletedReflectsAFalseFlagForTheTargetedWebsite(): void
+    /**
+     * CON-179: a setup finished before the update saved the mark for one
+     * website; the store counts as set up, so it is not sent back into the
+     * setup, and nothing is rewritten.
+     */
+    public function testAStoreWhoseWebsiteFinishedTheSetupBeforeTheUpdateIsSetUp(): void
     {
-        $this->websiteContext->method('getWebsiteId')->willReturn(3);
+        $this->websiteContext->method('getWebsiteOptions')->willReturn([1 => 'Main', 2 => 'Second']);
+        $this->scopeConfig->method('isSetFlag')->willReturnCallback(
+            static fn (string $path, string $scope = ScopeConfigInterface::SCOPE_TYPE_DEFAULT, $id = null): bool =>
+                $scope === ScopeInterface::SCOPE_WEBSITE && $id === 2
+        );
+
+        $this->assertTrue($this->guard->isSetupCompleted());
+    }
+
+    public function testAStoreWithoutAnyMarkIsNotSetUp(): void
+    {
+        $this->websiteContext->method('getWebsiteOptions')->willReturn([1 => 'Main', 2 => 'Second']);
         $this->scopeConfig->method('isSetFlag')->willReturn(false);
 
         $this->assertFalse($this->guard->isSetupCompleted());
     }
 
-    /**
-     * PRO-4012: a page opened for a website that is not set up yet sends the
-     * merchant to the initial setup of that website, not to the chooser,
-     * which starts on the first website.
-     */
-    public function testTheWizardRedirectKeepsTheWebsiteTheRequestNamed(): void
-    {
-        $this->websiteContext->method('isExplicit')->willReturn(true);
-        $this->websiteContext->method('getWebsiteId')->willReturn(2);
-
-        $this->assertSame(['_query' => ['website' => 2]], $this->guard->getWizardRouteParams());
-    }
-
-    public function testTheWizardRedirectNamesNoWebsiteWhenTheRequestNamedNone(): void
-    {
-        $this->websiteContext->method('isExplicit')->willReturn(false);
-        $this->websiteContext->method('getWebsiteId')->willReturn(1);
-
-        $this->assertSame([], $this->guard->getWizardRouteParams());
-    }
-
-    public function testAWebsiteSetUpGetsNoRedirect(): void
+    public function testAStoreSetUpGetsNoRedirect(): void
     {
         $this->scopeConfig->method('isSetFlag')->willReturn(true);
         $resultFactory = $this->createMock(ResultFactory::class);
@@ -100,14 +99,19 @@ class SetupGuardTest extends TestCase
         $this->assertNull($this->guard->redirectIfNotSetUp($resultFactory));
     }
 
-    public function testAWebsiteNotSetUpRedirectsToTheSetupOfThatWebsite(): void
+    /**
+     * CON-179: the admin sends the merchant to the store's setup, never to
+     * the setup of one website.
+     */
+    public function testAStoreNotSetUpRedirectsToTheSetupWithoutAWebsite(): void
     {
         $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->websiteContext->method('getWebsiteOptions')->willReturn([1 => 'Main', 2 => 'Second']);
         $this->websiteContext->method('isExplicit')->willReturn(true);
         $this->websiteContext->method('getWebsiteId')->willReturn(2);
         $redirect = $this->createMock(Redirect::class);
         $redirect->expects($this->once())->method('setPath')
-            ->with('smaily_connect/wizard', ['_query' => ['website' => 2]])
+            ->with('smaily_connect/wizard')
             ->willReturnSelf();
         $resultFactory = $this->createMock(ResultFactory::class);
         $resultFactory->method('create')->with(ResultFactory::TYPE_REDIRECT)->willReturn($redirect);

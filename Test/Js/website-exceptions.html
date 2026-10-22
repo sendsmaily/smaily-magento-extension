@@ -1,0 +1,262 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the store-wide setup and its website exceptions
+  (CON-179): the real templates, rendered in en_US and et_EE by
+  Test/Js/render-admin.php into Test/Js/build/, run with jQuery from vendor/,
+  one fresh frame per scenario. Stubbed: RequireJS's require() and the
+  requests (fetch), each answered as saved.
+
+  The initial setup on a store with three websites shows no website choice
+  and opens on Connect although Smaily login details are saved. Its Connect
+  step does not offer per-language Smaily accounts and says where they are
+  set. The Connect and Contacts steps list the website that holds its own
+  values, with them; it keeps them unless "Use this step's values" is picked
+  for it, which the step's save posts. The Contacts step says that its save
+  starts contact sync on every website and names them.
+
+  Settings for one website: each tab's "Use its own … on this website"
+  switch shows whether the website holds its own values; unticked on a
+  website that holds them, the tab's settings are out of use and the tab
+  says that the save removes them; the save posts the switch; per-language
+  accounts are offered only while the website uses its own Smaily account.
+
+  Run it with bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>website exceptions harness</title>
+    <script src="build/setup-websites.en_US.js"></script>
+    <script src="build/setup-websites.et_EE.js"></script>
+    <script src="build/settings-website.en_US.js"></script>
+    <script src="build/settings-website.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var HEADING = 'Websites with their own values';
+    var KEEP = 'Keep its own values';
+    var STARTS = 'Saving this step starts contact sync on every website: %1.';
+    var KEEPS_OWN = 'A website that keeps its own Contacts settings below syncs as those settings say.';
+    var PER_LANGUAGE = 'Per-language Smaily accounts are set for one website: under Settings > Connection,'
+        + ' pick the website and tick Use its own Smaily account on this website.';
+    var OWN_ACCOUNT = 'Use its own Smaily account on this website';
+    var OWN_CONTACTS = 'Use its own Contacts settings on this website';
+    var RETURNS = 'Save to remove this website\'s own values: it then uses the settings saved for all websites.';
+    var ESTIMATE = 'This import sends %1 contacts from all websites. It runs in the background, a chunk per minute,'
+        + ' and never slows the storefront down.';
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    function text(element) {
+        return element ? element.textContent.replace(/\s+/g, ' ').trim() : null;
+    }
+
+    function shown(element) {
+        return !!element && element.ownerDocument.defaultView.getComputedStyle(element).display !== 'none';
+    }
+
+    // Runs in the frame before the page: the admin's form key, require()
+    // for a page script that asks for jQuery, and the requests, each
+    // recorded and answered as saved.
+    function stubs() {
+        return [
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.require = function (deps, callback) { callback(window.jQuery); };',
+            'window.requests = [];',
+            'window.fetch = function (url, options) {',
+            '  window.requests.push({url: url, body: JSON.parse(options.body || "{}")});',
+            '  return Promise.resolve(new Response(JSON.stringify({saved: true, errors: [], workflows: [], status: "idle"}),',
+            '    {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>'
+        ].join('\n');
+    }
+
+    function open(page) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.onload = function () {
+                wait(50).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs()
+                + '</head><body>' + rendered.html + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    // The last save of a step the page posted.
+    function lastSave(frame, step) {
+        var saves = frame.contentWindow.requests.filter(function (request) {
+            return request.body.step === step;
+        });
+
+        return saves.length ? saves[saves.length - 1].body.data : null;
+    }
+
+    function activeStep(doc) {
+        var panel = doc.querySelector('.smaily-step-panel.active');
+
+        return panel ? Number(panel.getAttribute('data-step')) : 0;
+    }
+
+    function setChecked(frame, element, checked) {
+        element.checked = checked;
+        frame.contentWindow.jQuery(element).trigger('change');
+    }
+
+    async function setup(locale) {
+        var strings = window.smailyAdminPages['setup-websites.' + locale].strings,
+            frame = await open('setup-websites.' + locale),
+            doc = frame.contentDocument,
+            card,
+            data;
+
+        check(locale + ', setup: no website choice', doc.getElementById('smaily-wizard-website-chooser') === null);
+        check(locale + ', setup: Smaily login details saved, the setup still opens on Connect', activeStep(doc) === 1);
+        check(locale + ', setup: per-language Smaily accounts are not offered for the whole store',
+            doc.querySelector('input[name=smaily-w-mlmode][value=a]') === null
+            && doc.querySelector('input[name=smaily-w-mlmode][value=b]').checked);
+        check(locale + ', setup: the Connect step says where per-language Smaily accounts are set',
+            Array.prototype.some.call(doc.querySelectorAll('#smaily-ml-modes .note'), function (note) {
+                return text(note) === strings[PER_LANGUAGE];
+            }));
+
+        card = doc.querySelector('.smaily-website-overrides[data-section=connection]');
+        check(locale + ', setup: the Connect step lists the website with its own Smaily account, with its values',
+            !!card && text(card.querySelector('h2')) === strings[HEADING]
+            && text(card).indexOf('Latvia') !== -1 && text(card).indexOf('lv-shop') !== -1
+            && text(card).indexOf('lv-api') !== -1);
+        check(locale + ', setup: the website keeps its own values unless the merchant picks otherwise',
+            card.querySelector('input[value=keep]').checked
+            && text(card.querySelector('input[value=keep]').parentNode) === strings[KEEP]);
+        setChecked(frame, card.querySelector('input[value=store]'), true);
+        doc.getElementById('smaily-w-next').click();
+        await wait(100);
+        data = lastSave(frame, 'connect');
+        check(locale + ', setup: Continue posts the website that takes the step\'s values',
+            !!data && JSON.stringify(data.use_store_wide) === '[2]');
+        check(locale + ', setup: Continue moves on to Contacts', activeStep(doc) === 2);
+
+        check(locale + ', setup: the Contacts step says its save starts contact sync on every website, naming them',
+            shown(doc.getElementById('smaily-w-sync-starts-websites'))
+            && text(doc.getElementById('smaily-w-sync-starts-websites'))
+                === strings[STARTS].replace('%1', 'Estonia, Latvia, Lithuania') + ' ' + strings[KEEPS_OWN]);
+        check(locale + ', setup: the contacts import estimate counts every website',
+            text(doc.getElementById('smaily-w-backfill-estimate')) === strings[ESTIMATE].replace('%1', '12'));
+        check(locale + ', setup: the Contacts step lists the website with its own Contacts settings',
+            text(doc.querySelector('.smaily-website-overrides[data-section=subscribers]')).indexOf('Latvia') !== -1);
+        doc.getElementById('smaily-w-next').click();
+        await wait(100);
+        data = lastSave(frame, 'subscribers');
+        check(locale + ', setup: a website kept by default is not posted',
+            !!data && JSON.stringify(data.use_store_wide) === '[]');
+        frame.remove();
+    }
+
+    async function settings(locale) {
+        var strings = window.smailyAdminPages['settings-website.' + locale].strings,
+            frame = await open('settings-website.' + locale),
+            doc = frame.contentDocument,
+            ownAccount = doc.getElementById('smaily-own-connection'),
+            ownContacts = doc.getElementById('smaily-own-subscribers'),
+            modeA = doc.querySelector('input[name=smaily-w-mlmode][value=a]'),
+            region = doc.querySelector('.smaily-own-region[data-section=subscribers]'),
+            note = ownContacts && ownContacts.closest('.smaily-own-toggle').querySelector('.smaily-own-return'),
+            data;
+
+        check(locale + ', Settings: the switches say which values the website holds of its own',
+            !!ownAccount && !ownAccount.checked && text(ownAccount.parentNode) === strings[OWN_ACCOUNT]
+            && !!ownContacts && ownContacts.checked && text(ownContacts.parentNode) === strings[OWN_CONTACTS]);
+        check(locale + ', Settings: per-language accounts are offered only with the website\'s own Smaily account',
+            !!modeA && !shown(modeA.closest('.smaily-choice')));
+        setChecked(frame, ownAccount, true);
+        check(locale + ', Settings: ticking its own Smaily account offers per-language accounts',
+            shown(modeA.closest('.smaily-choice')));
+
+        setChecked(frame, ownContacts, false);
+        check(locale + ', Settings: unticked, the website\'s own Contacts settings are out of use and the tab says the save removes them',
+            region.hasAttribute('inert') && shown(note) && text(note) === strings[RETURNS]);
+        doc.querySelector('.smaily-tabs li[data-tab=subscribers]').click();
+        doc.getElementById('smaily-w-subscribers-save').click();
+        await wait(100);
+        data = lastSave(frame, 'subscribers');
+        check(locale + ', Settings: the Contacts save posts the switch', !!data && data.own === false);
+
+        doc.querySelector('.smaily-tabs li[data-tab=connection]').click();
+        doc.getElementById('smaily-w-connection-save').click();
+        await wait(100);
+        data = lastSave(frame, 'connect');
+        check(locale + ', Settings: the Connection save posts the switch', !!data && data.own === true);
+        frame.remove();
+    }
+
+    (async function () {
+        try {
+            for (var locale of ['en_US', 'et_EE']) {
+                log('# ' + locale);
+                if (locale !== 'en_US') {
+                    check(locale + ': the website list is translated',
+                        window.smailyAdminPages['setup-websites.' + locale].strings[HEADING] !== HEADING);
+                }
+                await setup(locale);
+                await settings(locale);
+            }
+        } catch (error) {
+            failures++;
+            log('FAIL ' + (error && error.stack ? error.stack : error));
+        }
+        clearInterval(keepAlive);
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    })();
+</script>
+</body>
+</html>

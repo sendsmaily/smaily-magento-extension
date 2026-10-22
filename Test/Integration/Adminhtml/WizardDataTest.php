@@ -8,13 +8,14 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Adminhtml;
 
-use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use Smaily\Connect\Model\Adminhtml\SetupGuard;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
@@ -57,7 +58,6 @@ class WizardDataTest extends IntegrationTestCase
             $this->objectManager->get(Config::class),
             $this->objectManager->get(Mode::class),
             $this->createMock(EngineSettings::class),
-            $this->objectManager->get(ScopeConfigInterface::class),
             $this->createMock(AccountResolver::class),
             $this->createMock(ContactAudience::class),
             $this->objectManager->get(Json::class),
@@ -66,7 +66,9 @@ class WizardDataTest extends IntegrationTestCase
             $this->createMock(VerifiedCredentials::class),
             $this->createMock(ResolverInterface::class),
             $this->createMock(ConsentSource::class),
-            $this->createMock(OrderOrigin::class)
+            $this->createMock(OrderOrigin::class),
+            $this->createMock(SetupGuard::class),
+            $this->createMock(WebsiteOverrides::class)
         );
     }
 

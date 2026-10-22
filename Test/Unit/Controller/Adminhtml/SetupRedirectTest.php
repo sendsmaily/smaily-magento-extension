@@ -25,10 +25,9 @@ use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\ModuleVersion;
 
 /**
- * PRO-4012: Settings, Dashboard or Log opened for a website that is not set
- * up yet redirect to the initial setup of that website. Without the website
- * the initial setup opened on its chooser, which starts on the first
- * website, so the merchant saw the main website.
+ * Settings, Dashboard or Log opened while the store is not set up redirect
+ * to the initial setup, which sets the whole store up (CON-179) — never to
+ * the setup of the website the request named (PRO-4012 sent it there).
  */
 class SetupRedirectTest extends TestCase
 {
@@ -48,13 +47,14 @@ class SetupRedirectTest extends TestCase
      * @param class-string<SettingsIndex|DashboardIndex|LogIndex> $controllerClass
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('pages')]
-    public function testAPageForAWebsiteNotSetUpRedirectsToTheSetupOfThatWebsite(string $controllerClass): void
+    public function testAPageOfAStoreNotSetUpRedirectsToTheStoresSetup(string $controllerClass): void
     {
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $scopeConfig->method('isSetFlag')->willReturn(false);
         $websiteContext = $this->createMock(WebsiteContext::class);
         $websiteContext->method('isExplicit')->willReturn(true);
         $websiteContext->method('getWebsiteId')->willReturn(2);
+        $websiteContext->method('getWebsiteOptions')->willReturn([1 => 'Main', 2 => 'Second']);
         $setupGuard = new SetupGuard(
             $scopeConfig,
             $this->createMock(WriterInterface::class),
@@ -66,7 +66,7 @@ class SetupRedirectTest extends TestCase
 
         $redirect = $this->createMock(Redirect::class);
         $redirect->expects(self::once())->method('setPath')
-            ->with('smaily_connect/wizard', ['_query' => ['website' => 2]])
+            ->with('smaily_connect/wizard')
             ->willReturnSelf();
         $resultFactory = $this->createMock(ResultFactory::class);
         $resultFactory->method('create')->with(ResultFactory::TYPE_REDIRECT)->willReturn($redirect);

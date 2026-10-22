@@ -11,6 +11,7 @@ namespace Smaily\Connect\Test\Integration\Adminhtml;
 use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\App\RequestInterface;
+use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\FlagManager;
 use Magento\Framework\Locale\ResolverInterface;
@@ -21,7 +22,9 @@ use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
 use Smaily\Connect\Model\Adminhtml\SetupNotice;
 use Smaily\Connect\Model\Adminhtml\TransactionalSettingsSaver;
+use Smaily\Connect\Model\Adminhtml\SetupGuard;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
 use Smaily\Connect\Model\Automation\MappingSaver;
@@ -166,8 +169,17 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
 
             return $website;
         });
+        // Two websites, so a website's per-language accounts are its own
+        // Smaily account on Settings > Connection (CON-179).
+        $websites = [];
+        foreach ([self::WEBSITE_ID, self::OTHER_WEBSITE_ID] as $websiteId) {
+            $websites[$websiteId] = $this->createMock(Website::class);
+            $websites[$websiteId]->method('getId')->willReturn($websiteId);
+            $websites[$websiteId]->method('getName')->willReturn('Website ' . $websiteId);
+        }
+        $storeManager->method('getWebsites')->willReturn($websites);
         $request = $this->createMock(RequestInterface::class);
-        $request->method('getParam')->willReturn(null);
+        $request->method('getParam')->willReturn((string)self::WEBSITE_ID);
 
         $this->saver = new WizardStepSaver(
             $this->objectManager->get(WriterInterface::class),
@@ -183,7 +195,12 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
             new ConfigRowNormalizer(),
             new CredentialCheck($clientFactory, $requestConfig),
             $this->createMock(SetupNotice::class),
-            $this->createMock(TransactionalSettingsSaver::class)
+            $this->createMock(TransactionalSettingsSaver::class),
+            new WebsiteOverrides(
+                $this->objectManager->get(ResourceConnection::class),
+                $this->objectManager->get(WriterInterface::class),
+                $storeManager
+            )
         );
 
         // The other website's store view holds its own Estonian account.
@@ -252,6 +269,7 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
         $this->setStoreLocale(3, 'fi_FI');
         $accounts = [$this->account('en'), $this->account('et'), $this->account('fi')];
         $errors = $this->saver->save('connect', [
+            'own' => true,
             'subdomain' => 'en-shop',
             'username' => 'en-user',
             'password' => '',
@@ -494,13 +512,12 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
     private function wizardData(): WizardData
     {
         $request = $this->createMock(RequestInterface::class);
-        $request->method('getParam')->willReturn(null);
+        $request->method('getParam')->willReturn((string)self::WEBSITE_ID);
 
         return new WizardData(
             $this->config,
             $this->createMock(Mode::class),
             $this->createMock(EngineSettings::class),
-            $this->scopeConfig,
             new AccountResolver($this->storeManager, new LanguageResolver($this->scopeConfig)),
             $this->createMock(ContactAudience::class),
             new Json(),
@@ -509,7 +526,9 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
             $this->verifiedCredentials,
             $this->createMock(ResolverInterface::class),
             $this->createMock(ConsentSource::class),
-            $this->createMock(OrderOrigin::class)
+            $this->createMock(OrderOrigin::class),
+            $this->createMock(SetupGuard::class),
+            $this->createMock(WebsiteOverrides::class)
         );
     }
 
@@ -523,6 +542,7 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
     private function saveSingle(array $account): array
     {
         return $this->saver->save('connect', [
+            'own' => true,
             'subdomain' => $account['subdomain'],
             'username' => $account['username'],
             'password' => $account['password'],
@@ -555,6 +575,7 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
         ))[0];
 
         return $this->saver->save('connect', [
+            'own' => true,
             'subdomain' => $fallbackAccount['subdomain'],
             'username' => $fallbackAccount['username'],
             'password' => $fallbackAccount['password'],

@@ -36,7 +36,7 @@ Model/
   Privacy/          profiling consent, data-subject erasure
 Observer/           thin event bridges (all logic lives in Model/)
 Plugin/             newsletter email suppression, config validation,
-                    checkout layout injection
+                    checkout layout injection, admin subscriber-delete mark
 Setup/Patch/        legacy schema cleanup (Schema/), config migration (Data/)
 Setup/Uninstall.php settings + flag removal on module:uninstall
 ViewModel/          template data providers
@@ -106,6 +106,24 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   (`Model/Queue/HandlerPool`); adding an event type = adding a handler.
 - Payloads are built at enqueue time (`ContactSync\SubscriberPayloadBuilder`,
   `ContactSync\SyncDispatcher`) and stored on the row.
+- The live `contact.sync` triggers: a subscriber save (`Observer\SubscriberSaveAfter`,
+  subscribe and unsubscribe), a customer save (`Observer\CustomerSaveAfter`),
+  an order (`Observer\OrderPlaced`, the checkout opt-in, guest-order emails
+  and the abandoned-cart purchase marker), and a subscriber row deleted in
+  the admin's Newsletter Subscribers grid (CON-176). The grid's only delete
+  is its mass action `Newsletter\Controller\Adminhtml\Subscriber\MassDelete`,
+  which loads each selected row and deletes it through the model, so
+  `newsletter_subscriber_delete_after` fires per row
+  (`Observer\SubscriberDeleteAfter`) and the contact sync is queued in the
+  delete's transaction. A customer account's deletion deletes its subscriber
+  row the same way (Magento's `CustomerPlugin`), and that sends nothing, as
+  in the WooCommerce plugin: the observer acts only under the
+  `ContactSync\AdminSubscriberDelete` mark, which
+  `Plugin\Adminhtml\MarkSubscriberMassDelete` sets around the action. The
+  delete queues the unsubscribe a store unsubscribe queues
+  (`is_unsubscribed = 1`, the row's customer's fields), under the same gates
+  (`Config::isContactSyncActive()` of the row's website, the store's
+  credentials); a row already unsubscribed sends nothing.
 
 ### Engine ingest → Campaign Intelligence (`smaily_ingest_queue`)
 

@@ -7,80 +7,100 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-10-12 session end — **transactional emails, first
-slice (settings only, no send path) is on `master`**; 3.0.0-rc12 is still
-the latest release, and the pilot store waits for its developer's rc12
-upgrade. **Merged since #173:** #174 PRO-2461 (a product page view of a
-product with an empty SKU is keyed `mag-<id>`, the same as its catalog row
-and its orders; `CatalogPayloadBuilder::sku()` is now the single helper;
-Hyvä is covered because it reads the same server-side context). #175
-PRO-4057 (storefront-only translations ru_RU, fi_FI, lv_LV and lt_LT of the
-13 shopper texts — machine translations that wait for a native review,
-PRO-4058; `StorefrontTranslationsTest` keeps them complete; the admin stays
-EN/ET). #176 PRO-4062 and #177 PRO-4065 (transactional emails, settings
-only: Settings > Connection has a "Transactional emails" card with the
-"Send transactional emails" master switch, a separate Smaily account
-store-wide with an optional per-website account, and Test connection;
-Settings > Automations shows nothing transactional until that account is
-connected, then "Order confirmation" and "Shipping confirmation" with
-Enabled off by default and a workflow per store language, plus the
-Customer details switch — all in the WooCommerce plugin's wording; the
-mapping rows live in `smaily_automation_mapping` with account_key
-`transactional`, no schema change; `ModuleDefinitionTest` guards that
-nothing hooks Magento's order and shipment email senders). Sandbox
-`setup:upgrade` + `setup:di:compile` passed on `master` after #176 and
-#177; the guide site was re-uploaded after each (its md5 matches
-`master`). rc12 does not hold #171–#177; the next release candidate (or
-3.0.0) brings them.
+_Last updated: 2026-10-22 — **both pilot stores run 3.0.0-rc12; pilot day
+is 2026-10-22 or 23, on rc12** (no rc13 before the pilot — Erkki's
+decision). 3.0.0-rc12 is still the latest release. Linear: since
+2026-10-20 the project's issues live in team Connect (key `CON`, a
+sub-team of Growth (lab)); moved issues keep their `PRO-####` identifiers
+as redirects (CLAUDE.md "Linear discipline"). **Merged today:** #180
+CON-145, CON-154 (the engine contract copy is v1.17.0, byte-identical;
+Contract staleness is green again after being red since 2026-10-16; the
+visitor-token check already allowed 64 characters in all, now pinned by a
+test; nothing the extension sends changes). #179 (composer.lock
+refreshed, patch and minor moves only; GitHub issue #165 closed).
+Unreleased on `master` since rc12: #171–#177, #179, #180 (+ CON-179 when
+it lands).
 
-**Decided (Erkki, 2026-10-12, PRO-1766 transactional emails):** a
-separate Smaily account (store-wide; a website may override it); v1 is
-order confirmation and shipping confirmation; the first send attempt runs
-synchronously during checkout with a short time limit, then the queue
-retries; after a 1-hour ceiling Magento's own email goes out once; the
-admin "Send Email" resends through Smaily; only the connector's own
-Enabled decides (Magento's order-email setting does not, and there is no
-fallback when Enabled is off); the merchant's copy keeps coming from
-Magento's "Send Order Email Copy To", because Smaily's public message/send
-API has no CC (an unannounced newer API stays out of public docs).
-Shipping confirmation fires on a Magento shipment — a Magento-specific
-difference from Woo; PRO-4067 holds the two small Woo differences left
-(the wizard card; triggers after Test connection).
+**Pilot:** the developer of both pilot stores ("the pilot store" and "the
+second pilot store") upgraded them to 3.0.0-rc12; Erkki ran the initial
+setup in both. The pilot-day plan is in Erkki's private document; the
+gauge is CON-147 (4/5).
 
-**Gotchas:** (1) the synchronous first send attempt is a deliberate
+**Decided (Erkki, 2026-10-22, CON-179):** the extension is set up once
+for the whole store (default scope), with per-website exceptions in
+Settings — like the WooCommerce plugin and the transactional-email
+account. This replaces the per-website setup of multi-website phase 1.
+CON-179 is in work (a PR follows). Guest newsletter subscribers already
+sync live and in the contacts import (rc12 and `master`); a guide
+sentence goes in with CON-179.
+
+**Engine contract 1.14–1.17, not built yet:** CON-143: decided (Erkki,
+2026-10-22, with Woo CON-51) that the extension never sends the §16
+store-deletion request. A disconnect or removal deletes only its own
+engine key, because a merchant may only be changing platform, and a
+store's data is deleted when the merchant closes the Smaily account
+(engine ask INT-145). What is left: the privacy text's retention periods,
+worded as the WooCommerce plugin words them, after CON-51/CON-52. CON-168 (the start button
+§21, design links §22/§23, the engine-email setup §17–§20, the brand kit
+§18) waits for the WooCommerce plugin's build (CON-166) and is mirrored
+after it (Erkki's decision, 2026-10-22). The engine's questions on CON-168
+are answered in Linear; one point is open: §23 gives a transactional
+email only a template id, while the extension sends by workflow.
+
+**New Stories:** CON-176 (a subscriber deleted in the admin stays
+subscribed in Smaily); CON-177 (a store-created visitor token in a landing
+link is accepted on Magento, while Woo refuses it); CON-178, in the Woo
+project (Woo accepts 67-character engine tokens).
+
+**Gotchas:** (1) pilot day on rc12: on a multi-website store the setup
+asks for a website, and when that website's Smaily login came over from
+2.8.x the setup opens on the Contacts step — go back to step 1 (language
+mode, storefront address, connection test) for every website. (2) The
+synchronous first send attempt of transactional emails is a deliberate
 exception to "nothing user-facing waits on HTTP" — the sending slice
-records it in `docs/ARCHITECTURE.md` in the same PR. (2) Workers never
-clone a private Smaily repository without Erkki's OK. (3) Client details
-never go into this public repository (CLAUDE.md "Public facade"); say
-"the pilot store". (4) Sandbox: an old pending contacts→Smaily backfill
-job (id 1, 2026-10-02) and 2 ingest rows wait there; `cron:run` sends them
-to the smailydemo account and the synthetic engine tenant.
+records it in `docs/ARCHITECTURE.md` in the same PR. (3) Workers never
+clone a private Smaily repository without Erkki's OK. (4) Client details
+never go into this public repository (CLAUDE.md "No client details"); say
+"the pilot store" / "the second pilot store". (5) Sandbox: an old pending
+contacts→Smaily backfill job (id 1, 2026-10-02) and 2 ingest rows wait
+there; `cron:run` sends them to the smailydemo account and the synthetic
+engine tenant.
 
-**Pilot:** waiting for the pilot store's developer to upgrade to rc12
-(Erkki sent the one-page guide as a PDF); the pilot-day plan is in Erkki's
-private document. **Open for Erkki:** the developer's reply and pilot day;
-PRO-4019 (the Estonian proofread — now also the transactional texts);
-PRO-4058 (native review of the ru/fi/lv/lt storefront texts); a
+**Open for Erkki:** the pilot-day results; CON-151 (the Estonian
+proofread); CON-146 (native review of the ru/fi/lv/lt storefront texts); a
 transactional Smaily test account in a local credentials file (like the
-FTPS one); the "Pilot store live" milestone date once the upgrade date is
-known.
+FTPS one); the "Pilot store live" milestone date.
 
 **Next session opens with:**
-1. Check for the pilot developer's reply. Upgrade done → pilot day (the
-   initial setup per website, PRO-3663's three one-step-checkout checks,
-   a test order and cart with Erkki's own test contact, Campaign
-   Intelligence with one tenant).
-2. Otherwise, if the transactional account file exists → the live test
-   with a real transactional Smaily account: which workflow kinds
-   message/send accepts (the settings list
-   `autoresponder.php?status=ACTIVE`, as Woo does), escaping, and the
-   response codes.
-3. Then the order-confirmation sending slice (PRO-1766; it updates
-   `docs/ARCHITECTURE.md`, gotcha 1).
-4. Cut rc13 when the pilot needs #171–#177.
-5. Backlog: PRO-4067, PRO-3746 (after the pilot), PRO-3921 / PRO-3916
-   (engine; after PRO-3941 / PRO-3919); the second pilot store after the
-   first._
+1. Pilot-day results, and the fixes they ask for.
+2. Merge CON-179, then the sandbox check (`setup:upgrade` +
+   `setup:di:compile`).
+3. CON-143 privacy text after Woo CON-51/CON-52.
+4. Cut rc13 after the pilot.
+5. Before transactional sending is built (PRO-1766), check it again
+   against contract 1.17 §23._
+
+_Earlier (2026-10-12 session end): transactional emails, first slice
+(settings only, no send path) on `master`. #174 PRO-2461 (a product page
+view of an empty-SKU product is keyed `mag-<id>`, like its catalog row and
+orders; `CatalogPayloadBuilder::sku()` is the single helper). #175
+PRO-4057 (machine-translated ru_RU, fi_FI, lv_LV and lt_LT storefront
+texts; `StorefrontTranslationsTest` keeps them complete; the admin stays
+EN/ET). #176 PRO-4062 and #177 PRO-4065 (Settings > Connection
+"Transactional emails" card with its own Smaily account, store-wide with
+an optional per-website account; Settings > Automations "Order
+confirmation" and "Shipping confirmation", off by default, a workflow per
+store language; mapping rows in `smaily_automation_mapping` with
+account_key `transactional`, no schema change; `ModuleDefinitionTest`
+guards that nothing hooks Magento's order and shipment email senders).
+Decided then (Erkki, PRO-1766): a separate Smaily account; v1 is order and
+shipping confirmation; the first send attempt runs synchronously at
+checkout with a short time limit, then the queue retries; after a 1-hour
+ceiling Magento's own email goes out once; the admin "Send Email" resends
+through Smaily; only the connector's Enabled decides; the merchant's copy
+keeps coming from Magento's "Send Order Email Copy To" (Smaily's public
+message/send API has no CC). PRO-4067 holds the two small Woo differences
+left._
 
 _Earlier (2026-10-12 later): **3.0.0-rc12 released** (`gh release
 create`, no HTTP 500; four assets — the main and the Hyvä ZIP, each with

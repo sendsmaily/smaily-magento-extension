@@ -2034,10 +2034,10 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
   <div class="sub" id="faq-disconnect">
     <h2><span data-lang="en">How do I disconnect Campaign Intelligence?</span><span data-lang="et">Kuidas Campaign Intelligence'i lahti ühendada?</span></h2>
     <div data-lang="en">
-      <p>From the command line: <code>bin/magento smaily:engine:disconnect --force</code>. It removes the store's connection; data already in Campaign Intelligence stays there, and the API key stays valid on the engine until Smaily revokes it. Connecting again needs a new setup link from Smaily. To stop Smaily syncing for a website, switch off <strong>Sync contacts to Smaily</strong> and the automations.</p>
+      <p>From the command line: <code>bin/magento smaily:engine:disconnect --force</code>. It removes the store's connection; data already in Campaign Intelligence stays there, and the API key stays valid on the engine until Smaily revokes it. The extension never asks Campaign Intelligence to delete your store's data — not on removal and not on disconnect; that data is deleted when you close your Smaily account. Connecting again needs a new setup link from Smaily. To stop Smaily syncing for a website, switch off <strong>Sync contacts to Smaily</strong> and the automations.</p>
     </div>
     <div data-lang="et">
-      <p>Käsurealt: <code>bin/magento smaily:engine:disconnect --force</code>. See eemaldab poe ühenduse; Campaign Intelligence'is juba olevad andmed jäävad sinna ja API võti kehtib mootoris, kuni Smaily selle tühistab. Uuesti ühendamiseks on vaja Smailylt uut seadistuslinki. Veebisaidi Smaily sünkroonimise peatamiseks lülita välja <strong>Sünkrooni kontaktid Smailysse</strong> ja automaatikad.</p>
+      <p>Käsurealt: <code>bin/magento smaily:engine:disconnect --force</code>. See eemaldab poe ühenduse; Campaign Intelligence'is juba olevad andmed jäävad sinna ja API võti kehtib mootoris, kuni Smaily selle tühistab. Laiendus ei palu kunagi Campaign Intelligence'il su poe andmeid kustutada — ei eemaldamisel ega lahtiühendamisel; need andmed kustutatakse, kui sulged oma Smaily konto. Uuesti ühendamiseks on vaja Smailylt uut seadistuslinki. Veebisaidi Smaily sünkroonimise peatamiseks lülita välja <strong>Sünkrooni kontaktid Smailysse</strong> ja automaatikad.</p>
     </div>
   </div>
 
@@ -2047,7 +2047,7 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
       <ul>
         <li><strong>Disabling</strong> stops everything at once. On the next <code>setup:upgrade</code>, Magento drops the extension's tables — the queues (including anything not yet sent), the Log, the abandoned-cart tracker and the import progress. Your settings are kept.</li>
         <li><strong>Uninstalling</strong> also removes the settings (the encrypted Smaily password and Campaign Intelligence key included) and the record of personalization opt-outs.</li>
-        <li><strong>Nothing is deleted in Smaily or Campaign Intelligence.</strong> Contacts and data already there stay.</li>
+        <li><strong>Nothing is deleted in Smaily or Campaign Intelligence.</strong> Contacts and data already there stay. The extension never asks Campaign Intelligence to delete your store's data — not on removal and not on disconnect; that data is deleted when you close your Smaily account.</li>
       </ul>
       <p>The commands are in <a href="https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/INSTALLING.md#disabling-or-removing-the-module">INSTALLING.md › Disabling or removing the module</a>.</p>
     </div>
@@ -2055,7 +2055,7 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
       <ul>
         <li><strong>Keelamine</strong> peatab kohe kõik. Järgmisel käsul <code>setup:upgrade</code> kustutab Magento laienduse tabelid — järjekorrad (koos veel saatmata kirjetega), logi, hüljatud ostukorvide jälgija ja impordi edenemise. Sinu seaded säilivad.</li>
         <li><strong>Eemaldamine (uninstall)</strong> kustutab ka seaded (koos krüpteeritud Smaily parooli ja Campaign Intelligence'i võtmega) ning personaliseerimisest loobumiste kirje.</li>
-        <li><strong>Smailys ja Campaign Intelligence'is ei kustutata midagi.</strong> Seal juba olevad kontaktid ja andmed jäävad alles.</li>
+        <li><strong>Smailys ja Campaign Intelligence'is ei kustutata midagi.</strong> Seal juba olevad kontaktid ja andmed jäävad alles. Laiendus ei palu kunagi Campaign Intelligence'il su poe andmeid kustutada — ei eemaldamisel ega lahtiühendamisel; need andmed kustutatakse, kui sulged oma Smaily konto.</li>
       </ul>
       <p>Käsud on juhendis <a href="https://github.com/sendsmaily/smaily-magento-extension/blob/master/docs/INSTALLING.md#disabling-or-removing-the-module">INSTALLING.md › Disabling or removing the module</a> (inglise keeles).</p>
     </div>
@@ -2221,9 +2221,19 @@ bin/magento smaily:gdpr erase shopper@example.com --force   # art 17</code></pre
       <p><strong>Legal basis.</strong> Our legitimate interest in offering relevant marketing (Article 6(1)(f) GDPR), with your right to object at any time (Article 21). Browsing data is collected only with your marketing-cookie consent. <em>[Your legal counsel: confirm the lawful basis and document a legitimate-interest assessment.]</em></p>
       <p><strong>How to opt out.</strong> Log in, open My Account &gt; Personalization, untick "Allow personalized recommendations" and press "Save Preference". You will still receive our emails, without personalization. Unsubscribing from our newsletter also stops personalization. You can also contact us at [your contact email].</p>
       <p><strong>Your rights.</strong> You may access the data used for recommendations and get a copy, have it erased, object to profiling, and complain to your data protection authority [e.g. Andmekaitse Inspektsioon in Estonia]. Contact us at [your contact email].</p>
+      <p><strong>Retention.</strong> We keep each kind of data only as long as its purpose needs it; after that it is deleted automatically and permanently:</p>
+      <ul>
+        <li>Your browsing activity in our store (pages and products viewed, cart events and searches) and your interactions with our emails (opens and clicks): 14 months after each event, so that we can compare with the same month a year earlier (seasonal purchases), plus two months of margin.</li>
+        <li>The pseudonymous visitor token: 14 months after its last activity (its creation, or the latest order that carried it), so that we can recognize you as a returning shopper in our store (recommendations in the store, crediting a purchase) across a year of repeat purchases, plus two months of margin. The cookie in your browser expires on its own schedule, as stated above.</li>
+        <li>The product recommendations computed for you, the records of which recommendation led to which purchase, and the history of your engagement with our emails: 2 years (730 days), for two-year reporting and to look back at purchases.</li>
+        <li>A recommendation that a newer one replaced: 180 days after the replacement, so that a later click or purchase can still be credited to the email that showed the product, and so that products are not repeated too soon. One that is still linked to a click or purchase record is kept as long as that record, at most 2 years.</li>
+        <li>Short-lived technical records: why a recommendation was chosen, 30 days (support and error tracing); signals from your shopping behavior that the next recommendations act on, 30 days after they were acted on, or 90 days after they were detected if they never were (an old signal no longer describes you); changes to the weights of the recommendation rules, 90 days (checking and undoing a wrong change); data our store sent twice, 90 days (so that it is stored once).</li>
+        <li>Your contact and account details and the recommendation profile kept with them, your purchase history and our product catalog: as long as we use this service for our store, to provide the service.</li>
+      </ul>
+      <p>When we close our Smaily account, all data held for our store in this service is deleted. If you ask us to erase your data at any time (see "Your rights" above), it is deleted immediately regardless of these periods; we retain only a record showing that the deletion was carried out.</p>
       <div class="note warn">
         <span class="k">Adapt before you publish</span>
-        <p>Replace the bracketed parts, drop the sentences about features you do not use, and add how long your data is kept — ask Smaily for the retention periods of the Campaign Intelligence service. Have your legal counsel review the final text.</p>
+        <p>Replace the bracketed parts and drop the sentences about features you do not use. The retention periods are those of the Campaign Intelligence service. The extension does not add this text to your store's privacy-policy page; paste the adapted text there yourself. Have your legal counsel review the final text.</p>
       </div>
     </div>
     <div data-lang="et">
@@ -2242,9 +2252,19 @@ bin/magento smaily:gdpr erase shopper@example.com --force   # art 17</code></pre
       <p><strong>Õiguslik alus.</strong> Meie õigustatud huvi pakkuda asjakohast turundust (GDPR art 6 lg 1 p f) koos sinu õigusega igal ajal vastuväide esitada (art 21). Sirvimisandmeid kogume ainult sinu turundusküpsiste nõusolekul. <em>[Sinu jurist: kinnita õiguslik alus ja dokumenteeri õigustatud huvi hindamine.]</em></p>
       <p><strong>Kuidas loobuda.</strong> Logi sisse, ava Minu konto &gt; Personaliseerimine, eemalda märge „Luba personaalsed soovitused“ ja vajuta „Salvesta eelistus“. Meie kirju saad edasi, ilma personaliseerimiseta. Uudiskirjast loobumine peatab samuti personaliseerimise. Võid ka kirjutada meile aadressil [sinu kontakt-e-post].</p>
       <p><strong>Sinu õigused.</strong> Sul on õigus tutvuda soovituste jaoks kasutatavate andmetega ja saada neist koopia, nõuda nende kustutamist, esitada vastuväide profileerimisele ja pöörduda andmekaitse järelevalveasutuse poole [nt Andmekaitse Inspektsioon]. Kirjuta meile aadressil [sinu kontakt-e-post].</p>
+      <p><strong>Säilitamine.</strong> Hoiame iga liiki andmeid ainult nii kaua, kui selle eesmärk nõuab; seejärel kustutatakse need automaatselt ja jäädavalt:</p>
+      <ul>
+        <li>Sinu sirvimistegevus meie poes (vaadatud lehed ja tooted, ostukorvisündmused ja otsingud) ning sinu tegevus meie e-kirjadega (avamised ja klikid): 14 kuud pärast iga sündmust, et saaksime võrrelda eelmise aasta sama kuuga (hooajalised ostud), pluss kahe kuu varu.</li>
+        <li>Pseudonüümne külastajatunnus: 14 kuud pärast selle viimast kasutust (loomist või viimast tellimust, millega see kaasas oli), et tunda sind meie poes naasva ostjana ära (soovitused poes, ostu sidumine soovitusega) aasta jooksul korduvate ostude vältel, pluss kahe kuu varu. Sinu brauseris olev küpsis aegub oma tähtaja järgi, nagu eespool kirjas.</li>
+        <li>Sulle arvutatud tootesoovitused, kirjed selle kohta, milline soovitus millise ostuni viis, ning sinu e-kirjadega seotud kaasatuse ajalugu: 2 aastat (730 päeva), kaheaastase aruandluse ja ostude tagasivaate jaoks.</li>
+        <li>Soovitus, mille uuem soovitus asendas: 180 päeva pärast asendamist, et hilisemat klikki või ostu saaks endiselt siduda e-kirjaga, mis toodet näitas, ja et samu tooteid liiga varsti ei korrataks. Kui soovitus on seotud kliki või ostu kirjega, hoitakse seda sama kaua kui seda kirjet, kõige rohkem 2 aastat.</li>
+        <li>Lühiajalised tehnilised kirjed: miks soovitus valiti — 30 päeva (kasutajatugi ja vigade uurimine); sinu ostukäitumise signaalid, millele järgmised soovitused toetuvad — 30 päeva pärast seda, kui neid kasutati, või 90 päeva pärast avastamist, kui neid ei kasutatud (vana signaal ei kirjelda sind enam); soovitusreeglite kaalude muudatused — 90 päeva (vale muudatuse kontrollimiseks ja tagasivõtmiseks); meie poe kaks korda saadetud andmed — 90 päeva (et need salvestataks ühe korra).</li>
+        <li>Sinu kontakt- ja kontoandmed koos nende juures hoitava soovitusprofiiliga, sinu ostuajalugu ja meie tootekataloog: seni, kuni kasutame seda teenust oma poe jaoks, teenuse osutamiseks.</li>
+      </ul>
+      <p>Kui sulgeme oma Smaily konto, kustutatakse kõik selles teenuses meie poe kohta hoitavad andmed. Kui palud oma andmed igal ajal kustutada (vt eespool „Sinu õigused“), kustutatakse need kohe, sõltumata eespool nimetatud tähtaegadest; alles jääb üksnes kirje, mis tõendab, et kustutamine on tehtud.</p>
       <div class="note warn">
         <span class="k">Kohanda enne avaldamist</span>
-        <p>Asenda nurksulgudes osad, jäta välja laused funktsioonide kohta, mida ei kasuta, ja lisa, kui kaua andmeid hoitakse — küsi Campaign Intelligence'i teenuse säilitustähtaegu Smailylt. Lase lõplik tekst oma juristil üle vaadata.</p>
+        <p>Asenda nurksulgudes osad ja jäta välja laused funktsioonide kohta, mida ei kasuta. Säilitustähtajad on Campaign Intelligence'i teenuse omad. Laiendus ei lisa seda teksti sinu poe privaatsuspoliitika lehele; kleebi kohandatud tekst sinna ise. Lase lõplik tekst oma juristil üle vaadata.</p>
       </div>
     </div>
   </div>

@@ -109,9 +109,17 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   through an account it was not picked from. A matched
   row's `account_key` travels with the workflow (`WorkflowMatch`) and the
   handler posts through THAT account's credentials
-  (`Multilingual\AccountResolver` maps the key to a store view; `default`
-  = default scope) — so a mode-A fallback row never fires another
-  account's workflow ID through the event store view's credentials. The
+  (`Multilingual\AccountResolver` maps the key to a store view; `default`,
+  and a language with no store view left, is the event website's account —
+  its own, else the store-wide one, `SmailyClientProvider::forWebsite()`,
+  CON-189) — so a mode-A fallback row never fires another account's
+  workflow ID through the event store view's credentials, and a website
+  with its own Smaily account never starts its workflows through the
+  store-wide account. A config-default workflow (no row) goes through the
+  event's store view, which reads store view → website → default. The
+  admin saves check a saved workflow id against the same account's list
+  (`WizardStepSaver`: the website's account for the config defaults and
+  the `default` rows, each language's store view for its rows). The
   admin panels write rows through `Model/Automation/MappingSaver` under
   website 0 for a store-wide save and under the website for its own
   automations (full-desired-state sync: unique-key upsert, cleared rows
@@ -1550,8 +1558,9 @@ Initial setup, Settings, Log. Design rules:
   and a website differs only where it holds its own value — a row at its
   website scope (from Settings, from the 2.8.x migration, or from an
   initial setup run on an earlier release candidate, which saved per
-  website). Runtime reads are unchanged: every reader already resolves
-  website → default.
+  website). Runtime reads are unchanged: every reader resolves
+  website → default (the automation handler's `default` account since
+  CON-189, which read the default scope alone before).
   - `Model\Adminhtml\WebsiteContext` is the single seam every admin
     save/prefill path reads to know its target. The initial setup page
     marks its request store-wide (`useStoreWide()`) and its AJAX calls

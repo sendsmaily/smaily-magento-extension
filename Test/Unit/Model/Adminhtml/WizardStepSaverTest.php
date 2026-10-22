@@ -169,6 +169,7 @@ class WizardStepSaverTest extends TestCase
         $client = $this->createMock(SmailyClient::class);
         $client->method('getAutomationWorkflows')->willReturn($workflows);
         $this->clientProvider->method('forStore')->willReturn($client);
+        $this->clientProvider->method('forWebsite')->willReturn($client);
     }
 
     private function savedValue(string $path): ?string
@@ -236,12 +237,32 @@ class WizardStepSaverTest extends TestCase
     public function testMissingSavedWorkflowIsPreservedWhenListFailsToLoad(): void
     {
         $this->config->method('getWelcomeWorkflow')->willReturn(123);
-        $this->clientProvider->method('forStore')
+        $this->clientProvider->method('forWebsite')
             ->willThrowException(new SmailyClientException('no credentials'));
 
         $this->saver->save('automations', ['welcome_workflow' => '']);
 
         self::assertFalse($this->wasSaved(Config::XML_PATH_WELCOME_WORKFLOW));
+    }
+
+    /**
+     * CON-189: a website's automation workflows are posted through its
+     * Smaily account — its own, else the store-wide one — so the save checks
+     * the posted workflow against that account's list, never the store-wide
+     * account's alone.
+     */
+    public function testTheWorkflowCheckListsTheSelectedWebsitesAccount(): void
+    {
+        $this->onStoreWithWebsites(3);
+        $this->config->method('getWelcomeWorkflow')->willReturn(456);
+        $client = $this->createMock(SmailyClient::class);
+        $client->method('getAutomationWorkflows')->willReturn([['id' => 456, 'title' => 'Welcome']]);
+        $this->clientProvider->expects(self::never())->method('forStore');
+        $this->clientProvider->expects(self::once())->method('forWebsite')->with(3)->willReturn($client);
+
+        $this->saver->save('automations', ['own' => '1', 'welcome_workflow' => '']);
+
+        self::assertSame('0', $this->savedValue(Config::XML_PATH_WELCOME_WORKFLOW));
     }
 
     public function testDeliberateClearOfPresentWorkflowIsHonored(): void

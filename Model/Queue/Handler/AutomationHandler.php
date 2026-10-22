@@ -38,6 +38,8 @@ use Smaily\Connect\Model\Queue\Skipped;
  * matched, the row's account_key names the Smaily account that must deliver
  * the workflow — mode-A fallback rows included, so another account's
  * workflow ID is never posted through the event's store-view credentials.
+ * The 'default' account is the event website's account — its own, else the
+ * store-wide one — never the store-wide account alone (CON-189).
  * Config-default resolutions (modes single, b and c) keep using the event's
  * store view as before; mode A has none (Router, CON-188), and its skip
  * names the contact's language.
@@ -109,14 +111,18 @@ class AutomationHandler implements EventHandlerInterface
             $client = null;
             try {
                 $storeId = (int)($payload['store_id'] ?? 0);
-                $clientStoreId = $storeId ?: null;
-                if ($match->accountKey !== null) {
+                if ($match->accountKey === null) {
+                    $client = $this->clientProvider->forStore($storeId ?: null);
+                } else {
                     // The mapping row names the account. 'default' (and an
                     // account whose language no longer has a store view)
-                    // resolves to null = the default-scope credentials.
-                    $clientStoreId = $this->accountResolver->storeIdForAccountKey($match->accountKey, $websiteId);
+                    // is the website's account: its own, else the
+                    // store-wide one (CON-189).
+                    $accountStoreId = $this->accountResolver->storeIdForAccountKey($match->accountKey, $websiteId);
+                    $client = $accountStoreId === null
+                        ? $this->clientProvider->forWebsite($websiteId)
+                        : $this->clientProvider->forStore($accountStoreId);
                 }
-                $client = $this->clientProvider->forStore($clientStoreId);
                 $client->post(SmailyClient::ENDPOINT_AUTORESPONDER, [
                     'autoresponder' => $match->workflowId,
                     'addresses' => [$address],

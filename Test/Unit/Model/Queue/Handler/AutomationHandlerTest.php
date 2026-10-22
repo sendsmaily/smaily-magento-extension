@@ -176,6 +176,81 @@ class AutomationHandlerTest extends TestCase
     }
 
     /**
+     * CON-189: the account a matched row names decides the credentials. The
+     * 'default' account, and a language with no store view left, is the
+     * event website's account (its own, else the store-wide one); a
+     * language's account is its store view's; a config default follows the
+     * event's store view.
+     *
+     * @return array<string, array{0: WorkflowMatch, 1: string, 2: int}>
+     */
+    public static function accountCases(): array
+    {
+        return [
+            'a default row' => [new WorkflowMatch(7, 'default'), 'website', 2],
+            'a language row' => [new WorkflowMatch(7, 'et'), 'store', 21],
+            'a language without a store view' => [new WorkflowMatch(7, 'lv'), 'website', 2],
+            'a config default' => [new WorkflowMatch(7), 'store', 20],
+        ];
+    }
+
+    /**
+     * @dataProvider accountCases
+     */
+    public function testTheMatchedAccountDecidesTheCredentials(
+        WorkflowMatch $match,
+        string $scope,
+        int $scopeId
+    ): void {
+        $asked = [];
+        $client = $this->createMock(SmailyClient::class);
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->method('forStore')->willReturnCallback(
+            static function (int|string|null $storeId) use (&$asked, $client): SmailyClient {
+                $asked[] = ['store', $storeId];
+
+                return $client;
+            }
+        );
+        $clientProvider->method('forWebsite')->willReturnCallback(
+            static function (int $websiteId) use (&$asked, $client): SmailyClient {
+                $asked[] = ['website', $websiteId];
+
+                return $client;
+            }
+        );
+        $router = $this->createMock(Router::class);
+        $router->method('resolve')->willReturn($match);
+        $accountResolver = $this->createMock(AccountResolver::class);
+        $accountResolver->method('storeIdForAccountKey')->willReturnCallback(
+            static fn (string $accountKey, int $websiteId): ?int => $accountKey === 'et' && $websiteId === 2 ? 21 : null
+        );
+
+        $event = $this->createMock(Event::class);
+        $event->method('getId')->willReturn(1);
+        $eventQueue = $this->createMock(EventQueue::class);
+        $eventQueue->method('decodePayload')->willReturn([
+            'trigger_type' => 'welcome',
+            'store_id' => 20,
+            'website_id' => 2,
+            'language' => 'en',
+            'address' => ['email' => 'person@example.com'],
+        ]);
+
+        $handler = new AutomationHandler(
+            $clientProvider,
+            $router,
+            $eventQueue,
+            $this->createMock(Logger::class),
+            $accountResolver,
+            $this->createMock(Config::class)
+        );
+
+        self::assertSame([1 => true], $handler->handle([$event]));
+        self::assertSame([[$scope, $scopeId]], $asked);
+    }
+
+    /**
      * PRO-1965: the Log's Details show what this row put on the wire and
      * what Smaily answered — a refusal included.
      */

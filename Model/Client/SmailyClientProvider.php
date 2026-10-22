@@ -47,6 +47,32 @@ class SmailyClientProvider
     }
 
     /**
+     * Get a client for the Smaily account saved for a website: its own, else
+     * the store-wide one (CON-189). In per-language accounts mode it is the
+     * default fallback account, saved by the same save. Website 0 reads the
+     * store-wide account.
+     *
+     * @throws SmailyClientException when credentials are not configured
+     */
+    public function forWebsite(int $websiteId): SmailyClient
+    {
+        $subdomain = $this->config->getWebsiteSubdomain($websiteId);
+        $username = $this->config->getWebsiteUsername($websiteId);
+        $password = $this->config->getWebsitePassword($websiteId);
+        if ($subdomain === '' || $username === '' || $password === '') {
+            throw new SmailyClientException(
+                __('Smaily API credentials are not configured (website: %1)', $websiteId)
+            );
+        }
+
+        return $this->clientFactory->create([
+            'subdomain' => $subdomain,
+            'username' => $username,
+            'password' => $password,
+        ]);
+    }
+
+    /**
      * Get a client for the transactional-email account saved for a website
      * (its own, else the one saved for all websites; PRO-4062), or for the
      * one saved for all websites (null).

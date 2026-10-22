@@ -28,6 +28,7 @@ use Smaily\Connect\Model\Automation\MappingSaver;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Client\CredentialCheck;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
+use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
@@ -71,12 +72,19 @@ class WizardStepSaverTest extends IntegrationTestCase
      * website '0', Settings' the selected website's id.
      *
      * @param int[] $websiteIds the store's websites
+     * @param SmailyClientProvider|null $smailyClientProvider null: no Smaily account can be reached
      */
-    private function saver(?string $websiteParam, array $websiteIds = [self::MAIN, self::SECOND]): WizardStepSaver
-    {
+    private function saver(
+        ?string $websiteParam,
+        array $websiteIds = [self::MAIN, self::SECOND],
+        ?SmailyClientProvider $smailyClientProvider = null
+    ): WizardStepSaver {
         $storeManager = $this->storeManager($websiteIds);
-        $smailyClientProvider = $this->createMock(SmailyClientProvider::class);
-        $smailyClientProvider->method('forStore')->willThrowException(new SmailyClientException('not configured'));
+        if ($smailyClientProvider === null) {
+            $smailyClientProvider = $this->createMock(SmailyClientProvider::class);
+            $smailyClientProvider->method('forStore')->willThrowException(new SmailyClientException('not configured'));
+            $smailyClientProvider->method('forWebsite')->willThrowException(new SmailyClientException('not configured'));
+        }
 
         return new WizardStepSaver(
             $this->objectManager->get(WriterInterface::class),
@@ -293,6 +301,45 @@ class WizardStepSaverTest extends IntegrationTestCase
             $this->config->isContactSyncActive(self::SECOND),
             'Its contacts were confirmed; returning keeps them syncing'
         );
+    }
+
+    /**
+     * CON-189: a website with its own Smaily account starts its workflows
+     * through that account, so its automations save checks a saved workflow
+     * against that account's list — here the id is missing from it and is
+     * kept (PRO-1286), while the store-wide account, which lists it, is
+     * never asked.
+     */
+    public function testAWebsitesAutomationsSaveChecksTheWorkflowsOfItsOwnAccount(): void
+    {
+        $encryptor = $this->objectManager->get(EncryptorInterface::class);
+        foreach ([['default', 0, 'shop'], ['websites', self::SECOND, 'second-shop']] as [$scope, $scopeId, $subdomain]) {
+            $this->insertRow($scope, $scopeId, Config::XML_PATH_SUBDOMAIN, $subdomain);
+            $this->insertRow($scope, $scopeId, Config::XML_PATH_USERNAME, 'api-user');
+            $this->insertRow($scope, $scopeId, Config::XML_PATH_PASSWORD, $encryptor->encrypt($subdomain . '-secret'));
+        }
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_WELCOME_WORKFLOW, '555');
+        $asked = [];
+        $clientFactory = $this->createMock(SmailyClientFactory::class);
+        $clientFactory->method('create')->willReturnCallback(function (array $data) use (&$asked): SmailyClient {
+            $asked[] = $data['subdomain'] . ':' . $data['password'];
+            $client = $this->createMock(SmailyClient::class);
+            $client->method('getAutomationWorkflows')->willReturn(
+                $data['subdomain'] === 'shop' ? [['id' => 555, 'title' => 'Store-wide']] : [['id' => 777, 'title' => 'Own']]
+            );
+
+            return $client;
+        });
+
+        $saver = $this->saver(
+            (string)self::SECOND,
+            [self::MAIN, self::SECOND],
+            new SmailyClientProvider($this->config, $clientFactory)
+        );
+        self::assertSame([], $saver->save('automations', ['own' => true, 'welcome_workflow' => '']));
+
+        self::assertSame(['second-shop:second-shop-secret'], $asked);
+        self::assertSame(555, $this->config->getWelcomeWorkflow(self::SECOND));
     }
 
     /**

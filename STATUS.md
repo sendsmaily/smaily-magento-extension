@@ -7,78 +7,102 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-10-22 — **both pilot stores run 3.0.0-rc12; pilot day
-is 2026-10-22 or 23, on rc12** (no rc13 before the pilot — Erkki's
-decision). 3.0.0-rc12 is still the latest release. Linear: since
+_Last updated: 2026-10-22 evening — **both pilot stores run 3.0.0-rc12;
+pilot day is 2026-10-22/23, on rc12** (no rc13 before the pilot — Erkki's
+decision). 3.0.0-rc12 is still the latest release; unreleased on `master`
+since rc12: #171–#192; rc13 is cut after the pilot. Linear: since
 2026-10-20 the project's issues live in team Connect (key `CON`, a
 sub-team of Growth (lab)); moved issues keep their `PRO-####` identifiers
-as redirects (CLAUDE.md "Linear discipline"). **Merged today:** #180
-CON-145, CON-154 (the engine contract copy is v1.17.0, byte-identical;
-Contract staleness is green again after being red since 2026-10-16; the
-visitor-token check already allowed 64 characters in all, now pinned by a
-test; nothing the extension sends changes). #179 (composer.lock
-refreshed, patch and minor moves only; GitHub issue #165 closed).
-Unreleased on `master` since rc12: #171–#177, #179, #180 (+ CON-179 when
-it lands).
+as redirects (CLAUDE.md "Linear discipline").
+
+**Merged on 2026-10-22:** #179 (composer.lock refreshed, patch and minor
+moves only). #180 CON-145/CON-154 (engine contract copy v1.17.0,
+byte-identical; Contract staleness green again; the 64-character visitor
+token pinned by a test). #181 (STATUS/CLAUDE.md). #182 CON-177 (a
+store-created `vs_` token in a landing link is ignored, Luma and Hyvä, as
+Woo). #183 CON-181 + #185 (its simplification): a `vs_` token reaches the
+engine only with marketing consent — cookie restriction mode on and the
+notice accepted; the relay takes the token from the cookie, not the
+body. #184 CON-179: the extension is set up once for the whole store at
+default scope, with website exceptions in Settings for the Smaily
+account, Contacts and automations; the setup opens on step 1 with no
+website picker; existing installs keep their rows; per-language Smaily
+accounts (mode a) are always a website's own (Erkki). #186 CON-143: the
+extension never sends the §16 store-deletion request — a disconnect or
+removal deletes only the local key; the privacy template lists the
+contract's retention periods (Erkki, with Woo CON-51; engine ask
+INT-145). #187 CON-176: a subscriber deleted in the admin grid is
+unsubscribed in Smaily; a customer-account deletion sends nothing (as
+Woo). #189 CON-187: that deletion also opts the subscriber out of CI
+profiling. #188 CON-184: each language mode reads only its own mapping
+rows; nothing is deleted. #190 CON-186: the privacy template states the
+abandoned-cart email period — kept with Magento's cart for Quote
+Lifetime, default 30 days (Woo: 24 h). #191 CON-188: in mode a, a
+language with no row of its own uses the fallback language's row through
+that language's account, else the run is Skipped with a Log reason;
+Settings warns on languages without a workflow; a save keeps the other
+mode's rows. #192 CON-189: a website with its own Smaily account starts
+its workflows through it (the audit found the other Smaily calls already
+website-scoped).
+
+**Decided (Erkki, 2026-10-22):** no rc13 before the pilot. A guest's
+recommendations by an engine `vt_` token keep the browser-side consent
+rule — a platform-forced difference from Woo (CON-181). A website with
+its own Smaily account uses only that account's workflows (CON-190, in
+work). CON-168 (contract §17–§23: start button, design links, brand kit,
+engine-email setup) waits for the WooCommerce build (CON-166/CON-173) and
+mirrors it; the email-creation design ("Add new" in the workflow
+dropdown, sender and subject fields, an "Edit template" modal, the
+default design otherwise) is recorded on CON-168. Transactional sends use
+the workflow id until the engine answers INT-146.
+
+**Verified:** sandbox `setup:upgrade` + `setup:di:compile` passed after
+#191 (covers #183–#191); the initial setup opens on step 1 and Settings
+loads without console errors. The guide site was uploaded after every
+guide change; its md5 matches `master` (last after #191).
 
 **Pilot:** the developer of both pilot stores ("the pilot store" and "the
 second pilot store") upgraded them to 3.0.0-rc12; Erkki ran the initial
 setup in both. The pilot-day plan is in Erkki's private document; the
 gauge is CON-147 (4/5).
 
-**Decided (Erkki, 2026-10-22, CON-179):** the extension is set up once
-for the whole store (default scope), with per-website exceptions in
-Settings — like the WooCommerce plugin and the transactional-email
-account. This replaces the per-website setup of multi-website phase 1.
-CON-179 is in work (a PR follows). Guest newsletter subscribers already
-sync live and in the contacts import (rc12 and `master`); a guide
-sentence goes in with CON-179.
-
-**Engine contract 1.14–1.17, not built yet:** CON-143: decided (Erkki,
-2026-10-22, with Woo CON-51) that the extension never sends the §16
-store-deletion request. A disconnect or removal deletes only its own
-engine key, because a merchant may only be changing platform, and a
-store's data is deleted when the merchant closes the Smaily account
-(engine ask INT-145). What is left: the privacy text's retention periods,
-worded as the WooCommerce plugin words them, after CON-51/CON-52. CON-168 (the start button
-§21, design links §22/§23, the engine-email setup §17–§20, the brand kit
-§18) waits for the WooCommerce plugin's build (CON-166) and is mirrored
-after it (Erkki's decision, 2026-10-22). The engine's questions on CON-168
-are answered in Linear; one point is open: §23 gives a transactional
-email only a template id, while the extension sends by workflow.
-
-**New Stories:** CON-176 (a subscriber deleted in the admin stays
-subscribed in Smaily); CON-177 (a store-created visitor token in a landing
-link is accepted on Magento, while Woo refuses it); CON-178, in the Woo
-project (Woo accepts 67-character engine tokens).
+**Open Stories:** CON-190 (in work); CON-185 (left: the account summary
+is empty when a finished setup is reopened on a store with only
+per-website accounts); CON-168 (after Woo); CON-151 Estonian proofread
+(now also all of today's guide and admin texts); CON-146 native review of
+the ru/fi/lv/lt storefront texts; CON-156 (one place to connect Campaign
+Intelligence — Magento has no admin Disconnect, CLI only); transactional
+sending (Epic CON-31; check it again against contract 1.17 §23 / INT-146
+first; needs a transactional test account file).
 
 **Gotchas:** (1) pilot day on rc12: on a multi-website store the setup
 asks for a website, and when that website's Smaily login came over from
 2.8.x the setup opens on the Contacts step — go back to step 1 (language
-mode, storefront address, connection test) for every website. (2) The
-synchronous first send attempt of transactional emails is a deliberate
-exception to "nothing user-facing waits on HTTP" — the sending slice
-records it in `docs/ARCHITECTURE.md` in the same PR. (3) Workers never
-clone a private Smaily repository without Erkki's OK. (4) Client details
-never go into this public repository (CLAUDE.md "No client details"); say
-"the pilot store" / "the second pilot store". (5) Sandbox: an old pending
-contacts→Smaily backfill job (id 1, 2026-10-02) and 2 ingest rows wait
-there; `cron:run` sends them to the smailydemo account and the synthetic
-engine tenant.
+mode, storefront address, connection test) for every website. (2) Version
+cut: the CHANGELOG bullet that says `vs_` tokens from a separate
+storefront are "now supported" needs rewording next to the CON-181
+fragment. (3) The synchronous first send attempt of transactional emails
+is a deliberate exception to "nothing user-facing waits on HTTP" — the
+sending slice records it in `docs/ARCHITECTURE.md` in the same PR. (4)
+Workers never clone a private Smaily repository without Erkki's OK. (5)
+Client details never go into this public repository (CLAUDE.md "No
+client details"); say "the pilot store" / "the second pilot store". (6)
+Sandbox: an old pending contacts→Smaily backfill job (id 1, 2026-10-02)
+and 2 ingest rows wait there; `cron:run` sends them to the smailydemo
+account and the synthetic engine tenant.
 
 **Open for Erkki:** the pilot-day results; CON-151 (the Estonian
-proofread); CON-146 (native review of the ru/fi/lv/lt storefront texts); a
-transactional Smaily test account in a local credentials file (like the
-FTPS one); the "Pilot store live" milestone date.
+proofread); CON-146 (native ru/fi/lv/lt review); a transactional Smaily
+test account in a local credentials file (like the FTPS one); the "Pilot
+store live" milestone date; the go for rc13.
 
 **Next session opens with:**
 1. Pilot-day results, and the fixes they ask for.
-2. Merge CON-179, then the sandbox check (`setup:upgrade` +
+2. Merge CON-190, then the sandbox check (`setup:upgrade` +
    `setup:di:compile`).
-3. CON-143 privacy text after Woo CON-51/CON-52.
-4. Cut rc13 after the pilot.
-5. Before transactional sending is built (PRO-1766), check it again
-   against contract 1.17 §23._
+3. Cut rc13 after the pilot (Erkki's go).
+4. CON-168 after Woo CON-173.
+5. The rest of CON-185._
 
 _Earlier (2026-10-12 session end): transactional emails, first slice
 (settings only, no send path) on `master`. #174 PRO-2461 (a product page

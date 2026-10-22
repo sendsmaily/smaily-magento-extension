@@ -32,9 +32,11 @@ namespace Smaily\Connect\Model\Engine;
  */
 class AttributionShape
 {
-    private const VISITOR_TOKEN_PATTERN = '/^(?:vt_[A-Za-z0-9]{1,61}|vs_[A-Za-z0-9]{22})$/D';
+    private const STORE_TOKEN = 'vs_[A-Za-z0-9]{22}';
 
-    private const STORE_VISITOR_TOKEN_PATTERN = '/^vs_[A-Za-z0-9]{22}$/D';
+    private const VISITOR_TOKEN_PATTERN = '/^(?:vt_[A-Za-z0-9]{1,61}|' . self::STORE_TOKEN . ')$/D';
+
+    private const STORE_VISITOR_TOKEN_PATTERN = '/^' . self::STORE_TOKEN . '$/D';
 
     private const CONTEXT_PATTERN = '/^[A-Za-z0-9._-]{1,64}$/D';
 

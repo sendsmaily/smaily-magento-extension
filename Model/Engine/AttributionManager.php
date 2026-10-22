@@ -22,9 +22,8 @@ use Smaily\Connect\Model\OrderPlacer;
  * Cookie names come from the tenant's setup-exchange config with the
  * cross-platform defaults below. Attribution is deliberately NOT gated on
  * analytics consent (first-party functional cookie for the merchant's own
- * email click), matching the Woo/Shopify behavior. The one exception is a
- * store-created `vs_` visitor token, which is read only with marketing
- * consent (readCookies()).
+ * email click), matching the Woo/Shopify behavior, except the visitor token
+ * as gated by `AttributionManager::readCookies()`.
  *
  * Nothing is stamped on an order an admin places, in the admin's order
  * screen or with "Login as Customer": the browser's cookies are then the
@@ -114,17 +113,13 @@ class AttributionManager
     {
         $names = $this->getClientConfig();
 
-        $visitorToken = $this->cookie((string)$names['cookieVisitor'], AttributionShape::isVisitorToken(...));
-        if ($visitorToken !== null
-            && AttributionShape::isStoreVisitorToken($visitorToken)
-            && !$this->marketingConsent->isGiven()
-        ) {
-            $visitorToken = null;
-        }
-
         return [
             'rec_id' => $this->cookie((string)$names['cookieRecId'], RecId::isValid(...)),
-            'visitor_token' => $visitorToken,
+            'visitor_token' => $this->cookie(
+                (string)$names['cookieVisitor'],
+                fn (string $v): bool => AttributionShape::isVisitorToken($v)
+                    && (!AttributionShape::isStoreVisitorToken($v) || $this->marketingConsent->isGiven())
+            ),
             'rec_ctx' => $this->cookie((string)$names['cookieContext'], AttributionShape::isContext(...)),
             'anon_session_id' => $this->cookie((string)$names['cookieSession'], AttributionShape::isSessionId(...)),
         ];

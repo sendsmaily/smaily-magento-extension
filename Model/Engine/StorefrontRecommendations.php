@@ -27,14 +27,12 @@ use Smaily\Connect\Model\Privacy\ProfilingConsent;
  *   - a logged-in shopper by the store customer id, and only while profiling
  *     is allowed for them (ProfilingConsent). A shopper who objected is never
  *     asked about, not by the visitor token either;
- *   - a guest by the shape-checked visitor-token cookie
- *     (AttributionManager::readCookies()), and only when Magento's cookie
+ *   - a guest by the visitor token as gated by
+ *     `AttributionManager::readCookies()`, and only when Magento's cookie
  *     notice does not hold the shopper's consent back
  *     (`isUserNotAllowSaveCookie()`: restriction mode on and not accepted on
  *     this website). The storefront script asks only with consent; this is
- *     the half of that rule the server can see. A store-created `vs_` token
- *     needs the shopper's explicit marketing yes on top (MarketingConsent,
- *     applied by readCookies(); CON-181, as Woo PRO-3857);
+ *     the half of that rule the server can see;
  *   - nobody else.
  * Always only while the engine may be called (`isSendingAllowed()`), in one
  * attempt (Client).

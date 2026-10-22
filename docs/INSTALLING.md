@@ -242,8 +242,10 @@ later install enables the module again with the step 3 `module:enable`.
 Nothing is sent to Smaily or Campaign Intelligence. Contacts and data
 already there stay there, and the Campaign Intelligence API key stays
 valid on the engine side until it is revoked there; a new install connects
-with a new setup token. Install the module again later and it starts from
-the initial setup.
+with a new setup token. The module never asks Campaign Intelligence to
+delete the store's data, neither on removal nor on disconnect; that data is
+deleted when you close your Smaily account. Install the module again later
+and it starts from the initial setup.
 
 For a ZIP install in `app/code`, `module:uninstall` needs
 `--non-composer`. In that mode Magento only reverts the module's data

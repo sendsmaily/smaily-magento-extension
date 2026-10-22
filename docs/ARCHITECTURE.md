@@ -917,6 +917,30 @@ reverts data patches, so `Setup/Patch/Data/RemoveSettingsOnUninstall`
 (apply is a no-op) runs the same removal from `revert()`. Disabling runs
 neither.
 
+Neither uninstalling nor `smaily:engine:disconnect` (`Settings::clear()`)
+makes an engine request: both delete only the extension's own stored
+engine connection (the API key and the other `smaily_connect/intelligence/*`
+rows). The extension never sends the contract §16 store-deletion request
+(`POST /api/v1/store/uninstall`), which deletes all of the store's engine
+data once the store's last connection sends it (owner decision 2026-10-22,
+CON-143, taken with the WooCommerce plugin's CON-51): a merchant who removes
+the extension may only be changing platform, and a deletion cannot be
+undone. The store's engine data is deleted when the merchant closes the
+Smaily account. `Test/Unit/Console/Command/EngineDisconnectCommandTest`
+pins it (disconnect sends no request, the uninstall classes make none, no
+shipped code names the endpoint); changing it is an owner decision.
+
+Retention follows the contract (same decision, the WooCommerce plugin's
+CON-52): the merchant guide's privacy-policy template
+([`#pr-policy`](https://smaily.com/connect-magento/#pr-policy)) states every
+§8 `data_retention_policy` period with its `data_retention_purpose`. The
+extension adds no text to the store's privacy-policy page; the template is
+its suggested text. No cookie lifetime is set by the extension: each comes
+from the setup exchange's `config` (`*_ttl_days`), and the fallbacks in
+`AttributionManager` (365 / 30 / 30 / 30 days) equal the contract's cookie
+table. §15 lets the visitor cookie and the visitor token expire at different
+times, so the 365-day cookie and the 14-month token do not conflict.
+
 ## Cron jobs (group `smaily_connect`)
 
 The group runs in a separate process (`etc/config.xml`). Host cron should

@@ -19,10 +19,13 @@ namespace Smaily\Connect\Model\Engine;
  *
  * A visitor token takes either form the contract allows: an engine-issued
  * `vt_` token, or a store-created `vs_` token, which is `vs_` + exactly 22
- * alphanumerics (contract 1.11.0, PRO-3912). One difference from
- * WooCommerce: a `vt_` token is capped at 64 characters, the width of the
- * side table's visitor_token column, so a value this class accepts always
- * fits. The context and the session id keep WooCommerce's
+ * alphanumerics (contract 1.11.0, PRO-3912). A `vt_` token is accepted at
+ * any length up to 64 characters in all: since contract 1.13.0 a connector
+ * treats a token as an opaque string of up to 64 characters, although the
+ * engine issues `vt_` + 10. One difference from WooCommerce, which allows
+ * `vt_` + 64: the cap is 64 characters in all, the contract's limit and the
+ * width of the side table's visitor_token column, so a value this class
+ * accepts always fits. The context and the session id keep WooCommerce's
  * 64-character context charset; every session id this module generates is a
  * UUID, which fits it. The D modifier keeps `$` from accepting a trailing
  * newline.

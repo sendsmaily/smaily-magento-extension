@@ -359,8 +359,12 @@ window.smailyPanelsInit = function ($) {
         $('#smaily-ml-mapping-off').toggle(isMultilingual && !mapping);
         $('#smaily-ml-mapping .smaily-ml-hint-a').toggle(mode === 'a');
         $('#smaily-ml-mapping .smaily-ml-hint-b').toggle(mode === 'b');
+        // Mode A never starts the cards' workflow: it belongs to no
+        // per-language account (CON-188). Hidden, it keeps its saved value.
+        $('.smaily-store-trigger .smaily-w-workflow').closest('label').toggle(!modeA);
         $('#smaily-ml-modes .smaily-choice').removeClass('is-selected');
         $('input[name=smaily-w-mlmode][value=' + mode + ']').closest('.smaily-choice').addClass('is-selected');
+        showUnmappedLanguages();
     }
 
     function mlAccountFields($block) {
@@ -405,6 +409,7 @@ window.smailyPanelsInit = function ($) {
             var $select = $(this);
             fillOptions($select, workflows, $select.val() || $select.data('saved') || '');
         });
+        showUnmappedLanguages();
     }
 
     /**
@@ -435,6 +440,47 @@ window.smailyPanelsInit = function ($) {
                 return this.value === fallback;
             }).prop('checked', true);
         });
+    }
+
+    /**
+     * Per-language Smaily accounts (mode A, CON-188): names, for each
+     * switched-on automation, the languages whose contacts get no workflow,
+     * read as the Router reads the rows — the language's own row, else the
+     * trigger's default fallback, else the row of the default fallback
+     * account's language. A list not loaded yet counts its saved workflow.
+     */
+    function showUnmappedLanguages() {
+        var $notice = $('#smaily-ml-unmapped');
+        var $list = $notice.find('.smaily-ml-unmapped-list').empty();
+        var accountFallback = $('input[name=smaily-w-fallback]:checked').val() || '';
+        if (currentMlMode() === 'a') {
+            $('.smaily-ml-trigger').each(function () {
+                var $trigger = $(this);
+                var trigger = String($trigger.data('trigger'));
+                var workflow = function (language) {
+                    var select = $trigger.find('.smaily-ml-workflow[data-language=' + language + ']')[0];
+                    if (!select) {
+                        return '';
+                    }
+                    return select.options.length ? (select.value || '') : String($(select).data('saved') || '');
+                };
+                var fallback = $('input[name=smaily-ml-fallback-' + trigger + ']:checked').val() || '';
+                if (!$('#' + $trigger.data('switch')).is(':checked')
+                    || $trigger.data('unlisted-fallback-a')
+                    || (fallback && workflow(fallback))
+                    || (accountFallback && workflow(accountFallback))) {
+                    return;
+                }
+                var missing = mlLanguages.filter(function (language) {
+                    return !workflow(language);
+                });
+                if (missing.length) {
+                    $('<li/>').text($trigger.children('label').text() + ': ' + missing.join(', ').toUpperCase())
+                        .appendTo($list);
+                }
+            });
+        }
+        $notice.toggle($list.children().length > 0);
     }
 
     /**
@@ -975,6 +1021,14 @@ window.smailyPanelsInit = function ($) {
             applyMlMode(next);
             loadMappingWorkflows();
         });
+        // The mode-A notice of languages without a workflow follows every
+        // control it reads (CON-188).
+        $(document).on(
+            'change',
+            '.smaily-ml-workflow, input[name^=smaily-ml-fallback-], input[name=smaily-w-fallback], '
+                + '#smaily-w-welcome-enabled, #smaily-w-firstorder-enabled, #smaily-w-abandoned-enabled',
+            showUnmappedLanguages
+        );
 
         // Per-language account connection tests (mode A).
         $(document).on('click', '.smaily-ml-test', function () {
@@ -1315,6 +1369,9 @@ window.smailyPanelsInit = function ($) {
                     });
                 });
                 data.mappings = mappings;
+                // The mode the rows are for: the save replaces only that
+                // mode's rows and keeps the other mode's (CON-188).
+                data.mappings_mode = mode;
             }
             // The transactional-email triggers (Settings, PRO-4062), only
             // while they show: a workflow per store language, the full

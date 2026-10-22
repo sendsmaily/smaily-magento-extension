@@ -1319,7 +1319,7 @@ $pages['settings-modes'] = [
         'panel.automations' => $root . '/view/adminhtml/templates/panel/automations.phtml',
         'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
     ]],
-    'strings' => [],
+    'strings' => ['Some languages have no workflow'],
 ];
 
 /*

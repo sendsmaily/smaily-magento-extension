@@ -58,6 +58,7 @@ class FailureMessage
         // Not errors: the reasons a row was closed without sending (PRO-3619, PRO-3634, PRO-3693).
         ContactSyncHandler::SKIPPED_NOT_A_CONTACT,
         AutomationHandler::SKIPPED_NO_WORKFLOW,
+        AutomationHandler::SKIPPED_NO_LANGUAGE_WORKFLOW,
         ProfilingConsentHandler::SKIPPED_REPLACED,
         IdentityMergeHandler::SKIPPED_OPTED_OUT,
         AbandonedCart::SKIPPED_RECENTLY_REMINDED,

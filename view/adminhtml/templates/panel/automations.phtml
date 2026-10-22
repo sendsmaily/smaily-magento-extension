@@ -15,7 +15,8 @@
  * In multilingual modes A/B a per-language workflow mapping editor renders
  * below the trigger cards: one table per trigger with a workflow select per
  * language and a default-fallback radio (Woo parity). The editor shows/hides
- * live when the mode cards on the Connection panel change.
+ * live when the mode cards on the Connection panel change. In mode A it names
+ * the languages a switched-on automation has no workflow for (CON-188).
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
@@ -41,6 +42,8 @@ $triggers = [
     'first_order' => __('First order'),
     'abandoned_cart' => __('Abandoned cart'),
 ];
+// Each mapping trigger's Enabled switch on its card below.
+$switchIds = ['welcome' => 'welcome', 'first_order' => 'firstorder', 'abandoned_cart' => 'abandoned'];
 
 // Store-event trigger cards. The id slug differs from the trigger key
 // (first_order -> firstorder, abandoned_cart -> abandoned) to match the
@@ -112,7 +115,18 @@ $storeTriggers = [
     <p class="note smaily-ml-hint-b" <?= $mode === 'b' ? '' : 'style="display:none;"' ?>>
         <?= $escaper->escapeHtml(__('All languages share one Smaily account; each language fires its own workflow from the list.')) ?>
     </p>
-    <p class="note"><?= $escaper->escapeHtml(__('The default fallback handles contacts whose language is not mapped. Leave it on "None" to fall back to the default workflow above.')) ?></p>
+    <p class="note smaily-ml-hint-b" <?= $mode === 'b' ? '' : 'style="display:none;"' ?>><?= $escaper->escapeHtml(__('The default fallback handles contacts whose language is not mapped. Leave it on "None" to fall back to the default workflow above.')) ?></p>
+    <?php // Mode A never starts the default workflow above: it was picked from no per-language account (CON-188). ?>
+    <p class="note smaily-ml-hint-a" <?= $mode === 'a' ? '' : 'style="display:none;"' ?>><?= $escaper->escapeHtml(__('The default fallback handles contacts whose language has no workflow. Leave it on "None" to use the workflow of the default fallback account\'s language (Connection panel). With neither, these contacts get no automation.')) ?></p>
+    <?php // Filled live by panels-js.phtml (showUnmappedLanguages()) in mode A. ?>
+    <div class="smaily-banner smaily-banner--warning" id="smaily-ml-unmapped" style="display:none;">
+        <span class="smaily-banner__icon">&#9888;</span>
+        <div class="smaily-banner__body">
+            <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('Some languages have no workflow')) ?></div>
+            <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Contacts in these languages get no automation. Pick a workflow for them, or a default fallback.')) ?></div>
+            <ul class="smaily-banner__message smaily-ml-unmapped-list"></ul>
+        </div>
+    </div>
 
     <?php foreach ($triggers as $triggerType => $triggerLabel): ?>
     <?php
@@ -127,8 +141,10 @@ $storeTriggers = [
     }
     ?>
     <div class="smaily-field smaily-ml-trigger" data-trigger="<?= $escaper->escapeHtmlAttr($triggerType) ?>"
+         data-switch="smaily-w-<?= $escaper->escapeHtmlAttr($switchIds[$triggerType]) ?>-enabled"
          data-fallback-a="<?= $escaper->escapeHtmlAttr($fallbackByMode['a']) ?>"
-         data-fallback-b="<?= $escaper->escapeHtmlAttr($fallbackByMode['b']) ?>">
+         data-fallback-b="<?= $escaper->escapeHtmlAttr($fallbackByMode['b']) ?>"
+         data-unlisted-fallback-a="<?= ($savedByMode['a'][$triggerType . '|default']['isDefaultFallback'] ?? false) ? '1' : '' ?>">
         <label><?= $escaper->escapeHtml($triggerLabel) ?></label>
         <table class="smaily-ml-table">
             <thead>
@@ -166,7 +182,10 @@ $storeTriggers = [
                 </tr>
                 <?php endforeach; ?>
                 <tr>
-                    <td colspan="2" class="smaily-ml-none"><?= $escaper->escapeHtml(__('None (use the default workflow above)')) ?></td>
+                    <td colspan="2" class="smaily-ml-none">
+                        <span class="smaily-ml-hint-b" <?= $mode === 'b' ? '' : 'style="display:none;"' ?>><?= $escaper->escapeHtml(__('None (use the default workflow above)')) ?></span>
+                        <span class="smaily-ml-hint-a" <?= $mode === 'a' ? '' : 'style="display:none;"' ?>><?= $escaper->escapeHtml(__('None (use the default fallback account\'s language)')) ?></span>
+                    </td>
                     <td>
                         <input type="radio"
                                name="smaily-ml-fallback-<?= $escaper->escapeHtmlAttr($triggerType) ?>"

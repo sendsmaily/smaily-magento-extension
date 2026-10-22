@@ -17,7 +17,11 @@
   rows of both modes. The Automations tab shows mode A's rows. Picking
   "One account, per-language workflows" (mode B) shows mode B's own rows,
   and the Automations save posts only them, never mode A's workflow id.
-  Picking mode A again shows mode A's rows again.
+  Picking mode A again shows mode A's rows again. Each save names the mode
+  its rows are for (CON-188). In mode A the Automations tab names the
+  languages a switched-on automation has no workflow for, read as the
+  Router reads the rows, and hides the cards' workflow, which mode A never
+  starts.
 
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
@@ -153,6 +157,7 @@
                 {trigger_type: 'welcome', language: 'et', account_key: 'default', workflow_id: 201, is_default_fallback: false},
                 {trigger_type: 'welcome', language: 'lv', account_key: 'default', workflow_id: 202, is_default_fallback: true}
             ]));
+        check(locale + ': the mode B save names its mode', lastSave(frame, 'automations').mappings_mode === 'b');
 
         pickMode(frame, 'a');
         await wait(100);
@@ -162,7 +167,43 @@
             JSON.stringify(mappings) === JSON.stringify([
                 {trigger_type: 'welcome', language: 'et', account_key: 'et', workflow_id: 101, is_default_fallback: true}
             ]));
+        check(locale + ': the save names the mode its rows are for', lastSave(frame, 'automations').mappings_mode === 'a');
+
+        // CON-188: the languages a switched-on automation has no workflow for.
+        var title = window.smailyAdminPages['settings-modes.' + locale].strings['Some languages have no workflow'],
+            notice = doc.getElementById('smaily-ml-unmapped'),
+            shown = function () {
+                return notice.style.display !== 'none';
+            };
+        check(locale + ': mode A hides the cards\' workflow, which it never starts',
+            doc.getElementById('smaily-w-welcome-workflow').closest('label').style.display === 'none');
+        check(locale + ': no notice while Welcome is off', !shown());
+        tick(frame, '#smaily-w-welcome-enabled');
+        check(locale + ': no notice while ET\'s row is Welcome\'s default fallback', !shown());
+        tick(frame, 'input[name=smaily-ml-fallback-welcome][value=""]');
+        check(locale + ': without a fallback, LV has no Welcome workflow',
+            shown() && notice.querySelectorAll('li').length === 1
+                && /: LV$/.test(notice.querySelector('li').textContent));
+        check(locale + ': the notice is in the admin\'s language',
+            notice.querySelector('.smaily-banner__title').textContent === title
+                && (locale === 'en_US' || title !== 'Some languages have no workflow'));
+        tick(frame, 'input[name=smaily-w-fallback][value=et]');
+        check(locale + ': LV gets the workflow of the default fallback account\'s language', !shown());
+        tick(frame, 'input[name=smaily-w-fallback][value=lv]');
+        check(locale + ': the LV account as the default fallback has no Welcome workflow either', shown());
+
+        pickMode(frame, 'b');
+        await wait(100);
+        check(locale + ': mode B shows no such notice', !shown());
+        check(locale + ': mode B shows the cards\' workflow',
+            doc.getElementById('smaily-w-welcome-workflow').closest('label').style.display !== 'none');
         frame.remove();
+    }
+
+    function tick(frame, selector) {
+        var input = frame.contentDocument.querySelector(selector);
+        input.checked = true;
+        frame.contentWindow.jQuery(input).trigger('change');
     }
 
     (async function () {

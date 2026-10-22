@@ -869,11 +869,14 @@ class WizardStepSaver
         // instead of dropping it on the full sync (PRO-1286). Store-wide
         // rows are website 0's; a website's own rows are its own, which the
         // Router prefers over website 0's.
+        // Only the rows of the mode the panel posts them for are replaced:
+        // the other per-language mode's rows stay for a switch back (CON-188).
         if (isset($data['mappings']) && is_array($data['mappings'])) {
             return $this->mappingSaver->save(
                 $data['mappings'],
                 $target ?? 0,
-                $this->availableWorkflowIdsByAccount($websiteId)
+                $this->availableWorkflowIdsByAccount($websiteId),
+                (string)($data['mappings_mode'] ?? $this->config->getMultilingualMode($websiteId))
             );
         }
 

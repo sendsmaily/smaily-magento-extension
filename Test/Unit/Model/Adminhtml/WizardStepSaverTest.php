@@ -1065,6 +1065,34 @@ class WizardStepSaverTest extends TestCase
         ]);
     }
 
+    /**
+     * CON-188: the save replaces only the rows of the mode the panel posts
+     * them for; a post without it is for the saved mode.
+     */
+    public function testAutomationMappingsAreSavedForThePostedMode(): void
+    {
+        $this->onStoreWithWebsites(7);
+        $this->config->method('getMultilingualMode')->willReturn('b');
+        $this->accountResolver->method('languageStoreIds')->willReturn([]);
+        $this->withWorkflows([]);
+        $modes = [];
+        $this->mappingSaver->expects(self::exactly(2))
+            ->method('save')
+            ->willReturnCallback(
+                static function (array $rows, int $websiteId, ?array $lists, ?string $mode) use (&$modes): array {
+                    $modes[] = $mode;
+
+                    return [];
+                }
+            );
+        $mappings = [['trigger_type' => 'welcome', 'language' => 'et', 'account_key' => 'et', 'workflow_id' => 5]];
+
+        $this->saver->save('automations', ['own' => true, 'mappings' => $mappings, 'mappings_mode' => 'a']);
+        $this->saver->save('automations', ['own' => true, 'mappings' => $mappings]);
+
+        self::assertSame(['a', 'b'], $modes);
+    }
+
     public function testTheInitialSetupSavesTheMappingsForTheWholeStore(): void
     {
         $this->onStoreWithWebsites(7, true);

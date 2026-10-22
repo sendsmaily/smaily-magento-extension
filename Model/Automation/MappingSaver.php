@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Automation;
 
+use Smaily\Connect\Model\Config\Source\MultilingualMode;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
 
 /**
@@ -21,7 +22,10 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
  * unique key and rows the payload no longer contains are deleted — saving the
  * same payload twice is a no-op. Only the known automation triggers within
  * the given website scope are managed; rows other websites own (seeded by a
- * website-scoped 2.8.x migration) are left alone.
+ * website-scoped 2.8.x migration) are left alone. Given a multilingual mode,
+ * only that mode's rows are managed (the rows the Router reads in it,
+ * Mapping\Collection::addModeFilter(), CON-184): a save in mode A keeps the
+ * website's mode-B rows, and the other way round (CON-188).
  */
 class MappingSaver
 {
@@ -48,10 +52,17 @@ class MappingSaver
      *        never offered in the select, so its absence is not a deliberate
      *        clear (PRO-1286). Null keeps the plain full-sync delete (callers
      *        that do not resolve the lists, e.g. migrations/tests).
+     * @param string|null $mode the multilingual mode the rows are for: only
+     *        the existing rows of that mode's accounts are replaced; null
+     *        replaces the rows of every account
      * @return array<int, array{field: string, message: string}> empty on success
      */
-    public function save(array $rows, int $websiteId = 0, ?array $availableByAccount = null): array
-    {
+    public function save(
+        array $rows,
+        int $websiteId = 0,
+        ?array $availableByAccount = null,
+        ?string $mode = null
+    ): array {
         $desired = [];
         foreach ($rows as $row) {
             if (!is_array($row)) {
@@ -110,7 +121,7 @@ class MappingSaver
         }
         unset($row);
 
-        $this->sync($desired, $websiteId, self::MANAGED_TRIGGERS, $availableByAccount);
+        $this->sync($desired, $websiteId, self::MANAGED_TRIGGERS, $availableByAccount, $mode);
 
         return [];
     }
@@ -180,18 +191,32 @@ class MappingSaver
      * @param array<string, array<string, int|string>> $desired keyed "trigger|language|account"
      * @param string[] $triggers
      * @param array<string, array<int, string>>|null $availableByAccount see save()
+     * @param string|null $mode see save()
      */
-    private function sync(array $desired, int $websiteId, array $triggers, ?array $availableByAccount): void
-    {
+    private function sync(
+        array $desired,
+        int $websiteId,
+        array $triggers,
+        ?array $availableByAccount,
+        ?string $mode = null
+    ): void {
         $connection = $this->resource->getConnection();
         $table = $this->resource->getMainTable();
 
-        $existing = $connection->fetchAll(
-            $connection->select()
-                ->from($table, ['id', 'trigger_type', 'language', 'account_key', 'workflow_id'])
-                ->where('website_id = ?', $websiteId)
-                ->where('trigger_type IN (?)', $triggers)
-        );
+        $select = $connection->select()
+            ->from($table, ['id', 'trigger_type', 'language', 'account_key', 'workflow_id'])
+            ->where('website_id = ?', $websiteId)
+            ->where('trigger_type IN (?)', $triggers);
+        // The rows of the mode's accounts, as Mapping\Collection::addModeFilter() reads them.
+        if ($mode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS) {
+            $select->where(
+                $connection->quoteInto('account_key <> ?', Mapping::ACCOUNT_DEFAULT)
+                . ' OR ' . $connection->quoteInto('language = ?', Mapping::LANGUAGE_DEFAULT)
+            );
+        } elseif ($mode !== null) {
+            $select->where('account_key = ?', Mapping::ACCOUNT_DEFAULT);
+        }
+        $existing = $connection->fetchAll($select);
         $staleIds = [];
         foreach ($existing as $row) {
             $key = $row['trigger_type'] . '|' . $row['language'] . '|' . $row['account_key'];

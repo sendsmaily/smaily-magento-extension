@@ -292,7 +292,7 @@ class RouterTest extends TestCase
     public function testAWebsiteWithItsOwnAccountReadsOnlyItsOwnRows(): void
     {
         $this->config->method('getMultilingualMode')->willReturn('b');
-        $this->overrides->method('usesOwnAccount')->with(3)->willReturn(true);
+        $this->overrides->method('usesOtherAccount')->with(3)->willReturn(true);
         $this->config->expects(self::never())->method('getWelcomeWorkflow');
         $this->lookupResults = [null, null];
 
@@ -311,7 +311,7 @@ class RouterTest extends TestCase
     public function testAWebsiteWithItsOwnAccountStartsOnlyTheWorkflowSavedForIt(): void
     {
         $this->config->method('getMultilingualMode')->willReturn('single');
-        $this->overrides->method('usesOwnAccount')->willReturn(true);
+        $this->overrides->method('usesOtherAccount')->willReturn(true);
         $this->overrides->method('ownValue')->willReturnCallback(
             static fn (string $section, int $websiteId, string $path): ?string
                 => $section === WebsiteOverrides::AUTOMATIONS && $websiteId === 3

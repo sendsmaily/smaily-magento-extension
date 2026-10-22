@@ -879,13 +879,14 @@ $pages['setup-completed'] = $setupCompleted + ['viewModel' => $intelligence];
  * One account, per-language workflows mode, Smaily login details saved but
  * the setup not finished. The setup-websites page renders the initial setup
  * (wizard/index.phtml) with its Connect, Contacts and Automations steps:
- * Latvia holds its own Smaily account, and so its own automations
- * (CON-190), and its own Contacts settings. The settings-website page renders Settings (settings/index.phtml) with its
+ * Latvia holds its own Smaily account — another account than the
+ * store-wide one, so it keeps its own automations (CON-190) — and its own
+ * Contacts settings. The settings-website page renders Settings (settings/index.phtml) with its
  * Connection and Contacts tabs for Latvia, which holds its own Contacts
  * settings but uses the Smaily account for all websites. The
  * settings-own-account page renders Settings with its Connection and
- * Automations tabs for Latvia with its own Smaily account and no workflow
- * of its own (CON-190).
+ * Automations tabs for Latvia on another Smaily account than the store-wide
+ * one, with no workflow of its own (CON-190).
  */
 $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWide) {
     /**
@@ -979,7 +980,7 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
             'subscribers' => [['websiteId' => 2, 'name' => 'Latvia', 'values' => [
                 [(string)__('Sync contacts to Smaily'), (string)__('Off')],
             ]]],
-            // Latvia's own Smaily account keeps its own automations (CON-190).
+            // Latvia's other Smaily account keeps its own automations (CON-190).
             'automations' => [['websiteId' => 2, 'name' => 'Latvia', 'required' => true, 'values' => [
                 [(string)__('Welcome') . ' · ' . (string)__('Smaily Workflow'), '#7'],
             ]]],
@@ -1237,7 +1238,8 @@ $websitesStrings = [
     'Save to remove this website\'s own values: it then uses the settings saved for all websites.',
     'This import sends %1 contacts from all websites. It runs in the background, a chunk per minute,'
         . ' and never slows the storefront down.',
-    'A website with its own Smaily account keeps its own automations: their workflows come from its own account.',
+    'A website with another Smaily account than the one saved for all websites keeps its own automations:'
+        . ' their workflows come from its own account.',
 ];
 $pages['setup-websites'] = [
     'template' => $root . '/view/adminhtml/templates/wizard/index.phtml',
@@ -1315,9 +1317,11 @@ $pages['settings-own-account'] = [
     ]],
     'strings' => [
         'Use its own automations on this website',
-        'A website with its own Smaily account keeps its own automations: their workflows come from its own account.',
+        'A website with another Smaily account than the one saved for all websites keeps its own automations:'
+            . ' their workflows come from its own account.',
         'Pick this website\'s workflows',
-        'This website uses its own Smaily account, so it starts only workflows picked from that account.'
+        'This website uses another Smaily account than the one saved for all websites, so it starts only workflows'
+            . ' picked from its own account.'
             . ' No automation starts on it until you pick its workflows below and save.',
     ],
 ];

@@ -198,7 +198,7 @@ class AutomationHandlerTest extends TestCase
         $router = $this->createMock(Router::class);
         $router->method('resolve')->willReturn(null);
         $overrides = $this->createMock(WebsiteOverrides::class);
-        $overrides->method('usesOwnAccount')->with(2)->willReturn(true);
+        $overrides->method('usesOtherAccount')->with(2)->willReturn(true);
         $website = $this->createMock(WebsiteInterface::class);
         $website->method('getName')->willReturn('Latvia');
         $storeManager = $this->createMock(StoreManagerInterface::class);

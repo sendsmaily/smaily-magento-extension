@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Adminhtml;
 
+use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Store\Model\ScopeInterface;
@@ -17,6 +18,7 @@ use Smaily\Connect\Model\Automation\Mapping;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
+use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
  * The values a website holds of its own for the settings the initial setup
@@ -76,7 +78,8 @@ class WebsiteOverrides
     public function __construct(
         private readonly ResourceConnection $resource,
         private readonly WriterInterface $configWriter,
-        private readonly StoreManagerInterface $storeManager
+        private readonly StoreManagerInterface $storeManager,
+        private readonly SubdomainNormalizer $normalizer
     ) {
     }
 
@@ -142,16 +145,59 @@ class WebsiteOverrides
     }
 
     /**
-     * Whether a website of a 2+-website install uses its own Smaily account:
-     * it holds its own values of the Smaily account section (the state of
-     * its "Use its own Smaily account on this website" switch). Its
-     * automations are then always its own (CON-190): the store-wide
-     * workflows were picked from another Smaily account. Never on a
+     * Whether a website of a 2+-website install uses another Smaily account
+     * than the store-wide one (CON-190): the account it sends with — its own
+     * subdomain and API username where it holds them, else the store-wide
+     * ones — is not the store-wide account. The account's identity decides,
+     * not the scope its login is saved at: a website that holds the
+     * store-wide account's login of its own (a 2.8.x upgrade often saved it
+     * on every website) uses the same account. Its automations are then
+     * always its own, because the store-wide workflows were picked from
+     * another account.
+     *
+     * False where no store-wide account is saved (only website logins, a
+     * 2.8.x shape): which account the default-scope workflows were picked
+     * from is not known, so they stay in use as before. Never on a
      * single-website install, where the store and its website are one.
      */
-    public function usesOwnAccount(int $websiteId): bool
+    public function usesOtherAccount(int $websiteId): bool
     {
-        return count($this->websiteIds()) > 1 && $this->hasOwnValues(self::CONNECTION, $websiteId);
+        if (count($this->websiteIds()) < 2) {
+            return false;
+        }
+        $own = $this->ownValues(self::CONNECTION)[$websiteId] ?? null;
+        $storeWide = $this->storeWideAccount();
+        if ($own === null || $storeWide === null) {
+            return false;
+        }
+        $subdomain = isset($own[Config::XML_PATH_SUBDOMAIN])
+            ? $this->normalizer->normalize($own[Config::XML_PATH_SUBDOMAIN])
+            : $storeWide[0];
+        $username = trim($own[Config::XML_PATH_USERNAME] ?? $storeWide[1]);
+
+        return $subdomain !== $storeWide[0] || $username !== $storeWide[1];
+    }
+
+    /**
+     * The store-wide Smaily account's identity — its normalized subdomain
+     * and API username at the default scope — or null when either is empty.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    private function storeWideAccount(): ?array
+    {
+        $connection = $this->resource->getConnection();
+        $values = $connection->fetchPairs(
+            $connection->select()
+                ->from($this->resource->getTableName('core_config_data'), ['path', 'value'])
+                ->where('scope = ?', ScopeConfigInterface::SCOPE_TYPE_DEFAULT)
+                ->where('scope_id = ?', 0)
+                ->where('path IN (?)', [Config::XML_PATH_SUBDOMAIN, Config::XML_PATH_USERNAME])
+        );
+        $subdomain = $this->normalizer->normalize((string)($values[Config::XML_PATH_SUBDOMAIN] ?? ''));
+        $username = trim((string)($values[Config::XML_PATH_USERNAME] ?? ''));
+
+        return $subdomain === '' || $username === '' ? null : [$subdomain, $username];
     }
 
     /**

@@ -45,8 +45,9 @@ use Smaily\Connect\Model\Queue\Skipped;
  * store-wide one — never the store-wide account alone (CON-189).
  * Config-default resolutions (modes single, b and c) keep using the event's
  * store view as before; mode A has none (Router, CON-188), and its skip
- * names the contact's language. A website with its own Smaily account has
- * only its own workflows (Router, CON-190), and its skip names the website.
+ * names the contact's language. A website on another Smaily account than
+ * the store-wide one has only its own workflows (Router, CON-190), and its
+ * skip names the website.
  *
  * force_opt_in is always false, in every contact-sync mode (PRO-3577, as
  * the WooCommerce plugin's PRO-1716): a trigger never overrides an
@@ -68,12 +69,12 @@ class AutomationHandler implements EventHandlerInterface
         . ' contact\'s language (%1), and no default fallback workflow either. Nothing was sent.';
 
     /**
-     * A website with its own Smaily account (CON-190) has no workflow of
-     * that account for this automation; the store-wide workflows belong to
-     * another account. %1 is the website's name.
+     * A website on another Smaily account than the store-wide one (CON-190)
+     * has no workflow of its account for this automation; the store-wide
+     * workflows belong to the store-wide account. %1 is the website's name.
      */
-    public const SKIPPED_NO_OWN_ACCOUNT_WORKFLOW = 'Skipped: the website %1 uses its own Smaily account, and no'
-        . ' workflow of that account is picked for this automation. Nothing was sent.';
+    public const SKIPPED_NO_OWN_ACCOUNT_WORKFLOW = 'Skipped: the website %1 uses another Smaily account than the one'
+        . ' saved for all websites, and no workflow of its account is picked for this automation. Nothing was sent.';
 
     public function __construct(
         private readonly SmailyClientProvider $clientProvider,
@@ -156,7 +157,7 @@ class AutomationHandler implements EventHandlerInterface
 
     /**
      * Why no workflow was found: the contact's language in mode A, the
-     * website that uses its own Smaily account, else no mapped workflow.
+     * website on another Smaily account, else no mapped workflow.
      */
     private function skipReason(int $websiteId, string $language): string
     {
@@ -165,7 +166,7 @@ class AutomationHandler implements EventHandlerInterface
         ) {
             return str_replace('%1', strtoupper($language), self::SKIPPED_NO_LANGUAGE_WORKFLOW);
         }
-        if ($this->overrides->usesOwnAccount($websiteId)) {
+        if ($this->overrides->usesOtherAccount($websiteId)) {
             try {
                 $name = (string)$this->storeManager->getWebsite($websiteId)->getName();
             } catch (LocalizedException) {

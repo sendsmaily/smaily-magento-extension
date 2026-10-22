@@ -36,13 +36,16 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory;
  * accounts' workflow ids stay in the table but are never posted through the
  * website's one account, and the other way round.
  *
- * A website of a 2+-website install that uses its own Smaily account
- * (WebsiteOverrides::usesOwnAccount()) has only its own automations
- * (CON-190): its own rows and the workflows saved at its website scope. The
- * store-wide rows (website 0) and the default-scope workflows were picked
- * from the store-wide account, so they resolve to nothing there — also
- * where the website holds no automations of its own yet (an install from
- * before CON-190): it starts nothing until its workflows are picked.
+ * A website of a 2+-website install that uses another Smaily account than
+ * the store-wide one (WebsiteOverrides::usesOtherAccount(): the account's
+ * identity, not the scope its login is saved at) has only its own
+ * automations (CON-190): its own rows and the workflows saved at its website
+ * scope. The store-wide rows (website 0) and the default-scope workflows
+ * were picked from the store-wide account, so they resolve to nothing there
+ * — also where the website holds no automations of its own yet (an install
+ * from before CON-190): it starts nothing until its workflows are picked. A
+ * website whose own login is the store-wide account, and every website
+ * where no store-wide account is saved, reads them as before.
  *
  * A matched row's account_key travels with the workflow (WorkflowMatch), so
  * the dispatcher posts the workflow through the account the row names — a
@@ -73,7 +76,7 @@ class Router
     public function resolve(string $trigger, int $websiteId, string $language): ?WorkflowMatch
     {
         $mode = $this->config->getMultilingualMode($websiteId);
-        $ownAccount = $this->overrides->usesOwnAccount($websiteId);
+        $ownAccount = $this->overrides->usesOtherAccount($websiteId);
 
         if ($mode === MultilingualMode::MODE_SINGLE || $mode === MultilingualMode::MODE_SINGLE_WORKFLOW) {
             return $this->configDefault($trigger, $websiteId, $ownAccount);
@@ -81,7 +84,7 @@ class Router
 
         $effectiveLanguage = $language !== '' ? $language : Mapping::LANGUAGE_DEFAULT;
         // The website's own rows win over the store-wide rows (website 0),
-        // which a website with its own Smaily account does not read.
+        // which a website on another Smaily account does not read.
         $websiteIds = $ownAccount ? [$websiteId] : [$websiteId, 0];
 
         $match = $this->findMapping($trigger, $websiteIds, $effectiveLanguage, $mode)
@@ -145,7 +148,7 @@ class Router
 
     /**
      * The trigger's workflow saved in system config: for a website that uses
-     * its own Smaily account only the one saved at its website scope.
+     * another Smaily account only the one saved at its website scope.
      */
     private function configDefault(string $trigger, int $websiteId, bool $ownAccount): ?WorkflowMatch
     {

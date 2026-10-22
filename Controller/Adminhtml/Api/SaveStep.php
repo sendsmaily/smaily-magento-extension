@@ -26,8 +26,9 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  *
  * A Settings save that returned the selected website to the store-wide
  * values of a tab says so (CON-179), so the page reloads to show them; so
- * does a connection save that turned the website's own Smaily account on,
- * whose automations then start from no workflow (CON-190).
+ * does a connection save that moved the website onto another Smaily account
+ * than the store-wide one, whose automations then start from no workflow
+ * (CON-190).
  *
  * The finish step also answers whether Smaily accepted the saved
  * credentials at the last check (PRO-3560), for the Overview step's copy.

@@ -19,7 +19,7 @@
   values, with them; it keeps them unless "Use this step's values" is picked
   for it, which the step's save posts. The Contacts step says that its save
   starts contact sync on every website and names them. The Automations step
-  offers no choice for the website with its own Smaily account: it keeps
+  offers no choice for the website on another Smaily account: it keeps
   its own automations, and says why (CON-190).
 
   Settings for one website: each tab's "Use its own … on this website"
@@ -27,7 +27,7 @@
   website that holds them, the tab's settings are out of use and the tab
   says that the save removes them; the save posts the switch; per-language
   accounts are offered only while the website uses its own Smaily account.
-  A website with its own Smaily account (CON-190): its automations switch is
+  A website on another Smaily account than the store-wide one (CON-190): its automations switch is
   on and cannot be turned off, with a note that says why; while it holds no
   workflow of its own the tab asks for its workflows; the save posts its own
   automations.
@@ -65,10 +65,11 @@
     var ESTIMATE = 'This import sends %1 contacts from all websites. It runs in the background, a chunk per minute,'
         + ' and never slows the storefront down.';
     var OWN_AUTOMATIONS = 'Use its own automations on this website';
-    var KEEPS_AUTOMATIONS = 'A website with its own Smaily account keeps its own automations:'
+    var KEEPS_AUTOMATIONS = 'A website with another Smaily account than the one saved for all websites keeps its own automations:'
         + ' their workflows come from its own account.';
     var PICK = 'Pick this website\'s workflows';
-    var PICK_WHY = 'This website uses its own Smaily account, so it starts only workflows picked from that account.'
+    var PICK_WHY = 'This website uses another Smaily account than the one saved for all websites, so it starts only workflows'
+        + ' picked from its own account.'
         + ' No automation starts on it until you pick its workflows below and save.';
     var failures = 0;
     var passes = 0;
@@ -213,7 +214,7 @@
             !!data && JSON.stringify(data.use_store_wide) === '[]');
 
         card = doc.querySelector('.smaily-website-overrides[data-section=automations]');
-        check(locale + ', setup: the website with its own Smaily account keeps its automations, and the step says why',
+        check(locale + ', setup: the website on another Smaily account keeps its automations, and the step says why',
             !!card && text(card).indexOf('Latvia') !== -1 && card.querySelector('input[type=radio]') === null
             && Array.prototype.some.call(card.querySelectorAll('.note'), function (note) {
                 return text(note) === strings[KEEPS_AUTOMATIONS];

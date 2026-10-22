@@ -105,7 +105,8 @@ class WizardStepSaverTest extends IntegrationTestCase
             new WebsiteOverrides(
                 $this->objectManager->get(ResourceConnection::class),
                 $this->objectManager->get(WriterInterface::class),
-                $storeManager
+                $storeManager,
+                new SubdomainNormalizer()
             )
         );
     }
@@ -148,7 +149,8 @@ class WizardStepSaverTest extends IntegrationTestCase
         return new WebsiteOverrides(
             $this->objectManager->get(ResourceConnection::class),
             $this->objectManager->get(WriterInterface::class),
-            $this->storeManager($websiteIds)
+            $this->storeManager($websiteIds),
+            new SubdomainNormalizer()
         );
     }
 
@@ -377,7 +379,7 @@ class WizardStepSaverTest extends IntegrationTestCase
         self::assertSame(900, $router->resolve('welcome', self::MAIN, 'default')?->workflowId);
         self::assertSame(800, $router->resolve('first_order', self::MAIN, 'default')?->workflowId);
         $overrides = $this->overrides([self::MAIN, self::SECOND]);
-        self::assertTrue($overrides->usesOwnAccount(self::SECOND));
+        self::assertTrue($overrides->usesOtherAccount(self::SECOND));
         self::assertFalse($overrides->hasOwnValues(WebsiteOverrides::AUTOMATIONS, self::SECOND));
 
         // Unticked or not, its automations save is its own.
@@ -393,6 +395,42 @@ class WizardStepSaverTest extends IntegrationTestCase
         self::assertTrue($saver->isReturnedToStoreWide());
         self::assertFalse($overrides->hasOwnValues(WebsiteOverrides::AUTOMATIONS, self::SECOND));
         self::assertSame(900, $router->resolve('welcome', self::SECOND, 'default')?->workflowId);
+        self::assertSame(800, $router->resolve('first_order', self::SECOND, 'default')?->workflowId);
+    }
+
+    /**
+     * CON-190: the account's identity decides, not the scope its login is
+     * saved at. A website that gets its own login of the store-wide account
+     * (the subdomain in another case) keeps its automations, the store-wide
+     * ones included, and its automations switch stays free.
+     */
+    public function testAWebsitesOwnLoginOfTheStoreWideAccountKeepsItsAutomations(): void
+    {
+        $this->insertRow('default', 0, Config::XML_PATH_MULTILINGUAL_MODE, 'b');
+        $this->saver('0')->save('connect', [
+            'subdomain' => 'shop',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'multilingual_mode' => 'b',
+        ]);
+        $this->saver('0')->save('automations', ['first_order_workflow' => '800']);
+        self::assertSame([], $this->saver((string)self::SECOND)->save('automations', ['own' => true, 'mappings' => [
+            ['trigger_type' => 'welcome', 'language' => 'default', 'account_key' => 'default', 'workflow_id' => 901],
+        ]]));
+
+        $settings = $this->saver((string)self::SECOND);
+        self::assertSame([], $settings->save('connect', [
+            'own' => true,
+            'subdomain' => 'SHOP',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'multilingual_mode' => 'b',
+        ]));
+
+        self::assertFalse($settings->isOwnAccountStarted());
+        self::assertFalse($this->overrides([self::MAIN, self::SECOND])->usesOtherAccount(self::SECOND));
+        $router = $this->router();
+        self::assertSame(901, $router->resolve('welcome', self::SECOND, 'default')?->workflowId);
         self::assertSame(800, $router->resolve('first_order', self::SECOND, 'default')?->workflowId);
     }
 
@@ -524,7 +562,8 @@ class WizardStepSaverTest extends IntegrationTestCase
         $overrides = new WebsiteOverrides(
             $this->objectManager->get(ResourceConnection::class),
             $this->objectManager->get(WriterInterface::class),
-            $this->storeManager([self::MAIN, self::SECOND])
+            $this->storeManager([self::MAIN, self::SECOND]),
+            new SubdomainNormalizer()
         );
         self::assertSame([self::MAIN], array_keys($overrides->ownValues(WebsiteOverrides::CONNECTION)));
 

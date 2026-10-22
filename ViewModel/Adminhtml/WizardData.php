@@ -128,8 +128,9 @@ class WizardData implements ArgumentInterface
 
     /**
      * Whether the selected website must keep its own values of a section
-     * on Settings: the automations of a website with its own Smaily account
-     * (CON-190) or per-language Smaily accounts (mode A), whose workflows
+     * on Settings: the automations of a website on another Smaily account
+     * than the store-wide one (CON-190) or with per-language Smaily accounts
+     * (mode A), whose workflows
      * come from those accounts (WizardStepSaver::sectionTarget()). Its
      * switch shows ticked and fixed.
      */
@@ -144,20 +145,20 @@ class WizardData implements ArgumentInterface
         $websiteId = $this->websiteContext->getWebsiteId();
 
         return $this->config->getMultilingualMode($websiteId) === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
-            || $this->overrides->usesOwnAccount($websiteId);
+            || $this->overrides->usesOtherAccount($websiteId);
     }
 
     /**
      * Whether Settings tells the merchant to pick the selected website's
-     * workflows (CON-190): it uses its own Smaily account, which starts only
-     * its own workflows, and it holds none — it has just turned its own
-     * account on, or it held its own account with the store-wide
-     * automations before CON-190.
+     * workflows (CON-190): it uses another Smaily account than the
+     * store-wide one, which starts only its own workflows, and it holds none
+     * — it has just moved onto that account, or it held that account with
+     * the store-wide automations before CON-190.
      */
     public function needsOwnWorkflows(): bool
     {
         $websiteId = $this->websiteContext->getWebsiteId();
-        if (!$this->overrides->usesOwnAccount($websiteId)) {
+        if (!$this->overrides->usesOtherAccount($websiteId)) {
             return false;
         }
         $own = $this->overrides->ownValues(WebsiteOverrides::AUTOMATIONS)[$websiteId] ?? [];
@@ -194,10 +195,10 @@ class WizardData implements ArgumentInterface
                 'websiteId' => $websiteId,
                 'name' => $names[$websiteId] ?? (string)$websiteId,
                 'values' => $lines,
-                // A website with its own Smaily account keeps its own
+                // A website on another Smaily account keeps its own
                 // automations (CON-190).
                 'required' => $section === WebsiteOverrides::AUTOMATIONS
-                    && $this->overrides->usesOwnAccount($websiteId),
+                    && $this->overrides->usesOtherAccount($websiteId),
             ];
         }
 
@@ -467,7 +468,7 @@ class WizardData implements ArgumentInterface
      */
     private function ownWorkflows(int $websiteId, array $automations): array
     {
-        if (!$this->overrides->usesOwnAccount($websiteId)) {
+        if (!$this->overrides->usesOtherAccount($websiteId)) {
             return $automations;
         }
         foreach (self::WORKFLOW_PATHS as $key => $path) {
@@ -778,7 +779,7 @@ class WizardData implements ArgumentInterface
      * the given mode's accounts (mode A or B) are read, as the Router reads
      * them (CON-184): the editor shows each mode its own workflows, and a
      * mode-B save never posts another account's workflow id. A website that
-     * uses its own Smaily account reads only its own rows, as the Router
+     * uses another Smaily account reads only its own rows, as the Router
      * does (CON-190).
      *
      * @return array<string, array{workflowId: int, isDefaultFallback: bool}>
@@ -786,7 +787,7 @@ class WizardData implements ArgumentInterface
     public function getSavedMappings(string $mode): array
     {
         $websiteId = $this->websiteContext->getWebsiteId();
-        $ownAccount = $this->overrides->usesOwnAccount($websiteId);
+        $ownAccount = $this->overrides->usesOtherAccount($websiteId);
         $collection = $this->mappingCollectionFactory->create();
         $collection->addFieldToFilter('website_id', ['in' => $ownAccount ? [$websiteId] : [$websiteId, 0]])
             ->addFieldToFilter('trigger_type', ['in' => Trigger::ALL])

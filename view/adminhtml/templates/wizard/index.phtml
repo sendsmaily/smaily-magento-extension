@@ -18,8 +18,8 @@
  * Automations steps list each website that holds its own values of the
  * step's settings, with those values; each one keeps them unless the
  * merchant picks the step's values for it (posted as `use_store_wide`) —
- * except the automations of a website with its own Smaily account, which
- * it always keeps (CON-190).
+ * except the automations of a website on another Smaily account than the
+ * store-wide one, which it always keeps (CON-190).
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
@@ -56,9 +56,9 @@ $websiteOverrides = static function (string $section) use ($viewModel, $escaper)
                 . $escaper->escapeHtml($value) . '</li>';
         }
         $html .= '</ul>';
-        // A website with its own Smaily account keeps its own automations (CON-190).
+        // A website on another Smaily account keeps its own automations (CON-190).
         if (!empty($website['required'])) {
-            $html .= '<p class="note">' . $escaper->escapeHtml(__('A website with its own Smaily account keeps its own automations: their workflows come from its own account.')) . '</p></div>';
+            $html .= '<p class="note">' . $escaper->escapeHtml(__('A website with another Smaily account than the one saved for all websites keeps its own automations: their workflows come from its own account.')) . '</p></div>';
             continue;
         }
         foreach (['keep' => __('Keep its own values'), 'store' => __('Use this step\'s values')] as $choice => $label) {

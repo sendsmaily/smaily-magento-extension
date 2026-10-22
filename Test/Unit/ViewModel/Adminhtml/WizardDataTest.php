@@ -430,7 +430,7 @@ class WizardDataTest extends TestCase
             2 => [Config::XML_PATH_WELCOME_WORKFLOW => '7'],
             3 => [Config::XML_PATH_WELCOME_WORKFLOW => '8'],
         ]);
-        $this->overrides->method('usesOwnAccount')->willReturnCallback(static fn (int $id): bool => $id === 2);
+        $this->overrides->method('usesOtherAccount')->willReturnCallback(static fn (int $id): bool => $id === 2);
 
         $list = $this->storeWideViewModel()->getWebsiteOverrides(WebsiteOverrides::AUTOMATIONS);
 
@@ -448,7 +448,7 @@ class WizardDataTest extends TestCase
         $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
         $this->config->method('getMultilingualMode')->willReturn(MultilingualMode::MODE_SINGLE);
         $this->config->method('getWelcomeWorkflow')->willReturn(555);
-        $this->overrides->method('usesOwnAccount')->with(2)->willReturn(true);
+        $this->overrides->method('usesOtherAccount')->with(2)->willReturn(true);
         $this->overrides->method('ownValues')->willReturn([2 => [Config::XML_PATH_WELCOME_ENABLED => '1']]);
         $this->overrides->method('ownValue')->willReturn(null);
 
@@ -461,7 +461,7 @@ class WizardDataTest extends TestCase
     public function testAWebsiteWithItsOwnAccountAndItsOwnWorkflowIsNotAskedForOne(): void
     {
         $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
-        $this->overrides->method('usesOwnAccount')->willReturn(true);
+        $this->overrides->method('usesOtherAccount')->willReturn(true);
         $this->overrides->method('ownValues')->willReturn([2 => [Config::XML_PATH_FIRST_ORDER_WORKFLOW => '42']]);
         $this->overrides->method('ownValue')->willReturnCallback(
             static fn (string $section, int $websiteId, string $path): ?string
@@ -481,7 +481,7 @@ class WizardDataTest extends TestCase
     {
         $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
         $this->config->method('getWelcomeWorkflow')->willReturn(555);
-        $this->overrides->method('usesOwnAccount')->willReturn(false);
+        $this->overrides->method('usesOtherAccount')->willReturn(false);
 
         self::assertFalse($this->viewModel->isOwnRequired(WebsiteOverrides::AUTOMATIONS));
         self::assertFalse($this->viewModel->needsOwnWorkflows());

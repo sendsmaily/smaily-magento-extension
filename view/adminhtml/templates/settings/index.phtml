@@ -25,11 +25,11 @@
  * unticked, the tab shows and saves the values for all websites. Unticking
  * it on a website that holds its own values and saving removes them (the
  * page then reloads to show the values for all websites). A website with
- * its own Smaily account, per-language Smaily accounts (mode A) included,
- * keeps its own automations: their switch shows ticked and fixed
- * (WizardData::isOwnRequired(), CON-190). Saving the Connection tab with
- * the website's own Smaily account turned on reloads the page: its
- * automations then start from no workflow.
+ * another Smaily account than the store-wide one, or with per-language
+ * Smaily accounts (mode A), keeps its own automations: their switch shows
+ * ticked and fixed (WizardData::isOwnRequired(), CON-190). A Connection save
+ * that moves the website onto another account than the store-wide one
+ * reloads the page: its automations then start from no workflow.
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
@@ -54,7 +54,7 @@ $ownSwitch = static function (string $section, string $label) use ($viewModel, $
         . ' data-section="' . $escaper->escapeHtmlAttr($section) . '" data-own-saved="' . ($own ? '1' : '0') . '"'
         . ($own ? ' checked' : '') . ($required ? ' disabled' : '') . '/> ' . $escaper->escapeHtml($label) . '</label>'
         . '<p class="note">' . $escaper->escapeHtml($required
-            ? __('A website with its own Smaily account keeps its own automations: their workflows come from its own account.')
+            ? __('A website with another Smaily account than the one saved for all websites keeps its own automations: their workflows come from its own account.')
             : __('Otherwise this website uses the settings saved for all websites, and a change here applies to every website that uses them.')) . '</p>'
         . '<p class="note smaily-own-return" style="display:none;">' . $escaper->escapeHtml(__('Save to remove this website\'s own values: it then uses the settings saved for all websites.')) . '</p>'
         . '</div>';
@@ -120,13 +120,13 @@ $tabs = [
         <h3><?= $escaper->escapeHtml(__('Automations')) ?></h3>
         <p class="smaily-tab-desc"><?= $escaper->escapeHtml(__('How store events and Campaign Intelligence triggers fire Smaily workflows.')) ?></p>
         <?= /* @noEscape */ $ownSwitch('automations', (string)__('Use its own automations on this website')) ?>
-        <?php // A website with its own Smaily account starts only its own workflows (CON-190). ?>
+        <?php // A website on another Smaily account starts only its own workflows (CON-190). ?>
         <?php if ($viewModel->needsOwnWorkflows()): ?>
         <div class="smaily-banner smaily-banner--warning" id="smaily-own-workflows">
             <span class="smaily-banner__icon">&#9888;</span>
             <div class="smaily-banner__body">
                 <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('Pick this website\'s workflows')) ?></div>
-                <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('This website uses its own Smaily account, so it starts only workflows picked from that account. No automation starts on it until you pick its workflows below and save.')) ?></div>
+                <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('This website uses another Smaily account than the one saved for all websites, so it starts only workflows picked from its own account. No automation starts on it until you pick its workflows below and save.')) ?></div>
             </div>
         </div>
         <?php endif; ?>

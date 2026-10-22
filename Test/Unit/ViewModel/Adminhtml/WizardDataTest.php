@@ -8,13 +8,13 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Unit\ViewModel\Adminhtml;
 
-use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json;
-use Magento\Store\Model\ScopeInterface;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\Adminhtml\SetupGuard;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
-use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
+use Smaily\Connect\Model\Config\Source\MultilingualMode;
 use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
@@ -42,8 +42,11 @@ class WizardDataTest extends TestCase
     /** @var Mode&\PHPUnit\Framework\MockObject\MockObject */
     private $mode;
 
-    /** @var ScopeConfigInterface&\PHPUnit\Framework\MockObject\MockObject */
-    private $scopeConfig;
+    /** @var SetupGuard&\PHPUnit\Framework\MockObject\MockObject */
+    private $setupGuard;
+
+    /** @var WebsiteOverrides&\PHPUnit\Framework\MockObject\MockObject */
+    private $overrides;
 
     /** @var AccountResolver&\PHPUnit\Framework\MockObject\MockObject */
     private $accountResolver;
@@ -69,7 +72,8 @@ class WizardDataTest extends TestCase
     {
         $this->config = $this->createMock(Config::class);
         $this->mode = $this->createMock(Mode::class);
-        $this->scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $this->setupGuard = $this->createMock(SetupGuard::class);
+        $this->overrides = $this->createMock(WebsiteOverrides::class);
         $this->accountResolver = $this->createMock(AccountResolver::class);
         $this->accountResolver->method('detectedLanguages')->willReturn([]);
         $this->websiteContext = $this->createMock(WebsiteContext::class);
@@ -81,26 +85,48 @@ class WizardDataTest extends TestCase
         $this->contactAudience = $this->createMock(ContactAudience::class);
 
         $this->orderOrigin = $this->createMock(OrderOrigin::class);
-        $this->viewModel = new WizardData(
+        $this->viewModel = $this->viewModel($this->websiteContext);
+    }
+
+    private function viewModel(WebsiteContext $websiteContext): WizardData
+    {
+        return new WizardData(
             $this->config,
             $this->mode,
             $this->createMock(EngineSettings::class),
-            $this->scopeConfig,
             $this->accountResolver,
             $this->contactAudience,
             new Json(),
             $this->createMock(MappingCollectionFactory::class),
-            $this->websiteContext,
+            $websiteContext,
             $this->verifiedCredentials,
             $this->localeResolver,
             $this->createMock(ConsentSource::class),
-            $this->orderOrigin
+            $this->orderOrigin,
+            $this->setupGuard,
+            $this->overrides
         );
+    }
+
+    /**
+     * The initial setup on a store with more than one website (CON-179):
+     * website 0, whose reads resolve the default scope.
+     */
+    private function storeWideViewModel(): WizardData
+    {
+        $context = $this->createMock(WebsiteContext::class);
+        $context->method('isStoreWide')->willReturn(true);
+        $context->method('hasMultipleWebsites')->willReturn(true);
+        $context->method('getWebsiteId')->willReturn(WebsiteContext::STORE_WIDE);
+        $context->method('getStoreId')->willReturn(0);
+        $context->method('getWebsiteOptions')->willReturn([1 => 'Estonia', 2 => 'Latvia', 3 => 'Lithuania']);
+
+        return $this->viewModel($context);
     }
 
     public function testGetBootJsonReadsConnectionFieldsAtTheSelectedWebsitesStoreScope(): void
     {
-        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->setupGuard->method('isSetupCompleted')->willReturn(false);
         $this->config->expects(self::atLeastOnce())->method('isConnected')->with(5)->willReturn(true);
         $this->config->expects(self::atLeastOnce())->method('getSubdomain')->with(5)->willReturn('demo');
         $this->config->expects(self::atLeastOnce())->method('getUsername')->with(5)->willReturn('user');
@@ -121,7 +147,7 @@ class WizardDataTest extends TestCase
      */
     public function testGetBootJsonCarriesTheAccountSavedForTheWebsite(): void
     {
-        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->setupGuard->method('isSetupCompleted')->willReturn(false);
         $this->config->method('getSubdomain')->willReturn('et-shop');
         $this->config->method('getUsername')->willReturn('et-user');
         $this->config->method('getWebsiteSubdomain')->with(2)->willReturn('en-shop');
@@ -139,7 +165,7 @@ class WizardDataTest extends TestCase
      */
     public function testTheTransactionalAccountNeverCarriesItsPassword(): void
     {
-        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->setupGuard->method('isSetupCompleted')->willReturn(false);
         $this->config->method('getTransactionalSubdomain')->willReturnMap([[2, 'demo-tx'], [null, 'shop-tx']]);
         $this->config->method('getTransactionalUsername')->willReturnMap([[2, 'tx'], [null, 'api']]);
         $this->config->method('getTransactionalPassword')->willReturnMap([[2, 'tx-secret'], [null, 'secret']]);
@@ -169,7 +195,7 @@ class WizardDataTest extends TestCase
      * PRO-3719: each website shows its own default fallback language.
     public function testTheFallbackLanguageIsTheSelectedWebsites(): void
     {
-        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->setupGuard->method('isSetupCompleted')->willReturn(false);
         $this->config->method('getFallbackLanguage')->willReturnMap([[null, 'et'], [2, 'en']]);
 
         $decoded = json_decode($this->viewModel->getBootJson(), true);
@@ -184,7 +210,7 @@ class WizardDataTest extends TestCase
      */
     public function testSavedCredentialsSmailyHasNotAcceptedAreNotShownAsConnected(): void
     {
-        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->setupGuard->method('isSetupCompleted')->willReturn(false);
         $this->config->method('isConnected')->willReturn(true);
         $this->verifiedCredentials->expects(self::once())->method('isWebsiteVerified')->with(2)->willReturn(false);
 
@@ -196,7 +222,7 @@ class WizardDataTest extends TestCase
 
     public function testSavedCredentialsSmailyAcceptedAreShownAsConnected(): void
     {
-        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->setupGuard->method('isSetupCompleted')->willReturn(false);
         $this->verifiedCredentials->method('isWebsiteVerified')->with(2)->willReturn(true);
 
         $decoded = json_decode($this->viewModel->getBootJson(), true);
@@ -276,7 +302,7 @@ class WizardDataTest extends TestCase
      */
     public function testAPackageWithoutApiAccessIsShownAsTheReason(): void
     {
-        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->setupGuard->method('isSetupCompleted')->willReturn(false);
         $this->verifiedCredentials->method('isWebsiteVerified')->with(2)->willReturn(false);
         $this->verifiedCredentials->method('isWebsitePlanBlocked')->with(2)->willReturn(true);
 
@@ -288,7 +314,7 @@ class WizardDataTest extends TestCase
 
     public function testGetBootJsonReadsSubscriberAndAutomationFieldsAtTheSelectedWebsiteScope(): void
     {
-        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->setupGuard->method('isSetupCompleted')->willReturn(false);
         $this->config->expects(self::atLeastOnce())->method('isSyncEnabled')->with(2)->willReturn(true);
         $this->mode->expects(self::atLeastOnce())->method('mode')->with(2)->willReturn('consent');
         $this->config->expects(self::atLeastOnce())->method('isWelcomeEnabled')->with(2)->willReturn(true);
@@ -302,12 +328,9 @@ class WizardDataTest extends TestCase
         self::assertSame('10', $decoded['automations']['welcomeWorkflow']);
     }
 
-    public function testIsSetupCompletedReadsAtTheSelectedWebsitesScope(): void
+    public function testIsSetupCompletedIsTheStoresMark(): void
     {
-        $this->scopeConfig->expects(self::once())
-            ->method('isSetFlag')
-            ->with(WizardStepSaver::XML_PATH_SETUP_COMPLETED, ScopeInterface::SCOPE_WEBSITE, 2)
-            ->willReturn(true);
+        $this->setupGuard->expects(self::once())->method('isSetupCompleted')->willReturn(true);
 
         self::assertTrue($this->viewModel->isSetupCompleted());
     }
@@ -318,25 +341,30 @@ class WizardDataTest extends TestCase
      */
     public function testAFreshSetupOpensOnConnectWithOnlyThatStepReached(): void
     {
-        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->setupGuard->method('isSetupCompleted')->willReturn(false);
         $this->config->method('isConnected')->willReturn(false);
 
         self::assertSame(1, $this->viewModel->getStartStep());
         self::assertSame(1, $this->viewModel->getReachedStep());
     }
 
-    public function testFilledInCredentialsOpenAnUnfinishedSetupOnContacts(): void
+    /**
+     * CON-179: Smaily login details saved already (carried over from 2.8.x)
+     * do not skip the Connect step: an unfinished setup opens on it, as in
+     * the WooCommerce plugin.
+     */
+    public function testSavedCredentialsStillOpenAnUnfinishedSetupOnConnect(): void
     {
-        $this->scopeConfig->method('isSetFlag')->willReturn(false);
-        $this->config->expects(self::atLeastOnce())->method('isConnected')->with(5)->willReturn(true);
+        $this->setupGuard->method('isSetupCompleted')->willReturn(false);
+        $this->config->method('isConnected')->willReturn(true);
 
-        self::assertSame(2, $this->viewModel->getStartStep());
-        self::assertSame(2, $this->viewModel->getReachedStep());
+        self::assertSame(1, $this->viewModel->getStartStep());
+        self::assertSame(1, $this->viewModel->getReachedStep());
     }
 
     public function testAFinishedSetupOpensOnConnectWithEveryStepReached(): void
     {
-        $this->scopeConfig->method('isSetFlag')->willReturn(true);
+        $this->setupGuard->method('isSetupCompleted')->willReturn(true);
         $this->config->method('isConnected')->willReturn(true);
 
         self::assertSame(1, $this->viewModel->getStartStep());
@@ -346,13 +374,94 @@ class WizardDataTest extends TestCase
     public function testSelectorHelpersDelegateToWebsiteContext(): void
     {
         $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
-        $this->websiteContext->method('isExplicit')->willReturn(false);
         $this->websiteContext->method('getWebsiteOptions')->willReturn([1 => 'Main', 2 => 'Second']);
 
         self::assertSame(2, $this->viewModel->getSelectedWebsiteId());
         self::assertTrue($this->viewModel->hasMultipleWebsites());
-        self::assertFalse($this->viewModel->hasSelectedWebsite());
         self::assertSame([1 => 'Main', 2 => 'Second'], $this->viewModel->getWebsiteOptions());
+        self::assertSame(['Main', 'Second'], $this->viewModel->getWebsiteNames());
+        self::assertSame(['_query' => ['website' => 2]], $this->viewModel->getWebsiteQuery());
+    }
+
+    /**
+     * CON-179: the initial setup's calls carry website 0, the whole store.
+     */
+    public function testTheInitialSetupsCallsTargetTheWholeStore(): void
+    {
+        self::assertSame(['_query' => ['website' => 0]], $this->storeWideViewModel()->getWebsiteQuery());
+    }
+
+    /**
+     * CON-179 (criterion 5): the initial setup lists each website that holds
+     * its own values of a step's settings, with those values in the
+     * admin's words — never a password.
+     */
+    public function testTheInitialSetupListsTheWebsitesWithTheirOwnValues(): void
+    {
+        $this->overrides->method('ownValues')->with(WebsiteOverrides::CONNECTION)->willReturn([
+            3 => [
+                Config::XML_PATH_SUBDOMAIN => 'lt-shop',
+                Config::XML_PATH_PASSWORD => 'encrypted',
+                Config::XML_PATH_MULTILINGUAL_MODE => 'b',
+            ],
+        ]);
+
+        $list = $this->storeWideViewModel()->getWebsiteOverrides(WebsiteOverrides::CONNECTION);
+
+        self::assertSame([[
+            'websiteId' => 3,
+            'name' => 'Lithuania',
+            'values' => [
+                ['Subdomain', 'lt-shop'],
+                ['API password', '••••••••'],
+                ['', 'One account, per-language workflows'],
+            ],
+        ]], $list);
+    }
+
+    /**
+     * Per-language Smaily accounts are always a website's own: on Settings,
+     * a website in mode A keeps its own automations, so their switch is
+     * ticked and fixed.
+     */
+    public function testAWebsiteWithPerLanguageAccountsMustKeepItsOwnAutomations(): void
+    {
+        $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
+        $this->config->method('getMultilingualMode')->with(2)->willReturn(MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS);
+        $this->overrides->method('hasOwnValues')->willReturn(false);
+
+        self::assertTrue($this->viewModel->isOwnRequired(WebsiteOverrides::AUTOMATIONS));
+        self::assertTrue($this->viewModel->hasOwnValues(WebsiteOverrides::AUTOMATIONS));
+        self::assertFalse($this->viewModel->isOwnRequired(WebsiteOverrides::CONNECTION));
+    }
+
+    public function testSettingsListsNoWebsitesButKnowsTheSelectedWebsitesOwnValues(): void
+    {
+        $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
+        $this->overrides->method('hasOwnValues')->with(WebsiteOverrides::SUBSCRIBERS, 2)->willReturn(true);
+
+        self::assertSame([], $this->viewModel->getWebsiteOverrides(WebsiteOverrides::SUBSCRIBERS));
+        self::assertTrue($this->viewModel->hasOwnValues(WebsiteOverrides::SUBSCRIBERS));
+    }
+
+    /**
+     * CON-179: the initial setup covers every website's languages and
+     * contacts; per-language accounts are a website's own, so it shows none.
+     */
+    public function testTheInitialSetupCoversEveryWebsite(): void
+    {
+        $this->accountResolver->method('detectedLanguagesOfAllWebsites')->willReturn(['et', 'lv']);
+        $this->config->method('getMultilingualMode')->willReturn(MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS);
+        $this->accountResolver->expects(self::never())->method('languageStoreIds');
+        $this->contactAudience->method('count')->willReturnCallback(
+            static fn (int $websiteId, string $mode): int => $mode === SyncMode::MODE_CONSENT ? $websiteId * 10 : 0
+        );
+        $viewModel = $this->storeWideViewModel();
+
+        self::assertSame(['et', 'lv'], $viewModel->getDetectedLanguages());
+        self::assertSame(MultilingualMode::MODE_SINGLE, $viewModel->getMultilingualMode());
+        self::assertSame([], $viewModel->getMultilingualAccounts());
+        self::assertSame(60, $viewModel->getContactImportCounts()[SyncMode::MODE_CONSENT]);
     }
 
     public function testGetSelectedSyncFieldsReadsAtTheSelectedWebsiteScope(): void
@@ -390,7 +499,7 @@ class WizardDataTest extends TestCase
      */
     public function testTheBootDataCarriesWhetherTheSelectedWebsitesContactsSync(): void
     {
-        $this->scopeConfig->method('isSetFlag')->willReturn(false);
+        $this->setupGuard->method('isSetupCompleted')->willReturn(false);
         $this->config->method('isSyncEnabled')->with(2)->willReturn(true);
         $this->config->method('isContactSyncActive')->with(2)->willReturn(false);
 

@@ -89,17 +89,19 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   (trigger, language) row first, then the trigger's `is_default_fallback`
   row, then the config default; no match anywhere is a terminal skip
   (`Queue\Skipped`: closed with the reason, read as Skipped in the Log). Rows
-  are looked up for the event's website with legacy global rows
-  (`website_id 0` — the 2.8.x migration's default-scope seeding, or a
-  pre-Phase-3 save) as the fallback; a website-specific row wins. A matched
+  are looked up for the event's website with the store-wide rows
+  (`website_id 0` — the initial setup's and a store-wide Settings save's,
+  CON-179, and the 2.8.x migration's default-scope seeding) as the
+  fallback; a website's own row wins. A matched
   row's `account_key` travels with the workflow (`WorkflowMatch`) and the
   handler posts through THAT account's credentials
   (`Multilingual\AccountResolver` maps the key to a store view; `default`
   = default scope) — so a mode-A fallback row never fires another
   account's workflow ID through the event store view's credentials. The
-  admin panels write rows through `Model/Automation/MappingSaver` at the
-  target website scope (full-desired-state sync: unique-key upsert,
-  cleared rows deleted, other websites' rows untouched).
+  admin panels write rows through `Model/Automation/MappingSaver` under
+  website 0 for a store-wide save and under the website for its own
+  automations (full-desired-state sync: unique-key upsert, cleared rows
+  deleted, other websites' rows untouched).
 - Handlers are registered per type in `di.xml`
   (`Model/Queue/HandlerPool`); adding an event type = adding a handler.
 - Payloads are built at enqueue time (`ContactSync\SubscriberPayloadBuilder`,
@@ -1472,23 +1474,72 @@ Initial setup, Settings, Log. Design rules:
   Campaign Intelligence API key — are declared sensitive in `etc/di.xml`
   (`Magento\Config\Model\Config\TypePool`), so `app:config:dump` never
   writes them to `app/etc/config.php`.
-- **Multi-website (docs/internal/RFC_MULTI_WEBSITE.md).** `Model\Adminhtml\WebsiteContext`
-  is the single seam every admin save/prefill path reads to know its target
-  website: it resolves a `website` request param (validated against real
-  websites) falling back to the installation's default website. On a
-  2+-website install, the Settings page renders an explicit website
-  selector next to the tab strip and the wizard renders a website-chooser
-  step before Connect (own chrome, not Magento's native store-switcher);
-  both work by reloading with `?website=<id>` — every AJAX call and the
-  page's own prefill (`ViewModel\Adminhtml\WizardData::getBootJson()`)
-  already read that same context, so no further plumbing is needed per
-  field. Single-website installs never see either control.
-  `Model\Adminhtml\SetupGuard`'s completed flag is website-scoped the same
-  way, so each website's own onboarding is tracked independently (a new
-  website falls back to the installation's existing completed flag via the
-  normal website→default scope chain, same as any other field). Campaign
-  Intelligence stays installation-wide regardless of the selected website
-  (Phase 4 of the RFC, gated on engine-side confirmation).
+- **Multi-website — set up once for the whole store (CON-179, owner
+  decision 2026-10-22; replaces the per-website setup of
+  docs/internal/RFC_MULTI_WEBSITE.md §2).** The extension is set up once,
+  as in the WooCommerce plugin and as the transactional-email account
+  already was: every value the initial setup saves is at the default scope,
+  and a website differs only where it holds its own value — a row at its
+  website scope (from Settings, from the 2.8.x migration, or from an
+  initial setup run on an earlier release candidate, which saved per
+  website). Runtime reads are unchanged: every reader already resolves
+  website → default.
+  - `Model\Adminhtml\WebsiteContext` is the single seam every admin
+    save/prefill path reads to know its target. The initial setup page
+    marks its request store-wide (`useStoreWide()`) and its AJAX calls
+    carry `?website=0`; a store-wide request's `getWebsiteId()` is
+    `WebsiteContext::STORE_WIDE` (0) on a 2+-website install — a read at
+    website 0 (the admin website, which holds no rows) or store 0 resolves
+    the default scope — and the one real website on a single-website
+    install. Otherwise it resolves a `website` request param (validated
+    against real websites), falling back to the installation's default
+    website.
+  - `Model\Adminhtml\WebsiteOverrides` names the three sections a website
+    can hold its own values of — the Smaily account (subdomain, username,
+    password, multilingual mode, fallback language, Storefront URL), the
+    Contacts settings and the automations (their switches, workflows and
+    wait time, plus the website's own non-transactional mapping rows) —
+    reads which websites hold own rows (`core_config_data` at website
+    scope), and removes a website's own values of a section (with its store
+    views' credentials for the Smaily account, and its mapping rows for the
+    automations). `contacts_confirmed` is not an own value and is never
+    removed.
+  - `WizardStepSaver::sectionTarget()` decides where a section's save
+    writes. The initial setup writes the default scope (store-wide mapping
+    rows under website 0); on a 2+-website install each step lists the
+    websites with own values (`WizardData::getWebsiteOverrides()`), which
+    keep them unless the post names them in `use_store_wide`. Settings on a
+    2+-website install has a "Use its own … on this website" switch per
+    tab (`own`): ticked, the tab writes the website's own values; unticked
+    on a website with own values, the save only removes them (the answer
+    says `returnedToStoreWide`, the page reloads); unticked on a website
+    without, it writes the store-wide values it shows. A single-website
+    install writes the default scope and removes the website's own values
+    (an empty password then writes the kept one at the default scope).
+  - **Per-language Smaily accounts (mode A) are always a website's own**
+    (owner decision 2026-10-22): they live on one website's store views,
+    and its per-language workflow rows name those accounts by language. A
+    Smaily account saved in mode A — the mode, the fallback language, the
+    fallback account and the store views' accounts — is written at the
+    website's scope, and so are the automations of a website in mode A
+    (config rows and mapping rows under its id), on every install:
+    `WizardStepSaver::sectionTarget()` targets the website for them, also
+    in the initial setup of a single-website install, and removes none of
+    its own values. A website added later therefore reads no mode A from
+    the default scope and no workflow row of another website's accounts.
+    On a 2+-website install a store-wide save does not take mode A and the
+    setup's Connect step does not offer it; Settings offers it while the
+    website's own Smaily account is ticked, shows the automations switch
+    of a website in mode A ticked and fixed (`WizardData::isOwnRequired()`),
+    and returns its Smaily account (leaving mode A) when that switch is
+    unticked and saved.
+  - The Settings page renders an explicit website selector next to the tab
+    strip (own chrome, not Magento's native store-switcher), reloading with
+    `?website=<id>`; single-website installs never see it or the switches.
+    Campaign Intelligence and RSS stay installation-wide (default scope).
+  - The store-wide setup reads the default scope on a 2+-website install,
+    with every website's languages and every website's contacts in the
+    import estimate; Settings reads the selected website as before.
 - **Shared step partials.** The wizard's step content and the Settings
   tabs are the SAME templates (`view/adminhtml/templates/panel/*.phtml`),
   composed by two thin page templates (`wizard/index.phtml`,
@@ -1506,9 +1557,9 @@ Initial setup, Settings, Log. Design rules:
   Test connection — saved accounts re-test via `store_id` against the
   saved store-view credentials) plus a default-fallback picker whose
   account's credentials double as the website's account; the fallback
-  language is saved per website as well (`Config::getFallbackLanguage()`
-  reads the website value, else the default-scope value saved before
-  PRO-3719). Modes `a`/`b` reveal
+  language is saved with that account (`Config::getFallbackLanguage()`
+  reads the website value, else the default-scope value). Mode `a` is
+  always a website's own Smaily account (CON-179, see "Multi-website"). Modes `a`/`b` reveal
   the per-language workflow mapping editor on the Automations panel
   (workflow dropdowns loaded live per account). All sections show/hide
   live on mode change with no save round-trip; leaving mode `a` removes
@@ -1611,27 +1662,35 @@ Initial setup, Settings, Log. Design rules:
   `Model\Log\SelectionRetry` splits to route the mass retry back to the
   right queue. Grid filters/sorting apply to the outer select.
 - **Wizard-first gating.** `Model\Adminhtml\SetupGuard`: the wizard's
-  Finish step saves `smaily_connect/internal/setup_completed` for its one
-  website (website scope). While the flag is unset for the current
-  `WebsiteContext` target, Dashboard/Settings/Log redirect to the wizard,
-  keeping a `?website=<id>` the request named, so the wizard opens for that
-  website instead of on its chooser (`SetupGuard::getWizardRouteParams()`).
-  A newly added website has no flag, and after an upgrade from 2.8.x no
-  website has one (the legacy migration does not write it), so each such
-  website goes through the wizard — intended. The flag gates these admin
-  pages only; contact sync never reads it. A website's contact sync — the
+  Finish step saves `smaily_connect/internal/setup_completed` once for the
+  store (default scope, CON-179). While the store is not set up,
+  Dashboard/Settings/Log redirect to the wizard, without a website. The
+  store is set up when the default scope holds the flag or any website
+  does: an initial setup finished on an earlier release candidate saved it
+  per website, and no data patch moves it, so such a store is not sent
+  back into the setup. After an upgrade from 2.8.x the store has no flag
+  (the legacy migration does not write it), so it goes through the wizard
+  once — intended. The wizard always opens on Connect (its summary once
+  the setup is finished), also when credentials are saved already. The
+  flag gates these admin pages only; contact sync never reads it. A website's contact sync — the
   observers, `Cron\ContactReconcile`, the checkout checkbox and the
   contacts import (`Backfill\ContactsProcessor`) — runs only while
   `Config::isContactSyncActive()` says so: `smaily_connect/subscribers/sync_enabled`
   is on (`etc/config.xml` defaults it to 1) AND
-  `smaily_connect/internal/contacts_confirmed` is set for the website
-  (PRO-4036); each path also needs the credentials of the store it sends
+  `smaily_connect/internal/contacts_confirmed` resolves set for the website
+  (its row, else the default scope's; PRO-4036); each path also needs the credentials of the store it sends
   through (`Config::isConnected()`, non-empty values, not a Smaily check).
-  `WizardStepSaver::saveSubscribers()` writes `contacts_confirmed` at
-  website scope on every Contacts save — the setup's Contacts step and
-  **Settings > Contacts** — so on a new install nothing is sent or queued
-  for a website before its Contacts step is saved, the Connect step's save
-  included. An upgrade keeps a website that synced before syncing:
+  `WizardStepSaver::saveSubscribers()` writes `contacts_confirmed` where
+  it writes the Contacts settings on every Contacts save — the default
+  scope for a store-wide save (the setup's Contacts step, Settings for a
+  website that uses the store-wide settings), which counts for every
+  website without its own mark, and the website's scope for its own
+  Contacts settings — so on a new install nothing is sent or queued
+  before the Contacts settings that apply are saved, the Connect step's
+  save included. A website's own Contacts settings come with its own mark
+  (Settings writes it with them; the migration and
+  `ConfirmContactsOfConnectedWebsites` wrote it for every website that
+  synced). An upgrade keeps a website that synced before syncing:
   `MigrateLegacyConfig` sets the flag where the migrated `sync_enabled`
   (the website's row, else the default scope's) is 1, and
   `ConfirmContactsOfConnectedWebsites` sets it on a 3.0.0
@@ -1646,7 +1705,7 @@ Initial setup, Settings, Log. Design rules:
   and starts no import: the contacts import starts only from **Start
   import** (`Api\BackfillState`, `action: start`). The import card follows
   the same answer (boot data `subscribers.syncActive`): **Start import**
-  stays disabled until the website's Contacts settings are saved. A
+  stays disabled until the Contacts settings that apply are saved. A
   contacts job that ran while the answer was no completes at 0 with
   `Job::REASON_CONTACT_SYNC_INACTIVE` in its `error_message`;
   `BackfillState` returns those websites' names as `sync_inactive`, which

@@ -303,11 +303,39 @@ $intelligenceViewModel = static fn (
     }
 
     /**
+     * One website: the store's values are its own, with no exceptions.
+     *
      * @return bool
      */
-    public function hasSelectedWebsite(): bool
+    public function isStoreWide(): bool
     {
         return true;
+    }
+
+    /**
+     * @param string $section
+     * @return bool
+     */
+    public function hasOwnValues(string $section): bool
+    {
+        return false;
+    }
+
+    /**
+     * @param string $section
+     * @return array<int, array<string, mixed>>
+     */
+    public function getWebsiteOverrides(string $section): array
+    {
+        return [];
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getWebsiteNames(): array
+    {
+        return ['Main Website'];
     }
 
     /**
@@ -844,6 +872,379 @@ $setupCompleted = [
 $pages['setup-completed-storefront'] = $setupCompleted
     + ['viewModel' => $intelligenceViewModel('https://shop.example.com', true)];
 $pages['setup-completed'] = $setupCompleted + ['viewModel' => $intelligence];
+
+/*
+ * The store-wide setup and its website exceptions (CON-179) on a store with
+ * three websites (Estonia, Latvia, Lithuania) and two store languages, in
+ * One account, per-language workflows mode, Smaily login details saved but
+ * the setup not finished. The setup-websites page renders the initial setup
+ * (wizard/index.phtml) with its Connect, Contacts and Automations steps:
+ * Latvia holds its own Smaily account and its own Contacts settings. The
+ * settings-website page renders Settings (settings/index.phtml) with its
+ * Connection and Contacts tabs for Latvia, which holds its own Contacts
+ * settings but uses the Smaily account for all websites.
+ */
+$websitesViewModel = static fn (bool $storeWide): object => new class ($storeWide) {
+    /**
+     * @param bool $storeWide
+     */
+    public function __construct(private readonly bool $storeWide)
+    {
+    }
+
+    /**
+     * @return bool
+     */
+    public function isStoreWide(): bool
+    {
+        return $this->storeWide;
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasMultipleWebsites(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function getWebsiteOptions(): array
+    {
+        return [1 => 'Estonia', 2 => 'Latvia', 3 => 'Lithuania'];
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getWebsiteNames(): array
+    {
+        return ['Estonia', 'Latvia', 'Lithuania'];
+    }
+
+    /**
+     * @return int
+     */
+    public function getSelectedWebsiteId(): int
+    {
+        return $this->storeWide ? 0 : 2;
+    }
+
+    /**
+     * @param string $section
+     * @return bool
+     */
+    public function hasOwnValues(string $section): bool
+    {
+        return !$this->storeWide && $section === 'subscribers';
+    }
+
+    /**
+     * @param string $section
+     * @return bool
+     */
+    public function isOwnRequired(string $section): bool
+    {
+        return false;
+    }
+
+    /**
+     * @param string $section
+     * @return array<int, array<string, mixed>>
+     */
+    public function getWebsiteOverrides(string $section): array
+    {
+        if (!$this->storeWide) {
+            return [];
+        }
+
+        return match ($section) {
+            'connection' => [['websiteId' => 2, 'name' => 'Latvia', 'values' => [
+                [(string)__('Subdomain'), 'lv-shop'],
+                [(string)__('API username'), 'lv-api'],
+            ]]],
+            'subscribers' => [['websiteId' => 2, 'name' => 'Latvia', 'values' => [
+                [(string)__('Sync contacts to Smaily'), (string)__('Off')],
+            ]]],
+            default => [],
+        };
+    }
+
+    /**
+     * @return array{_query: array{website: int}}
+     */
+    public function getWebsiteQuery(): array
+    {
+        return ['_query' => ['website' => $this->storeWide ? 0 : 2]];
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSetupCompleted(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return int
+     */
+    public function getStartStep(): int
+    {
+        return 1;
+    }
+
+    /**
+     * @return int
+     */
+    public function getReachedStep(): int
+    {
+        return 1;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSmailyVerified(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSavedSubdomain(): string
+    {
+        return 'shop';
+    }
+
+    /**
+     * @return string
+     */
+    public function getSavedUsername(): string
+    {
+        return 'api';
+    }
+
+    /**
+     * @return string
+     */
+    public function getSavedStorefrontUrl(): string
+    {
+        return '';
+    }
+
+    /**
+     * @return bool
+     */
+    public function isApiOnlyStore(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isStorefrontDisclosureOpen(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isMultilingual(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getDetectedLanguages(): array
+    {
+        return ['et', 'lv'];
+    }
+
+    /**
+     * @return string
+     */
+    public function getMultilingualMode(): string
+    {
+        return 'b';
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getMultilingualAccounts(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return string
+     */
+    public function getFallbackLanguage(): string
+    {
+        return '';
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    public function getSavedMappings(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return bool
+     */
+    public function isEngineRefused(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isCookieRestrictionOnEverywhere(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return string
+     */
+    public function getConsentGuideUrl(): string
+    {
+        return 'https://example.com/consent-guide';
+    }
+
+    /**
+     * @return string
+     */
+    public function getSmailyAccountUrl(): string
+    {
+        return 'https://shop.sendsmaily.net';
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSyncEnabled(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isContactSyncActive(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSyncMode(): string
+    {
+        return 'consent';
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getSelectedSyncFields(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function getContactImportCounts(): array
+    {
+        return ['consent' => 12, 'legitimate_interest' => 40, 'checkout_optin' => 0];
+    }
+
+    /**
+     * @return string
+     */
+    public function getBootJson(): string
+    {
+        return (string)json_encode([
+            'connected' => true,
+            'verified' => true,
+            'planBlocked' => false,
+            'setupCompleted' => false,
+            'storeId' => $this->storeWide ? 0 : 2,
+            'connection' => ['subdomain' => 'shop', 'username' => 'api', 'hasPassword' => true, 'multilingualMode' => 'b'],
+            'websiteAccount' => ['subdomain' => 'shop', 'username' => 'api'],
+            'multilingual' => ['languages' => ['et', 'lv'], 'fallbackLanguage' => ''],
+            'subscribers' => [
+                'syncEnabled' => true,
+                'syncActive' => false,
+                'syncMode' => 'consent',
+                'syncFields' => [],
+                'checkoutOptin' => true,
+                'suppressOptinEmails' => true,
+                'includeGuests' => false,
+            ],
+            'automations' => [
+                'welcomeEnabled' => false,
+                'welcomeWorkflow' => '',
+                'firstOrderEnabled' => false,
+                'firstOrderWorkflow' => '',
+                'abandonedEnabled' => false,
+                'abandonedWorkflow' => '',
+                'abandonedCutoff' => 30,
+            ],
+            'intelligence' => ['connected' => false, 'tenantName' => '', 'engineVersion' => '', 'browseTracking' => false],
+            'rss' => ['enabled' => false],
+        ]);
+    }
+};
+$websitesStrings = [
+    'Websites with their own values',
+    'Keep its own values',
+    'Use this step\'s values',
+    'Saving this step starts contact sync on every website: %1.',
+    'A website that keeps its own Contacts settings below syncs as those settings say.',
+    'Per-language Smaily accounts are set for one website: under Settings > Connection, pick the website and tick'
+        . ' Use its own Smaily account on this website.',
+    'Use its own Smaily account on this website',
+    'Use its own Contacts settings on this website',
+    'Save to remove this website\'s own values: it then uses the settings saved for all websites.',
+    'This import sends %1 contacts from all websites. It runs in the background, a chunk per minute,'
+        . ' and never slows the storefront down.',
+];
+$pages['setup-websites'] = [
+    'template' => $root . '/view/adminhtml/templates/wizard/index.phtml',
+    'viewModel' => $websitesViewModel(true),
+    'data' => ['children' => [
+        'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
+        'panel.subscribers' => $root . '/view/adminhtml/templates/panel/subscribers.phtml',
+        'panel.automations' => $root . '/view/adminhtml/templates/panel/automations.phtml',
+        'panel.intelligence' => $root . '/view/adminhtml/templates/panel/intelligence.phtml',
+        'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+    ]],
+    'strings' => $websitesStrings,
+];
+$pages['settings-website'] = [
+    'template' => $root . '/view/adminhtml/templates/settings/index.phtml',
+    'viewModel' => $websitesViewModel(false),
+    'data' => ['context' => 'settings', 'children' => [
+        'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
+        'panel.subscribers' => $root . '/view/adminhtml/templates/panel/subscribers.phtml',
+        'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+    ]],
+    'strings' => $websitesStrings,
+];
 
 /*
  * The Dashboard (view/adminhtml/templates/dashboard/index.phtml): set up,

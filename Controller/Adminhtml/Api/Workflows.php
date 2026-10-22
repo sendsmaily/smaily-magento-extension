@@ -78,8 +78,10 @@ class Workflows extends AbstractJsonAction implements HttpPostActionInterface
                     'password' => $password,
                 ]);
             } else {
-                $storeId = isset($body['store_id']) ? (int)$body['store_id'] : null;
-                $client = $this->clientProvider->forStore($storeId ?: null);
+                // Store 0 (admin) reads the default scope: the initial setup's
+                // account on a store with more than one website (CON-179).
+                $storeId = isset($body['store_id']) && $body['store_id'] !== '' ? (int)$body['store_id'] : null;
+                $client = $this->clientProvider->forStore($storeId);
             }
 
             $workflows = [];

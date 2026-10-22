@@ -19,15 +19,17 @@ use Magento\Store\Model\ScopeInterface;
 use Smaily\Connect\Model\ModuleVersion;
 
 /**
- * Wizard-first gating for the Smaily Connect admin pages
- * (docs/internal/RFC_MULTI_WEBSITE.md §2):
- * - The initial setup's Finish step saves the setup-completed flag for its
- *   one website (website scope). Dashboard, Settings and Log redirect a
- *   website without the flag to the initial setup of that website. A
- *   website has no flag on a fresh install, when it is newly added, and,
- *   after an upgrade from 2.8.x, on every website: the legacy migration
- *   does not write the flag, so each website goes through the initial
- *   setup (intended, owner decision 2026-10-09).
+ * Wizard-first gating for the Smaily Connect admin pages:
+ * - The initial setup sets the whole store up (CON-179): its Finish step
+ *   saves the setup-completed flag once for the store (default scope).
+ *   Until the store is set up, Dashboard, Settings and Log redirect to the
+ *   initial setup; a website is never sent there on its own. The store is
+ *   not set up on a fresh install and after an upgrade from 2.8.x (the
+ *   legacy migration does not write the flag; intended, owner decision
+ *   2026-10-09).
+ * - An initial setup finished before CON-179 saved the flag per website: a
+ *   store where any website holds it counts as set up, so a finished store
+ *   is not sent back into the setup (nothing is rewritten).
  * - After a MAJOR version upgrade a one-time "review what's new" notice is
  *   also posted; it does not replace the redirect.
  */
@@ -48,7 +50,7 @@ class SetupGuard
     /**
      * The gate of Dashboard, Settings and Log: record the module version
      * (checkVersionChange()), then the redirect to the initial setup when
-     * the website is not set up yet, else null so the page renders.
+     * the store is not set up yet, else null so the page renders.
      */
     public function redirectIfNotSetUp(ResultFactory $resultFactory): ?Redirect
     {
@@ -59,31 +61,29 @@ class SetupGuard
         /** @var Redirect $redirect */
         $redirect = $resultFactory->create(ResultFactory::TYPE_REDIRECT);
 
-        return $redirect->setPath('smaily_connect/wizard', $this->getWizardRouteParams());
-    }
-
-    public function isSetupCompleted(): bool
-    {
-        return $this->scopeConfig->isSetFlag(
-            WizardStepSaver::XML_PATH_SETUP_COMPLETED,
-            ScopeInterface::SCOPE_WEBSITE,
-            $this->websiteContext->getWebsiteId()
-        );
+        return $redirect->setPath('smaily_connect/wizard');
     }
 
     /**
-     * The route params of a page's redirect to the initial setup: the
-     * website the request named, so the setup opens for that website
-     * instead of on its website chooser, which starts on the first website
-     * (PRO-4012). A request that named no website gets the chooser.
-     *
-     * @return array<string, mixed>
+     * Whether the store is set up: the store's mark, or (an initial setup
+     * finished before CON-179) any website's own.
      */
-    public function getWizardRouteParams(): array
+    public function isSetupCompleted(): bool
     {
-        return $this->websiteContext->isExplicit()
-            ? ['_query' => ['website' => $this->websiteContext->getWebsiteId()]]
-            : [];
+        if ($this->scopeConfig->isSetFlag(WizardStepSaver::XML_PATH_SETUP_COMPLETED)) {
+            return true;
+        }
+        foreach (array_keys($this->websiteContext->getWebsiteOptions()) as $websiteId) {
+            if ($this->scopeConfig->isSetFlag(
+                WizardStepSaver::XML_PATH_SETUP_COMPLETED,
+                ScopeInterface::SCOPE_WEBSITE,
+                $websiteId
+            )) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

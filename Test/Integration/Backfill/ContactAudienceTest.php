@@ -8,7 +8,6 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Backfill;
 
-use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json;
@@ -16,7 +15,9 @@ use Magento\Newsletter\Model\Subscriber;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
+use Smaily\Connect\Model\Adminhtml\SetupGuard;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
@@ -128,7 +129,6 @@ class ContactAudienceTest extends IntegrationTestCase
             $this->createMock(Config::class),
             $this->createMock(Mode::class),
             $this->createMock(EngineSettings::class),
-            $this->createMock(ScopeConfigInterface::class),
             $this->createMock(AccountResolver::class),
             $this->audience,
             new Json(),
@@ -137,7 +137,9 @@ class ContactAudienceTest extends IntegrationTestCase
             $this->createMock(VerifiedCredentials::class),
             $this->createMock(ResolverInterface::class),
             $this->createMock(ConsentSource::class),
-            $this->createMock(OrderOrigin::class)
+            $this->createMock(OrderOrigin::class),
+            $this->createMock(SetupGuard::class),
+            $this->createMock(WebsiteOverrides::class)
         );
 
         $walked = [];

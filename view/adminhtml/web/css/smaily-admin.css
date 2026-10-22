@@ -90,6 +90,11 @@
 .smaily-ui #smaily-w-fields label { display: inline-block; width: 16rem; }
 .smaily-ui .smaily-muted { opacity: 0.5; }
 
+/* --- Website exceptions (CON-179): the setup's list, the Settings switch -- */
+.smaily-ui .smaily-website-override { border-top: 1px solid #e3e3e3; padding-top: 1rem; margin-top: 1rem; }
+.smaily-ui .smaily-website-override ul { margin: 0.5rem 0 1rem 1.5rem; }
+.smaily-ui .smaily-website-override .smaily-inline-toggle { margin-bottom: 0.5rem; }
+
 /* --- Multilingual routing (mode cards, per-language accounts, mapping) ---- */
 .smaily-ui .smaily-ml-table { width: 100%; max-width: 56rem; border-collapse: collapse; }
 .smaily-ui .smaily-ml-table th { text-align: left; font-weight: 600; color: #666; padding: 0.4rem 1rem 0.4rem 0; }

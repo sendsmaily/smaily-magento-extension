@@ -12,12 +12,12 @@
  * guided view over one source of truth. Steps 2+ unlock once the Smaily
  * connection is verified (same gating as the Woo/Shopify plugins).
  *
- * On a 2+-website install, a website-chooser card renders BEFORE the normal
- * step rail whenever the request hasn't already named a website
- * (docs/internal/RFC_MULTI_WEBSITE.md §2): picking one reloads the page with
- * `?website=<id>`, which is the same mechanism the Settings selector uses —
- * every step from then on saves/prefills against that website's scope with
- * no further plumbing.
+ * The setup sets the whole store up (CON-179): every step prefills and
+ * saves the store-wide values, on a store with any number of websites, and
+ * opens on Connect. On a 2+-website install, the Connect, Contacts and
+ * Automations steps list each website that holds its own values of the
+ * step's settings, with those values; each one keeps them unless the
+ * merchant picks the step's values for it (posted as `use_store_wide`).
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
@@ -25,19 +25,48 @@
 
 /** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
 $viewModel = $block->getData('view_model');
-$showChooser = $viewModel->hasMultipleWebsites() && !$viewModel->hasSelectedWebsite();
-$websiteOptions = $viewModel->getWebsiteOptions();
 
 // The user guide's address is set in one place, Model/UserGuide.php.
 $userGuideUrl = \Smaily\Connect\Model\UserGuide::URL;
 
-// Carries the website this run just configured through to Settings/Log so a
-// multi-website merchant lands back on the same website, not silently the
-// installation's default one.
-$websiteQuery = $viewModel->getWebsiteQuery();
-$settingsUrl = $block->getUrl('smaily_connect/settings', $websiteQuery);
-$dashboardUrl = $block->getUrl('smaily_connect/dashboard', $websiteQuery);
-$logUrl = $block->getUrl('smaily_connect/log', $websiteQuery);
+$settingsUrl = $block->getUrl('smaily_connect/settings');
+$dashboardUrl = $block->getUrl('smaily_connect/dashboard');
+$logUrl = $block->getUrl('smaily_connect/log');
+
+// The websites that hold their own values of a step's settings (CON-179),
+// under the step's own panel: each keeps them unless "Use this step's
+// values" is picked for it. Rendered on a 2+-website install only.
+$websiteOverrides = static function (string $section) use ($viewModel, $escaper): string {
+    $websites = $viewModel->getWebsiteOverrides($section);
+    if ($websites === []) {
+        return '';
+    }
+    $html = '<div class="smaily-card smaily-website-overrides" data-section="'
+        . $escaper->escapeHtmlAttr($section) . '">'
+        . '<h2>' . $escaper->escapeHtml(__('Websites with their own values')) . '</h2>'
+        . '<p class="note">' . $escaper->escapeHtml(__('These websites hold their own values for the settings of this step, so the values you save here do not reach them. Each one keeps its own values unless you pick this step\'s values for it.')) . '</p>';
+    foreach ($websites as $website) {
+        $name = 'smaily-ov-' . $section . '-' . $website['websiteId'];
+        $html .= '<div class="smaily-website-override">'
+            . '<strong>' . $escaper->escapeHtml($website['name']) . '</strong><ul>';
+        foreach ($website['values'] as [$label, $value]) {
+            $html .= '<li>' . ($label !== '' ? $escaper->escapeHtml($label) . ': ' : '')
+                . $escaper->escapeHtml($value) . '</li>';
+        }
+        $html .= '</ul>';
+        foreach (['keep' => __('Keep its own values'), 'store' => __('Use this step\'s values')] as $choice => $label) {
+            $html .= '<div class="smaily-inline-toggle"><label><input type="radio"'
+                . ' name="' . $escaper->escapeHtmlAttr($name) . '"'
+                . ' value="' . $escaper->escapeHtmlAttr($choice) . '"'
+                . ' data-website-id="' . (int)$website['websiteId'] . '"'
+                . ($choice === 'keep' ? ' checked' : '') . '/> '
+                . $escaper->escapeHtml($label) . '</label></div>';
+        }
+        $html .= '</div>';
+    }
+
+    return $html . '</div>';
+};
 
 // Step N of 5 + the step title above each step's content, as the pack draws
 // them (PRO-3561). The panels below carry no title of their own here.
@@ -73,28 +102,7 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
 ?>
 <div id="smaily-wizard" class="smaily-ui smaily-wizard">
     <!-- Styles live in view/adminhtml/web/css/smaily-admin.css (loaded via the wizard layout XML). -->
-    <?php if ($showChooser): ?>
-    <div class="smaily-card" id="smaily-wizard-website-chooser">
-        <h2><?= $escaper->escapeHtml(__('Which website are you setting up?')) ?></h2>
-        <p><?= $escaper->escapeHtml(__('This install has more than one website. Pick the one to connect — you can run the initial setup again for each of the others.')) ?></p>
-        <div class="smaily-field">
-            <label for="smaily-wizard-website-input"><?= $escaper->escapeHtml(__('Website')) ?></label>
-            <select id="smaily-wizard-website-input">
-                <?php foreach ($websiteOptions as $websiteId => $websiteName): ?>
-                <option value="<?= (int)$websiteId ?>"><?= $escaper->escapeHtml($websiteName) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="smaily-footer">
-            <div>
-                <button type="button" class="action-primary" id="smaily-wizard-website-continue">
-                    <span><?= $escaper->escapeHtml(__('Continue')) ?></span>
-                </button>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
-    <div id="smaily-wizard-main"<?= $showChooser ? ' style="display:none"' : '' ?>>
+    <div id="smaily-wizard-main">
     <?php // Each rail step carries the pack's short line under its name (the
     // WooCommerce plugin's step descriptions); the rail shows it, the narrow
     // strip across the top does not. ?>
@@ -145,10 +153,10 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
             </div>
         </div>
         <?php endif; ?>
-        <div id="smaily-w-connect-form"<?= $setupCompleted ? ' style="display:none"' : '' ?>><?= $block->getChildHtml('panel.connection') ?></div>
+        <div id="smaily-w-connect-form"<?= $setupCompleted ? ' style="display:none"' : '' ?>><?= $block->getChildHtml('panel.connection') ?><?= /* @noEscape */ $websiteOverrides('connection') ?></div>
     </div>
-    <div class="<?= /* @noEscape */ $panelClass(2) ?>" data-step="2"><?= /* @noEscape */ $stepHead(2) ?><?= $block->getChildHtml('panel.subscribers') ?></div>
-    <div class="<?= /* @noEscape */ $panelClass(3) ?>" data-step="3"><?= /* @noEscape */ $stepHead(3) ?><?= $block->getChildHtml('panel.automations') ?></div>
+    <div class="<?= /* @noEscape */ $panelClass(2) ?>" data-step="2"><?= /* @noEscape */ $stepHead(2) ?><?= $block->getChildHtml('panel.subscribers') ?><?= /* @noEscape */ $websiteOverrides('subscribers') ?></div>
+    <div class="<?= /* @noEscape */ $panelClass(3) ?>" data-step="3"><?= /* @noEscape */ $stepHead(3) ?><?= $block->getChildHtml('panel.automations') ?><?= /* @noEscape */ $websiteOverrides('automations') ?></div>
     <div class="<?= /* @noEscape */ $panelClass(4) ?>" data-step="4"><?= /* @noEscape */ $stepHead(4) ?><?= $block->getChildHtml('panel.intelligence') ?></div>
 
     <!-- Step 5: Overview (wizard-only) -->
@@ -163,7 +171,7 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
                 <li><a href="<?= $escaper->escapeUrl($logUrl) ?>"><?= $escaper->escapeHtml(__('Log')) ?></a> — <?= $escaper->escapeHtml(__('every delivery to Smaily and Campaign Intelligence with retry; check here first if something seems off')) ?></li>
                 <li><?= $escaper->escapeHtml(__('Product RSS feed for the Smaily template editor:')) ?> <code><?= $escaper->escapeHtml($block->getBaseUrl() . 'smaily/rss/feed') ?></code><br/>
                     <span class="note"><?= $escaper->escapeHtml(__('Need a category-filtered or sorted feed? Use the URL builder under Settings > RSS.')) ?>
-                        <a href="<?= $escaper->escapeUrl($block->getUrl('smaily_connect/settings', array_replace_recursive($websiteQuery, ['_query' => ['tab' => 'rss']]))) ?>"><?= $escaper->escapeHtml(__('Open the URL builder')) ?></a></span></li>
+                        <a href="<?= $escaper->escapeUrl($block->getUrl('smaily_connect/settings', ['_query' => ['tab' => 'rss']])) ?>"><?= $escaper->escapeHtml(__('Open the URL builder')) ?></a></span></li>
                 <li><a href="<?= $escaper->escapeUrl($userGuideUrl) ?>" target="_blank" rel="noopener noreferrer"><?= $escaper->escapeHtml(__('User Guide')) ?></a> — <?= $escaper->escapeHtml(__('the full merchant documentation: every feature, setting and troubleshooting steps')) ?></li>
             </ul>
             <p class="note"><?= $escaper->escapeHtml(__('Tip: make sure the Magento cron runs every minute — deliveries are queued and flushed by the smaily_connect cron group.')) ?></p>
@@ -202,14 +210,6 @@ require(['jquery'], function ($) {
 
     var panels = window.smailyPanelsInit($);
     // Strings are translated server-side — see panel/panels-js.phtml.
-
-    // Website chooser (docs/internal/RFC_MULTI_WEBSITE.md §2, 2+-website installs only):
-    // reloads with ?website=<id>, same mechanism as the Settings selector.
-    $('#smaily-wizard-website-continue').on('click', function () {
-        var url = new URL(window.location.href);
-        url.searchParams.set('website', $('#smaily-wizard-website-input').val());
-        window.location.href = url.toString();
-    });
     //
     // step = the step currently shown; maxStep = the furthest step ever
     // reached (from the saved config on load, then per-step saves). The
@@ -247,17 +247,29 @@ require(['jquery'], function ($) {
         window.scrollTo(0, 0);
     }
 
-    /** Wraps a (possibly throwing) collector into a promise chain. */
-    function save(name, collector) {
+    /**
+     * Wraps a (possibly throwing) collector into a promise chain. The post
+     * names the websites listed under the step whose own values give way to
+     * the step's values (CON-179).
+     */
+    function save(name, collector, section) {
         return new Promise(function (resolve) { resolve(collector()); })
-            .then(function (data) { return panels.saveStep(name, data); });
+            .then(function (data) {
+                if (section) {
+                    data.use_store_wide = $('.smaily-website-overrides[data-section=' + section + ']'
+                        + ' input[value=store]:checked').map(function () {
+                        return parseInt($(this).data('website-id'), 10);
+                    }).get();
+                }
+                return panels.saveStep(name, data);
+            });
     }
 
     var stepSavers = {
         // The summary saves nothing: Continue only moves on.
-        1: function () { return summary ? Promise.resolve() : save('connect', panels.collect.connect); },
-        2: function () { return save('subscribers', panels.collect.subscribers); },
-        3: function () { return save('automations', panels.collect.automations); },
+        1: function () { return summary ? Promise.resolve() : save('connect', panels.collect.connect, 'connection'); },
+        2: function () { return save('subscribers', panels.collect.subscribers, 'subscribers'); },
+        3: function () { return save('automations', panels.collect.automations, 'automations'); },
         4: function () {
             return save('intelligence', panels.collect.intelligence).then(function () {
                 return panels.saveStep('finish', {});
@@ -316,9 +328,9 @@ require(['jquery'], function ($) {
     });
 
     // The start step and the furthest step reached come from the server
-    // (WizardData::getStartStep() / getReachedStep()), which drew them: a
-    // finished setup opens on the connection summary with every step
-    // unlocked, filled-in credentials open an unfinished setup on Contacts.
+    // (WizardData::getStartStep() / getReachedStep()), which drew them: the
+    // setup opens on Connect, a finished one on the connection summary with
+    // every step unlocked (CON-179).
     if (step === 3) {
         panels.loadWorkflows('#smaily-w-save-result');
     }

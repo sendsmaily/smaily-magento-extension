@@ -30,20 +30,13 @@ $isSettings = $block->getData('context') === 'settings';
 // so (PRO-4036, PRO-4037).
 $syncEnabled = $isSettings || $viewModel->isSyncEnabled();
 $showSyncSwitch = $isSettings || !$syncEnabled;
+// The initial setup on a 2+-website install saves the Contacts settings for
+// the whole store (CON-179): its save starts contact sync on every website.
+$allWebsites = !$isSettings && $viewModel->isStoreWide() && $viewModel->hasMultipleWebsites();
 
 // Optional contact fields, server-rendered (same values the system.xml
 // multiselect edits).
-$syncFieldLabels = [
-    'first_name' => __('First name'),
-    'last_name' => __('Last name'),
-    'prefix' => __('Name prefix'),
-    'user_phone' => __('Phone'),
-    'user_gender' => __('Gender'),
-    'birthday' => __('Date of birth'),
-    'customer_id' => __('Customer ID'),
-    'customer_group' => __('Customer group'),
-    'subscription_type' => __('Subscription type'),
-];
+$syncFieldLabels = \Smaily\Connect\ViewModel\Adminhtml\WizardData::syncFieldLabels();
 $selectedSyncFields = $viewModel->getSelectedSyncFields();
 ?>
 <div class="smaily-card">
@@ -63,7 +56,16 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
             : __('This is a lawful-basis choice. Pick the preset that matches how you have asked your customers for permission — you can change it later in Settings > Contacts.')) ?></p>
         <?php // A new website sends nothing to Smaily before this step is
         // saved (PRO-4036); with the switch shown, the switch says it. ?>
-        <?php if (!$showSyncSwitch && !$viewModel->isContactSyncActive()): ?>
+        <?php // On a 2+-website install it names the websites; with the switch
+        // shown, panels-js.phtml shows it while the switch is ticked. ?>
+        <?php if ($allWebsites): ?>
+        <p id="smaily-w-sync-starts-websites"<?= $showSyncSwitch ? ' style="display:none;"' : '' ?>>
+            <?= $escaper->escapeHtml(__('Saving this step starts contact sync on every website: %1.', implode(', ', $viewModel->getWebsiteNames()))) ?>
+            <?php if ($viewModel->getWebsiteOverrides('subscribers') !== []): ?>
+            <?= $escaper->escapeHtml(__('A website that keeps its own Contacts settings below syncs as those settings say.')) ?>
+            <?php endif; ?>
+        </p>
+        <?php elseif (!$showSyncSwitch && !$viewModel->isContactSyncActive()): ?>
         <p id="smaily-w-sync-starts">
             <?= $escaper->escapeHtml(__('Contacts start syncing to Smaily when you save this step.')) ?>
         </p>
@@ -150,6 +152,20 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
     // forms, so each count picks its own singular or plural phrase.
     $importEstimates = [];
     foreach ($viewModel->getContactImportCounts() as $countMode => $contactCount) {
+        if ($allWebsites) {
+            $importEstimates[$countMode] = (string)($contactCount === 1
+                ? __(
+                    'This import sends %1 contact from all websites. It runs in the background,'
+                    . ' a chunk per minute, and never slows the storefront down.',
+                    $contactCount
+                )
+                : __(
+                    'This import sends %1 contacts from all websites. It runs in the background,'
+                    . ' a chunk per minute, and never slows the storefront down.',
+                    $contactCount
+                ));
+            continue;
+        }
         $importEstimates[$countMode] = (string)($contactCount === 1
             ? __(
                 'This import sends %1 contact from this website. It runs in the background,'

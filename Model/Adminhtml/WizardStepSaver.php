@@ -39,16 +39,31 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * section itself is hidden) — one source of truth, the wizard is just a
  * guided view over it.
  *
- * Website-scoped fields (connection credentials, subscriber sync toggles,
- * automation toggles — docs/internal/RFC_MULTI_WEBSITE.md §1) write at the target
- * website's scope, defaulting to the installation's default website when no
- * website is specified — unchanged behaviour for a single-website install,
- * since Config's readers already resolve website scope. The automation
- * mapping table saves at that same target website scope (§6, Phase 3). The
- * setup-completed flag is also website-scoped (§2, Phase 2) so each
- * website's own onboarding is tracked independently. Fields outside that
- * list (Intelligence, RSS) are untouched in this phase — they stay at
- * default scope.
+ * The extension is set up once for the whole store (CON-179): the Smaily
+ * account, the Contacts settings and the automations (WebsiteOverrides'
+ * sections) save at the default scope, and a website differs only where it
+ * holds its own values. Where a section's save writes (sectionTarget()):
+ * - The initial setup (a store-wide request) writes the default scope; on a
+ *   2+-website install a website listed with its own values keeps them
+ *   unless the post names it in `use_store_wide`.
+ * - Settings on a 2+-website install, for its selected website: `own` true
+ *   writes the website's own values (its scope; the mapping rows under its
+ *   id); otherwise a website with own values gets them removed and nothing
+ *   else is written (it returns to the store-wide values), and a website
+ *   without writes the store-wide values it shows.
+ * - A single-website install writes the default scope and removes the
+ *   website's own values: the store and its one website are one thing.
+ * - Per-language Smaily accounts (multilingual mode A) are always a
+ *   website's own (owner decision 2026-10-22): they live on its store
+ *   views, and its per-language workflow rows name those accounts. A
+ *   Smaily account saved in mode A, and the automations of a website in
+ *   mode A, are written at the website's scope — also by the initial setup
+ *   of a single-website install — so a website added later does not
+ *   inherit them. A store-wide save on a 2+-website install does not take
+ *   mode A (saveConnect()).
+ * Store-wide mapping rows are website 0's. The setup-completed flag is one
+ * mark for the store (default scope). Intelligence and RSS are default
+ * scope as before.
  */
 class WizardStepSaver
 {
@@ -59,6 +74,9 @@ class WizardStepSaver
 
     /** Whether the last connection save changed the storefront address (PRO-3660). */
     private bool $storefrontUrlChanged = false;
+
+    /** Whether the last save returned the website to the store-wide values (CON-179). */
+    private bool $returnedToStoreWide = false;
 
     public function __construct(
         private readonly WriterInterface $configWriter,
@@ -74,7 +92,8 @@ class WizardStepSaver
         private readonly ConfigRowNormalizer $rowNormalizer,
         private readonly CredentialCheck $credentialCheck,
         private readonly SetupNotice $setupNotice,
-        private readonly TransactionalSettingsSaver $transactionalSaver
+        private readonly TransactionalSettingsSaver $transactionalSaver,
+        private readonly WebsiteOverrides $overrides
     ) {
     }
 
@@ -84,21 +103,141 @@ class WizardStepSaver
      */
     public function save(string $step, array $data): array
     {
+        $this->returnedToStoreWide = false;
+        // The scope the section's saved values are read from: the selected
+        // website, or for the initial setup the store (WebsiteContext).
         $websiteId = $this->websiteContext->getWebsiteId();
         $errors = match ($step) {
             'connect' => $this->saveConnection($data, $websiteId),
-            'subscribers' => $this->saveSubscribers($data, $websiteId),
-            'automations' => $this->saveAutomations($data, $websiteId)
-                ?: $this->saveTransactionalTriggers($data, $websiteId),
+            'subscribers' => $this->saveSection(
+                WebsiteOverrides::SUBSCRIBERS,
+                $data,
+                $websiteId,
+                fn (?int $target): array => $this->saveSubscribers($data, $target)
+            ),
+            'automations' => $this->saveSection(
+                WebsiteOverrides::AUTOMATIONS,
+                $data,
+                $websiteId,
+                fn (?int $target): array => $this->saveAutomations($data, $websiteId, $target)
+            ) ?: $this->saveTransactionalTriggers($data, $websiteId),
             'intelligence' => $this->saveIntelligence($data),
             'rss' => $this->saveRss($data),
-            'finish' => $this->saveFinish($websiteId),
+            'finish' => $this->saveFinish(),
             default => [['field' => 'step', 'message' => (string)__('Unknown wizard step "%1".', $step)]],
         };
 
         $this->cacheTypeList->cleanType(ConfigCache::TYPE_IDENTIFIER);
 
         return $errors;
+    }
+
+    /**
+     * Whether the last save returned the selected website to the store-wide
+     * values of a section (CON-179): it removed the website's own values
+     * and wrote nothing else, so the page shows the store-wide values only
+     * after a reload.
+     */
+    public function isReturnedToStoreWide(): bool
+    {
+        return $this->returnedToStoreWide;
+    }
+
+    /**
+     * Saves a section where sectionTarget() says, then removes the own
+     * values of the websites it names.
+     *
+     * @param array<string, mixed> $data
+     * @param callable(int|null): array<int, array{field: string, message: string}> $save
+     * @return array<int, array{field: string, message: string}>
+     */
+    private function saveSection(string $section, array $data, int $websiteId, callable $save): array
+    {
+        [$target, $remove, $write] = $this->sectionTarget($section, $data, $websiteId);
+        $errors = $write ? $save($target) : [];
+        if ($errors !== []) {
+            return $errors;
+        }
+        $multiple = $this->websiteContext->hasMultipleWebsites();
+        foreach ($remove as $removeId) {
+            // A website that set its own per-language accounts (mode A)
+            // keeps them on its store views; they go with its own account.
+            $this->overrides->removeOwnValues($section, $removeId, $multiple);
+        }
+        $this->returnedToStoreWide = !$write;
+
+        return [];
+    }
+
+    /**
+     * Where a section's save writes: the website id whose scope gets the
+     * values (null = the default scope, the whole store), the websites
+     * whose own values of the section are removed, and whether the values
+     * are written at all (not when a website returns to the store-wide
+     * values) — see the class comment.
+     *
+     * @param array<string, mixed> $data
+     * @return array{0: int|null, 1: int[], 2: bool}
+     */
+    private function sectionTarget(string $section, array $data, int $websiteId): array
+    {
+        $withOwn = array_keys($this->overrides->ownValues($section));
+        $perLanguage = $this->isPerLanguageAccounts($section, $data, $websiteId);
+        if (!$this->websiteContext->hasMultipleWebsites()) {
+            return $perLanguage
+                ? [$websiteId, [], true]
+                : [null, array_values(array_intersect($withOwn, [$websiteId])), true];
+        }
+        if ($this->websiteContext->isStoreWide()) {
+            $chosen = array_map('intval', is_array($data['use_store_wide'] ?? null) ? $data['use_store_wide'] : []);
+
+            return [null, array_values(array_intersect($withOwn, $chosen)), true];
+        }
+        // A website in mode A keeps its own automations; unticking its own
+        // Smaily account still returns it (and so leaves mode A).
+        if (!empty($data['own']) || ($perLanguage && $section === WebsiteOverrides::AUTOMATIONS)) {
+            return [$websiteId, [], true];
+        }
+        if (in_array($websiteId, $withOwn, true)) {
+            return [null, [$websiteId], false];
+        }
+
+        return $perLanguage ? [$websiteId, [], true] : [null, [], true];
+    }
+
+    /**
+     * Whether the section's save belongs to a website's per-language Smaily
+     * accounts (mode A), which are always the website's own: a Smaily
+     * account posted in mode A, or the automations of a website saved in
+     * mode A. Never for the whole store of a 2+-website install (website 0).
+     *
+     * @param array<string, mixed> $data
+     */
+    private function isPerLanguageAccounts(string $section, array $data, int $websiteId): bool
+    {
+        if ($websiteId === WebsiteContext::STORE_WIDE) {
+            return false;
+        }
+
+        return match ($section) {
+            WebsiteOverrides::CONNECTION => strtolower((string)($data['multilingual_mode'] ?? ''))
+                === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS,
+            WebsiteOverrides::AUTOMATIONS => $this->config->getMultilingualMode($websiteId)
+                === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS,
+            default => false,
+        };
+    }
+
+    /**
+     * Saves a value at a website's scope, or at the default scope (null).
+     */
+    private function write(string $path, string $value, ?int $websiteId): void
+    {
+        if ($websiteId === null) {
+            $this->configWriter->save($path, $value);
+        } else {
+            $this->configWriter->save($path, $value, ScopeInterface::SCOPE_WEBSITES, $websiteId);
+        }
     }
 
     /**
@@ -151,7 +290,12 @@ class WizardStepSaver
             }
         }
 
-        $errors = $this->saveConnect($data, $websiteId);
+        $errors = $this->saveSection(
+            WebsiteOverrides::CONNECTION,
+            $data,
+            $websiteId,
+            fn (?int $target): array => $this->saveConnect($data, $websiteId, $target)
+        );
         if ($errors === [] && $transactional !== null) {
             $this->transactionalSaver->saveAccount($transactional, $websiteId);
         }
@@ -174,10 +318,16 @@ class WizardStepSaver
     }
 
     /**
+     * The Smaily account, read from $websiteId's saved values (the account
+     * the form was drawn with) and written at $target's scope (null = the
+     * default scope). Per-language accounts (mode A) live on the store
+     * views of one website, so on a 2+-website install they are a website's
+     * own Smaily account: a store-wide save there does not take mode A.
+     *
      * @param array<string, mixed> $data
      * @return array<int, array{field: string, message: string}>
      */
-    private function saveConnect(array $data, int $websiteId): array
+    private function saveConnect(array $data, int $websiteId, ?int $target): array
     {
         $this->connectionAccepted = false;
         $this->storefrontUrlChanged = false;
@@ -246,8 +396,15 @@ class WizardStepSaver
 
         $previousMode = $this->config->getMultilingualMode($websiteId) ?: MultilingualMode::MODE_SINGLE;
         $postedMode = strtolower((string)($data['multilingual_mode'] ?? 'single'));
-        $postedModeValid = in_array($postedMode, ['single', 'a', 'b', 'c'], true);
+        $modes = $target === null && $this->websiteContext->hasMultipleWebsites()
+            ? ['single', 'b', 'c']
+            : ['single', 'a', 'b', 'c'];
+        $postedModeValid = in_array($postedMode, $modes, true);
         $mode = $postedModeValid ? $postedMode : $previousMode;
+        if (!in_array($mode, $modes, true)) {
+            $mode = MultilingualMode::MODE_SINGLE;
+            $postedModeValid = true;
+        }
         $fallbackLanguage = strtolower(trim((string)($data['fallback_language'] ?? '')));
 
         // The accounts the store views hold before anything below is saved.
@@ -269,24 +426,22 @@ class WizardStepSaver
             return $errors;
         }
 
-        $this->configWriter->save(Config::XML_PATH_SUBDOMAIN, $subdomain, ScopeInterface::SCOPE_WEBSITES, $websiteId);
-        $this->configWriter->save(Config::XML_PATH_USERNAME, $username, ScopeInterface::SCOPE_WEBSITES, $websiteId);
-        if ($password !== '') {
-            $this->configWriter->save(
+        $this->write(Config::XML_PATH_SUBDOMAIN, $subdomain, $target);
+        $this->write(Config::XML_PATH_USERNAME, $username, $target);
+        // An empty password keeps the saved one; a store-wide save writes it
+        // at the default scope too, where a single-website install's
+        // website held it before (its own values are removed after the save).
+        $keptPassword = $password === '' && $target === null ? $this->config->getWebsitePassword($websiteId) : '';
+        if ($password !== '' || $keptPassword !== '') {
+            $this->write(
                 Config::XML_PATH_PASSWORD,
-                $this->encryptor->encrypt($password),
-                ScopeInterface::SCOPE_WEBSITES,
-                $websiteId
+                $this->encryptor->encrypt($password !== '' ? $password : $keptPassword),
+                $target
             );
         }
 
         if ($postedModeValid) {
-            $this->configWriter->save(
-                Config::XML_PATH_MULTILINGUAL_MODE,
-                $mode,
-                ScopeInterface::SCOPE_WEBSITES,
-                $websiteId
-            );
+            $this->write(Config::XML_PATH_MULTILINGUAL_MODE, $mode, $target);
         }
 
         if ($mode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS && is_array($data['accounts'] ?? null)) {
@@ -295,16 +450,11 @@ class WizardStepSaver
 
         // The default-fallback account (mode A): its credentials are also
         // posted as the top-level subdomain/username/password, so the
-        // website scope IS the fallback account; the language is remembered
-        // for the admin UI's fallback picker, per website as the account is
+        // saved account IS the fallback account; the language is remembered
+        // for the admin UI's fallback picker, where the account is saved
         // (PRO-3719).
         if ($fallbackLanguage !== '' && preg_match('/^[a-z]{2,3}$/', $fallbackLanguage) === 1) {
-            $this->configWriter->save(
-                Config::XML_PATH_FALLBACK_LANGUAGE,
-                $fallbackLanguage,
-                ScopeInterface::SCOPE_WEBSITES,
-                $websiteId
-            );
+            $this->write(Config::XML_PATH_FALLBACK_LANGUAGE, $fallbackLanguage, $target);
         }
 
         // Leaving mode A is destructive by design (the UI confirms first):
@@ -314,6 +464,7 @@ class WizardStepSaver
         // the Router ignores them outside modes a/b.
         if ($previousMode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
             && $mode !== MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
+            && $websiteId !== WebsiteContext::STORE_WIDE
         ) {
             $website = $this->storeManager->getWebsite($websiteId);
             if ($website instanceof Website) {
@@ -328,12 +479,7 @@ class WizardStepSaver
                 $this->config->getStorefrontUrl($this->websiteContext->getStoreId())
             );
             $this->storefrontUrlChanged = $storefrontUrl !== $savedStorefrontUrl;
-            $this->configWriter->save(
-                Config::XML_PATH_STOREFRONT_URL,
-                $storefrontUrl,
-                ScopeInterface::SCOPE_WEBSITES,
-                $websiteId
-            );
+            $this->write(Config::XML_PATH_STOREFRONT_URL, $storefrontUrl, $target);
         }
 
         $this->checkCredentials($subdomain, $username, $password, $websiteId);
@@ -625,15 +771,18 @@ class WizardStepSaver
     }
 
     /**
+     * The Contacts settings, written at $target's scope (null = the default
+     * scope, for every website without its own Contacts settings).
+     *
      * @param array<string, mixed> $data
      * @return array<int, array{field: string, message: string}>
      */
-    private function saveSubscribers(array $data, int $websiteId): array
+    private function saveSubscribers(array $data, ?int $target): array
     {
-        $this->saveFlag(Config::XML_PATH_SYNC_ENABLED, $data, 'sync_enabled', $websiteId);
-        $this->saveFlag(Config::XML_PATH_INCLUDE_GUESTS, $data, 'include_guests', $websiteId);
-        $this->saveFlag(Config::XML_PATH_CHECKOUT_OPTIN_ENABLED, $data, 'checkout_optin_enabled', $websiteId);
-        $this->saveFlag(Config::XML_PATH_SUPPRESS_OPTIN_EMAILS, $data, 'suppress_optin_emails', $websiteId);
+        $this->saveFlag(Config::XML_PATH_SYNC_ENABLED, $data, 'sync_enabled', $target);
+        $this->saveFlag(Config::XML_PATH_INCLUDE_GUESTS, $data, 'include_guests', $target);
+        $this->saveFlag(Config::XML_PATH_CHECKOUT_OPTIN_ENABLED, $data, 'checkout_optin_enabled', $target);
+        $this->saveFlag(Config::XML_PATH_SUPPRESS_OPTIN_EMAILS, $data, 'suppress_optin_emails', $target);
 
         $mode = (string)($data['sync_mode'] ?? '');
         if (in_array($mode, [
@@ -641,7 +790,7 @@ class WizardStepSaver
             SyncMode::MODE_LEGITIMATE_INTEREST,
             SyncMode::MODE_CHECKOUT_OPTIN,
         ], true)) {
-            $this->configWriter->save(Config::XML_PATH_SYNC_MODE, $mode, ScopeInterface::SCOPE_WEBSITES, $websiteId);
+            $this->write(Config::XML_PATH_SYNC_MODE, $mode, $target);
         }
 
         if (isset($data['sync_fields']) && is_array($data['sync_fields'])) {
@@ -649,35 +798,31 @@ class WizardStepSaver
                 SyncFields::SUPPORTED_FIELDS,
                 array_map('strval', $data['sync_fields'])
             ));
-            $this->configWriter->save(
-                Config::XML_PATH_SYNC_FIELDS,
-                implode(',', $fields),
-                ScopeInterface::SCOPE_WEBSITES,
-                $websiteId
-            );
+            $this->write(Config::XML_PATH_SYNC_FIELDS, implode(',', $fields), $target);
         }
 
-        // The merchant has now chosen how this website's contacts sync:
-        // contact sync starts here, not with the connection (PRO-4036).
-        $this->configWriter->save(
-            Config::XML_PATH_CONTACTS_CONFIRMED,
-            '1',
-            ScopeInterface::SCOPE_WEBSITES,
-            $websiteId
-        );
+        // The merchant has now chosen how contacts sync: contact sync starts
+        // here, not with the connection (PRO-4036) — a store-wide save on
+        // every website that reads its mark from the default scope, the
+        // website's own save on that website (CON-179).
+        $this->write(Config::XML_PATH_CONTACTS_CONFIRMED, '1', $target);
 
         return [];
     }
 
     /**
+     * The automations, read from $websiteId's saved values and written at
+     * $target's scope (null = the default scope; the mapping rows then
+     * under website 0).
+     *
      * @param array<string, mixed> $data
      * @return array<int, array{field: string, message: string}>
      */
-    private function saveAutomations(array $data, int $websiteId): array
+    private function saveAutomations(array $data, int $websiteId, ?int $target): array
     {
-        $this->saveFlag(Config::XML_PATH_WELCOME_ENABLED, $data, 'welcome_enabled', $websiteId);
-        $this->saveFlag(Config::XML_PATH_FIRST_ORDER_ENABLED, $data, 'first_order_enabled', $websiteId);
-        $this->saveFlag(Config::XML_PATH_ABANDONED_ENABLED, $data, 'abandoned_enabled', $websiteId);
+        $this->saveFlag(Config::XML_PATH_WELCOME_ENABLED, $data, 'welcome_enabled', $target);
+        $this->saveFlag(Config::XML_PATH_FIRST_ORDER_ENABLED, $data, 'first_order_enabled', $target);
+        $this->saveFlag(Config::XML_PATH_ABANDONED_ENABLED, $data, 'abandoned_enabled', $target);
 
         // A saved workflow id that is missing from the freshly loaded Smaily
         // list was never offered in the select, so an empty post is not a
@@ -702,20 +847,14 @@ class WizardStepSaver
                 // Missing-from-list preserve: leave the stored value untouched.
                 continue;
             }
-            $this->configWriter->save(
-                $path,
-                $postedId === '' ? '0' : $postedId,
-                ScopeInterface::SCOPE_WEBSITES,
-                $websiteId
-            );
+            $this->write($path, $postedId === '' ? '0' : $postedId, $target);
         }
 
         if (array_key_exists('abandoned_cutoff', $data)) {
-            $this->configWriter->save(
+            $this->write(
                 Config::XML_PATH_ABANDONED_CUTOFF,
                 (string)max(Config::MIN_ABANDONED_CUTOFF_MINUTES, min(1440, (int)$data['abandoned_cutoff'])),
-                ScopeInterface::SCOPE_WEBSITES,
-                $websiteId
+                $target
             );
         }
 
@@ -724,16 +863,13 @@ class WizardStepSaver
         // rows; single/c saves omit the key and leave the table untouched.
         // The per-account available-workflow lists let the saver preserve a
         // saved mapping row whose id is missing from its account's live list
-        // instead of dropping it on the full sync (PRO-1286). The mapping
-        // table now saves at the real target website scope
-        // (docs/internal/RFC_MULTI_WEBSITE.md §6, Phase 3) — the Router already prefers a
-        // website-specific row over a legacy website_id=0 row, so a
-        // single-website install keeps resolving its pre-existing rows
-        // unchanged until this website's own row is saved.
+        // instead of dropping it on the full sync (PRO-1286). Store-wide
+        // rows are website 0's; a website's own rows are its own, which the
+        // Router prefers over website 0's.
         if (isset($data['mappings']) && is_array($data['mappings'])) {
             return $this->mappingSaver->save(
                 $data['mappings'],
-                $websiteId,
+                $target ?? 0,
                 $this->availableWorkflowIdsByAccount($websiteId)
             );
         }
@@ -753,6 +889,11 @@ class WizardStepSaver
     private function availableWorkflowIdsByAccount(int $websiteId): array
     {
         $byAccount = [Mapping::ACCOUNT_DEFAULT => $this->workflowIdsForStore(null)];
+        // A store-wide save on a 2+-website install has no per-language
+        // accounts (saveConnect()).
+        if ($websiteId === WebsiteContext::STORE_WIDE) {
+            return $byAccount;
+        }
         foreach ($this->accountResolver->languageStoreIds($websiteId) as $language => $storeId) {
             $byAccount[$language] = $this->workflowIdsForStore($storeId);
         }
@@ -805,14 +946,10 @@ class WizardStepSaver
     /**
      * @return array<int, array{field: string, message: string}>
      */
-    private function saveFinish(int $websiteId): array
+    private function saveFinish(): array
     {
-        $this->configWriter->save(
-            self::XML_PATH_SETUP_COMPLETED,
-            '1',
-            ScopeInterface::SCOPE_WEBSITES,
-            $websiteId
-        );
+        // One mark for the store (CON-179).
+        $this->configWriter->save(self::XML_PATH_SETUP_COMPLETED, '1');
         // The install's "ready to set up" notice has done its job.
         $this->setupNotice->markRead();
 
@@ -827,11 +964,6 @@ class WizardStepSaver
         if (!array_key_exists($key, $data)) {
             return;
         }
-        $value = $data[$key] ? '1' : '0';
-        if ($websiteId === null) {
-            $this->configWriter->save($path, $value);
-        } else {
-            $this->configWriter->save($path, $value, ScopeInterface::SCOPE_WEBSITES, $websiteId);
-        }
+        $this->write($path, $data[$key] ? '1' : '0', $websiteId);
     }
 }

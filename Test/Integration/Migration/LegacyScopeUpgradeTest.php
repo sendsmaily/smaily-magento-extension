@@ -412,8 +412,8 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
             [
                 'Smaily for Magento 2.8.x sent no welcome email on these websites, because Enable Subscribers'
                 . ' Collection was on there with no Autoresponder ID: Website 2. The welcome automation stays off'
-                . ' there. To send one, open Marketing > Smaily Connect > Initial setup for each of these websites'
-                . ' and, on the Automations step, tick Enabled for Welcome and pick a Smaily Workflow.',
+                . ' there. To send one, open Marketing > Smaily Connect > Settings, pick each of these websites'
+                . ' and, on the Automations tab, tick Enabled for Welcome and pick a Smaily Workflow.',
             ],
             $this->noticeDescriptions(self::WELCOME_NOTICE_TITLE)
         );
@@ -436,8 +436,8 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
             [
                 'Smaily for Magento 2.8.x ei saatnud nendel veebisaitidel tervituskirja, sest seal oli Enable'
                 . ' Subscribers Collection sees, kuid Autoresponder ID puudus: Website 1, Website 3, Website 4.'
-                . ' Tervitusautomaatika jääb seal välja. Tervituskirja saatmiseks ava iga nimetatud veebisaidi'
-                . ' jaoks Turundus > Smaily Connect > Algseadistus ning märgi sammul Automaatikad sündmuse'
+                . ' Tervitusautomaatika jääb seal välja. Tervituskirja saatmiseks ava Turundus > Smaily Connect'
+                . ' > Seaded, vali järjest iga nimetatud veebisait ning märgi vahekaardil Automaatikad sündmuse'
                 . ' Tervitus juures Lubatud ja vali Smaily töövoog.',
             ],
             $this->noticeDescriptions('Smaily Connecti uuendus: tervitusautomaatikal pole töövoogu')
@@ -483,8 +483,8 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
             [
                 'Smaily for Magento 2.8.x sent no abandoned-cart reminder on these websites, because Enable'
                 . ' Abandoned Cart was on there with no Autoresponder ID: Website 2. The abandoned-cart automation'
-                . ' stays off there. To send one, open Marketing > Smaily Connect > Initial setup for each of these'
-                . ' websites and, on the Automations step, tick Enabled for Abandoned cart and pick a Smaily'
+                . ' stays off there. To send one, open Marketing > Smaily Connect > Settings, pick each of these'
+                . ' websites and, on the Automations tab, tick Enabled for Abandoned cart and pick a Smaily'
                 . ' Workflow.',
             ],
             $this->noticeDescriptions(self::ABANDONED_CART_NOTICE_TITLE)
@@ -509,9 +509,9 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
             [
                 'Smaily for Magento 2.8.x ei saatnud nendel veebisaitidel hüljatud ostukorvi meeldetuletust, sest'
                 . ' seal oli Enable Abandoned Cart sees, kuid Autoresponder ID puudus: Website 1, Website 3,'
-                . ' Website 4. Hüljatud ostukorvi automaatika jääb seal välja. Meeldetuletuse saatmiseks ava iga'
-                . ' nimetatud veebisaidi jaoks Turundus > Smaily Connect > Algseadistus ning märgi sammul'
-                . ' Automaatikad sündmuse Hüljatud ostukorv juures Lubatud ja vali Smaily töövoog.',
+                . ' Website 4. Hüljatud ostukorvi automaatika jääb seal välja. Meeldetuletuse saatmiseks ava'
+                . ' Turundus > Smaily Connect > Seaded, vali järjest iga nimetatud veebisait ning märgi'
+                . ' vahekaardil Automaatikad sündmuse Hüljatud ostukorv juures Lubatud ja vali Smaily töövoog.',
             ],
             $this->noticeDescriptions('Smaily Connecti uuendus: hüljatud ostukorvi automaatikal pole töövoogu')
         );

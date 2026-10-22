@@ -123,6 +123,33 @@ class AccountResolver
     }
 
     /**
+     * Distinct storefront languages of every website, in website order, each
+     * website's default store's language first: the languages a store-wide
+     * setting covers (CON-179).
+     *
+     * @return string[]
+     */
+    public function detectedLanguagesOfAllWebsites(): array
+    {
+        $websiteIds = [];
+        foreach ($this->storeManager->getWebsites() as $website) {
+            $websiteIds[] = (int)$website->getId();
+        }
+        sort($websiteIds);
+
+        $languages = [];
+        foreach ($websiteIds as $websiteId) {
+            foreach ($this->detectedLanguages($websiteId) as $language) {
+                if (!in_array($language, $languages, true)) {
+                    $languages[] = $language;
+                }
+            }
+        }
+
+        return $languages;
+    }
+
+    /**
      * Representative store view per detected language on the given website:
      * language => store view id, or null when the language has no resolvable
      * store view. The shared walk behind every per-language-account surface

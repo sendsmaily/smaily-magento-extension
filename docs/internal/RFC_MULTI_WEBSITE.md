@@ -3,6 +3,15 @@
 > **Status:** draft, pending review. References PRO-1456 (this RFC) and
 > PRO-1459 (engine-side per-tenant provisioning/billing confirmation, an
 > external dependency for Phase 4 below).
+>
+> **Superseded in part (CON-179, owner decision 2026-10-22):** the
+> extension is set up once for the whole store. The initial setup has no
+> website chooser and saves at the default scope; "setup completed" is one
+> mark for the store; a website differs only where Settings gives it its
+> own values. §1's per-website binding stays as the storage model of a
+> website's own values; §2's "wizard flow" and per-website `SetupGuard` are
+> replaced — `docs/ARCHITECTURE.md` "Multi-website" holds the current
+> model.
 
 ## Decision
 

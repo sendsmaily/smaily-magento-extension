@@ -89,9 +89,10 @@ confirms you downloaded the archive we built.
    delivery, with retry).
 
 Everything is configured on the module's own pages — there is no separate
-Stores > Configuration entry. Installs with more than one website get an
-explicit website selector on Settings (and a website-picker step in the
-wizard) so each website keeps its own connection and settings.
+Stores > Configuration entry. The initial setup sets the whole store up
+once, however many websites it has. Installs with more than one website get
+a website selector on Settings, where a website can be given its own Smaily
+account, Contacts settings and automations.
 
 ## Development
 

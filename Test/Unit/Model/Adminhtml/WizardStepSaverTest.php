@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Adminhtml\SetupNotice;
 use Smaily\Connect\Model\Adminhtml\TransactionalSettingsSaver;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
 use Smaily\Connect\Model\Automation\MappingSaver;
@@ -68,6 +69,9 @@ class WizardStepSaverTest extends TestCase
     /** @var TransactionalSettingsSaver&\PHPUnit\Framework\MockObject\MockObject */
     private $transactionalSaver;
 
+    /** @var WebsiteOverrides&\PHPUnit\Framework\MockObject\MockObject */
+    private $overrides;
+
     /** @var array<int, array{path: string, value: mixed, scope: string, scopeId: int}> */
     private array $saved = [];
 
@@ -93,6 +97,7 @@ class WizardStepSaverTest extends TestCase
         $this->websiteContext = $this->createMock(WebsiteContext::class);
         $this->setupNotice = $this->createMock(SetupNotice::class);
         $this->transactionalSaver = $this->createMock(TransactionalSettingsSaver::class);
+        $this->overrides = $this->createMock(WebsiteOverrides::class);
 
         $this->saved = [];
         $this->configWriter->method('save')->willReturnCallback(
@@ -110,7 +115,7 @@ class WizardStepSaverTest extends TestCase
 
         $this->saver = new WizardStepSaver(
             $this->configWriter,
-            $this->createMock(EncryptorInterface::class),
+            $this->encryptor(),
             $this->createMock(TypeListInterface::class),
             $normalizer,
             $this->accountResolver,
@@ -122,8 +127,38 @@ class WizardStepSaverTest extends TestCase
             new ConfigRowNormalizer(),
             new CredentialCheck($this->clientFactory, $this->config),
             $this->setupNotice,
-            $this->transactionalSaver
+            $this->transactionalSaver,
+            $this->overrides
         );
+    }
+
+    /**
+     * A store with more than one website: the initial setup (store-wide,
+     * website 0) or Settings for one website.
+     */
+    private function onStoreWithWebsites(int $websiteId, bool $storeWide = false): void
+    {
+        $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
+        $this->websiteContext->method('isStoreWide')->willReturn($storeWide);
+        $this->websiteContext->method('getWebsiteId')->willReturn($storeWide ? WebsiteContext::STORE_WIDE : $websiteId);
+    }
+
+    /**
+     * @param array<string, int[]> $bySection section => the websites that hold own values of it
+     */
+    private function withOwnValues(array $bySection): void
+    {
+        $this->overrides->method('ownValues')->willReturnCallback(
+            static fn (string $section): array => array_fill_keys($bySection[$section] ?? [], ['path' => 'value'])
+        );
+    }
+
+    private function encryptor(): EncryptorInterface
+    {
+        $encryptor = $this->createMock(EncryptorInterface::class);
+        $encryptor->method('encrypt')->willReturnCallback(static fn (string $value): string => 'enc:' . $value);
+
+        return $encryptor;
     }
 
     /**
@@ -287,20 +322,39 @@ class WizardStepSaverTest extends TestCase
 
     /**
      * PRO-4036: every save of the Contacts settings — the setup's step with
-     * or without the switch, and Settings > Contacts — marks them saved for
-     * the website, which starts its contact sync. No other step does.
+     * or without the switch, and Settings > Contacts — marks them saved,
+     * which starts contact sync. No other step does. A store-wide save marks
+     * them at the default scope, for every website that reads its mark from
+     * there (CON-179).
      *
      * @dataProvider contactsSaveProvider
      * @param array<string, mixed> $data
      */
-    public function testAContactsSaveMarksTheWebsitesContactsSettingsSaved(array $data): void
+    public function testAContactsSaveMarksTheContactsSettingsSaved(array $data): void
     {
         $this->saver->save('subscribers', $data);
 
         self::assertSame('1', $this->savedValue(Config::XML_PATH_CONTACTS_CONFIRMED));
+        self::assertSame(['scope' => ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 'scopeId' => 0], $this->savedScope(Config::XML_PATH_CONTACTS_CONFIRMED));
+    }
+
+    /**
+     * CON-179: a website's own Contacts settings in Settings mark them saved
+     * for that website.
+     */
+    public function testAWebsitesOwnContactsSaveMarksThemSavedForTheWebsite(): void
+    {
+        $this->onStoreWithWebsites(3);
+
+        $this->saver->save('subscribers', ['own' => true, 'sync_enabled' => true, 'sync_mode' => SyncMode::MODE_CONSENT]);
+
         self::assertSame(
-            ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 0],
+            ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 3],
             $this->savedScope(Config::XML_PATH_CONTACTS_CONFIRMED)
+        );
+        self::assertSame(
+            ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 3],
+            $this->savedScope(Config::XML_PATH_SYNC_MODE)
         );
     }
 
@@ -328,12 +382,10 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
-     * PRO-1460: connection credentials and the multilingual mode write at
-     * website scope (docs/internal/RFC_MULTI_WEBSITE.md §1) — no website chooser exists
-     * yet, so this is the installation's default website (id 0 with a bare
-     * StoreManager stub in this test harness).
+     * CON-179: the Smaily account and the multilingual mode are saved for
+     * the whole store (the default scope).
      */
-    public function testConnectCredentialsAreSavedAtWebsiteScope(): void
+    public function testConnectCredentialsAreSavedForTheWholeStore(): void
     {
         $this->saver->save('connect', [
             'subdomain' => 'demo',
@@ -342,7 +394,7 @@ class WizardStepSaverTest extends TestCase
             'multilingual_mode' => 'single',
         ]);
 
-        $expectedScope = ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 0];
+        $expectedScope = ['scope' => ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 'scopeId' => 0];
         self::assertSame('demo', $this->savedValue(Config::XML_PATH_SUBDOMAIN));
         self::assertSame($expectedScope, $this->savedScope(Config::XML_PATH_SUBDOMAIN));
         self::assertSame($expectedScope, $this->savedScope(Config::XML_PATH_USERNAME));
@@ -656,15 +708,16 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
-     * PRO-3660: the storefront address is saved normalized at the website's
-     * scope, and the save tells that it changed.
+     * PRO-3660: the storefront address is saved normalized — here as a
+     * website's own (CON-179) — and the save tells that it changed.
      */
     public function testAStorefrontUrlIsSavedNormalizedAtWebsiteScope(): void
     {
-        $this->websiteContext->method('getWebsiteId')->willReturn(2);
+        $this->onStoreWithWebsites(2);
         $this->config->method('getStorefrontUrl')->willReturn('');
 
         $errors = $this->saver->save('connect', [
+            'own' => true,
             'subdomain' => 'demo',
             'username' => 'api-user',
             'storefront_url' => ' https://Shop.Example.com/ ',
@@ -682,12 +735,13 @@ class WizardStepSaverTest extends TestCase
     /**
      * PRO-3802: the initial setup's Connect step posts the Storefront URL
      * with the first credentials, as the setup's script collects them; the
-     * one connection save stores it at the website's scope with them, so it
-     * is saved before the Contacts step's save switches contact sync on.
+     * one connection save stores it with them for the whole store (CON-179),
+     * so it is saved before the Contacts step's save switches contact sync
+     * on.
      */
     public function testTheInitialSetupsConnectStepSavesTheStorefrontUrlWithTheCredentials(): void
     {
-        $this->websiteContext->method('getWebsiteId')->willReturn(2);
+        $this->onStoreWithWebsites(2, true);
         $this->config->method('getStorefrontUrl')->willReturn('');
 
         $errors = $this->saver->save('connect', [
@@ -700,7 +754,7 @@ class WizardStepSaverTest extends TestCase
 
         self::assertSame([], $errors);
         foreach ([Config::XML_PATH_SUBDOMAIN, Config::XML_PATH_PASSWORD, Config::XML_PATH_STOREFRONT_URL] as $path) {
-            self::assertTrue($this->wasSavedAtScope($path, ScopeInterface::SCOPE_WEBSITES, 2), $path);
+            self::assertTrue($this->wasSavedAtScope($path, ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 0), $path);
         }
         self::assertSame('https://shop.example.com', $this->savedValue(Config::XML_PATH_STOREFRONT_URL));
         self::assertFalse($this->wasSaved(Config::XML_PATH_SYNC_ENABLED));
@@ -785,15 +839,15 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
-     * The mode-A fallback language is saved for the target website, as the
-     * fallback account it names is (PRO-3719) — another website's save does
-     * not change it.
+     * The mode-A fallback language is saved where the fallback account it
+     * names is (PRO-3719): here a website's own account (CON-179).
      */
     public function testFallbackLanguageIsSavedAtTheTargetWebsitesScope(): void
     {
-        $this->websiteContext->method('getWebsiteId')->willReturn(3);
+        $this->onStoreWithWebsites(3);
 
         $this->saver->save('connect', [
+            'own' => true,
             'subdomain' => 'demo',
             'username' => 'api-user',
             'fallback_language' => 'en',
@@ -855,7 +909,7 @@ class WizardStepSaverTest extends TestCase
         $normalizer->method('normalize')->willReturnArgument(0);
         $saver = new WizardStepSaver(
             $this->configWriter,
-            $this->createMock(EncryptorInterface::class),
+            $this->encryptor(),
             $this->createMock(TypeListInterface::class),
             $normalizer,
             $this->accountResolver,
@@ -867,7 +921,8 @@ class WizardStepSaverTest extends TestCase
             new ConfigRowNormalizer(),
             new CredentialCheck($this->clientFactory, $config),
             $this->setupNotice,
-            $this->createMock(TransactionalSettingsSaver::class)
+            $this->createMock(TransactionalSettingsSaver::class),
+            $this->overrides
         );
 
         $errors = $saver->save('connect', [
@@ -893,7 +948,7 @@ class WizardStepSaverTest extends TestCase
         ];
     }
 
-    public function testSubscriberFieldsAreSavedAtWebsiteScope(): void
+    public function testSubscriberFieldsAreSavedForTheWholeStore(): void
     {
         $this->saver->save('subscribers', [
             'sync_enabled' => true,
@@ -901,7 +956,7 @@ class WizardStepSaverTest extends TestCase
             'sync_fields' => ['first_name'],
         ]);
 
-        $expectedScope = ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 0];
+        $expectedScope = ['scope' => ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 'scopeId' => 0];
         self::assertSame($expectedScope, $this->savedScope(Config::XML_PATH_SYNC_ENABLED));
         self::assertSame($expectedScope, $this->savedScope(Config::XML_PATH_SYNC_MODE));
         self::assertSame($expectedScope, $this->savedScope(Config::XML_PATH_SYNC_FIELDS));
@@ -971,7 +1026,7 @@ class WizardStepSaverTest extends TestCase
         self::assertSame([], $this->saver->save('automations', ['welcome_enabled' => false, 'transactional' => $triggers]));
     }
 
-    public function testAutomationTogglesAndWorkflowsAreSavedAtWebsiteScope(): void
+    public function testAutomationTogglesAndWorkflowsAreSavedForTheWholeStore(): void
     {
         $this->config->method('getWelcomeWorkflow')->willReturn(0);
         $this->withWorkflows([['id' => 456, 'title' => 'Welcome']]);
@@ -982,25 +1037,42 @@ class WizardStepSaverTest extends TestCase
             'abandoned_cutoff' => 30,
         ]);
 
-        $expectedScope = ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 0];
+        $expectedScope = ['scope' => ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 'scopeId' => 0];
         self::assertSame($expectedScope, $this->savedScope(Config::XML_PATH_WELCOME_ENABLED));
         self::assertSame($expectedScope, $this->savedScope(Config::XML_PATH_WELCOME_WORKFLOW));
         self::assertSame($expectedScope, $this->savedScope(Config::XML_PATH_ABANDONED_CUTOFF));
     }
 
     /**
-     * PRO-1462 (docs/internal/RFC_MULTI_WEBSITE.md §6, Phase 3): the automation-mapping
-     * table's admin save routes through the real target website instead of
-     * the previously hardcoded website_id=0.
+     * CON-179: a website's own automations keep their mapping rows under
+     * its id; the store-wide rows are website 0's.
      */
     public function testAutomationMappingsAreSavedAtTheTargetWebsite(): void
     {
-        $this->websiteContext->method('getWebsiteId')->willReturn(7);
+        $this->onStoreWithWebsites(7);
         $this->accountResolver->method('languageStoreIds')->with(7)->willReturn([]);
         $this->withWorkflows([]);
         $this->mappingSaver->expects(self::once())
             ->method('save')
             ->with(self::anything(), 7, self::anything())
+            ->willReturn([]);
+
+        $this->saver->save('automations', [
+            'own' => true,
+            'mappings' => [
+                ['trigger_type' => 'welcome', 'language' => 'default', 'workflow_id' => 5],
+            ],
+        ]);
+    }
+
+    public function testTheInitialSetupSavesTheMappingsForTheWholeStore(): void
+    {
+        $this->onStoreWithWebsites(7, true);
+        $this->accountResolver->expects(self::never())->method('languageStoreIds');
+        $this->withWorkflows([]);
+        $this->mappingSaver->expects(self::once())
+            ->method('save')
+            ->with(self::anything(), 0, self::anything())
             ->willReturn([]);
 
         $this->saver->save('automations', [
@@ -1025,20 +1097,213 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
-     * PRO-1461 (docs/internal/RFC_MULTI_WEBSITE.md §2, Phase 2): the setup-completed flag
-     * is website-scoped so a second website's own wizard run is tracked
-     * independently of the first.
+     * CON-179: the setup-completed flag is one mark for the store.
      */
-    public function testFinishSavesTheSetupCompletedFlagAtTheTargetWebsite(): void
+    public function testFinishSavesTheSetupCompletedFlagForTheStore(): void
     {
-        $this->websiteContext->method('getWebsiteId')->willReturn(7);
+        $this->onStoreWithWebsites(7, true);
 
         $this->saver->save('finish', []);
 
+        self::assertSame(['scope' => ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 'scopeId' => 0], $this->savedScope(WizardStepSaver::XML_PATH_SETUP_COMPLETED));
+    }
+
+    /**
+     * CON-179: the initial setup on a store with more than one website saves
+     * for the whole store; a website with its own values keeps them unless
+     * the merchant picked the step's values for it.
+     */
+    public function testTheSetupKeepsAWebsitesOwnValuesUnlessTheStepsValuesArePickedForIt(): void
+    {
+        $this->onStoreWithWebsites(1, true);
+        $this->withOwnValues([WebsiteOverrides::SUBSCRIBERS => [2, 3]]);
+        $this->overrides->expects(self::once())->method('removeOwnValues')
+            ->with(WebsiteOverrides::SUBSCRIBERS, 3, true);
+
+        $errors = $this->saver->save('subscribers', [
+            'sync_mode' => SyncMode::MODE_CONSENT,
+            'use_store_wide' => [3, 4],
+        ]);
+
+        self::assertSame([], $errors);
+        self::assertSame(['scope' => ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 'scopeId' => 0], $this->savedScope(Config::XML_PATH_SYNC_MODE));
+        self::assertFalse($this->saver->isReturnedToStoreWide());
+    }
+
+    /**
+     * CON-179: in Settings, unticking a website's own values and saving
+     * removes them — nothing else is written, and the page reloads.
+     */
+    public function testSettingsReturnsAWebsiteWithOwnValuesToTheStoreWideValues(): void
+    {
+        $this->onStoreWithWebsites(2);
+        $this->withOwnValues([WebsiteOverrides::CONNECTION => [2]]);
+        $this->overrides->expects(self::once())->method('removeOwnValues')
+            ->with(WebsiteOverrides::CONNECTION, 2, true);
+        $this->clientFactory->expects(self::never())->method('create');
+
+        $errors = $this->saver->save('connect', ['own' => false, 'subdomain' => 'demo', 'username' => 'api-user']);
+
+        self::assertSame([], $errors);
+        self::assertSame([], $this->saved);
+        self::assertTrue($this->saver->isReturnedToStoreWide());
+    }
+
+    /**
+     * CON-179: in Settings, a website that uses the store-wide values shows
+     * and saves them, for every website that uses them.
+     */
+    public function testSettingsSavesTheStoreWideValuesOfAWebsiteThatUsesThem(): void
+    {
+        $this->onStoreWithWebsites(2);
+        $this->withOwnValues([WebsiteOverrides::AUTOMATIONS => [3]]);
+        $this->overrides->expects(self::never())->method('removeOwnValues');
+
+        $this->saver->save('automations', ['own' => false, 'welcome_enabled' => true]);
+
+        self::assertSame(['scope' => ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 'scopeId' => 0], $this->savedScope(Config::XML_PATH_WELCOME_ENABLED));
+        self::assertFalse($this->saver->isReturnedToStoreWide());
+    }
+
+    /**
+     * CON-179: a store with one website has no website exceptions: a save
+     * writes the store's values and removes the website's own (which an
+     * initial setup before the update saved), keeping its password.
+     */
+    public function testAStoreWithOneWebsiteSavesForTheStoreAndRemovesTheWebsitesOwnValues(): void
+    {
+        $this->websiteContext->method('getWebsiteId')->willReturn(1);
+        $this->config->method('getWebsitePassword')->with(1)->willReturn('kept-secret');
+        $this->withOwnValues([WebsiteOverrides::CONNECTION => [1]]);
+        $this->overrides->expects(self::once())->method('removeOwnValues')
+            ->with(WebsiteOverrides::CONNECTION, 1, false);
+
+        $this->saver->save('connect', ['subdomain' => 'demo', 'username' => 'api-user', 'password' => '']);
+
+        self::assertSame(['scope' => ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 'scopeId' => 0], $this->savedScope(Config::XML_PATH_SUBDOMAIN));
+        self::assertSame('enc:kept-secret', $this->savedValue(Config::XML_PATH_PASSWORD));
+        self::assertSame(['scope' => ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 'scopeId' => 0], $this->savedScope(Config::XML_PATH_PASSWORD));
+    }
+
+    /**
+     * Per-language Smaily accounts are always a website's own (owner
+     * decision 2026-10-22): the initial setup of a store with one website
+     * saves a Smaily account in mode A at the website's scope and removes
+     * none of its own values, so a website added later does not inherit
+     * mode A.
+     */
+    public function testAStoreWithOneWebsiteSavesPerLanguageAccountsAsTheWebsitesOwn(): void
+    {
+        $this->websiteContext->method('isStoreWide')->willReturn(true);
+        $this->websiteContext->method('getWebsiteId')->willReturn(1);
+        $this->withOwnValues([WebsiteOverrides::CONNECTION => [1]]);
+        $this->overrides->expects(self::never())->method('removeOwnValues');
+
+        $errors = $this->saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'multilingual_mode' => 'a',
+            'fallback_language' => 'et',
+            'accounts' => [],
+        ]);
+
+        self::assertSame([], $errors);
+        $website = ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 1];
+        foreach ([
+            Config::XML_PATH_SUBDOMAIN,
+            Config::XML_PATH_PASSWORD,
+            Config::XML_PATH_MULTILINGUAL_MODE,
+            Config::XML_PATH_FALLBACK_LANGUAGE,
+        ] as $path) {
+            self::assertSame($website, $this->savedScope($path), $path);
+            self::assertFalse($this->wasSavedAtScope($path, ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 0), $path);
+        }
+        self::assertSame('a', $this->savedValue(Config::XML_PATH_MULTILINGUAL_MODE));
+    }
+
+    /**
+     * The automations of a website in mode A are its own as well: their
+     * per-language workflows name its accounts. On a store with one website
+     * the setup saves them under the website; in Settings on a store with
+     * more than one website they stay its own, unticked or not.
+     */
+    public function testTheAutomationsOfAWebsiteWithPerLanguageAccountsAreItsOwn(): void
+    {
+        $this->websiteContext->method('isStoreWide')->willReturn(true);
+        $this->websiteContext->method('getWebsiteId')->willReturn(1);
+        $this->config->method('getMultilingualMode')->willReturn('a');
+        $this->accountResolver->method('languageStoreIds')->willReturn([]);
+        $this->withWorkflows([]);
+        $this->overrides->expects(self::never())->method('removeOwnValues');
+        $this->mappingSaver->expects(self::once())->method('save')
+            ->with(self::anything(), 1, self::anything())
+            ->willReturn([]);
+
+        $this->saver->save('automations', [
+            'welcome_enabled' => true,
+            'mappings' => [['trigger_type' => 'welcome', 'language' => 'et', 'account_key' => 'et', 'workflow_id' => 5]],
+        ]);
+
         self::assertSame(
-            ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 7],
-            $this->savedScope(WizardStepSaver::XML_PATH_SETUP_COMPLETED)
+            ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 1],
+            $this->savedScope(Config::XML_PATH_WELCOME_ENABLED)
         );
+    }
+
+    public function testSettingsKeepsTheAutomationsOfAWebsiteWithPerLanguageAccountsItsOwn(): void
+    {
+        $this->onStoreWithWebsites(2);
+        $this->config->method('getMultilingualMode')->willReturn('a');
+        $this->withOwnValues([WebsiteOverrides::AUTOMATIONS => [2]]);
+        $this->overrides->expects(self::never())->method('removeOwnValues');
+
+        $this->saver->save('automations', ['own' => false, 'welcome_enabled' => true]);
+
+        self::assertSame(
+            ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 2],
+            $this->savedScope(Config::XML_PATH_WELCOME_ENABLED)
+        );
+        self::assertFalse($this->saver->isReturnedToStoreWide());
+    }
+
+    /**
+     * Unticking the own Smaily account of a website in mode A still returns
+     * it to the store-wide account, which leaves mode A.
+     */
+    public function testSettingsReturnsTheSmailyAccountOfAWebsiteInModeA(): void
+    {
+        $this->onStoreWithWebsites(2);
+        $this->withOwnValues([WebsiteOverrides::CONNECTION => [2]]);
+        $this->overrides->expects(self::once())->method('removeOwnValues')
+            ->with(WebsiteOverrides::CONNECTION, 2, true);
+
+        $this->saver->save('connect', ['own' => false, 'subdomain' => 'demo', 'username' => 'api-user', 'multilingual_mode' => 'a']);
+
+        self::assertSame([], $this->saved);
+        self::assertTrue($this->saver->isReturnedToStoreWide());
+    }
+
+    /**
+     * CON-179: per-language accounts live on one website's store views, so
+     * a store-wide save on a store with more than one website does not take
+     * them; Settings for a website with its own account does.
+     */
+    public function testTheStoreWideSaveOfAStoreWithWebsitesDoesNotTakePerLanguageAccounts(): void
+    {
+        $this->onStoreWithWebsites(1, true);
+        $this->accountResolver->expects(self::never())->method('storeLanguages');
+
+        $this->saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'multilingual_mode' => 'a',
+            'accounts' => [['language' => 'et', 'subdomain' => 'et-shop', 'username' => 'api', 'password' => 'x']],
+        ]);
+
+        self::assertNotSame('a', $this->savedValue(Config::XML_PATH_MULTILINGUAL_MODE));
+        self::assertFalse($this->wasSavedAtScope(Config::XML_PATH_SUBDOMAIN, ScopeInterface::SCOPE_STORES, 0));
     }
 
     /**

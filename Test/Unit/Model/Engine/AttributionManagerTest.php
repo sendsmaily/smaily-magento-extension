@@ -63,6 +63,41 @@ class AttributionManagerTest extends TestCase
         ];
     }
 
+    /**
+     * @dataProvider cookiesWithoutAStoreCreatedToken
+     */
+    public function testConsentIsReadOnlyForAStoreCreatedToken(?string $cookie): void
+    {
+        $settings = $this->createMock(Settings::class);
+        $settings->method('getEngineConfig')->willReturn([]);
+        $cookieManager = $this->createMock(CookieManagerInterface::class);
+        $cookieManager->method('getCookie')->willReturnCallback(
+            static fn (string $name) => $name === AttributionManager::DEFAULT_COOKIE_VISITOR ? $cookie : null
+        );
+        $consent = $this->createMock(MarketingConsent::class);
+        $consent->expects(self::never())->method('isGiven');
+
+        (new AttributionManager(
+            $settings,
+            $cookieManager,
+            $this->createMock(ResourceConnection::class),
+            $this->createMock(OrderPlacer::class),
+            $consent
+        ))->readCookies();
+    }
+
+    /**
+     * @return array<string, array{0: ?string}>
+     */
+    public static function cookiesWithoutAStoreCreatedToken(): array
+    {
+        return [
+            'engine vt_ token' => ['vt_8f3k2a'],
+            'no visitor cookie' => [null],
+            'neither form' => ['abc123'],
+        ];
+    }
+
     public function testAStoreCreatedTokenWithoutConsentIsNotStampedOnTheOrderButTheOtherSignalsAre(): void
     {
         $connection = $this->createMock(AdapterInterface::class);

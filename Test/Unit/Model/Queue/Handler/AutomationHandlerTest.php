@@ -8,7 +8,10 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Unit\Model\Queue\Handler;
 
+use Magento\Store\Api\Data\WebsiteInterface;
+use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\WorkflowMatch;
 use Smaily\Connect\Model\Client\Exception\TransportException;
@@ -65,7 +68,9 @@ class AutomationHandlerTest extends TestCase
             $eventQueue,
             $this->createMock(Logger::class),
             $this->createMock(AccountResolver::class),
-            $this->createMock(Config::class)
+            $this->createMock(Config::class),
+            $this->createMock(WebsiteOverrides::class),
+            $this->createMock(StoreManagerInterface::class)
         );
 
         self::assertSame([1 => true], $handler->handle([$event]));
@@ -92,7 +97,9 @@ class AutomationHandlerTest extends TestCase
             $eventQueue,
             $this->createMock(Logger::class),
             $this->createMock(AccountResolver::class),
-            $this->createMock(Config::class)
+            $this->createMock(Config::class),
+            $this->createMock(WebsiteOverrides::class),
+            $this->createMock(StoreManagerInterface::class)
         );
 
         self::assertEquals([1 => Failure::permanent('Malformed automation payload')], $handler->handle([$event]));
@@ -128,7 +135,9 @@ class AutomationHandlerTest extends TestCase
             $eventQueue,
             $this->createMock(Logger::class),
             $this->createMock(AccountResolver::class),
-            $this->createMock(Config::class)
+            $this->createMock(Config::class),
+            $this->createMock(WebsiteOverrides::class),
+            $this->createMock(StoreManagerInterface::class)
         );
 
         self::assertEquals(
@@ -166,11 +175,58 @@ class AutomationHandlerTest extends TestCase
             $eventQueue,
             $this->createMock(Logger::class),
             $this->createMock(AccountResolver::class),
-            $config
+            $config,
+            $this->createMock(WebsiteOverrides::class),
+            $this->createMock(StoreManagerInterface::class)
         );
 
         self::assertEquals(
             [1 => new Skipped(str_replace('%1', 'LV', AutomationHandler::SKIPPED_NO_LANGUAGE_WORKFLOW))],
+            $handler->handle([$event])
+        );
+    }
+
+    /**
+     * CON-190: a website with its own Smaily account starts only that
+     * account's workflows; the Log names the website that has none picked.
+     */
+    public function testAWebsiteWithItsOwnAccountSkipNamesTheWebsite(): void
+    {
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->expects(self::never())->method('forStore');
+        $clientProvider->expects(self::never())->method('forWebsite');
+        $router = $this->createMock(Router::class);
+        $router->method('resolve')->willReturn(null);
+        $overrides = $this->createMock(WebsiteOverrides::class);
+        $overrides->method('usesOwnAccount')->with(2)->willReturn(true);
+        $website = $this->createMock(WebsiteInterface::class);
+        $website->method('getName')->willReturn('Latvia');
+        $storeManager = $this->createMock(StoreManagerInterface::class);
+        $storeManager->method('getWebsite')->with(2)->willReturn($website);
+
+        $event = $this->createMock(Event::class);
+        $event->method('getId')->willReturn(1);
+        $eventQueue = $this->createMock(EventQueue::class);
+        $eventQueue->method('decodePayload')->willReturn([
+            'trigger_type' => 'welcome',
+            'website_id' => 2,
+            'language' => 'lv',
+            'address' => ['email' => 'person@example.com'],
+        ]);
+
+        $handler = new AutomationHandler(
+            $clientProvider,
+            $router,
+            $eventQueue,
+            $this->createMock(Logger::class),
+            $this->createMock(AccountResolver::class),
+            $this->createMock(Config::class),
+            $overrides,
+            $storeManager
+        );
+
+        self::assertEquals(
+            [1 => new Skipped(str_replace('%1', 'Latvia', AutomationHandler::SKIPPED_NO_OWN_ACCOUNT_WORKFLOW))],
             $handler->handle([$event])
         );
     }
@@ -243,7 +299,9 @@ class AutomationHandlerTest extends TestCase
             $eventQueue,
             $this->createMock(Logger::class),
             $accountResolver,
-            $this->createMock(Config::class)
+            $this->createMock(Config::class),
+            $this->createMock(WebsiteOverrides::class),
+            $this->createMock(StoreManagerInterface::class)
         );
 
         self::assertSame([1 => true], $handler->handle([$event]));
@@ -286,7 +344,9 @@ class AutomationHandlerTest extends TestCase
             $eventQueue,
             $this->createMock(Logger::class),
             $this->createMock(AccountResolver::class),
-            $this->createMock(Config::class)
+            $this->createMock(Config::class),
+            $this->createMock(WebsiteOverrides::class),
+            $this->createMock(StoreManagerInterface::class)
         );
 
         self::assertSame([1 => $refusal], $handler->handle([$event]));

@@ -40,6 +40,13 @@ use Smaily\Connect\Model\SmailyUrl;
  */
 class WizardData implements ArgumentInterface
 {
+    /** The automations' workflows in system config. */
+    private const WORKFLOW_PATHS = [
+        'welcomeWorkflow' => Config::XML_PATH_WELCOME_WORKFLOW,
+        'firstOrderWorkflow' => Config::XML_PATH_FIRST_ORDER_WORKFLOW,
+        'abandonedWorkflow' => Config::XML_PATH_ABANDONED_WORKFLOW,
+    ];
+
     public function __construct(
         private readonly Config $config,
         private readonly Mode $mode,
@@ -121,17 +128,46 @@ class WizardData implements ArgumentInterface
 
     /**
      * Whether the selected website must keep its own values of a section
-     * on Settings: the automations of a website with per-language Smaily
-     * accounts (mode A), whose workflows come from those accounts
-     * (WizardStepSaver::sectionTarget()). Its switch shows ticked and fixed.
+     * on Settings: the automations of a website with its own Smaily account
+     * (CON-190) or per-language Smaily accounts (mode A), whose workflows
+     * come from those accounts (WizardStepSaver::sectionTarget()). Its
+     * switch shows ticked and fixed.
      */
     public function isOwnRequired(string $section): bool
     {
-        return $section === WebsiteOverrides::AUTOMATIONS
-            && $this->websiteContext->hasMultipleWebsites()
-            && !$this->websiteContext->isStoreWide()
-            && $this->config->getMultilingualMode($this->websiteContext->getWebsiteId())
-                === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS;
+        if ($section !== WebsiteOverrides::AUTOMATIONS
+            || !$this->websiteContext->hasMultipleWebsites()
+            || $this->websiteContext->isStoreWide()
+        ) {
+            return false;
+        }
+        $websiteId = $this->websiteContext->getWebsiteId();
+
+        return $this->config->getMultilingualMode($websiteId) === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
+            || $this->overrides->usesOwnAccount($websiteId);
+    }
+
+    /**
+     * Whether Settings tells the merchant to pick the selected website's
+     * workflows (CON-190): it uses its own Smaily account, which starts only
+     * its own workflows, and it holds none — it has just turned its own
+     * account on, or it held its own account with the store-wide
+     * automations before CON-190.
+     */
+    public function needsOwnWorkflows(): bool
+    {
+        $websiteId = $this->websiteContext->getWebsiteId();
+        if (!$this->overrides->usesOwnAccount($websiteId)) {
+            return false;
+        }
+        $own = $this->overrides->ownValues(WebsiteOverrides::AUTOMATIONS)[$websiteId] ?? [];
+        foreach (self::WORKFLOW_PATHS as $path) {
+            if ((int)($own[$path] ?? 0) > 0) {
+                return false;
+            }
+        }
+
+        return (int)($own['mappings'] ?? 0) === 0;
     }
 
     /**
@@ -140,7 +176,7 @@ class WizardData implements ArgumentInterface
      * and its own values as label/value lines (a password only as saved).
      * Empty elsewhere.
      *
-     * @return array<int, array{websiteId: int, name: string, values: array<int, array{0: string, 1: string}>}>
+     * @return array<int, array{websiteId: int, name: string, values: array<int, array{0: string, 1: string}>, required: bool}>
      */
     public function getWebsiteOverrides(string $section): array
     {
@@ -154,7 +190,15 @@ class WizardData implements ArgumentInterface
             foreach ($values as $key => $value) {
                 $lines[] = $this->describeOwnValue($key, $value);
             }
-            $list[] = ['websiteId' => $websiteId, 'name' => $names[$websiteId] ?? (string)$websiteId, 'values' => $lines];
+            $list[] = [
+                'websiteId' => $websiteId,
+                'name' => $names[$websiteId] ?? (string)$websiteId,
+                'values' => $lines,
+                // A website with its own Smaily account keeps its own
+                // automations (CON-190).
+                'required' => $section === WebsiteOverrides::AUTOMATIONS
+                    && $this->overrides->usesOwnAccount($websiteId),
+            ];
         }
 
         return $list;
@@ -390,7 +434,7 @@ class WizardData implements ArgumentInterface
                 'checkoutOptin' => $this->config->isCheckoutOptinEnabled($websiteId),
                 'suppressOptinEmails' => $this->config->suppressOptinEmails($websiteId),
             ],
-            'automations' => [
+            'automations' => $this->ownWorkflows($websiteId, [
                 'welcomeEnabled' => $this->config->isWelcomeEnabled($websiteId),
                 'welcomeWorkflow' => (string)($this->config->getWelcomeWorkflow($websiteId) ?: ''),
                 'firstOrderEnabled' => $this->config->isFirstOrderEnabled($websiteId),
@@ -398,7 +442,7 @@ class WizardData implements ArgumentInterface
                 'abandonedEnabled' => $this->config->isAbandonedCartEnabled($websiteId),
                 'abandonedWorkflow' => (string)($this->config->getAbandonedCartWorkflow($websiteId) ?: ''),
                 'abandonedCutoff' => $this->config->getAbandonedCutoffMinutes($websiteId),
-            ],
+            ]),
             'intelligence' => [
                 'connected' => $this->engineSettings->isConnected(),
                 'tenantName' => $this->engineSettings->getTenantName()
@@ -410,6 +454,28 @@ class WizardData implements ArgumentInterface
                 'enabled' => $this->config->isRssEnabled(),
             ],
         ]);
+    }
+
+    /**
+     * The automations' prefill with, for a website that uses its own Smaily
+     * account, only the workflows saved at its website scope (CON-190): a
+     * store-wide workflow it inherits was picked from another account, and
+     * the Router does not start it there.
+     *
+     * @param array<string, mixed> $automations
+     * @return array<string, mixed>
+     */
+    private function ownWorkflows(int $websiteId, array $automations): array
+    {
+        if (!$this->overrides->usesOwnAccount($websiteId)) {
+            return $automations;
+        }
+        foreach (self::WORKFLOW_PATHS as $key => $path) {
+            $own = (int)$this->overrides->ownValue(WebsiteOverrides::AUTOMATIONS, $websiteId, $path);
+            $automations[$key] = $own > 0 ? (string)$own : '';
+        }
+
+        return $automations;
     }
 
     /**
@@ -711,15 +777,18 @@ class WizardData implements ArgumentInterface
      * `Model\Automation\Router` applies at dispatch time. Only the rows of
      * the given mode's accounts (mode A or B) are read, as the Router reads
      * them (CON-184): the editor shows each mode its own workflows, and a
-     * mode-B save never posts another account's workflow id.
+     * mode-B save never posts another account's workflow id. A website that
+     * uses its own Smaily account reads only its own rows, as the Router
+     * does (CON-190).
      *
      * @return array<string, array{workflowId: int, isDefaultFallback: bool}>
      */
     public function getSavedMappings(string $mode): array
     {
         $websiteId = $this->websiteContext->getWebsiteId();
+        $ownAccount = $this->overrides->usesOwnAccount($websiteId);
         $collection = $this->mappingCollectionFactory->create();
-        $collection->addFieldToFilter('website_id', ['in' => [$websiteId, 0]])
+        $collection->addFieldToFilter('website_id', ['in' => $ownAccount ? [$websiteId] : [$websiteId, 0]])
             ->addFieldToFilter('trigger_type', ['in' => Trigger::ALL])
             ->addModeFilter($mode)
             ->setOrder('website_id', 'ASC');

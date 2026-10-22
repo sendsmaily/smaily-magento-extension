@@ -59,6 +59,7 @@ class FailureMessage
         ContactSyncHandler::SKIPPED_NOT_A_CONTACT,
         AutomationHandler::SKIPPED_NO_WORKFLOW,
         AutomationHandler::SKIPPED_NO_LANGUAGE_WORKFLOW,
+        AutomationHandler::SKIPPED_NO_OWN_ACCOUNT_WORKFLOW,
         ProfilingConsentHandler::SKIPPED_REPLACED,
         IdentityMergeHandler::SKIPPED_OPTED_OUT,
         AbandonedCart::SKIPPED_RECENTLY_REMINDED,

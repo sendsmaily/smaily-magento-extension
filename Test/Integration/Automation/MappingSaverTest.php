@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Automation;
 
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Automation\MappingSaver;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Config;
@@ -226,7 +227,9 @@ class MappingSaverTest extends IntegrationTestCase
         ]);
 
         /** @var Router $router */
-        $router = $this->objectManager->create(Router::class);
+        $router = $this->objectManager->create(Router::class, [
+            'overrides' => $this->createMock(WebsiteOverrides::class),
+        ]);
 
         $override = $router->resolve('welcome', 1, 'et');
         self::assertNotNull($override);

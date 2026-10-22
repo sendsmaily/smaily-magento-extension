@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Automation;
 
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Source\MultilingualMode;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory;
@@ -35,6 +36,14 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory;
  * accounts' workflow ids stay in the table but are never posted through the
  * website's one account, and the other way round.
  *
+ * A website of a 2+-website install that uses its own Smaily account
+ * (WebsiteOverrides::usesOwnAccount()) has only its own automations
+ * (CON-190): its own rows and the workflows saved at its website scope. The
+ * store-wide rows (website 0) and the default-scope workflows were picked
+ * from the store-wide account, so they resolve to nothing there — also
+ * where the website holds no automations of its own yet (an install from
+ * before CON-190): it starts nothing until its workflows are picked.
+ *
  * A matched row's account_key travels with the workflow (WorkflowMatch), so
  * the dispatcher posts the workflow through the account the row names — a
  * mode-A fallback row must never fire another account's workflow ID through
@@ -47,29 +56,41 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory;
  */
 class Router
 {
+    /** Each trigger's workflow in system config. */
+    private const WORKFLOW_PATHS = [
+        Trigger::WELCOME => Config::XML_PATH_WELCOME_WORKFLOW,
+        Trigger::FIRST_ORDER => Config::XML_PATH_FIRST_ORDER_WORKFLOW,
+        Trigger::ABANDONED_CART => Config::XML_PATH_ABANDONED_WORKFLOW,
+    ];
+
     public function __construct(
         private readonly Config $config,
-        private readonly CollectionFactory $mappingCollectionFactory
+        private readonly CollectionFactory $mappingCollectionFactory,
+        private readonly WebsiteOverrides $overrides
     ) {
     }
 
     public function resolve(string $trigger, int $websiteId, string $language): ?WorkflowMatch
     {
         $mode = $this->config->getMultilingualMode($websiteId);
+        $ownAccount = $this->overrides->usesOwnAccount($websiteId);
 
         if ($mode === MultilingualMode::MODE_SINGLE || $mode === MultilingualMode::MODE_SINGLE_WORKFLOW) {
-            return $this->configDefault($trigger, $websiteId);
+            return $this->configDefault($trigger, $websiteId, $ownAccount);
         }
 
         $effectiveLanguage = $language !== '' ? $language : Mapping::LANGUAGE_DEFAULT;
+        // The website's own rows win over the store-wide rows (website 0),
+        // which a website with its own Smaily account does not read.
+        $websiteIds = $ownAccount ? [$websiteId] : [$websiteId, 0];
 
-        $match = $this->findMapping($trigger, $websiteId, $effectiveLanguage, $mode)
-            ?? $this->findFallbackMapping($trigger, $websiteId, $mode);
+        $match = $this->findMapping($trigger, $websiteIds, $effectiveLanguage, $mode)
+            ?? $this->findFallbackMapping($trigger, $websiteIds, $mode);
         if ($match !== null) {
             return $match;
         }
         if ($mode !== MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS) {
-            return $this->configDefault($trigger, $websiteId);
+            return $this->configDefault($trigger, $websiteId, $ownAccount);
         }
 
         // Mode A: the default fallback account's own row for the trigger.
@@ -78,13 +99,16 @@ class Router
             return null;
         }
 
-        return $this->findMapping($trigger, $websiteId, $fallbackLanguage, $mode);
+        return $this->findMapping($trigger, $websiteIds, $fallbackLanguage, $mode);
     }
 
-    private function findMapping(string $trigger, int $websiteId, string $language, string $mode): ?WorkflowMatch
+    /**
+     * @param int[] $websiteIds
+     */
+    private function findMapping(string $trigger, array $websiteIds, string $language, string $mode): ?WorkflowMatch
     {
         $collection = $this->mappingCollectionFactory->create();
-        $collection->addFieldToFilter('website_id', ['in' => [$websiteId, 0]])
+        $collection->addFieldToFilter('website_id', ['in' => $websiteIds])
             ->addFieldToFilter('trigger_type', $trigger)
             ->addFieldToFilter('language', $language)
             ->addModeFilter($mode)
@@ -94,10 +118,13 @@ class Router
         return $this->toMatch($collection->getFirstItem());
     }
 
-    private function findFallbackMapping(string $trigger, int $websiteId, string $mode): ?WorkflowMatch
+    /**
+     * @param int[] $websiteIds
+     */
+    private function findFallbackMapping(string $trigger, array $websiteIds, string $mode): ?WorkflowMatch
     {
         $collection = $this->mappingCollectionFactory->create();
-        $collection->addFieldToFilter('website_id', ['in' => [$websiteId, 0]])
+        $collection->addFieldToFilter('website_id', ['in' => $websiteIds])
             ->addFieldToFilter('trigger_type', $trigger)
             ->addFieldToFilter('is_default_fallback', ['eq' => 1])
             ->addModeFilter($mode)
@@ -116,14 +143,24 @@ class Router
         return new WorkflowMatch($mapping->getWorkflowId(), $mapping->getAccountKey());
     }
 
-    private function configDefault(string $trigger, int $websiteId): ?WorkflowMatch
+    /**
+     * The trigger's workflow saved in system config: for a website that uses
+     * its own Smaily account only the one saved at its website scope.
+     */
+    private function configDefault(string $trigger, int $websiteId, bool $ownAccount): ?WorkflowMatch
     {
-        $workflowId = match ($trigger) {
-            Trigger::WELCOME => $this->config->getWelcomeWorkflow($websiteId),
-            Trigger::FIRST_ORDER => $this->config->getFirstOrderWorkflow($websiteId),
-            Trigger::ABANDONED_CART => $this->config->getAbandonedCartWorkflow($websiteId),
-            default => 0,
-        };
+        $workflowId = $ownAccount
+            ? (int)$this->overrides->ownValue(
+                WebsiteOverrides::AUTOMATIONS,
+                $websiteId,
+                self::WORKFLOW_PATHS[$trigger] ?? ''
+            )
+            : match ($trigger) {
+                Trigger::WELCOME => $this->config->getWelcomeWorkflow($websiteId),
+                Trigger::FIRST_ORDER => $this->config->getFirstOrderWorkflow($websiteId),
+                Trigger::ABANDONED_CART => $this->config->getAbandonedCartWorkflow($websiteId),
+                default => 0,
+            };
 
         return $workflowId > 0 ? new WorkflowMatch($workflowId, null) : null;
     }

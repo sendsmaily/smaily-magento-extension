@@ -99,7 +99,13 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   are looked up for the event's website with the store-wide rows
   (`website_id 0` — the initial setup's and a store-wide Settings save's,
   CON-179, and the 2.8.x migration's default-scope seeding) as the
-  fallback; a website's own row wins. Each lookup reads only the rows of
+  fallback; a website's own row wins. A website of a 2+-website install
+  that uses its own Smaily account (`WebsiteOverrides::usesOwnAccount()`:
+  it holds its own values of the Smaily account section) reads only its own
+  rows and the workflows saved at its website scope (CON-190): the
+  store-wide rows and the default-scope workflows were picked from the
+  store-wide account, so they resolve to nothing there, and the skip names
+  the website (`AutomationHandler::SKIPPED_NO_OWN_ACCOUNT_WORKFLOW`). Each lookup reads only the rows of
   the active mode's accounts (`Mapping\Collection::addModeFilter()`,
   CON-184): mode `b` the rows of the website's one account
   (`account_key = default`), mode `a` the per-language accounts' rows
@@ -1610,6 +1616,30 @@ Initial setup, Settings, Log. Design rules:
     of a website in mode A ticked and fixed (`WizardData::isOwnRequired()`),
     and returns its Smaily account (leaving mode A) when that switch is
     unticked and saved.
+  - **A website with its own Smaily account always has its own
+    automations** (CON-190, owner decision 2026-10-22; the same mechanism
+    as mode A): the store-wide workflows were picked from another account.
+    On a 2+-website install, `WebsiteOverrides::usesOwnAccount()` (the
+    website holds own values of the Smaily account section) makes
+    `WizardStepSaver::sectionTarget()` keep its automations at its scope —
+    in Settings unticked or not, and in the initial setup whatever
+    `use_store_wide` names (`WizardData::getWebsiteOverrides()` marks it
+    `required`, and the step offers no choice) — and
+    `WizardData::isOwnRequired()` shows its switch ticked and fixed. A
+    connection save that turns the website's own account on removes its own
+    automations (they were picked from the store-wide account), so they
+    start from no workflow; the answer says `ownAccountStarted` and the page
+    reloads. Removing a website's own Smaily account (Settings unticked, or
+    the setup's `use_store_wide`) removes its own automations too, so it
+    returns to the store-wide ones. Such a website's Automations tab reads
+    only its own values — the prefill (`getBootJson()`), the mapping editor
+    (`getSavedMappings()`) and the save's PRO-1286 keep (`saveAutomations()`)
+    — and `WizardData::needsOwnWorkflows()` shows **Pick this website's
+    workflows** while it holds no workflow of its own. The Router reads the
+    same way (Automation routing above), so a website that held its own
+    account with the store-wide automations before CON-190 starts nothing
+    until its workflows are picked; no data patch moves rows. A
+    single-website install has no exceptions and is unchanged.
   - The Settings page renders an explicit website selector next to the tab
     strip (own chrome, not Magento's native store-switcher), reloading with
     `?website=<id>`; single-website installs never see it or the switches.

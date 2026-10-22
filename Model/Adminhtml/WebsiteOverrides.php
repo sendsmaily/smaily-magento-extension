@@ -133,6 +133,28 @@ class WebsiteOverrides
     }
 
     /**
+     * The website's own value of one path of a section, or null when the
+     * website follows the store-wide value.
+     */
+    public function ownValue(string $section, int $websiteId, string $path): ?string
+    {
+        return $this->ownValues($section)[$websiteId][$path] ?? null;
+    }
+
+    /**
+     * Whether a website of a 2+-website install uses its own Smaily account:
+     * it holds its own values of the Smaily account section (the state of
+     * its "Use its own Smaily account on this website" switch). Its
+     * automations are then always its own (CON-190): the store-wide
+     * workflows were picked from another Smaily account. Never on a
+     * single-website install, where the store and its website are one.
+     */
+    public function usesOwnAccount(int $websiteId): bool
+    {
+        return count($this->websiteIds()) > 1 && $this->hasOwnValues(self::CONNECTION, $websiteId);
+    }
+
+    /**
      * Removes a website's own values of the section, so it follows the
      * store-wide values again. For the Smaily account, with
      * $storeViewAccounts, its store views' own accounts (multilingual mode

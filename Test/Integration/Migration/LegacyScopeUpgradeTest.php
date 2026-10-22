@@ -12,6 +12,7 @@ use Magento\Framework\App\ResourceConnection;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Api\Data\WebsiteInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Config;
@@ -553,7 +554,10 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
             'scopeConfig' => $this->configScope(),
         ]);
         /** @var Router $router */
-        $router = $this->objectManager->create(Router::class, ['config' => $this->config]);
+        $router = $this->objectManager->create(Router::class, [
+            'config' => $this->config,
+            'overrides' => $this->createMock(WebsiteOverrides::class),
+        ]);
 
         $expectedLanguage = ['et_EE' => 'et', 'en_US' => 'en', 'ru_RU' => 'ru',
             'lv_LV' => 'lv', 'lt_LT' => 'lt', 'fi_FI' => 'fi'];

@@ -171,6 +171,14 @@ settings for all websites, with **Use its own Smaily account on this
 website**, **Use its own Contacts settings on this website** and **Use its
 own automations on this website**.
 
+A website with its own Smaily account uses only its own automations,
+because the workflows saved for all websites come from another Smaily
+account. A website whose 2.8.x Smaily login was its own, but whose
+workflows were set only for all websites, therefore starts no automation
+after the update: on **Settings > Automations**, pick the website, pick
+its workflows from its own account and save. Until then the **Log** shows
+each of its automations as **Skipped**, naming the website.
+
 A store that finished the initial setup on an earlier 3.0.0 release
 candidate — which saved it per website — counts as set up: the update
 moves no saved value, and the admin does not send the store back into the

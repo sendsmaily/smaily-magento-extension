@@ -416,7 +416,76 @@ class WizardDataTest extends TestCase
                 ['API password', '••••••••'],
                 ['', 'One account, per-language workflows'],
             ],
+            'required' => false,
         ]], $list);
+    }
+
+    /**
+     * CON-190: the initial setup offers no "Use this step's values" for the
+     * automations of a website with its own Smaily account.
+     */
+    public function testTheInitialSetupKeepsTheAutomationsOfAWebsiteWithItsOwnAccount(): void
+    {
+        $this->overrides->method('ownValues')->with(WebsiteOverrides::AUTOMATIONS)->willReturn([
+            2 => [Config::XML_PATH_WELCOME_WORKFLOW => '7'],
+            3 => [Config::XML_PATH_WELCOME_WORKFLOW => '8'],
+        ]);
+        $this->overrides->method('usesOwnAccount')->willReturnCallback(static fn (int $id): bool => $id === 2);
+
+        $list = $this->storeWideViewModel()->getWebsiteOverrides(WebsiteOverrides::AUTOMATIONS);
+
+        self::assertSame([2 => true, 3 => false], array_column($list, 'required', 'websiteId'));
+    }
+
+    /**
+     * CON-190: a website with its own Smaily account keeps its own
+     * automations, as a website in mode A does: their switch is ticked and
+     * fixed, and Settings asks for its workflows while it holds none — the
+     * store-wide workflow it would inherit is not shown as its own.
+     */
+    public function testAWebsiteWithItsOwnAccountMustKeepItsOwnAutomations(): void
+    {
+        $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
+        $this->config->method('getMultilingualMode')->willReturn(MultilingualMode::MODE_SINGLE);
+        $this->config->method('getWelcomeWorkflow')->willReturn(555);
+        $this->overrides->method('usesOwnAccount')->with(2)->willReturn(true);
+        $this->overrides->method('ownValues')->willReturn([2 => [Config::XML_PATH_WELCOME_ENABLED => '1']]);
+        $this->overrides->method('ownValue')->willReturn(null);
+
+        self::assertTrue($this->viewModel->isOwnRequired(WebsiteOverrides::AUTOMATIONS));
+        self::assertTrue($this->viewModel->hasOwnValues(WebsiteOverrides::AUTOMATIONS));
+        self::assertTrue($this->viewModel->needsOwnWorkflows());
+        self::assertSame('', json_decode($this->viewModel->getBootJson(), true)['automations']['welcomeWorkflow']);
+    }
+
+    public function testAWebsiteWithItsOwnAccountAndItsOwnWorkflowIsNotAskedForOne(): void
+    {
+        $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
+        $this->overrides->method('usesOwnAccount')->willReturn(true);
+        $this->overrides->method('ownValues')->willReturn([2 => [Config::XML_PATH_FIRST_ORDER_WORKFLOW => '42']]);
+        $this->overrides->method('ownValue')->willReturnCallback(
+            static fn (string $section, int $websiteId, string $path): ?string
+                => $path === Config::XML_PATH_FIRST_ORDER_WORKFLOW ? '42' : null
+        );
+
+        self::assertFalse($this->viewModel->needsOwnWorkflows());
+        self::assertSame('42', json_decode($this->viewModel->getBootJson(), true)['automations']['firstOrderWorkflow']);
+    }
+
+    /**
+     * A website on the store-wide Smaily account (and every single-website
+     * install, CON-190) shows the workflows it reads, asks for none, and its
+     * automations switch stays free.
+     */
+    public function testAWebsiteOnTheStoreWideAccountKeepsItsInheritedWorkflows(): void
+    {
+        $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
+        $this->config->method('getWelcomeWorkflow')->willReturn(555);
+        $this->overrides->method('usesOwnAccount')->willReturn(false);
+
+        self::assertFalse($this->viewModel->isOwnRequired(WebsiteOverrides::AUTOMATIONS));
+        self::assertFalse($this->viewModel->needsOwnWorkflows());
+        self::assertSame('555', json_decode($this->viewModel->getBootJson(), true)['automations']['welcomeWorkflow']);
     }
 
     /**

@@ -16,8 +16,10 @@ use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Magento\Customer\Api\CustomerRepositoryInterface;
+use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Api\Queue\EventHandlerInterface;
 use Smaily\Connect\Cron\FlushEventQueue;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
@@ -739,6 +741,8 @@ class FlushEventQueueTest extends IntegrationTestCase
             'router' => $router,
             'clientProvider' => $clientProvider,
             'accountResolver' => $this->createMock(AccountResolver::class),
+            'overrides' => $this->createMock(WebsiteOverrides::class),
+            'storeManager' => $this->createMock(StoreManagerInterface::class),
         ])]);
 
         $row = $this->fetchAll(EventResource::TABLE_NAME)[0];

@@ -62,6 +62,14 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  *   of a single-website install — so a website added later does not
  *   inherit them. A store-wide save on a 2+-website install does not take
  *   mode A (saveConnect()).
+ * - A website of a 2+-website install that uses its own Smaily account
+ *   always has its own automations (CON-190, the same rule as mode A): its
+ *   workflows come from that account. Its automations are written at its
+ *   scope, a store-wide save does not remove them, and turning its own
+ *   Smaily account on starts them from no workflow (its own automations
+ *   are removed; the store-wide ones it then does not use). A website that
+ *   returns to the store-wide Smaily account returns to the store-wide
+ *   automations as well.
  * Store-wide mapping rows are website 0's. The setup-completed flag is one
  * mark for the store (default scope). Intelligence and RSS are default
  * scope as before.
@@ -78,6 +86,9 @@ class WizardStepSaver
 
     /** Whether the last save returned the website to the store-wide values (CON-179). */
     private bool $returnedToStoreWide = false;
+
+    /** Whether the last save turned the website's own Smaily account on (CON-190). */
+    private bool $ownAccountStarted = false;
 
     public function __construct(
         private readonly WriterInterface $configWriter,
@@ -105,6 +116,7 @@ class WizardStepSaver
     public function save(string $step, array $data): array
     {
         $this->returnedToStoreWide = false;
+        $this->ownAccountStarted = false;
         // The scope the section's saved values are read from: the selected
         // website, or for the initial setup the store (WebsiteContext).
         $websiteId = $this->websiteContext->getWebsiteId();
@@ -145,6 +157,16 @@ class WizardStepSaver
     }
 
     /**
+     * Whether the last save turned the selected website's own Smaily account
+     * on (CON-190): its automations now start from no workflow, so the page
+     * shows them only after a reload.
+     */
+    public function isOwnAccountStarted(): bool
+    {
+        return $this->ownAccountStarted;
+    }
+
+    /**
      * Saves a section where sectionTarget() says, then removes the own
      * values of the websites it names.
      *
@@ -155,15 +177,29 @@ class WizardStepSaver
     private function saveSection(string $section, array $data, int $websiteId, callable $save): array
     {
         [$target, $remove, $write] = $this->sectionTarget($section, $data, $websiteId);
+        $multiple = $this->websiteContext->hasMultipleWebsites();
+        // A website whose own Smaily account this save turns on (CON-190).
+        $startsOwnAccount = $section === WebsiteOverrides::CONNECTION && $multiple && $write && $target !== null
+            && !$this->overrides->usesOwnAccount($target);
         $errors = $write ? $save($target) : [];
         if ($errors !== []) {
             return $errors;
         }
-        $multiple = $this->websiteContext->hasMultipleWebsites();
         foreach ($remove as $removeId) {
             // A website that set its own per-language accounts (mode A)
             // keeps them on its store views; they go with its own account.
             $this->overrides->removeOwnValues($section, $removeId, $multiple);
+            // Its own automations' workflows came from its own Smaily
+            // account: they go with it (CON-190).
+            if ($section === WebsiteOverrides::CONNECTION && $multiple) {
+                $this->overrides->removeOwnValues(WebsiteOverrides::AUTOMATIONS, $removeId);
+            }
+        }
+        // Its own automations so far were picked from the store-wide
+        // account: they start from no workflow (CON-190).
+        if ($startsOwnAccount) {
+            $this->overrides->removeOwnValues(WebsiteOverrides::AUTOMATIONS, (int)$target);
+            $this->ownAccountStarted = true;
         }
         $this->returnedToStoreWide = !$write;
 
@@ -191,12 +227,20 @@ class WizardStepSaver
         }
         if ($this->websiteContext->isStoreWide()) {
             $chosen = array_map('intval', is_array($data['use_store_wide'] ?? null) ? $data['use_store_wide'] : []);
+            // A website with its own Smaily account keeps its automations (CON-190).
+            if ($section === WebsiteOverrides::AUTOMATIONS) {
+                $chosen = array_filter($chosen, fn (int $id): bool => !$this->overrides->usesOwnAccount($id));
+            }
 
             return [null, array_values(array_intersect($withOwn, $chosen)), true];
         }
-        // A website in mode A keeps its own automations; unticking its own
-        // Smaily account still returns it (and so leaves mode A).
-        if (!empty($data['own']) || ($perLanguage && $section === WebsiteOverrides::AUTOMATIONS)) {
+        // A website in mode A, or with its own Smaily account, keeps its own
+        // automations (CON-190); unticking its own Smaily account still
+        // returns it (and so leaves mode A).
+        if (!empty($data['own'])
+            || ($section === WebsiteOverrides::AUTOMATIONS
+                && ($perLanguage || $this->overrides->usesOwnAccount($websiteId)))
+        ) {
             return [$websiteId, [], true];
         }
         if (in_array($websiteId, $withOwn, true)) {
@@ -834,6 +878,9 @@ class WizardStepSaver
         // (PRO-1286, same rule as the engine-automations single mode). Only
         // resolved lazily below, when a workflow key is actually posted.
         $availableWorkflowIds = null;
+        // A website with its own Smaily account has only its own workflows
+        // (CON-190): a store-wide one it inherits is not its saved workflow.
+        $ownAccount = $target !== null && $this->overrides->usesOwnAccount($websiteId);
         foreach ([
             'welcome_workflow' => [Config::XML_PATH_WELCOME_WORKFLOW, $this->config->getWelcomeWorkflow($websiteId)],
             'first_order_workflow' =>
@@ -843,6 +890,9 @@ class WizardStepSaver
         ] as $key => [$path, $savedWorkflow]) {
             if (!array_key_exists($key, $data)) {
                 continue;
+            }
+            if ($ownAccount) {
+                $savedWorkflow = (int)$this->overrides->ownValue(WebsiteOverrides::AUTOMATIONS, $websiteId, $path);
             }
             $postedId = ($id = (int)$data[$key]) > 0 ? (string)$id : '';
             $savedId = $savedWorkflow > 0 ? (string)$savedWorkflow : '';

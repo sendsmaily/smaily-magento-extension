@@ -10,6 +10,7 @@ namespace Smaily\Connect\Test\Unit\Model\Automation;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Automation\Mapping;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\Trigger;
@@ -24,7 +25,8 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory;
  * default, mode a the row of the default fallback account's language and
  * never the config default (CON-188); a matched row's account_key travels
  * with the workflow so mode-A fallback rows fire through the account they
- * name.
+ * name. A website with its own Smaily account reads only its own rows and
+ * workflows (CON-190).
  */
 class RouterTest extends TestCase
 {
@@ -32,6 +34,11 @@ class RouterTest extends TestCase
      * @var Config&MockObject
      */
     private Config $config;
+
+    /**
+     * @var WebsiteOverrides&MockObject
+     */
+    private WebsiteOverrides $overrides;
 
     /**
      * Queued collection results: each Router lookup consumes one.
@@ -50,6 +57,7 @@ class RouterTest extends TestCase
     protected function setUp(): void
     {
         $this->config = $this->createMock(Config::class);
+        $this->overrides = $this->createMock(WebsiteOverrides::class);
         $this->lookupResults = [];
         $this->recordedFilters = [];
     }
@@ -273,7 +281,47 @@ class RouterTest extends TestCase
             return $collection;
         });
 
-        return new Router($this->config, $factory);
+        return new Router($this->config, $factory, $this->overrides);
+    }
+
+    /**
+     * CON-190: the store-wide rows and workflows were picked from the
+     * store-wide account, so a website with its own Smaily account reads
+     * only its own rows, and with none resolves to nothing.
+     */
+    public function testAWebsiteWithItsOwnAccountReadsOnlyItsOwnRows(): void
+    {
+        $this->config->method('getMultilingualMode')->willReturn('b');
+        $this->overrides->method('usesOwnAccount')->with(3)->willReturn(true);
+        $this->config->expects(self::never())->method('getWelcomeWorkflow');
+        $this->lookupResults = [null, null];
+
+        self::assertNull($this->router()->resolve(Trigger::WELCOME, 3, 'et'));
+        self::assertSame(
+            [['in' => [3]], ['in' => [3]]],
+            array_column($this->recordedFilters, 'website_id'),
+            'Neither lookup reads the store-wide rows (website 0)'
+        );
+    }
+
+    /**
+     * CON-190: a website with its own Smaily account starts the workflow
+     * saved at its website scope, never the store-wide one it would inherit.
+     */
+    public function testAWebsiteWithItsOwnAccountStartsOnlyTheWorkflowSavedForIt(): void
+    {
+        $this->config->method('getMultilingualMode')->willReturn('single');
+        $this->overrides->method('usesOwnAccount')->willReturn(true);
+        $this->overrides->method('ownValue')->willReturnCallback(
+            static fn (string $section, int $websiteId, string $path): ?string
+                => $section === WebsiteOverrides::AUTOMATIONS && $websiteId === 3
+                    && $path === Config::XML_PATH_FIRST_ORDER_WORKFLOW ? '42' : null
+        );
+        $this->config->expects(self::never())->method('getFirstOrderWorkflow');
+        $this->config->expects(self::never())->method('getWelcomeWorkflow');
+
+        self::assertSame(42, $this->router()->resolve(Trigger::FIRST_ORDER, 3, 'et')?->workflowId);
+        self::assertNull($this->router()->resolve(Trigger::WELCOME, 3, 'et'), 'The store-wide Welcome workflow is not its own');
     }
 
     private function mappingRow(int $workflowId, string $accountKey): Mapping

@@ -21,10 +21,13 @@ use Smaily\Connect\Model\SubdomainNormalizer;
 /**
  * POST {step: connect|subscribers|automations|intelligence|finish, data: {...}}
  * -> {saved: bool, errors: [{field, message}], verified?: bool, accountName?: string,
- *     storefrontUrlChanged?: bool, transactionalVerified?: bool, returnedToStoreWide?: true}
+ *     storefrontUrlChanged?: bool, transactionalVerified?: bool, returnedToStoreWide?: true,
+ *     ownAccountStarted?: true}
  *
  * A Settings save that returned the selected website to the store-wide
- * values of a tab says so (CON-179), so the page reloads to show them.
+ * values of a tab says so (CON-179), so the page reloads to show them; so
+ * does a connection save that turned the website's own Smaily account on,
+ * whose automations then start from no workflow (CON-190).
  *
  * The finish step also answers whether Smaily accepted the saved
  * credentials at the last check (PRO-3560), for the Overview step's copy.
@@ -72,6 +75,9 @@ class SaveStep extends AbstractJsonAction implements HttpPostActionInterface
         ];
         if ($this->stepSaver->isReturnedToStoreWide()) {
             $response['returnedToStoreWide'] = true;
+        }
+        if ($this->stepSaver->isOwnAccountStarted()) {
+            $response['ownAccountStarted'] = true;
         }
         if ($step === 'connect' && $errors === []) {
             $response['verified'] = $this->stepSaver->isConnectionAccepted();

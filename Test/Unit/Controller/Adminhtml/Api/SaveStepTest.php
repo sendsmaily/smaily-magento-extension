@@ -126,6 +126,19 @@ class SaveStepTest extends TestCase
         self::assertArrayNotHasKey('transactionalVerified', $this->response);
     }
 
+    /**
+     * CON-190: a connection save that turned the website's own Smaily
+     * account on says so, for the page to reload its automations.
+     */
+    public function testAConnectionSaveThatTurnedTheWebsitesOwnAccountOnSaysSo(): void
+    {
+        $body = ['step' => 'connect', 'data' => ['own' => true, 'subdomain' => 'demo', 'username' => 'u']];
+
+        $this->controller($body, $this->createMock(VerifiedCredentials::class), [], true, false, false, true)->execute();
+
+        self::assertTrue($this->response['ownAccountStarted']);
+    }
+
     public function testARefusedConnectionSaveAnswersOnlyTheErrors(): void
     {
         $errors = [['field' => 'subdomain', 'message' => 'Subdomain and username are required.']];
@@ -159,7 +172,8 @@ class SaveStepTest extends TestCase
         array $errors = [],
         bool $connectionAccepted = false,
         bool $storefrontUrlChanged = false,
-        bool $transactionalAccepted = false
+        bool $transactionalAccepted = false,
+        bool $ownAccountStarted = false
     ): SaveStep {
         $request = $this->createMock(HttpRequest::class);
         $request->method('getContent')->willReturn((string)json_encode($body));
@@ -180,6 +194,7 @@ class SaveStepTest extends TestCase
         $stepSaver->method('isConnectionAccepted')->willReturn($connectionAccepted);
         $stepSaver->method('isStorefrontUrlChanged')->willReturn($storefrontUrlChanged);
         $stepSaver->method('isTransactionalAccepted')->willReturn($transactionalAccepted);
+        $stepSaver->method('isOwnAccountStarted')->willReturn($ownAccountStarted);
         $websiteContext = $this->createMock(WebsiteContext::class);
         $websiteContext->method('getWebsiteId')->willReturn(3);
 

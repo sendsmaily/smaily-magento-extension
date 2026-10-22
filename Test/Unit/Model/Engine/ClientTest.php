@@ -608,6 +608,13 @@ class ClientTest extends TestCase
             'endpoints' => [
                 'ingest_ping' => 'https://intelligence.smaily.com/api/v1/ingest/ping',
                 'customer_export' => 'https://intelligence.smaily.com/api/v1/customer/{email}/export',
+                // Contract v1.14.0–v1.17.0 keys the live engine returns,
+                // with their {key} and {email_key} placeholders.
+                'store_uninstall' => 'https://intelligence.smaily.com/api/v1/store/uninstall',
+                'automations_setup_link' => 'https://intelligence.smaily.com/api/v1/automations/{key}/setup-link',
+                'store_branding' => 'https://intelligence.smaily.com/api/v1/store/branding',
+                'emails_design_link' => 'https://intelligence.smaily.com/api/v1/emails/{email_key}/design-link',
+                'emails_designs' => 'https://intelligence.smaily.com/api/v1/emails/designs',
             ],
         ];
         $client = $this->createClient([new Response(200, [], (string)json_encode($reply))]);

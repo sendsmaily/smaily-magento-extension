@@ -14,7 +14,10 @@ use Smaily\Connect\Model\Engine\AttributionShape;
 /**
  * A visitor token takes either form the contract allows: an engine-issued
  * `vt_` token or a store-created `vs_` token, `vs_` + exactly 22
- * alphanumerics (contract 1.11.0, PRO-3912). Values are synthetic.
+ * alphanumerics (contract 1.11.0, PRO-3912). A `vt_` token is accepted at
+ * any length up to 64 characters in all (contract 1.13.0: a token is an
+ * opaque string of up to 64 characters; the engine issues `vt_` + 10).
+ * Values are synthetic.
  */
 class AttributionShapeTest extends TestCase
 {
@@ -32,14 +35,15 @@ class AttributionShapeTest extends TestCase
     public static function visitorTokens(): array
     {
         return [
-            'engine vt_ token' => ['vt_8f3k2a', true],
+            'engine vt_ token as the engine issues it, vt_ + 10' => ['vt_8f3k2a9xq4', true],
+            'engine vt_ token of another length' => ['vt_8f3k2a', true],
             'engine vt_ token at 64 characters' => ['vt_' . str_repeat('A', 61), true],
             'store-created vs_ token' => ['vs_4fK9a2LmQ7xZ0bR3tY8wP1', true],
             'vs_ with 21 characters' => ['vs_4fK9a2LmQ7xZ0bR3tY8wP', false],
             'vs_ with 23 characters' => ['vs_4fK9a2LmQ7xZ0bR3tY8wP1c', false],
             'vs_ with an underscore' => ['vs_4fK9a2LmQ7xZ0bR3tY8w_1', false],
             'vs_ with a trailing newline' => ["vs_4fK9a2LmQ7xZ0bR3tY8wP1\n", false],
-            'vt_ over 64 characters' => ['vt_' . str_repeat('a', 62), false],
+            'vt_ at 65 characters' => ['vt_' . str_repeat('a', 62), false],
             'another prefix' => ['vx_4fK9a2LmQ7xZ0bR3tY8wP1', false],
             'no prefix' => ['abc123', false],
             'empty' => ['', false],

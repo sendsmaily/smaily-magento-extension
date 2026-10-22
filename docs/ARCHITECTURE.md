@@ -1124,7 +1124,8 @@ to the link's `smaily_ctx` or deleting it when the link has none, so the
 two cookies always describe the same click
 (`Test/Js/attribution-landing.html`). The visitor token, context and
 session id are shape-checked by `Engine\AttributionShape` (WooCommerce's
-PRO-1942 definitions, the visitor token capped at 64 characters in total;
+PRO-1942 definitions, the visitor token capped at 64 characters in total,
+the limit contract 1.13.0 sets for an opaque token;
 since contract 1.11.0 a store-created `vs_` + 22 alphanumerics token is
 accepted too, PRO-3912): the capture scripts write the visitor token and context cookies only in shape,
 `AttributionManager::readCookies()` treats every off-shape cookie, the rec
@@ -1629,7 +1630,7 @@ Initial setup, Settings, Log. Design rules:
 ## Wire contracts
 
 The authoritative engine contract is
-[RECENGINE_API_CONTRACT.md](RECENGINE_API_CONTRACT.md) (v1.12.0, byte-synced
+[RECENGINE_API_CONTRACT.md](RECENGINE_API_CONTRACT.md) (v1.17.0, byte-synced
 across the Smaily connect repositories). Load-bearing invariants
 implemented here:
 

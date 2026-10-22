@@ -241,7 +241,7 @@ value only when it has the shape shown; ignore it otherwise.
 | Query parameter | Shape | Cookie | Lifetime |
 |---|---|---|---|
 | `smaily_rec` | UUID (`8-4-4-4-12` hex) | `smaily_rec_id` | 30 days |
-| `smaily_vt` | `vt_` + 1–61 letters or digits, or `vs_` + exactly 22 letters or digits | `smaily_rec_uid` | 365 days |
+| `smaily_vt` | `vt_` + letters or digits, 64 characters at most in all, or `vs_` + exactly 22 letters or digits | `smaily_rec_uid` | 365 days |
 | `smaily_ctx` | 1–64 of `A-Z a-z 0-9 . _ -` | `smaily_rec_ctx` | 30 days |
 
 When the address has no valid `smaily_rec` but has `utm_source=smaily`,

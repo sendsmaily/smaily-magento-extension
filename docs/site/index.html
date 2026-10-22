@@ -840,6 +840,7 @@ bin/magento cache:flush</code></pre>
         <p>The EU soft opt-in lets you email existing customers only about products similar to what they bought; they must have had a clear way to refuse at purchase, and every email needs an unsubscribe link. You are responsible for the legal basis.</p>
       </div>
       <p>With Magento's <strong>Need to Confirm</strong> newsletter option on, a signup waits for its confirmation email and syncs once confirmed.</p>
+      <p>Deleting a subscriber in <span class="path">Marketing &gt; Communications &gt; Newsletter Subscribers</span> (the grid's <strong>Delete</strong> action, for one row or many) unsubscribes the contact in Smaily, as an unsubscribe in the store does; the contact is not deleted in Smaily. A row that was already unsubscribed sends nothing, and nothing is sent for a website whose contact sync is not running. Deleting a customer account does not change the contact in Smaily.</p>
       <h3>Other options</h3>
       <ul>
         <li><strong>Extra fields to sync with each contact</strong> — First name, Last name, Name prefix, Phone, Gender, Date of birth, Customer ID, Customer group, Subscription type. Empty values are never sent, so existing Smaily data is not wiped. The field names in Smaily are listed under <a href="#ef-contact">Email fields</a>.</li>
@@ -867,6 +868,7 @@ bin/magento cache:flush</code></pre>
         <p>ELi pehme nõusolek lubab olemasolevatele klientidele saata kirju ainult nende ostetuga sarnaste toodete kohta; kliendil pidi ostu ajal olema selge võimalus keelduda ja igas kirjas peab olema loobumislink. Õigusliku aluse eest vastutad sina.</p>
       </div>
       <p>Kui Magento uudiskirja valik <strong>Need to Confirm</strong> on sees, ootab liitumine kinnituskirja ja sünkroonitakse pärast kinnitamist.</p>
+      <p>Tellija kustutamine menüüs <span class="path">Marketing &gt; Communications &gt; Newsletter Subscribers</span> (tabeli toiming <strong>Delete</strong>, ühe või mitme rea jaoks) märgib kontakti Smailys loobunuks, nagu poes tehtud loobumine; Smailys kontakti ei kustutata. Juba loobunud rea kustutamine ei saada midagi, samuti ei saadeta midagi veebisaidilt, mille kontaktide sünkroonimine ei käi. Kliendikonto kustutamine kontakti Smailys ei muuda.</p>
       <h3>Muud valikud</h3>
       <ul>
         <li><strong>Lisaväljad, mis sünkroonitakse iga kontaktiga</strong> — Eesnimi, Perekonnanimi, Nime eesliide, Telefon, Sugu, Sünnikuupäev, Kliendi ID, Kliendigrupp, Tellimuse tüüp. Tühje väärtusi ei saadeta kunagi, seega olemasolevaid Smaily andmeid ei kustutata. Väljade nimed Smailys on loetletud jaotises <a href="#ef-contact">E-kirja väljad</a>.</li>

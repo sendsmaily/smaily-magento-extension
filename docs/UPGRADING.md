@@ -152,13 +152,30 @@ Smaily_SmailyForMagento` answers `Module does not exist`.
 ## After the upgrade: the initial setup
 
 Every **Marketing > Smaily Connect** page (Dashboard, Settings, Log) opens
-**Initial setup** until the initial setup is finished for the website
-selected. On a store with more than one website, it first asks which
-website to set up; run it once for each website. The migrated settings are
-filled in: when the website's Smaily account carried over, the setup opens
-on the Contacts step, and the Automations step shows the migrated
-workflows and wait time. Compare each step with your notes, in
-particular each automation's *Enabled* tick, then finish the setup.
+**Initial setup** until the initial setup is finished. It is run once, for
+the whole store, however many websites the store has: it asks for no
+website, opens on the Connect step even when the Smaily account carried
+over, and every value it saves applies to all websites. The migrated
+settings are filled in, and the Automations step shows the migrated
+workflows and wait time. Compare each step with your notes, in particular
+each automation's *Enabled* tick, then finish the setup.
+
+On a store with more than one website, a website whose 2.8.x settings had
+their own values (a website-scope value in the 2.8.x scope switcher)
+keeps them: the Connect, Contacts and Automations steps list each such
+website under **Websites with their own values**, with those values. Leave
+**Keep its own values** to keep them, or pick **Use this step's values**
+for the website to replace them with the values the step saves. Later,
+**Settings** gives a website its own values, or returns it to the
+settings for all websites, with **Use its own Smaily account on this
+website**, **Use its own Contacts settings on this website** and **Use its
+own automations on this website**.
+
+A store that finished the initial setup on an earlier 3.0.0 release
+candidate — which saved it per website — counts as set up: the update
+moves no saved value, and the admin does not send the store back into the
+setup. Each website's values stay its own values until you change them in
+Settings or run the initial setup again.
 
 For a website where 2.8.x had *Enable Module = No* — or its own *Yes*
 under a Default Config with *No*, and no *Enable Syncronization* value at
@@ -226,8 +243,9 @@ you upgrade*) or take a database backup before you upgrade.
 ## What changes on upgrade day
 
 Two v3 defaults apply from the first request after `setup:upgrade`. Both
-are per website, on **Marketing > Smaily Connect > Settings > Contacts**
-(and in step 2 of the initial setup):
+are Contacts settings, on **Marketing > Smaily Connect > Settings >
+Contacts** (and in step 2 of the initial setup), for all websites or for a
+website with its own Contacts settings:
 
 - **The checkout newsletter checkbox is on.** 2.8.x had no checkout
   checkbox. v3 adds one to the checkout payment step while contact sync

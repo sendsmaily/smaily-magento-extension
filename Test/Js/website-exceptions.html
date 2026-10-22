@@ -18,13 +18,19 @@
   set. The Connect and Contacts steps list the website that holds its own
   values, with them; it keeps them unless "Use this step's values" is picked
   for it, which the step's save posts. The Contacts step says that its save
-  starts contact sync on every website and names them.
+  starts contact sync on every website and names them. The Automations step
+  offers no choice for the website on another Smaily account: it keeps
+  its own automations, and says why (CON-190).
 
   Settings for one website: each tab's "Use its own … on this website"
   switch shows whether the website holds its own values; unticked on a
   website that holds them, the tab's settings are out of use and the tab
   says that the save removes them; the save posts the switch; per-language
   accounts are offered only while the website uses its own Smaily account.
+  A website on another Smaily account than the store-wide one (CON-190): its automations switch is
+  on and cannot be turned off, with a note that says why; while it holds no
+  workflow of its own the tab asks for its workflows; the save posts its own
+  automations.
 
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
@@ -37,6 +43,8 @@
     <script src="build/setup-websites.et_EE.js"></script>
     <script src="build/settings-website.en_US.js"></script>
     <script src="build/settings-website.et_EE.js"></script>
+    <script src="build/settings-own-account.en_US.js"></script>
+    <script src="build/settings-own-account.et_EE.js"></script>
 </head>
 <body>
 <pre id="log"></pre>
@@ -56,6 +64,13 @@
     var RETURNS = 'Save to remove this website\'s own values: it then uses the settings saved for all websites.';
     var ESTIMATE = 'This import sends %1 contacts from all websites. It runs in the background, a chunk per minute,'
         + ' and never slows the storefront down.';
+    var OWN_AUTOMATIONS = 'Use its own automations on this website';
+    var KEEPS_AUTOMATIONS = 'A website with another Smaily account than the one saved for all websites keeps its own automations:'
+        + ' their workflows come from its own account.';
+    var PICK = 'Pick this website\'s workflows';
+    var PICK_WHY = 'This website uses another Smaily account than the one saved for all websites, so it starts only workflows'
+        + ' picked from its own account.'
+        + ' No automation starts on it until you pick its workflows below and save.';
     var failures = 0;
     var passes = 0;
 
@@ -197,6 +212,45 @@
         data = lastSave(frame, 'subscribers');
         check(locale + ', setup: a website kept by default is not posted',
             !!data && JSON.stringify(data.use_store_wide) === '[]');
+
+        card = doc.querySelector('.smaily-website-overrides[data-section=automations]');
+        check(locale + ', setup: the website on another Smaily account keeps its automations, and the step says why',
+            !!card && text(card).indexOf('Latvia') !== -1 && card.querySelector('input[type=radio]') === null
+            && Array.prototype.some.call(card.querySelectorAll('.note'), function (note) {
+                return text(note) === strings[KEEPS_AUTOMATIONS];
+            }));
+        doc.getElementById('smaily-w-next').click();
+        await wait(100);
+        data = lastSave(frame, 'automations');
+        check(locale + ', setup: the Automations step does not post that website',
+            !!data && JSON.stringify(data.use_store_wide) === '[]');
+        frame.remove();
+    }
+
+    async function ownAccount(locale) {
+        var strings = window.smailyAdminPages['settings-own-account.' + locale].strings,
+            frame = await open('settings-own-account.' + locale),
+            doc = frame.contentDocument,
+            own = doc.getElementById('smaily-own-automations'),
+            toggle = own && own.closest('.smaily-own-toggle'),
+            banner = doc.getElementById('smaily-own-workflows'),
+            data;
+
+        check(locale + ', own account: the automations switch is on and cannot be turned off',
+            !!own && own.checked && own.disabled && text(own.parentNode) === strings[OWN_AUTOMATIONS]);
+        check(locale + ', own account: a note says why',
+            !!toggle && text(toggle.querySelector('.note')) === strings[KEEPS_AUTOMATIONS]);
+        check(locale + ', own account: the automations are in use',
+            !doc.querySelector('.smaily-own-region[data-section=automations]').hasAttribute('inert'));
+        check(locale + ', own account: the tab asks for the website\'s workflows',
+            shown(banner) && text(banner.querySelector('.smaily-banner__title')) === strings[PICK]
+            && text(banner.querySelector('.smaily-banner__message')) === strings[PICK_WHY]);
+        doc.querySelector('.smaily-tabs li[data-tab=automations]').click();
+        doc.getElementById('smaily-w-automations-save').click();
+        await wait(100);
+        data = lastSave(frame, 'automations');
+        check(locale + ', own account: the Automations save posts the website\'s own automations',
+            !!data && data.own === true);
         frame.remove();
     }
 
@@ -247,6 +301,7 @@
                 }
                 await setup(locale);
                 await settings(locale);
+                await ownAccount(locale);
             }
         } catch (error) {
             failures++;

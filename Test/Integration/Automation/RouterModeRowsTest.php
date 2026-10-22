@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Automation;
 
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Config;
@@ -38,7 +39,9 @@ class RouterModeRowsTest extends IntegrationTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->router = $this->objectManager->create(Router::class);
+        $this->router = $this->objectManager->create(Router::class, [
+            'overrides' => $this->createMock(WebsiteOverrides::class),
+        ]);
         $this->env->getScopeConfig()->setValue(Config::XML_PATH_WELCOME_WORKFLOW, (string)self::CONFIG_DEFAULT);
 
         // Saved in mode A: each language's own account, ET the fallback.

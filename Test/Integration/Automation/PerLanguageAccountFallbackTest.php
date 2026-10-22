@@ -8,7 +8,9 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Automation;
 
+use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Cron\FlushEventQueue;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Client\SmailyClient;
@@ -153,9 +155,13 @@ class PerLanguageAccountFallbackTest extends IntegrationTestCase
         $cron = $this->objectManager->create(FlushEventQueue::class, [
             'handlerPool' => new HandlerPool([
                 EventType::AUTOMATION_TRIGGER => $this->objectManager->create(AutomationHandler::class, [
-                    'router' => $this->objectManager->create(Router::class),
+                    'router' => $this->objectManager->create(Router::class, [
+                        'overrides' => $this->createMock(WebsiteOverrides::class),
+                    ]),
                     'clientProvider' => $clientProvider,
                     'accountResolver' => $accountResolver,
+                    'overrides' => $this->createMock(WebsiteOverrides::class),
+                    'storeManager' => $this->createMock(StoreManagerInterface::class),
                 ]),
             ]),
         ]);

@@ -199,7 +199,8 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
             new WebsiteOverrides(
                 $this->objectManager->get(ResourceConnection::class),
                 $this->objectManager->get(WriterInterface::class),
-                $storeManager
+                $storeManager,
+                new SubdomainNormalizer()
             )
         );
 

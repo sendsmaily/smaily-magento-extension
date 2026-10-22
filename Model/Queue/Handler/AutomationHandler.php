@@ -8,7 +8,10 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Queue\Handler;
 
+use Magento\Framework\Exception\LocalizedException;
+use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Api\Queue\EventHandlerInterface;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClient;
@@ -42,7 +45,9 @@ use Smaily\Connect\Model\Queue\Skipped;
  * store-wide one — never the store-wide account alone (CON-189).
  * Config-default resolutions (modes single, b and c) keep using the event's
  * store view as before; mode A has none (Router, CON-188), and its skip
- * names the contact's language.
+ * names the contact's language. A website on another Smaily account than
+ * the store-wide one has only its own workflows (Router, CON-190), and its
+ * skip names the website.
  *
  * force_opt_in is always false, in every contact-sync mode (PRO-3577, as
  * the WooCommerce plugin's PRO-1716): a trigger never overrides an
@@ -63,13 +68,23 @@ class AutomationHandler implements EventHandlerInterface
     public const SKIPPED_NO_LANGUAGE_WORKFLOW = 'Skipped: this automation has no Smaily workflow for the'
         . ' contact\'s language (%1), and no default fallback workflow either. Nothing was sent.';
 
+    /**
+     * A website on another Smaily account than the store-wide one (CON-190)
+     * has no workflow of its account for this automation; the store-wide
+     * workflows belong to the store-wide account. %1 is the website's name.
+     */
+    public const SKIPPED_NO_OWN_ACCOUNT_WORKFLOW = 'Skipped: the website %1 uses another Smaily account than the one'
+        . ' saved for all websites, and no workflow of its account is picked for this automation. Nothing was sent.';
+
     public function __construct(
         private readonly SmailyClientProvider $clientProvider,
         private readonly Router $router,
         private readonly EventQueue $eventQueue,
         private readonly Logger $logger,
         private readonly AccountResolver $accountResolver,
-        private readonly Config $config
+        private readonly Config $config,
+        private readonly WebsiteOverrides $overrides,
+        private readonly StoreManagerInterface $storeManager
     ) {
     }
 
@@ -100,11 +115,7 @@ class AutomationHandler implements EventHandlerInterface
                     'trigger' => $trigger,
                     'website_id' => $websiteId,
                 ]);
-                $perLanguage = $language !== ''
-                    && $this->config->getMultilingualMode($websiteId) === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS;
-                $results[$id] = new Skipped($perLanguage
-                    ? str_replace('%1', strtoupper($language), self::SKIPPED_NO_LANGUAGE_WORKFLOW)
-                    : self::SKIPPED_NO_WORKFLOW);
+                $results[$id] = new Skipped($this->skipReason($websiteId, $language));
                 continue;
             }
 
@@ -142,5 +153,29 @@ class AutomationHandler implements EventHandlerInterface
         }
 
         return $results;
+    }
+
+    /**
+     * Why no workflow was found: the contact's language in mode A, the
+     * website on another Smaily account, else no mapped workflow.
+     */
+    private function skipReason(int $websiteId, string $language): string
+    {
+        if ($language !== ''
+            && $this->config->getMultilingualMode($websiteId) === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
+        ) {
+            return str_replace('%1', strtoupper($language), self::SKIPPED_NO_LANGUAGE_WORKFLOW);
+        }
+        if ($this->overrides->usesOtherAccount($websiteId)) {
+            try {
+                $name = (string)$this->storeManager->getWebsite($websiteId)->getName();
+            } catch (LocalizedException) {
+                $name = (string)$websiteId;
+            }
+
+            return str_replace('%1', $name, self::SKIPPED_NO_OWN_ACCOUNT_WORKFLOW);
+        }
+
+        return self::SKIPPED_NO_WORKFLOW;
     }
 }

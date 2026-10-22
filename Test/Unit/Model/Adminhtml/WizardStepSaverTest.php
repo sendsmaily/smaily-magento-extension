@@ -75,6 +75,9 @@ class WizardStepSaverTest extends TestCase
     /** @var array<int, array{path: string, value: mixed, scope: string, scopeId: int}> */
     private array $saved = [];
 
+    /** @var array<int, array{0: string, 1: int, 2: bool}> removeOwnValues() calls: section, website, store views */
+    private array $removed = [];
+
     private WizardStepSaver $saver;
 
     protected function setUp(): void
@@ -150,6 +153,18 @@ class WizardStepSaverTest extends TestCase
     {
         $this->overrides->method('ownValues')->willReturnCallback(
             static fn (string $section): array => array_fill_keys($bySection[$section] ?? [], ['path' => 'value'])
+        );
+    }
+
+    /**
+     * Records each removeOwnValues() call in $removed.
+     */
+    private function recordRemovals(): void
+    {
+        $this->overrides->method('removeOwnValues')->willReturnCallback(
+            function (string $section, int $websiteId, bool $storeViewAccounts = false): void {
+                $this->removed[] = [$section, $websiteId, $storeViewAccounts];
+            }
         );
     }
 
@@ -1181,21 +1196,166 @@ class WizardStepSaverTest extends TestCase
 
     /**
      * CON-179: in Settings, unticking a website's own values and saving
-     * removes them — nothing else is written, and the page reloads.
+     * removes them — nothing else is written, and the page reloads. A
+     * website on another Smaily account than the store-wide one takes its
+     * own automations with it: their workflows came from that account
+     * (CON-190).
      */
     public function testSettingsReturnsAWebsiteWithOwnValuesToTheStoreWideValues(): void
     {
         $this->onStoreWithWebsites(2);
         $this->withOwnValues([WebsiteOverrides::CONNECTION => [2]]);
-        $this->overrides->expects(self::once())->method('removeOwnValues')
-            ->with(WebsiteOverrides::CONNECTION, 2, true);
+        $this->overrides->method('usesOtherAccount')->with(2)->willReturn(true);
+        $this->recordRemovals();
         $this->clientFactory->expects(self::never())->method('create');
 
         $errors = $this->saver->save('connect', ['own' => false, 'subdomain' => 'demo', 'username' => 'api-user']);
 
         self::assertSame([], $errors);
         self::assertSame([], $this->saved);
+        self::assertSame(
+            [[WebsiteOverrides::CONNECTION, 2, true], [WebsiteOverrides::AUTOMATIONS, 2, false]],
+            $this->removed
+        );
         self::assertTrue($this->saver->isReturnedToStoreWide());
+        self::assertFalse($this->saver->isOwnAccountStarted());
+    }
+
+    /**
+     * CON-190: a website whose own login is the store-wide account keeps
+     * its own automations when it returns to the store-wide login: they
+     * were picked from that same account.
+     */
+    public function testAWebsiteOnTheStoreWideAccountKeepsItsAutomationsWhenItsLoginReturns(): void
+    {
+        $this->onStoreWithWebsites(2);
+        $this->withOwnValues([WebsiteOverrides::CONNECTION => [2]]);
+        $this->overrides->method('usesOtherAccount')->willReturn(false);
+        $this->recordRemovals();
+
+        $this->saver->save('connect', ['own' => false, 'subdomain' => 'demo', 'username' => 'api-user']);
+
+        self::assertSame([[WebsiteOverrides::CONNECTION, 2, true]], $this->removed);
+    }
+
+    /**
+     * CON-190: a connection save that moves a website onto another Smaily
+     * account than the store-wide one starts its automations from no
+     * workflow — its own automations so far were picked from the store-wide
+     * account — and the page reloads to show them.
+     */
+    public function testTurningAWebsitesOwnSmailyAccountOnStartsItsAutomationsFromNoWorkflow(): void
+    {
+        $this->onStoreWithWebsites(2);
+        // Before the save it uses the store-wide account; after, another one.
+        $this->overrides->method('usesOtherAccount')->willReturnOnConsecutiveCalls(false, true);
+        $this->recordRemovals();
+
+        $errors = $this->saver->save('connect', [
+            'own' => true,
+            'subdomain' => 'own-shop',
+            'username' => 'own-api',
+            'password' => 'own-secret',
+        ]);
+
+        self::assertSame([], $errors);
+        self::assertSame(
+            ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 2],
+            $this->savedScope(Config::XML_PATH_SUBDOMAIN)
+        );
+        self::assertSame([[WebsiteOverrides::AUTOMATIONS, 2, false]], $this->removed);
+        self::assertTrue($this->saver->isOwnAccountStarted());
+        self::assertFalse($this->saver->isReturnedToStoreWide());
+    }
+
+    /**
+     * CON-190: a website's own login that names the store-wide account is
+     * the same account, so it keeps its automations.
+     */
+    public function testTurningOnAnOwnLoginOfTheStoreWideAccountKeepsTheAutomations(): void
+    {
+        $this->onStoreWithWebsites(2);
+        $this->overrides->method('usesOtherAccount')->willReturn(false);
+        $this->overrides->expects(self::never())->method('removeOwnValues');
+
+        $this->saver->save('connect', ['own' => true, 'subdomain' => 'demo', 'username' => 'api-user']);
+
+        self::assertFalse($this->saver->isOwnAccountStarted());
+    }
+
+    /**
+     * CON-190: saving a website's own Smaily account again keeps the
+     * automations it picked from it.
+     */
+    public function testSavingAWebsitesOwnSmailyAccountAgainKeepsItsAutomations(): void
+    {
+        $this->onStoreWithWebsites(2);
+        $this->withOwnValues([WebsiteOverrides::CONNECTION => [2]]);
+        $this->overrides->method('usesOtherAccount')->willReturn(true);
+        $this->overrides->expects(self::never())->method('removeOwnValues');
+
+        $this->saver->save('connect', ['own' => true, 'subdomain' => 'demo', 'username' => 'api-user']);
+
+        self::assertFalse($this->saver->isOwnAccountStarted());
+    }
+
+    /**
+     * CON-190: the automations of a website with its own Smaily account are
+     * its own, as in mode A: unticked or not, Settings saves them at its
+     * scope and removes none of them.
+     */
+    public function testSettingsKeepsTheAutomationsOfAWebsiteWithItsOwnSmailyAccountItsOwn(): void
+    {
+        $this->onStoreWithWebsites(2);
+        $this->withOwnValues([WebsiteOverrides::AUTOMATIONS => [2]]);
+        $this->overrides->method('usesOtherAccount')->with(2)->willReturn(true);
+        $this->overrides->expects(self::never())->method('removeOwnValues');
+
+        $this->saver->save('automations', ['own' => false, 'welcome_enabled' => true]);
+
+        self::assertSame(
+            ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 2],
+            $this->savedScope(Config::XML_PATH_WELCOME_ENABLED)
+        );
+        self::assertFalse($this->saver->isReturnedToStoreWide());
+    }
+
+    /**
+     * CON-190: a website on another Smaily account has only its own
+     * workflows. A store-wide workflow it inherits is not its saved one, so
+     * an empty select clears it for the website instead of keeping the
+     * other account's id as the missing-from-list rule would (PRO-1286).
+     */
+    public function testTheAutomationsSaveOfAWebsiteWithItsOwnAccountDoesNotKeepAnInheritedWorkflow(): void
+    {
+        $this->onStoreWithWebsites(2);
+        $this->overrides->method('usesOtherAccount')->with(2)->willReturn(true);
+        $this->overrides->method('ownValue')->willReturn(null);
+        $this->config->method('getWelcomeWorkflow')->willReturn(555);
+        $this->withWorkflows([['id' => 777, 'title' => 'Own']]);
+
+        $this->saver->save('automations', ['own' => true, 'welcome_workflow' => '']);
+
+        self::assertSame('0', $this->savedValue(Config::XML_PATH_WELCOME_WORKFLOW));
+        self::assertSame(
+            ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 2],
+            $this->savedScope(Config::XML_PATH_WELCOME_WORKFLOW)
+        );
+    }
+
+    /**
+     * CON-190: the initial setup does not take the automations of a website
+     * with its own Smaily account, even when the post names it.
+     */
+    public function testTheSetupKeepsTheAutomationsOfAWebsiteWithItsOwnSmailyAccount(): void
+    {
+        $this->onStoreWithWebsites(1, true);
+        $this->withOwnValues([WebsiteOverrides::AUTOMATIONS => [2, 3]]);
+        $this->overrides->method('usesOtherAccount')->willReturnCallback(static fn (int $id): bool => $id === 2);
+        $this->overrides->expects(self::once())->method('removeOwnValues')
+            ->with(WebsiteOverrides::AUTOMATIONS, 3, true);
+
+        $this->saver->save('automations', ['welcome_enabled' => true, 'use_store_wide' => [2, 3]]);
     }
 
     /**
@@ -1324,12 +1484,17 @@ class WizardStepSaverTest extends TestCase
     {
         $this->onStoreWithWebsites(2);
         $this->withOwnValues([WebsiteOverrides::CONNECTION => [2]]);
-        $this->overrides->expects(self::once())->method('removeOwnValues')
-            ->with(WebsiteOverrides::CONNECTION, 2, true);
+        $this->overrides->method('usesOtherAccount')->willReturn(true);
+        $this->recordRemovals();
 
         $this->saver->save('connect', ['own' => false, 'subdomain' => 'demo', 'username' => 'api-user', 'multilingual_mode' => 'a']);
 
         self::assertSame([], $this->saved);
+        self::assertSame(
+            [[WebsiteOverrides::CONNECTION, 2, true], [WebsiteOverrides::AUTOMATIONS, 2, false]],
+            $this->removed,
+            'Its automations go with its own Smaily account (CON-190)'
+        );
         self::assertTrue($this->saver->isReturnedToStoreWide());
     }
 

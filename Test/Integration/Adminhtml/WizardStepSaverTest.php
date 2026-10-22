@@ -105,7 +105,8 @@ class WizardStepSaverTest extends IntegrationTestCase
             new WebsiteOverrides(
                 $this->objectManager->get(ResourceConnection::class),
                 $this->objectManager->get(WriterInterface::class),
-                $storeManager
+                $storeManager,
+                new SubdomainNormalizer()
             )
         );
     }
@@ -138,6 +139,32 @@ class WizardStepSaverTest extends IntegrationTestCase
         );
 
         return $storeManager;
+    }
+
+    /**
+     * @param int[] $websiteIds the store's websites
+     */
+    private function overrides(array $websiteIds): WebsiteOverrides
+    {
+        return new WebsiteOverrides(
+            $this->objectManager->get(ResourceConnection::class),
+            $this->objectManager->get(WriterInterface::class),
+            $this->storeManager($websiteIds),
+            new SubdomainNormalizer()
+        );
+    }
+
+    /**
+     * The Router over the real rows, on a store with these websites.
+     *
+     * @param int[] $websiteIds
+     */
+    private function router(array $websiteIds = [self::MAIN, self::SECOND]): Router
+    {
+        return $this->objectManager->create(Router::class, [
+            'config' => $this->config,
+            'overrides' => $this->overrides($websiteIds),
+        ]);
     }
 
     private function websiteContext(StoreManagerInterface $storeManager, ?string $websiteParam): WebsiteContext
@@ -277,13 +304,14 @@ class WizardStepSaverTest extends IntegrationTestCase
         self::assertSame('second-secret', $this->config->getWebsitePassword(self::SECOND));
         self::assertSame('shop', $this->config->getWebsiteSubdomain(self::MAIN));
         self::assertSame('legitimate_interest', $this->config->getSyncMode(self::SECOND));
-        $router = $this->objectManager->create(Router::class, ['config' => $this->config]);
+        $router = $this->router();
         self::assertSame(123, $router->resolve('welcome', self::SECOND, 'default')?->workflowId);
         self::assertSame(900, $router->resolve('welcome', self::MAIN, 'default')?->workflowId);
 
         // Returned: unticked and saved, the website's own values go and
-        // nothing else is written.
-        foreach (['connect', 'subscribers', 'automations'] as $step) {
+        // nothing else is written. Its own automations go with its own
+        // Smaily account (CON-190).
+        foreach (['connect', 'subscribers'] as $step) {
             $saver = $this->saver((string)self::SECOND);
             self::assertSame([], $saver->save($step, ['own' => false, 'subdomain' => 'ignored', 'username' => 'ignored']));
             self::assertTrue($saver->isReturnedToStoreWide(), $step);
@@ -301,6 +329,123 @@ class WizardStepSaverTest extends IntegrationTestCase
             $this->config->isContactSyncActive(self::SECOND),
             'Its contacts were confirmed; returning keeps them syncing'
         );
+    }
+
+    /**
+     * CON-190: a website with its own Smaily account always has its own
+     * automations. Turning its own account on starts them from no workflow:
+     * the store-wide ones and its own ones so far were picked from the
+     * store-wide account, so none of them starts through its own account,
+     * and its automations switch is fixed on. The merchant picks its
+     * workflows from its own account; returning it to the store-wide
+     * account returns it to the store-wide automations.
+     */
+    public function testAWebsiteWithItsOwnSmailyAccountHasItsOwnAutomations(): void
+    {
+        $this->insertRow('default', 0, Config::XML_PATH_MULTILINGUAL_MODE, 'b');
+        $this->saver('0')->save('connect', [
+            'subdomain' => 'shop',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'multilingual_mode' => 'b',
+        ]);
+        $this->saver('0')->save('automations', [
+            'first_order_workflow' => '800',
+            'mappings' => [
+                ['trigger_type' => 'welcome', 'language' => 'default', 'account_key' => 'default', 'workflow_id' => 900],
+            ],
+        ]);
+        // Second's own automations, picked from the store-wide account.
+        self::assertSame([], $this->saver((string)self::SECOND)->save('automations', ['own' => true, 'mappings' => [
+            ['trigger_type' => 'welcome', 'language' => 'default', 'account_key' => 'default', 'workflow_id' => 901],
+        ]]));
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_ABANDONED_WORKFLOW, '902');
+        $router = $this->router();
+        self::assertSame(901, $router->resolve('welcome', self::SECOND, 'default')?->workflowId);
+
+        $settings = $this->saver((string)self::SECOND);
+        self::assertSame([], $settings->save('connect', [
+            'own' => true,
+            'subdomain' => 'second-shop',
+            'username' => 'api-second',
+            'password' => 'second-secret',
+            'multilingual_mode' => 'b',
+        ]));
+
+        self::assertTrue($settings->isOwnAccountStarted());
+        foreach (['welcome', 'first_order', 'abandoned_cart'] as $trigger) {
+            self::assertNull($router->resolve($trigger, self::SECOND, 'default'), $trigger);
+        }
+        self::assertSame(900, $router->resolve('welcome', self::MAIN, 'default')?->workflowId);
+        self::assertSame(800, $router->resolve('first_order', self::MAIN, 'default')?->workflowId);
+        $overrides = $this->overrides([self::MAIN, self::SECOND]);
+        self::assertTrue($overrides->usesOtherAccount(self::SECOND));
+        self::assertFalse($overrides->hasOwnValues(WebsiteOverrides::AUTOMATIONS, self::SECOND));
+
+        // Unticked or not, its automations save is its own.
+        self::assertSame([], $this->saver((string)self::SECOND)->save('automations', ['own' => false, 'mappings' => [
+            ['trigger_type' => 'welcome', 'language' => 'default', 'account_key' => 'default', 'workflow_id' => 777],
+        ]]));
+        self::assertSame(777, $router->resolve('welcome', self::SECOND, 'default')?->workflowId);
+        self::assertSame(900, $router->resolve('welcome', self::MAIN, 'default')?->workflowId);
+
+        // Back on the store-wide account, it is back on the store-wide automations.
+        $saver = $this->saver((string)self::SECOND);
+        self::assertSame([], $saver->save('connect', ['own' => false, 'subdomain' => 'ignored', 'username' => 'ignored']));
+        self::assertTrue($saver->isReturnedToStoreWide());
+        self::assertFalse($overrides->hasOwnValues(WebsiteOverrides::AUTOMATIONS, self::SECOND));
+        self::assertSame(900, $router->resolve('welcome', self::SECOND, 'default')?->workflowId);
+        self::assertSame(800, $router->resolve('first_order', self::SECOND, 'default')?->workflowId);
+    }
+
+    /**
+     * CON-190: the account's identity decides, not the scope its login is
+     * saved at. A website that gets its own login of the store-wide account
+     * (the subdomain in another case) keeps its automations, the store-wide
+     * ones included, and its automations switch stays free.
+     */
+    public function testAWebsitesOwnLoginOfTheStoreWideAccountKeepsItsAutomations(): void
+    {
+        $this->insertRow('default', 0, Config::XML_PATH_MULTILINGUAL_MODE, 'b');
+        $this->saver('0')->save('connect', [
+            'subdomain' => 'shop',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'multilingual_mode' => 'b',
+        ]);
+        $this->saver('0')->save('automations', ['first_order_workflow' => '800']);
+        self::assertSame([], $this->saver((string)self::SECOND)->save('automations', ['own' => true, 'mappings' => [
+            ['trigger_type' => 'welcome', 'language' => 'default', 'account_key' => 'default', 'workflow_id' => 901],
+        ]]));
+
+        $settings = $this->saver((string)self::SECOND);
+        self::assertSame([], $settings->save('connect', [
+            'own' => true,
+            'subdomain' => 'SHOP',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'multilingual_mode' => 'b',
+        ]));
+
+        self::assertFalse($settings->isOwnAccountStarted());
+        self::assertFalse($this->overrides([self::MAIN, self::SECOND])->usesOtherAccount(self::SECOND));
+        $router = $this->router();
+        self::assertSame(901, $router->resolve('welcome', self::SECOND, 'default')?->workflowId);
+        self::assertSame(800, $router->resolve('first_order', self::SECOND, 'default')?->workflowId);
+    }
+
+    /**
+     * CON-190: on a store with one website nothing changes — its Smaily
+     * account saved at its website scope (an initial setup before the
+     * update) starts the store's workflows as before.
+     */
+    public function testAStoreWithOneWebsiteStartsTheStoresWorkflowsThroughItsAccount(): void
+    {
+        $this->insertRow('websites', self::MAIN, Config::XML_PATH_SUBDOMAIN, 'shop');
+        $this->insertRow('websites', self::MAIN, Config::XML_PATH_USERNAME, 'api-user');
+        $this->insertRow('default', 0, Config::XML_PATH_FIRST_ORDER_WORKFLOW, '800');
+
+        self::assertSame(800, $this->router([self::MAIN])->resolve('first_order', self::MAIN, 'default')?->workflowId);
     }
 
     /**
@@ -410,14 +555,15 @@ class WizardStepSaverTest extends IntegrationTestCase
         $this->insertRow('default', 0, Config::XML_PATH_MULTILINGUAL_MODE, 'b');
         self::assertSame('b', $this->config->getMultilingualMode(self::SECOND));
         self::assertSame('', $this->config->getWebsiteSubdomain(self::SECOND));
-        $router = $this->objectManager->create(Router::class, ['config' => $this->config]);
+        $router = $this->router();
         self::assertNull($router->resolve('welcome', self::SECOND, 'et'));
         self::assertSame(77, $router->resolve('welcome', self::MAIN, 'et')?->workflowId);
 
         $overrides = new WebsiteOverrides(
             $this->objectManager->get(ResourceConnection::class),
             $this->objectManager->get(WriterInterface::class),
-            $this->storeManager([self::MAIN, self::SECOND])
+            $this->storeManager([self::MAIN, self::SECOND]),
+            new SubdomainNormalizer()
         );
         self::assertSame([self::MAIN], array_keys($overrides->ownValues(WebsiteOverrides::CONNECTION)));
 

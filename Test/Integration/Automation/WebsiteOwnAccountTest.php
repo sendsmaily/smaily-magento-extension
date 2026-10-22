@@ -8,8 +8,13 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Automation;
 
+use Magento\Framework\App\Config\Storage\WriterInterface;
+use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Store\Api\Data\WebsiteInterface;
+use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Cron\FlushEventQueue;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Client\SmailyClient;
@@ -25,6 +30,7 @@ use Smaily\Connect\Model\Queue\Handler\ContactSyncHandler;
 use Smaily\Connect\Model\Queue\HandlerPool;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
+use Smaily\Connect\Model\SubdomainNormalizer;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
 
@@ -40,15 +46,34 @@ use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
  *
  * Websites: Main (1, store view 1) follows the store-wide account; Own (2,
  * store view 2) holds its own account; Languages (3, store views 31 ET and
- * 32 LV) has per-language accounts (mode A), ET the default fallback.
+ * 32 LV) has per-language accounts (mode A), ET the default fallback;
+ * Inherits (4, store view 4) holds another account than the store-wide one
+ * and no automations of its own — as an install from before CON-190 could;
+ * Same (5, store view 5) holds the store-wide account's login of its own,
+ * as a 2.8.x upgrade often saved it on every website.
+ *
+ * CON-190: a website on another account than the store-wide one has only
+ * its own automations, so Inherits starts none of the store-wide workflows
+ * through its account. The account's identity decides, not the scope its
+ * login is saved at: Same starts them as before, and so does every website
+ * where no store-wide account is saved.
  */
 class WebsiteOwnAccountTest extends IntegrationTestCase
 {
     private const MAIN = 1;
     private const OWN = 2;
     private const LANGUAGES = 3;
+    private const INHERITS = 4;
+    private const SAME = 5;
 
-    private const STORES = [1 => self::MAIN, 2 => self::OWN, 31 => self::LANGUAGES, 32 => self::LANGUAGES];
+    private const STORES = [
+        1 => self::MAIN,
+        2 => self::OWN,
+        31 => self::LANGUAGES,
+        32 => self::LANGUAGES,
+        4 => self::INHERITS,
+        5 => self::SAME,
+    ];
 
     /** @var list<array{account: string, endpoint: string, workflow: int|null}> what reached Smaily */
     private array $posted = [];
@@ -62,8 +87,15 @@ class WebsiteOwnAccountTest extends IntegrationTestCase
         $this->posted = [];
 
         $this->account('default', 0, 'store-wide');
-        $this->seed('default', 0, [Config::XML_PATH_MULTILINGUAL_MODE => 'b']);
+        // The store-wide First order workflow, picked from the store-wide account.
+        $this->seed('default', 0, [
+            Config::XML_PATH_MULTILINGUAL_MODE => 'b',
+            Config::XML_PATH_FIRST_ORDER_WORKFLOW => '150',
+        ]);
         $this->account('websites', self::OWN, 'website-own');
+        $this->account('websites', self::INHERITS, 'website-inherits');
+        // The store-wide account, its subdomain written in another case.
+        $this->account('websites', self::SAME, 'Store-Wide', 'store-wide-user');
         $this->seed('websites', self::OWN, [Config::XML_PATH_FIRST_ORDER_WORKFLOW => '250']);
         // Mode A: the website's account is the default fallback (ET) account.
         $this->account('websites', self::LANGUAGES, 'et-account');
@@ -118,6 +150,110 @@ class WebsiteOwnAccountTest extends IntegrationTestCase
 
         self::assertSame(
             [['account' => 'website-own', 'endpoint' => SmailyClient::ENDPOINT_AUTORESPONDER, 'workflow' => 250]],
+            $this->posted
+        );
+    }
+
+    /**
+     * CON-190: the store-wide Welcome row and the store-wide First order
+     * workflow were picked from the store-wide account. A website with its
+     * own account that holds no automations of its own starts neither
+     * through its account: the rows are closed as Skipped, naming it.
+     */
+    public function testAWebsiteWithItsOwnAccountStartsNoStoreWideWorkflow(): void
+    {
+        $this->automation(Trigger::WELCOME, 4, 'en');
+        $this->automation(Trigger::FIRST_ORDER, 4, 'en');
+
+        $this->flush();
+
+        self::assertSame([], $this->posted);
+        foreach ($this->fetchAll(EventResource::TABLE_NAME) as $row) {
+            self::assertSame(Event::STATUS_SENT, $row['status'], 'Closed, not retried');
+            self::assertNull($row['sent_payload']);
+            self::assertSame(
+                str_replace('%1', 'Inherits', AutomationHandler::SKIPPED_NO_OWN_ACCOUNT_WORKFLOW),
+                $row['last_error']
+            );
+        }
+    }
+
+    /**
+     * CON-190: a website's own login of the store-wide account is the same
+     * account, so the workflows saved for all websites keep starting there,
+     * through its own login.
+     */
+    public function testAWebsiteWithItsOwnLoginOfTheStoreWideAccountKeepsTheStoreWideWorkflows(): void
+    {
+        $this->automation(Trigger::WELCOME, 5, 'en');
+        $this->automation(Trigger::FIRST_ORDER, 5, 'en');
+
+        $this->flush();
+
+        self::assertSame(
+            [
+                ['account' => 'Store-Wide', 'endpoint' => SmailyClient::ENDPOINT_AUTORESPONDER, 'workflow' => 100],
+                ['account' => 'Store-Wide', 'endpoint' => SmailyClient::ENDPOINT_AUTORESPONDER, 'workflow' => 150],
+            ],
+            $this->posted
+        );
+    }
+
+    /**
+     * CON-190: with no store-wide account saved (only website logins, a
+     * 2.8.x shape), which account the workflows saved for all websites were
+     * picked from is not known, so they keep starting as before — here
+     * through Inherits' own account.
+     */
+    public function testWithNoStoreWideAccountTheWorkflowsSavedForAllWebsitesKeepStarting(): void
+    {
+        $this->connection->delete('core_config_data', [
+            'scope = ?' => 'default',
+            'path IN (?)' => [Config::XML_PATH_SUBDOMAIN, Config::XML_PATH_USERNAME, Config::XML_PATH_PASSWORD],
+        ]);
+        $this->automation(Trigger::WELCOME, 4, 'en');
+        $this->automation(Trigger::FIRST_ORDER, 4, 'en');
+
+        $this->flush();
+
+        self::assertSame(
+            [
+                ['account' => 'website-inherits', 'endpoint' => SmailyClient::ENDPOINT_AUTORESPONDER, 'workflow' => 100],
+                ['account' => 'website-inherits', 'endpoint' => SmailyClient::ENDPOINT_AUTORESPONDER, 'workflow' => 150],
+            ],
+            $this->posted
+        );
+    }
+
+    /**
+     * CON-190: once Inherits has a workflow of its own, it starts it
+     * through its own account.
+     */
+    public function testAWebsiteWithItsOwnAccountStartsItsOwnWorkflowThroughThatAccount(): void
+    {
+        $this->seed('websites', self::INHERITS, [Config::XML_PATH_FIRST_ORDER_WORKFLOW => '450']);
+        $this->automation(Trigger::FIRST_ORDER, 4, 'en');
+
+        $this->flush();
+
+        self::assertSame(
+            [['account' => 'website-inherits', 'endpoint' => SmailyClient::ENDPOINT_AUTORESPONDER, 'workflow' => 450]],
+            $this->posted
+        );
+    }
+
+    /**
+     * The store-wide workflows still start on a website that follows the
+     * store-wide account (CON-190 changes nothing there).
+     */
+    public function testAWebsiteFollowingTheStoreWideAccountStartsTheStoreWideConfigWorkflow(): void
+    {
+        $this->automation(Trigger::FIRST_ORDER, 1, 'en');
+
+        $this->flush();
+
+        self::assertSame(
+            [['account' => 'store-wide', 'endpoint' => SmailyClient::ENDPOINT_AUTORESPONDER, 'workflow' => 150]],
             $this->posted
         );
     }
@@ -213,14 +349,27 @@ class WebsiteOwnAccountTest extends IntegrationTestCase
                 => $websiteId === self::LANGUAGES ? (['et' => 31, 'lv' => 32][$accountKey] ?? null) : null
         );
 
+        $storeManager = $this->storeManager();
+        $overrides = new WebsiteOverrides(
+            $this->objectManager->get(ResourceConnection::class),
+            $this->objectManager->get(WriterInterface::class),
+            $storeManager,
+            new SubdomainNormalizer()
+        );
+
         /** @var FlushEventQueue $cron */
         $cron = $this->objectManager->create(FlushEventQueue::class, [
             'handlerPool' => new HandlerPool([
                 EventType::AUTOMATION_TRIGGER => $this->objectManager->create(AutomationHandler::class, [
-                    'router' => $this->objectManager->create(Router::class, ['config' => $config]),
+                    'router' => $this->objectManager->create(Router::class, [
+                        'config' => $config,
+                        'overrides' => $overrides,
+                    ]),
                     'clientProvider' => $clientProvider,
                     'accountResolver' => $accountResolver,
                     'config' => $config,
+                    'overrides' => $overrides,
+                    'storeManager' => $storeManager,
                 ]),
                 EventType::CONTACT_SYNC => $this->objectManager->create(ContactSyncHandler::class, [
                     'clientProvider' => $clientProvider,
@@ -231,14 +380,42 @@ class WebsiteOwnAccountTest extends IntegrationTestCase
     }
 
     /**
-     * A Smaily account's three rows at a scope: subdomain, username and the
-     * encrypted password ("<subdomain>-secret").
+     * The store's five websites, named as in the class comment.
      */
-    private function account(string $scope, int $scopeId, string $subdomain): void
+    private function storeManager(): StoreManagerInterface
+    {
+        $websites = [];
+        foreach ([
+            self::MAIN => 'Main',
+            self::OWN => 'Own',
+            self::LANGUAGES => 'Languages',
+            self::INHERITS => 'Inherits',
+            self::SAME => 'Same',
+        ] as $websiteId => $name) {
+            $website = $this->createMock(WebsiteInterface::class);
+            $website->method('getId')->willReturn($websiteId);
+            $website->method('getName')->willReturn($name);
+            $websites[$websiteId] = $website;
+        }
+        $storeManager = $this->createMock(StoreManagerInterface::class);
+        $storeManager->method('getWebsites')->willReturn($websites);
+        $storeManager->method('getWebsite')->willReturnCallback(
+            static fn (int $websiteId): WebsiteInterface => $websites[$websiteId]
+        );
+
+        return $storeManager;
+    }
+
+    /**
+     * A Smaily account's three rows at a scope: subdomain, username (by
+     * default "<subdomain>-user") and the encrypted password
+     * ("<subdomain>-secret").
+     */
+    private function account(string $scope, int $scopeId, string $subdomain, ?string $username = null): void
     {
         $this->seed($scope, $scopeId, [
             Config::XML_PATH_SUBDOMAIN => $subdomain,
-            Config::XML_PATH_USERNAME => $subdomain . '-user',
+            Config::XML_PATH_USERNAME => $username ?? $subdomain . '-user',
             Config::XML_PATH_PASSWORD => $this->objectManager->get(EncryptorInterface::class)
                 ->encrypt($subdomain . '-secret'),
         ]);

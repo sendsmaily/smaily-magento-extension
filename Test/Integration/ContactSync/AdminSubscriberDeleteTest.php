@@ -28,6 +28,7 @@ use Magento\Framework\Event;
 use Magento\Framework\Event\ManagerInterface as EventManagerInterface;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
+use Magento\Framework\Lock\LockManagerInterface;
 use Magento\Framework\Mail\Template\TransportBuilder;
 use Magento\Framework\Message\ManagerInterface as MessageManagerInterface;
 use Magento\Framework\Model\Context as ModelContext;
@@ -45,11 +46,15 @@ use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\ContactSync\AdminSubscriberDelete;
 use Smaily\Connect\Model\ContactSync\SubscriberPayloadBuilder;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
+use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
+use Smaily\Connect\Model\Privacy\ProfilingConsent;
+use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
 use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
+use Smaily\Connect\Observer\Engine\SubscriberDeleted;
 use Smaily\Connect\Observer\SubscriberDeleteAfter;
 use Smaily\Connect\Plugin\Adminhtml\MarkSubscriberMassDelete;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
@@ -62,8 +67,10 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  * subscriber model; the module's observer of the delete (as etc/events.xml
  * wires it) queues each deleted row's contact as an unsubscribe in Smaily.
  * The extension is set up store-wide; website 2 has contact sync off as its
- * own exception, so its row sends nothing. A delete outside the grid's
- * action — a customer account's deletion — sends nothing either.
+ * own exception, so its row sends nothing. The engine-side observer of
+ * the same delete opts each deleted row out of Campaign Intelligence
+ * profiling, as an unsubscribe in the store does (CON-187). A delete outside
+ * the grid's action — a customer account's deletion — sends nothing either.
  */
 class AdminSubscriberDeleteTest extends IntegrationTestCase
 {
@@ -80,6 +87,12 @@ class AdminSubscriberDeleteTest extends IntegrationTestCase
 
     private SubscriberResource $subscriberResource;
 
+    private SyncDispatcher $dispatcher;
+
+    private Config $config;
+
+    private ProfilingOptOuts $optOuts;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -91,6 +104,7 @@ class AdminSubscriberDeleteTest extends IntegrationTestCase
 
         $this->schema = new SchemaInstaller($this->connection);
         $this->schema->createContactTables();
+        $this->schema->createFlag();
         $this->seedStoreWideSetup();
 
         $this->storeManager = $this->storeManager();
@@ -99,14 +113,14 @@ class AdminSubscriberDeleteTest extends IntegrationTestCase
             ['storeManager' => $this->storeManager]
         );
         $this->mark = new AdminSubscriberDelete();
-        $config = $this->objectManager->create(Config::class, [
+        $this->config = $this->objectManager->create(Config::class, [
             'scopeConfig' => new DatabaseScopeConfig($this->connection, self::STORE_WEBSITES),
         ]);
         $languageResolver = $this->createMock(LanguageResolver::class);
         $languageResolver->method('forStore')->willReturn('et');
-        $dispatcher = new SyncDispatcher(
+        $this->dispatcher = new SyncDispatcher(
             new SubscriberPayloadBuilder(
-                $config,
+                $this->config,
                 $this->storeManager,
                 $languageResolver,
                 $this->groupRepository()
@@ -116,19 +130,16 @@ class AdminSubscriberDeleteTest extends IntegrationTestCase
             $this->objectManager->create(EventQueue::class),
             $this->objectManager->create(ContactEntity::class)
         );
-        $this->eventManager = $this->eventManager([
-            SubscriberDeleteAfter::class => new SubscriberDeleteAfter(
-                $config,
-                $this->mark,
-                $dispatcher,
-                $this->customerRepository()
-            ),
+        $this->optOuts = $this->objectManager->create(ProfilingOptOuts::class, [
+            'lockManager' => $this->createMock(LockManagerInterface::class),
         ]);
+        $this->wireObservers(true);
     }
 
     protected function tearDown(): void
     {
         $this->schema->dropContactTables();
+        $this->connection->query('DROP TABLE IF EXISTS `flag`');
         parent::tearDown();
     }
 
@@ -142,6 +153,8 @@ class AdminSubscriberDeleteTest extends IntegrationTestCase
         self::assertSame([
             ['email' => 'guest@example.com', 'is_unsubscribed' => 1, 'store' => 'Store 1'],
         ], $this->queuedContacts());
+        self::assertSame(['guest@example.com'], $this->queuedOptOuts());
+        self::assertTrue($this->optOuts->isByUnsubscribe('guest@example.com'), 'Kept as an opt-out by unsubscribing');
     }
 
     public function testAMassDeleteUnsubscribesEveryDeletedRowOfAnActiveWebsite(): void
@@ -165,6 +178,22 @@ class AdminSubscriberDeleteTest extends IntegrationTestCase
         );
         self::assertSame([1, 1, 1], array_column($contacts, 'is_unsubscribed'));
         self::assertSame('Mari', $contacts[1]['first_name'] ?? null, "The customer's fields, as an unsubscribe sends");
+        self::assertSame(
+            ['guest@example.com', 'customer@example.com', 'pending@example.com', 'other-website@example.com'],
+            $this->queuedOptOuts(),
+            'Profiling stops for every deleted row but the one already unsubscribed, as an unsubscribe in the store'
+        );
+    }
+
+    public function testWithoutCampaignIntelligenceTheEngineHearsNothing(): void
+    {
+        $this->wireObservers(false);
+        $guest = $this->seedSubscriber(1, 'guest@example.com', Subscriber::STATUS_SUBSCRIBED);
+
+        $this->deleteInTheGrid([$guest]);
+
+        self::assertSame(['guest@example.com'], array_column($this->queuedContacts(), 'email'));
+        self::assertSame([], $this->queuedOptOuts());
     }
 
     public function testADeleteOutsideTheGridSendsNothing(): void
@@ -177,7 +206,32 @@ class AdminSubscriberDeleteTest extends IntegrationTestCase
         $this->subscriberResource->delete($subscriber);
 
         self::assertSame([], $this->subscriberIds());
-        self::assertSame([], $this->fetchAll(EventResource::TABLE_NAME));
+        self::assertSame([], $this->fetchAll(EventResource::TABLE_NAME), 'No unsubscribe and no profiling opt-out');
+        self::assertNull($this->optOuts->moment('customer@example.com'));
+    }
+
+    /**
+     * The module's observers of the subscriber delete, with Campaign
+     * Intelligence connected or not.
+     */
+    private function wireObservers(bool $engineConnected): void
+    {
+        $engineSettings = $this->createMock(EngineSettings::class);
+        $engineSettings->method('isConnected')->willReturn($engineConnected);
+        /** @var ProfilingConsent $profilingConsent */
+        $profilingConsent = $this->objectManager->create(ProfilingConsent::class, [
+            'engineSettings' => $engineSettings,
+            'optOuts' => $this->optOuts,
+        ]);
+        $this->eventManager = $this->eventManager([
+            SubscriberDeleteAfter::class => new SubscriberDeleteAfter(
+                $this->config,
+                $this->mark,
+                $this->dispatcher,
+                $this->customerRepository()
+            ),
+            SubscriberDeleted::class => new SubscriberDeleted($engineSettings, $this->mark, $profilingConsent),
+        ]);
     }
 
     /**
@@ -324,13 +378,38 @@ class AdminSubscriberDeleteTest extends IntegrationTestCase
     {
         $contacts = [];
         foreach ($this->fetchAll(EventResource::TABLE_NAME) as $row) {
-            self::assertSame(EventType::CONTACT_SYNC, $row['event_type']);
+            if ($row['event_type'] !== EventType::CONTACT_SYNC) {
+                continue;
+            }
             $payload = json_decode((string)$row['payload'], true);
             $contact = $payload['contact'];
             $contacts[] = array_intersect_key($contact, array_flip(['email', 'is_unsubscribed', 'store', 'first_name']));
         }
 
         return $contacts;
+    }
+
+    /**
+     * The addresses of the queued profiling opt-outs for the engine, in
+     * queue order — each an opt-out with its moment, as an unsubscribe
+     * queues it.
+     *
+     * @return string[]
+     */
+    private function queuedOptOuts(): array
+    {
+        $emails = [];
+        foreach ($this->fetchAll(EventResource::TABLE_NAME) as $row) {
+            if ($row['event_type'] !== EventType::ENGINE_PROFILING_CONSENT) {
+                continue;
+            }
+            $payload = json_decode((string)$row['payload'], true);
+            self::assertTrue($payload['opt_out']);
+            self::assertSame(gmdate('Y-m-d\TH:i:s\Z', $this->clock->now()), $payload['opted_out_at']);
+            $emails[] = $payload['email'];
+        }
+
+        return $emails;
     }
 
     private function storeManager(): StoreManagerInterface

@@ -8,13 +8,12 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\ViewModel\Adminhtml;
 
-use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
-use Magento\Store\Model\ScopeInterface;
+use Smaily\Connect\Model\Adminhtml\SetupGuard;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
-use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Automation\Mapping;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Backfill\ContactAudience;
@@ -34,6 +33,10 @@ use Smaily\Connect\Model\SmailyUrl;
  * Boot data for the native setup wizard AND the tabbed settings page (both
  * render the same step partials): saved settings for prefill, store
  * environment for guidance texts, and connection state for step gating.
+ *
+ * The initial setup reads the store-wide values (CON-179): WebsiteContext
+ * gives website 0 on a 2+-website install, whose reads resolve the default
+ * scope, and the one website on a single-website install.
  */
 class WizardData implements ArgumentInterface
 {
@@ -41,7 +44,6 @@ class WizardData implements ArgumentInterface
         private readonly Config $config,
         private readonly Mode $mode,
         private readonly EngineSettings $engineSettings,
-        private readonly ScopeConfigInterface $scopeConfig,
         private readonly AccountResolver $accountResolver,
         private readonly ContactAudience $contactAudience,
         private readonly Json $serializer,
@@ -50,32 +52,30 @@ class WizardData implements ArgumentInterface
         private readonly VerifiedCredentials $verifiedCredentials,
         private readonly ResolverInterface $localeResolver,
         private readonly ConsentSource $consentSource,
-        private readonly OrderOrigin $orderOrigin
+        private readonly OrderOrigin $orderOrigin,
+        private readonly SetupGuard $setupGuard,
+        private readonly WebsiteOverrides $overrides
     ) {
     }
 
+    /**
+     * Whether the store is set up — one mark for the store (CON-179).
+     */
     public function isSetupCompleted(): bool
     {
-        return $this->scopeConfig->isSetFlag(
-            WizardStepSaver::XML_PATH_SETUP_COMPLETED,
-            ScopeInterface::SCOPE_WEBSITE,
-            $this->websiteContext->getWebsiteId()
-        );
+        return $this->setupGuard->isSetupCompleted();
     }
 
     /**
      * The initial setup step the page opens on, drawn server-side so the
-     * page does not jump when the script runs (PRO-2456): Connect on a fresh
-     * install and on a finished setup (its summary), Contacts once the
-     * Smaily credentials are filled in but the setup is not finished.
+     * page does not jump when the script runs (PRO-2456): always Connect —
+     * the form until it is confirmed, even when Smaily credentials are
+     * saved already, as in the WooCommerce plugin (CON-179), and on a
+     * finished setup its summary.
      */
     public function getStartStep(): int
     {
-        if ($this->isSetupCompleted()) {
-            return 1;
-        }
-
-        return $this->config->isConnected($this->websiteContext->getStoreId()) ? 2 : 1;
+        return 1;
     }
 
     /**
@@ -89,8 +89,8 @@ class WizardData implements ArgumentInterface
     }
 
     /**
-     * The website the page/wizard currently targets — feeds the Settings
-     * selector's/wizard chooser's own chrome (docs/internal/RFC_MULTI_WEBSITE.md §2).
+     * The website the Settings page currently targets — feeds its website
+     * selector.
      */
     public function getSelectedWebsiteId(): int
     {
@@ -98,18 +98,148 @@ class WizardData implements ArgumentInterface
     }
 
     /**
-     * Whether this request explicitly named a website (as opposed to
-     * resolving the installation's default one) — the wizard uses this to
-     * decide whether its website-chooser step still needs to be shown.
+     * Whether the page sets the whole store up: the initial setup (CON-179).
      */
-    public function hasSelectedWebsite(): bool
+    public function isStoreWide(): bool
     {
-        return $this->websiteContext->isExplicit();
+        return $this->websiteContext->isStoreWide();
     }
 
     /**
-     * More than one real website on this install? The selector/chooser only
-     * ever render when true; single-website installs never see them.
+     * Whether the selected website holds its own values of a section
+     * (WebsiteOverrides) — the state of its "own" switch on the Settings
+     * tab. Always false on a single-website install and in the initial
+     * setup.
+     */
+    public function hasOwnValues(string $section): bool
+    {
+        return $this->websiteContext->hasMultipleWebsites()
+            && !$this->websiteContext->isStoreWide()
+            && $this->overrides->hasOwnValues($section, $this->websiteContext->getWebsiteId());
+    }
+
+    /**
+     * The websites that hold their own values of a section, for the initial
+     * setup's step on a 2+-website install (CON-179): each with its name
+     * and its own values as label/value lines (a password only as saved).
+     * Empty elsewhere.
+     *
+     * @return array<int, array{websiteId: int, name: string, values: array<int, array{0: string, 1: string}>}>
+     */
+    public function getWebsiteOverrides(string $section): array
+    {
+        if (!$this->websiteContext->isStoreWide() || !$this->websiteContext->hasMultipleWebsites()) {
+            return [];
+        }
+        $names = $this->websiteContext->getWebsiteOptions();
+        $list = [];
+        foreach ($this->overrides->ownValues($section) as $websiteId => $values) {
+            $lines = [];
+            foreach ($values as $key => $value) {
+                $lines[] = $this->describeOwnValue($key, $value);
+            }
+            $list[] = ['websiteId' => $websiteId, 'name' => $names[$websiteId] ?? (string)$websiteId, 'values' => $lines];
+        }
+
+        return $list;
+    }
+
+    /**
+     * Every website's name, in website order — the websites a store-wide
+     * Contacts save starts contact sync on.
+     *
+     * @return string[]
+     */
+    public function getWebsiteNames(): array
+    {
+        return array_values($this->websiteContext->getWebsiteOptions());
+    }
+
+    /**
+     * The optional contact fields with their labels (the Contacts panel's
+     * checkboxes and the initial setup's website list).
+     *
+     * @return array<string, \Magento\Framework\Phrase>
+     */
+    public static function syncFieldLabels(): array
+    {
+        return [
+            'first_name' => __('First name'),
+            'last_name' => __('Last name'),
+            'prefix' => __('Name prefix'),
+            'user_phone' => __('Phone'),
+            'user_gender' => __('Gender'),
+            'birthday' => __('Date of birth'),
+            'customer_id' => __('Customer ID'),
+            'customer_group' => __('Customer group'),
+            'subscription_type' => __('Subscription type'),
+        ];
+    }
+
+    /**
+     * One own value of a website as a label and a value, in the admin's
+     * words; a value without a label names itself (a mode).
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function describeOwnValue(string $key, string $value): array
+    {
+        $flag = static fn (string $flagValue): string => (string)($flagValue === '1' ? __('On') : __('Off'));
+        $workflow = static fn (string $id): string => (int)$id > 0 ? '#' . (int)$id : '—';
+        $withWorkflow = static fn (string $trigger): string => $trigger . ' · ' . __('Smaily Workflow');
+        $modes = [
+            'single' => __('Single language'),
+            'a' => __('Per-language Smaily accounts'),
+            'b' => __('One account, per-language workflows'),
+            'c' => __('One workflow branching by language'),
+        ];
+        $syncModes = [
+            SyncMode::MODE_CONSENT => __('Subscribers only (consent)'),
+            SyncMode::MODE_LEGITIMATE_INTEREST => __('All customers (legitimate interest)'),
+            SyncMode::MODE_CHECKOUT_OPTIN => __('Checkout opt-in only'),
+        ];
+        $fieldLabels = self::syncFieldLabels();
+
+        $line = match ($key) {
+            Config::XML_PATH_SUBDOMAIN => [__('Subdomain'), $value],
+            Config::XML_PATH_USERNAME => [__('API username'), $value],
+            Config::XML_PATH_PASSWORD => [__('API password'), '••••••••'],
+            Config::XML_PATH_MULTILINGUAL_MODE => ['', (string)($modes[$value] ?? $value)],
+            Config::XML_PATH_FALLBACK_LANGUAGE => [__('Default fallback account'), strtoupper($value)],
+            Config::XML_PATH_STOREFRONT_URL => [__('Storefront URL'), $value],
+            Config::XML_PATH_SYNC_ENABLED => [__('Sync contacts to Smaily'), $flag($value)],
+            Config::XML_PATH_SYNC_MODE => ['', (string)($syncModes[$value] ?? $value)],
+            Config::XML_PATH_SYNC_FIELDS => [
+                __('Extra fields to sync with each contact'),
+                implode(', ', array_map(
+                    static fn (string $field): string => (string)($fieldLabels[$field] ?? $field),
+                    array_filter(array_map('trim', explode(',', $value)))
+                )) ?: '—',
+            ],
+            Config::XML_PATH_INCLUDE_GUESTS => [__('Include guest order emails'), $flag($value)],
+            Config::XML_PATH_CHECKOUT_OPTIN_ENABLED => [__('Show a newsletter checkbox at checkout'), $flag($value)],
+            Config::XML_PATH_SUPPRESS_OPTIN_EMAILS => [
+                __('Let Smaily send the opt-in confirmation emails (suppresses Magento\'s own)'),
+                $flag($value),
+            ],
+            Config::XML_PATH_WELCOME_ENABLED => [__('Welcome'), $flag($value)],
+            Config::XML_PATH_WELCOME_WORKFLOW => [$withWorkflow((string)__('Welcome')), $workflow($value)],
+            Config::XML_PATH_FIRST_ORDER_ENABLED => [__('First order'), $flag($value)],
+            Config::XML_PATH_FIRST_ORDER_WORKFLOW => [$withWorkflow((string)__('First order')), $workflow($value)],
+            Config::XML_PATH_ABANDONED_ENABLED => [__('Abandoned cart'), $flag($value)],
+            Config::XML_PATH_ABANDONED_WORKFLOW => [$withWorkflow((string)__('Abandoned cart')), $workflow($value)],
+            Config::XML_PATH_ABANDONED_CUTOFF => [__('Abandoned cart') . ' · ' . __('Wait (minutes)'), $value],
+            'mappings' => [__('Per-language workflows'), $value],
+            default => [$key, $value],
+        };
+
+        return [(string)$line[0], (string)$line[1]];
+    }
+
+    /**
+     * More than one real website on this install? The selector and the
+     * website exceptions only ever render when true; single-website
+     * installs never see them.
      */
     public function hasMultipleWebsites(): bool
     {
@@ -130,12 +260,15 @@ class WizardData implements ArgumentInterface
      * The `_query` fragment carrying the current target website, for any
      * admin URL that must land back on (or post to) the same website the
      * page was rendered with — the one shared definition of that mechanism.
+     * The initial setup's calls carry website 0: the whole store (CON-179).
      *
      * @return array{_query: array{website: int}}
      */
     public function getWebsiteQuery(): array
     {
-        return ['_query' => ['website' => $this->websiteContext->getWebsiteId()]];
+        return ['_query' => ['website' => $this->websiteContext->isStoreWide()
+            ? WebsiteContext::STORE_WIDE
+            : $this->websiteContext->getWebsiteId()]];
     }
 
     /**
@@ -226,7 +359,7 @@ class WizardData implements ArgumentInterface
                 'username' => $this->config->getWebsiteUsername($websiteId),
             ],
             'multilingual' => [
-                'languages' => $this->accountResolver->detectedLanguages($websiteId),
+                'languages' => $this->getDetectedLanguages(),
                 'fallbackLanguage' => $this->config->getFallbackLanguage($websiteId),
             ],
             'subscribers' => [
@@ -355,13 +488,22 @@ class WizardData implements ArgumentInterface
      */
     public function getContactImportCounts(): array
     {
+        // The initial setup on a 2+-website install imports from every
+        // website (CON-179).
+        $websiteId = $this->websiteContext->getWebsiteId();
+        $websiteIds = $websiteId === WebsiteContext::STORE_WIDE
+            ? array_keys($this->websiteContext->getWebsiteOptions())
+            : [$websiteId];
         $counts = [];
         foreach ([
             SyncMode::MODE_CONSENT,
             SyncMode::MODE_LEGITIMATE_INTEREST,
             SyncMode::MODE_CHECKOUT_OPTIN,
         ] as $mode) {
-            $counts[$mode] = $this->contactAudience->count($this->websiteContext->getWebsiteId(), $mode);
+            $counts[$mode] = 0;
+            foreach ($websiteIds as $countedId) {
+                $counts[$mode] += $this->contactAudience->count($countedId, $mode);
+            }
         }
 
         return $counts;
@@ -376,9 +518,15 @@ class WizardData implements ArgumentInterface
         if (!$this->isMultilingual()) {
             return MultilingualMode::MODE_SINGLE;
         }
-
-        return $this->config->getMultilingualMode($this->websiteContext->getWebsiteId())
+        $mode = $this->config->getMultilingualMode($this->websiteContext->getWebsiteId())
             ?: MultilingualMode::MODE_SINGLE;
+
+        // Per-language accounts are a website's own on a 2+-website install
+        // (WizardStepSaver::saveConnect()).
+        return $mode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
+            && $this->websiteContext->getWebsiteId() === WebsiteContext::STORE_WIDE
+            ? MultilingualMode::MODE_SINGLE
+            : $mode;
     }
 
     /**
@@ -386,15 +534,22 @@ class WizardData implements ArgumentInterface
      */
     public function isMultilingual(): bool
     {
-        return count($this->accountResolver->detectedLanguages($this->websiteContext->getWebsiteId())) > 1;
+        return count($this->getDetectedLanguages()) > 1;
     }
 
     /**
+     * The selected website's languages; the initial setup on a 2+-website
+     * install covers every website's (CON-179).
+     *
      * @return string[]
      */
     public function getDetectedLanguages(): array
     {
-        return $this->accountResolver->detectedLanguages($this->websiteContext->getWebsiteId());
+        $websiteId = $this->websiteContext->getWebsiteId();
+
+        return $websiteId === WebsiteContext::STORE_WIDE
+            ? $this->accountResolver->detectedLanguagesOfAllWebsites()
+            : $this->accountResolver->detectedLanguages($websiteId);
     }
 
     /**
@@ -418,6 +573,9 @@ class WizardData implements ArgumentInterface
     {
         $websiteId = $this->websiteContext->getWebsiteId();
         $accounts = [];
+        if ($websiteId === WebsiteContext::STORE_WIDE) {
+            return $accounts;
+        }
         foreach ($this->accountResolver->languageStoreIds($websiteId) as $language => $storeId) {
             $accounts[] = [
                 'language' => $language,

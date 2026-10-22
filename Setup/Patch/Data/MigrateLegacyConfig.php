@@ -266,8 +266,8 @@ class MigrateLegacyConfig implements DataPatchInterface
                 (string)__(
                     'Smaily for Magento 2.8.x sent no welcome email on these websites, because Enable Subscribers'
                     . ' Collection was on there with no Autoresponder ID: %1. The welcome automation stays off there.'
-                    . ' To send one, open Marketing > Smaily Connect > Initial setup for each of these websites and,'
-                    . ' on the Automations step, tick Enabled for Welcome and pick a Smaily Workflow.',
+                    . ' To send one, open Marketing > Smaily Connect > Settings, pick each of these websites and,'
+                    . ' on the Automations tab, tick Enabled for Welcome and pick a Smaily Workflow.',
                     implode(', ', $welcome)
                 )
             );
@@ -278,8 +278,8 @@ class MigrateLegacyConfig implements DataPatchInterface
                 (string)__(
                     'Smaily for Magento 2.8.x sent no abandoned-cart reminder on these websites, because Enable'
                     . ' Abandoned Cart was on there with no Autoresponder ID: %1. The abandoned-cart automation stays'
-                    . ' off there. To send one, open Marketing > Smaily Connect > Initial setup for each of these'
-                    . ' websites and, on the Automations step, tick Enabled for Abandoned cart and pick a Smaily'
+                    . ' off there. To send one, open Marketing > Smaily Connect > Settings, pick each of these'
+                    . ' websites and, on the Automations tab, tick Enabled for Abandoned cart and pick a Smaily'
                     . ' Workflow.',
                     implode(', ', $abandonedCart)
                 )

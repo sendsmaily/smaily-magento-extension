@@ -14,10 +14,12 @@ use Magento\Backend\Model\View\Result\Page;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\Controller\ResultFactory;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
+use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 
 /**
  * The guided setup wizard. Also the target of the wizard-first redirect all
- * other Smaily Connect pages perform while setup is incomplete.
+ * other Smaily Connect pages perform while setup is incomplete. It sets the
+ * whole store up (CON-179): the page reads and saves the store-wide values.
  */
 class Index extends Action implements HttpGetActionInterface
 {
@@ -25,7 +27,8 @@ class Index extends Action implements HttpGetActionInterface
 
     public function __construct(
         Context $context,
-        private readonly SetupGuard $setupGuard
+        private readonly SetupGuard $setupGuard,
+        private readonly WebsiteContext $websiteContext
     ) {
         parent::__construct($context);
     }
@@ -36,6 +39,7 @@ class Index extends Action implements HttpGetActionInterface
     public function execute(): Page
     {
         $this->setupGuard->checkVersionChange();
+        $this->websiteContext->useStoreWide();
 
         /** @var Page $page */
         $page = $this->resultFactory->create(ResultFactory::TYPE_PAGE);

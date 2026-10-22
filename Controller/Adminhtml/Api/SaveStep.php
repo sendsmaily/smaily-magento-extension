@@ -21,7 +21,10 @@ use Smaily\Connect\Model\SubdomainNormalizer;
 /**
  * POST {step: connect|subscribers|automations|intelligence|finish, data: {...}}
  * -> {saved: bool, errors: [{field, message}], verified?: bool, accountName?: string,
- *     storefrontUrlChanged?: bool, transactionalVerified?: bool}
+ *     storefrontUrlChanged?: bool, transactionalVerified?: bool, returnedToStoreWide?: true}
+ *
+ * A Settings save that returned the selected website to the store-wide
+ * values of a tab says so (CON-179), so the page reloads to show them.
  *
  * The finish step also answers whether Smaily accepted the saved
  * credentials at the last check (PRO-3560), for the Overview step's copy.
@@ -67,6 +70,9 @@ class SaveStep extends AbstractJsonAction implements HttpPostActionInterface
             'saved' => $errors === [],
             'errors' => $errors,
         ];
+        if ($this->stepSaver->isReturnedToStoreWide()) {
+            $response['returnedToStoreWide'] = true;
+        }
         if ($step === 'connect' && $errors === []) {
             $response['verified'] = $this->stepSaver->isConnectionAccepted();
             $response['accountName'] = $this->normalizer->normalize((string)($data['subdomain'] ?? ''));

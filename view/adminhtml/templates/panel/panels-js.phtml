@@ -408,6 +408,36 @@ window.smailyPanelsInit = function ($) {
     }
 
     /**
+     * Each per-language mode keeps its own workflow rows (CON-184): a
+     * workflow id belongs to the Smaily account it was picked from, mode A's
+     * to a language's own account, mode B's to the website's one account.
+     * Switching the mode cards keeps the picks of the mode being left for a
+     * switch back and shows the next mode's own rows, so a mode never posts
+     * the other mode's workflow ids.
+     */
+    function switchMappingRows(from, to) {
+        var keep = from === 'a' || from === 'b';
+        $('.smaily-ml-workflow').each(function () {
+            var $select = $(this);
+            if (keep) {
+                $select.data('saved-' + from, this.options.length ? ($select.val() || '') : $select.data('saved'));
+            }
+            $select.data('saved', $select.data('saved-' + to) || '').empty();
+        });
+        $('.smaily-ml-trigger').each(function () {
+            var $trigger = $(this);
+            var $radios = $('input[name=smaily-ml-fallback-' + $trigger.data('trigger') + ']');
+            if (keep) {
+                $trigger.data('fallback-' + from, $radios.filter(':checked').val() || '');
+            }
+            var fallback = String($trigger.data('fallback-' + to) || '');
+            $radios.filter(function () {
+                return this.value === fallback;
+            }).prop('checked', true);
+        });
+    }
+
+    /**
      * Re-renders the per-language mapping dropdowns live: mode B lists the
      * default account's workflows everywhere; mode A lists each language
      * account's own workflows in that language's rows.
@@ -940,6 +970,7 @@ window.smailyPanelsInit = function ($) {
                 }
                 mlSwitchConfirmed = true;
             }
+            switchMappingRows(mlModeCurrent, next);
             mlModeCurrent = next;
             applyMlMode(next);
             loadMappingWorkflows();

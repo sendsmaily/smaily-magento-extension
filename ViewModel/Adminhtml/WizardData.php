@@ -708,16 +708,20 @@ class WizardData implements ArgumentInterface
      * (pre-Phase-3 saves, the 2.8.x migration's default-scope seeding) are
      * read as a fallback for a key the target website hasn't saved its own
      * row for yet — the same website-beats-global preference
-     * `Model\Automation\Router` applies at dispatch time.
+     * `Model\Automation\Router` applies at dispatch time. Only the rows of
+     * the given mode's accounts (mode A or B) are read, as the Router reads
+     * them (CON-184): the editor shows each mode its own workflows, and a
+     * mode-B save never posts another account's workflow id.
      *
      * @return array<string, array{workflowId: int, isDefaultFallback: bool}>
      */
-    public function getSavedMappings(): array
+    public function getSavedMappings(string $mode): array
     {
         $websiteId = $this->websiteContext->getWebsiteId();
         $collection = $this->mappingCollectionFactory->create();
         $collection->addFieldToFilter('website_id', ['in' => [$websiteId, 0]])
             ->addFieldToFilter('trigger_type', ['in' => Trigger::ALL])
+            ->addModeFilter($mode)
             ->setOrder('website_id', 'ASC');
 
         $rows = [];

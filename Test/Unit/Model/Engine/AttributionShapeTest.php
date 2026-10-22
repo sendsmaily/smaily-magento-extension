@@ -49,4 +49,30 @@ class AttributionShapeTest extends TestCase
             'empty' => ['', false],
         ];
     }
+
+    /**
+     * CON-181: only a well-formed `vs_` token is the store-created form,
+     * which travels only with marketing consent; an engine `vt_` token is not.
+     *
+     * @dataProvider storeVisitorTokens
+     */
+    public function testOnlyAWellFormedVsTokenIsStoreCreated(string $value, bool $expected): void
+    {
+        self::assertSame($expected, AttributionShape::isStoreVisitorToken($value));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: bool}>
+     */
+    public static function storeVisitorTokens(): array
+    {
+        return [
+            'store-created vs_ token' => ['vs_4fK9a2LmQ7xZ0bR3tY8wP1', true],
+            'engine vt_ token' => ['vt_8f3k2a9xq4', false],
+            'engine vt_ token of 22 characters after the prefix' => ['vt_4fK9a2LmQ7xZ0bR3tY8wP1', false],
+            'vs_ with 21 characters' => ['vs_4fK9a2LmQ7xZ0bR3tY8wP', false],
+            'vs_ with a trailing newline' => ["vs_4fK9a2LmQ7xZ0bR3tY8wP1\n", false],
+            'empty' => ['', false],
+        ];
+    }
 }

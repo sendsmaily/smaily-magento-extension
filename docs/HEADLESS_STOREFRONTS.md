@@ -265,8 +265,14 @@ checkout (contract 1.11.0). A link carries only the `vt_` form: ignore a
 Campaign Intelligence never puts a `vs_` token in a link, so one there is a
 value its sender chose; written into the cookie, it would name the shopper
 to that sender at the shopper's next guest order. The module does not create
-`vs_` tokens, but sends a `vs_` token it finds in the `smaily_rec_uid`
-cookie with the order unchanged, as it does a `vt_` token; a value of
+`vs_` tokens. It sends a `vt_` token it finds in the `smaily_rec_uid`
+cookie with the order, the login and the browse events, and a `vs_` token
+only with the shopper's marketing consent that the back end can see:
+Magento's **Cookie Restriction Mode** on in the store view, and Magento's
+cookie `user_allowed_save_cookie` accepting the store view's website (for
+example `{"1":1}` for website id 1) on the same request — carry it with the
+other cookies (item 3). Without that consent the order, the login and the
+events go without the `vs_` token, as in the WooCommerce plugin. A value of
 neither form is not sent.
 
 The anonymous session id of browse events, the cookie `smaily_anon_sid`,
@@ -335,8 +341,7 @@ Send events from the shopper's browser to
     "session_id": "<value of the smaily_anon_sid cookie>",
     "event_type": "product_view",
     "sku": "OAK-TABLE-120",
-    "category_path": "dining/tables",
-    "smaily_visitor_token": "<value of the smaily_rec_uid cookie, when set>"
+    "category_path": "dining/tables"
   }
 ]}
 ```
@@ -348,7 +353,7 @@ Send events from the shopper's browser to
   `checkout_complete`.
 - Optional fields: `sku` (the Magento SKU — the same key the catalog sync
   sends), `category_path` (the category's URL path), `search_query`,
-  `smaily_visitor_token`, `dwell_seconds`. Text fields up to 255
+  `dwell_seconds`. Text fields up to 255
   characters (`session_id` up to 64); a longer value is dropped, not cut,
   and so is any other field. The server adds the time and the source.
   Magento's own tracker sends `product_view` and `category_view` (with the
@@ -356,11 +361,17 @@ Send events from the shopper's browser to
   `checkout_start` and `checkout_complete`.
 - Up to 100 events per request; batch for a few seconds. Magento's own
   tracker batches for 5 seconds and sends on `pagehide`.
-- Send `smaily_visitor_token` when the `smaily_rec_uid` cookie is set.
+- Do not send a visitor token. The relay ignores `smaily_visitor_token` in
+  the body and puts the token of the `smaily_rec_uid` cookie that comes with
+  the request on every event (a `vs_` token only with consent, item 2), so a
+  body cannot name a token that is not the shopper's. `sendBeacon()` sends
+  the back end's cookies: the events carry the token when the cookie is set
+  on the parent domain both hosts share (`Domain=.example.com`, item 3).
+  With no shared parent domain they go without it, anonymous.
 - Send with `navigator.sendBeacon()` and a `text/plain` body (for example
   `new Blob([json], {type: 'text/plain'})`). The relay reads the raw body
-  and needs no cookie, session or form key, so this cross-origin request
-  needs no CORS headers. A `fetch()` with `Content-Type: application/json`
+  and needs no session or form key, so this cross-origin request needs no
+  CORS headers. A `fetch()` with `Content-Type: application/json`
   needs a CORS preflight the relay does not answer.
 - Send from the browser, not from the storefront server: the relay limits
   each client address to 30 requests a minute, and a server would share one

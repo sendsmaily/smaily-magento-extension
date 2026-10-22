@@ -11,6 +11,7 @@ namespace Smaily\Connect\Test\Integration\Engine;
 use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\Framework\Stdlib\CookieManagerInterface;
 use Smaily\Connect\Model\Engine\AttributionManager;
+use Smaily\Connect\Model\Engine\MarketingConsent;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\OrderPlacer;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
@@ -98,9 +99,39 @@ class AttributionManagerTest extends IntegrationTestCase
     }
 
     /**
+     * CON-181: a store-created token is stamped onto the order only with the
+     * shopper's marketing consent; without it the order keeps its other
+     * signals.
+     */
+    public function testAStoreCreatedTokenIsStampedOnlyWithMarketingConsent(): void
+    {
+        $cookies = [
+            'smaily_rec_id' => self::REC_ID,
+            'smaily_rec_uid' => 'vs_4fK9a2LmQ7xZ0bR3tY8wP1',
+            'smaily_anon_sid' => self::SESSION_ID,
+        ];
+
+        $this->manager($cookies, false)->saveForOrder(self::ORDER_ID);
+        self::assertSame([
+            'rec_id' => self::REC_ID,
+            'visitor_token' => null,
+            'rec_ctx' => null,
+            'anon_session_id' => self::SESSION_ID,
+        ], $this->storedRow());
+
+        $this->manager($cookies, true)->saveForOrder(self::ORDER_ID);
+        self::assertSame([
+            'rec_id' => self::REC_ID,
+            'visitor_token' => 'vs_4fK9a2LmQ7xZ0bR3tY8wP1',
+            'rec_ctx' => null,
+            'anon_session_id' => self::SESSION_ID,
+        ], $this->storedRow());
+    }
+
+    /**
      * @param array<string, string> $cookies by cookie name
      */
-    private function manager(array $cookies): AttributionManager
+    private function manager(array $cookies, bool $marketingConsent = false): AttributionManager
     {
         $settings = $this->createMock(Settings::class);
         $settings->method('isConnected')->willReturn(true);
@@ -110,6 +141,8 @@ class AttributionManagerTest extends IntegrationTestCase
         $cookieManager->method('getCookie')->willReturnCallback(
             static fn (string $name) => $cookies[$name] ?? null
         );
+        $consent = $this->createMock(MarketingConsent::class);
+        $consent->method('isGiven')->willReturn($marketingConsent);
 
         return $this->objectManager->create(AttributionManager::class, [
             'settings' => $settings,
@@ -118,6 +151,7 @@ class AttributionManagerTest extends IntegrationTestCase
                 // Magento_LoginAsCustomer is absent here.
                 'moduleManager' => $this->createMock(ModuleManager::class),
             ]),
+            'marketingConsent' => $consent,
         ]);
     }
 

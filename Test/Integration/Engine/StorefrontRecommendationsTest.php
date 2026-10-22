@@ -36,6 +36,7 @@ use Smaily\Connect\Controller\Recommendations\Index;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\MarketingConsent;
 use Smaily\Connect\Model\Engine\RecommendedProducts;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\SleeperInterface;
@@ -77,6 +78,8 @@ class StorefrontRecommendationsTest extends IntegrationTestCase
 
     private bool $cookieNoticeHoldsBack = false;
 
+    private bool $cookieRestriction = false;
+
     /** @var array{code: int|null, items: mixed} */
     private array $answer = ['code' => null, 'items' => null];
 
@@ -116,6 +119,30 @@ class StorefrontRecommendationsTest extends IntegrationTestCase
         $this->controller([new Response(200, [], self::ANSWER)])->execute();
 
         self::assertSame(['smaily_visitor_token' => 'vt_8f3k2a', 'limit' => 4], $this->sentBody(0));
+    }
+
+    /**
+     * CON-181: a store-created token names a guest only with an explicit
+     * marketing yes — cookie restriction mode on and the notice accepted.
+     */
+    public function testAGuestWithAStoreCreatedTokenAndMarketingConsentIsAskedAboutByIt(): void
+    {
+        $this->cookies = ['smaily_rec_uid' => 'vs_4fK9a2LmQ7xZ0bR3tY8wP1'];
+        $this->cookieRestriction = true;
+
+        $this->controller([new Response(200, [], self::ANSWER)])->execute();
+
+        self::assertSame(['smaily_visitor_token' => 'vs_4fK9a2LmQ7xZ0bR3tY8wP1', 'limit' => 4], $this->sentBody(0));
+    }
+
+    public function testAGuestWithAStoreCreatedTokenWithoutAnExplicitYesIsNotAskedAbout(): void
+    {
+        $this->cookies = ['smaily_rec_uid' => 'vs_4fK9a2LmQ7xZ0bR3tY8wP1'];
+
+        $this->controller([new Response(200, [], self::ANSWER)])->execute();
+
+        self::assertSame([], $this->history);
+        self::assertSame(200, $this->answer['code']);
     }
 
     public function testAGuestWithoutConsentIsNotAskedAbout(): void
@@ -223,6 +250,14 @@ class StorefrontRecommendationsTest extends IntegrationTestCase
             'storefrontScript' => $this->createMock(StorefrontScript::class),
         ]);
 
+        $cookieHelper = $this->createMock(CookieHelper::class);
+        $cookieHelper->method('isUserNotAllowSaveCookie')->willReturnCallback(
+            fn (): bool => $this->cookieNoticeHoldsBack
+        );
+        $cookieHelper->method('isCookieRestrictionModeEnabled')->willReturnCallback(
+            fn (): bool => $this->cookieRestriction
+        );
+
         $cookieManager = $this->createMock(CookieManagerInterface::class);
         $cookieManager->method('getCookie')->willReturnCallback(fn (string $name) => $this->cookies[$name] ?? null);
         $attribution = $this->objectManager->create(AttributionManager::class, [
@@ -231,6 +266,7 @@ class StorefrontRecommendationsTest extends IntegrationTestCase
             'orderPlacer' => $this->objectManager->create(OrderPlacer::class, [
                 'moduleManager' => $this->createMock(ModuleManager::class),
             ]),
+            'marketingConsent' => new MarketingConsent($cookieHelper),
         ]);
 
         $customer = $this->createMock(CustomerInterface::class);
@@ -242,11 +278,6 @@ class StorefrontRecommendationsTest extends IntegrationTestCase
 
         $profiling = $this->createMock(ProfilingConsent::class);
         $profiling->method('isAllowed')->willReturnCallback(fn (): bool => $this->profilingAllowed);
-
-        $cookieHelper = $this->createMock(CookieHelper::class);
-        $cookieHelper->method('isUserNotAllowSaveCookie')->willReturnCallback(
-            fn (): bool => $this->cookieNoticeHoldsBack
-        );
 
         $store = $this->createMock(StoreInterface::class);
         $store->method('getId')->willReturn(1);

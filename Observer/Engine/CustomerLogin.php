@@ -25,6 +25,11 @@ use Smaily\Connect\Model\Queue\EventType;
  * Not on an admin's "Login as Customer": those cookies are the admin's own.
  * Queued (never blocks login) — the handler calls
  * POST identity/merge with the engine's retry policy.
+ *
+ * The visitor token is the shape-checked cookie read of
+ * AttributionManager::readCookies(): a store-created `vs_` token goes only
+ * with the shopper's marketing consent, an engine `vt_` token as before
+ * (CON-181, as Woo PRO-3860).
  */
 class CustomerLogin implements ObserverInterface
 {

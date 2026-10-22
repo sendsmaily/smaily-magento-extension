@@ -57,11 +57,13 @@ class BrowseEventValidator
             'source' => self::SOURCE,
         ];
 
-        // customer_email and external_id are deliberately NOT accepted from
-        // the anonymous beacon — the beacon asserts no identity of its own
-        // (tracker.js never sends either). Identity reaches the engine only
-        // from server-side state: the engine-issued visitor token and the
-        // identity-merge flow.
+        // customer_email, external_id and smaily_visitor_token are
+        // deliberately NOT accepted from the anonymous beacon — the beacon
+        // asserts no identity of its own (tracker.js sends none of them).
+        // Identity reaches the engine only from server-side state: the relay
+        // attaches the visitor-token cookie's token (Controller\Relay\Index,
+        // CON-181) and the identity-merge flow runs on login. A token named in
+        // the body need not be the shopper's.
         //
         // smaily_rec_id / smaily_ctx are not accepted either: the engine
         // stopped persisting and consulting them in contract v1.7.0
@@ -69,7 +71,7 @@ class BrowseEventValidator
         // event's UUID validation — forwarding them can only cost events.
         // Rec-link attribution runs on the order-level cookie->order path
         // (§5, Engine\AttributionManager), which is untouched.
-        foreach (['sku', 'category_path', 'search_query', 'smaily_visitor_token'] as $field) {
+        foreach (['sku', 'category_path', 'search_query'] as $field) {
             $value = trim($this->text($event, $field));
             if ($value !== '' && strlen($value) <= 255) {
                 $clean[$field] = $value;

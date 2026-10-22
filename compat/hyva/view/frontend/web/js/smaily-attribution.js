@@ -23,9 +23,13 @@
     var REC_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     // The visitor token and the context are written only in the shape the
-    // order capture accepts (Engine\AttributionShape, PRO-3584): a visitor
-    // token is an engine `vt_` token or a store-created `vs_` one (PRO-3912).
-    var VISITOR_TOKEN_PATTERN = /^(?:vt_[A-Za-z0-9]{1,61}|vs_[A-Za-z0-9]{22})$/,
+    // order capture accepts (Engine\AttributionShape, PRO-3584). A link
+    // carries the engine's `vt_` token only, never a store-created `vs_` one
+    // (CON-177, as the WooCommerce plugin's PRO-3857): an engine email link
+    // never carries a `vs_` token, so one in a link is a value its sender
+    // chose, and the engine would bind it to this visitor at their next
+    // guest order. A `vs_` token already in the cookie is left as it is.
+    var VISITOR_TOKEN_PATTERN = /^vt_[A-Za-z0-9]{1,61}$/,
         CONTEXT_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 
     function readParam(name) {

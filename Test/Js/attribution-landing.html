@@ -6,7 +6,7 @@
  */
 -->
 <!--
-  Headless harness for the landing capture (PRO-3911, PRO-3912): the Luma script
+  Headless harness for the landing capture (PRO-3911, PRO-3912, CON-177): the Luma script
   (view/frontend/web/js/attribution.js) and the Hyvä script
   (compat/hyva/.../smaily-attribution.js), the real scripts, each landing in a
   fresh frame. Stubbed: the landing's query (a frame of a file:// page cannot
@@ -159,11 +159,25 @@
         check(theme + ', a malformed rec id: both cookies are unchanged',
             jar.smaily_rec_id === OLD_REC_ID && jar.smaily_rec_ctx === 'storefront');
 
-        // PRO-3912: a visitor token of either form the contract allows.
+        // A link carries the engine's vt_ token only (CON-177): a
+        // store-created vs_ token in a link is refused, and a vs_ token the
+        // cookie already holds stays.
         jar = await land(theme, '?smaily_vt=vt_8f3k2a', {});
         check(theme + ', an engine vt_ visitor token is written', jar.smaily_rec_uid === 'vt_8f3k2a');
+        jar = await land(theme, '?smaily_vt=vt_' + 'A'.repeat(61), {});
+        check(theme + ', an engine vt_ visitor token of 64 characters is written',
+            jar.smaily_rec_uid === 'vt_' + 'A'.repeat(61));
         jar = await land(theme, '?smaily_vt=vs_4fK9a2LmQ7xZ0bR3tY8wP1', {});
-        check(theme + ', a store-created vs_ visitor token is written',
+        check(theme + ', a store-created vs_ visitor token in a link does not set the cookie',
+            !('smaily_rec_uid' in jar));
+        jar = await land(theme, '?smaily_vt=vs_4fK9a2LmQ7xZ0bR3tY8wP1', {smaily_rec_uid: 'vt_8f3k2a'});
+        check(theme + ', a store-created vs_ visitor token in a link leaves a vt_ cookie unchanged',
+            jar.smaily_rec_uid === 'vt_8f3k2a');
+        jar = await land(theme, '?smaily_vt=vs_9QxR2mLk7aZ0bT3yW8pN1c', {smaily_rec_uid: 'vs_4fK9a2LmQ7xZ0bR3tY8wP1'});
+        check(theme + ', a store-created vs_ visitor token in a link leaves the store\'s own vs_ cookie unchanged',
+            jar.smaily_rec_uid === 'vs_4fK9a2LmQ7xZ0bR3tY8wP1');
+        jar = await land(theme, '', {smaily_rec_uid: 'vs_4fK9a2LmQ7xZ0bR3tY8wP1'});
+        check(theme + ', a landing without a visitor token leaves the store\'s own vs_ cookie unchanged',
             jar.smaily_rec_uid === 'vs_4fK9a2LmQ7xZ0bR3tY8wP1');
         jar = await land(theme, '?smaily_vt=vs_4fK9a2LmQ7', {smaily_rec_uid: 'vt_8f3k2a'});
         check(theme + ', a visitor token of neither form leaves the cookie unchanged',

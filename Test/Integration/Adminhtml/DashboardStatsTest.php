@@ -152,6 +152,10 @@ class DashboardStatsTest extends IntegrationTestCase
     }
 
     /**
+     * A row's updated_at is its created_at, from the frozen clock: left to
+     * the column's CURRENT_TIMESTAMP default it is the wall clock, which can
+     * cross a second between two inserts and reorder recent activity.
+     *
      * @param array<string, mixed> $extra
      */
     private function smailyRow(string $status, string $createdAt, int $attempts = 0, array $extra = []): void
@@ -164,6 +168,7 @@ class DashboardStatsTest extends IntegrationTestCase
             'status' => $status,
             'attempts' => $attempts,
             'created_at' => $createdAt,
+            'updated_at' => $createdAt,
         ]);
     }
 
@@ -176,6 +181,7 @@ class DashboardStatsTest extends IntegrationTestCase
             'payload' => '{}',
             'status' => $status,
             'created_at' => $createdAt,
+            'updated_at' => $createdAt,
         ]);
     }
 }

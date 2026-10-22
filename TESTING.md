@@ -229,6 +229,14 @@ parentheses): `SMAILY_IT_DB_HOST` (127.0.0.1), `SMAILY_IT_DB_PORT` (3306),
 table-by-table and recreated on every run — never point it at data you care
 about. CI runs the suite in a dedicated job with a MySQL 8.4 service.
 
+Every test starts from empty module tables and a re-frozen clock
+(`IntegrationTestCase::setUp()`). A fixture row whose order or age a test
+asserts sets its datetimes (`created_at`, `updated_at`) from that frozen
+clock (`clockDate()`). Left to the columns' `CURRENT_TIMESTAMP` default they
+take MySQL's wall clock, which can cross a second between two inserts and
+reorder rows sorted by time — a test that passes alone then fails now and
+then in a full run.
+
 **Scope note:** the suite boots a standalone `Magento\Framework` object graph
 (real DB adapter, model/resource/collection layer, encryptor, config writer)
 rather than Magento's full integration TestFramework, which requires a

@@ -20,9 +20,11 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory;
 /**
  * The multilingual routing matrix (Woo Multilingual\Router parity): modes
  * single/c collapse to the config default; modes a/b resolve exact-language
- * mapping rows, then the default-fallback row, then the config default; a
- * matched row's account_key travels with the workflow so mode-A fallback
- * rows fire through the account they name.
+ * mapping rows, then the default-fallback row; mode b then the config
+ * default, mode a the row of the default fallback account's language and
+ * never the config default (CON-188); a matched row's account_key travels
+ * with the workflow so mode-A fallback rows fire through the account they
+ * name.
  */
 class RouterTest extends TestCase
 {
@@ -165,11 +167,57 @@ class RouterTest extends TestCase
 
     public function testNoMappingAnywhereIsATerminalSkip(): void
     {
-        $this->config->method('getMultilingualMode')->willReturn('a');
+        $this->config->method('getMultilingualMode')->willReturn('b');
         $this->config->method('getWelcomeWorkflow')->willReturn(0);
         $this->lookupResults = [null, null];
 
         self::assertNull($this->router()->resolve(Trigger::WELCOME, 1, 'et'));
+    }
+
+    /**
+     * CON-188: with per-language Smaily accounts a language without a row
+     * and a trigger without a default fallback get the workflow of the
+     * default fallback account's language, through that account.
+     */
+    public function testModeAFallsBackToTheRowOfTheFallbackAccountsLanguage(): void
+    {
+        $this->config->method('getMultilingualMode')->willReturn('a');
+        $this->config->method('getFallbackLanguage')->with(1)->willReturn('et');
+        $this->lookupResults = [null, null, $this->mappingRow(66, 'et')];
+
+        $match = $this->router()->resolve(Trigger::WELCOME, 1, 'lv');
+
+        self::assertNotNull($match);
+        self::assertSame(66, $match->workflowId);
+        self::assertSame('et', $match->accountKey, 'The fallback account\'s workflow goes through that account');
+        self::assertSame('et', $this->recordedFilters[2]['language']);
+        self::assertSame('a', $this->recordedFilters[2]['mode']);
+    }
+
+    /**
+     * CON-188: the config default was picked from no per-language account,
+     * and the handler would post it through the contact's language account
+     * — mode A never starts it.
+     */
+    public function testModeANeverStartsTheConfigDefault(): void
+    {
+        $this->config->method('getMultilingualMode')->willReturn('a');
+        $this->config->method('getFallbackLanguage')->willReturn('et');
+        $this->config->expects(self::never())->method('getWelcomeWorkflow');
+        $this->lookupResults = [null, null, null];
+
+        self::assertNull($this->router()->resolve(Trigger::WELCOME, 1, 'lv'));
+        self::assertCount(3, $this->recordedFilters);
+    }
+
+    public function testModeAWithoutAFallbackLanguageSkipsTheThirdLookup(): void
+    {
+        $this->config->method('getMultilingualMode')->willReturn('a');
+        $this->config->method('getFallbackLanguage')->willReturn('');
+        $this->lookupResults = [null, null];
+
+        self::assertNull($this->router()->resolve(Trigger::WELCOME, 1, 'lv'));
+        self::assertCount(2, $this->recordedFilters);
     }
 
     public function testUnknownTriggerIsATerminalSkip(): void

@@ -122,6 +122,13 @@ class FailureMessageTest extends TestCase
                 'Vahele jäetud: selle automaatika päästikuga pole seotud ühtegi Smaily töövoogu.'
                     . ' Midagi ei saadetud.',
             ],
+            // CON-188: per-language Smaily accounts, the contact's language named.
+            'skipped, no workflow for the language' => [
+                'Skipped: this automation has no Smaily workflow for the contact\'s language (LV),'
+                    . ' and no default fallback workflow either. Nothing was sent.',
+                'Vahele jäetud: sellel automaatikal pole kontakti keele (LV) jaoks Smaily töövoogu'
+                    . ' ega ka vaikimisi varuvalikut. Midagi ei saadetud.',
+            ],
             'skipped, newer personalization preference' => [
                 'Skipped: the shopper has since changed their personalization preference, and the newer'
                     . ' preference is sent in its own row. Nothing was sent.',

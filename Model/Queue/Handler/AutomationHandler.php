@@ -13,6 +13,8 @@ use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
+use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Config\Source\MultilingualMode;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Queue\EventQueue;
@@ -36,8 +38,9 @@ use Smaily\Connect\Model\Queue\Skipped;
  * matched, the row's account_key names the Smaily account that must deliver
  * the workflow — mode-A fallback rows included, so another account's
  * workflow ID is never posted through the event's store-view credentials.
- * Config-default resolutions (and modes single/c) keep using the event's
- * store view as before.
+ * Config-default resolutions (modes single, b and c) keep using the event's
+ * store view as before; mode A has none (Router, CON-188), and its skip
+ * names the contact's language.
  *
  * force_opt_in is always false, in every contact-sync mode (PRO-3577, as
  * the WooCommerce plugin's PRO-1716): a trigger never overrides an
@@ -50,12 +53,21 @@ class AutomationHandler implements EventHandlerInterface
     public const SKIPPED_NO_WORKFLOW = 'Skipped: no Smaily workflow is mapped to this automation trigger.'
         . ' Nothing was sent.';
 
+    /**
+     * Per-language Smaily accounts (mode A, CON-188): neither the contact's
+     * language, the trigger's default fallback nor the default fallback
+     * account's language has a workflow. %1 is the language code.
+     */
+    public const SKIPPED_NO_LANGUAGE_WORKFLOW = 'Skipped: this automation has no Smaily workflow for the'
+        . ' contact\'s language (%1), and no default fallback workflow either. Nothing was sent.';
+
     public function __construct(
         private readonly SmailyClientProvider $clientProvider,
         private readonly Router $router,
         private readonly EventQueue $eventQueue,
         private readonly Logger $logger,
-        private readonly AccountResolver $accountResolver
+        private readonly AccountResolver $accountResolver,
+        private readonly Config $config
     ) {
     }
 
@@ -78,18 +90,19 @@ class AutomationHandler implements EventHandlerInterface
             }
 
             $websiteId = (int)($payload['website_id'] ?? 0);
-            $match = $this->router->resolve(
-                $trigger,
-                $websiteId,
-                (string)($payload['language'] ?? '')
-            );
+            $language = (string)($payload['language'] ?? '');
+            $match = $this->router->resolve($trigger, $websiteId, $language);
             if ($match === null) {
                 // Terminal skip: no workflow mapped for this trigger/language.
                 $this->logger->debug('Automation skipped, no workflow mapped', [
                     'trigger' => $trigger,
                     'website_id' => $websiteId,
                 ]);
-                $results[$id] = new Skipped(self::SKIPPED_NO_WORKFLOW);
+                $perLanguage = $language !== ''
+                    && $this->config->getMultilingualMode($websiteId) === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS;
+                $results[$id] = new Skipped($perLanguage
+                    ? str_replace('%1', strtoupper($language), self::SKIPPED_NO_LANGUAGE_WORKFLOW)
+                    : self::SKIPPED_NO_WORKFLOW);
                 continue;
             }
 

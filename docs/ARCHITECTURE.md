@@ -87,8 +87,15 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   parity): multilingual modes `single`/`c` use the config-default workflow;
   modes `a`/`b` resolve `smaily_automation_mapping` rows — the exact
   (trigger, language) row first, then the trigger's `is_default_fallback`
-  row, then the config default; no match anywhere is a terminal skip
-  (`Queue\Skipped`: closed with the reason, read as Skipped in the Log). Rows
+  row. Mode `b` then takes the config default. Mode `a` never does
+  (CON-188): the config default was picked from no per-language account
+  and carries no account key, so the handler would post it through the
+  event store view's language account. Mode `a` takes instead the
+  (trigger, `Config::getFallbackLanguage()`) row — the default fallback
+  account's own workflow, posted through that account. No match anywhere is
+  a terminal skip (`Queue\Skipped`: closed with the reason, read as Skipped
+  in the Log; in mode `a` the reason names the contact's language,
+  `AutomationHandler::SKIPPED_NO_LANGUAGE_WORKFLOW`). Rows
   are looked up for the event's website with the store-wide rows
   (`website_id 0` — the initial setup's and a store-wide Settings save's,
   CON-179, and the 2.8.x migration's default-scope seeding) as the
@@ -108,7 +115,11 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   admin panels write rows through `Model/Automation/MappingSaver` under
   website 0 for a store-wide save and under the website for its own
   automations (full-desired-state sync: unique-key upsert, cleared rows
-  deleted, other websites' rows untouched).
+  deleted, other websites' rows untouched). The sync replaces only the rows
+  of the mode the panel posts them for (`mappings_mode`, else the saved
+  mode; the same rule as `addModeFilter()`, CON-188), so a mode-A save keeps
+  the website's mode-B rows and the other way round — the PRO-1286 keep
+  covers only an id missing from its account's list.
 - Handlers are registered per type in `di.xml`
   (`Model/Queue/HandlerPool`); adding an event type = adding a handler.
 - Payloads are built at enqueue time (`ContactSync\SubscriberPayloadBuilder`,
@@ -1619,7 +1630,15 @@ Initial setup, Settings, Log. Design rules:
   and each trigger's fallback, `data-fallback-a`/`-b`); a live switch of
   the mode cards keeps the left mode's picks and shows the next mode's
   (`switchMappingRows()` in panels-js), so a mode-`b` save never posts a
-  per-language account's workflow id (CON-184). Single-language installs are locked to `single` and see none of
+  per-language account's workflow id (CON-184). In mode `a` the trigger
+  cards hide their workflow select (mode `a` never starts it; hidden, it
+  keeps its saved value), and `showUnmappedLanguages()` lists live, under
+  **Some languages have no workflow**, each switched-on automation with the
+  languages the Router would find no row for — the language's own select,
+  else the trigger's default-fallback radio, else the select of the default
+  fallback account's language (`data-unlisted-fallback-a` marks a trigger
+  whose fallback is a language-less 2.8.x row the editor does not show)
+  (CON-188). Single-language installs are locked to `single` and see none of
   this.
 - **Transactional emails — settings only (PRO-4062, PRO-4065).** They
   work as the WooCommerce plugin's: Settings > Connection has the

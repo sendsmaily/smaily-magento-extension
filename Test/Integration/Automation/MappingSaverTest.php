@@ -246,10 +246,54 @@ class MappingSaverTest extends IntegrationTestCase
         self::assertNull($configDefault, 'No rows and no config default is a terminal skip');
 
         $scopeConfig->setValue(Config::XML_PATH_FIRST_ORDER_WORKFLOW, '7');
-        $viaConfig = $router->resolve('first_order', 2, 'ru');
-        self::assertNotNull($viaConfig);
-        self::assertSame(7, $viaConfig->workflowId);
-        self::assertNull($viaConfig->accountKey, 'Config defaults carry no account key');
+        self::assertNull(
+            $router->resolve('first_order', 2, 'ru'),
+            'Per-language accounts never start the config default, which belongs to none of them (CON-188)'
+        );
+    }
+
+    /**
+     * CON-188: a website that switched a→b→a keeps each mode's rows. A save
+     * replaces only the rows of the mode it is made in, even where the other
+     * mode's workflow ids are in the account lists (the PRO-1286 keep does
+     * not cover them).
+     */
+    public function testASaveInOneModeKeepsTheOtherModesRows(): void
+    {
+        $this->saver->save([
+            $this->row('welcome', 'et', 'et', 101, true),
+            $this->row('welcome', 'lv', 'lv', 102),
+        ], 1, null, 'a');
+        $this->saver->save([
+            $this->row('welcome', 'et', 'default', 201),
+            $this->row('welcome', 'lv', 'default', 202, true),
+        ], 1, null, 'b');
+        self::assertCount(4, $this->fetchAll(MappingResource::TABLE_NAME), 'Each mode keeps its own rows');
+        $lists = ['default' => ['101', '102', '201', '202'], 'et' => ['101', '201'], 'lv' => ['102', '202']];
+
+        // In mode A: ET changed, LV cleared.
+        $this->saver->save([$this->row('welcome', 'et', 'et', 111, true)], 1, $lists, 'a');
+
+        $byKey = $this->indexRows($this->fetchAll(MappingResource::TABLE_NAME));
+        self::assertSame(
+            ['welcome|et|et', 'welcome|et|default', 'welcome|lv|default'],
+            array_keys($byKey),
+            'Mode A\'s cleared row goes; mode B\'s rows stay'
+        );
+        self::assertSame('111', $byKey['welcome|et|et']['workflow_id']);
+        self::assertSame('1', $byKey['welcome|lv|default']['is_default_fallback']);
+
+        // In mode B: ET changed, LV cleared.
+        $this->saver->save([$this->row('welcome', 'et', 'default', 211)], 1, $lists, 'b');
+
+        $byKey = $this->indexRows($this->fetchAll(MappingResource::TABLE_NAME));
+        self::assertSame(
+            ['welcome|et|et', 'welcome|et|default'],
+            array_keys($byKey),
+            'Mode B\'s cleared row goes; mode A\'s row stays'
+        );
+        self::assertSame('111', $byKey['welcome|et|et']['workflow_id']);
+        self::assertSame('211', $byKey['welcome|et|default']['workflow_id']);
     }
 
     /**

@@ -103,6 +103,7 @@
 .smaily-ui .smaily-ml-table td:last-child { text-align: center; }
 .smaily-ui .smaily-ml-table select { max-width: 34rem; }
 .smaily-ui .smaily-ml-none { color: #666; }
+.smaily-ui .smaily-ml-unmapped-list { margin: 0.25rem 0 0; padding-left: 1.25rem; }
 /* Per-language Smaily accounts (PRO-3566, pack "Setup Wizard" frame 4): a
  * dashed accent-tinted region (the pack's #d6c3cb, no token) that appears with
  * the mode; the account blocks in a two-column grid that stacks when narrow;

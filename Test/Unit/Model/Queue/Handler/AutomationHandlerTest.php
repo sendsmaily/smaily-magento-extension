@@ -14,6 +14,7 @@ use Smaily\Connect\Model\Automation\WorkflowMatch;
 use Smaily\Connect\Model\Client\Exception\TransportException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
+use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Queue\Event;
@@ -63,7 +64,8 @@ class AutomationHandlerTest extends TestCase
             $router,
             $eventQueue,
             $this->createMock(Logger::class),
-            $this->createMock(AccountResolver::class)
+            $this->createMock(AccountResolver::class),
+            $this->createMock(Config::class)
         );
 
         self::assertSame([1 => true], $handler->handle([$event]));
@@ -89,7 +91,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(Router::class),
             $eventQueue,
             $this->createMock(Logger::class),
-            $this->createMock(AccountResolver::class)
+            $this->createMock(AccountResolver::class),
+            $this->createMock(Config::class)
         );
 
         self::assertEquals([1 => Failure::permanent('Malformed automation payload')], $handler->handle([$event]));
@@ -124,11 +127,50 @@ class AutomationHandlerTest extends TestCase
             $router,
             $eventQueue,
             $this->createMock(Logger::class),
-            $this->createMock(AccountResolver::class)
+            $this->createMock(AccountResolver::class),
+            $this->createMock(Config::class)
         );
 
         self::assertEquals(
             [1 => new Skipped(AutomationHandler::SKIPPED_NO_WORKFLOW)],
+            $handler->handle([$event])
+        );
+    }
+
+    /**
+     * CON-188: with per-language Smaily accounts, the Log names the language
+     * that has no workflow, so the merchant knows which row to fill in.
+     */
+    public function testAPerLanguageAccountSkipNamesTheContactsLanguage(): void
+    {
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->expects(self::never())->method('forStore');
+        $router = $this->createMock(Router::class);
+        $router->method('resolve')->willReturn(null);
+        $config = $this->createMock(Config::class);
+        $config->method('getMultilingualMode')->with(1)->willReturn('a');
+
+        $event = $this->createMock(Event::class);
+        $event->method('getId')->willReturn(1);
+        $eventQueue = $this->createMock(EventQueue::class);
+        $eventQueue->method('decodePayload')->willReturn([
+            'trigger_type' => 'welcome',
+            'website_id' => 1,
+            'language' => 'lv',
+            'address' => ['email' => 'person@example.com'],
+        ]);
+
+        $handler = new AutomationHandler(
+            $clientProvider,
+            $router,
+            $eventQueue,
+            $this->createMock(Logger::class),
+            $this->createMock(AccountResolver::class),
+            $config
+        );
+
+        self::assertEquals(
+            [1 => new Skipped(str_replace('%1', 'LV', AutomationHandler::SKIPPED_NO_LANGUAGE_WORKFLOW))],
             $handler->handle([$event])
         );
     }
@@ -168,7 +210,8 @@ class AutomationHandlerTest extends TestCase
             $router,
             $eventQueue,
             $this->createMock(Logger::class),
-            $this->createMock(AccountResolver::class)
+            $this->createMock(AccountResolver::class),
+            $this->createMock(Config::class)
         );
 
         self::assertSame([1 => $refusal], $handler->handle([$event]));

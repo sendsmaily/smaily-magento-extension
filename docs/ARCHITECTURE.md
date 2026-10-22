@@ -1516,10 +1516,23 @@ Initial setup, Settings, Log. Design rules:
     without, it writes the store-wide values it shows. A single-website
     install writes the default scope and removes the website's own values
     (an empty password then writes the kept one at the default scope).
-  - Per-language Smaily accounts (mode A) live on one website's store
-    views, so on a 2+-website install they are a website's own Smaily
-    account: a store-wide save does not take mode A, and the setup's
-    Connect step does not offer it.
+  - **Per-language Smaily accounts (mode A) are always a website's own**
+    (owner decision 2026-10-22): they live on one website's store views,
+    and its per-language workflow rows name those accounts by language. A
+    Smaily account saved in mode A — the mode, the fallback language, the
+    fallback account and the store views' accounts — is written at the
+    website's scope, and so are the automations of a website in mode A
+    (config rows and mapping rows under its id), on every install:
+    `WizardStepSaver::sectionTarget()` targets the website for them, also
+    in the initial setup of a single-website install, and removes none of
+    its own values. A website added later therefore reads no mode A from
+    the default scope and no workflow row of another website's accounts.
+    On a 2+-website install a store-wide save does not take mode A and the
+    setup's Connect step does not offer it; Settings offers it while the
+    website's own Smaily account is ticked, shows the automations switch
+    of a website in mode A ticked and fixed (`WizardData::isOwnRequired()`),
+    and returns its Smaily account (leaving mode A) when that switch is
+    unticked and saved.
   - The Settings page renders an explicit website selector next to the tab
     strip (own chrome, not Magento's native store-switcher), reloading with
     `?website=<id>`; single-website installs never see it or the switches.
@@ -1545,9 +1558,8 @@ Initial setup, Settings, Log. Design rules:
   saved store-view credentials) plus a default-fallback picker whose
   account's credentials double as the website's account; the fallback
   language is saved with that account (`Config::getFallbackLanguage()`
-  reads the website value, else the default-scope value). On a 2+-website
-  install mode `a` is a website's own Smaily account (CON-179, see
-  "Multi-website"). Modes `a`/`b` reveal
+  reads the website value, else the default-scope value). Mode `a` is
+  always a website's own Smaily account (CON-179, see "Multi-website"). Modes `a`/`b` reveal
   the per-language workflow mapping editor on the Automations panel
   (workflow dropdowns loaded live per account). All sections show/hide
   live on mode change with no save round-trip; leaving mode `a` removes

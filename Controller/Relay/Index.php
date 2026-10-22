@@ -15,6 +15,7 @@ use Magento\Framework\App\Request\InvalidRequestException;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
+use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\BrowseEventValidator;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
@@ -32,6 +33,12 @@ use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
  *
  * CSRF-exempt: an anonymous beacon has no session form key; the payload is
  * strictly validated and the endpoint 404s when browse tracking is off.
+ *
+ * The visitor token is never taken from the request body: every forwarded
+ * event carries the token of the shopper's visitor-token cookie, read on the
+ * server in a valid form, a store-created `vs_` token only with marketing
+ * consent (AttributionManager::readCookies()). Without one the events go
+ * anonymous. As the WooCommerce plugin's relay does (PRO-3860, CON-181).
  */
 class Index implements HttpPostActionInterface, CsrfAwareActionInterface
 {
@@ -45,7 +52,8 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
         private readonly Client $client,
         private readonly BrowseEventValidator $validator,
         private readonly PerAddressLimiter $limiter,
-        private readonly Logger $logger
+        private readonly Logger $logger,
+        private readonly AttributionManager $attributionManager
     ) {
     }
 
@@ -91,6 +99,13 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
             $result->setHttpResponseCode(400);
 
             return $result->setData(['ok' => false, 'error' => 'no valid events']);
+        }
+
+        $visitorToken = $this->attributionManager->readCookies()['visitor_token'];
+        if ($visitorToken !== null) {
+            foreach ($events as $index => $event) {
+                $events[$index]['smaily_visitor_token'] = $visitorToken;
+            }
         }
 
         try {

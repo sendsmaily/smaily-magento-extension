@@ -22,7 +22,9 @@ use Smaily\Connect\Model\OrderPlacer;
  * Cookie names come from the tenant's setup-exchange config with the
  * cross-platform defaults below. Attribution is deliberately NOT gated on
  * analytics consent (first-party functional cookie for the merchant's own
- * email click), matching the Woo/Shopify behavior.
+ * email click), matching the Woo/Shopify behavior. The one exception is a
+ * store-created `vs_` visitor token, which is read only with marketing
+ * consent (readCookies()).
  *
  * Nothing is stamped on an order an admin places, in the admin's order
  * screen or with "Login as Customer": the browser's cookies are then the
@@ -46,7 +48,8 @@ class AttributionManager
         private readonly Settings $settings,
         private readonly CookieManagerInterface $cookieManager,
         private readonly ResourceConnection $resourceConnection,
-        private readonly OrderPlacer $orderPlacer
+        private readonly OrderPlacer $orderPlacer,
+        private readonly MarketingConsent $marketingConsent
     ) {
     }
 
@@ -98,15 +101,30 @@ class AttributionManager
      * characters) nor be stored cut short, and
      * the order keeps every other signal (PRO-3584).
      *
+     * A store-created `vs_` visitor token reads as absent unless the shopper
+     * gave marketing consent (MarketingConsent; contract §5, CON-181), as in
+     * the WooCommerce plugin (PRO-3857, PRO-3860). Every path that sends the
+     * token reads it here: the order, the login identity merge, a guest's
+     * storefront recommendations and the browse relay. An engine `vt_` token
+     * from an email link is attribution and is read as before.
+     *
      * @return array{rec_id: ?string, visitor_token: ?string, rec_ctx: ?string, anon_session_id: ?string}
      */
     public function readCookies(): array
     {
         $names = $this->getClientConfig();
 
+        $visitorToken = $this->cookie((string)$names['cookieVisitor'], AttributionShape::isVisitorToken(...));
+        if ($visitorToken !== null
+            && AttributionShape::isStoreVisitorToken($visitorToken)
+            && !$this->marketingConsent->isGiven()
+        ) {
+            $visitorToken = null;
+        }
+
         return [
             'rec_id' => $this->cookie((string)$names['cookieRecId'], RecId::isValid(...)),
-            'visitor_token' => $this->cookie((string)$names['cookieVisitor'], AttributionShape::isVisitorToken(...)),
+            'visitor_token' => $visitorToken,
             'rec_ctx' => $this->cookie((string)$names['cookieContext'], AttributionShape::isContext(...)),
             'anon_session_id' => $this->cookie((string)$names['cookieSession'], AttributionShape::isSessionId(...)),
         ];

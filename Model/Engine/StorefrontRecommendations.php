@@ -32,7 +32,9 @@ use Smaily\Connect\Model\Privacy\ProfilingConsent;
  *     notice does not hold the shopper's consent back
  *     (`isUserNotAllowSaveCookie()`: restriction mode on and not accepted on
  *     this website). The storefront script asks only with consent; this is
- *     the half of that rule the server can see;
+ *     the half of that rule the server can see. A store-created `vs_` token
+ *     needs the shopper's explicit marketing yes on top (MarketingConsent,
+ *     applied by readCookies(); CON-181, as Woo PRO-3857);
  *   - nobody else.
  * Always only while the engine may be called (`isSendingAllowed()`), in one
  * attempt (Client).

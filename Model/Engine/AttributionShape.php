@@ -34,11 +34,23 @@ class AttributionShape
 {
     private const VISITOR_TOKEN_PATTERN = '/^(?:vt_[A-Za-z0-9]{1,61}|vs_[A-Za-z0-9]{22})$/D';
 
+    private const STORE_VISITOR_TOKEN_PATTERN = '/^vs_[A-Za-z0-9]{22}$/D';
+
     private const CONTEXT_PATTERN = '/^[A-Za-z0-9._-]{1,64}$/D';
 
     public static function isVisitorToken(string $value): bool
     {
         return preg_match(self::VISITOR_TOKEN_PATTERN, $value) === 1;
+    }
+
+    /**
+     * A store-created `vs_` token: it travels to the engine only with the
+     * shopper's marketing consent (MarketingConsent, CON-181), while an
+     * engine `vt_` token from an email link is attribution and is not gated.
+     */
+    public static function isStoreVisitorToken(string $value): bool
+    {
+        return preg_match(self::STORE_VISITOR_TOKEN_PATTERN, $value) === 1;
     }
 
     public static function isContext(string $value): bool

@@ -12,6 +12,8 @@ use Magento\Cookie\Helper\Cookie as CookieHelper;
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Framework\App\CacheInterface;
+use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\Stdlib\CookieManagerInterface;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -20,14 +22,20 @@ use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
+use Smaily\Connect\Model\Engine\MarketingConsent;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\StorefrontRecommendations;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\OrderPlacer;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 
 /**
  * PRO-3790: who the engine is asked about, and how its answer is cached.
- * Values are synthetic.
+ * The visitor-token cookie is read by the real AttributionManager and
+ * MarketingConsent over the stubbed cookie helper: a guest is asked about by
+ * a store-created `vs_` token only with an explicit marketing yes (cookie
+ * restriction mode on and the notice accepted), by an engine `vt_` token as
+ * before (CON-181). Values are synthetic.
  */
 class StorefrontRecommendationsTest extends TestCase
 {
@@ -47,6 +55,8 @@ class StorefrontRecommendationsTest extends TestCase
     private array $cacheStore = [];
 
     private ?string $visitorToken = null;
+
+    private bool $cookieRestriction = false;
 
     /** @var array<int, array{string, string, int}> */
     private array $engineCalls = [];
@@ -75,6 +85,9 @@ class StorefrontRecommendationsTest extends TestCase
         $this->profiling = $this->createMock(ProfilingConsent::class);
         $this->session = $this->createMock(CustomerSession::class);
         $this->cookieHelper = $this->createMock(CookieHelper::class);
+        $this->cookieHelper->method('isCookieRestrictionModeEnabled')->willReturnCallback(
+            fn (): bool => $this->cookieRestriction
+        );
     }
 
     public function testNothingIsAskedWhileTheEngineMayNotBeCalled(): void
@@ -120,6 +133,26 @@ class StorefrontRecommendationsTest extends TestCase
     public function testAGuestTheCookieNoticeHoldsBackIsNotAskedAbout(): void
     {
         $this->guest('vt_8f3k2a', false);
+
+        self::assertSame([], $this->service()->slots());
+        self::assertSame([], $this->engineCalls);
+    }
+
+    public function testAGuestWithAStoreCreatedTokenAndMarketingConsentIsAskedAboutByIt(): void
+    {
+        $this->cookieRestriction = true;
+        $this->guest('vs_4fK9a2LmQ7xZ0bR3tY8wP1');
+
+        $this->service()->slots();
+
+        self::assertSame([['smaily_visitor_token', 'vs_4fK9a2LmQ7xZ0bR3tY8wP1', 4]], $this->engineCalls);
+    }
+
+    public function testAGuestWithAStoreCreatedTokenWithoutAnExplicitYesIsNotAskedAbout(): void
+    {
+        // Cookie restriction mode off: the notice holds nothing back, but
+        // the server sees no yes either.
+        $this->guest('vs_4fK9a2LmQ7xZ0bR3tY8wP1');
 
         self::assertSame([], $this->service()->slots());
         self::assertSame([], $this->engineCalls);
@@ -263,13 +296,19 @@ class StorefrontRecommendationsTest extends TestCase
 
     private function service(?Settings $settings = null): StorefrontRecommendations
     {
-        $attribution = $this->createMock(AttributionManager::class);
-        $attribution->method('readCookies')->willReturnCallback(fn (): array => [
-            'rec_id' => null,
-            'visitor_token' => $this->visitorToken,
-            'rec_ctx' => null,
-            'anon_session_id' => null,
-        ]);
+        $attributionSettings = $this->createMock(Settings::class);
+        $attributionSettings->method('getEngineConfig')->willReturn([]);
+        $cookieManager = $this->createMock(CookieManagerInterface::class);
+        $cookieManager->method('getCookie')->willReturnCallback(
+            fn (string $name) => $name === AttributionManager::DEFAULT_COOKIE_VISITOR ? $this->visitorToken : null
+        );
+        $attribution = new AttributionManager(
+            $attributionSettings,
+            $cookieManager,
+            $this->createMock(ResourceConnection::class),
+            $this->createMock(OrderPlacer::class),
+            new MarketingConsent($this->cookieHelper)
+        );
 
         $store = $this->createMock(StoreInterface::class);
         $store->method('getId')->willReturn(3);

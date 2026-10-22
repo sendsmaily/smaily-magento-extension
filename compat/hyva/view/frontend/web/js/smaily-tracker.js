@@ -62,20 +62,14 @@
     }
 
     function baseEvent(type) {
-        var event = {
+        // No visitor token and no rec id/ctx cookies: the relay attaches the
+        // visitor-token cookie's token on the server and ignores one in the
+        // body (CON-181) — see Model/Engine/BrowseEventValidator for why.
+        return {
             event_id: helper.uuidv4(),
             session_id: sessionId(),
             event_type: type
         };
-        var visitorToken = helper.getCookie(config.attribution.cookieVisitor);
-
-        // The rec id/ctx cookies are deliberately NOT echoed here — see
-        // Model/Engine/BrowseEventValidator for why.
-        if (visitorToken) {
-            event.smaily_visitor_token = visitorToken;
-        }
-
-        return event;
     }
 
     function push(event) {

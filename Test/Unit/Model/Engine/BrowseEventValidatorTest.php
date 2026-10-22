@@ -40,7 +40,6 @@ class BrowseEventValidatorTest extends TestCase
         self::assertSame('plugin_magento', $clean['source']);
         self::assertNotSame('1999-01-01T00:00:00Z', $clean['event_ts']);
         self::assertSame('ABC-1', $clean['sku']);
-        self::assertSame('vt_8f3k2a', $clean['smaily_visitor_token']);
         self::assertArrayNotHasKey('unknown_key', $clean);
     }
 
@@ -95,8 +94,9 @@ class BrowseEventValidatorTest extends TestCase
 
     /**
      * PRO-3575: the anonymous beacon asserts no identity. Neither the email
-     * nor the platform customer id is forwarded; identity reaches the engine
-     * only from server-side state (the engine-issued visitor token and the
+     * nor the platform customer id is forwarded, and since CON-181 neither is
+     * a visitor token named in the body; identity reaches the engine only
+     * from server-side state (the relay's visitor-token cookie read and the
      * login identity merge).
      */
     public function testClientAssertedIdentityIsRejectedAndDwellCoerced(): void
@@ -108,6 +108,7 @@ class BrowseEventValidatorTest extends TestCase
             'search_query' => 'kassitoit',
             'customer_email' => 'spoofed@example.com',
             'external_id' => '42',
+            'smaily_visitor_token' => 'vt_8f3k2a',
             'dwell_seconds' => '12',
         ]);
 
@@ -115,6 +116,7 @@ class BrowseEventValidatorTest extends TestCase
         // Identity must never be client-asserted on the anonymous beacon.
         self::assertArrayNotHasKey('customer_email', $clean);
         self::assertArrayNotHasKey('external_id', $clean);
+        self::assertArrayNotHasKey('smaily_visitor_token', $clean);
         self::assertSame(12, $clean['dwell_seconds']);
         self::assertSame('kassitoit', $clean['search_query']);
     }

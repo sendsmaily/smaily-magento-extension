@@ -14,7 +14,8 @@
   navigator.sendBeacon, and jQuery as far as the Luma tracker uses it. The
   cookie notice's cookie user_allowed_save_cookie holds the website ids the
   shopper accepted on, e.g. {"1":1}. Run it with bin/test-js.sh; the page ends
-  with "RESULT: PASS" or "RESULT: FAIL".
+  with "RESULT: PASS" or "RESULT: FAIL". Neither tracker puts the
+  visitor token in an event: the relay reads it from the cookie (CON-181).
 -->
 <html lang="en">
 <head>
@@ -67,7 +68,7 @@
     }
 
     // Runs in the frame before the scripts under test.
-    function stubs(cookieValue, override) {
+    function stubs(cookieValue, override, visitorToken) {
         return [
             'var jar = {};',
             'Object.defineProperty(document, "cookie", {configurable: true,',
@@ -75,6 +76,7 @@
             '  set: function (v) { var pair = v.split(";")[0], i = pair.indexOf("=");',
             '    jar[pair.slice(0, i)] = pair.slice(i + 1); }});',
             cookieValue === null ? '' : 'jar.' + COOKIE + ' = ' + JSON.stringify(encodeURIComponent(cookieValue)) + ';',
+            visitorToken === undefined ? '' : 'jar.smaily_visitor_token = ' + JSON.stringify(visitorToken) + ';',
             'window.beacons = [];',
             'navigator.sendBeacon = function (url, blob) { window.beacons.push(blob); return true; };',
             'window.smailyPageContext = {type: "category", categoryPath: "Gear"};',
@@ -163,7 +165,7 @@
                 }, reject);
             };
             frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><script>'
-                + stubs(cookieValue, options.override) + '<\/script>'
+                + stubs(cookieValue, options.override, options.visitorToken) + '<\/script>'
                 + (theme === 'Luma' ? lumaFrame(websiteId) : hyvaFrame(websiteId))
                 + '</head><body></body></html>';
             document.body.appendChild(frame);
@@ -200,6 +202,13 @@
             await p(2, '{"1":1}', {override: true}));
         notTracked(theme + ', the consent override says no, cookie for website 2',
             await p(2, '{"2":1}', {override: false}));
+
+        // CON-181: the relay attaches the visitor-token cookie's token on the
+        // server; the tracker never names one in the body.
+        var withToken = await p(2, '{"2":1}', {visitorToken: 'vt_8f3k2a9xq4'});
+        tracked(theme + ', with a visitor-token cookie', withToken);
+        check(theme + ', with a visitor-token cookie: the event names no visitor token',
+            withToken.events.length === 1 && !('smaily_visitor_token' in withToken.events[0]));
     }
 
     // bin/test-js.sh runs the page on Chrome's virtual time, which jumps to

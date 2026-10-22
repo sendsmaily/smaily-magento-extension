@@ -84,7 +84,8 @@ first. `Test/Js/attribution-landing.html` runs the real Luma and Hyvä
 landing capture the same way (the query and document.cookie stubbed) and
 checks the context cookie rule: a recommendation link with a context sets
 it, one without clears it, and any other landing leaves both cookies alone;
-and that a visitor token is written in either form the contract allows.
+and that a link's visitor token is written only in the engine's `vt_` form:
+a store-created `vs_` token in a link leaves the cookie as it is.
 `Test/Js/recommendations.html` runs the real Luma and Hyvä recommendations
 scripts the same way (document.cookie, fetch and the Luma script's jQuery
 stubbed, two widget containers per page) and checks that nothing is asked

@@ -1128,6 +1128,11 @@ PRO-1942 definitions, the visitor token capped at 64 characters in total,
 the limit contract 1.13.0 sets for an opaque token;
 since contract 1.11.0 a store-created `vs_` + 22 alphanumerics token is
 accepted too, PRO-3912): the capture scripts write the visitor token and context cookies only in shape,
+and take a visitor token from a link only in the engine's `vt_` form
+(CON-177, the WooCommerce plugin's PRO-3857 rule: an engine email link never
+carries a `vs_` token, so one in a link is a value its sender chose, which
+the engine would bind to the shopper at their next guest order; a `vs_`
+token already in the cookie is left as it is and still read),
 `AttributionManager::readCookies()` treats every off-shape cookie, the rec
 id included, as absent (so a value can neither fail the side-table insert under a strict SQL mode
 nor be stored cut short to the 64-character columns), and

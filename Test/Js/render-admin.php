@@ -943,6 +943,15 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
 
     /**
      * @param string $section
+     * @return bool
+     */
+    public function isOwnRequired(string $section): bool
+    {
+        return false;
+    }
+
+    /**
+     * @param string $section
      * @return array<int, array<string, mixed>>
      */
     public function getWebsiteOverrides(string $section): array

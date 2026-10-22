@@ -1186,6 +1186,105 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
+     * Per-language Smaily accounts are always a website's own (owner
+     * decision 2026-10-22): the initial setup of a store with one website
+     * saves a Smaily account in mode A at the website's scope and removes
+     * none of its own values, so a website added later does not inherit
+     * mode A.
+     */
+    public function testAStoreWithOneWebsiteSavesPerLanguageAccountsAsTheWebsitesOwn(): void
+    {
+        $this->websiteContext->method('isStoreWide')->willReturn(true);
+        $this->websiteContext->method('getWebsiteId')->willReturn(1);
+        $this->withOwnValues([WebsiteOverrides::CONNECTION => [1]]);
+        $this->overrides->expects(self::never())->method('removeOwnValues');
+
+        $errors = $this->saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'multilingual_mode' => 'a',
+            'fallback_language' => 'et',
+            'accounts' => [],
+        ]);
+
+        self::assertSame([], $errors);
+        $website = ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 1];
+        foreach ([
+            Config::XML_PATH_SUBDOMAIN,
+            Config::XML_PATH_PASSWORD,
+            Config::XML_PATH_MULTILINGUAL_MODE,
+            Config::XML_PATH_FALLBACK_LANGUAGE,
+        ] as $path) {
+            self::assertSame($website, $this->savedScope($path), $path);
+            self::assertFalse($this->wasSavedAtScope($path, ScopeConfigInterface::SCOPE_TYPE_DEFAULT, 0), $path);
+        }
+        self::assertSame('a', $this->savedValue(Config::XML_PATH_MULTILINGUAL_MODE));
+    }
+
+    /**
+     * The automations of a website in mode A are its own as well: their
+     * per-language workflows name its accounts. On a store with one website
+     * the setup saves them under the website; in Settings on a store with
+     * more than one website they stay its own, unticked or not.
+     */
+    public function testTheAutomationsOfAWebsiteWithPerLanguageAccountsAreItsOwn(): void
+    {
+        $this->websiteContext->method('isStoreWide')->willReturn(true);
+        $this->websiteContext->method('getWebsiteId')->willReturn(1);
+        $this->config->method('getMultilingualMode')->willReturn('a');
+        $this->accountResolver->method('languageStoreIds')->willReturn([]);
+        $this->withWorkflows([]);
+        $this->overrides->expects(self::never())->method('removeOwnValues');
+        $this->mappingSaver->expects(self::once())->method('save')
+            ->with(self::anything(), 1, self::anything())
+            ->willReturn([]);
+
+        $this->saver->save('automations', [
+            'welcome_enabled' => true,
+            'mappings' => [['trigger_type' => 'welcome', 'language' => 'et', 'account_key' => 'et', 'workflow_id' => 5]],
+        ]);
+
+        self::assertSame(
+            ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 1],
+            $this->savedScope(Config::XML_PATH_WELCOME_ENABLED)
+        );
+    }
+
+    public function testSettingsKeepsTheAutomationsOfAWebsiteWithPerLanguageAccountsItsOwn(): void
+    {
+        $this->onStoreWithWebsites(2);
+        $this->config->method('getMultilingualMode')->willReturn('a');
+        $this->withOwnValues([WebsiteOverrides::AUTOMATIONS => [2]]);
+        $this->overrides->expects(self::never())->method('removeOwnValues');
+
+        $this->saver->save('automations', ['own' => false, 'welcome_enabled' => true]);
+
+        self::assertSame(
+            ['scope' => ScopeInterface::SCOPE_WEBSITES, 'scopeId' => 2],
+            $this->savedScope(Config::XML_PATH_WELCOME_ENABLED)
+        );
+        self::assertFalse($this->saver->isReturnedToStoreWide());
+    }
+
+    /**
+     * Unticking the own Smaily account of a website in mode A still returns
+     * it to the store-wide account, which leaves mode A.
+     */
+    public function testSettingsReturnsTheSmailyAccountOfAWebsiteInModeA(): void
+    {
+        $this->onStoreWithWebsites(2);
+        $this->withOwnValues([WebsiteOverrides::CONNECTION => [2]]);
+        $this->overrides->expects(self::once())->method('removeOwnValues')
+            ->with(WebsiteOverrides::CONNECTION, 2, true);
+
+        $this->saver->save('connect', ['own' => false, 'subdomain' => 'demo', 'username' => 'api-user', 'multilingual_mode' => 'a']);
+
+        self::assertSame([], $this->saved);
+        self::assertTrue($this->saver->isReturnedToStoreWide());
+    }
+
+    /**
      * CON-179: per-language accounts live on one website's store views, so
      * a store-wide save on a store with more than one website does not take
      * them; Settings for a website with its own account does.

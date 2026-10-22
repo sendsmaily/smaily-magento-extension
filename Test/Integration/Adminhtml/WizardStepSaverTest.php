@@ -323,6 +323,69 @@ class WizardStepSaverTest extends IntegrationTestCase
     }
 
     /**
+     * Per-language Smaily accounts are always a website's own (owner
+     * decision 2026-10-22). The initial setup of a store with one website
+     * saves mode A, its fallback account and the per-language workflows at
+     * that website, not for the whole store. A second website added later
+     * inherits none of it: it is not in mode A and no workflow of another
+     * website's accounts reaches it; the first website is listed with its
+     * own Smaily account and keeps it through a store-wide save.
+     */
+    public function testAStoreWithOneWebsiteInModeAThatAddsASecondWebsite(): void
+    {
+        $oneWebsite = $this->saver('0', [self::MAIN]);
+        self::assertSame([], $oneWebsite->save('connect', [
+            'subdomain' => 'en-shop',
+            'username' => 'en-user',
+            'password' => 'en-secret',
+            'multilingual_mode' => 'a',
+            'fallback_language' => 'en',
+            'accounts' => [],
+        ]));
+        self::assertSame([], $this->saver('0', [self::MAIN])->save('automations', ['mappings' => [
+            ['trigger_type' => 'welcome', 'language' => 'et', 'account_key' => 'et', 'workflow_id' => 77],
+        ]]));
+
+        foreach ([
+            Config::XML_PATH_SUBDOMAIN,
+            Config::XML_PATH_PASSWORD,
+            Config::XML_PATH_MULTILINGUAL_MODE,
+            Config::XML_PATH_FALLBACK_LANGUAGE,
+        ] as $path) {
+            self::assertSame([['websites', self::MAIN]], $this->scopesOf($path), $path);
+        }
+        self::assertSame([self::MAIN], array_map('intval', $this->connection->fetchCol(
+            $this->connection->select()->from(MappingResource::TABLE_NAME, ['website_id'])
+        )));
+        self::assertSame('a', $this->config->getMultilingualMode(self::MAIN));
+
+        // The store gains a second website, which reads the default scope.
+        $this->insertRow('default', 0, Config::XML_PATH_MULTILINGUAL_MODE, 'b');
+        self::assertSame('b', $this->config->getMultilingualMode(self::SECOND));
+        self::assertSame('', $this->config->getWebsiteSubdomain(self::SECOND));
+        $router = $this->objectManager->create(Router::class, ['config' => $this->config]);
+        self::assertNull($router->resolve('welcome', self::SECOND, 'et'));
+        self::assertSame(77, $router->resolve('welcome', self::MAIN, 'et')?->workflowId);
+
+        $overrides = new WebsiteOverrides(
+            $this->objectManager->get(ResourceConnection::class),
+            $this->objectManager->get(WriterInterface::class),
+            $this->storeManager([self::MAIN, self::SECOND])
+        );
+        self::assertSame([self::MAIN], array_keys($overrides->ownValues(WebsiteOverrides::CONNECTION)));
+
+        self::assertSame([], $this->saver('0')->save('connect', [
+            'subdomain' => 'shop',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'multilingual_mode' => 'b',
+        ]));
+        self::assertSame('a', $this->config->getMultilingualMode(self::MAIN), 'Main keeps its own Smaily account');
+        self::assertSame('en-shop', $this->config->getWebsiteSubdomain(self::MAIN));
+        self::assertSame('shop', $this->config->getWebsiteSubdomain(self::SECOND));
+    }
+
+    /**
      * Criteria 8 and 9: a store set up before the update — the initial
      * setup saved its values and its "setup completed" mark per website —
      * keeps every row where it is, keeps sending with them, and counts as

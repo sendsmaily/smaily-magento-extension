@@ -419,6 +419,22 @@ class WizardDataTest extends TestCase
         ]], $list);
     }
 
+    /**
+     * Per-language Smaily accounts are always a website's own: on Settings,
+     * a website in mode A keeps its own automations, so their switch is
+     * ticked and fixed.
+     */
+    public function testAWebsiteWithPerLanguageAccountsMustKeepItsOwnAutomations(): void
+    {
+        $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
+        $this->config->method('getMultilingualMode')->with(2)->willReturn(MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS);
+        $this->overrides->method('hasOwnValues')->willReturn(false);
+
+        self::assertTrue($this->viewModel->isOwnRequired(WebsiteOverrides::AUTOMATIONS));
+        self::assertTrue($this->viewModel->hasOwnValues(WebsiteOverrides::AUTOMATIONS));
+        self::assertFalse($this->viewModel->isOwnRequired(WebsiteOverrides::CONNECTION));
+    }
+
     public function testSettingsListsNoWebsitesButKnowsTheSelectedWebsitesOwnValues(): void
     {
         $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);

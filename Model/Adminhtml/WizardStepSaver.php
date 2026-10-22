@@ -21,6 +21,7 @@ use Smaily\Connect\Model\Automation\MappingSaver;
 use Smaily\Connect\Model\Client\CredentialCheck;
 use Smaily\Connect\Model\Client\Exception\InvalidSubdomainException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
+use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Source\MultilingualMode;
@@ -845,7 +846,7 @@ class WizardStepSaver
             }
             $postedId = ($id = (int)$data[$key]) > 0 ? (string)$id : '';
             $savedId = $savedWorkflow > 0 ? (string)$savedWorkflow : '';
-            $availableWorkflowIds ??= $this->workflowIdsForStore(null);
+            $availableWorkflowIds ??= $this->workflowIdsForWebsite($websiteId);
             if ($this->rowNormalizer->isMissingFromList($postedId, $savedId, $availableWorkflowIds)) {
                 // Missing-from-list preserve: leave the stored value untouched.
                 continue;
@@ -884,17 +885,18 @@ class WizardStepSaver
     }
 
     /**
-     * Available workflow ids per mapping account key: 'default' (the shared /
-     * mode-B account) plus each language detected on the given website (mode
-     * A, where a language's rows route through that language's own Smaily
-     * account). An account whose list cannot be loaded maps to an empty list,
-     * which the saver reads as "unknown" and preserves.
+     * Available workflow ids per mapping account key: 'default' (the
+     * website's account, mode B's one account) plus each language detected
+     * on the given website (mode A, where a language's rows route through
+     * that language's own Smaily account). An account whose list cannot be
+     * loaded maps to an empty list, which the saver reads as "unknown" and
+     * preserves.
      *
      * @return array<string, array<int, string>>
      */
     private function availableWorkflowIdsByAccount(int $websiteId): array
     {
-        $byAccount = [Mapping::ACCOUNT_DEFAULT => $this->workflowIdsForStore(null)];
+        $byAccount = [Mapping::ACCOUNT_DEFAULT => $this->workflowIdsForWebsite($websiteId)];
         // A store-wide save on a 2+-website install has no per-language
         // accounts (saveConnect()).
         if ($websiteId === WebsiteContext::STORE_WIDE) {
@@ -916,8 +918,30 @@ class WizardStepSaver
      */
     private function workflowIdsForStore(?int $storeId): array
     {
+        return $this->workflowIds(fn (): SmailyClient => $this->smailyClientProvider->forStore($storeId));
+    }
+
+    /**
+     * Workflow ids the website's Smaily account can list — its own, else the
+     * store-wide one (website 0), the account its 'default' rows and its
+     * config-default workflows are posted through (CON-189). Empty when the
+     * list is unavailable.
+     *
+     * @return array<int, string>
+     */
+    private function workflowIdsForWebsite(int $websiteId): array
+    {
+        return $this->workflowIds(fn (): SmailyClient => $this->smailyClientProvider->forWebsite($websiteId));
+    }
+
+    /**
+     * @param \Closure(): SmailyClient $client
+     * @return array<int, string>
+     */
+    private function workflowIds(\Closure $client): array
+    {
         try {
-            $workflows = $this->smailyClientProvider->forStore($storeId)->getAutomationWorkflows();
+            $workflows = $client()->getAutomationWorkflows();
         } catch (SmailyClientException) {
             return [];
         }

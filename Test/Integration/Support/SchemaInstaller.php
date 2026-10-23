@@ -28,6 +28,9 @@ class SchemaInstaller
     /** Magento_Catalog's declarative schema, the source of the product tables. */
     private const CATALOG_SCHEMA = 'vendor/magento/module-catalog/etc/db_schema.xml';
 
+    /** Magento_Sales's declarative schema, the source of the order table. */
+    private const SALES_SCHEMA = 'vendor/magento/module-sales/etc/db_schema.xml';
+
     /** Magento_SalesRule's declarative schema, the source of the coupon tables. */
     private const SALES_RULE_SCHEMA = 'vendor/magento/module-sales-rule/etc/db_schema.xml';
 
@@ -245,6 +248,19 @@ class SchemaInstaller
     {
         $this->connection->query('DROP TABLE IF EXISTS `salesrule_coupon_usage`');
         $this->connection->query('DROP TABLE IF EXISTS `salesrule_coupon`');
+    }
+
+    /**
+     * The core sales_order table as Magento ships it (see createQuote()).
+     */
+    public function createSalesOrder(): void
+    {
+        $this->createMagentoTable(self::SALES_SCHEMA, 'sales_order');
+    }
+
+    public function dropSalesOrder(): void
+    {
+        $this->connection->query('DROP TABLE IF EXISTS `sales_order`');
     }
 
     /**

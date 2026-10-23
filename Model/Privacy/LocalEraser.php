@@ -47,6 +47,14 @@ use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
  *   address on the cart or on one of its addresses, but has no such row yet,
  *   gets one too (PRO-3693): the scan would otherwise mail it on its next
  *   sweep. The core quote rows are read, never changed.
+ * - **An order's attribution row loses its visitor token and its anonymous
+ *   session id** (CON-212, Erkki 2026-10-23), the two values that tie the
+ *   order to a browser. The order is Magento's and is never touched, and
+ *   what the row says led to the sale — the recommendation id, its context
+ *   and the row's time — stays. The orders are the ones placed under the
+ *   address and those of a customer account that has it: an order keeps the
+ *   address it was placed with, so an account whose address changed since
+ *   is found only by its id.
  *
  * Rows are found by decoding, never by searching the raw JSON text — see
  * PayloadAnonymizer. Erasure is idempotent by construction: an anonymised
@@ -75,6 +83,21 @@ class LocalEraser
     ];
 
     private const ABANDONED_CART_LABEL = 'Abandoned carts';
+
+    private const ATTRIBUTION_LABEL = 'Order attribution';
+
+    /**
+     * The attribution side table and the orders it belongs to, on the sales
+     * connection (AttributionManager writes it there).
+     */
+    private const ATTRIBUTION_TABLE = 'smaily_order_attribution';
+    private const SALES_CONNECTION = 'sales';
+
+    /**
+     * The attribution columns that point at a browser rather than at the
+     * sale.
+     */
+    private const ATTRIBUTION_IDENTIFIERS = ['visitor_token', 'anon_session_id'];
 
     /**
      * Statuses a row can still be sent from. Both queues use the same
@@ -129,6 +152,10 @@ class LocalEraser
         $counts[self::ABANDONED_CART_LABEL] = [
             'removed' => 0,
             'anonymised' => $this->cartState->eraseForEmail($email),
+        ];
+        $counts[self::ATTRIBUTION_LABEL] = [
+            'removed' => 0,
+            'anonymised' => $this->eraseAttribution($email),
         ];
 
         return $counts;
@@ -204,6 +231,68 @@ class LocalEraser
         }
 
         return $result;
+    }
+
+    /**
+     * Clear the browser identifiers on the attribution rows of this
+     * contact's orders. A row with neither left is not counted, so a second
+     * run counts nothing.
+     *
+     * @param string $email
+     * @return int
+     */
+    private function eraseAttribution(string $email): int
+    {
+        $connection = $this->resourceConnection->getConnection(self::SALES_CONNECTION);
+        $table = $this->resourceConnection->getTableName(self::ATTRIBUTION_TABLE, self::SALES_CONNECTION);
+
+        $owner = $connection->quoteInto('LOWER(sales_order.customer_email) = ?', $email);
+        $customerIds = $this->customerIds($email);
+        if ($customerIds) {
+            $owner .= ' OR ' . $connection->quoteInto('sales_order.customer_id IN (?)', $customerIds);
+        }
+        $ids = $connection->fetchCol(
+            $connection->select()
+                ->from(['attribution' => $table], ['id'])
+                ->join(
+                    [
+                        'sales_order' => $this->resourceConnection->getTableName(
+                            'sales_order',
+                            self::SALES_CONNECTION
+                        ),
+                    ],
+                    'sales_order.entity_id = attribution.order_id',
+                    []
+                )
+                ->where($owner)
+                ->where('attribution.visitor_token IS NOT NULL OR attribution.anon_session_id IS NOT NULL')
+        );
+        if (!$ids) {
+            return 0;
+        }
+
+        return $connection->update(
+            $table,
+            array_fill_keys(self::ATTRIBUTION_IDENTIFIERS, null),
+            ['id IN (?)' => array_map('intval', $ids)]
+        );
+    }
+
+    /**
+     * The customer accounts that hold the address, in any website.
+     *
+     * @param string $email
+     * @return int[]
+     */
+    private function customerIds(string $email): array
+    {
+        $connection = $this->resourceConnection->getConnection();
+
+        return array_map('intval', $connection->fetchCol(
+            $connection->select()
+                ->from($this->resourceConnection->getTableName('customer_entity'), ['entity_id'])
+                ->where('LOWER(email) = ?', $email)
+        ));
     }
 
     /**

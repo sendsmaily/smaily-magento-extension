@@ -19,7 +19,7 @@ use Smaily\Connect\Setup\Uninstall;
  * does not call the module's Uninstall class; it only reverts the module's
  * data patches. Applying this patch changes nothing; reverting it removes
  * the module's settings, flag rows and setup notice exactly as Uninstall
- * does. On a
+ * does, after telling Campaign Intelligence that the connection ends. On a
  * composer `module:uninstall` both run, and the second finds nothing left.
  */
 class RemoveSettingsOnUninstall implements DataPatchInterface, PatchRevertableInterface
@@ -59,6 +59,10 @@ class RemoveSettingsOnUninstall implements DataPatchInterface, PatchRevertableIn
      */
     public function revert(): void
     {
+        $this->uninstall->endEngineConnection(
+            $this->moduleDataSetup->getConnection(),
+            $this->moduleDataSetup->getTable('core_config_data')
+        );
         $this->uninstall->removeSettings(
             $this->moduleDataSetup->getConnection(),
             $this->moduleDataSetup->getTable('core_config_data'),

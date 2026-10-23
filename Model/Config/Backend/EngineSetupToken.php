@@ -17,17 +17,16 @@ use Magento\Framework\Message\ManagerInterface;
 use Magento\Framework\Model\Context;
 use Magento\Framework\Model\ResourceModel\AbstractResource;
 use Magento\Framework\Registry;
-use Smaily\Connect\Model\Backfill\ImportsOnConnect;
 use Smaily\Connect\Model\Backfill\Job;
-use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connector;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
-use Smaily\Connect\Model\Engine\Settings;
 
 /**
  * Exchanges a pasted setup token/URL on config save. The one-time token is
  * consumed immediately and never persisted — only the exchange result
  * (tenant credentials) is stored via Settings. A successful exchange starts
- * the catalog and customers imports and says so (PRO-3741, PRO-3790).
+ * the catalog and customers imports and says so (PRO-3741, PRO-3790) —
+ * Engine\Connector, the connect step the admin Connect shares.
  */
 class EngineSetupToken extends Value
 {
@@ -39,10 +38,8 @@ class EngineSetupToken extends Value
         Registry $registry,
         ScopeConfigInterface $config,
         TypeListInterface $cacheTypeList,
-        private readonly Client $client,
-        private readonly Settings $settings,
         private readonly ManagerInterface $messageManager,
-        private readonly ImportsOnConnect $importsOnConnect,
+        private readonly Connector $connector,
         ?AbstractResource $resource = null,
         ?AbstractDb $resourceCollection = null,
         array $data = []
@@ -61,8 +58,7 @@ class EngineSetupToken extends Value
 
         if ($token !== '') {
             try {
-                $response = $this->client->setupExchange($token);
-                $this->settings->storeExchange($response);
+                ['exchange' => $response, 'started' => $started] = $this->connector->connect($token);
                 $this->messageManager->addSuccessMessage(
                     __(
                         'Campaign Intelligence connected: %1 (engine %2).',
@@ -70,7 +66,6 @@ class EngineSetupToken extends Value
                         (string)($response['engine_version'] ?? '?')
                     )->render()
                 );
-                $started = $this->importsOnConnect->start();
                 if ($started[Job::TYPE_CATALOG]) {
                     $this->messageManager->addNoticeMessage(
                         __('The catalog import has started: your whole catalog goes to Campaign Intelligence once, in the background, from the next cron run (usually within a minute). To hold it back, press Cancel import on the Catalog card under Marketing > Smaily Connect > Settings > Intelligence before then: nothing is sent, and you can start the import later. Canceled after it began sending, the products already queued for sending still reach Campaign Intelligence and the rest are not sent.')->render()

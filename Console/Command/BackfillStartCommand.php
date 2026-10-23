@@ -8,8 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Console\Command;
 
-use Magento\Store\Model\StoreManagerInterface;
-use Smaily\Connect\Model\Backfill\EngineImportGuard;
+use Smaily\Connect\Model\Backfill\ImportStarter;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Config;
@@ -24,7 +23,9 @@ use Symfony\Component\Console\Output\OutputInterface;
  *
  * Queues a chunked historical import; the smaily_backfill_tick cron job
  * advances it. Progress: smaily:backfill:status. A catalog, customers or
- * orders import needs a Campaign Intelligence connection (PRO-1969, PRO-3742).
+ * orders import needs a Campaign Intelligence connection (PRO-1969, PRO-3742);
+ * the start is Model/Backfill/ImportStarter, the one the admin import
+ * endpoint shares.
  * A contacts import for a website whose contact sync is not active — off,
  * or its Contacts settings not saved yet (PRO-4036) — still starts: it sends
  * nothing and finishes at 0, as the import itself decides (PRO-1764), and
@@ -34,8 +35,7 @@ class BackfillStartCommand extends Command
 {
     public function __construct(
         private readonly JobManager $jobManager,
-        private readonly StoreManagerInterface $storeManager,
-        private readonly EngineImportGuard $engineImportGuard,
+        private readonly ImportStarter $importStarter,
         private readonly Config $config
     ) {
         parent::__construct();
@@ -75,7 +75,12 @@ class BackfillStartCommand extends Command
             return Command::FAILURE;
         }
 
-        $refusal = $this->engineImportGuard->refusal($jobType, $target);
+        $websiteOption = $input->getOption('website');
+        ['refusal' => $refusal, 'jobs' => $jobs] = $this->importStarter->start(
+            $jobType,
+            $target,
+            $websiteOption !== null ? (int)$websiteOption : null
+        );
         if ($refusal !== null) {
             // English, as the command's other output.
             $output->writeln(sprintf('<error>%s</error>', $refusal->getText()));
@@ -83,18 +88,8 @@ class BackfillStartCommand extends Command
             return Command::FAILURE;
         }
 
-        if ($target === Job::TARGET_ENGINE) {
-            $websiteIds = [Job::ENGINE_WEBSITE_ID];
-        } else {
-            $websiteOption = $input->getOption('website');
-            $websiteIds = $websiteOption !== null
-                ? [(int)$websiteOption]
-                : array_map(static fn ($website) => (int)$website->getId(), $this->storeManager->getWebsites());
-        }
-
         $started = 0;
-        foreach ($websiteIds as $websiteId) {
-            $job = $this->jobManager->startIfIdle($jobType, $target, $websiteId);
+        foreach ($jobs as $websiteId => $job) {
             if ($job === null) {
                 $output->writeln(sprintf(
                     '<comment>%s</comment>',

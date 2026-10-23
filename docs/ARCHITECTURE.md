@@ -358,9 +358,12 @@ below.
   paths — the admin Connect (`Controller/Adminhtml/Api/EngineExchange`,
   setup step and Settings tab) and the config save behind `bin/magento
   config:set smaily_connect/intelligence/setup_token`
-  (`Model/Config/Backend/EngineSetupToken`) — call
-  `Model/Backfill/ImportsOnConnect::start()` after a successful
-  setup exchange. It queues the catalog job, then the customers job
+  (`Model/Config/Backend/EngineSetupToken`) — share one connect step,
+  `Model/Engine/Connector::connect()`: the setup exchange, then storing
+  the connection (`Settings::storeExchange()`), then
+  `Model/Backfill/ImportsOnConnect::start()`; each caller only words the
+  outcome (a JSON answer, or admin messages). ImportsOnConnect queues
+  the catalog job, then the customers job
   (PRO-3790), each through `JobManager::startIfIdle()`, as
   the admin Start import does, so the one-active-job lock keeps a reconnect
   from starting a second import while one is queued or running (a
@@ -410,7 +413,13 @@ below.
   does not print; the user guide points CLI users to
   `smaily:backfill:status` and the card's Cancel import. The merchant
   starts the import again on the card or with `smaily:backfill:start
-  catalog`. Both refuse the start while Campaign Intelligence is not
+  catalog`. Both share one start, `Model/Backfill/ImportStarter::start()`:
+  the connection check, then the websites (one installation-wide job for
+  an engine import; for the contacts import one per website, or the
+  command's `--website`), then `JobManager::startIfIdle()` for each.
+  ImportsOnConnect does not go through it: the connection check reads the
+  configuration, which does not show the connection just stored until the
+  next request. Both refuse the start while Campaign Intelligence is not
   connected (`Model/Backfill/EngineImportGuard`, PRO-1969; the customers and orders
   imports likewise, PRO-3742 — every engine-target type of
   `Job::TYPE_TARGETS`, never the contacts import to Smaily) and say why —

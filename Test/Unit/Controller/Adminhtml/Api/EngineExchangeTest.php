@@ -20,6 +20,7 @@ use Smaily\Connect\Model\Backfill\ImportsOnConnect;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connector;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
 
@@ -124,9 +125,7 @@ class EngineExchangeTest extends TestCase
             $context,
             $jsonFactory,
             new JsonSerializer(),
-            $this->client,
-            $this->createMock(Settings::class),
-            new ImportsOnConnect($this->jobManager)
+            new Connector($this->client, $this->createMock(Settings::class), new ImportsOnConnect($this->jobManager))
         );
     }
 }

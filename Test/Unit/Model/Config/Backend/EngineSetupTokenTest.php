@@ -22,6 +22,7 @@ use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Config\Backend\EngineSetupToken;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connector;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
 
@@ -125,10 +126,8 @@ class EngineSetupTokenTest extends TestCase
             $this->createMock(Registry::class),
             $this->createMock(ScopeConfigInterface::class),
             $this->createMock(TypeListInterface::class),
-            $this->client,
-            $this->createMock(Settings::class),
             $this->messageManager,
-            new ImportsOnConnect($this->jobManager)
+            new Connector($this->client, $this->createMock(Settings::class), new ImportsOnConnect($this->jobManager))
         );
         $model->setValue($value);
 

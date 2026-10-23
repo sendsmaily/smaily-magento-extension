@@ -10,10 +10,13 @@ namespace Smaily\Connect\Model\Backfill;
 
 /**
  * Connecting Campaign Intelligence starts the full catalog import (PRO-3741)
- * and the customers import (PRO-3790): both connect paths — the admin
- * Connect (Controller/Adminhtml/Api/EngineExchange) and the configuration
- * save, also `bin/magento config:set` (Model/Config/Backend/
- * EngineSetupToken) — call this after a successful setup exchange. The
+ * and the customers import (PRO-3790): Engine\Connector, the connect step
+ * both connect paths share — the admin Connect (Controller/Adminhtml/Api/
+ * EngineExchange) and the configuration save, also `bin/magento config:set`
+ * (Model/Config/Backend/EngineSetupToken) — calls this after a successful
+ * setup exchange. It does not go through ImportStarter: the connection
+ * check there reads the configuration, which does not show the connection
+ * just stored until the next request. The
  * customers import gives the engine the Magento customer id (`external_id`)
  * of every account; live sync sends it only on a customer save, so an
  * account the engine knows only from orders (by email), or one created by

@@ -19,6 +19,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Controller\Adminhtml\Api\BackfillState;
 use Smaily\Connect\Model\Backfill\EngineImportGuard;
+use Smaily\Connect\Model\Backfill\ImportStarter;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\JobStatusAggregator;
@@ -317,7 +318,7 @@ class BackfillStateTest extends TestCase
             $storeManager,
             $this->createMock(TimezoneInterface::class),
             new JobStatusAggregator(),
-            new EngineImportGuard($engineSettings)
+            new ImportStarter($this->jobManager, $storeManager, new EngineImportGuard($engineSettings))
         );
     }
 }

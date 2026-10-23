@@ -147,9 +147,9 @@ class SyncDispatcher
      * Smaily creates a contact sent without a status as subscribed, so the
      * marker goes only when a reminder went out to Smaily (PRO-3619): one
      * withdrawn, still waiting or given up reached no contact, and the marker
-     * would create one. A reminder to an address Smaily does not have
-     * creates nothing either, so the queue handler reads the contact before
-     * it posts the marker and skips it for an address Smaily does not have
+     * would create one. A reminder that went out added its address to Smaily
+     * as a contact, and the queue handler still reads the contact before it
+     * posts the marker and skips it for an address Smaily does not have
      * (ContactSyncHandler). An email the store knows as unsubscribed carries
      * is_unsubscribed=1 (PRO-3616); otherwise the status is omitted and the
      * contact keeps the one it has.

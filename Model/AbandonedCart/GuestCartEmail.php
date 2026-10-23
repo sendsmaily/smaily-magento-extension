@@ -42,8 +42,9 @@ use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
  * writes per hour for the whole installation, which bounds a caller spread
  * over many addresses. Behind a proxy Magento is not told about, every
  * shopper has the proxy's address, so the per-address limit is then one
- * limit for the whole store. A reminder still reaches only a contact Smaily
- * already has (force_opt_in=false, AutomationHandler).
+ * limit for the whole store. A reminder to a guest Smaily does not have adds
+ * the guest to the Smaily account as a contact, and never re-subscribes a
+ * contact who unsubscribed (force_opt_in=false, AutomationHandler).
  */
 class GuestCartEmail implements GuestCartEmailInterface
 {

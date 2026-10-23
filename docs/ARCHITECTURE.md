@@ -1144,8 +1144,10 @@ not configured to read, every shopper shares the proxy's address, so the
 per-caller limit becomes one limit for the whole store (the user guide, Abandoned
 cart, says how to configure it). Hyvä's Luma-based checkout runs the same checkout JS, so the mixin
 applies there; Hyvä Checkout and other third-party checkouts are not covered.
-Who is reminded does not change: the automation still goes with
-`force_opt_in=false` (`AutomationHandler`).
+The automation still goes with `force_opt_in=false` (`AutomationHandler`):
+a reminder to a guest Smaily does not have adds the guest to the Smaily
+account as a contact, marked with `abandoned_cart_automation_at`, and never
+re-subscribes a contact who unsubscribed.
 
 **The exit signal (PRO-2453, Woo PRO-1723 parity).** A follow-up series has
 to stop when the shopper buys, and a Smaily-only "has ordered since" rule

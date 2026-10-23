@@ -51,9 +51,11 @@ use Smaily\Connect\Model\Queue\Skipped;
  *
  * force_opt_in is always false, in every contact-sync mode (PRO-3577, as
  * the WooCommerce plugin's PRO-1716): a trigger never overrides an
- * unsubscribe the contact made in Smaily. Without force opt-in, a trigger
- * for an address Smaily does not have creates no contact and sends nothing
- * (Smaily, confirmed 2026-10-02).
+ * unsubscribe the contact made in Smaily. A trigger for an address that is
+ * not a contact in the Smaily account adds it as a contact (Smaily,
+ * confirmed 2026-10-23; the WooCommerce plugin's PRO-1678 rule); the
+ * trigger's marker field (Trigger::MARKER_FIELDS) lets the merchant find or
+ * exclude those contacts in a Smaily segment.
  */
 class AutomationHandler implements EventHandlerInterface
 {

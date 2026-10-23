@@ -3,18 +3,20 @@
  * Copyright © Smaily. All rights reserved.
  * See LICENSE.txt for license details.
  *
- * Transactional-email triggers (PRO-4062) on Settings > Automations, after
- * the WooCommerce plugin's TransactionalTriggersSection; the initial setup
- * does not show them. Until Smaily accepts the transactional account saved
- * on the Connection tab, nothing of it shows (as in the WooCommerce plugin,
- * PRO-1540); once it does, Order confirmation and Shipping confirmation
+ * Transactional-email triggers (PRO-4062) on Settings > Automations and on
+ * the initial setup's Automations step (CON-33), after the WooCommerce
+ * plugin's TransactionalTriggersSection. Until Smaily accepts the
+ * transactional account — the saved one as the page loads, or the one a
+ * Test connection just checked — nothing of it shows (as in the WooCommerce
+ * plugin, PRO-1540); once it does, Order confirmation and Shipping confirmation
  * each show Enabled (off by default) and their workflow, listed from that
  * account: one row per store language with a default fallback when the
  * website has more than one language, whatever the multilingual mode (Woo
  * PRO-3187), else one workflow; below them the Customer details switch (off
- * by default, Woo PRO-3190). A connection save that connects the account
- * shows them without a reload. Saved with Save Automations. Behavior lives
- * in panel/panels-js.phtml. Nothing is sent yet.
+ * by default, Woo PRO-3190). A successful Test connection or a connection
+ * save that connects the account shows them without a reload. Saved with
+ * Save Automations, or the setup's Continue. Behavior lives in
+ * panel/panels-js.phtml. Nothing is sent yet.
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
@@ -23,6 +25,7 @@
 /** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
 $viewModel = $block->getData('view_model');
 $connected = $viewModel->getTransactionalAccount()['verified'];
+$isSettings = $block->getData('context') === 'settings';
 $languages = $viewModel->getDetectedLanguages();
 $perLanguage = count($languages) > 1;
 $saved = $viewModel->getTransactionalTriggers();
@@ -39,7 +42,9 @@ $triggers = [
 ?>
 <div class="smaily-card" id="smaily-tx-triggers" <?= $connected ? '' : 'style="display:none;"' ?>>
     <h2><?= $escaper->escapeHtml(__('Transactional emails')) ?></h2>
-    <p><?= $escaper->escapeHtml(__('Send transactional emails via transactional Smaily account, which you can connect on the Connection tab. Transactional emails should be sent from a separate account than marketing emails.')) ?></p>
+    <p><?= $escaper->escapeHtml($isSettings
+        ? __('Send transactional emails via transactional Smaily account, which you can connect on the Connection tab. Transactional emails should be sent from a separate account than marketing emails.')
+        : __('Send transactional emails via transactional Smaily account, which you can connect in the first setup step. Transactional emails should be sent from a separate account than marketing emails.')) ?></p>
     <p class="note"><?= $escaper->escapeHtml(__('Sending arrives in a later release: these settings send nothing yet, and Magento sends its own order and shipment emails as before.')) ?></p>
     <div class="smaily-engine-triggers smaily-store-triggers">
         <?php foreach ($triggers as $trigger => $labels): ?>

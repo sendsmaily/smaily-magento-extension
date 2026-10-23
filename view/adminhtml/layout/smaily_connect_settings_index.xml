@@ -31,6 +31,7 @@
                        template="Smaily_Connect::panel/transactional-account.phtml">
                     <arguments>
                         <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\WizardData</argument>
+                        <argument name="context" xsi:type="string">settings</argument>
                     </arguments>
                 </block>
                 <block class="Magento\Backend\Block\Template"
@@ -53,6 +54,7 @@
                        template="Smaily_Connect::panel/transactional-triggers.phtml">
                     <arguments>
                         <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\WizardData</argument>
+                        <argument name="context" xsi:type="string">settings</argument>
                     </arguments>
                 </block>
                 <block class="Magento\Backend\Block\Template"

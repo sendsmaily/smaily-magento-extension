@@ -4,14 +4,16 @@
  * See LICENSE.txt for license details.
  *
  * The optional transactional-email account (PRO-4062) on Settings >
- * Connection, below the Smaily account, after the WooCommerce plugin's
- * TransactionalEmailsSection: its "Send transactional emails" switch (off
- * by default, saved for the website; PRO-4065) shows the account; the
- * initial setup does not show it. A separate Smaily account for order and
- * shipment emails, saved for all websites; on an install with more than one
- * website, a website may use its own. Saved with Save Connection; its own
- * Test connection checks what is typed. Behavior lives in
- * panel/panels-js.phtml. Nothing is sent through it yet.
+ * Connection and on the initial setup's Connect step (CON-33), below the
+ * Smaily account, after the WooCommerce plugin's TransactionalEmailsSection:
+ * its "Send transactional emails" switch (off by default, saved for the
+ * website, or by the setup for the whole store; PRO-4065) shows the account.
+ * A separate Smaily account for order and shipment emails, saved for all
+ * websites; on an install with more than one website, a website may use its
+ * own, set in Settings only. Saved with Save Connection, or the setup's
+ * Continue; its own Test connection checks what is typed, and a successful
+ * one shows the triggers. Behavior lives in panel/panels-js.phtml. Nothing
+ * is sent through it yet.
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
@@ -20,6 +22,7 @@
 /** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
 $viewModel = $block->getData('view_model');
 $account = $viewModel->getTransactionalAccount();
+$isSettings = $block->getData('context') === 'settings';
 ?>
 <?php // The account the fields show (the saved-* values the form compares
 // with) is the one the website uses; on a multi-website install, unticking
@@ -45,7 +48,7 @@ $account = $viewModel->getTransactionalAccount();
     <div id="smaily-tx-account-fields" <?= $account['enabled'] ? '' : 'style="display:none;"' ?>>
         <h3><?= $escaper->escapeHtml(__('Transactional Smaily account')) ?></h3>
         <p class="note"><?= $escaper->escapeHtml(__('A separate Smaily account used only for transactional sends.')) ?></p>
-        <?php if ($viewModel->hasMultipleWebsites()): ?>
+        <?php if ($isSettings && $viewModel->hasMultipleWebsites()): ?>
         <div class="smaily-inline-toggle">
             <label>
                 <input type="checkbox" id="smaily-tx-website-account" <?= $account['websiteAccount'] ? 'checked' : '' ?>/>
@@ -80,6 +83,8 @@ $account = $viewModel->getTransactionalAccount();
             <span class="smaily-result smaily-inline-status is-idle" id="smaily-tx-test-result"><span><?= $escaper->escapeHtml(__('Not connected')) ?></span></span>
             <?php endif; ?>
         </div>
-        <p class="note"><?= $escaper->escapeHtml(__('Once connected, set up the Order confirmation and Shipping confirmation triggers on the Automations tab.')) ?></p>
+        <p class="note"><?= $escaper->escapeHtml($isSettings
+            ? __('Once connected, set up the Order confirmation and Shipping confirmation triggers on the Automations tab.')
+            : __('Once connected, set up the Order confirmation and Shipping confirmation triggers in the Automations step.')) ?></p>
     </div>
 </div>

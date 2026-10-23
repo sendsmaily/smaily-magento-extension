@@ -21,17 +21,20 @@ use Smaily\Connect\Model\SmailyUrl;
 use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
- * Saves the transactional-email settings of Settings (PRO-4062), for
- * WizardStepSaver: the "Send transactional emails" switch and the separate
- * Smaily account on the Connection tab, and the Order confirmation and
- * Shipping confirmation triggers and the Customer details switch on the
- * Automations tab, as the WooCommerce plugin has them. Settings only; the
- * initial setup posts neither. Nothing here sends an email or changes
- * Magento's own order and shipment emails.
+ * Saves the transactional-email settings (PRO-4062), for WizardStepSaver:
+ * the "Send transactional emails" switch and the separate Smaily account on
+ * the Connection tab or the setup's Connect step, and the Order confirmation
+ * and Shipping confirmation triggers and the Customer details switch on the
+ * Automations tab or step, as the WooCommerce plugin has them (CON-33).
+ * Nothing here sends an email or changes Magento's own order and shipment
+ * emails.
  *
- * The switch is saved for the website. While it is off, the account fields
- * are hidden and a save leaves the saved account as it is (the WooCommerce
- * plugin keeps its credentials too).
+ * The switches are saved for the website; the initial setup of an install
+ * with more than one website (WebsiteContext::STORE_WIDE) saves them for all
+ * websites (default scope), and its trigger workflows are website 0's rows,
+ * as the store-wide automations are. While "Send transactional emails" is
+ * off, the account fields are hidden and a save leaves the saved account as
+ * it is (the WooCommerce plugin keeps its credentials too).
  *
  * The account is saved for all websites (default scope). On an install with
  * more than one website, a website may use its own account instead
@@ -135,12 +138,7 @@ class TransactionalSettingsSaver
     public function saveAccount(array $posted, int $websiteId): void
     {
         $this->accountAccepted = false;
-        $this->configWriter->save(
-            Config::XML_PATH_TRANSACTIONAL_ENABLED,
-            $this->switchedOn($posted) ? '1' : '0',
-            ScopeInterface::SCOPE_WEBSITES,
-            $websiteId
-        );
+        $this->saveSwitch(Config::XML_PATH_TRANSACTIONAL_ENABLED, $this->switchedOn($posted), $websiteId);
         if (!$this->switchedOn($posted)) {
             return;
         }
@@ -222,18 +220,27 @@ class TransactionalSettingsSaver
             'personal_data_enabled' => Config::XML_PATH_TRANSACTIONAL_PERSONAL_DATA,
         ] as $key => $path) {
             if (array_key_exists($key, $posted)) {
-                $this->configWriter->save(
-                    $path,
-                    $posted[$key] ? '1' : '0',
-                    ScopeInterface::SCOPE_WEBSITES,
-                    $websiteId
-                );
+                $this->saveSwitch($path, (bool)$posted[$key], $websiteId);
             }
         }
 
         return is_array($posted['mappings'] ?? null)
             ? $this->mappingSaver->saveTransactional($posted['mappings'], $websiteId)
             : [];
+    }
+
+    /**
+     * Saves a switch for the website, or for all websites when the initial
+     * setup of a 2+-website install saves it (WebsiteContext::STORE_WIDE).
+     */
+    private function saveSwitch(string $path, bool $on, int $websiteId): void
+    {
+        if ($websiteId === WebsiteContext::STORE_WIDE) {
+            $this->configWriter->save($path, $on ? '1' : '0');
+
+            return;
+        }
+        $this->configWriter->save($path, $on ? '1' : '0', ScopeInterface::SCOPE_WEBSITES, $websiteId);
     }
 
     /**

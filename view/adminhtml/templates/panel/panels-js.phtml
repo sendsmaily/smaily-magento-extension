@@ -524,10 +524,9 @@ window.smailyPanelsInit = function ($) {
         });
     }
 
-    // --- Transactional emails (Settings only, PRO-4062) ----------------------
-    // The optional transactional-email account on the Connection tab and its
-    // triggers on the Automations tab. The initial setup renders neither, so
-    // every function here finds nothing there.
+    // --- Transactional emails (PRO-4062, CON-33) -----------------------------
+    // The optional transactional-email account on the Connection tab or the
+    // setup's Connect step, and its triggers on the Automations tab or step.
     function transactionalFields() {
         return {
             subdomain: $('#smaily-tx-subdomain').val(),
@@ -578,9 +577,10 @@ window.smailyPanelsInit = function ($) {
             .append($('<span></span>').text('<?= $escaper->escapeJs(__('Not connected')) ?>'));
     }
 
-    // The trigger settings show only while Smaily accepts the saved
-    // transactional account; otherwise nothing of them shows (as in the
-    // WooCommerce plugin, PRO-1540).
+    // The trigger settings show only while Smaily accepts the transactional
+    // account — the saved one, or the one a Test connection just checked;
+    // otherwise nothing of them shows (as in the WooCommerce plugin, PRO-1540,
+    // CON-33).
     function transactionalConnected(verified) {
         $('#smaily-tx-triggers').toggle(verified);
         loadTransactionalWorkflows();
@@ -1132,17 +1132,28 @@ window.smailyPanelsInit = function ($) {
             $('#smaily-tx-account-fields').toggle($(this).is(':checked'));
         });
 
+        $(document).on('input', '#smaily-tx-subdomain, #smaily-tx-username, #smaily-tx-password', function () {
+            transactionalStatus(false);
+            transactionalConnected(false);
+        });
+
         $(document).on('change', '#smaily-tx-website-account', function () {
             showTransactionalAccount($(this).is(':checked') ? 'own' : 'shared');
         });
 
-        // Transactional-email account test (Settings > Connection, PRO-4062):
-        // shown like the per-language account tests.
+        // Transactional-email account test (PRO-4062): shown like the
+        // per-language account tests. As in the WooCommerce plugin (CON-33),
+        // a test that asked Smaily shows the triggers when it accepted the
+        // account and hides them when not, before any save; changed fields
+        // hide them until the next test or save.
         $('#smaily-tx-test').on('click', function () {
             var $panel = $(this).closest('.smaily-step-panel, .smaily-tab-panel');
             clearFormErrors($panel);
             result('#smaily-tx-test-result', '<?= $escaper->escapeJs(__('Testing…')) ?>', true);
             post(urls.test, transactionalRequestCreds()).then(function (data) {
+                if (data.checked) {
+                    transactionalConnected(!!data.connected);
+                }
                 if (data.connected) {
                     result('#smaily-tx-test-result', '<?= $escaper->escapeJs(__('Connected!')) ?>', true);
                     return;
@@ -1415,8 +1426,8 @@ window.smailyPanelsInit = function ($) {
                 // mode's rows and keeps the other mode's (CON-188).
                 data.mappings_mode = mode;
             }
-            // The transactional-email triggers (Settings, PRO-4062), only
-            // while they show: a workflow per store language, the full
+            // The transactional-email triggers (PRO-4062), only while they
+            // show: a workflow per store language, the full
             // desired state. A list not loaded yet posts the saved workflow,
             // so it is not cleared.
             if (transactionalTriggersShown()) {

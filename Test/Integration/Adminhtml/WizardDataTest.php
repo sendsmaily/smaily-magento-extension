@@ -141,4 +141,35 @@ class WizardDataTest extends IntegrationTestCase
         self::assertSame(['workflowId' => 101, 'isDefaultFallback' => true], $modeA['welcome|et']);
         self::assertSame(['workflowId' => 201, 'isDefaultFallback' => false], $modeB['welcome|et']);
     }
+
+    /**
+     * CON-33: a website that saved no transactional-email workflow of its
+     * own shows the ones the initial setup saved for all websites; once it
+     * saves its own, only its own show.
+     */
+    public function testTheTransactionalWorkflowsOfTheSetupShowUntilTheWebsiteSavesItsOwn(): void
+    {
+        $row = static fn (int $websiteId, string $trigger, int $workflowId): array => [
+            'website_id' => $websiteId,
+            'trigger_type' => $trigger,
+            'language' => 'default',
+            'account_key' => 'transactional',
+            'workflow_id' => $workflowId,
+            'is_default_fallback' => 0,
+        ];
+        $this->connection->insert(MappingResource::TABLE_NAME, $row(0, 'order_confirmation', 31));
+        $this->connection->insert(MappingResource::TABLE_NAME, $row(0, 'shipment_confirmation', 32));
+
+        $triggers = $this->viewModel->getTransactionalTriggers();
+
+        self::assertSame(31, $triggers['order_confirmation']['workflows']['default']['workflowId']);
+        self::assertSame(32, $triggers['shipment_confirmation']['workflows']['default']['workflowId']);
+
+        $this->connection->insert(MappingResource::TABLE_NAME, $row(self::WEBSITE_ID, 'order_confirmation', 41));
+
+        $triggers = $this->viewModel->getTransactionalTriggers();
+
+        self::assertSame(41, $triggers['order_confirmation']['workflows']['default']['workflowId']);
+        self::assertSame([], $triggers['shipment_confirmation']['workflows']);
+    }
 }

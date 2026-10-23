@@ -25,9 +25,15 @@
   and Customer details; switching the account off leaves them shown; the
   account's password is never drawn into the form; unticking "Use a
   separate account for this website" shows the account saved for all
-  websites, and a test of an unchanged account asks for the saved one. Run
-  it with bin/test-js.sh (it renders the pages first); the page ends with
-  "RESULT: PASS" or "RESULT: FAIL".
+  websites, and a test of an unchanged account asks for the saved one. As
+  in the WooCommerce plugin (CON-33), a successful Test connection shows the
+  triggers before any save, and a changed field or a refused test hides
+  them again. The initial setup (wizard/index.phtml on a store with three
+  websites, as setup-websites renders it) offers the account on its Connect
+  step below the Smaily account, without a website's own account, and
+  its Continue posts it; a successful test shows the triggers on the
+  Automations step. Run it with bin/test-js.sh (it renders the pages
+  first); the page ends with "RESULT: PASS" or "RESULT: FAIL".
 -->
 <html lang="en">
 <head>
@@ -37,6 +43,8 @@
     <script src="build/transactional-off.et_EE.js"></script>
     <script src="build/transactional-connected.en_US.js"></script>
     <script src="build/transactional-connected.et_EE.js"></script>
+    <script src="build/setup-websites.en_US.js"></script>
+    <script src="build/setup-websites.et_EE.js"></script>
 </head>
 <body>
 <pre id="log"></pre>
@@ -79,6 +87,8 @@
         return [
             '<script>',
             'window.FORM_KEY = "form-key";',
+            'window.require = function (deps, callback) { callback(window.jQuery); };',
+            'window.testAnswer = {connected: true, checked: true};',
             'window.requests = [];',
             'window.fetch = function (url, options) {',
             '  var body = JSON.parse(options.body || "{}"), answer;',
@@ -86,7 +96,7 @@
             '  if (url.indexOf("/workflows/") !== -1) {',
             '    answer = {workflows: [{id: "31", name: "Tellimus"}, {id: "32", name: "Order"}]};',
             '  } else if (url.indexOf("/testsmaily/") !== -1) {',
-            '    answer = {connected: true, checked: true};',
+            '    answer = window.testAnswer;',
             '  } else {',
             '    answer = {saved: true, errors: [], verified: true, transactionalVerified: true};',
             '  }',
@@ -112,9 +122,11 @@
                     resolve(frame);
                 }, reject);
             };
+            // The setup page starts its panels itself.
             frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs()
                 + '</head><body>' + rendered.html
-                + '<script>window.panels = window.smailyPanelsInit(window.jQuery); window.panels.initAll();<\/script>'
+                + (page.indexOf('setup-') === 0 ? ''
+                    : '<script>window.panels = window.smailyPanelsInit(window.jQuery); window.panels.initAll();<\/script>')
                 + '</body></html>';
             document.body.appendChild(frame);
         });
@@ -124,6 +136,11 @@
         var element = doc.getElementById(id);
 
         return element !== null && element.style.display !== 'none';
+    }
+
+    function typeInto(frame, id, value) {
+        frame.contentDocument.getElementById(id).value = value;
+        frame.contentWindow.jQuery('#' + id).trigger('input');
     }
 
     function workflowRequests(frame) {
@@ -256,6 +273,78 @@
         check(locale + ', switched off: the account hides, the triggers stay and the save posts only the switch',
             !shown(doc, 'smaily-tx-account-fields') && shown(doc, 'smaily-tx-triggers')
             && JSON.stringify(panels.collect.connect().transactional) === JSON.stringify({enabled: false}));
+        frame.remove();
+
+        // CON-33: a successful test shows the triggers before any save.
+        frame = await open('transactional-off.' + locale);
+        doc = frame.contentDocument;
+        panels = frame.contentWindow.panels;
+        doc.getElementById('smaily-tx-enabled').checked = true;
+        frame.contentWindow.jQuery('#smaily-tx-enabled').trigger('change');
+        typeInto(frame, 'smaily-tx-subdomain', 'shop-tx');
+        typeInto(frame, 'smaily-tx-username', 'api');
+        typeInto(frame, 'smaily-tx-password', 'secret');
+        doc.getElementById('smaily-tx-test').click();
+        await wait(20);
+        requests = frame.contentWindow.requests.filter(function (request) {
+            return request.url.indexOf('/savestep/') !== -1;
+        });
+        check(locale + ', a successful test: the triggers show before any save',
+            shown(doc, 'smaily-tx-triggers') && requests.length === 0
+            && Object.prototype.hasOwnProperty.call(panels.collect.automations(), 'transactional'));
+        check(locale + ', a successful test: the workflows are listed from the transactional account',
+            workflowRequests(frame).length === 1);
+        typeInto(frame, 'smaily-tx-password', 'other');
+        check(locale + ', a changed field: the triggers hide until the next test',
+            !shown(doc, 'smaily-tx-triggers')
+            && doc.getElementById('smaily-tx-test-result').textContent.trim() === strings['Not connected']);
+        doc.getElementById('smaily-tx-test').click();
+        await wait(20);
+        check(locale + ', tested again: the triggers show', shown(doc, 'smaily-tx-triggers'));
+        frame.contentWindow.testAnswer = {connected: false, checked: true, error: 'Refused'};
+        doc.getElementById('smaily-tx-test').click();
+        await wait(20);
+        check(locale + ', a refused test: the triggers hide', !shown(doc, 'smaily-tx-triggers'));
+        frame.remove();
+
+        // CON-33: the initial setup offers the account, store-wide.
+        frame = await open('setup-websites.' + locale);
+        doc = frame.contentDocument;
+        strings = window.smailyAdminPages['setup-websites.' + locale].strings;
+        check(locale + ', setup: the Connect step offers the transactional account below the Smaily account',
+            doc.querySelector('.smaily-step-panel[data-step="1"] #smaily-tx-account') !== null
+            && (doc.getElementById('smaily-w-subdomain').compareDocumentPosition(doc.getElementById('smaily-tx-account'))
+                & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+            && !doc.getElementById('smaily-tx-enabled').checked && !shown(doc, 'smaily-tx-account-fields'));
+        check(locale + ', setup: no website\'s own account, three websites or not',
+            doc.getElementById('smaily-tx-website-account') === null);
+        check(locale + ', setup: the account points at the Automations step',
+            doc.querySelector('#smaily-tx-account-fields > p.note:last-child').textContent.trim()
+                === strings['Once connected, set up the Order confirmation and Shipping confirmation triggers in the Automations step.']);
+        check(locale + ', setup: the Automations step holds the triggers, hidden until the account is connected',
+            doc.querySelector('.smaily-step-panel[data-step="3"] #smaily-tx-triggers') !== null
+            && !shown(doc, 'smaily-tx-triggers')
+            && doc.querySelector('#smaily-tx-triggers > p').textContent.trim()
+                === strings['Send transactional emails via transactional Smaily account, which you can connect in the first setup step.'
+                    + ' Transactional emails should be sent from a separate account than marketing emails.']);
+        doc.getElementById('smaily-tx-enabled').checked = true;
+        frame.contentWindow.jQuery('#smaily-tx-enabled').trigger('change');
+        typeInto(frame, 'smaily-tx-subdomain', 'shop-tx');
+        typeInto(frame, 'smaily-tx-username', 'api');
+        typeInto(frame, 'smaily-tx-password', 'secret');
+        doc.getElementById('smaily-tx-test').click();
+        await wait(20);
+        check(locale + ', setup: a successful test shows the triggers on the Automations step',
+            shown(doc, 'smaily-tx-triggers'));
+        doc.getElementById('smaily-w-next').click();
+        await wait(50);
+        requests = frame.contentWindow.requests.filter(function (request) {
+            return request.url.indexOf('/savestep/') !== -1 && request.body.step === 'connect';
+        });
+        data = requests.length === 1 ? requests[0].body.data.transactional : {};
+        check(locale + ', setup: Continue saves the account with the Connect step, for all websites',
+            data.enabled === true && data.subdomain === 'shop-tx' && data.username === 'api'
+            && data.password === 'secret' && data.website_account === false);
         frame.remove();
     }
 

@@ -37,7 +37,7 @@ Model/
   Privacy/          profiling consent, data-subject erasure
 Observer/           thin event bridges (all logic lives in Model/)
 Plugin/             newsletter email suppression, config validation,
-                    checkout layout injection, admin subscriber-delete mark,
+                    checkout layout injection,
                     discount code expiry (SalesRule)
 Setup/Patch/        legacy schema cleanup (Schema/), config migration (Data/)
 Setup/Uninstall.php settings + flag removal on module:uninstall
@@ -145,8 +145,7 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   newsletter status is a consent act whoever makes it — the shopper on the
   storefront, staff in the admin (customer edit, the Newsletter Subscribers
   grid and its mass actions), an API call in any context, a Magento import:
-  `Observer\SubscriberSaveAfter` (and `SubscriberDeleteAfter` for the
-  grid's delete) sends `is_unsubscribed` 0 or 1, and a subscription may
+  `Observer\SubscriberSaveAfter` sends `is_unsubscribed` 0 or 1, and a subscription may
   re-subscribe a contact who unsubscribed in Smaily. A write that changes
   other fields never sends a status: a profile save
   (`Observer\CustomerSaveAfter`) in the consent mode, the purchase marker
@@ -161,22 +160,19 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
 - The live `contact.sync` triggers: a subscriber save (`Observer\SubscriberSaveAfter`,
   subscribe and unsubscribe), a customer save (`Observer\CustomerSaveAfter`),
   an order (`Observer\OrderPlaced`, the checkout opt-in, guest-order emails
-  and the abandoned-cart purchase marker), and a subscriber row deleted in
-  the admin's Newsletter Subscribers grid (CON-176). The grid's only delete
-  is its mass action `Newsletter\Controller\Adminhtml\Subscriber\MassDelete`,
-  which loads each selected row and deletes it through the model, so
-  `newsletter_subscriber_delete_after` fires per row
-  (`Observer\SubscriberDeleteAfter`) and the contact sync is queued in the
-  delete's transaction. A customer account's deletion deletes its subscriber
-  row the same way (Magento's `CustomerPlugin`), and that sends nothing, as
-  in the WooCommerce plugin: the observer acts only under the
-  `ContactSync\AdminSubscriberDelete` mark, which
-  `Plugin\Adminhtml\MarkSubscriberMassDelete` sets around the action. The
-  delete queues the unsubscribe a store unsubscribe queues
-  (`is_unsubscribed = 1`, the row's customer's fields), under the same gates
-  (`Config::isContactSyncActive()` of the row's website, the store's
-  credentials); a row already unsubscribed sends nothing. The same delete
-  also stops profiling (CON-187, Profiling consent below).
+  and the abandoned-cart purchase marker).
+- **A deleted subscriber row sends nothing (CON-224, Erkki 2026-10-23;
+  supersedes CON-176/CON-187).** A deletion is not a withdrawal of consent,
+  and the contact may come from another source, so a subscriber row deleted
+  in the admin's Newsletter Subscribers grid (its Delete mass action) or with
+  a customer account changes nothing in Smaily or in Campaign Intelligence,
+  as in the WooCommerce plugin, which sends nothing when a user is deleted.
+  The module observes no `newsletter_subscriber_delete_*` event and plugs
+  nothing into `Newsletter\Controller\Adminhtml\Subscriber\MassDelete`. To
+  stop the emails, staff unsubscribe the subscriber (the grid's Unsubscribe
+  action, or the customer's newsletter tab): that is a status change, sent
+  and turned into a profiling opt-out as above. rc14 and rc15 unsubscribed
+  a contact deleted in the grid and opted it out of profiling.
 
 ### Engine ingest → Campaign Intelligence (`smaily_ingest_queue`)
 
@@ -1637,14 +1633,10 @@ mirror read back from Smaily keeps the origin too (`is_unsubscribed = 1`
 without `smaily_rec_profiling = 0` is by unsubscribing), and a record made
 by unsubscribing is never carried to the contact's profiling field. Both
 observers are deliberately outside the `ReconcileGuard`, so an unsubscribe
-or a subscription Smaily's consent mirror writes counts too. A subscriber
-row deleted in the admin's Newsletter Subscribers grid is an unsubscribe
-here too (CON-187, Erkki 2026-10-22): `Observer\Engine\SubscriberDeleted`
-(`newsletter_subscriber_delete_after`) calls `optOutOnUnsubscribe()` under
-the same `ContactSync\AdminSubscriberDelete` mark as the delete's contact
-sync, so a customer account's deletion opts nobody out. A row already
-unsubscribed is skipped, and the gate is `Engine\Settings::isConnected()`,
-as for an unsubscribe — not the website's contact sync.
+or a subscription Smaily's consent mirror writes counts too. A deleted
+subscriber row is not an unsubscribe and opts nobody out (CON-224, Erkki
+2026-10-23; supersedes CON-187): deleting a row in the admin's Newsletter
+Subscribers grid, or a customer account, leaves profiling as it was.
 
 - **The page** (My Account > Personalization: `Controller\Privacy\Index`
   and `Save`, the nav link `Block\Account\PersonalizationLink`) exists

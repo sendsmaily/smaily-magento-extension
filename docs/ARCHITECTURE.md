@@ -1008,18 +1008,40 @@ reverts data patches, so `Setup/Patch/Data/RemoveSettingsOnUninstall`
 (apply is a no-op) runs the same removal from `revert()`. Disabling runs
 neither.
 
-Neither uninstalling nor `smaily:engine:disconnect` (`Settings::clear()`)
-makes an engine request: both delete only the extension's own stored
-engine connection (the API key and the other `smaily_connect/intelligence/*`
-rows). The extension never sends the contract §16 store-deletion request
-(`POST /api/v1/store/uninstall`), which deletes all of the store's engine
-data once the store's last connection sends it (owner decision 2026-10-22,
-CON-143, taken with the WooCommerce plugin's CON-51): a merchant who removes
-the extension may only be changing platform, and a deletion cannot be
-undone. The store's engine data is deleted when the merchant closes the
-Smaily account. `Test/Unit/Console/Command/EngineDisconnectCommandTest`
-pins it (disconnect sends no request, the uninstall classes make none, no
-shipped code names the endpoint); changing it is an owner decision.
+Uninstalling and `smaily:engine:disconnect` both end the store's
+Campaign Intelligence connection on the engine before they delete the
+extension's own stored connection (the API key and the other
+`smaily_connect/intelligence/*` rows): `Model/Engine/Disconnector` sends
+contract §16 (`POST /api/v1/store/uninstall`; endpoint map key
+`store_uninstall`, the contract's path for a connection whose map lacks it)
+with the connection's own key (owner decision 2026-10-23, CON-220, with the
+WooCommerce plugin's CON-219; it replaces CON-143's "never call §16"). Since
+contract v1.18.0 §16 deletes nothing: the engine revokes the calling key,
+pauses a store left with no connection (`store_paused`; `connection_removed`
+when another connection remains) and keeps its data, and a new setup
+exchange resumes it. The store's engine data is deleted when the merchant
+closes the Smaily account, so no text tells the merchant that a disconnect
+or a removal deletes it. As in the WooCommerce plugin, one attempt of at
+most 3 s (connect included), no redirect and no retry, also for a refused
+(suspended) account, which §16 does not refuse: any 200 is done, a
+401 means the key had already been revoked (§16 Idempotency), and no answer
+or another error leaves the key valid on the engine; none of them stops the
+disconnect or the removal. The command prints one line per outcome; the
+removal writes the outcome to Magento's log.
+
+Both removal paths call `Setup\Uninstall::endEngineConnection()` before
+`removeSettings()`; it reads the connection straight from
+`core_config_data`. INSTALLING.md disables the module before it is
+uninstalled, and Magento then builds the removal's classes without the
+module's di.xml, so their constructor dependencies must resolve from
+Magento's own configuration — which is why the removal does not go through
+`Engine\Client` (its `SleeperInterface` and `Logger` need the module's
+di.xml). Magento runs `Setup\Uninstall` only when the data is removed
+(`--remove-data`, as INSTALLING.md says, or a yes to its question).
+Pinned by `Test/Unit/Model/Engine/DisconnectorTest`,
+`Test/Unit/Console/Command/EngineDisconnectCommandTest`,
+`Test/Unit/Setup/UninstallTest` (the di.xml rule) and
+`Test/Integration/Setup/UninstallTest`.
 
 Retention follows the contract (same decision, the WooCommerce plugin's
 CON-52): the merchant guide's privacy-policy template

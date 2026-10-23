@@ -1,0 +1,231 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for an automation's discount code (CON-198) on the
+  Automations tab: the real Settings templates, rendered in en_US and et_EE
+  by Test/Js/render-admin.php into Test/Js/build/, run with jQuery from
+  vendor/, one fresh frame per page and locale. Stubbed: RequireJS's
+  require() and the requests (fetch), each answered as saved with an empty
+  workflow list — or, for the save of a switch without a rule, with the
+  save endpoint's error for that field.
+
+  "Send a discount code" follows the automation's Enabled switch, and its
+  cart price rule picker and "Valid for (days)" show while it is on; the
+  save posts the three. Without a cart price rule that can generate codes
+  the tab says to make one in Magento first and links Magento's new rule
+  page in a new tab; when the store has cart price rules but none can
+  generate codes, it says why none is listed.
+
+  Run it with bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>discount code harness</title>
+    <script src="build/settings-discount.en_US.js"></script>
+    <script src="build/settings-discount.et_EE.js"></script>
+    <script src="build/settings-discount-empty.en_US.js"></script>
+    <script src="build/settings-discount-empty.et_EE.js"></script>
+    <script src="build/settings-discount-no-autogen.en_US.js"></script>
+    <script src="build/settings-discount-no-autogen.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var SAVED = {saved: true, errors: [], workflows: [], status: 'idle'};
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    // The save request is answered with $saveAnswer, every other request as saved.
+    function stubs(saveAnswer) {
+        return [
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.require = function (deps, callback) { callback(window.jQuery); };',
+            'window.confirm = function () { return true; };',
+            'window.requests = [];',
+            'window.fetch = function (url, options) {',
+            '  var body = JSON.parse(options.body || "{}");',
+            '  window.requests.push({url: url, body: body});',
+            '  var answer = body.step === "automations" ? ' + JSON.stringify(saveAnswer) + ' : ' + JSON.stringify(SAVED) + ';',
+            '  return Promise.resolve(new Response(JSON.stringify(answer),',
+            '    {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>'
+        ].join('\n');
+    }
+
+    function open(page, saveAnswer) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.onload = function () {
+                var doc = frame.contentDocument;
+                doc.querySelector('.smaily-tabs li[data-tab=automations]').click();
+                wait(100).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs(saveAnswer || SAVED)
+                + '</head><body>' + rendered.html + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function tick(frame, id, on) {
+        var input = frame.contentDocument.getElementById(id);
+        input.checked = on;
+        frame.contentWindow.jQuery(input).trigger('change');
+    }
+
+    function shown(element) {
+        return !!element && element.offsetParent !== null;
+    }
+
+    async function save(frame) {
+        frame.contentDocument.getElementById('smaily-w-automations-save').click();
+        await wait(100);
+        var saves = frame.contentWindow.requests.filter(function (request) {
+            return request.body.step === 'automations';
+        });
+
+        return saves.length ? saves[saves.length - 1].body.data : null;
+    }
+
+    async function withRules(locale) {
+        var frame = await open('settings-discount.' + locale),
+            doc = frame.contentDocument,
+            body = doc.getElementById('smaily-w-welcome-coupon'),
+            rule = doc.getElementById('smaily-w-welcome-coupon-rule'),
+            data;
+
+        check(locale + ': the switch is off while Welcome is off',
+            doc.getElementById('smaily-w-welcome-coupon-enabled').disabled);
+        tick(frame, 'smaily-w-welcome-enabled', true);
+        check(locale + ': Welcome on opens the switch', !doc.getElementById('smaily-w-welcome-coupon-enabled').disabled);
+        check(locale + ': the rule picker hides while the switch is off', !shown(body));
+        tick(frame, 'smaily-w-welcome-coupon-enabled', true);
+        check(locale + ': the switch on shows the rule picker and the days', shown(rule)
+            && shown(doc.getElementById('smaily-w-welcome-coupon-days')));
+        check(locale + ': the picker lists the rules that can generate codes', Array.prototype.map.call(
+            rule.options,
+            function (option) {
+                return option.value;
+            }
+        ).join(',') === ',12,14');
+        check(locale + ': no empty-state note while rules are listed', !doc.querySelector('.smaily-w-coupon-empty'));
+        rule.value = '14';
+        doc.getElementById('smaily-w-welcome-coupon-days').value = '10';
+        data = await save(frame);
+        check(locale + ': the save posts the switch, the rule and the days', data.welcome_coupon_enabled === true
+            && data.welcome_coupon_rule === 14 && data.welcome_coupon_days === 10);
+        check(locale + ': an automation with the switch off posts it off', data.first_order_coupon_enabled === false
+            && data.abandoned_coupon_enabled === false);
+        tick(frame, 'smaily-w-welcome-coupon-enabled', false);
+        check(locale + ': the switch off hides the picker again', !shown(body));
+        frame.remove();
+
+        // The save endpoint's answer for a switch without a rule.
+        var message = window.smailyAdminPages['settings-discount.' + locale].strings[
+            'Send a discount code is on, but no cart price rule is picked. Pick a rule, or switch the discount code off.'
+        ];
+        frame = await open('settings-discount.' + locale, {
+            saved: false,
+            errors: [{field: 'first_order_coupon_rule', message: message}]
+        });
+        doc = frame.contentDocument;
+        tick(frame, 'smaily-w-firstorder-enabled', true);
+        tick(frame, 'smaily-w-firstorder-coupon-enabled', true);
+        await save(frame);
+        var error = doc.getElementById('smaily-w-firstorder-coupon-rule').nextElementSibling;
+        check(locale + ': the error shows under the rule picker, in the admin\'s language',
+            !!error && error.className === 'smaily-field-error' && error.textContent === message
+                && (locale === 'en_US' || message.indexOf('Send a discount code') === -1));
+        frame.remove();
+    }
+
+    async function emptyState(locale, page, why) {
+        var frame = await open(page + '.' + locale),
+            doc = frame.contentDocument,
+            strings = window.smailyAdminPages[page + '.' + locale].strings,
+            note = doc.querySelector('#smaily-w-abandoned-coupon .smaily-w-coupon-empty');
+
+        tick(frame, 'smaily-w-abandoned-enabled', true);
+        check(locale + ' ' + page + ': no note while the switch is off', !shown(note));
+        tick(frame, 'smaily-w-abandoned-coupon-enabled', true);
+        check(locale + ' ' + page + ': the switch on says to make the discount in Magento first', shown(note)
+            && note.querySelector('.smaily-banner__title').textContent === strings['Make the discount in Magento first']);
+        var link = note.querySelector('a');
+        check(locale + ' ' + page + ': the link opens Magento\'s new cart price rule page in a new tab',
+            !!link && /sales_rule\/promo_quote\/new\/$/.test(link.getAttribute('href'))
+                && link.getAttribute('target') === '_blank');
+        var line = note.querySelector('.smaily-w-coupon-why');
+        check(locale + ' ' + page + (why ? ': says why no rule is listed' : ': without cart price rules, no why line'),
+            why ? !!line && line.textContent === strings[
+                'Your cart price rules are not listed: a rule is listed only when it is active for these websites and'
+                    + ' has Coupon "Specific Coupon" with "Use Auto Generation" ticked.'
+            ] : !line);
+        frame.remove();
+    }
+
+    (async function () {
+        try {
+            for (var locale of ['en_US', 'et_EE']) {
+                log('# ' + locale);
+                await withRules(locale);
+                await emptyState(locale, 'settings-discount-empty', false);
+                await emptyState(locale, 'settings-discount-no-autogen', true);
+            }
+        } catch (error) {
+            failures++;
+            log('FAIL ' + (error && error.stack ? error.stack : error));
+        }
+        clearInterval(keepAlive);
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    })();
+</script>
+</body>
+</html>

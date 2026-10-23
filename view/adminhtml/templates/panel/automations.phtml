@@ -18,6 +18,10 @@
  * live when the mode cards on the Connection panel change. In mode A it names
  * the languages a switched-on automation has no workflow for (CON-188).
  *
+ * Each card has a "Send a discount code" switch (CON-198): a cart price rule
+ * picker, listing the rules that can generate codes, and the days a code is
+ * valid. Without such a rule it says how to make one in Magento.
+ *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
  */
@@ -44,6 +48,9 @@ $triggers = [
 ];
 // Each mapping trigger's Enabled switch on its card below.
 $switchIds = ['welcome' => 'welcome', 'first_order' => 'firstorder', 'abandoned_cart' => 'abandoned'];
+// The cart price rules a discount code can come from (CON-198).
+$discountRules = $viewModel->getDiscountRules();
+$hasCartPriceRules = $discountRules === [] && $viewModel->hasCartPriceRules();
 
 // Store-event trigger cards. The id slug differs from the trigger key
 // (first_order -> firstorder, abandoned_cart -> abandoned) to match the
@@ -88,6 +95,41 @@ $storeTriggers = [
                         <span><?= $escaper->escapeHtml(__('Wait (minutes)')) ?></span>
                         <input type="number" id="smaily-w-cutoff" min="10" max="1440" value="30"/>
                     </label>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php // The automation's discount code (CON-198); panels-js.phtml shows the fields while the switch is on. ?>
+            <div class="smaily-store-discount">
+                <label class="smaily-store-discount__switch"><input type="checkbox" id="smaily-w-<?= /* @noEscape */ $id ?>-coupon-enabled" class="smaily-w-coupon-enabled"/> <?= $escaper->escapeHtml(__('Send a discount code')) ?></label>
+                <div class="smaily-store-discount__body" id="smaily-w-<?= /* @noEscape */ $id ?>-coupon" style="display:none;">
+                    <div class="smaily-engine-trigger__controls">
+                        <label class="smaily-engine-trigger__ctrl">
+                            <span><?= $escaper->escapeHtml(__('Cart price rule')) ?></span>
+                            <select id="smaily-w-<?= /* @noEscape */ $id ?>-coupon-rule" class="smaily-w-coupon-rule">
+                                <option value=""><?= $escaper->escapeHtml(__('Pick a rule')) ?></option>
+                                <?php foreach ($discountRules as $ruleId => $ruleName): ?>
+                                <option value="<?= (int)$ruleId ?>"><?= $escaper->escapeHtml($ruleName) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label class="smaily-engine-trigger__ctrl">
+                            <span><?= $escaper->escapeHtml(__('Valid for (days)')) ?></span>
+                            <input type="number" id="smaily-w-<?= /* @noEscape */ $id ?>-coupon-days" class="smaily-w-coupon-days" min="1" max="365" value="7"/>
+                        </label>
+                    </div>
+                    <p class="note"><?= $escaper->escapeHtml(__('The discount\'s percentage or amount, its conditions and its dates come from the cart price rule you pick. The extension only makes each shopper\'s own single-use code from it.')) ?></p>
+                    <p class="note"><?= $escaper->escapeHtml(__('A code works until the end of the day that many days after the email, and never after the rule\'s To date.')) ?></p>
+                    <?php if ($discountRules === []): ?>
+                    <div class="smaily-banner smaily-banner--info smaily-w-coupon-empty">
+                        <div class="smaily-banner__body">
+                            <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('Make the discount in Magento first')) ?></div>
+                            <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('The codes come from one of your cart price rules. In Marketing > Cart Price Rules > Add New Rule, set Coupon to "Specific Coupon", tick "Use Auto Generation" and save the rule. Then reload this page: the rule appears in the list.')) ?></div>
+                            <?php if ($hasCartPriceRules): ?>
+                            <div class="smaily-banner__message smaily-w-coupon-why"><?= $escaper->escapeHtml(__('Your cart price rules are not listed: a rule is listed only when it is active for these websites and has Coupon "Specific Coupon" with "Use Auto Generation" ticked.')) ?></div>
+                            <?php endif; ?>
+                            <div class="smaily-banner__message"><a href="<?= $escaper->escapeUrl($block->getUrl('sales_rule/promo_quote/new')) ?>" target="_blank" rel="noopener"><?= $escaper->escapeHtml(__('Add a cart price rule')) ?></a></div>
+                        </div>
+                    </div>
                     <?php endif; ?>
                 </div>
             </div>

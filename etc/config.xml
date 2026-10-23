@@ -28,6 +28,12 @@
                 <first_order_enabled>0</first_order_enabled>
                 <abandoned_enabled>0</abandoned_enabled>
                 <abandoned_cutoff>30</abandoned_cutoff>
+                <welcome_coupon_enabled>0</welcome_coupon_enabled>
+                <welcome_coupon_days>7</welcome_coupon_days>
+                <first_order_coupon_enabled>0</first_order_coupon_enabled>
+                <first_order_coupon_days>7</first_order_coupon_days>
+                <abandoned_coupon_enabled>0</abandoned_coupon_enabled>
+                <abandoned_coupon_days>7</abandoned_coupon_days>
             </automations>
             <transactional>
                 <enabled>0</enabled>

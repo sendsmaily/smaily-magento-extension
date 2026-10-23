@@ -30,13 +30,15 @@ Model/
   ContactSync/      lawful-basis mode, payload builder, dispatcher, guard
   AbandonedCart/    quote-scan state, payload, restore tokens
   Automation/       trigger routing (multilingual mapping table + saver)
+  Discount/         automation discount codes from cart price rules
   Multilingual/     store-view → language, account-key → store-view
   Backfill/         chunked import jobs + processors
   Migration/        2.8.x config mapper (pure, unit-tested)
   Privacy/          profiling consent, data-subject erasure
 Observer/           thin event bridges (all logic lives in Model/)
 Plugin/             newsletter email suppression, config validation,
-                    checkout layout injection, admin subscriber-delete mark
+                    checkout layout injection, admin subscriber-delete mark,
+                    discount code expiry (SalesRule)
 Setup/Patch/        legacy schema cleanup (Schema/), config migration (Data/)
 Setup/Uninstall.php settings + flag removal on module:uninstall
 ViewModel/          template data providers
@@ -1252,6 +1254,90 @@ posts the marker. For an address Smaily does not have (code 206) the handler
 answers `Queue\Skipped` and `EventQueue::markSkipped()` closes the row —
 `sent`, no `sent_payload`, the reason in `last_error` for the Log; a read
 that fails leaves the row on the retry ladder with nothing posted.
+
+### Discount codes in automations (CON-198)
+
+Each store-event automation (welcome, first order, abandoned cart) may
+carry one single-use discount code per email. The discount is the
+merchant's own Magento cart price rule — amount, conditions, customer
+groups, uses per customer and dates stay in the rule; the extension only
+makes each shopper's code from it.
+
+**Settings.** Per automation, three paths under `smaily_connect/automations/`
+(`Config::COUPON_PATHS`): `<prefix>_coupon_enabled` (the "Send a discount
+code" switch), `_coupon_rule` (the rule id) and `_coupon_days` (Valid for,
+1–365, default 7), with prefixes `welcome`, `first_order`, `abandoned`.
+They are in `WebsiteOverrides::PATHS[AUTOMATIONS]`, so they follow the
+automations' scope model exactly: store-wide at the default scope, a
+website's own values as a website exception, kept, removed and returned with
+the rest of its automations (a website on another Smaily account keeps
+them as its own, CON-190). `WizardStepSaver::saveAutomations()` refuses the
+whole save when a switch is on without a rule. The picker
+(`panel/automations.phtml`, Settings and the initial setup's Automations
+step) lists `Discount\RuleSource::forWebsites()`: active rules with Coupon
+"Specific Coupon" + "Use Auto Generation" (or the API-only type Auto),
+not ended, assigned to every website the shown settings send for — the
+selected website, or in the initial setup of a 2+-website install every
+website that follows the store-wide automations. Without such a rule the
+card says how to make one (Marketing > Cart Price Rules > Add New Rule)
+and links the new-rule page; when rules exist but none qualifies, it says
+why. Rules are read through Magento's rule collection, never the table, so
+Adobe Commerce's staged rules read as Magento reads them.
+
+**When the code is made.** In `AutomationHandler`, just before the post —
+after the workflow match and the abandoned-cart consent read — so a row
+that ends Skipped (no workflow, consent, the cron's 24-hour and
+unsubscribed skips, which never reach the handler) makes no code.
+`Discount\AutomationDiscount::address()` asks `Discount\CodeIssuer`, which
+uses Magento's own `Coupon\Massgenerator` (the generator behind the rule's
+Manage Coupon Codes): `qty` 1, the store's code format from
+`promo/auto_generated_coupon_codes/*`, `uses_per_coupon` **1** and the
+rule's uses per customer. `CouponManagementInterface::generate()` is not
+used: it gives every code the rule's own Uses per Coupon. The code's last
+valid day is today + N days in the store's timezone (`Discount\StoreDate`),
+capped at the rule's To date.
+
+**Once per queue row.** Before posting, the handler stores the code fields
+in the row's own payload (`EventQueue::addToPayload()`: one UPDATE of
+`payload`, top-level keys replaced, a Send again record kept). A retry, a
+row requeued after a killed worker and the Log's Send again (which copies
+the payload) find `<trigger>_coupon_code` in the address and post the same
+code; nothing is generated twice. A crash between generating and storing
+leaves one unused code in the rule, never a second email code. A generation
+or storage failure is a retryable row failure with nothing posted. No
+column or table was added.
+
+**Wire.** The address payload of `POST autoresponder.php` carries
+`Trigger::COUPON_FIELDS` beside the trigger's marker:
+`welcome_coupon_code` + `welcome_coupon_expires_at`,
+`first_order_coupon_code` + `first_order_coupon_expires_at`,
+`abandoned_cart_coupon_code` + `abandoned_cart_coupon_expires_at`
+(cross-platform canon, the Woo and Shopify connectors use the same names).
+The expiry is `YYYY-MM-DD`, the last valid day in the store's timezone —
+the one date on the contact wire that is not UTC. With the switch off the
+payload is exactly what it was before CON-198.
+
+**A rule that no longer gives codes** (deleted, inactive, no longer
+auto-generating, not for the event's website, or today outside its From/To
+dates) does not hold the email back: it goes without a code, the row's
+payload keeps the reason under `AutomationDiscount::NOTICE_KEY`
+(`discount_notice`, shown in the Log's Details), and
+`var/log/smaily_connect.log` gets an error line. A row stored that way makes
+no code on a retry either.
+
+**Expiry is the extension's check.** Magento keeps a coupon
+`expiration_date` but never validates it at checkout (2.4.4–2.4.8; only the
+rule's dates count). `Discount\CouponExpiry` writes the code's last day
+there as `<Y-m-d> 23:59:59`, and `Plugin\SalesRule\RejectExpiredCoupon`
+(after `Utility::canProcessRule()`, the method Magento's own coupon usage
+check runs in) refuses the rule for a code of type auto-generated whose
+date carries that time and lies before today in the quote's store
+timezone; the cart then shows Magento's own "The coupon code isn't valid".
+Magento only ever wrote a rule's To date (a date without a time) into that
+column, so the time is what marks the extension's codes: a coupon the
+merchant generated in the admin is left to Magento as before. One indexed
+lookup per code per request, only when Magento already accepts the rule.
+"Works once" is Magento's own usage limit (`usage_limit` 1).
 
 ### Attribution (FPC-safe by construction)
 

@@ -11,6 +11,7 @@ namespace Smaily\Connect\Model;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Store\Model\ScopeInterface;
+use Smaily\Connect\Model\Automation\Trigger;
 
 /**
  * Typed accessors for Smaily Connect configuration.
@@ -41,6 +42,15 @@ class Config
     public const XML_PATH_ABANDONED_ENABLED = 'smaily_connect/automations/abandoned_enabled';
     public const XML_PATH_ABANDONED_WORKFLOW = 'smaily_connect/automations/abandoned_workflow';
     public const XML_PATH_ABANDONED_CUTOFF = 'smaily_connect/automations/abandoned_cutoff';
+    public const XML_PATH_WELCOME_COUPON_ENABLED = 'smaily_connect/automations/welcome_coupon_enabled';
+    public const XML_PATH_WELCOME_COUPON_RULE = 'smaily_connect/automations/welcome_coupon_rule';
+    public const XML_PATH_WELCOME_COUPON_DAYS = 'smaily_connect/automations/welcome_coupon_days';
+    public const XML_PATH_FIRST_ORDER_COUPON_ENABLED = 'smaily_connect/automations/first_order_coupon_enabled';
+    public const XML_PATH_FIRST_ORDER_COUPON_RULE = 'smaily_connect/automations/first_order_coupon_rule';
+    public const XML_PATH_FIRST_ORDER_COUPON_DAYS = 'smaily_connect/automations/first_order_coupon_days';
+    public const XML_PATH_ABANDONED_COUPON_ENABLED = 'smaily_connect/automations/abandoned_coupon_enabled';
+    public const XML_PATH_ABANDONED_COUPON_RULE = 'smaily_connect/automations/abandoned_coupon_rule';
+    public const XML_PATH_ABANDONED_COUPON_DAYS = 'smaily_connect/automations/abandoned_coupon_days';
     public const XML_PATH_TRANSACTIONAL_SUBDOMAIN = 'smaily_connect/transactional/subdomain';
     public const XML_PATH_TRANSACTIONAL_USERNAME = 'smaily_connect/transactional/username';
     public const XML_PATH_TRANSACTIONAL_PASSWORD = 'smaily_connect/transactional/password';
@@ -53,6 +63,34 @@ class Config
     public const XML_PATH_LOG_VERBOSITY = 'smaily_connect/logging/verbosity';
 
     public const MIN_ABANDONED_CUTOFF_MINUTES = 10;
+
+    /**
+     * Each automation's discount code settings (CON-198): the "Send a
+     * discount code" switch, the cart price rule its codes come from and
+     * how many days a code is valid, keyed by trigger.
+     *
+     * @var array<string, array{enabled: string, rule: string, days: string}>
+     */
+    public const COUPON_PATHS = [
+        Trigger::WELCOME => [
+            'enabled' => self::XML_PATH_WELCOME_COUPON_ENABLED,
+            'rule' => self::XML_PATH_WELCOME_COUPON_RULE,
+            'days' => self::XML_PATH_WELCOME_COUPON_DAYS,
+        ],
+        Trigger::FIRST_ORDER => [
+            'enabled' => self::XML_PATH_FIRST_ORDER_COUPON_ENABLED,
+            'rule' => self::XML_PATH_FIRST_ORDER_COUPON_RULE,
+            'days' => self::XML_PATH_FIRST_ORDER_COUPON_DAYS,
+        ],
+        Trigger::ABANDONED_CART => [
+            'enabled' => self::XML_PATH_ABANDONED_COUPON_ENABLED,
+            'rule' => self::XML_PATH_ABANDONED_COUPON_RULE,
+            'days' => self::XML_PATH_ABANDONED_COUPON_DAYS,
+        ],
+    ];
+
+    /** The longest a discount code may be valid, in days. */
+    public const MAX_COUPON_DAYS = 365;
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -291,6 +329,38 @@ class Config
             self::MIN_ABANDONED_CUTOFF_MINUTES,
             (int)$this->websiteValue(self::XML_PATH_ABANDONED_CUTOFF, $websiteId)
         );
+    }
+
+    /**
+     * Whether the automation's emails carry a discount code (CON-198).
+     */
+    public function isCouponEnabled(string $trigger, int $websiteId): bool
+    {
+        return isset(self::COUPON_PATHS[$trigger])
+            && $this->websiteFlag(self::COUPON_PATHS[$trigger]['enabled'], $websiteId);
+    }
+
+    /**
+     * The cart price rule the automation's discount codes come from (0: none).
+     */
+    public function getCouponRuleId(string $trigger, int $websiteId): int
+    {
+        return isset(self::COUPON_PATHS[$trigger])
+            ? (int)$this->websiteValue(self::COUPON_PATHS[$trigger]['rule'], $websiteId)
+            : 0;
+    }
+
+    /**
+     * How many days after sending the automation's discount code is valid
+     * (1 to MAX_COUPON_DAYS).
+     */
+    public function getCouponValidDays(string $trigger, int $websiteId): int
+    {
+        $days = isset(self::COUPON_PATHS[$trigger])
+            ? (int)$this->websiteValue(self::COUPON_PATHS[$trigger]['days'], $websiteId)
+            : 0;
+
+        return max(1, min(self::MAX_COUPON_DAYS, $days));
     }
 
     /**

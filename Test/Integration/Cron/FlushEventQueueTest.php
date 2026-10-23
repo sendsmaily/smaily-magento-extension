@@ -27,6 +27,8 @@ use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
+use Smaily\Connect\Model\Discount\AutomationDiscount;
+use Smaily\Connect\Model\Discount\CodeIssuer;
 use Smaily\Connect\Model\Engine\Client as EngineClient;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
@@ -738,6 +740,10 @@ class FlushEventQueueTest extends IntegrationTestCase
         $clientProvider->expects(self::never())->method('forStore');
 
         $this->runCron([EventType::AUTOMATION_TRIGGER => $this->objectManager->create(AutomationHandler::class, [
+            // No discount code: the automation's switch is off (CON-198).
+            'discount' => $this->objectManager->create(AutomationDiscount::class, [
+                'issuer' => $this->createMock(CodeIssuer::class),
+            ]),
             'router' => $router,
             'clientProvider' => $clientProvider,
             'accountResolver' => $this->createMock(AccountResolver::class),

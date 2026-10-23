@@ -18,6 +18,7 @@ use Magento\Store\Model\Website;
 use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
 use Smaily\Connect\Model\Automation\Mapping;
 use Smaily\Connect\Model\Automation\MappingSaver;
+use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Client\CredentialCheck;
 use Smaily\Connect\Model\Client\Exception\InvalidSubdomainException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
@@ -81,6 +82,16 @@ use Smaily\Connect\Model\SubdomainNormalizer;
 class WizardStepSaver
 {
     public const XML_PATH_SETUP_COMPLETED = 'smaily_connect/internal/setup_completed';
+
+    /**
+     * The post key prefix of each automation's discount code settings
+     * (CON-198): `<prefix>_coupon_enabled`, `_coupon_rule`, `_coupon_days`.
+     */
+    private const COUPON_KEYS = [
+        Trigger::WELCOME => 'welcome',
+        Trigger::FIRST_ORDER => 'first_order',
+        Trigger::ABANDONED_CART => 'abandoned',
+    ];
 
     /** Whether Smaily accepted the credentials the last connection save checked (PRO-3570). */
     private bool $connectionAccepted = false;
@@ -877,6 +888,10 @@ class WizardStepSaver
      */
     private function saveAutomations(array $data, int $websiteId, ?int $target): array
     {
+        $couponErrors = $this->couponErrors($data);
+        if ($couponErrors !== []) {
+            return $couponErrors;
+        }
         $this->saveFlag(Config::XML_PATH_WELCOME_ENABLED, $data, 'welcome_enabled', $target);
         $this->saveFlag(Config::XML_PATH_FIRST_ORDER_ENABLED, $data, 'first_order_enabled', $target);
         $this->saveFlag(Config::XML_PATH_ABANDONED_ENABLED, $data, 'abandoned_enabled', $target);
@@ -920,6 +935,17 @@ class WizardStepSaver
                 $target
             );
         }
+        foreach (self::COUPON_KEYS as $trigger => $key) {
+            $paths = Config::COUPON_PATHS[$trigger];
+            $this->saveFlag($paths['enabled'], $data, $key . '_coupon_enabled', $target);
+            if (array_key_exists($key . '_coupon_rule', $data)) {
+                $this->write($paths['rule'], (string)max(0, (int)$data[$key . '_coupon_rule']), $target);
+            }
+            if (array_key_exists($key . '_coupon_days', $data)) {
+                $days = max(1, min(Config::MAX_COUPON_DAYS, (int)$data[$key . '_coupon_days']));
+                $this->write($paths['days'], (string)$days, $target);
+            }
+        }
 
         // Per-language workflow mappings (multilingual modes a/b). The panel
         // sends the full desired state, so absent selections delete their
@@ -941,6 +967,35 @@ class WizardStepSaver
         }
 
         return [];
+    }
+
+    /**
+     * A switched-on automation whose "Send a discount code" switch is on
+     * needs a cart price rule to make its codes from (CON-198); nothing is
+     * saved without one.
+     *
+     * @param array<string, mixed> $data
+     * @return array<int, array{field: string, message: string}>
+     */
+    private function couponErrors(array $data): array
+    {
+        $errors = [];
+        foreach (self::COUPON_KEYS as $key) {
+            if (!empty($data[$key . '_enabled'])
+                && !empty($data[$key . '_coupon_enabled'])
+                && (int)($data[$key . '_coupon_rule'] ?? 0) <= 0
+            ) {
+                $errors[] = [
+                    'field' => $key . '_coupon_rule',
+                    'message' => (string)__(
+                        'Send a discount code is on, but no cart price rule is picked. Pick a rule, or switch the'
+                        . ' discount code off.'
+                    ),
+                ];
+            }
+        }
+
+        return $errors;
     }
 
     /**

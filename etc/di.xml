@@ -49,6 +49,11 @@
         <plugin name="smaily_connect_suppress_newsletter_emails" type="Smaily\Connect\Plugin\SuppressNewsletterEmails"/>
     </type>
 
+    <!-- An automation's discount code stops working after its last valid day (CON-198). -->
+    <type name="Magento\SalesRule\Model\Utility">
+        <plugin name="smaily_connect_reject_expired_coupon" type="Smaily\Connect\Plugin\SalesRule\RejectExpiredCoupon"/>
+    </type>
+
     <!-- MSI stock changes → catalog ingest, one thin plugin per seam.
          Optional dependency: if the Magento_Inventory* modules are absent
          these types do not exist, the plugin is never wired and nothing else

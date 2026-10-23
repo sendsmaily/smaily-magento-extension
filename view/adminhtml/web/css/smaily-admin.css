@@ -778,6 +778,13 @@
 .smaily-store-trigger__enable { margin-top: var(--sp-2); }
 .smaily-store-trigger .smaily-w-workflow { min-width: 16rem; }
 .smaily-store-trigger #smaily-w-cutoff { width: 6rem; }
+/* The automation's discount code (CON-198), below the card's controls. */
+.smaily-store-discount { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--s-border); }
+.smaily-store-discount__switch { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.smaily-store-discount__body { margin-top: var(--sp-2); }
+.smaily-store-discount__body .note { margin-top: var(--sp-2); }
+.smaily-store-trigger .smaily-w-coupon-rule { min-width: 16rem; }
+.smaily-store-trigger .smaily-w-coupon-days { width: 6rem; }
 
 /* --- Log details slide-out: attempt timeline ------------------------------ */
 .smaily-log-details-retry { display: flex; gap: var(--sp-2); align-items: center; background: var(--s-info-soft); border: 1px solid var(--s-info-border); color: var(--s-info); border-radius: var(--r-3); padding: 11px 14px; font-size: var(--fs-13); line-height: 1.45; }

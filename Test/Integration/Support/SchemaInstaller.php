@@ -28,6 +28,9 @@ class SchemaInstaller
     /** Magento_Catalog's declarative schema, the source of the product tables. */
     private const CATALOG_SCHEMA = 'vendor/magento/module-catalog/etc/db_schema.xml';
 
+    /** Magento_SalesRule's declarative schema, the source of the coupon tables. */
+    private const SALES_RULE_SCHEMA = 'vendor/magento/module-sales-rule/etc/db_schema.xml';
+
     public function __construct(
         private readonly AdapterInterface $connection
     ) {
@@ -225,6 +228,23 @@ class SchemaInstaller
     {
         $this->connection->query('DROP TABLE IF EXISTS `customer_entity`');
         $this->connection->query('DROP TABLE IF EXISTS `newsletter_subscriber`');
+    }
+
+    /**
+     * The core salesrule_coupon and salesrule_coupon_usage tables as
+     * Magento ships them (see createQuote()): the coupon codes of the cart
+     * price rules and their uses per customer.
+     */
+    public function createSalesRuleCouponTables(): void
+    {
+        $this->createMagentoTable(self::SALES_RULE_SCHEMA, 'salesrule_coupon');
+        $this->createMagentoTable(self::SALES_RULE_SCHEMA, 'salesrule_coupon_usage');
+    }
+
+    public function dropSalesRuleCouponTables(): void
+    {
+        $this->connection->query('DROP TABLE IF EXISTS `salesrule_coupon_usage`');
+        $this->connection->query('DROP TABLE IF EXISTS `salesrule_coupon`');
     }
 
     /**

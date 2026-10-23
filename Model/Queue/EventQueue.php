@@ -289,6 +289,26 @@ class EventQueue
     }
 
     /**
+     * Store values in a claimed row's payload at once, before it is sent
+     * (CON-198: the discount code a retry sends again): each top-level key
+     * of $values replaces the payload's. A Send again record stays.
+     *
+     * @param array<string, mixed> $values
+     */
+    public function addToPayload(Event $event, array $values): void
+    {
+        $payload = $this->serializer->serialize(
+            array_replace($this->payloadDecoder->decode($event->getPayload()), $values)
+        );
+        $this->resourceConnection->getConnection()->update(
+            $this->resourceConnection->getTableName(EventResource::TABLE_NAME),
+            ['payload' => $payload],
+            ['id = ?' => (int)$event->getId()]
+        );
+        $event->setData('payload', $payload);
+    }
+
+    /**
      * Mark an event as delivered.
      */
     public function markSent(Event $event, ?string $sentPayload = null, ?string $response = null): void

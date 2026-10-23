@@ -45,6 +45,8 @@ use Smaily\Connect\Model\Config\Source\SyncMode;
 use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\ContactSync\SubscriberPayloadBuilder;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
+use Smaily\Connect\Model\Discount\AutomationDiscount;
+use Smaily\Connect\Model\Discount\CodeIssuer;
 use Smaily\Connect\Model\Log\QueueRowLoader;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
@@ -590,6 +592,10 @@ class AbandonedCartTest extends IntegrationTestCase
         $cron = $this->objectManager->create(FlushEventQueue::class, [
             'handlerPool' => new HandlerPool([
                 EventType::AUTOMATION_TRIGGER => $this->objectManager->create(AutomationHandler::class, [
+                    // No discount code: the automation's switch is off (CON-198).
+                    'discount' => $this->objectManager->create(AutomationDiscount::class, [
+                        'issuer' => $this->createMock(CodeIssuer::class),
+                    ]),
                     'clientProvider' => $clientProvider,
                     'router' => $router,
                     'accountResolver' => $this->createMock(AccountResolver::class),

@@ -1080,6 +1080,53 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
+     * CON-198: each automation's discount code settings are saved with the
+     * automations, where they are — here as a website's own.
+     */
+    public function testDiscountCodeSettingsAreSavedWithTheAutomations(): void
+    {
+        $this->onStoreWithWebsites(7);
+        $this->withWorkflows([]);
+
+        self::assertSame([], $this->saver->save('automations', [
+            'own' => true,
+            'welcome_coupon_enabled' => true,
+            'welcome_coupon_rule' => 12,
+            'welcome_coupon_days' => 400,
+            'abandoned_coupon_enabled' => false,
+            'abandoned_coupon_rule' => 0,
+            'abandoned_coupon_days' => 0,
+        ]));
+
+        self::assertTrue($this->wasSavedAtScope(Config::XML_PATH_WELCOME_COUPON_ENABLED, ScopeInterface::SCOPE_WEBSITES, 7));
+        self::assertSame('1', $this->savedValue(Config::XML_PATH_WELCOME_COUPON_ENABLED));
+        self::assertSame('12', $this->savedValue(Config::XML_PATH_WELCOME_COUPON_RULE));
+        self::assertSame('365', $this->savedValue(Config::XML_PATH_WELCOME_COUPON_DAYS), 'at most 365 days');
+        self::assertSame('0', $this->savedValue(Config::XML_PATH_ABANDONED_COUPON_ENABLED));
+        self::assertSame('1', $this->savedValue(Config::XML_PATH_ABANDONED_COUPON_DAYS), 'at least a day');
+        self::assertFalse($this->wasSaved(Config::XML_PATH_FIRST_ORDER_COUPON_ENABLED), 'nothing posted, nothing saved');
+    }
+
+    /**
+     * CON-198: a switched-on automation's discount code needs a cart price
+     * rule; without one, nothing of the automations is saved.
+     */
+    public function testADiscountCodeWithoutARuleSavesNothing(): void
+    {
+        $errors = $this->saver->save('automations', [
+            'welcome_enabled' => false,
+            'welcome_coupon_enabled' => true,
+            'welcome_coupon_rule' => 0,
+            'first_order_enabled' => true,
+            'first_order_coupon_enabled' => true,
+            'first_order_coupon_rule' => 0,
+        ]);
+
+        self::assertSame(['first_order_coupon_rule'], array_column($errors, 'field'), 'only a switched-on automation');
+        self::assertSame([], $this->saved);
+    }
+
+    /**
      * CON-179: a website's own automations keep their mapping rows under
      * its id; the store-wide rows are website 0's.
      */

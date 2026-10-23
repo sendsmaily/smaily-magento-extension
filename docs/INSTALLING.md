@@ -43,6 +43,13 @@ Then check the rest:
   storefront application on top of Magento) needs work from its own team
   before the storefront features work — see
   [HEADLESS_STOREFRONTS.md](HEADLESS_STOREFRONTS.md).
+- With Campaign Intelligence: a web application firewall, CDN rule or
+  security module in front of the store lets `POST /smaily/attribution/land`
+  (an email-link click, so that the server sets the campaign-click cookies)
+  and `POST /smaily/relay` (browse events) through on the store's own
+  domain. They need no login and carry no name or email address. When they
+  are blocked, browse events are lost and the browser sets the click
+  cookies instead (Safari keeps those for 7 days at most).
 
 Run every `bin/magento` command below from the Magento root, as the user
 that owns the Magento files.

@@ -25,8 +25,9 @@ use Smaily\Connect\Model\ContactSync\SyncDispatcher;
  * Audience follows the contact-sync mode: legitimate interest syncs every
  * registered customer (is_unsubscribed omitted unless the customer
  * unsubscribed in the store, then sent as 1);
- * consent mode only refreshes customers who are subscribed; checkout-only
- * mode never syncs accounts.
+ * consent mode only refreshes customers who are subscribed, without
+ * is_unsubscribed, so a profile save never re-subscribes a contact who
+ * unsubscribed in Smaily (CON-195); checkout-only mode never syncs accounts.
  */
 class CustomerSaveAfter implements ObserverInterface
 {
@@ -66,7 +67,6 @@ class CustomerSaveAfter implements ObserverInterface
             if ($status !== Subscriber::STATUS_SUBSCRIBED) {
                 return;
             }
-            $isUnsubscribed = false;
         } elseif ($status === Subscriber::STATUS_UNSUBSCRIBED) {
             // Soft opt-in: Smaily creates a contact sent without a status as
             // subscribed, so a store unsubscribe always travels (PRO-3616).

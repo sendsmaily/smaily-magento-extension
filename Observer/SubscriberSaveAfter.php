@@ -42,6 +42,12 @@ use Smaily\Connect\Model\Automation\Trigger;
  * subscription made in the admin, through the REST/SOAP/GraphQL API or by an
  * import (cron or command line) syncs the contact but fires no welcome
  * (PRO-3580).
+ *
+ * Only that storefront subscription sends is_unsubscribed=0, so it subscribes
+ * a contact who unsubscribed in Smaily again. Any other subscription goes
+ * without is_unsubscribed: Smaily keeps an existing contact's status and
+ * creates a new contact as subscribed, so an admin, API or import write never
+ * undoes an unsubscribe (CON-195).
  */
 class SubscriberSaveAfter implements ObserverInterface
 {
@@ -92,10 +98,18 @@ class SubscriberSaveAfter implements ObserverInterface
         }
 
         $customer = $this->loadCustomer((int)$subscriber->getCustomerId());
+        $isStorefront = $this->isStorefront();
 
-        $this->dispatcher->dispatchContactSync($email, $storeId, $isUnsubscribed, $customer);
+        // An unsubscribe goes as 1; only the shopper's own storefront
+        // subscription goes as 0 (CON-195).
+        $this->dispatcher->dispatchContactSync(
+            $email,
+            $storeId,
+            $isUnsubscribed ? true : ($isStorefront ? false : null),
+            $customer
+        );
 
-        if (!$isUnsubscribed && $this->isStorefront() && $this->config->isWelcomeEnabled($websiteId)) {
+        if (!$isUnsubscribed && $isStorefront && $this->config->isWelcomeEnabled($websiteId)) {
             $address = $this->payloadBuilder->build($email, $storeId, null, $customer);
             unset($address['language']);
             $this->dispatcher->dispatchAutomation(Trigger::WELCOME, $storeId, $address);

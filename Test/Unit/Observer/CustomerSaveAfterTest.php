@@ -49,7 +49,7 @@ class CustomerSaveAfterTest extends TestCase
         $dispatcher = $this->createMock(SyncDispatcher::class);
         $dispatcher->expects($sends ? self::once() : self::never())
             ->method('dispatchContactSync')
-            ->with('person@example.com', 1, $expected, self::isInstanceOf(CustomerInterface::class));
+            ->with('person@example.com', 1, self::identicalTo($expected), self::isInstanceOf(CustomerInterface::class));
 
         $this->observer($mode, $status, $dispatcher)->execute($this->event());
     }
@@ -66,7 +66,8 @@ class CustomerSaveAfterTest extends TestCase
             'all customers, no newsletter record' => [$all, 0, true, null],
             'all customers, waiting for confirmation' => [$all, Subscriber::STATUS_NOT_ACTIVE, true, null],
             'all customers, subscribed' => [$all, Subscriber::STATUS_SUBSCRIBED, true, null],
-            'subscribers only, subscribed' => [SyncMode::MODE_CONSENT, Subscriber::STATUS_SUBSCRIBED, true, false],
+            // CON-195: an admin save never re-subscribes a contact who unsubscribed in Smaily.
+            'subscribers only, subscribed' => [SyncMode::MODE_CONSENT, Subscriber::STATUS_SUBSCRIBED, true, null],
             'subscribers only, unsubscribed' => [SyncMode::MODE_CONSENT, Subscriber::STATUS_UNSUBSCRIBED, false, null],
         ];
     }

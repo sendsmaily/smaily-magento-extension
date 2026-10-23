@@ -106,15 +106,20 @@ class ContactsProcessorTest extends TestCase
         $this->createProcessor($jobManager, $audience, $clientProvider, false)->process($job);
     }
 
-    public function testSubscribersOnlySendsTheSubscribersWithTheirOwnStatus(): void
+    /**
+     * CON-195: a subscriber goes without is_unsubscribed, so the import never
+     * re-subscribes a contact who unsubscribed in Smaily and still creates a
+     * new contact as subscribed; an unsubscribed one goes as unsubscribed.
+     */
+    public function testSubscribersOnlySendsTheUnsubscribedAsUnsubscribedAndTheRestWithoutAStatus(): void
     {
         $client = $this->createMock(SmailyClient::class);
         $client->expects(self::once())
             ->method('post')
-            ->with(SmailyClient::ENDPOINT_CONTACT, [
-                ['email' => 'person@example.com', 'is_unsubscribed' => 0],
+            ->with(SmailyClient::ENDPOINT_CONTACT, self::identicalTo([
+                ['email' => 'person@example.com'],
                 ['email' => 'person-left@example.com', 'is_unsubscribed' => 1],
-            ]);
+            ]));
         $clientProvider = $this->createMock(SmailyClientProvider::class);
         $clientProvider->expects(self::once())->method('forStore')->with(5)->willReturn($client);
 
@@ -138,9 +143,10 @@ class ContactsProcessorTest extends TestCase
 
     /**
      * PRO-3610: "All customers" is the soft opt-in. A customer who never
-     * answered the newsletter goes without is_unsubscribed, so Smaily keeps
-     * an existing contact's status and creates a new one as subscribed; a
-     * customer who unsubscribed in the store goes as unsubscribed.
+     * answered the newsletter, and a subscriber (CON-195), goes without
+     * is_unsubscribed, so Smaily keeps an existing contact's status and
+     * creates a new one as subscribed; a customer who unsubscribed in the
+     * store goes as unsubscribed.
      */
     public function testAllCustomersSendsTheSubscribersThenEveryOtherCustomerWithoutAStatus(): void
     {
@@ -151,7 +157,7 @@ class ContactsProcessorTest extends TestCase
                 static $calls = 0;
                 $expected = [
                     [
-                        ['email' => 'person@example.com', 'is_unsubscribed' => 0],
+                        ['email' => 'person@example.com'],
                         ['email' => 'person-left@example.com', 'is_unsubscribed' => 1],
                     ],
                     [['email' => 'person-customer@example.com']],

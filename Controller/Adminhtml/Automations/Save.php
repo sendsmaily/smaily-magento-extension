@@ -15,6 +15,7 @@ use Magento\Framework\App\Request\Http as HttpRequest;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\Redirect;
 use Magento\Framework\Controller\ResultFactory;
+use Magento\Framework\Controller\ResultInterface;
 use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
@@ -47,8 +48,10 @@ class Save extends Action implements HttpPostActionInterface
 
     /**
      * @inheritDoc
+     *
+     * @return Redirect|Json
      */
-    public function execute(): Redirect|Json
+    public function execute(): ResultInterface
     {
         $errors = [];
         $savedKeys = [];

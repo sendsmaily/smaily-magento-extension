@@ -14,6 +14,7 @@ use Magento\Backend\Model\View\Result\Page;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\Controller\Result\Redirect;
 use Magento\Framework\Controller\ResultFactory;
+use Magento\Framework\Controller\ResultInterface;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
 
 /**
@@ -33,8 +34,10 @@ class Index extends Action implements HttpGetActionInterface
 
     /**
      * @inheritDoc
+     *
+     * @return Page|Redirect
      */
-    public function execute(): Page|Redirect
+    public function execute(): ResultInterface
     {
         $redirect = $this->setupGuard->redirectIfNotSetUp($this->resultFactory);
         if ($redirect !== null) {

@@ -1339,6 +1339,15 @@ merchant generated in the admin is left to Magento as before. One indexed
 lookup per code per request, only when Magento already accepts the rule.
 "Works once" is Magento's own usage limit (`usage_limit` 1).
 
+**Versions checked.** Magento 2.4.7-p10 (and 2.4.9's source), and a clean Magento
+2.4.4-p13 on PHP 8.1 (CON-204): there `Massgenerator::generatePool()` and
+`getGeneratedCodes()` take the same data, the code gets `usage_limit` 1
+whatever the rule's Uses per Coupon, an order uses it up (Magento's
+`sales.rule.update.coupon.usage` consumer) and a second cart is refused,
+`RejectExpiredCoupon` refuses a code after its last day and leaves a
+merchant's own generated code alone, and `RuleSource` lists the same rules
+per website as on 2.4.7.
+
 ### Attribution (FPC-safe by construction)
 
 Landing capture is client-side (`view/frontend/web/js/attribution.js` —

@@ -26,7 +26,13 @@ class SmailyClientException extends \RuntimeException
 {
     private readonly string $sourceMessage;
 
-    public function __construct(string|Phrase $message = '', int $code = 0, ?\Throwable $previous = null)
+    /**
+     * $message has no native type: Magento 2.4.4's setup:di:compile cannot
+     * read a constructor parameter with a union type (CON-204).
+     *
+     * @param string|Phrase $message
+     */
+    public function __construct($message = '', int $code = 0, ?\Throwable $previous = null)
     {
         $this->sourceMessage = $message instanceof Phrase
             ? (string)(new Placeholder())->render([$message->getText()], $message->getArguments())

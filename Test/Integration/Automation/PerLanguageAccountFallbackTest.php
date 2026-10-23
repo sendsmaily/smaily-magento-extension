@@ -16,6 +16,8 @@ use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Discount\AutomationDiscount;
+use Smaily\Connect\Model\Discount\CodeIssuer;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
@@ -155,6 +157,10 @@ class PerLanguageAccountFallbackTest extends IntegrationTestCase
         $cron = $this->objectManager->create(FlushEventQueue::class, [
             'handlerPool' => new HandlerPool([
                 EventType::AUTOMATION_TRIGGER => $this->objectManager->create(AutomationHandler::class, [
+                    // No discount code: the automation's switch is off (CON-198).
+                    'discount' => $this->objectManager->create(AutomationDiscount::class, [
+                        'issuer' => $this->createMock(CodeIssuer::class),
+                    ]),
                     'router' => $this->objectManager->create(Router::class, [
                         'overrides' => $this->createMock(WebsiteOverrides::class),
                     ]),

@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Unit\Model\Queue\Handler;
 
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Store\Api\Data\WebsiteInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -451,8 +452,76 @@ class AutomationHandlerTest extends TestCase
         self::assertSame([1 => true], $handler->handle([$event]));
     }
 
-    private function reminderHandler(SmailyClient $client, StateManager $cartState): AutomationHandler
+    /**
+     * CON-198: a reminder the consent check skips makes no discount code.
+     */
+    public function testASkippedReminderMakesNoDiscountCode(): void
     {
+        $client = $this->createMock(SmailyClient::class);
+        $client->method('get')->willReturn(['email' => 'person@example.com', 'is_unsubscribed' => '1']);
+        $client->expects(self::never())->method('post');
+        $discount = $this->createMock(AutomationDiscount::class);
+        $discount->expects(self::never())->method('address');
+
+        $event = $this->reminderEvent(false);
+        $this->reminderHandler($client, $this->createMock(StateManager::class), $discount)->handle([$event]);
+    }
+
+    /**
+     * CON-198: the reminder posts the address with its discount code fields.
+     */
+    public function testAReminderCarriesItsDiscountCode(): void
+    {
+        $posted = [];
+        $client = $this->createMock(SmailyClient::class);
+        $client->method('get')->willReturn(['email' => 'person@example.com', 'is_unsubscribed' => '0']);
+        $client->method('post')->willReturnCallback(
+            static function (string $endpoint, array $payload) use (&$posted): array {
+                $posted[] = $payload;
+
+                return [];
+            }
+        );
+        $withCode = [
+            'email' => 'person@example.com',
+            'abandoned_cart_coupon_code' => 'ABC123',
+            'abandoned_cart_coupon_expires_at' => '2026-10-30',
+        ];
+        $discount = $this->createMock(AutomationDiscount::class);
+        $discount->expects(self::once())->method('address')
+            ->with(self::anything(), self::anything(), 'abandoned_cart', 1, 1)
+            ->willReturn($withCode);
+
+        $event = $this->reminderEvent(true);
+        $results = $this->reminderHandler($client, $this->createMock(StateManager::class), $discount)->handle([$event]);
+
+        self::assertSame([1 => true], $results);
+        self::assertSame([$withCode], $posted[0]['addresses']);
+    }
+
+    /**
+     * CON-198: when Magento cannot make the code, nothing is posted and the
+     * row waits on the retry ladder.
+     */
+    public function testARowWhoseCodeCannotBeMadeWaitsWithNothingPosted(): void
+    {
+        $failure = new LocalizedException(__('We cannot create the requested Coupon Qty.'));
+        $client = $this->createMock(SmailyClient::class);
+        $client->expects(self::never())->method('post');
+        $discount = $this->createMock(AutomationDiscount::class);
+        $discount->method('address')->willThrowException($failure);
+
+        $event = $this->reminderEvent(null);
+        $results = $this->reminderHandler($client, $this->createMock(StateManager::class), $discount)->handle([$event]);
+
+        self::assertSame([1 => $failure], $results);
+    }
+
+    private function reminderHandler(
+        SmailyClient $client,
+        StateManager $cartState,
+        ?AutomationDiscount $discount = null
+    ): AutomationHandler {
         $clientProvider = $this->createMock(SmailyClientProvider::class);
         $clientProvider->method('forStore')->willReturn($client);
         $router = $this->createMock(Router::class);
@@ -468,7 +537,7 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
             $cartState,
-            $this->noDiscount()
+            $discount ?? $this->noDiscount()
         );
     }
 

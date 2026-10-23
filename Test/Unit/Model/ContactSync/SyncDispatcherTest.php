@@ -167,19 +167,17 @@ class SyncDispatcherTest extends TestCase
     }
 
     /**
-     * PRO-3616: Smaily creates a contact sent without a status as subscribed,
-     * so a store unsubscribe travels with the marker.
+     * CON-196: the marker changes another field, so it carries no
+     * subscription status; the contact keeps the one it has in Smaily.
      */
-    public function testTheCartPurchaseMarkerOfAStoreUnsubscribeCarriesTheUnsubscribe(): void
+    public function testTheCartPurchaseMarkerCarriesNoStatus(): void
     {
-        $this->dispatcher->dispatchCartPurchase('shopper@example.com', 1, true);
+        $this->dispatcher->dispatchCartPurchase('shopper@example.com', 1);
 
-        $contact = $this->enqueued[0]['payload']['contact'];
         self::assertSame(
-            ['email', Trigger::ABANDONED_CART_PURCHASED_FIELD, 'is_unsubscribed'],
-            array_keys($contact)
+            ['email', Trigger::ABANDONED_CART_PURCHASED_FIELD],
+            array_keys($this->enqueued[0]['payload']['contact'])
         );
-        self::assertSame(1, $contact['is_unsubscribed']);
     }
 
     /**

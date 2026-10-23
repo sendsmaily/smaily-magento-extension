@@ -403,7 +403,9 @@ headless storefront:
   on a headless storefront: that mode accepts only the module's own
   checkbox.
 - A subscription made this way fires no welcome automation (it counts as an
-  API signup).
+  API signup). Like every change of the newsletter status, it goes to
+  Smaily as subscribed, and subscribes again a contact who unsubscribed in
+  Smaily.
 
 ### 6. Links in Smaily templates
 
@@ -435,9 +437,15 @@ separate storefront does the same:
   route from the back end (no credentials needed; see
   [On the Magento back end](#on-the-magento-back-end)).
 
-As on any store, a reminder to an address that is not a contact in the
-Smaily account adds it as a contact, and a reminder never re-subscribes a
-contact who unsubscribed. The reminder writes `abandoned_cart_automation_at`
+As on any store, the contact sync mode decides who gets a reminder (see
+[Abandoned cart](https://smaily.com/connect-magento/#set-abandoned)), and
+a contact who unsubscribed in Smaily gets none. Under **Subscribers only
+(consent)** a guest the store has no newsletter subscription for is
+reminded only when the guest is a subscribed contact in Smaily — the
+module's checkout box, which also counts, is not on a separate storefront.
+Under **All customers (legitimate interest)** a reminder to an address that
+is not a contact in the Smaily account adds it as a contact. A reminder never
+re-subscribes a contact who unsubscribed. The reminder writes `abandoned_cart_automation_at`
 on the contact, so a Smaily segment can find or exclude these contacts.
 
 ## Abandoned-cart link

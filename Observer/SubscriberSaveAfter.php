@@ -42,6 +42,12 @@ use Smaily\Connect\Model\Automation\Trigger;
  * subscription made in the admin, through the REST/SOAP/GraphQL API or by an
  * import (cron or command line) syncs the contact but fires no welcome
  * (PRO-3580).
+ *
+ * A change of the subscription status is a consent act whoever makes it — the
+ * shopper, staff in the admin, an API call in any context, a Magento import
+ * (CON-196, the same rule in every Smaily connector): it always sends
+ * is_unsubscribed, 0 or 1, and a subscription may re-subscribe a contact who
+ * unsubscribed in Smaily. Every other write leaves the status out.
  */
 class SubscriberSaveAfter implements ObserverInterface
 {

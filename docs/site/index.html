@@ -832,7 +832,7 @@ bin/magento cache:flush</code></pre>
           <thead><tr><th scope="col">Mode</th><th scope="col">Who is synced</th><th scope="col">Unsubscribes in Smaily come back?</th></tr></thead>
           <tbody>
             <tr><td><strong>Subscribers only (consent)</strong> — default</td><td>Only opted-in newsletter subscribers.</td><td>Yes, every 15 minutes — and an unsubscribe in the store goes to Smaily.</td></tr>
-            <tr><td><strong>All customers (legitimate interest)</strong></td><td>Every registered customer, as a soft opt-in: a customer new to Smaily becomes a subscriber; a contact Smaily already has keeps its status. A customer who unsubscribed in the store is sent as unsubscribed.</td><td>No</td></tr>
+            <tr><td><strong>All customers (legitimate interest)</strong></td><td>Every registered customer, as a soft opt-in: a customer new to Smaily becomes a subscriber; a contact Smaily already has keeps its status. A customer's unsubscribe in the store goes to Smaily when it is made; a later profile update or guest order carries no status, so a shopper Smaily does not have yet is added as a subscriber.</td><td>No</td></tr>
             <tr><td><strong>Checkout opt-in only</strong></td><td>Nobody automatically — only shoppers who tick the checkout newsletter checkbox. An unsubscribe in the store is sent.</td><td>No</td></tr>
           </tbody>
         </table>
@@ -841,6 +841,7 @@ bin/magento cache:flush</code></pre>
         <span class="k">All customers is a legal choice</span>
         <p>The EU soft opt-in lets you email existing customers only about products similar to what they bought; they must have had a clear way to refuse at purchase, and every email needs an unsubscribe link. You are responsible for the legal basis.</p>
       </div>
+      <p><strong>When the subscription status goes to Smaily.</strong> Only when a subscriber's newsletter status changes in Magento — by the shopper on the storefront, by staff in the admin (the customer's <strong>Newsletter</strong> tab, the <strong>Newsletter Subscribers</strong> grid and its actions), through Magento's API or by a Magento import. That is a consent act: it goes to Smaily as subscribed or unsubscribed, and a new subscription subscribes again a contact who unsubscribed in Smaily. Everything else sends no status, so the contact keeps the one it has in Smaily: a profile save that does not change the newsletter status, the automations and their fields, and the extension's own contacts import (an address Smaily does not have yet is added as a subscriber; an unsubscribed subscriber is sent as unsubscribed). Who gets an abandoned-cart reminder in each mode: see <a href="#set-abandoned">Abandoned cart</a>.</p>
       <p>With Magento's <strong>Need to Confirm</strong> newsletter option on, a signup waits for its confirmation email and syncs once confirmed.</p>
       <p>Deleting a subscriber in <span class="path">Marketing &gt; Communications &gt; Newsletter Subscribers</span> (the grid's <strong>Delete</strong> action, for one row or many) unsubscribes the contact in Smaily, as an unsubscribe in the store does, and with Campaign Intelligence connected also turns personalization off (see <a href="#pr-personalization">Personalization opt-out</a>); the contact is not deleted in Smaily. A row that was already unsubscribed sends nothing, and nothing is sent to Smaily for a website whose contact sync is not running. Deleting a customer account does not change the contact in Smaily or turn personalization off.</p>
       <h3>Other options</h3>
@@ -860,7 +861,7 @@ bin/magento cache:flush</code></pre>
           <thead><tr><th scope="col">Režiim</th><th scope="col">Keda sünkroonitakse</th><th scope="col">Kas Smaily loobumised tulevad tagasi?</th></tr></thead>
           <tbody>
             <tr><td><strong>Ainult turunduskirjade tellijad (nõusolekuga)</strong> — vaikimisi</td><td>Ainult nõusoleku andnud uudiskirja tellijad.</td><td>Jah, iga 15 minuti järel — ja poes tehtud loobumine läheb Smailysse.</td></tr>
-            <tr><td><strong>Kõik kliendid (õigustatud huvi)</strong></td><td>Iga registreeritud klient, pehme nõusolekuna: Smaily jaoks uus klient saab tellijaks; Smailys juba olev kontakt säilitab oma oleku. Poes loobunud klient saadetakse loobununa.</td><td>Ei</td></tr>
+            <tr><td><strong>Kõik kliendid (õigustatud huvi)</strong></td><td>Iga registreeritud klient, pehme nõusolekuna: Smaily jaoks uus klient saab tellijaks; Smailys juba olev kontakt säilitab oma oleku. Kliendi loobumine poes läheb Smailysse siis, kui see tehakse; hilisem profiili muutmine või külalistellimus olekut ei saada, nii et ostja, keda Smailys veel pole, lisatakse tellijana.</td><td>Ei</td></tr>
             <tr><td><strong>Ainult kassas turunduskirjade nõusoleku andnud kontaktid</strong></td><td>Kedagi ei sünkroonita automaatselt — ainult ostjad, kes märgivad kassas uudiskirja märkeruudu. Poes tehtud loobumine saadetakse.</td><td>Ei</td></tr>
           </tbody>
         </table>
@@ -869,6 +870,7 @@ bin/magento cache:flush</code></pre>
         <span class="k">„Kõik kliendid“ on õiguslik valik</span>
         <p>ELi pehme nõusolek lubab olemasolevatele klientidele saata kirju ainult nende ostetuga sarnaste toodete kohta; kliendil pidi ostu ajal olema selge võimalus keelduda ja igas kirjas peab olema loobumislink. Õigusliku aluse eest vastutad sina.</p>
       </div>
+      <p><strong>Millal läheb tellimuse olek Smailysse.</strong> Ainult siis, kui tellija uudiskirja olek Magentos muutub — ostja poes, töötaja halduses (kliendi vahekaart <strong>Newsletter</strong>, tabel <strong>Newsletter Subscribers</strong> ja selle toimingud), Magento API kaudu või Magento impordiga. See on nõusoleku toiming: see läheb Smailysse tellija või loobununa ning uus liitumine tellib uuesti ka kontakti, kes on Smailys loobunud. Kõik muu ei saada olekut, nii et kontakt säilitab Smailys oma oleku: profiili salvestamine, mis uudiskirja olekut ei muuda, automaatikad ja nende väljad ning laienduse enda kontaktide import (aadress, mida Smailys veel pole, lisatakse tellijana; loobunud tellija saadetakse loobununa). Kes saab igas režiimis hüljatud ostukorvi meeldetuletuse: vt <a href="#set-abandoned">Hüljatud ostukorv</a>.</p>
       <p>Kui Magento uudiskirja valik <strong>Need to Confirm</strong> on sees, ootab liitumine kinnituskirja ja sünkroonitakse pärast kinnitamist.</p>
       <p>Tellija kustutamine menüüs <span class="path">Marketing &gt; Communications &gt; Newsletter Subscribers</span> (tabeli toiming <strong>Delete</strong>, ühe või mitme rea jaoks) märgib kontakti Smailys loobunuks, nagu poes tehtud loobumine, ja ühendatud Campaign Intelligence'i korral lülitab välja ka personaliseerimise (vt <a href="#pr-personalization">Personaliseerimisest loobumine</a>); Smailys kontakti ei kustutata. Juba loobunud rea kustutamine ei saada midagi, samuti ei saadeta Smailysse midagi veebisaidilt, mille kontaktide sünkroonimine ei käi. Kliendikonto kustutamine kontakti Smailys ei muuda ega lülita personaliseerimist välja.</p>
       <h3>Muud valikud</h3>
@@ -892,7 +894,7 @@ bin/magento cache:flush</code></pre>
           <tbody>
             <tr><td><strong>Welcome</strong></td><td>A shopper subscribes in your store: the newsletter form, the registration form, the newsletter page of their account, the checkout checkbox or the confirmation link. A shopper who unsubscribed and subscribes again gets it again. A subscription made in the admin, through the API or by an import syncs the contact but sends no welcome.</td></tr>
             <tr><td><strong>First order</strong></td><td>A registered customer places their first order. A guest order does not fire it.</td></tr>
-            <tr><td><strong>Abandoned cart</strong></td><td>A cart with an email address has been left idle — see <a href="#set-abandoned">Abandoned cart</a>.</td></tr>
+            <tr><td><strong>Abandoned cart</strong></td><td>A cart with an email address has been left idle. The contact sync mode decides which shoppers get a reminder — see <a href="#set-abandoned">Abandoned cart</a>.</td></tr>
           </tbody>
         </table>
       </div>
@@ -914,7 +916,7 @@ bin/magento cache:flush</code></pre>
           <tbody>
             <tr><td><strong>Tervitus</strong></td><td>Ostja liitub sinu poes: uudiskirja vormi, registreerimisvormi, oma konto uudiskirja lehe, kassa märkeruudu või kinnituslingi kaudu. Loobunud ja uuesti liituv ostja saab selle uuesti. Halduses, API kaudu või impordiga tehtud liitumine sünkroonib kontakti, kuid tervitust ei saada.</td></tr>
             <tr><td><strong>Esimene tellimus</strong></td><td>Registreeritud klient esitab oma esimese tellimuse. Külalistellimus seda ei käivita.</td></tr>
-            <tr><td><strong>Hüljatud ostukorv</strong></td><td>E-posti aadressiga ostukorv on jäetud puutumata — vt <a href="#set-abandoned">Hüljatud ostukorv</a>.</td></tr>
+            <tr><td><strong>Hüljatud ostukorv</strong></td><td>E-posti aadressiga ostukorv on jäetud puutumata. Kontaktide sünkroonimise režiim otsustab, millised ostjad meeldetuletuse saavad — vt <a href="#set-abandoned">Hüljatud ostukorv</a>.</td></tr>
           </tbody>
         </table>
       </div>
@@ -941,6 +943,15 @@ bin/magento cache:flush</code></pre>
         <li>To stop the checkout being used to put other people's addresses on carts: one IP address can save at most 30 emails in 10 minutes, one cart takes at most five addresses, and the whole store at most 2,000 an hour.</li>
         <li>The reminder carries up to 10 products and a recovery link, <code>abandoned_cart_url</code>, that restores the exact cart (a registered customer signs in first). The link works for 30 days; after that it opens the cart page with "This cart link has expired."</li>
       </ul>
+      <h3>Who gets a reminder</h3>
+      <p>The website's <a href="#set-contacts">contact sync mode</a> decides, not whether contact sync is switched on. Just before each reminder goes out, the store reads the shopper's contact in Smaily:</p>
+      <ul>
+        <li>A contact who unsubscribed in Smaily gets no reminder, in every mode.</li>
+        <li><strong>Subscribers only (consent)</strong> and <strong>Checkout opt-in only</strong>: a shopper who agreed to marketing emails in the store — a newsletter subscriber of the website (a customer or a guest), or a shopper who ticked <strong>Subscribe to our newsletter</strong> at checkout for this cart, also without placing the order — gets it, also when Smaily does not have them yet. Any other shopper gets it only as a subscribed contact in Smaily, also one who unsubscribed in the store: the Smaily list is the one you send to.</li>
+        <li><strong>All customers (legitimate interest)</strong>: every cart with an email address, also when Smaily does not have the shopper (they are added as a contact), except a shopper who unsubscribed from the store's newsletter and did not tick the checkout box for this cart.</li>
+        <li><strong>Include guest order emails</strong> does not decide a guest's reminder: it applies only to the contact sync under <strong>All customers (legitimate interest)</strong>.</li>
+      </ul>
+      <p>A skipped cart's row in the Log reads <strong>Skipped</strong> with the reason. A reminder carries no subscription status, so it never subscribes a contact again who unsubscribed in Smaily. While Smaily cannot be reached, the reminder waits and is tried again.</p>
       <div class="note warn">
         <span class="k">Avoid two reminders for one cart</span>
         <p>Before you switch this automation on, switch off abandoned-cart emails sent by any other tool — for example Mageplaza SMTP, Avada Email Marketing, or Adobe Commerce's own email reminder rules.</p>
@@ -959,6 +970,15 @@ bin/magento cache:flush</code></pre>
         <li>Et kassat ei kasutataks teiste inimeste aadresside ostukorvidele panemiseks: üks IP-aadress saab salvestada kõige rohkem 30 e-posti aadressi 10 minutiga, üks ostukorv võtab kõige rohkem viis aadressi ja kogu pood kõige rohkem 2000 tunnis.</li>
         <li>Meeldetuletus sisaldab kuni 10 toodet ja taastamislinki <code>abandoned_cart_url</code>, mis taastab täpselt sama ostukorvi (registreeritud klient logib enne sisse). Link kehtib 30 päeva; pärast seda avab see ostukorvi lehe teatega „See ostukorvi link on aegunud.“</li>
       </ul>
+      <h3>Kes saab meeldetuletuse</h3>
+      <p>Otsustab veebisaidi <a href="#set-contacts">kontaktide sünkroonimise režiim</a>, mitte see, kas kontaktide sünkroonimine on sisse lülitatud. Vahetult enne iga meeldetuletuse saatmist loeb pood Smailyst ostja kontakti:</p>
+      <ul>
+        <li>Kontakt, kes on Smailys loobunud, meeldetuletust ei saa, üheski režiimis.</li>
+        <li><strong>Ainult turunduskirjade tellijad (nõusolekuga)</strong> ja <strong>Ainult kassas turunduskirjade nõusoleku andnud kontaktid</strong>: ostja, kes on poes turunduskirjadega nõustunud (veebisaidi uudiskirja tellija – klient või külaline – või ostja, kes märkis selle ostukorvi puhul kassas ruudu <strong>Liitu meie uudiskirjaga</strong>, ka tellimust esitamata), saab selle ka siis, kui teda Smailys veel pole. Iga teine ostja saab selle ainult siis, kui ta on Smailys tellija, ka poes loobunud ostja: Smaily nimekiri on see, kellele sa saadad.</li>
+        <li><strong>Kõik kliendid (õigustatud huvi)</strong>: iga e-posti aadressiga ostukorv, ka siis, kui ostjat Smailys pole (ta lisatakse kontaktiks), välja arvatud ostja, kes on poe uudiskirjast loobunud ega märkinud selle ostukorvi puhul kassa ruutu.</li>
+        <li><strong>Kaasa külalistellimuste e-posti aadressid</strong> ei otsusta külalise meeldetuletust: see kehtib ainult kontaktide sünkroonimisele režiimis <strong>Kõik kliendid (õigustatud huvi)</strong>.</li>
+      </ul>
+      <p>Vahele jäetud ostukorvi rida on logis <strong>Vahele jäetud</strong> koos põhjusega. Meeldetuletus ei saada tellimuse olekut, nii et see ei telli kunagi uuesti kontakti, kes on Smailys loobunud. Kuni Smailyga ühendust ei saa, meeldetuletus ootab ja seda proovitakse uuesti.</p>
       <div class="note warn">
         <span class="k">Väldi kahte meeldetuletust ühe ostukorvi kohta</span>
         <p>Enne selle automaatika sisselülitamist lülita välja hüljatud ostukorvi kirjad, mida saadab mõni teine tööriist — näiteks Mageplaza SMTP, Avada Email Marketing või Adobe Commerce'i enda e-posti meeldetuletuste reeglid.</p>
@@ -1824,6 +1844,9 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
             <tr><td>"Skipped: no Smaily workflow is mapped to this automation trigger."</td><td>Pick a workflow under <span class="path">Settings &gt; Automations</span> (or for that language).</td></tr>
             <tr><td>"Skipped: this automation has no Smaily workflow for the contact's language (…), and no default fallback workflow either."</td><td>With <a href="#set-multilingual">per-language Smaily accounts</a>: pick a workflow for that language under <span class="path">Settings &gt; Automations</span>, or a <strong>Default fallback</strong>.</td></tr>
             <tr><td>"Skipped: this address already got an abandoned-cart reminder for another cart in the last 24 hours."</td><td>Nothing — the one-reminder-a-day rule.</td></tr>
+            <tr><td>"Skipped: this shopper has not agreed to marketing emails in the store, and is not a subscribed contact in Smaily."</td><td>Nothing — under <strong>Subscribers only (consent)</strong> and <strong>Checkout opt-in only</strong> a reminder goes only to a shopper who agreed in the store or is subscribed in Smaily (see <a href="#set-abandoned">Abandoned cart</a>).</td></tr>
+            <tr><td>"Skipped: this shopper unsubscribed from the store's newsletter."</td><td>Nothing — no reminder goes to a shopper who unsubscribed.</td></tr>
+            <tr><td>"Skipped: this shopper unsubscribed in Smaily."</td><td>Nothing — no reminder goes to a contact who unsubscribed in Smaily, in any mode.</td></tr>
             <tr><td>"Skipped: Smaily does not have this contact, and the purchase marker would create it as a subscriber."</td><td>Nothing — the purchase marker never creates a contact.</td></tr>
             <tr><td>"Skipped: the shopper has since changed their personalization preference, …"</td><td>Nothing — the newer choice goes on its own row.</td></tr>
             <tr><td>"Skipped: the shopper opted out of personalized recommendations, so their browsing is not linked to their address."</td><td>Nothing — this respects the opt-out.</td></tr>
@@ -1841,6 +1864,9 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
             <tr><td>„Vahele jäetud: selle automaatika päästikuga pole seotud ühtegi Smaily töövoogu.“</td><td>Vali töövoog jaotises <span class="path">Seaded &gt; Automaatikad</span> (või selle keele jaoks).</td></tr>
             <tr><td>„Vahele jäetud: sellel automaatikal pole kontakti keele (…) jaoks Smaily töövoogu ega ka vaikimisi varuvalikut.“</td><td><a href="#set-multilingual">Keelepõhiste Smaily kontodega</a>: vali selle keele töövoog jaotises <span class="path">Seaded &gt; Automaatikad</span> või <strong>Vaikimisi varuvalik</strong>.</td></tr>
             <tr><td>„Vahele jäetud: sellele aadressile saadeti viimase 24 tunni jooksul juba teise ostukorvi meeldetuletus.“</td><td>Midagi — üks meeldetuletus päevas.</td></tr>
+            <tr><td>„Vahele jäetud: see ostja pole poes turunduskirjadega nõustunud ega ole Smailys tellija.“</td><td>Midagi — režiimides <strong>Ainult turunduskirjade tellijad (nõusolekuga)</strong> ja <strong>Ainult kassas turunduskirjade nõusoleku andnud kontaktid</strong> saab meeldetuletuse ainult ostja, kes on poes nõustunud või on Smailys tellija (vt <a href="#set-abandoned">Hüljatud ostukorv</a>).</td></tr>
+            <tr><td>„Vahele jäetud: see ostja loobus poe uudiskirjast.“</td><td>Midagi — loobunud ostjale meeldetuletust ei saadeta.</td></tr>
+            <tr><td>„Vahele jäetud: see ostja on Smailys loobunud.“</td><td>Midagi — Smailys loobunud kontaktile meeldetuletust ei saadeta, üheski režiimis.</td></tr>
             <tr><td>„Vahele jäetud: Smailys ei ole seda kontakti ja ostu märge looks selle tellijana.“</td><td>Midagi — ostu märge ei loo kunagi kontakti.</td></tr>
             <tr><td>„Vahele jäetud: ostja on vahepeal oma personaliseerimise eelistust muutnud, …“</td><td>Midagi — uuem valik saadetakse eraldi real.</td></tr>
             <tr><td>„Vahele jäetud: ostja loobus personaalsetest soovitustest, seega tema sirvimist ei seota tema e-posti aadressiga.“</td><td>Midagi — nii austatakse loobumist.</td></tr>
@@ -1969,6 +1995,7 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
         <li>The cart has an email address: a signed-in customer's, or a guest's typed on the checkout's email field.</li>
         <li>The cart has been idle longer than <strong>Wait (minutes)</strong>, but less than 24 hours.</li>
         <li>The cart was not reminded already, and the address got no reminder for another cart in the last 24 hours (that row reads <strong>Skipped</strong>).</li>
+        <li>The website's contact sync mode allows a reminder to this shopper — see <a href="#set-abandoned">Abandoned cart</a>. A skipped cart's row reads <strong>Skipped</strong> with the reason.</li>
         <li>The address has not unsubscribed in Smaily — an automation never re-subscribes a contact who unsubscribed. An address that is not a contact yet is added as one.</li>
       </ul>
     </div>
@@ -1978,6 +2005,7 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
         <li>Ostukorvil on e-posti aadress: sisselogitud kliendi oma või külalise oma, mis on sisestatud kassa e-posti väljale.</li>
         <li>Ostukorv on olnud puutumata kauem kui <strong>Ooteaeg (minutites)</strong>, kuid vähem kui 24 tundi.</li>
         <li>Ostukorvile pole meeldetuletust juba saadetud ja aadress pole viimase 24 tunni jooksul saanud teise ostukorvi meeldetuletust (see rida on <strong>Vahele jäetud</strong>).</li>
+        <li>Veebisaidi kontaktide sünkroonimise režiim lubab sellele ostjale meeldetuletuse — vt <a href="#set-abandoned">Hüljatud ostukorv</a>. Vahele jäetud ostukorvi rida on <strong>Vahele jäetud</strong> koos põhjusega.</li>
         <li>Aadress pole Smailys loobunud — automaatika ei telli kunagi uuesti kontakti, kes on loobunud. Aadress, mis pole veel kontakt, lisatakse kontaktiks.</li>
       </ul>
     </div>

@@ -8,8 +8,16 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Cron;
 
+use GuzzleHttp\Client as HttpClient;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
+use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Response;
+use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Data\Collection\EntityFactoryInterface;
 use Magento\Framework\Model\ResourceModel\Db\VersionControl\Snapshot;
+use Magento\Newsletter\Model\Subscriber;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\ResourceModel\Quote as QuoteResource;
 use Magento\Quote\Model\ResourceModel\Quote\Collection as QuoteCollection;
@@ -20,19 +28,34 @@ use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
 use Smaily\Connect\Cron\AbandonedCart;
+use Smaily\Connect\Cron\FlushEventQueue;
 use Smaily\Connect\Cron\QueueJanitor;
 use Smaily\Connect\Model\AbandonedCart\PayloadBuilder;
+use Smaily\Connect\Model\AbandonedCart\ReminderConsent;
 use Smaily\Connect\Model\AbandonedCart\StateManager;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
+use Smaily\Connect\Model\Automation\Router;
+use Smaily\Connect\Model\Automation\WorkflowMatch;
+use Smaily\Connect\Model\Client\HttpClientFactory;
+use Smaily\Connect\Model\Client\SmailyClient;
+use Smaily\Connect\Model\Client\SmailyClientProvider;
+use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Config\Source\SyncMode;
+use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\ContactSync\SubscriberPayloadBuilder;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
 use Smaily\Connect\Model\Log\QueueRowLoader;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
 use Smaily\Connect\Model\Privacy\AddressKey;
 use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\EventType;
+use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
+use Smaily\Connect\Model\Queue\HandlerPool;
 use Smaily\Connect\Model\ResourceModel\Log\Collection;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
@@ -45,7 +68,12 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  * number of carts carry it. PRO-3711: handled carts never keep a new one
  * out of the scan's page. The payload builder is stubbed: it reads the
  * cart's own email. PRO-1960: the reminders are built once per store, under
- * one emulation of that store.
+ * one emulation of that store. CON-195: who gets a reminder follows the
+ * website's contact-sync mode, on real newsletter_subscriber rows, and every
+ * reminder reads its contact in Smaily first (CON-196); the reminders go
+ * through the real automation handler and Smaily client, with only the HTTP
+ * transport faked. Contact sync is off throughout: the reminder does not
+ * depend on it.
  */
 class AbandonedCartTest extends IntegrationTestCase
 {
@@ -56,18 +84,28 @@ class AbandonedCartTest extends IntegrationTestCase
     /** @var array<int, int[]> The quote ids of each payload build, in build order. */
     private array $builds = [];
 
+    /** The website's contact-sync mode. */
+    private string $syncMode = SyncMode::MODE_CONSENT;
+
+    /** @var array<int, array{request: Request}> what the fake transport received */
+    private array $requests = [];
+
+    private SchemaInstaller $schema;
+
     protected function setUp(): void
     {
         parent::setUp();
         require_once __DIR__ . '/../Support/Stub/QuoteCollectionFactory.php';
         $this->stateManager = $this->objectManager->create(StateManager::class);
-        $schema = new SchemaInstaller($this->connection);
-        $schema->createQuote();
-        $schema->createQuoteAddress();
+        $this->schema = new SchemaInstaller($this->connection);
+        $this->schema->createQuote();
+        $this->schema->createQuoteAddress();
+        $this->schema->createContactTables();
     }
 
     protected function tearDown(): void
     {
+        $this->schema->dropContactTables();
         $this->connection->query('DROP TABLE IF EXISTS `quote_address`');
         $this->connection->query('DROP TABLE IF EXISTS `quote`');
         parent::tearDown();
@@ -279,6 +317,181 @@ class AbandonedCartTest extends IntegrationTestCase
         self::assertSame([], $this->fetchAll(EventResource::TABLE_NAME), 'No reminder is queued');
     }
 
+    /**
+     * CON-195, CON-196: in the consent and checkout opt-in modes a shopper
+     * who agreed to marketing emails in the store — a subscribed customer, a
+     * guest who ticked the checkout newsletter box on the cart (no order
+     * placed), a guest who signed up to the newsletter — gets the reminder,
+     * also when Smaily does not have them yet. The contact is read first, and
+     * one who unsubscribed in Smaily gets none.
+     *
+     * @dataProvider consentModes
+     */
+    public function testInTheConsentModesAShopperWhoAgreedInTheStoreGetsTheReminder(string $mode): void
+    {
+        $this->syncMode = $mode;
+        $this->customerCart(1, 'customer@example.com', 7);
+        $this->subscriber('customer@example.com', Subscriber::STATUS_SUBSCRIBED, 7);
+        $this->idleCarts([2 => 'ticked@example.com', 3 => 'signed-up@example.com']);
+        $this->stateManager->setNewsletterOptin(2, 1, 'ticked@example.com', true);
+        $this->subscriber('Signed-Up@example.com', Subscriber::STATUS_SUBSCRIBED);
+
+        $this->cron()->execute();
+        foreach ([1, 2, 3] as $quoteId) {
+            self::assertSame(StateManager::STATUS_MAILED, $this->statusOf($quoteId));
+        }
+        $this->flush([
+            $this->contact('customer@example.com', '0'),
+            $this->ok(),
+            $this->notAContact(),
+            $this->ok(),
+            $this->contact('signed-up@example.com', '1'),
+        ]);
+
+        self::assertSame(['GET', 'POST', 'GET', 'POST', 'GET'], $this->requestMethods());
+        $this->assertRemindersNeverResubscribe(['customer@example.com', 'ticked@example.com']);
+        $this->assertSkipped(3, AutomationHandler::SKIPPED_UNSUBSCRIBED_IN_SMAILY);
+    }
+
+    /**
+     * CON-195: in the consent and checkout opt-in modes a shopper without
+     * store consent gets the reminder as a subscribed contact in Smaily —
+     * also one unsubscribed in the store (Erkki, 2026-10-23: the Smaily list
+     * is the one the merchant sends to).
+     *
+     * @dataProvider consentModes
+     */
+    public function testInTheConsentModesASubscribedContactInSmailyGetsTheReminder(string $mode): void
+    {
+        $this->syncMode = $mode;
+        $this->idleCarts([4 => 'smaily-subscriber@example.com', 9 => 'left-in-store@example.com']);
+        $this->stateManager->setNewsletterOptin(4, 1, 'smaily-subscriber@example.com', false);
+        $this->subscriber('left-in-store@example.com', Subscriber::STATUS_UNSUBSCRIBED);
+
+        $this->cron()->execute();
+        $this->flush([
+            $this->contact('smaily-subscriber@example.com', '0'),
+            $this->ok(),
+            $this->contact('left-in-store@example.com', '0'),
+            $this->ok(),
+        ]);
+
+        self::assertSame(['GET', 'POST', 'GET', 'POST'], $this->requestMethods());
+        self::assertStringContainsString(
+            'email=smaily-subscriber%40example.com',
+            (string)$this->requests[0]['request']->getUri()
+        );
+        self::assertSame(StateManager::STATUS_MAILED, $this->statusOf(4));
+        $this->assertRemindersNeverResubscribe(['smaily-subscriber@example.com', 'left-in-store@example.com']);
+    }
+
+    /**
+     * CON-195: in the consent and checkout opt-in modes every other cart is
+     * skipped: Smaily does not have the shopper, or has them unsubscribed.
+     * Nothing is posted, the Log shows the row as Skipped with the reason,
+     * and the cart is closed as skipped without counting as reminded — the
+     * shopper's next cart is weighed again, not held back as reminded.
+     *
+     * @dataProvider consentModes
+     */
+    public function testInTheConsentModesEveryOtherCartIsSkippedAndTheLogSaysWhy(string $mode): void
+    {
+        $this->syncMode = $mode;
+        $this->idleCarts([5 => 'unknown@example.com', 6 => 'left@example.com']);
+
+        $this->cron()->execute();
+        $this->flush([$this->notAContact(), $this->contact('left@example.com', '1')]);
+
+        self::assertSame(['GET', 'GET'], $this->requestMethods(), 'Nothing is posted');
+        $this->assertSkipped(5, AutomationHandler::SKIPPED_NO_MARKETING_CONSENT);
+        $this->assertSkipped(6, AutomationHandler::SKIPPED_UNSUBSCRIBED_IN_SMAILY);
+
+        $this->idleCarts([7 => 'unknown@example.com']);
+        $this->cron()->execute();
+
+        $last = $this->fetchAll(EventResource::TABLE_NAME);
+        $last = end($last);
+        self::assertIsArray($last);
+        self::assertSame(Event::STATUS_PENDING, $last['status'], 'Weighed again, not held back as reminded');
+        self::assertSame(
+            ['quote_id' => 7, 'new_contact' => false],
+            json_decode((string)$last['payload'], true)[AutomationHandler::CART_REMINDER]
+        );
+    }
+
+    public function testAReminderWaitsWhenSmailyCannotBeRead(): void
+    {
+        $this->idleCarts([8 => 'unread@example.com']);
+
+        $this->cron()->execute();
+        $this->flush([new Response(503, [], 'Service unavailable')]);
+
+        self::assertSame(['GET'], $this->requestMethods(), 'Nothing is posted while the answer is not known');
+        $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
+        self::assertSame(Event::STATUS_PENDING, $row['status'], 'Retried on the ladder');
+        self::assertSame('1', (string)$row['attempts']);
+        self::assertSame(StateManager::STATUS_MAILED, $this->statusOf(8));
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function consentModes(): array
+    {
+        return [
+            'subscribers only (consent)' => [SyncMode::MODE_CONSENT],
+            'checkout opt-in only' => [SyncMode::MODE_CHECKOUT_OPTIN],
+        ];
+    }
+
+    /**
+     * CON-195, CON-196: in the legitimate-interest mode every cart with an
+     * email gets the reminder — no newsletter record, a pending confirmation,
+     * a subscriber, an address Smaily does not have (enrolled) — except a
+     * shopper unsubscribed in the store, by customer or by address, whose
+     * cart is skipped in the cron with the reason in the Log, and a contact
+     * who unsubscribed in Smaily. A shopper who unsubscribed in the store and
+     * ticked the checkout newsletter box on this cart gave a new consent.
+     */
+    public function testInTheLegitimateInterestModeEveryCartButAnUnsubscribeGetsTheReminder(): void
+    {
+        $this->syncMode = SyncMode::MODE_LEGITIMATE_INTEREST;
+        $this->idleCarts([1 => 'anyone@example.com', 2 => 'pending@example.com', 3 => 'left-in-smaily@example.com']);
+        $this->subscriber('pending@example.com', Subscriber::STATUS_NOT_ACTIVE);
+        $this->subscriber('left-in-smaily@example.com', Subscriber::STATUS_SUBSCRIBED);
+        $this->customerCart(4, 'renamed@example.com', 9);
+        $this->subscriber('old-address@example.com', Subscriber::STATUS_UNSUBSCRIBED, 9);
+        $this->idleCarts([5 => 'left-guest@example.com', 6 => 'ticked-again@example.com']);
+        $this->subscriber('left-guest@example.com', Subscriber::STATUS_UNSUBSCRIBED);
+        $this->subscriber('ticked-again@example.com', Subscriber::STATUS_UNSUBSCRIBED);
+        $this->stateManager->setNewsletterOptin(6, 1, 'ticked-again@example.com', true);
+
+        $this->cron()->execute();
+
+        $rows = $this->queueRowsByEntity();
+        foreach (['renamed@example.com' => 4, 'left-guest@example.com' => 5] as $email => $quoteId) {
+            self::assertSame(StateManager::STATUS_SKIPPED, $this->statusOf($quoteId));
+            self::assertSame(Event::STATUS_SENT, $rows[$email]['status']);
+            self::assertNull($rows[$email]['sent_payload'], 'Nothing was sent');
+            self::assertSame(AbandonedCart::SKIPPED_UNSUBSCRIBED_IN_STORE, $rows[$email]['last_error']);
+        }
+        self::assertSame(StateManager::STATUS_MAILED, $this->statusOf(6), 'The tick is a new consent');
+
+        $this->flush([
+            $this->notAContact(),
+            $this->ok(),
+            $this->contact('pending@example.com', '0'),
+            $this->ok(),
+            $this->contact('left-in-smaily@example.com', '1'),
+            $this->notAContact(),
+            $this->ok(),
+        ]);
+
+        self::assertSame(['GET', 'POST', 'GET', 'POST', 'GET', 'GET', 'POST'], $this->requestMethods());
+        $this->assertRemindersNeverResubscribe(['anyone@example.com', 'pending@example.com', 'ticked-again@example.com']);
+        $this->assertSkipped(3, AutomationHandler::SKIPPED_UNSUBSCRIBED_IN_SMAILY);
+    }
+
     private function cron(?Emulation $emulation = null): AbandonedCart
     {
         $store = $this->createMock(Store::class);
@@ -297,6 +510,9 @@ class AbandonedCartTest extends IntegrationTestCase
         $config->method('isAbandonedCartEnabled')->willReturn(true);
         $config->method('isConnected')->willReturn(true);
         $config->method('getAbandonedCutoffMinutes')->willReturn(30);
+        $config->method('getSyncMode')->willReturnCallback(fn (): string => $this->syncMode);
+        // The reminder does not depend on whether contact sync runs (CON-196).
+        $config->method('isContactSyncActive')->willReturn(false);
 
         $languages = $this->createMock(LanguageResolver::class);
         $languages->method('forStore')->willReturn('en');
@@ -328,8 +544,171 @@ class AbandonedCartTest extends IntegrationTestCase
             $dispatcher,
             $emulation ?? $this->createMock(Emulation::class),
             $this->clock,
-            $this->createMock(Logger::class)
+            $this->createMock(Logger::class),
+            new ReminderConsent(
+                new Mode($config),
+                $this->objectManager->get(ResourceConnection::class),
+                $this->stateManager
+            )
         );
+    }
+
+    /**
+     * The queue flush cron with the real automation handler and a real
+     * Smaily client; every reminder matches workflow 7, and only the HTTP
+     * transport is faked.
+     *
+     * @param array<int, Response|\Throwable> $responses
+     */
+    private function flush(array $responses): void
+    {
+        $handlerStack = HandlerStack::create(new MockHandler($responses));
+        $handlerStack->push(Middleware::history($this->requests));
+        $httpClientFactory = $this->createMock(HttpClientFactory::class);
+        $httpClientFactory->method('create')->willReturnCallback(
+            static function (array $config) use ($handlerStack): HttpClient {
+                $config['handler'] = $handlerStack;
+
+                return new HttpClient($config);
+            }
+        );
+        /** @var Logger $logger */
+        $logger = $this->objectManager->get(Logger::class);
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->method('forStore')->willReturn(new SmailyClient(
+            $httpClientFactory,
+            $logger,
+            $this->createMock(VerifiedCredentials::class),
+            'demo',
+            'user',
+            'secret'
+        ));
+        $router = $this->createMock(Router::class);
+        $router->method('resolve')->willReturn(new WorkflowMatch(7));
+
+        /** @var FlushEventQueue $cron */
+        $cron = $this->objectManager->create(FlushEventQueue::class, [
+            'handlerPool' => new HandlerPool([
+                EventType::AUTOMATION_TRIGGER => $this->objectManager->create(AutomationHandler::class, [
+                    'clientProvider' => $clientProvider,
+                    'router' => $router,
+                    'accountResolver' => $this->createMock(AccountResolver::class),
+                    'overrides' => $this->createMock(WebsiteOverrides::class),
+                    'storeManager' => $this->createMock(StoreManagerInterface::class),
+                    'cartState' => $this->stateManager,
+                ]),
+            ]),
+        ]);
+        $cron->execute();
+    }
+
+    private function ok(): Response
+    {
+        return new Response(200, [], '{"code":101,"message":"OK"}');
+    }
+
+    /**
+     * Smaily's answer to a contact read: the contact with its status.
+     */
+    private function contact(string $email, string $isUnsubscribed): Response
+    {
+        return new Response(200, [], (string)json_encode(['email' => $email, 'is_unsubscribed' => $isUnsubscribed]));
+    }
+
+    private function notAContact(): Response
+    {
+        return new Response(200, [], '{"code":206,"message":"Could not find requested email address"}');
+    }
+
+    /**
+     * The cart's reminder was closed without sending: the queue row is
+     * Skipped in the Log with the reason, and the cart is skipped without
+     * counting as reminded.
+     */
+    private function assertSkipped(int $quoteId, string $reason): void
+    {
+        self::assertSame(StateManager::STATUS_SKIPPED, $this->statusOf($quoteId));
+        self::assertNull($this->fetchRow(self::CART_TABLE, $quoteId, 'quote_id')['mail_sent_at']);
+        $rows = array_filter(
+            $this->fetchAll(EventResource::TABLE_NAME),
+            static fn (array $row): bool => (json_decode((string)$row['payload'], true)
+                [AutomationHandler::CART_REMINDER]['quote_id'] ?? null) === $quoteId
+        );
+        self::assertCount(1, $rows);
+        $row = reset($rows);
+        self::assertSame(Event::STATUS_SENT, $row['status'], 'Closed: retrying cannot change the answer');
+        self::assertNull($row['sent_payload'], 'Nothing was sent');
+        self::assertSame($reason, $row['last_error']);
+        /** @var QueueRowLoader $rowLoader */
+        $rowLoader = $this->objectManager->create(QueueRowLoader::class);
+        self::assertSame(
+            Collection::STATUS_SKIPPED,
+            $rowLoader->load('smaily-' . $row['id'])['status'] ?? null,
+            'The Log shows the row as Skipped'
+        );
+    }
+
+    /**
+     * @return string[]
+     */
+    private function requestMethods(): array
+    {
+        return array_map(static fn (array $entry): string => $entry['request']->getMethod(), $this->requests);
+    }
+
+    /**
+     * The reminders posted went to these addresses, each with
+     * force_opt_in=false and no is_unsubscribed: a reminder never
+     * re-subscribes a contact who unsubscribed in Smaily (CON-195,
+     * PRO-3577).
+     *
+     * @param string[] $emails
+     */
+    private function assertRemindersNeverResubscribe(array $emails): void
+    {
+        $posted = [];
+        foreach ($this->requests as $entry) {
+            if ($entry['request']->getMethod() !== 'POST') {
+                continue;
+            }
+            $body = json_decode((string)$entry['request']->getBody(), true);
+            self::assertSame(7, $body['autoresponder']);
+            self::assertFalse($body['force_opt_in']);
+            foreach ($body['addresses'] as $address) {
+                self::assertArrayNotHasKey('is_unsubscribed', $address);
+                $posted[] = $address['email'];
+            }
+        }
+        self::assertSame($emails, $posted);
+    }
+
+    /**
+     * Seed a signed-in customer's active cart, idle for an hour.
+     */
+    private function customerCart(int $quoteId, string $email, int $customerId): void
+    {
+        $this->connection->insert('quote', [
+            'entity_id' => $quoteId,
+            'store_id' => 1,
+            'is_active' => 1,
+            'items_count' => 1,
+            'customer_id' => $customerId,
+            'customer_email' => $email,
+            'updated_at' => $this->clockDate(-3600),
+        ]);
+    }
+
+    /**
+     * Seed a newsletter record of the website's store view 2.
+     */
+    private function subscriber(string $email, int $status, int $customerId = 0): void
+    {
+        $this->connection->insert('newsletter_subscriber', [
+            'store_id' => 2,
+            'customer_id' => $customerId,
+            'subscriber_email' => $email,
+            'subscriber_status' => $status,
+        ]);
     }
 
     /**

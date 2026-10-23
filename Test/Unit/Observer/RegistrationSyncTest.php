@@ -81,6 +81,10 @@ class RegistrationSyncTest extends TestCase
         ], $this->contactSyncs());
     }
 
+    /**
+     * CON-195: the profile save goes without is_unsubscribed, so it never
+     * re-subscribes a contact who unsubscribed in Smaily since.
+     */
     public function testAProfileEditAfterTheRegistrationStillSyncs(): void
     {
         $this->register(SyncMode::MODE_CONSENT);
@@ -90,7 +94,7 @@ class RegistrationSyncTest extends TestCase
 
         self::assertSame([
             ['email' => self::EMAIL, 'is_unsubscribed' => 0, 'first_name' => 'Test'],
-            ['email' => self::EMAIL, 'is_unsubscribed' => 0, 'first_name' => 'Changed'],
+            ['email' => self::EMAIL, 'first_name' => 'Changed'],
         ], $this->contactSyncs());
     }
 

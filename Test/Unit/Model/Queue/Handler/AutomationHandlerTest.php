@@ -11,9 +11,11 @@ namespace Smaily\Connect\Test\Unit\Model\Queue\Handler;
 use Magento\Store\Api\Data\WebsiteInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\AbandonedCart\StateManager;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\WorkflowMatch;
+use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\TransportException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
@@ -28,6 +30,8 @@ use Smaily\Connect\Model\Queue\Skipped;
 
 class AutomationHandlerTest extends TestCase
 {
+    private EventQueue $eventQueue;
+
     /**
      * PRO-3577: an automation trigger never re-subscribes a contact who
      * unsubscribed in Smaily. The handler reads no setting for it, so a
@@ -70,7 +74,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(AccountResolver::class),
             $this->createMock(Config::class),
             $this->createMock(WebsiteOverrides::class),
-            $this->createMock(StoreManagerInterface::class)
+            $this->createMock(StoreManagerInterface::class),
+            $this->createMock(StateManager::class)
         );
 
         self::assertSame([1 => true], $handler->handle([$event]));
@@ -99,7 +104,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(AccountResolver::class),
             $this->createMock(Config::class),
             $this->createMock(WebsiteOverrides::class),
-            $this->createMock(StoreManagerInterface::class)
+            $this->createMock(StoreManagerInterface::class),
+            $this->createMock(StateManager::class)
         );
 
         self::assertEquals([1 => Failure::permanent('Malformed automation payload')], $handler->handle([$event]));
@@ -137,7 +143,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(AccountResolver::class),
             $this->createMock(Config::class),
             $this->createMock(WebsiteOverrides::class),
-            $this->createMock(StoreManagerInterface::class)
+            $this->createMock(StoreManagerInterface::class),
+            $this->createMock(StateManager::class)
         );
 
         self::assertEquals(
@@ -177,7 +184,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(AccountResolver::class),
             $config,
             $this->createMock(WebsiteOverrides::class),
-            $this->createMock(StoreManagerInterface::class)
+            $this->createMock(StoreManagerInterface::class),
+            $this->createMock(StateManager::class)
         );
 
         self::assertEquals(
@@ -222,7 +230,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(AccountResolver::class),
             $this->createMock(Config::class),
             $overrides,
-            $storeManager
+            $storeManager,
+            $this->createMock(StateManager::class)
         );
 
         self::assertEquals(
@@ -301,7 +310,8 @@ class AutomationHandlerTest extends TestCase
             $accountResolver,
             $this->createMock(Config::class),
             $this->createMock(WebsiteOverrides::class),
-            $this->createMock(StoreManagerInterface::class)
+            $this->createMock(StoreManagerInterface::class),
+            $this->createMock(StateManager::class)
         );
 
         self::assertSame([1 => true], $handler->handle([$event]));
@@ -346,9 +356,133 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(AccountResolver::class),
             $this->createMock(Config::class),
             $this->createMock(WebsiteOverrides::class),
-            $this->createMock(StoreManagerInterface::class)
+            $this->createMock(StoreManagerInterface::class),
+            $this->createMock(StateManager::class)
         );
 
         self::assertSame([1 => $refusal], $handler->handle([$event]));
+    }
+
+    /**
+     * CON-195, CON-196: every abandoned-cart reminder reads its contact first.
+     * A contact who unsubscribed in Smaily gets none, whether or not a new
+     * contact is allowed; an address Smaily does not have gets it only when
+     * a new contact is allowed (store consent, or legitimate interest). A
+     * skip closes the row as Skipped and the cart as skipped, with nothing
+     * posted.
+     *
+     * @return array<string, array{0: array<int|string, mixed>|\Throwable, 1: bool, 2: ?string}>
+     */
+    public static function contactReadCases(): array
+    {
+        $subscribed = ['email' => 'person@example.com', 'is_unsubscribed' => '0'];
+        $unsubscribed = ['email' => 'person@example.com', 'is_unsubscribed' => '1'];
+        $missing = new ApiException('Could not find requested email address', 206);
+        $left = AutomationHandler::SKIPPED_UNSUBSCRIBED_IN_SMAILY;
+
+        return [
+            'a subscribed contact, no new contact' => [$subscribed, false, null],
+            'a subscribed contact, new contact allowed' => [$subscribed, true, null],
+            'a subscribed contact, as a list' => [[['email' => 'person@example.com', 'is_unsubscribed' => 0]], false, null],
+            'an unsubscribed contact, no new contact' => [$unsubscribed, false, $left],
+            'an unsubscribed contact, new contact allowed' => [$unsubscribed, true, $left],
+            'a contact without a status' => [['email' => 'person@example.com'], true, $left],
+            'no contact, no new contact' => [$missing, false, AutomationHandler::SKIPPED_NO_MARKETING_CONSENT],
+            'no contact, new contact allowed' => [$missing, true, null],
+        ];
+    }
+
+    /**
+     * @dataProvider contactReadCases
+     * @param array<int|string, mixed>|\Throwable $contact
+     */
+    public function testAReminderGoesByTheContactInSmaily(
+        array|\Throwable $contact,
+        bool $newContact,
+        ?string $skipReason
+    ): void {
+        $client = $this->createMock(SmailyClient::class);
+        $read = $client->expects(self::once())->method('get')
+            ->with(SmailyClient::ENDPOINT_CONTACT, ['email' => 'person@example.com']);
+        $contact instanceof \Throwable ? $read->willThrowException($contact) : $read->willReturn($contact);
+        $client->expects($skipReason === null ? self::once() : self::never())->method('post');
+        $cartState = $this->createMock(StateManager::class);
+        $cartState->expects($skipReason === null ? self::never() : self::once())
+            ->method('markReminderSkipped')->with(42);
+
+        $event = $this->reminderEvent($newContact);
+        $results = $this->reminderHandler($client, $cartState)->handle([$event]);
+
+        self::assertEquals([1 => $skipReason === null ? true : new Skipped($skipReason)], $results);
+    }
+
+    public function testAReminderWaitsWhenSmailyCannotBeRead(): void
+    {
+        $failure = new TransportException('Smaily API request failed with HTTP 503', 503);
+        $client = $this->createMock(SmailyClient::class);
+        $client->method('get')->willThrowException($failure);
+        $client->expects(self::never())->method('post');
+        $cartState = $this->createMock(StateManager::class);
+        $cartState->expects(self::never())->method('markReminderSkipped');
+
+        $event = $this->reminderEvent(true);
+        $results = $this->reminderHandler($client, $cartState)->handle([$event]);
+
+        self::assertSame([1 => $failure], $results);
+    }
+
+    public function testAnotherAutomationIsPostedWithoutAContactRead(): void
+    {
+        $client = $this->createMock(SmailyClient::class);
+        $client->expects(self::never())->method('get');
+        $client->expects(self::once())->method('post');
+
+        $event = $this->reminderEvent(null);
+        $handler = $this->reminderHandler($client, $this->createMock(StateManager::class));
+
+        self::assertSame([1 => true], $handler->handle([$event]));
+    }
+
+    private function reminderHandler(SmailyClient $client, StateManager $cartState): AutomationHandler
+    {
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->method('forStore')->willReturn($client);
+        $router = $this->createMock(Router::class);
+        $router->method('resolve')->willReturn(new WorkflowMatch(7));
+
+        return new AutomationHandler(
+            $clientProvider,
+            $router,
+            $this->eventQueue,
+            $this->createMock(Logger::class),
+            $this->createMock(AccountResolver::class),
+            $this->createMock(Config::class),
+            $this->createMock(WebsiteOverrides::class),
+            $this->createMock(StoreManagerInterface::class),
+            $cartState
+        );
+    }
+
+    /**
+     * An abandoned-cart reminder of cart 42 — or, with $newContact null, a
+     * welcome; the queue mock decodes it.
+     */
+    private function reminderEvent(?bool $newContact): Event
+    {
+        $payload = [
+            'trigger_type' => $newContact === null ? 'welcome' : 'abandoned_cart',
+            'store_id' => 1,
+            'website_id' => 1,
+            'address' => ['email' => 'person@example.com'],
+        ];
+        if ($newContact !== null) {
+            $payload[AutomationHandler::CART_REMINDER] = ['quote_id' => 42, 'new_contact' => $newContact];
+        }
+        $this->eventQueue = $this->createMock(EventQueue::class);
+        $this->eventQueue->method('decodePayload')->willReturn($payload);
+        $event = $this->createMock(Event::class);
+        $event->method('getId')->willReturn(1);
+
+        return $event;
     }
 }

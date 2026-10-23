@@ -16,6 +16,7 @@ use Magento\Store\Model\StoreManagerInterface;
 use Magento\Framework\App\Area;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Smaily\Connect\Model\AbandonedCart\PayloadBuilder;
+use Smaily\Connect\Model\AbandonedCart\ReminderConsent;
 use Smaily\Connect\Model\AbandonedCart\StateManager;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Config;
@@ -37,11 +38,21 @@ use Smaily\Connect\Model\Logger\Logger;
  * number of carts carry it (PRO-3693): a cart whose address had a reminder
  * for another cart in that time is closed as skipped, in the side table and
  * as a skipped row in the Log.
+ *
+ * Who gets a reminder follows the website's contact-sync mode
+ * (AbandonedCart\ReminderConsent, CON-195, CON-196), not whether contact
+ * sync runs: a cart of a shopper unsubscribed in the store under legitimate
+ * interest is closed as skipped here, with the reason in the Log; every other
+ * reminder is queued with its cart, and the queue reads the contact in Smaily
+ * before it sends.
  */
 class AbandonedCart
 {
     public const SKIPPED_RECENTLY_REMINDED = 'Skipped: this address already got an abandoned-cart reminder'
         . ' for another cart in the last 24 hours. Nothing was sent.';
+
+    public const SKIPPED_UNSUBSCRIBED_IN_STORE = 'Skipped: this shopper unsubscribed from the store\'s newsletter.'
+        . ' Nothing was sent.';
 
     private const MAX_AGE_SECONDS = 86400;
     private const REMINDER_INTERVAL_SECONDS = 86400;
@@ -56,7 +67,8 @@ class AbandonedCart
         private readonly SyncDispatcher $dispatcher,
         private readonly Emulation $emulation,
         private readonly DateTime $dateTime,
-        private readonly Logger $logger
+        private readonly Logger $logger,
+        private readonly ReminderConsent $reminderConsent
     ) {
     }
 
@@ -145,6 +157,7 @@ class AbandonedCart
         );
 
         $addresses = $this->buildAddresses($candidates);
+        $verdicts = $this->reminderConsent->verdicts($websiteId, $storeIds, $this->carts($candidates, $addresses));
         $mailed = 0;
         foreach ($candidates as $quote) {
             $quoteId = (int)$quote->getId();
@@ -152,6 +165,18 @@ class AbandonedCart
             $address = $addresses[$quoteId];
 
             if (($address['email'] ?? '') === '') {
+                continue;
+            }
+
+            $verdict = $verdicts[$quoteId] ?? ReminderConsent::SEND_TO_SUBSCRIBED_CONTACT;
+            if ($verdict === ReminderConsent::SKIP_UNSUBSCRIBED) {
+                $this->stateManager->markSkipped($quoteId, $storeId, $address['email']);
+                $this->dispatcher->recordSkippedAutomation(
+                    Trigger::ABANDONED_CART,
+                    $storeId,
+                    $address,
+                    self::SKIPPED_UNSUBSCRIBED_IN_STORE
+                );
                 continue;
             }
 
@@ -173,7 +198,12 @@ class AbandonedCart
             if ($remindedAddress !== '') {
                 $reminded[$remindedAddress] = true;
             }
-            $this->dispatcher->dispatchAutomation(Trigger::ABANDONED_CART, $storeId, $address);
+            $this->dispatcher->dispatchCartReminder(
+                $quoteId,
+                $storeId,
+                $address,
+                $verdict === ReminderConsent::SEND
+            );
             $mailed++;
         }
 
@@ -183,6 +213,28 @@ class AbandonedCart
                 'count' => $mailed,
             ]);
         }
+    }
+
+    /**
+     * The address and customer of each candidate with an address, by quote
+     * id, for the consent verdicts.
+     *
+     * @param Quote[] $candidates
+     * @param array<int, array<string, string>> $addresses
+     * @return array<int, array{email: string, customer_id: int}>
+     */
+    private function carts(array $candidates, array $addresses): array
+    {
+        $carts = [];
+        foreach ($candidates as $quote) {
+            $quoteId = (int)$quote->getId();
+            $email = (string)($addresses[$quoteId]['email'] ?? '');
+            if ($email !== '') {
+                $carts[$quoteId] = ['email' => $email, 'customer_id' => (int)$quote->getCustomerId()];
+            }
+        }
+
+        return $carts;
     }
 
     /**

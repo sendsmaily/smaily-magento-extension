@@ -94,17 +94,36 @@ class SubscriberSaveAfterTest extends TestCase
     /**
      * PRO-3580: a subscription made in the admin, through the REST, SOAP or
      * GraphQL API, or by a cron or command-line import fires no welcome. The
-     * contact still syncs.
+     * contact still syncs as subscribed (CON-196): a status change is a
+     * consent act whoever makes it, and may re-subscribe a contact who
+     * unsubscribed in Smaily.
      *
      * @dataProvider nonStorefrontAreaProvider
      */
     public function testANonStorefrontSubscriptionSyncsTheContactWithoutAWelcome(?string $area): void
     {
         $this->dispatcher->expects(self::once())->method('dispatchContactSync')
-            ->with('person@example.com', 1, false, null);
+            ->with('person@example.com', 1, self::identicalTo(false), null);
         $this->dispatcher->expects(self::never())->method('dispatchAutomation');
 
-        $this->observer($area)->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED));
+        $this->observer($area)->execute(
+            $this->eventFor(Subscriber::STATUS_SUBSCRIBED, Subscriber::STATUS_UNSUBSCRIBED)
+        );
+    }
+
+    /**
+     * CON-196: an unsubscribe goes as 1 in every context too.
+     *
+     * @dataProvider nonStorefrontAreaProvider
+     */
+    public function testAnUnsubscribeSyncsInEveryContext(?string $area): void
+    {
+        $this->dispatcher->expects(self::once())->method('dispatchContactSync')
+            ->with('person@example.com', 1, self::identicalTo(true), null);
+
+        $this->observer($area)->execute(
+            $this->eventFor(Subscriber::STATUS_UNSUBSCRIBED, Subscriber::STATUS_SUBSCRIBED)
+        );
     }
 
     /**
@@ -142,7 +161,7 @@ class SubscriberSaveAfterTest extends TestCase
     public function testInCheckoutOptInOnlyModeTheCheckoutOptInSyncsTheContact(): void
     {
         $this->dispatcher->expects(self::once())->method('dispatchContactSync')
-            ->with('person@example.com', 1, false, null);
+            ->with('person@example.com', 1, self::identicalTo(false), null);
 
         $storefrontSubscription = new StorefrontSubscription();
         $storefrontSubscription->run(function () use ($storefrontSubscription): void {
@@ -161,7 +180,7 @@ class SubscriberSaveAfterTest extends TestCase
     public function testInCheckoutOptInOnlyModeAConfirmedPendingSubscriptionSyncs(): void
     {
         $this->dispatcher->expects(self::once())->method('dispatchContactSync')
-            ->with('person@example.com', 1, false, null);
+            ->with('person@example.com', 1, self::identicalTo(false), null);
 
         $this->observer('frontend', null, SyncMode::MODE_CHECKOUT_OPTIN)
             ->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED, Subscriber::STATUS_NOT_ACTIVE));
@@ -175,7 +194,7 @@ class SubscriberSaveAfterTest extends TestCase
     public function testInCheckoutOptInOnlyModeAnUnsubscribeSyncs(): void
     {
         $this->dispatcher->expects(self::once())->method('dispatchContactSync')
-            ->with('person@example.com', 1, true, null);
+            ->with('person@example.com', 1, self::identicalTo(true), null);
 
         $this->observer('frontend', null, SyncMode::MODE_CHECKOUT_OPTIN)->execute(
             $this->eventFor(Subscriber::STATUS_UNSUBSCRIBED, Subscriber::STATUS_SUBSCRIBED)
@@ -191,7 +210,7 @@ class SubscriberSaveAfterTest extends TestCase
     public function testInTheOtherModesANewsletterFormSignupSyncsTheContact(string $mode): void
     {
         $this->dispatcher->expects(self::once())->method('dispatchContactSync')
-            ->with('person@example.com', 1, false, null);
+            ->with('person@example.com', 1, self::identicalTo(false), null);
 
         $this->observer('frontend', null, $mode)->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED));
     }

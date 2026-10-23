@@ -24,10 +24,13 @@ use Smaily\Connect\Model\Logger\Logger;
 /**
  * Backfills a website's existing contacts into Smaily: the audience of the
  * website's contact-sync mode (Model\Backfill\ContactAudience, PRO-3582).
- * A newsletter subscriber goes with its real subscription status; under
- * "All customers" (the soft opt-in, PRO-3610) every other customer goes
- * without is_unsubscribed, as the live sync sends them: Smaily keeps an
- * existing contact's status and creates a new contact as subscribed.
+ * An unsubscribed newsletter subscriber goes with is_unsubscribed=1; a
+ * subscribed one, and under "All customers" (the soft opt-in, PRO-3610)
+ * every other customer, goes without is_unsubscribed: Smaily keeps an
+ * existing contact's status and creates a new contact as subscribed. So the
+ * import, which is not a consent act, never re-subscribes a contact who
+ * unsubscribed in Smaily (CON-195, CON-196); only a change of the newsletter
+ * status does (Observer\SubscriberSaveAfter).
  *
  * The cursor is the last processed subscriber_id while the walk is in the
  * subscribers; under "All customers" it then moves on to the other
@@ -170,7 +173,7 @@ class ContactsProcessor implements ProcessorInterface
             $byStore[$contact['store_id']][] = $this->payloadBuilder->build(
                 $contact['email'],
                 $contact['store_id'],
-                $contact['subscribed'] === null ? null : !$contact['subscribed'],
+                $contact['subscribed'] === false ? true : null,
                 $customers[$contact['customer_id']] ?? null
             );
         }

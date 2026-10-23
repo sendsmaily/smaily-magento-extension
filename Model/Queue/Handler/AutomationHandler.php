@@ -11,8 +11,11 @@ namespace Smaily\Connect\Model\Queue\Handler;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Api\Queue\EventHandlerInterface;
+use Smaily\Connect\Model\AbandonedCart\StateManager;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Automation\Router;
+use Smaily\Connect\Model\Automation\WorkflowMatch;
+use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
@@ -56,6 +59,15 @@ use Smaily\Connect\Model\Queue\Skipped;
  * confirmed 2026-10-23; the WooCommerce plugin's PRO-1678 rule); the
  * trigger's marker field (Trigger::MARKER_FIELDS) lets the merchant find or
  * exclude those contacts in a Smaily segment.
+ *
+ * An abandoned-cart reminder carries CART_REMINDER (CON-195, CON-196): one
+ * read of the contact, through the account that would send the workflow,
+ * just before it is sent. A contact who unsubscribed there gets none, in
+ * every mode; an address the account does not have gets it only when the
+ * cron allowed a new contact (store consent, or legitimate interest). A skip
+ * closes the row as Skipped with the reason and the cart's tracker row as
+ * skipped; a read that fails leaves the row on the retry ladder with nothing
+ * sent.
  */
 class AutomationHandler implements EventHandlerInterface
 {
@@ -78,6 +90,23 @@ class AutomationHandler implements EventHandlerInterface
     public const SKIPPED_NO_OWN_ACCOUNT_WORKFLOW = 'Skipped: the website %1 uses another Smaily account than the one'
         . ' saved for all websites, and no workflow of its account is picked for this automation. Nothing was sent.';
 
+    /**
+     * A reminder for a shopper without store consent whom the Smaily account
+     * does not have as a contact (CON-195).
+     */
+    public const SKIPPED_NO_MARKETING_CONSENT = 'Skipped: this shopper has not agreed to marketing emails in the'
+        . ' store, and is not a subscribed contact in Smaily. Nothing was sent.';
+
+    /** A reminder for a contact who unsubscribed in Smaily (CON-196). */
+    public const SKIPPED_UNSUBSCRIBED_IN_SMAILY = 'Skipped: this shopper unsubscribed in Smaily. Nothing was sent.';
+
+    /**
+     * Payload key of an abandoned-cart reminder: {quote_id, new_contact}, the
+     * cart and whether an address Smaily does not have may get it
+     * (SyncDispatcher::dispatchCartReminder()).
+     */
+    public const CART_REMINDER = 'cart_reminder';
+
     public function __construct(
         private readonly SmailyClientProvider $clientProvider,
         private readonly Router $router,
@@ -86,7 +115,8 @@ class AutomationHandler implements EventHandlerInterface
         private readonly AccountResolver $accountResolver,
         private readonly Config $config,
         private readonly WebsiteOverrides $overrides,
-        private readonly StoreManagerInterface $storeManager
+        private readonly StoreManagerInterface $storeManager,
+        private readonly StateManager $cartState
     ) {
     }
 
@@ -121,21 +151,24 @@ class AutomationHandler implements EventHandlerInterface
                 continue;
             }
 
-            $client = null;
+            $reminder = $payload[self::CART_REMINDER] ?? null;
             try {
-                $storeId = (int)($payload['store_id'] ?? 0);
-                if ($match->accountKey === null) {
-                    $client = $this->clientProvider->forStore($storeId ?: null);
-                } else {
-                    // The mapping row names the account. 'default' (and an
-                    // account whose language no longer has a store view)
-                    // is the website's account: its own, else the
-                    // store-wide one (CON-189).
-                    $accountStoreId = $this->accountResolver->storeIdForAccountKey($match->accountKey, $websiteId);
-                    $client = $accountStoreId === null
-                        ? $this->clientProvider->forWebsite($websiteId)
-                        : $this->clientProvider->forStore($accountStoreId);
-                }
+                $client = $this->clientFor($match, (int)($payload['store_id'] ?? 0), $websiteId);
+                $skipReason = is_array($reminder)
+                    ? $this->reminderSkipReason($client, (string)$address['email'], !empty($reminder['new_contact']))
+                    : null;
+            } catch (SmailyClientException $exception) {
+                // Nothing was posted: the row waits on the retry ladder.
+                $results[$id] = $exception;
+                continue;
+            }
+            if ($skipReason !== null) {
+                $this->cartState->markReminderSkipped((int)($reminder['quote_id'] ?? 0));
+                $results[$id] = new Skipped($skipReason);
+                continue;
+            }
+
+            try {
                 $client->post(SmailyClient::ENDPOINT_AUTORESPONDER, [
                     'autoresponder' => $match->workflowId,
                     'addresses' => [$address],
@@ -148,13 +181,55 @@ class AutomationHandler implements EventHandlerInterface
                 $results[$id] = $exception;
             }
 
-            $exchange = $client?->lastExchange();
+            $exchange = $client->lastExchange();
             if ($exchange !== null) {
                 $this->eventQueue->recordExchange($event, $exchange['request'], $exchange['response']);
             }
         }
 
         return $results;
+    }
+
+    /**
+     * The Smaily account that delivers the matched workflow. The mapping row
+     * names the account: 'default' (and an account whose language no longer
+     * has a store view) is the website's account — its own, else the
+     * store-wide one (CON-189); a config-default match goes through the
+     * event's store view.
+     */
+    private function clientFor(WorkflowMatch $match, int $storeId, int $websiteId): SmailyClient
+    {
+        if ($match->accountKey === null) {
+            return $this->clientProvider->forStore($storeId ?: null);
+        }
+        $accountStoreId = $this->accountResolver->storeIdForAccountKey($match->accountKey, $websiteId);
+
+        return $accountStoreId === null
+            ? $this->clientProvider->forWebsite($websiteId)
+            : $this->clientProvider->forStore($accountStoreId);
+    }
+
+    /**
+     * Why a reminder may not go, or null when it may: the account's contact
+     * unsubscribed (any status but an explicit 0 counts), or the account does
+     * not have the address (code 206) and no new contact is allowed.
+     *
+     * @throws SmailyClientException when Smaily cannot be read
+     */
+    private function reminderSkipReason(SmailyClient $client, string $email, bool $newContact): ?string
+    {
+        try {
+            $contact = $client->get(SmailyClient::ENDPOINT_CONTACT, ['email' => $email]);
+        } catch (ApiException $exception) {
+            if ($exception->getSmailyCode() !== ApiException::CODE_EMAIL_NOT_FOUND) {
+                throw $exception;
+            }
+
+            return $newContact ? null : self::SKIPPED_NO_MARKETING_CONSENT;
+        }
+        $fields = isset($contact[0]) && is_array($contact[0]) ? $contact[0] : $contact;
+
+        return (string)($fields['is_unsubscribed'] ?? '') === '0' ? null : self::SKIPPED_UNSUBSCRIBED_IN_SMAILY;
     }
 
     /**

@@ -423,7 +423,8 @@ is written in English.
   on master); 2026-10-22: 4/5 (both pilot stores upgraded to rc12 by
   their developer; pilot day today or tomorrow, on rc12); 2026-10-22
   night: 4/5 (rc13 cut, its tag waits for Erkki; the pilot runs on
-  rc12).
+  rc12); 2026-10-23: 4/5 (rc14 cut; both pilot stores on rc12, Campaign
+  Intelligence not yet connected — waits for the client).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Feature (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

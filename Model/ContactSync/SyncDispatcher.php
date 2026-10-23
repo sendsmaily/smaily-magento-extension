@@ -16,6 +16,7 @@ use Smaily\Connect\Model\Multilingual\LanguageResolver;
 use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
+use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
 
 /**
  * Builds payloads and enqueues contact-sync and automation events. The thin
@@ -88,6 +89,27 @@ class SyncDispatcher
         $this->eventQueue->enqueue(
             EventType::AUTOMATION_TRIGGER,
             $this->automationPayload($trigger, $storeId, $address),
+            $this->contactEntity->of((string)($address['email'] ?? '')),
+            $this->websiteId($storeId)
+        );
+    }
+
+    /**
+     * An abandoned-cart reminder the queue sends only to a contact Smaily
+     * has as subscribed (CON-195): in the consent and checkout opt-in modes,
+     * for a shopper who has not agreed to marketing emails in the store. The
+     * queue handler reads the contact before it sends, and a skip there
+     * closes the cart's tracker row as skipped, so the payload names the cart.
+     *
+     * @param array<string, string|int> $address must contain "email"
+     */
+    public function dispatchReminderToSubscribedContact(int $quoteId, int $storeId, array $address): void
+    {
+        $payload = $this->automationPayload(Trigger::ABANDONED_CART, $storeId, $address);
+        $payload[AutomationHandler::SUBSCRIBED_CONTACT_CART] = $quoteId;
+        $this->eventQueue->enqueue(
+            EventType::AUTOMATION_TRIGGER,
+            $payload,
             $this->contactEntity->of((string)($address['email'] ?? '')),
             $this->websiteId($storeId)
         );

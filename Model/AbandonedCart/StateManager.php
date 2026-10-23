@@ -19,7 +19,8 @@ use Magento\Framework\Stdlib\DateTime\DateTime;
  * Statuses: open (tracked), mailed (automation fired), completed (order
  * placed), expired (aged out unmailed), erased (Art. 17 tombstone — see
  * anonymizeForEmail()), skipped (not mailed: its address had a reminder in
- * the last 24 hours — see markSkipped()).
+ * the last 24 hours, or the shopper's consent does not allow one — see
+ * markSkipped() and markReminderSkipped()).
  */
 class StateManager
 {
@@ -120,6 +121,23 @@ class StateManager
     }
 
     /**
+     * Record that the queue closed a quote's reminder without sending it:
+     * the shopper had not agreed to marketing emails in the store and is not
+     * a subscribed contact in Smaily (CON-195). The row of markMailed()
+     * becomes a skip, without mail_sent_at, so the address does not count as
+     * reminded and the order placed later sends no purchase marker. A row
+     * that is no longer `mailed` (completed, erased) keeps its status.
+     */
+    public function markReminderSkipped(int $quoteId): void
+    {
+        $this->resourceConnection->getConnection(self::CONNECTION)->update(
+            $this->table(),
+            ['status' => self::STATUS_SKIPPED, 'mail_sent_at' => null],
+            ['quote_id = ?' => $quoteId, 'status = ?' => self::STATUS_MAILED]
+        );
+    }
+
+    /**
      * The addresses a reminder went to — delivered or still waiting in the
      * queue, for any cart — at or after $since (UTC, `Y-m-d H:i:s`),
      * lower-cased, as the keys of a set.
@@ -168,6 +186,27 @@ class StateManager
         }
 
         return $addresses;
+    }
+
+    /**
+     * The given quotes whose shopper ticked the checkout newsletter box
+     * (setNewsletterOptin()), as the keys of a set.
+     *
+     * @param int[] $quoteIds
+     * @return array<int, true>
+     */
+    public function optedInQuotes(array $quoteIds): array
+    {
+        if ($quoteIds === []) {
+            return [];
+        }
+        $connection = $this->resourceConnection->getConnection(self::CONNECTION);
+        $select = $connection->select()
+            ->from($this->table(), ['quote_id'])
+            ->where('quote_id IN (?)', $quoteIds)
+            ->where('newsletter_optin = ?', 1);
+
+        return array_fill_keys(array_map('intval', $connection->fetchCol($select)), true);
     }
 
     /**

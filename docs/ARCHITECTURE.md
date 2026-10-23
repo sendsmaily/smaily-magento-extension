@@ -138,6 +138,19 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   (`Model/Queue/HandlerPool`); adding an event type = adding a handler.
 - Payloads are built at enqueue time (`ContactSync\SubscriberPayloadBuilder`,
   `ContactSync\SyncDispatcher`) and stored on the row.
+- **An unsubscribe in Smaily is never undone by the extension's own writes
+  (CON-195).** `is_unsubscribed = 0` goes only with the shopper's own
+  subscription in the store: `Observer\SubscriberSaveAfter` in the
+  frontend area or under the checkout opt-in's
+  `ContactSync\StorefrontSubscription` mark (the welcome's own test,
+  PRO-3580) — the newsletter form, a confirmation link, My Account, the
+  checkout box. A subscription saved in the admin, through Magento's API
+  (a separate storefront's included) or by an import, a profile save
+  (`Observer\CustomerSaveAfter`), the contacts import
+  (`Backfill\ContactsProcessor`), the automations and the purchase marker
+  send a subscribed contact without `is_unsubscribed`: Smaily keeps an
+  existing contact's status and creates a new contact as subscribed. An
+  unsubscribe goes as `1` everywhere.
 - The live `contact.sync` triggers: a subscriber save (`Observer\SubscriberSaveAfter`,
   subscribe and unsubscribe), a customer save (`Observer\CustomerSaveAfter`),
   an order (`Observer\OrderPlaced`, the checkout opt-in, guest-order emails
@@ -1107,6 +1120,38 @@ did not, and the flusher never claims it. A cart the cron marks `mailed` adds
 the address its row holds (`StateManager::trackedAddresses()`, or the
 resolved address for a new row) to the set before the next candidate, so two
 carts of one address in one run get one reminder.
+
+**Who gets a reminder (CON-195, the same rule in every Smaily
+connector).** Once per page, after the payloads are built,
+`AbandonedCart\ReminderConsent::verdicts()` weighs each cart by its
+website's contact-sync mode, with one read of `newsletter_subscriber` (the
+website's store views, matched by the cart's address or its customer id;
+an unsubscribed record wins over a subscribed one) and one of the checkout
+ticks (`StateManager::optedInQuotes()`, `newsletter_optin` of an `open`
+row — the tick counts without an order):
+
+- consent and checkout opt-in only (`Mode::requiresOptin()`): a subscribed
+  record or a tick is consent in the store, and the reminder is dispatched
+  as before. Every other cart is marked `mailed` and dispatched through
+  `SyncDispatcher::dispatchReminderToSubscribedContact()`, whose payload
+  carries `AutomationHandler::SUBSCRIBED_CONTACT_CART` (the quote id). The
+  handler reads the contact (`GET contact.php`) through the account that
+  would send the workflow, after the workflow match, and posts only for
+  `is_unsubscribed = 0`. Any other answer (code 206, an unsubscribed
+  contact) closes the row as Skipped with
+  `AutomationHandler::SKIPPED_NO_MARKETING_CONSENT` and turns the tracker row
+  into `skipped` without `mail_sent_at`
+  (`StateManager::markReminderSkipped()`), so the address does not count as
+  reminded and a later order sends no purchase marker. A read that fails
+  leaves the row on the retry ladder with nothing posted.
+- legitimate interest: every cart, except one whose record is
+  unsubscribed. That cart is marked `skipped` and recorded in the Log with
+  `Cron\AbandonedCart::SKIPPED_UNSUBSCRIBED_IN_STORE`, as the 24-hour skip
+  is.
+
+Smaily adds an address it does not have when a workflow is triggered, and
+`force_opt_in = false` keeps an unsubscribe, so the reminder itself never
+re-subscribes anyone.
 
 **Where a guest's email comes from (PRO-3693).** Magento's checkout keeps a
 guest's email in the browser (`quote.guestEmail`) and sends it only with

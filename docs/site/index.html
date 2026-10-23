@@ -832,7 +832,7 @@ bin/magento cache:flush</code></pre>
           <thead><tr><th scope="col">Mode</th><th scope="col">Who is synced</th><th scope="col">Unsubscribes in Smaily come back?</th></tr></thead>
           <tbody>
             <tr><td><strong>Subscribers only (consent)</strong> — default</td><td>Only opted-in newsletter subscribers.</td><td>Yes, every 15 minutes — and an unsubscribe in the store goes to Smaily.</td></tr>
-            <tr><td><strong>All customers (legitimate interest)</strong></td><td>Every registered customer, as a soft opt-in: a customer new to Smaily becomes a subscriber; a contact Smaily already has keeps its status. A customer who unsubscribed in the store is sent as unsubscribed.</td><td>No</td></tr>
+            <tr><td><strong>All customers (legitimate interest)</strong></td><td>Every registered customer, as a soft opt-in: a customer new to Smaily becomes a subscriber; a contact Smaily already has keeps its status. A customer's unsubscribe in the store goes to Smaily when it is made; a later profile update or guest order carries no status, so a shopper Smaily does not have yet is added as a subscriber.</td><td>No</td></tr>
             <tr><td><strong>Checkout opt-in only</strong></td><td>Nobody automatically — only shoppers who tick the checkout newsletter checkbox. An unsubscribe in the store is sent.</td><td>No</td></tr>
           </tbody>
         </table>
@@ -861,7 +861,7 @@ bin/magento cache:flush</code></pre>
           <thead><tr><th scope="col">Režiim</th><th scope="col">Keda sünkroonitakse</th><th scope="col">Kas Smaily loobumised tulevad tagasi?</th></tr></thead>
           <tbody>
             <tr><td><strong>Ainult turunduskirjade tellijad (nõusolekuga)</strong> — vaikimisi</td><td>Ainult nõusoleku andnud uudiskirja tellijad.</td><td>Jah, iga 15 minuti järel — ja poes tehtud loobumine läheb Smailysse.</td></tr>
-            <tr><td><strong>Kõik kliendid (õigustatud huvi)</strong></td><td>Iga registreeritud klient, pehme nõusolekuna: Smaily jaoks uus klient saab tellijaks; Smailys juba olev kontakt säilitab oma oleku. Poes loobunud klient saadetakse loobununa.</td><td>Ei</td></tr>
+            <tr><td><strong>Kõik kliendid (õigustatud huvi)</strong></td><td>Iga registreeritud klient, pehme nõusolekuna: Smaily jaoks uus klient saab tellijaks; Smailys juba olev kontakt säilitab oma oleku. Kliendi loobumine poes läheb Smailysse siis, kui see tehakse; hilisem profiili muutmine või külalistellimus olekut ei saada, nii et ostja, keda Smailys veel pole, lisatakse tellijana.</td><td>Ei</td></tr>
             <tr><td><strong>Ainult kassas turunduskirjade nõusoleku andnud kontaktid</strong></td><td>Kedagi ei sünkroonita automaatselt — ainult ostjad, kes märgivad kassas uudiskirja märkeruudu. Poes tehtud loobumine saadetakse.</td><td>Ei</td></tr>
           </tbody>
         </table>

@@ -152,10 +152,10 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   (`Backfill\ContactsProcessor`) is not a consent act: it sends a
   subscribed row without `is_unsubscribed` and an unsubscribed one as `1`.
   Smaily keeps an existing contact's status when none is sent, and creates
-  a new contact as subscribed. Two writes still carry a store unsubscribe
-  as `1` under legitimate interest (PRO-3616), because without a status
-  Smaily would create the contact as subscribed: a profile save and a guest
-  order's email of a shopper unsubscribed in the store.
+  a new contact as subscribed. This supersedes PRO-3616 for a profile save
+  and a guest order's email under legitimate interest, which sent a shopper
+  unsubscribed in the store as `1` (Erkki, 2026-10-23: rule B applies to
+  every non-status write; a missing contact is created subscribed).
 - The live `contact.sync` triggers: a subscriber save (`Observer\SubscriberSaveAfter`,
   subscribe and unsubscribe), a customer save (`Observer\CustomerSaveAfter`),
   an order (`Observer\OrderPlaced`, the checkout opt-in, guest-order emails

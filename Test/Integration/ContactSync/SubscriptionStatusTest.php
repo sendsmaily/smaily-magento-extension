@@ -140,11 +140,16 @@ class SubscriptionStatusTest extends IntegrationTestCase
     }
 
     /**
-     * A profile save changes other fields, not the subscription status.
+     * A profile save changes other fields, not the subscription status, so it
+     * sends none — under all customers also for a customer unsubscribed in
+     * the store (Erkki, 2026-10-23, superseding PRO-3616).
+     *
+     * @dataProvider profileSaves
      */
-    public function testAnAdminSaveOfACustomerNeverResubscribesAContact(): void
+    public function testAnAdminSaveOfACustomerNeverSendsAStatus(string $mode, int $status): void
     {
-        $this->seedSubscriber('customer@example.com', Subscriber::STATUS_SUBSCRIBED, 7);
+        $this->syncMode = $mode;
+        $this->seedSubscriber('customer@example.com', $status, 7);
         $customer = $this->createConfiguredMock(CustomerInterface::class, [
             'getId' => 7,
             'getEmail' => 'customer@example.com',
@@ -165,6 +170,21 @@ class SubscriptionStatusTest extends IntegrationTestCase
         $observer->execute(new Observer(['event' => new Event(['customer_data_object' => $customer])]));
 
         self::assertSame([['email' => 'customer@example.com']], $this->queuedContacts());
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: int}>
+     */
+    public static function profileSaves(): array
+    {
+        return [
+            'subscribers only, subscribed' => [SyncMode::MODE_CONSENT, Subscriber::STATUS_SUBSCRIBED],
+            'all customers, subscribed' => [SyncMode::MODE_LEGITIMATE_INTEREST, Subscriber::STATUS_SUBSCRIBED],
+            'all customers, unsubscribed in the store' => [
+                SyncMode::MODE_LEGITIMATE_INTEREST,
+                Subscriber::STATUS_UNSUBSCRIBED,
+            ],
+        ];
     }
 
     /**

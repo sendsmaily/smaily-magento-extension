@@ -370,7 +370,12 @@ The contact fields Smaily receives change too:
   subscription subscribes again a contact who unsubscribed in Smaily. The
   contacts import, a profile save without a status change, the purchase
   marker and the automations send no status, so the contact keeps the one
-  it has in Smaily.
+  it has in Smaily. Under *All customers (legitimate interest)* this
+  includes a profile save of a customer, and a guest order's email, that
+  unsubscribed in the store, which earlier release candidates sent as
+  unsubscribed: a shopper Smaily does not have yet is now added as a
+  subscriber (Erkki, 2026-10-23: rule B applies to every non-status write; a
+  missing contact is created subscribed).
 - **Automations never re-subscribe.** A welcome, first-order or
   abandoned-cart trigger never overrides an unsubscribe the contact made in
   Smaily, in any contact sync mode (2.8.x behaved the same). A 3.0.0

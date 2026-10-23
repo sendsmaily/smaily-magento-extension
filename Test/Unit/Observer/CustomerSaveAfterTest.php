@@ -22,10 +22,9 @@ use Smaily\Connect\Model\ContactSync\SyncDispatcher;
 use Smaily\Connect\Observer\CustomerSaveAfter;
 
 /**
- * PRO-3616: in the all-customers mode (soft opt-in) a profile save sends a
- * customer who unsubscribed in the store as unsubscribed. Smaily creates a
- * new contact sent without a status as subscribed, so the status is omitted
- * only where the store knows of no unsubscribe.
+ * CON-196: a profile save changes no subscription status, so it never sends
+ * one, in any mode — also for a customer who unsubscribed in the store under
+ * all customers (Erkki, 2026-10-23, superseding PRO-3616).
  *
  * PRO-4036: before contact sync is active for the website, a profile save
  * sends nothing.
@@ -62,7 +61,7 @@ class CustomerSaveAfterTest extends TestCase
         $all = SyncMode::MODE_LEGITIMATE_INTEREST;
 
         return [
-            'all customers, unsubscribed in the store' => [$all, Subscriber::STATUS_UNSUBSCRIBED, true, true],
+            'all customers, unsubscribed in the store' => [$all, Subscriber::STATUS_UNSUBSCRIBED, true, null],
             'all customers, no newsletter record' => [$all, 0, true, null],
             'all customers, waiting for confirmation' => [$all, Subscriber::STATUS_NOT_ACTIVE, true, null],
             'all customers, subscribed' => [$all, Subscriber::STATUS_SUBSCRIBED, true, null],

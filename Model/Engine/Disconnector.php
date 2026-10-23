@@ -24,8 +24,11 @@ use Smaily\Connect\Model\ModuleInfo;
  * call, whatever it returns: a refused key or an engine that does not
  * answer never blocks a disconnect or a removal.
  *
- * One attempt, no retry: a removal does not wait for an engine that does
- * not answer, and the engine's key just stays unused. The only dependency
+ * One attempt of at most 3 seconds (connect included), no redirect and no
+ * retry, as the WooCommerce plugin sends it: the merchant waits on it, and
+ * a key the engine was not told about just stays unused. A refused
+ * (suspended) account is told too: §16 does not answer `403
+ * tenant_inactive`. The only dependency
  * resolves without the module's di.xml, because Magento builds the
  * removal's classes when the module may already be disabled.
  */
@@ -51,8 +54,8 @@ class Disconnector
 
     public const FALLBACK_PATH = '/api/v1/store/uninstall';
 
-    private const TIMEOUT_SECONDS = 10;
-    private const CONNECT_TIMEOUT_SECONDS = 5;
+    private const TIMEOUT_SECONDS = 3;
+    private const CONNECT_TIMEOUT_SECONDS = 2;
 
     public function __construct(
         private readonly HttpClientFactory $httpClientFactory
@@ -81,6 +84,7 @@ class Disconnector
             $response = $this->httpClientFactory->create()->request('POST', $url, [
                 RequestOptions::TIMEOUT => self::TIMEOUT_SECONDS,
                 RequestOptions::CONNECT_TIMEOUT => self::CONNECT_TIMEOUT_SECONDS,
+                RequestOptions::ALLOW_REDIRECTS => false,
                 RequestOptions::HEADERS => [
                     'User-Agent' => ModuleInfo::USER_AGENT,
                     'Accept' => 'application/json',

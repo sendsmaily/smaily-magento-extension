@@ -88,6 +88,29 @@ class DisconnectorTest extends TestCase
         self::assertSame(Disconnector::KEY_REFUSED, $outcome);
     }
 
+    public function testOneAttemptOfAtMostThreeSecondsWithoutRedirects(): void
+    {
+        $options = [];
+        $factory = $this->createMock(HttpClientFactory::class);
+        $factory->method('create')->willReturnCallback(
+            function () use (&$options): HttpClient {
+                $handler = function (RequestInterface $request, array $requestOptions) use (&$options): Response {
+                    $options = $requestOptions;
+
+                    return $this->ok('store_paused');
+                };
+
+                return new HttpClient(['handler' => HandlerStack::create(new MockHandler([$handler]))]);
+            }
+        );
+
+        (new Disconnector($factory))->endConnection('sk_live_key', ['store_uninstall' => self::MAPPED], '');
+
+        self::assertSame(3, $options['timeout']);
+        self::assertLessThanOrEqual(3, $options['connect_timeout']);
+        self::assertFalse($options['allow_redirects']);
+    }
+
     public function testAServerErrorIsOneAttemptAndNotTold(): void
     {
         $outcome = $this->disconnector([new Response(503), $this->ok('store_paused')])

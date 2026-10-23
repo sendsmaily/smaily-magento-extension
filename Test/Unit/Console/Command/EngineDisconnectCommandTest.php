@@ -73,12 +73,25 @@ class EngineDisconnectCommandTest extends TestCase
     public static function outcomes(): array
     {
         return [
-            'store paused' => [Disconnector::PAUSED, 'The engine paused the store and keeps its data'],
+            'store paused' => [Disconnector::PAUSED, 'Campaign Intelligence paused the store'],
             'another connection remains' => [Disconnector::CONNECTION_REMOVED, 'other connection keeps working'],
-            'another 200' => [Disconnector::ENDED, 'The engine ended this connection.'],
+            'another 200' => [Disconnector::ENDED, 'Campaign Intelligence ended this connection.'],
             'key refused (401)' => [Disconnector::KEY_REFUSED, 'the connection had already ended there'],
-            'engine not reached' => [Disconnector::NOT_TOLD, 'the engine could not be told'],
+            'engine not reached' => [Disconnector::NOT_TOLD, 'could not be told'],
         ];
+    }
+
+    /**
+     * A suspended account (`403 tenant_inactive` remembered) may still
+     * disconnect: §16 does not refuse it, so it is told once.
+     */
+    public function testARefusedAccountIsStillToldOnce(): void
+    {
+        $tester = $this->runCommand(Disconnector::PAUSED, ['--force' => true], refused: true);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertCount(1, $this->calls);
+        self::assertSame([], $this->values);
     }
 
     public function testWithoutForceNothingIsSentAndTheKeyStays(): void
@@ -102,14 +115,21 @@ class EngineDisconnectCommandTest extends TestCase
     /**
      * @param array<string, bool> $input
      */
-    private function runCommand(string $outcome, array $input, bool $connected = true): CommandTester
-    {
+    private function runCommand(
+        string $outcome,
+        array $input,
+        bool $connected = true,
+        bool $refused = false
+    ): CommandTester {
         $this->values = [
             Settings::XML_PATH_CONNECTED => $connected ? '1' : '',
             Settings::XML_PATH_API_KEY => 'encrypted',
             Settings::XML_PATH_BASE_URL => 'https://intelligence.smaily.com',
             Settings::XML_PATH_ENDPOINTS => self::ENDPOINTS,
         ];
+        if ($refused) {
+            $this->values[Settings::XML_PATH_REFUSED_AT] = '2026-10-23 10:00:00';
+        }
         $this->calls = [];
 
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);

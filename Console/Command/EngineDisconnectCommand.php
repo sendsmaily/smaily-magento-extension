@@ -25,15 +25,17 @@ class EngineDisconnectCommand extends Command
 {
     /** The one-line note per Disconnector outcome; the local connection is removed in every case. */
     private const NOTES = [
-        Disconnector::PAUSED => '<info>Campaign Intelligence disconnected. The engine paused the store and keeps'
-            . ' its data; connecting again with a new setup link resumes it.</info>',
-        Disconnector::CONNECTION_REMOVED => '<info>Campaign Intelligence disconnected. The engine ended this'
-            . ' connection; the store\'s other connection keeps working.</info>',
-        Disconnector::ENDED => '<info>Campaign Intelligence disconnected. The engine ended this connection.</info>',
-        Disconnector::KEY_REFUSED => '<info>Campaign Intelligence disconnected. The engine no longer accepted the'
-            . ' key, so the connection had already ended there.</info>',
-        Disconnector::NOT_TOLD => '<comment>Campaign Intelligence disconnected here, but the engine could not be'
-            . ' told: its key stays valid there until Smaily revokes it.</comment>',
+        Disconnector::PAUSED => '<info>Campaign Intelligence disconnected. Campaign Intelligence paused the store:'
+            . ' no recommendations and none of its automated emails until you connect again.'
+            . ' Your data is kept.</info>',
+        Disconnector::CONNECTION_REMOVED => '<info>Campaign Intelligence disconnected. Campaign Intelligence ended'
+            . ' this connection; your store\'s other connection keeps working.</info>',
+        Disconnector::ENDED => '<info>Campaign Intelligence disconnected. Campaign Intelligence ended this'
+            . ' connection.</info>',
+        Disconnector::KEY_REFUSED => '<info>Campaign Intelligence disconnected. Campaign Intelligence no longer'
+            . ' accepted the key, so the connection had already ended there.</info>',
+        Disconnector::NOT_TOLD => '<comment>Campaign Intelligence disconnected here, but Campaign Intelligence'
+            . ' could not be told: its key stays valid there until Smaily revokes it.</comment>',
     ];
 
     public function __construct(

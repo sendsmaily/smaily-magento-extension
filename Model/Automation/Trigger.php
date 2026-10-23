@@ -62,6 +62,24 @@ class Trigger
     ];
 
     /**
+     * Trigger slug => the Smaily contact fields of the discount code its
+     * email carries (CON-198): the shopper's single-use code and its last
+     * valid day, `YYYY-MM-DD` in the store's timezone (the code works until
+     * the end of that day). Cross-platform canon (Erkki, 2026-10-23): the
+     * Woo and Shopify plugins write the same names. Sent only when the
+     * automation's "Send a discount code" is on and a code was made, in the
+     * automation's own address payload beside its marker; absent otherwise,
+     * so Smaily keeps the code an earlier email gave.
+     *
+     * @var array<string, array{0: string, 1: string}>
+     */
+    public const COUPON_FIELDS = [
+        self::WELCOME => ['welcome_coupon_code', 'welcome_coupon_expires_at'],
+        self::FIRST_ORDER => ['first_order_coupon_code', 'first_order_coupon_expires_at'],
+        self::ABANDONED_CART => ['abandoned_cart_coupon_code', 'abandoned_cart_coupon_expires_at'],
+    ];
+
+    /**
      * The shape of every marker stamp on the Smaily contact wire: UTC
      * `Y-m-d H:i:s`, taken with gmdate() at the moment the store event
      * happened.

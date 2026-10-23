@@ -21,6 +21,7 @@ use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Source\MultilingualMode;
+use Smaily\Connect\Model\Discount\AutomationDiscount;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Queue\EventQueue;
@@ -68,6 +69,11 @@ use Smaily\Connect\Model\Queue\Skipped;
  * closes the row as Skipped with the reason and the cart's tracker row as
  * skipped; a read that fails leaves the row on the retry ladder with nothing
  * sent.
+ *
+ * An automation whose "Send a discount code" is on gets its code just before
+ * it is posted, after the checks above (AutomationDiscount, CON-198): a row
+ * that is skipped makes no code, and a retried row sends the code its first
+ * attempt made.
  */
 class AutomationHandler implements EventHandlerInterface
 {
@@ -116,7 +122,8 @@ class AutomationHandler implements EventHandlerInterface
         private readonly Config $config,
         private readonly WebsiteOverrides $overrides,
         private readonly StoreManagerInterface $storeManager,
-        private readonly StateManager $cartState
+        private readonly StateManager $cartState,
+        private readonly AutomationDiscount $discount
     ) {
     }
 
@@ -165,6 +172,19 @@ class AutomationHandler implements EventHandlerInterface
             if ($skipReason !== null) {
                 $this->cartState->markReminderSkipped((int)($reminder['quote_id'] ?? 0));
                 $results[$id] = new Skipped($skipReason);
+                continue;
+            }
+            try {
+                $address = $this->discount->address(
+                    $event,
+                    $payload,
+                    $trigger,
+                    (int)($payload['store_id'] ?? 0),
+                    $websiteId
+                );
+            } catch (\Exception $exception) {
+                // No code could be made: nothing was posted, the row is retried.
+                $results[$id] = $exception;
                 continue;
             }
 

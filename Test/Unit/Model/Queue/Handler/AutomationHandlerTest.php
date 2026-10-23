@@ -20,6 +20,7 @@ use Smaily\Connect\Model\Client\Exception\TransportException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Discount\AutomationDiscount;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Queue\Event;
@@ -75,7 +76,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(Config::class),
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
-            $this->createMock(StateManager::class)
+            $this->createMock(StateManager::class),
+            $this->noDiscount()
         );
 
         self::assertSame([1 => true], $handler->handle([$event]));
@@ -105,7 +107,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(Config::class),
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
-            $this->createMock(StateManager::class)
+            $this->createMock(StateManager::class),
+            $this->noDiscount()
         );
 
         self::assertEquals([1 => Failure::permanent('Malformed automation payload')], $handler->handle([$event]));
@@ -144,7 +147,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(Config::class),
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
-            $this->createMock(StateManager::class)
+            $this->createMock(StateManager::class),
+            $this->noDiscount()
         );
 
         self::assertEquals(
@@ -185,7 +189,8 @@ class AutomationHandlerTest extends TestCase
             $config,
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
-            $this->createMock(StateManager::class)
+            $this->createMock(StateManager::class),
+            $this->noDiscount()
         );
 
         self::assertEquals(
@@ -231,7 +236,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(Config::class),
             $overrides,
             $storeManager,
-            $this->createMock(StateManager::class)
+            $this->createMock(StateManager::class),
+            $this->noDiscount()
         );
 
         self::assertEquals(
@@ -311,7 +317,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(Config::class),
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
-            $this->createMock(StateManager::class)
+            $this->createMock(StateManager::class),
+            $this->noDiscount()
         );
 
         self::assertSame([1 => true], $handler->handle([$event]));
@@ -357,7 +364,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(Config::class),
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
-            $this->createMock(StateManager::class)
+            $this->createMock(StateManager::class),
+            $this->noDiscount()
         );
 
         self::assertSame([1 => $refusal], $handler->handle([$event]));
@@ -459,7 +467,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(Config::class),
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
-            $cartState
+            $cartState,
+            $this->noDiscount()
         );
     }
 
@@ -484,5 +493,18 @@ class AutomationHandlerTest extends TestCase
         $event->method('getId')->willReturn(1);
 
         return $event;
+    }
+
+    /**
+     * An automation without a discount code: the address goes as queued.
+     */
+    private function noDiscount(): AutomationDiscount
+    {
+        $discount = $this->createMock(AutomationDiscount::class);
+        $discount->method('address')->willReturnCallback(
+            static fn (Event $event, array $payload): array => $payload['address']
+        );
+
+        return $discount;
     }
 }

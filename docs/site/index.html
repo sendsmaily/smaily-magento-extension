@@ -897,9 +897,10 @@ bin/magento cache:flush</code></pre>
         </table>
       </div>
       <ul>
-        <li>An automation reaches only a contact Smaily already has, and never re-subscribes a contact who unsubscribed.</li>
+        <li>An automation for an address that is not a contact in your Smaily account adds it as a contact. It never re-subscribes a contact who unsubscribed.</li>
         <li>Each run also writes a date field onto the contact, for segments such as "got the welcome letter" — see <a href="#ef-markers">When an automation last ran</a>.</li>
         <li><strong>Stop the abandoned-cart follow-ups once the shopper buys:</strong> on every follow-up step of the workflow, continue only while <code>abandoned_cart_purchased_at</code> is empty or earlier than <code>abandoned_cart_automation_at</code>. The extension writes the purchase time as soon as a reminded shopper places an order.</li>
+        <li><strong>Keep reminded guests out of newsletters:</strong> a reminder to a guest adds the guest to your Smaily account as a contact. To leave these contacts out of newsletter campaigns, exclude in the campaign's segment the contacts whose <code>abandoned_cart_automation_at</code> is set and who did not subscribe in your store.</li>
         <li>Campaign Intelligence's own automations are on this tab too, under the store events — see <a href="#set-engine-automations">Campaign Intelligence automations</a>.</li>
         <li>Order and shipping confirmations through a separate transactional account are set up here too, once that account is connected — see <a href="#set-transactional">Transactional emails</a>.</li>
         <li>A website on another Smaily account than the one saved for all websites starts only the workflows picked for it from its own account — see <a href="#setup-website">If your store has several websites</a>.</li>
@@ -918,9 +919,10 @@ bin/magento cache:flush</code></pre>
         </table>
       </div>
       <ul>
-        <li>Automaatika jõuab ainult kontaktini, kes Smailys juba on, ega telli kunagi uuesti kontakti, kes on loobunud.</li>
+        <li>Automaatika aadressile, mis pole su Smaily kontol kontakt, lisab selle kontaktiks. See ei telli kunagi uuesti kontakti, kes on loobunud.</li>
         <li>Iga käivitus kirjutab kontaktile ka kuupäevavälja, segmentide jaoks nagu „sai tervituskirja“ — vt <a href="#ef-markers">Automaatika viimane käivitus</a>.</li>
         <li><strong>Peata hüljatud ostukorvi järelkirjad, kui ostja ostab:</strong> töövoo igas järelsammus jätka ainult siis, kui <code>abandoned_cart_purchased_at</code> on tühi või varasem kui <code>abandoned_cart_automation_at</code>. Laiendus kirjutab ostu aja kohe, kui meeldetuletuse saanud ostja tellimuse esitab.</li>
+        <li><strong>Hoia meeldetuletuse saanud külalised uudiskirjadest eemal:</strong> meeldetuletus külalisele lisab külalise su Smaily kontole kontaktiks. Et need kontaktid uudiskirja kampaaniatesse ei satuks, välista kampaania segmendis kontaktid, kellel on <code>abandoned_cart_automation_at</code> täidetud ja kes ei liitunud su poes.</li>
         <li>Campaign Intelligence'i enda automaatikad on samuti sellel vahekaardil, poe sündmuste all — vt <a href="#set-engine-automations">Campaign Intelligence'i automaatikad</a>.</li>
         <li>Ka ostu ja tarne kinnituskirjad eraldi tehingulise konto kaudu seadistatakse siin, kui see konto on ühendatud — vt <a href="#set-transactional">Tehingulised kirjad</a>.</li>
         <li>Veebisait, mis kasutab muud Smaily kontot kui kõigi veebisaitide jaoks salvestatu, käivitab ainult need töövood, mis on talle tema enda kontolt valitud — vt <a href="#setup-website">Kui poel on mitu veebisaiti</a>.</li>
@@ -1967,7 +1969,7 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
         <li>The cart has an email address: a signed-in customer's, or a guest's typed on the checkout's email field.</li>
         <li>The cart has been idle longer than <strong>Wait (minutes)</strong>, but less than 24 hours.</li>
         <li>The cart was not reminded already, and the address got no reminder for another cart in the last 24 hours (that row reads <strong>Skipped</strong>).</li>
-        <li>Smaily already has the address as a contact who has not unsubscribed — an automation never creates or re-subscribes a contact.</li>
+        <li>The address has not unsubscribed in Smaily — an automation never re-subscribes a contact who unsubscribed. An address that is not a contact yet is added as one.</li>
       </ul>
     </div>
     <div data-lang="et">
@@ -1976,7 +1978,7 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
         <li>Ostukorvil on e-posti aadress: sisselogitud kliendi oma või külalise oma, mis on sisestatud kassa e-posti väljale.</li>
         <li>Ostukorv on olnud puutumata kauem kui <strong>Ooteaeg (minutites)</strong>, kuid vähem kui 24 tundi.</li>
         <li>Ostukorvile pole meeldetuletust juba saadetud ja aadress pole viimase 24 tunni jooksul saanud teise ostukorvi meeldetuletust (see rida on <strong>Vahele jäetud</strong>).</li>
-        <li>Smailys on aadress juba kontaktina, kes pole loobunud — automaatika ei loo kunagi kontakti ega telli seda uuesti.</li>
+        <li>Aadress pole Smailys loobunud — automaatika ei telli kunagi uuesti kontakti, kes on loobunud. Aadress, mis pole veel kontakt, lisatakse kontaktiks.</li>
       </ul>
     </div>
   </div>

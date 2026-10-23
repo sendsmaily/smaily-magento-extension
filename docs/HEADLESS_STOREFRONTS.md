@@ -435,8 +435,10 @@ separate storefront does the same:
   route from the back end (no credentials needed; see
   [On the Magento back end](#on-the-magento-back-end)).
 
-As on any store, the reminder reaches only an address Smaily already has as
-a contact that has not unsubscribed.
+As on any store, a reminder to an address that is not a contact in the
+Smaily account adds it as a contact, and a reminder never re-subscribes a
+contact who unsubscribed. The reminder writes `abandoned_cart_automation_at`
+on the contact, so a Smaily segment can find or exclude these contacts.
 
 ## Abandoned-cart link
 

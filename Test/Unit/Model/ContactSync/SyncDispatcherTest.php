@@ -168,8 +168,7 @@ class SyncDispatcherTest extends TestCase
 
     /**
      * PRO-3616: Smaily creates a contact sent without a status as subscribed,
-     * and a reminder sent to an address Smaily does not have creates nothing.
-     * A store unsubscribe therefore travels with the marker.
+     * so a store unsubscribe travels with the marker.
      */
     public function testTheCartPurchaseMarkerOfAStoreUnsubscribeCarriesTheUnsubscribe(): void
     {

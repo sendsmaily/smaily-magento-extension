@@ -440,6 +440,7 @@ pre code{background:none; border:0; padding:0; font-size:inherit}
         <li><strong>Magento cron running every minute.</strong> The extension does all its sending from cron. Without it, nothing reaches Smaily.</li>
         <li>A <strong>Smaily account with API access</strong>. Create an API user in Smaily under <span class="path">Preferences &gt; API</span> — you'll need the <strong>subdomain</strong>, the <strong>API username</strong> and the <strong>API password</strong>. The account's package must include API access.</li>
         <li><em>(Optional)</em> A <strong>Campaign Intelligence setup link</strong> — a one-time link on <code>https://intelligence.smaily.com/…</code>, provided by Smaily if you use the recommendation add-on.</li>
+        <li><em>(With Campaign Intelligence)</em> <strong>Two storefront addresses your firewall lets through.</strong> The shopper's browser posts to <code>POST /smaily/attribution/land</code> (an email-link click, so that your server sets the campaign-click cookies) and to <code>POST /smaily/relay</code> (browse events) on your store's own domain. A web application firewall, a CDN rule or a security module must let both through. They need no login and carry no name or email address — only the visitor token, the link's values and the products the shopper looked at. When they are blocked, browse events are lost and the browser sets the click cookies instead (Safari keeps those for 7 days at most).</li>
       </ul>
       <div class="tw">
         <table>
@@ -461,6 +462,7 @@ pre code{background:none; border:0; padding:0; font-size:inherit}
         <li><strong>Magento cron, mis käivitub iga minut.</strong> Laiendus saadab kõik cronist. Ilma selleta ei jõua Smailysse midagi.</li>
         <li><strong>API-ligipääsuga Smaily kontot</strong>. Loo Smailys API kasutaja menüüs <span class="path">Preferences &gt; API</span> — vaja läheb <strong>alamdomeeni</strong>, <strong>API kasutajanime</strong> ja <strong>API parooli</strong>. Konto pakett peab sisaldama API-ligipääsu.</li>
         <li><em>(Valikuline)</em> <strong>Campaign Intelligence'i seadistuslinki</strong> — ühekordset linki aadressil <code>https://intelligence.smaily.com/…</code>, mille Smaily annab, kui kasutad soovituste lisateenust.</li>
+        <li><em>(Campaign Intelligence'iga)</em> <strong>Kahte poe veebilehe aadressi, mida sinu tulemüür läbi laseb.</strong> Ostja brauser postitab sinu poe enda domeenil aadressile <code>POST /smaily/attribution/land</code> (e-kirja lingi klikk, et sinu server seaks kampaaniakliki küpsised) ja aadressile <code>POST /smaily/relay</code> (sirvimissündmused). Veebirakenduse tulemüür, CDN-i reegel või turvamoodul peab mõlemad läbi laskma. Need ei vaja sisselogimist ega sisalda nime ega e-posti aadressi — ainult külastajatunnust, lingi väärtusi ja tooteid, mida ostja vaatas. Kui need on blokeeritud, lähevad sirvimissündmused kaduma ja kliki küpsised seab hoopis brauser (Safari hoiab neid kõige rohkem 7 päeva).</li>
       </ul>
       <div class="tw">
         <table>

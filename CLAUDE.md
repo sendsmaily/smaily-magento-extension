@@ -207,6 +207,14 @@ start one.
   DI-correctness gate (see TESTING.md). After a constructor change the
   first `setup:upgrade` can fail with "Too few arguments" (or a type error) from the stale
   compiled DI; run `setup:di:compile`, then both again.
+- **The removal runs without the module's di.xml** (CON-220): INSTALLING.md
+  disables the module before `module:uninstall`, so Magento builds
+  `Setup\Uninstall`, `RemoveSettingsOnUninstall` and everything they
+  construct from Magento's own DI configuration only. A dependency that
+  needs one of our preferences or arguments (e.g. `Engine\Client`:
+  `SleeperInterface`, `Logger`) breaks the uninstall before anything is
+  removed — that is why the §16 call there goes through
+  `Engine\Disconnector`. `Test/Unit/Setup/UninstallTest` pins it.
 - Release ZIP is built by `.github/workflows/release.yaml` on a published
   GitHub release (see "Release cut" below).
 

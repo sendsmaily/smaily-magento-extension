@@ -13,6 +13,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Console\Command\BackfillStartCommand;
 use Smaily\Connect\Model\Backfill\EngineImportGuard;
+use Smaily\Connect\Model\Backfill\ImportStarter;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Config;
@@ -184,8 +185,11 @@ class BackfillStartCommandTest extends TestCase
         $config->method('isContactSyncActive')->willReturn($syncEnabled && $contactsSaved);
         $tester = new CommandTester(new BackfillStartCommand(
             $this->jobManager,
-            $this->createMock(StoreManagerInterface::class),
-            new EngineImportGuard($engineSettings),
+            new ImportStarter(
+                $this->jobManager,
+                $this->createMock(StoreManagerInterface::class),
+                new EngineImportGuard($engineSettings)
+            ),
             $config
         ));
         $tester->execute(['type' => $jobType] + $options);

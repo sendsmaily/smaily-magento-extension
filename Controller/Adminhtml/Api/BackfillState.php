@@ -15,7 +15,7 @@ use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use Magento\Store\Model\StoreManagerInterface;
-use Smaily\Connect\Model\Backfill\EngineImportGuard;
+use Smaily\Connect\Model\Backfill\ImportStarter;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\JobStatusAggregator;
@@ -30,7 +30,8 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * engine types) and is idempotent — an already-active job is not an error.
  * A Campaign Intelligence import (catalog, customers, orders) does not
  * start while Campaign Intelligence is not connected: the answer then
- * carries a `message` saying why (PRO-1969, PRO-3742).
+ * carries a `message` saying why (PRO-1969, PRO-3742). The start is
+ * Model/Backfill/ImportStarter, the one smaily:backfill:start shares.
  * "cancel" flips every active job of the type to cancelled; the background
  * worker stops at its next page boundary, and a later "start" begins a
  * fresh import. `stalled` marks a queued or running import that nothing
@@ -55,7 +56,7 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
         private readonly StoreManagerInterface $storeManager,
         private readonly TimezoneInterface $timezone,
         private readonly JobStatusAggregator $statusAggregator,
-        private readonly EngineImportGuard $engineImportGuard
+        private readonly ImportStarter $importStarter
     ) {
         parent::__construct($context, $jsonFactory, $serializer);
     }
@@ -74,16 +75,10 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
 
         $action = (string)($body['action'] ?? 'status');
         if ($action === 'start') {
-            $refusal = $this->engineImportGuard->refusal($jobType, $target);
+            // Idempotent: an already-active job is not an error.
+            $refusal = $this->importStarter->start($jobType, $target)['refusal'];
             if ($refusal !== null) {
                 return $this->jsonResponse($this->aggregate($jobType, $target) + ['message' => (string)$refusal]);
-            }
-            $websiteIds = $target === Job::TARGET_ENGINE
-                ? [Job::ENGINE_WEBSITE_ID]
-                : array_map(static fn ($website) => (int)$website->getId(), $this->storeManager->getWebsites());
-            foreach ($websiteIds as $websiteId) {
-                // Idempotent: an already-active job is not an error.
-                $this->jobManager->startIfIdle($jobType, $target, $websiteId);
             }
         } elseif ($action === 'cancel') {
             $this->jobManager->requestCancel($jobType, $target);

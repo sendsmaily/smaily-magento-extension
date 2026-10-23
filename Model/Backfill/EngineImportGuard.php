@@ -14,9 +14,10 @@ use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 /**
  * Why a Campaign Intelligence import cannot start now: every engine-bound
  * import (catalog, customers, orders) needs the connection — without it
- * there is nowhere to send the data (PRO-1969, PRO-3742). The admin import
- * endpoint and smaily:backfill:start both ask here before starting a job;
- * the contacts import goes to Smaily and is never refused here.
+ * there is nowhere to send the data (PRO-1969, PRO-3742). ImportStarter —
+ * the start the admin import endpoint and smaily:backfill:start share —
+ * asks here before starting a job; the contacts import goes to Smaily and
+ * is never refused here.
  */
 class EngineImportGuard
 {

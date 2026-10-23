@@ -1108,18 +1108,21 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
-     * CON-198: a switched-on discount code needs a cart price rule; without
-     * one, nothing of the automations is saved.
+     * CON-198: a switched-on automation's discount code needs a cart price
+     * rule; without one, nothing of the automations is saved.
      */
     public function testADiscountCodeWithoutARuleSavesNothing(): void
     {
         $errors = $this->saver->save('automations', [
-            'welcome_enabled' => true,
+            'welcome_enabled' => false,
+            'welcome_coupon_enabled' => true,
+            'welcome_coupon_rule' => 0,
+            'first_order_enabled' => true,
             'first_order_coupon_enabled' => true,
             'first_order_coupon_rule' => 0,
         ]);
 
-        self::assertSame(['first_order_coupon_rule'], array_column($errors, 'field'));
+        self::assertSame(['first_order_coupon_rule'], array_column($errors, 'field'), 'only a switched-on automation');
         self::assertSame([], $this->saved);
     }
 

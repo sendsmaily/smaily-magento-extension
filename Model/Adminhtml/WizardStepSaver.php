@@ -970,9 +970,9 @@ class WizardStepSaver
     }
 
     /**
-     * An automation whose "Send a discount code" switch is on needs a cart
-     * price rule to make its codes from (CON-198); nothing is saved without
-     * one.
+     * A switched-on automation whose "Send a discount code" switch is on
+     * needs a cart price rule to make its codes from (CON-198); nothing is
+     * saved without one.
      *
      * @param array<string, mixed> $data
      * @return array<int, array{field: string, message: string}>
@@ -981,7 +981,10 @@ class WizardStepSaver
     {
         $errors = [];
         foreach (self::COUPON_KEYS as $key) {
-            if (!empty($data[$key . '_coupon_enabled']) && (int)($data[$key . '_coupon_rule'] ?? 0) <= 0) {
+            if (!empty($data[$key . '_enabled'])
+                && !empty($data[$key . '_coupon_enabled'])
+                && (int)($data[$key . '_coupon_rule'] ?? 0) <= 0
+            ) {
                 $errors[] = [
                     'field' => $key . '_coupon_rule',
                     'message' => (string)__(

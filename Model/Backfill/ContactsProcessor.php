@@ -28,9 +28,9 @@ use Smaily\Connect\Model\Logger\Logger;
  * subscribed one, and under "All customers" (the soft opt-in, PRO-3610)
  * every other customer, goes without is_unsubscribed: Smaily keeps an
  * existing contact's status and creates a new contact as subscribed. So the
- * import never re-subscribes a contact who unsubscribed in Smaily (CON-195);
- * only the shopper's own subscription in the store does
- * (Observer\SubscriberSaveAfter).
+ * import, which is not a consent act, never re-subscribes a contact who
+ * unsubscribed in Smaily (CON-195, CON-196); only a change of the newsletter
+ * status does (Observer\SubscriberSaveAfter).
  *
  * The cursor is the last processed subscriber_id while the walk is in the
  * subscribers; under "All customers" it then moves on to the other

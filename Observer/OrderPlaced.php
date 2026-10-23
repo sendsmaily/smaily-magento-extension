@@ -101,11 +101,7 @@ class OrderPlaced implements ObserverInterface
             return;
         }
 
-        $this->dispatcher->dispatchCartPurchase(
-            $email,
-            $storeId,
-            $this->isUnsubscribedInStore($email, $websiteId)
-        );
+        $this->dispatcher->dispatchCartPurchase($email, $storeId);
     }
 
     private function syncContact(

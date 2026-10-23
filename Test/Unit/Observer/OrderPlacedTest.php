@@ -150,18 +150,18 @@ class OrderPlacedTest extends TestCase
     }
 
     /**
-     * PRO-3616: the abandoned-cart purchase marker can create the contact
-     * when the withdrawn reminder never reached Smaily, so an email that
-     * unsubscribed in the store carries its unsubscribe.
+     * CON-196: the abandoned-cart purchase marker changes another field, so
+     * it never carries a subscription status, whatever the store's record
+     * says; it goes only to a contact Smaily has (ContactSyncHandler).
      *
      * @dataProvider cartPurchaseProvider
      */
-    public function testTheCartPurchaseMarkerCarriesAStoreUnsubscribe(int $status, bool $expected): void
+    public function testTheCartPurchaseMarkerNeverCarriesAStatus(int $status): void
     {
         $dispatcher = $this->createMock(SyncDispatcher::class);
         $dispatcher->method('websiteId')->willReturn(1);
         $dispatcher->expects(self::once())->method('dispatchCartPurchase')
-            ->with('person@example.com', 1, $expected);
+            ->with('person@example.com', 1);
 
         $this->observer(
             $this->createMock(SubscriptionManagerInterface::class),
@@ -175,14 +175,14 @@ class OrderPlacedTest extends TestCase
     }
 
     /**
-     * @return array<string, array{0: int, 1: bool}>
+     * @return array<string, array{0: int}>
      */
     public static function cartPurchaseProvider(): array
     {
         return [
-            'unsubscribed in the store' => [Subscriber::STATUS_UNSUBSCRIBED, true],
-            'subscribed' => [Subscriber::STATUS_SUBSCRIBED, false],
-            'no newsletter record' => [0, false],
+            'unsubscribed in the store' => [Subscriber::STATUS_UNSUBSCRIBED],
+            'subscribed' => [Subscriber::STATUS_SUBSCRIBED],
+            'no newsletter record' => [0],
         ];
     }
 
@@ -229,7 +229,7 @@ class OrderPlacedTest extends TestCase
     {
         $dispatcher = $this->createMock(SyncDispatcher::class);
         $dispatcher->method('websiteId')->willReturn(1);
-        $dispatcher->expects(self::once())->method('dispatchCartPurchase')->with('person@example.com', 1, false);
+        $dispatcher->expects(self::once())->method('dispatchCartPurchase')->with('person@example.com', 1);
         $dispatcher->expects(self::never())->method('dispatchContactSync');
 
         $this->observer(

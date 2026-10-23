@@ -94,19 +94,36 @@ class SubscriberSaveAfterTest extends TestCase
     /**
      * PRO-3580: a subscription made in the admin, through the REST, SOAP or
      * GraphQL API, or by a cron or command-line import fires no welcome. The
-     * contact still syncs, without is_unsubscribed (CON-195): Smaily creates
-     * a new contact as subscribed and never re-subscribes one who
-     * unsubscribed there.
+     * contact still syncs as subscribed (CON-196): a status change is a
+     * consent act whoever makes it, and may re-subscribe a contact who
+     * unsubscribed in Smaily.
      *
      * @dataProvider nonStorefrontAreaProvider
      */
     public function testANonStorefrontSubscriptionSyncsTheContactWithoutAWelcome(?string $area): void
     {
         $this->dispatcher->expects(self::once())->method('dispatchContactSync')
-            ->with('person@example.com', 1, self::identicalTo(null), null);
+            ->with('person@example.com', 1, self::identicalTo(false), null);
         $this->dispatcher->expects(self::never())->method('dispatchAutomation');
 
-        $this->observer($area)->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED));
+        $this->observer($area)->execute(
+            $this->eventFor(Subscriber::STATUS_SUBSCRIBED, Subscriber::STATUS_UNSUBSCRIBED)
+        );
+    }
+
+    /**
+     * CON-196: an unsubscribe goes as 1 in every context too.
+     *
+     * @dataProvider nonStorefrontAreaProvider
+     */
+    public function testAnUnsubscribeSyncsInEveryContext(?string $area): void
+    {
+        $this->dispatcher->expects(self::once())->method('dispatchContactSync')
+            ->with('person@example.com', 1, self::identicalTo(true), null);
+
+        $this->observer($area)->execute(
+            $this->eventFor(Subscriber::STATUS_UNSUBSCRIBED, Subscriber::STATUS_SUBSCRIBED)
+        );
     }
 
     /**

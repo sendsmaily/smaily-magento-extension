@@ -95,18 +95,19 @@ class SyncDispatcher
     }
 
     /**
-     * An abandoned-cart reminder the queue sends only to a contact Smaily
-     * has as subscribed (CON-195): in the consent and checkout opt-in modes,
-     * for a shopper who has not agreed to marketing emails in the store. The
-     * queue handler reads the contact before it sends, and a skip there
-     * closes the cart's tracker row as skipped, so the payload names the cart.
+     * An abandoned-cart reminder of one cart (CON-195, CON-196). The queue
+     * handler reads the contact before it sends: never to a contact who
+     * unsubscribed in Smaily, and to an address Smaily does not have only when
+     * $toNewContact (the shopper's consent in the store, or legitimate
+     * interest). A skip there closes the cart's tracker row as skipped, so
+     * the payload names the cart.
      *
      * @param array<string, string|int> $address must contain "email"
      */
-    public function dispatchReminderToSubscribedContact(int $quoteId, int $storeId, array $address): void
+    public function dispatchCartReminder(int $quoteId, int $storeId, array $address, bool $toNewContact): void
     {
         $payload = $this->automationPayload(Trigger::ABANDONED_CART, $storeId, $address);
-        $payload[AutomationHandler::SUBSCRIBED_CONTACT_CART] = $quoteId;
+        $payload[AutomationHandler::CART_REMINDER] = ['quote_id' => $quoteId, 'new_contact' => $toNewContact];
         $this->eventQueue->enqueue(
             EventType::AUTOMATION_TRIGGER,
             $payload,
@@ -172,11 +173,11 @@ class SyncDispatcher
      * would create one. A reminder that went out added its address to Smaily
      * as a contact, and the queue handler still reads the contact before it
      * posts the marker and skips it for an address Smaily does not have
-     * (ContactSyncHandler). An email the store knows as unsubscribed carries
-     * is_unsubscribed=1 (PRO-3616); otherwise the status is omitted and the
-     * contact keeps the one it has.
+     * (ContactSyncHandler). The marker never carries a subscription status
+     * (CON-196): it changes another field, so the contact keeps the status it
+     * has in Smaily.
      */
-    public function dispatchCartPurchase(string $email, int $storeId, bool $unsubscribedInStore = false): void
+    public function dispatchCartPurchase(string $email, int $storeId): void
     {
         $entity = $this->contactEntity->of($email);
         $this->eventQueue->cancelPendingAutomation(Trigger::ABANDONED_CART, $entity);
@@ -184,14 +185,10 @@ class SyncDispatcher
             return;
         }
 
-        $contact = [
+        $this->enqueueContactSync([
             'email' => $email,
             Trigger::ABANDONED_CART_PURCHASED_FIELD => gmdate(Trigger::MARKER_STAMP_FORMAT),
-        ];
-        if ($unsubscribedInStore) {
-            $contact['is_unsubscribed'] = 1;
-        }
-        $this->enqueueContactSync($contact, $storeId);
+        ], $storeId);
     }
 
     /**

@@ -59,15 +59,17 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
 
 /**
- * CON-195: the extension's own writes never undo an unsubscribe made in
- * Smaily — the contacts import and an admin save of a customer send a
- * subscribed contact without is_unsubscribed, so Smaily keeps the status it
- * holds and creates a new contact as subscribed. Only the shopper's own
- * subscription in the store sends is_unsubscribed=0 and subscribes them
- * again. On real newsletter_subscriber rows, the real queue and Magento's
- * own subscriber model; the Smaily client is stubbed.
+ * CON-195, CON-196: a subscription status goes to Smaily only when the
+ * status itself changes. A change of the newsletter status is a consent act
+ * whoever makes it — the shopper, staff in the admin, an API call, a Magento
+ * import — and sends 0 or 1, so a subscription subscribes a contact who
+ * unsubscribed in Smaily again. The extension's contacts import and a profile
+ * save send a subscribed contact without is_unsubscribed, so Smaily keeps the
+ * status it holds and creates a new contact as subscribed. On real
+ * newsletter_subscriber rows, the real queue and Magento's own subscriber
+ * model; the Smaily client is stubbed.
  */
-class UnsubscribeKeptTest extends IntegrationTestCase
+class SubscriptionStatusTest extends IntegrationTestCase
 {
     private SchemaInstaller $schema;
 
@@ -137,6 +139,9 @@ class UnsubscribeKeptTest extends IntegrationTestCase
         ];
     }
 
+    /**
+     * A profile save changes other fields, not the subscription status.
+     */
     public function testAnAdminSaveOfACustomerNeverResubscribesAContact(): void
     {
         $this->seedSubscriber('customer@example.com', Subscriber::STATUS_SUBSCRIBED, 7);
@@ -163,44 +168,51 @@ class UnsubscribeKeptTest extends IntegrationTestCase
     }
 
     /**
-     * @dataProvider storefrontAreas
+     * @dataProvider subscriptionContexts
      */
-    public function testAShoppersOwnSubscriptionInTheStoreSubscribesThemAgain(string $area): void
+    public function testASubscriptionStatusChangeIsSentWhoeverMakesIt(string $area): void
     {
         $this->area = $area;
         $id = $this->seedSubscriber('returning@example.com', Subscriber::STATUS_UNSUBSCRIBED);
 
-        $this->subscribe($id);
+        $this->changeStatus($id, Subscriber::STATUS_SUBSCRIBED);
 
         self::assertSame([['email' => 'returning@example.com', 'is_unsubscribed' => 0]], $this->queuedContacts());
     }
 
     /**
-     * @return array<string, array{0: string}>
+     * @dataProvider subscriptionContexts
      */
-    public static function storefrontAreas(): array
+    public function testAnUnsubscribeIsSentWhoeverMakesIt(string $area): void
     {
-        return [
-            'the newsletter form or My Account' => ['frontend'],
-            'the checkout box, placed through the REST API' => ['webapi_rest'],
-        ];
-    }
+        $this->area = $area;
+        $id = $this->seedSubscriber('leaving@example.com', Subscriber::STATUS_SUBSCRIBED);
 
-    public function testASubscriptionMadeInTheAdminNeverResubscribesAContact(): void
-    {
-        $id = $this->seedSubscriber('returning@example.com', Subscriber::STATUS_UNSUBSCRIBED);
+        $this->changeStatus($id, Subscriber::STATUS_UNSUBSCRIBED);
 
-        $this->subscribe($id);
-
-        self::assertSame([['email' => 'returning@example.com']], $this->queuedContacts());
+        self::assertSame([['email' => 'leaving@example.com', 'is_unsubscribed' => 1]], $this->queuedContacts());
     }
 
     /**
-     * Subscribe a stored subscriber again through Magento's subscriber model,
-     * its save event dispatched to the module's observer. Under
-     * `webapi_rest` the checkout opt-in marks the save, as OrderPlaced does.
+     * @return array<string, array{0: string}>
      */
-    private function subscribe(int $subscriberId): void
+    public static function subscriptionContexts(): array
+    {
+        return [
+            'the storefront: newsletter form, My Account' => ['frontend'],
+            'the checkout box, placed through the REST API' => ['webapi_rest'],
+            'a GraphQL call (any caller)' => ['graphql'],
+            'staff in the admin' => ['adminhtml'],
+            'a Magento import from cron' => ['crontab'],
+        ];
+    }
+
+    /**
+     * Change a stored subscriber's status through Magento's subscriber model,
+     * its save event dispatched to the module's observer, in the test's area.
+     * A REST save is the checkout opt-in, marked as OrderPlaced marks it.
+     */
+    private function changeStatus(int $subscriberId, int $status): void
     {
         $storefrontSubscription = new StorefrontSubscription();
         $appState = $this->createMock(State::class);
@@ -224,11 +236,11 @@ class UnsubscribeKeptTest extends IntegrationTestCase
             }
         );
 
-        $save = function () use ($subscriberId, $eventManager): void {
+        $save = function () use ($subscriberId, $status, $eventManager): void {
             $resource = $this->subscriberResource();
             $subscriber = $this->newSubscriber($eventManager, $resource);
             $resource->load($subscriber, $subscriberId);
-            $resource->save($subscriber->setStatus(Subscriber::STATUS_SUBSCRIBED)->setStatusChanged(true));
+            $resource->save($subscriber->setStatus($status)->setStatusChanged(true));
         };
         $this->area === 'webapi_rest' ? $storefrontSubscription->run($save) : $save();
     }

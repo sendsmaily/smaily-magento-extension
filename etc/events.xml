@@ -10,10 +10,6 @@
     <event name="newsletter_subscriber_save_after">
         <observer name="smaily_connect_subscriber_save" instance="Smaily\Connect\Observer\SubscriberSaveAfter"/>
     </event>
-    <!-- Only the admin's subscriber grid Delete action sends (Plugin\Adminhtml\MarkSubscriberMassDelete). -->
-    <event name="newsletter_subscriber_delete_after">
-        <observer name="smaily_connect_subscriber_delete" instance="Smaily\Connect\Observer\SubscriberDeleteAfter"/>
-    </event>
     <event name="customer_save_after_data_object">
         <observer name="smaily_connect_customer_save" instance="Smaily\Connect\Observer\CustomerSaveAfter"/>
     </event>
@@ -46,9 +42,5 @@
     <event name="newsletter_subscriber_save_after">
         <observer name="smaily_connect_engine_unsubscribe" instance="Smaily\Connect\Observer\Engine\SubscriberUnsubscribed"/>
         <observer name="smaily_connect_engine_resubscribe" instance="Smaily\Connect\Observer\Engine\SubscriberResubscribed"/>
-    </event>
-    <!-- Only the admin's subscriber grid Delete action opts out (Plugin\Adminhtml\MarkSubscriberMassDelete). -->
-    <event name="newsletter_subscriber_delete_after">
-        <observer name="smaily_connect_engine_subscriber_delete" instance="Smaily\Connect\Observer\Engine\SubscriberDeleted"/>
     </event>
 </config>

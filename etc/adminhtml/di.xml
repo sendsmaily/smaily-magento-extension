@@ -11,11 +11,6 @@
         <plugin name="smaily_connect_validate_connection" type="Smaily\Connect\Plugin\Adminhtml\ValidateConnectionOnSave"/>
     </type>
 
-    <!-- A subscriber deleted in the Newsletter Subscribers grid unsubscribes in Smaily (CON-176). -->
-    <type name="Magento\Newsletter\Controller\Adminhtml\Subscriber\MassDelete">
-        <plugin name="smaily_connect_mark_subscriber_mass_delete" type="Smaily\Connect\Plugin\Adminhtml\MarkSubscriberMassDelete"/>
-    </type>
-
     <!-- The customers-import notice in the admin's system messages (PRO-4007). -->
     <type name="Magento\Framework\Notification\MessageList">
         <arguments>

@@ -1133,6 +1133,22 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
     }
 
     /**
+     * @return array<int, string>
+     */
+    public function getDiscountRules(): array
+    {
+        return [12 => 'Welcome 10%'];
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasCartPriceRules(): bool
+    {
+        return true;
+    }
+
+    /**
      * @return bool
      */
     public function isEngineRefused(): bool
@@ -1523,6 +1539,81 @@ $pages['settings-modes'] = [
     ]],
     'strings' => ['Some languages have no workflow'],
 ];
+
+/*
+ * The Automations tab's discount code (CON-198) for the Latvia website of
+ * the two-website store above: the settings-discount page lists two cart
+ * price rules that can generate codes; the settings-discount-empty page has
+ * no cart price rule at all; on the settings-discount-no-autogen page the
+ * store has cart price rules, but none can generate codes.
+ */
+$discountViewModel = static fn (array $rules, bool $hasRules): object => new class (
+    $websitesViewModel(false),
+    $rules,
+    $hasRules
+) {
+    /**
+     * @param object $inner
+     * @param array<int, string> $rules
+     * @param bool $hasRules
+     */
+    public function __construct(
+        private readonly object $inner,
+        private readonly array $rules,
+        private readonly bool $hasRules
+    ) {
+    }
+
+    /**
+     * @param string $name
+     * @param array<int, mixed> $arguments
+     * @return mixed
+     */
+    public function __call(string $name, array $arguments): mixed
+    {
+        return $this->inner->$name(...$arguments);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function getDiscountRules(): array
+    {
+        return $this->rules;
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasCartPriceRules(): bool
+    {
+        return $this->hasRules;
+    }
+};
+$discountStrings = [
+    'Send a discount code',
+    'Make the discount in Magento first',
+    'Your cart price rules are not listed: a rule is listed only when it is active for these websites and has'
+        . ' Coupon "Specific Coupon" with "Use Auto Generation" ticked.',
+    'Send a discount code is on, but no cart price rule is picked. Pick a rule, or switch the discount code off.',
+];
+$discountPages = [
+    'settings-discount' => [[12 => 'Welcome 10%', 14 => 'Come back 5 EUR'], true],
+    'settings-discount-empty' => [[], false],
+    'settings-discount-no-autogen' => [[], true],
+];
+foreach ($discountPages as $page => [$rules, $hasRules]) {
+    $pages[$page] = [
+        'template' => $root . '/view/adminhtml/templates/settings/index.phtml',
+        'viewModel' => $discountViewModel($rules, $hasRules),
+        'data' => ['context' => 'settings', 'children' => [
+            'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
+            'panel.automations' => $root . '/view/adminhtml/templates/panel/automations.phtml',
+            'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+        ]],
+        'strings' => $discountStrings,
+    ];
+}
 
 /*
  * The Dashboard (view/adminhtml/templates/dashboard/index.phtml): set up,

@@ -22,6 +22,8 @@ use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Source\MultilingualMode;
 use Smaily\Connect\Model\Config\Source\SyncMode;
 use Smaily\Connect\Model\ContactSync\Mode;
+use Smaily\Connect\Model\Discount\RuleSource;
+use Smaily\Connect\Model\Discount\StoreDate;
 use Smaily\Connect\Model\Engine\ConsentSource;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
@@ -47,6 +49,13 @@ class WizardData implements ArgumentInterface
         'abandonedWorkflow' => Config::XML_PATH_ABANDONED_WORKFLOW,
     ];
 
+    /** Trigger => the id slug of its card in panel/automations.phtml. */
+    private const COUPON_SLUGS = [
+        Trigger::WELCOME => 'welcome',
+        Trigger::FIRST_ORDER => 'firstOrder',
+        Trigger::ABANDONED_CART => 'abandoned',
+    ];
+
     public function __construct(
         private readonly Config $config,
         private readonly Mode $mode,
@@ -61,7 +70,9 @@ class WizardData implements ArgumentInterface
         private readonly ConsentSource $consentSource,
         private readonly OrderOrigin $orderOrigin,
         private readonly SetupGuard $setupGuard,
-        private readonly WebsiteOverrides $overrides
+        private readonly WebsiteOverrides $overrides,
+        private readonly RuleSource $ruleSource,
+        private readonly StoreDate $storeDate
     ) {
     }
 
@@ -318,10 +329,38 @@ class WizardData implements ArgumentInterface
             Config::XML_PATH_ABANDONED_WORKFLOW => [$withWorkflow((string)__('Abandoned cart')), $workflow($value)],
             Config::XML_PATH_ABANDONED_CUTOFF => [__('Abandoned cart') . ' · ' . __('Wait (minutes)'), $value],
             'mappings' => [__('Per-language workflows'), $value],
-            default => [$key, $value],
+            default => $this->describeOwnCouponValue($key, $value) ?? [$key, $value],
         };
 
         return [(string)$line[0], (string)$line[1]];
+    }
+
+    /**
+     * One own discount code setting of a website (CON-198) as a label and a
+     * value, or null for another key.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    private function describeOwnCouponValue(string $key, string $value): ?array
+    {
+        $names = [
+            Trigger::WELCOME => __('Welcome'),
+            Trigger::FIRST_ORDER => __('First order'),
+            Trigger::ABANDONED_CART => __('Abandoned cart'),
+        ];
+        foreach (Config::COUPON_PATHS as $trigger => $paths) {
+            $line = match ($key) {
+                $paths['enabled'] => [__('Send a discount code'), $value === '1' ? __('On') : __('Off')],
+                $paths['rule'] => [__('Cart price rule'), (int)$value > 0 ? '#' . (int)$value : '—'],
+                $paths['days'] => [__('Valid for (days)'), $value],
+                default => null,
+            };
+            if ($line !== null) {
+                return [$names[$trigger] . ' · ' . $line[0], (string)$line[1]];
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -470,7 +509,7 @@ class WizardData implements ArgumentInterface
                 'abandonedEnabled' => $this->config->isAbandonedCartEnabled($websiteId),
                 'abandonedWorkflow' => (string)($this->config->getAbandonedCartWorkflow($websiteId) ?: ''),
                 'abandonedCutoff' => $this->config->getAbandonedCutoffMinutes($websiteId),
-            ]),
+            ]) + $this->couponSettings($websiteId),
             'intelligence' => [
                 'connected' => $this->engineSettings->isConnected(),
                 'tenantName' => $this->engineSettings->getTenantName()
@@ -482,6 +521,75 @@ class WizardData implements ArgumentInterface
                 'enabled' => $this->config->isRssEnabled(),
             ],
         ]);
+    }
+
+    /**
+     * Each automation's discount code settings (CON-198), keyed by the
+     * trigger cards' id slug: `<slug>Coupon` {enabled, rule, days}.
+     *
+     * @return array<string, array{enabled: bool, rule: string, days: int}>
+     */
+    private function couponSettings(int $websiteId): array
+    {
+        $settings = [];
+        foreach (self::COUPON_SLUGS as $trigger => $slug) {
+            $ruleId = $this->config->getCouponRuleId($trigger, $websiteId);
+            $settings[$slug . 'Coupon'] = [
+                'enabled' => $this->config->isCouponEnabled($trigger, $websiteId),
+                'rule' => $ruleId > 0 ? (string)$ruleId : '',
+                'days' => $this->config->getCouponValidDays($trigger, $websiteId),
+            ];
+        }
+
+        return $settings;
+    }
+
+    /**
+     * The cart price rules an automation's discount codes can come from
+     * (CON-198), id => name: those for the selected website, or in the
+     * initial setup of a 2+-website install those for every website that
+     * follows the store-wide automations (RuleSource::forWebsites()).
+     *
+     * @return array<int, string>
+     */
+    public function getDiscountRules(): array
+    {
+        $storeId = $this->websiteContext->getStoreId();
+
+        return $this->ruleSource->forWebsites(
+            $this->discountWebsiteIds(),
+            $this->storeDate->today($storeId > 0 ? $storeId : null)
+        );
+    }
+
+    /**
+     * Whether the store has any cart price rule at all — when none is in
+     * getDiscountRules(), the panel says why.
+     */
+    public function hasCartPriceRules(): bool
+    {
+        return $this->ruleSource->hasRules();
+    }
+
+    /**
+     * The websites the shown automation settings send for.
+     *
+     * @return int[]
+     */
+    private function discountWebsiteIds(): array
+    {
+        $websiteId = $this->websiteContext->getWebsiteId();
+        if ($websiteId !== WebsiteContext::STORE_WIDE) {
+            return [$websiteId];
+        }
+        $all = array_keys($this->websiteContext->getWebsiteOptions());
+        $own = array_keys($this->overrides->ownValues(WebsiteOverrides::AUTOMATIONS));
+        $following = array_values(array_filter(
+            array_diff($all, $own),
+            fn (int $id): bool => !$this->overrides->usesOtherAccount($id)
+        ));
+
+        return $following !== [] ? $following : $all;
     }
 
     /**

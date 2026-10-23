@@ -61,6 +61,13 @@ window.smailyPanelsInit = function ($) {
     // (applySubscribersEnabled(), PRO-4016, PRO-4037).
     var syncSaved = boot.subscribers.syncEnabled;
     var syncActive = boot.subscribers.syncActive;
+    // The automation cards with a discount code (CON-198): the card's id
+    // slug, its boot key and its save keys' prefix.
+    var COUPON_CARDS = [
+        {id: 'welcome', boot: 'welcome', post: 'welcome'},
+        {id: 'firstorder', boot: 'firstOrder', post: 'first_order'},
+        {id: 'abandoned', boot: 'abandoned', post: 'abandoned'}
+    ];
 
     function post(url, data) {
         // Some URLs (Connection/Subscribers/Automations, docs/internal/RFC_MULTI_WEBSITE.md
@@ -153,11 +160,15 @@ window.smailyPanelsInit = function ($) {
         };
         var account = /^accounts\.([a-z]{2,3})\.(subdomain|username|password)$/.exec(String(key || ''));
         var transactional = /^transactional\.(subdomain|username|password)$/.exec(String(key || ''));
+        var coupon = /^(welcome|first_order|abandoned)_coupon_rule$/.exec(String(key || ''));
         if (plain[key]) {
             return $(plain[key]);
         }
         if (transactional) {
             return $('#smaily-tx-' + transactional[1]);
+        }
+        if (coupon) {
+            return $('#smaily-w-' + coupon[1].replace('_', '') + '-coupon-rule');
         }
         if (account) {
             return $('.smaily-ml-account[data-language=' + account[1] + '] .smaily-ml-' + account[2]);
@@ -886,6 +897,19 @@ window.smailyPanelsInit = function ($) {
         apply();
     }
 
+    // An automation's discount code fields (CON-198) show while its "Send a
+    // discount code" switch is on, and the switch follows the automation's
+    // own Enabled switch.
+    function reactCoupon(id) {
+        var apply = function () {
+            var enabled = $('#smaily-w-' + id + '-enabled').is(':checked');
+            var $switch = $('#smaily-w-' + id + '-coupon-enabled').prop('disabled', !enabled);
+            $('#smaily-w-' + id + '-coupon').toggle(enabled && $switch.is(':checked'));
+        };
+        $(document).on('change', '#smaily-w-' + id + '-enabled, #smaily-w-' + id + '-coupon-enabled', apply);
+        apply();
+    }
+
     function applySubscribersEnabled() {
         var $switch = $('#smaily-w-sync-enabled');
         if (!$('#smaily-w-backfill').length) {
@@ -962,6 +986,13 @@ window.smailyPanelsInit = function ($) {
         $('#smaily-w-welcome-workflow').data('saved', boot.automations.welcomeWorkflow);
         $('#smaily-w-firstorder-workflow').data('saved', boot.automations.firstOrderWorkflow);
         $('#smaily-w-abandoned-workflow').data('saved', boot.automations.abandonedWorkflow);
+        // Each automation's discount code (CON-198).
+        COUPON_CARDS.forEach(function (card) {
+            var coupon = boot.automations[card.boot + 'Coupon'] || {};
+            $('#smaily-w-' + card.id + '-coupon-enabled').prop('checked', !!coupon.enabled);
+            $('#smaily-w-' + card.id + '-coupon-rule').val(coupon.rule || '');
+            $('#smaily-w-' + card.id + '-coupon-days').val(coupon.days || 7);
+        });
 
         // Intelligence.
         if (boot.intelligence.connected) {
@@ -990,6 +1021,9 @@ window.smailyPanelsInit = function ($) {
         reactAutomationRow('#smaily-w-welcome-enabled', '#smaily-w-welcome-workflow');
         reactAutomationRow('#smaily-w-firstorder-enabled', '#smaily-w-firstorder-workflow');
         reactAutomationRow('#smaily-w-abandoned-enabled', '#smaily-w-abandoned-workflow, #smaily-w-cutoff');
+        COUPON_CARDS.forEach(function (card) {
+            reactCoupon(card.id);
+        });
         ['order_confirmation', 'shipment_confirmation'].forEach(function (trigger) {
             reactAutomationRow(
                 '#smaily-tx-' + trigger + '-enabled',
@@ -1347,6 +1381,14 @@ window.smailyPanelsInit = function ($) {
                 abandoned_workflow: $('#smaily-w-abandoned-workflow').val(),
                 abandoned_cutoff: parseInt($('#smaily-w-cutoff').val(), 10) || 30
             };
+            COUPON_CARDS.forEach(function (card) {
+                if (!$('#smaily-w-' + card.id + '-coupon-enabled').length) {
+                    return;
+                }
+                data[card.post + '_coupon_enabled'] = $('#smaily-w-' + card.id + '-coupon-enabled').is(':checked');
+                data[card.post + '_coupon_rule'] = parseInt($('#smaily-w-' + card.id + '-coupon-rule').val(), 10) || 0;
+                data[card.post + '_coupon_days'] = parseInt($('#smaily-w-' + card.id + '-coupon-days').val(), 10) || 7;
+            });
             var mode = currentMlMode();
             if (isMultilingual && (mode === 'a' || mode === 'b')) {
                 // The full desired mapping state: cleared selects post no

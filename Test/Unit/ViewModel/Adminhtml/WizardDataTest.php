@@ -20,6 +20,8 @@ use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Source\SyncMode;
 use Smaily\Connect\Model\ContactSync\Mode;
+use Smaily\Connect\Model\Discount\RuleSource;
+use Smaily\Connect\Model\Discount\StoreDate;
 use Smaily\Connect\Model\Engine\ConsentSource;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
@@ -104,7 +106,9 @@ class WizardDataTest extends TestCase
             $this->createMock(ConsentSource::class),
             $this->orderOrigin,
             $this->setupGuard,
-            $this->overrides
+            $this->overrides,
+            $this->createMock(RuleSource::class),
+            $this->createMock(StoreDate::class)
         );
     }
 

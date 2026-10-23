@@ -23,7 +23,7 @@ use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
- * The transactional-email settings of Settings (PRO-4062): the separate
+ * The transactional-email settings (PRO-4062, CON-33): the separate
  * account saved for all websites (default scope) with an optional website
  * account, its password stored encrypted, behind the "Send transactional
  * emails" switch (PRO-4065), and the two triggers and Customer details off
@@ -306,6 +306,42 @@ class TransactionalSettingsSaverTest extends TestCase
         self::assertSame('1', $this->saved[Config::XML_PATH_TRANSACTIONAL_PERSONAL_DATA . '@websites/3']);
         self::assertSame('1', $this->saved[Config::XML_PATH_ORDER_CONFIRMATION_ENABLED . '@websites/3']);
         self::assertSame('0', $this->saved[Config::XML_PATH_SHIPMENT_CONFIRMATION_ENABLED . '@websites/3']);
+    }
+
+    /**
+     * CON-33: the initial setup of a 2+-website install saves the switches
+     * for all websites, and the trigger workflows as website 0's rows.
+     */
+    public function testTheInitialSetupOfAMultiWebsiteInstallSavesTheSwitchesForAllWebsites(): void
+    {
+        $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
+        $this->mappingSaver->expects(self::once())->method('saveTransactional')
+            ->with([], WebsiteContext::STORE_WIDE)->willReturn([]);
+
+        $this->saver->saveAccount(
+            ['enabled' => true, 'subdomain' => 'shop-tx', 'username' => 'api', 'password' => 'secret'],
+            WebsiteContext::STORE_WIDE
+        );
+        $this->saver->saveTriggers([
+            'order_confirmation_enabled' => true,
+            'shipment_confirmation_enabled' => false,
+            'personal_data_enabled' => true,
+            'mappings' => [],
+        ], WebsiteContext::STORE_WIDE);
+
+        foreach ([
+            Config::XML_PATH_TRANSACTIONAL_ENABLED => '1',
+            Config::XML_PATH_TRANSACTIONAL_SUBDOMAIN => 'shop-tx',
+            Config::XML_PATH_ORDER_CONFIRMATION_ENABLED => '1',
+            Config::XML_PATH_SHIPMENT_CONFIRMATION_ENABLED => '0',
+            Config::XML_PATH_TRANSACTIONAL_PERSONAL_DATA => '1',
+        ] as $path => $value) {
+            self::assertSame($value, $this->saved[$path . '@default/0'] ?? null, $path);
+        }
+        self::assertSame([], array_filter(
+            array_keys($this->saved),
+            static fn (string $key): bool => str_contains($key, '@websites/')
+        ));
     }
 
     private function savedAccount(string $subdomain, string $username, string $password): void

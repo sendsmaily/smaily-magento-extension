@@ -21,6 +21,12 @@
  * except the automations of a website on another Smaily account than the
  * store-wide one, which it always keeps (CON-190).
  *
+ * As in the WooCommerce plugin's setup (CON-33), the Connect step offers the
+ * optional transactional-email account below the Smaily account, saved for
+ * the whole store (a website's own account is set in Settings only), and the
+ * Automations step shows its Order confirmation and Shipping confirmation
+ * triggers once Smaily accepts that account.
+ *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
  */
@@ -176,10 +182,10 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
         </div>
         <?php endif; ?>
         <?php endif; ?>
-        <div id="smaily-w-connect-form"<?= $setupCompleted ? ' style="display:none"' : '' ?>><?= $block->getChildHtml('panel.connection') ?><?= /* @noEscape */ $websiteOverrides('connection') ?></div>
+        <div id="smaily-w-connect-form"<?= $setupCompleted ? ' style="display:none"' : '' ?>><?= $block->getChildHtml('panel.connection') ?><?= /* @noEscape */ $websiteOverrides('connection') ?><?= $block->getChildHtml('panel.transactional.account') ?></div>
     </div>
     <div class="<?= /* @noEscape */ $panelClass(2) ?>" data-step="2"><?= /* @noEscape */ $stepHead(2) ?><?= $block->getChildHtml('panel.subscribers') ?><?= /* @noEscape */ $websiteOverrides('subscribers') ?></div>
-    <div class="<?= /* @noEscape */ $panelClass(3) ?>" data-step="3"><?= /* @noEscape */ $stepHead(3) ?><?= $block->getChildHtml('panel.automations') ?><?= /* @noEscape */ $websiteOverrides('automations') ?></div>
+    <div class="<?= /* @noEscape */ $panelClass(3) ?>" data-step="3"><?= /* @noEscape */ $stepHead(3) ?><?= $block->getChildHtml('panel.automations') ?><?= /* @noEscape */ $websiteOverrides('automations') ?><?= $block->getChildHtml('panel.transactional.triggers') ?></div>
     <div class="<?= /* @noEscape */ $panelClass(4) ?>" data-step="4"><?= /* @noEscape */ $stepHead(4) ?><?= $block->getChildHtml('panel.intelligence') ?></div>
 
     <!-- Step 5: Overview (wizard-only) -->

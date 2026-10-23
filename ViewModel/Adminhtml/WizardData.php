@@ -870,7 +870,10 @@ class WizardData implements ArgumentInterface
     /**
      * The selected website's transactional-email triggers: each one's switch
      * and its saved workflows by store language ('default' on a website with
-     * one language).
+     * one language). A website that saved no workflow of its own shows the
+     * ones the initial setup saved for all websites (website 0's rows,
+     * CON-33), unless it uses its own transactional-email account, whose
+     * workflows those are not.
      *
      * @return array<string, array{enabled: bool,
      *     workflows: array<string, array{workflowId: int, isDefaultFallback: bool}>}>
@@ -878,6 +881,7 @@ class WizardData implements ArgumentInterface
     public function getTransactionalTriggers(): array
     {
         $websiteId = $this->websiteContext->getWebsiteId();
+        $websiteIds = $this->config->hasTransactionalWebsiteAccount($websiteId) ? [$websiteId] : [$websiteId, 0];
         $triggers = [
             Trigger::ORDER_CONFIRMATION => [
                 'enabled' => $this->config->isOrderConfirmationEnabled($websiteId),
@@ -889,11 +893,15 @@ class WizardData implements ArgumentInterface
             ],
         ];
         $collection = $this->mappingCollectionFactory->create();
-        $collection->addFieldToFilter('website_id', ['eq' => $websiteId])
+        $collection->addFieldToFilter('website_id', ['in' => $websiteIds])
             ->addFieldToFilter('trigger_type', ['in' => Trigger::TRANSACTIONAL])
             ->addFieldToFilter('account_key', Mapping::ACCOUNT_TRANSACTIONAL);
+        $byWebsite = [];
         /** @var Mapping $mapping */
         foreach ($collection as $mapping) {
+            $byWebsite[(int)$mapping->getData('website_id')][] = $mapping;
+        }
+        foreach ($byWebsite[$websiteId] ?? $byWebsite[0] ?? [] as $mapping) {
             $trigger = (string)$mapping->getData('trigger_type');
             $triggers[$trigger]['workflows'][(string)$mapping->getData('language')] = [
                 'workflowId' => $mapping->getWorkflowId(),

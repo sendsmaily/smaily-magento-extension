@@ -1882,19 +1882,25 @@ Initial setup, Settings, Log. Design rules:
   whose fallback is a language-less 2.8.x row the editor does not show)
   (CON-188). Single-language installs are locked to `single` and see none of
   this.
-- **Transactional emails — settings only (PRO-4062, PRO-4065).** They
-  work as the WooCommerce plugin's: Settings > Connection has the
+- **Transactional emails — settings only (PRO-4062, PRO-4065, CON-33).**
+  They work as the WooCommerce plugin's: Settings > Connection and the
+  initial setup's Connect step have the
   **Send transactional emails** switch (website-scoped
   `smaily_connect/transactional/enabled`, off) that shows an optional
   second Smaily account for order and shipment emails
   (`panel/transactional-account.phtml`; switched off, a connection save
   posts only the switch and the saved account stays), Settings >
-  Automations its **Order confirmation** / **Shipping confirmation**
-  triggers and the **Customer details** switch (website-scoped
-  `smaily_connect/transactional/personal_data_enabled`, off)
-  (`panel/transactional-triggers.phtml`); the wizard renders neither (its
-  layout has no such blocks, and the shared panels-js posts the
-  `transactional` keys only where the blocks exist). The account lives under
+  Automations and the setup's Automations step its **Order confirmation** /
+  **Shipping confirmation** triggers and the **Customer details** switch
+  (website-scoped `smaily_connect/transactional/personal_data_enabled`,
+  off) (`panel/transactional-triggers.phtml`). The blocks take the layout
+  argument `context` (`settings` / `wizard`): the setup shows no "Use a
+  separate account for this website" and points at its own steps. The
+  setup of a 2+-website install (`WebsiteContext::STORE_WIDE`) saves the
+  switches at default scope and the trigger workflows as website 0's rows;
+  a website without transactional rows of its own shows website 0's
+  (`WizardData::getTransactionalTriggers()`), unless it uses its own
+  transactional account. The account lives under
   `smaily_connect/transactional/{subdomain,username,password}`, saved at
   default scope for all websites; on a 2+-website install a website may
   use its own (`website_account`, written at website scope with the flag
@@ -1905,9 +1911,13 @@ Initial setup, Settings, Log. Design rules:
   account before either account is written, applies the PRO-3690
   empty-password rule against the account the form was drawn with, and
   checks it once with Smaily; `VerifiedCredentials::isTransactionalVerified()`
-  is the gate of the triggers, which show nothing until it says yes (as
-  the WooCommerce plugin, PRO-1540; they appear without a reload after a
-  save that connects). The triggers' switches are website-scoped
+  is the gate of the triggers as the page loads, which show nothing until
+  it says yes (as the WooCommerce plugin, PRO-1540). In the page, as in the
+  WooCommerce plugin's wizard state (CON-33), a Test connection that asked
+  Smaily shows them when it accepted the account and hides them when not,
+  before any save; a save that connects shows them too, and an edit of the
+  account's fields hides them until the next test or save. Their workflow
+  lists still come from the saved account. The triggers' switches are website-scoped
   (`smaily_connect/transactional/{order,shipment}_confirmation_enabled`,
   off); their workflows are `smaily_automation_mapping` rows with
   `account_key = 'transactional'` and `Trigger::TRANSACTIONAL` types, one

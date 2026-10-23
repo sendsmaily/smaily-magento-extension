@@ -147,4 +147,29 @@ class TransactionalSettingsSaverTest extends IntegrationTestCase
         self::assertFalse($this->config->isOrderConfirmationEnabled(1), 'Another website stays off');
         self::assertFalse($this->config->isTransactionalPersonalDataEnabled(1));
     }
+
+    /**
+     * CON-33: the initial setup (website 0 on a 2+-website install) saves
+     * the switches for all websites; a website's own Settings save still
+     * differs from them.
+     */
+    public function testTheInitialSetupSavesTheSwitchesForEveryWebsite(): void
+    {
+        $this->saver->saveAccount(
+            ['enabled' => true, 'subdomain' => 'shop-tx', 'username' => 'api', 'password' => 'secret'],
+            WebsiteContext::STORE_WIDE
+        );
+        $this->saver->saveTriggers(['order_confirmation_enabled' => true], WebsiteContext::STORE_WIDE);
+
+        foreach ([1, 2] as $websiteId) {
+            self::assertTrue($this->config->isTransactionalEnabled($websiteId));
+            self::assertTrue($this->config->isOrderConfirmationEnabled($websiteId));
+            self::assertSame('shop-tx', $this->config->getTransactionalSubdomain($websiteId));
+        }
+
+        $this->saver->saveTriggers(['order_confirmation_enabled' => false], 2);
+
+        self::assertTrue($this->config->isOrderConfirmationEnabled(1));
+        self::assertFalse($this->config->isOrderConfirmationEnabled(2));
+    }
 }

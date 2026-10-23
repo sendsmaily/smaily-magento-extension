@@ -857,11 +857,13 @@ $transactionalStrings = [
 $pages['transactional-off'] = [
     'template' => $transactionalTemplates,
     'viewModel' => $transactionalViewModel(false),
+    'data' => ['context' => 'settings'],
     'strings' => $transactionalStrings,
 ];
 $pages['transactional-connected'] = [
     'template' => $transactionalTemplates,
     'viewModel' => $transactionalViewModel(true),
+    'data' => ['context' => 'settings'],
     'strings' => $transactionalStrings,
 ];
 $setupCompleted = [
@@ -889,7 +891,9 @@ $pages['setup-completed'] = $setupCompleted + ['viewModel' => $intelligence];
  * (wizard/index.phtml) with its Connect, Contacts and Automations steps:
  * Latvia holds its own Smaily account — another account than the
  * store-wide one, so it keeps its own automations (CON-190) — and its own
- * Contacts settings. The settings-website page renders Settings (settings/index.phtml) with its
+ * Contacts settings; below the Smaily account, the optional
+ * transactional-email account, not saved yet, and in the Automations step
+ * its triggers (CON-33). The settings-website page renders Settings (settings/index.phtml) with its
  * Connection and Contacts tabs for Latvia, which holds its own Contacts
  * settings but uses the Smaily account for all websites. The
  * settings-own-account page renders Settings with its Connection and
@@ -1002,6 +1006,35 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
     public function getOwnAccountWebsites(): array
     {
         return [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getTransactionalAccount(): array
+    {
+        $none = ['subdomain' => '', 'username' => '', 'hasPassword' => false];
+
+        return ['enabled' => false, 'websiteAccount' => false, 'verified' => false, 'shared' => $none] + $none;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isTransactionalPersonalDataEnabled(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    public function getTransactionalTriggers(): array
+    {
+        return [
+            'order_confirmation' => ['enabled' => false, 'workflows' => []],
+            'shipment_confirmation' => ['enabled' => false, 'workflows' => []],
+        ];
     }
 
     /**
@@ -1278,12 +1311,18 @@ $pages['setup-websites'] = [
     'viewModel' => $websitesViewModel(true),
     'data' => ['children' => [
         'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
+        'panel.transactional.account' => $root . '/view/adminhtml/templates/panel/transactional-account.phtml',
         'panel.subscribers' => $root . '/view/adminhtml/templates/panel/subscribers.phtml',
         'panel.automations' => $root . '/view/adminhtml/templates/panel/automations.phtml',
+        'panel.transactional.triggers' => $root . '/view/adminhtml/templates/panel/transactional-triggers.phtml',
         'panel.intelligence' => $root . '/view/adminhtml/templates/panel/intelligence.phtml',
         'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
     ]],
-    'strings' => $websitesStrings,
+    'strings' => array_merge($websitesStrings, $transactionalStrings, [
+        'Once connected, set up the Order confirmation and Shipping confirmation triggers in the Automations step.',
+        'Send transactional emails via transactional Smaily account, which you can connect in the first setup step.'
+            . ' Transactional emails should be sent from a separate account than marketing emails.',
+    ]),
 ];
 
 /*

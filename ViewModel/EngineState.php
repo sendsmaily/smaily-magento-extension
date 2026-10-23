@@ -53,7 +53,7 @@ class EngineState implements ArgumentInterface
 
     public function getAttributionConfigJson(): string
     {
-        return $this->serializer->serialize($this->attributionManager->getClientConfig());
+        return $this->serializer->serialize($this->attributionConfig());
     }
 
     public function getTrackerConfigJson(): string
@@ -61,7 +61,7 @@ class EngineState implements ArgumentInterface
         return $this->serializer->serialize(
             ['relayUrl' => $this->urlBuilder->getUrl('smaily/relay')]
             + $this->consentConfig()
-            + ['attribution' => $this->attributionManager->getClientConfig()]
+            + ['attribution' => $this->attributionConfig()]
         );
     }
 
@@ -74,6 +74,19 @@ class EngineState implements ArgumentInterface
         return $this->serializer->serialize(
             ['url' => $this->urlBuilder->getUrl('smaily/recommendations')] + $this->consentConfig()
         );
+    }
+
+    /**
+     * The landing capture's config: the cookie and parameter names and
+     * lifetimes, and the store route that sets the cookies (CON-211). The
+     * tracker gets the same, as it runs the capture too.
+     *
+     * @return array<string, string|int>
+     */
+    private function attributionConfig(): array
+    {
+        return $this->attributionManager->getClientConfig()
+            + ['landUrl' => $this->urlBuilder->getUrl('smaily/attribution/land')];
     }
 
     /**

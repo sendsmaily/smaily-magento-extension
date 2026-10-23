@@ -75,4 +75,28 @@ class AttributionShapeTest extends TestCase
             'empty' => ['', false],
         ];
     }
+
+    /**
+     * @dataProvider engineVisitorTokens
+     */
+    public function testOnlyAWellFormedVtTokenIsEngineIssued(string $value, bool $expected): void
+    {
+        self::assertSame($expected, AttributionShape::isEngineVisitorToken($value));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: bool}>
+     */
+    public static function engineVisitorTokens(): array
+    {
+        return [
+            'engine vt_ token' => ['vt_8f3k2a9xq4', true],
+            'engine vt_ token of 64 characters' => ['vt_' . str_repeat('A', 61), true],
+            'vt_ token of 65 characters' => ['vt_' . str_repeat('A', 62), false],
+            'store-created vs_ token' => ['vs_4fK9a2LmQ7xZ0bR3tY8wP1', false],
+            'vt_ with a trailing newline' => ["vt_8f3k2a9xq4\n", false],
+            'bare prefix' => ['vt_', false],
+            'empty' => ['', false],
+        ];
+    }
 }

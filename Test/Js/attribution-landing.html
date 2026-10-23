@@ -6,13 +6,15 @@
  */
 -->
 <!--
-  Headless harness for the landing capture (PRO-3911, PRO-3912, CON-177): the Luma script
+  Headless harness for the landing capture (PRO-3911, PRO-3912, CON-177, CON-211): the Luma script
   (view/frontend/web/js/attribution.js) and the Hyvä script
   (compat/hyva/.../smaily-attribution.js), the real scripts, each landing in a
   fresh frame. Stubbed: the landing's query (a frame of a file:// page cannot
   change its address, so URLSearchParams reads the query given here),
   document.cookie (file:// pages keep no cookies; a cookie whose expiry has
-  passed is removed, as a browser does) and, for Luma, RequireJS's define().
+  passed is removed, as a browser does), fetch() (the store route that sets
+  the cookies: it answers, fails, or the network fails; each request is
+  recorded) and, for Luma, RequireJS's define().
   Run it with bin/test-js.sh; the page ends with "RESULT: PASS" or
   "RESULT: FAIL".
 -->
@@ -58,13 +60,19 @@
         ttlRecIdDays: 30,
         ttlVisitorDays: 365,
         ttlContextDays: 30,
-        ttlSessionDays: 30
+        ttlSessionDays: 30,
+        landUrl: 'https://store.example/smaily/attribution/land/'
     };
 
-    // Runs in the frame before the script under test: the landing's query
-    // and the cookies the shopper already holds.
-    function stubs(query, cookies) {
+    // Runs in the frame before the script under test: the landing's query,
+    // the cookies the shopper already holds and the store route's answer
+    // ('stored': 204, 'error': 500, 'offline': the request fails).
+    function stubs(query, cookies, route) {
         return [
+            'var requests = [];',
+            'window.fetch = function (url, init) { requests.push({url: url, init: init});',
+            '  return ' + JSON.stringify(route) + ' === "offline" ? Promise.reject(new TypeError("offline"))',
+            '    : Promise.resolve({ok: ' + JSON.stringify(route) + ' === "stored"}); };',
             'var RealParams = URLSearchParams;',
             'window.URLSearchParams = function () { return new RealParams(' + JSON.stringify(query) + '); };',
             'var jar = ' + JSON.stringify(cookies) + ';',
@@ -77,7 +85,7 @@
         ].join('\n');
     }
 
-    function lumaFrame() {
+    function lumaFrame(config, runs) {
         return [
             '<script>',
             'var factory;',
@@ -85,37 +93,50 @@
             'define.amd = {};',
             '<\/script>',
             '<script src="../../view/frontend/web/js/attribution.js"><\/script>',
-            '<script>factory()(' + JSON.stringify(CONFIG) + ');<\/script>'
-        ].join('\n');
+            '<script>var capture = factory();<\/script>',
+            '<script>capture(' + JSON.stringify(config) + ');<\/script>'
+        ].concat(runs > 1 ? ['<script>capture(' + JSON.stringify(config) + ');<\/script>'] : []).join('\n');
     }
 
-    function hyvaFrame() {
+    // A second run is the tracker's (window.smailyAttribution).
+    function hyvaFrame(config, runs) {
         return [
             '<script type="application/json" id="smaily-attribution-config">'
-                + JSON.stringify(CONFIG) + '<\/script>',
+                + JSON.stringify(config) + '<\/script>',
             '<script src="../../compat/hyva/view/frontend/web/js/smaily-attribution.js"><\/script>'
-        ].join('\n');
+        ].concat(runs > 1 ? ['<script>window.smailyAttribution(' + JSON.stringify(config) + ');<\/script>'] : [])
+            .join('\n');
     }
 
     // Lands on a page with the given query and cookies; resolves with the
-    // cookies the page leaves behind.
-    function land(theme, query, cookies) {
+    // cookies the page leaves behind once the store route has answered, and
+    // the requests made to it. options: route (default 'offline': the
+    // script writes the cookies itself), config, runs (2: the tracker runs
+    // the capture again).
+    function land(theme, query, cookies, options) {
+        var route = (options && options.route) || 'offline',
+            config = (options && options.config) || CONFIG,
+            runs = (options && options.runs) || 1;
+
         return new Promise(function (resolve, reject) {
             var frame = document.createElement('iframe');
 
             frame.onload = function () {
-                try {
-                    var jar = Object.assign({}, frame.contentWindow.jar);
+                setTimeout(function () {
+                    try {
+                        var jar = Object.assign({}, frame.contentWindow.jar);
 
-                    frame.remove();
-                    resolve(jar);
-                } catch (error) {
-                    reject(error);
-                }
+                        jar.requests = frame.contentWindow.requests.slice();
+                        frame.remove();
+                        resolve(jar);
+                    } catch (error) {
+                        reject(error);
+                    }
+                }, 50);
             };
             frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><script>'
-                + stubs(query, cookies) + '<\/script>'
-                + (theme === 'Luma' ? lumaFrame() : hyvaFrame())
+                + stubs(query, cookies, route) + '<\/script>'
+                + (theme === 'Luma' ? lumaFrame(config, runs) : hyvaFrame(config, runs))
                 + '</head><body></body></html>';
             document.body.appendChild(frame);
         });
@@ -182,6 +203,46 @@
         jar = await land(theme, '?smaily_vt=vs_4fK9a2LmQ7', {smaily_rec_uid: 'vt_8f3k2a'});
         check(theme + ', a visitor token of neither form leaves the cookie unchanged',
             jar.smaily_rec_uid === 'vt_8f3k2a');
+
+        // CON-211: the store's server sets the cookies, so Safari keeps them
+        // for their lifetime; the script writes them only when that fails.
+        // Every check above ran with the store route failing.
+        jar = await land(theme, '?smaily_rec=' + REC_ID + '&smaily_ctx=cart_abandoned&smaily_vt=vt_8f3k2a',
+            before, {route: 'stored'});
+        check(theme + ', a recommendation link posts its values to the store route once',
+            jar.requests.length === 1 && jar.requests[0].url === CONFIG.landUrl
+                && jar.requests[0].init.method === 'POST'
+                && jar.requests[0].init.credentials === 'same-origin'
+                && jar.requests[0].init.body === 'rec_id=' + REC_ID + '&visitor_token=vt_8f3k2a&context=cart_abandoned');
+        check(theme + ', the store route set the cookies: the script writes none',
+            jar.smaily_rec_id === OLD_REC_ID && jar.smaily_rec_ctx === 'storefront' && !('smaily_rec_uid' in jar));
+
+        jar = await land(theme, '?smaily_rec=' + REC_ID, before, {route: 'stored'});
+        check(theme + ', a recommendation link without a context posts no context',
+            jar.requests.length === 1 && jar.requests[0].init.body === 'rec_id=' + REC_ID);
+
+        jar = await land(theme, '?smaily_vt=vt_8f3k2a&smaily_ctx=welcome', {}, {route: 'stored'});
+        check(theme + ', a visitor token without a recommendation posts the token alone',
+            jar.requests.length === 1 && jar.requests[0].init.body === 'visitor_token=vt_8f3k2a');
+
+        jar = await land(theme, '', before, {route: 'stored'});
+        check(theme + ', a landing without a recommendation link asks nothing', jar.requests.length === 0);
+        jar = await land(theme, '?smaily_vt=vs_4fK9a2LmQ7xZ0bR3tY8wP1&smaily_rec=rec_abc123', {}, {route: 'stored'});
+        check(theme + ', a vs_ token and a malformed rec id ask nothing', jar.requests.length === 0);
+
+        jar = await land(theme, '?smaily_rec=' + REC_ID + '&smaily_vt=vt_8f3k2a', before, {route: 'error'});
+        check(theme + ', the store route answers an error: the script writes the cookies itself',
+            jar.requests.length === 1 && jar.smaily_rec_id === REC_ID && !('smaily_rec_ctx' in jar)
+                && jar.smaily_rec_uid === 'vt_8f3k2a');
+
+        jar = await land(theme, '?smaily_vt=vt_8f3k2a', {}, {route: 'stored', runs: 2});
+        check(theme + ', the tracker running the capture again posts nothing more and writes no cookie',
+            jar.requests.length === 1 && !('smaily_rec_uid' in jar));
+
+        jar = await land(theme, '?smaily_vt=vt_8f3k2a', {},
+            {route: 'stored', config: Object.assign({}, CONFIG, {landUrl: undefined})});
+        check(theme + ', without a store route the script writes the cookies itself',
+            jar.requests.length === 0 && jar.smaily_rec_uid === 'vt_8f3k2a');
     }
 
     // bin/test-js.sh runs the page on Chrome's virtual time, which jumps to

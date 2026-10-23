@@ -70,10 +70,28 @@ class EngineStateTest extends TestCase
         );
     }
 
+    /**
+     * CON-211: the landing capture, and the tracker that runs it too, post
+     * the click to the store route that sets the cookies.
+     */
+    public function testAttributionConfigNamesTheLandingRoute(): void
+    {
+        $viewModel = $this->viewModel($this->createMock(CookieHelper::class), '1');
+
+        $attribution = json_decode($viewModel->getAttributionConfigJson(), true);
+        $tracker = json_decode($viewModel->getTrackerConfigJson(), true);
+
+        self::assertSame(
+            ['cookieVisitor' => 'smaily_rec_uid', 'landUrl' => 'https://store.example/smaily/attribution/land/'],
+            $attribution
+        );
+        self::assertSame($attribution, $tracker['attribution']);
+    }
+
     private function viewModel(CookieHelper $cookieHelper, string $websiteId): EngineState
     {
         $attributionManager = $this->createMock(AttributionManager::class);
-        $attributionManager->method('getClientConfig')->willReturn([]);
+        $attributionManager->method('getClientConfig')->willReturn(['cookieVisitor' => 'smaily_rec_uid']);
 
         $urlBuilder = $this->createMock(UrlInterface::class);
         $urlBuilder->method('getUrl')->willReturnCallback(

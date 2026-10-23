@@ -17,8 +17,8 @@ autoloader maps `Smaily\Connect\*` to the module root.
 Api/                service contracts (queue handler interface)
 Block/              adminhtml config renderers, the recommendations widget
 Console/Command/    CLI (backfill, engine ping/disconnect, GDPR)
-Controller/         frontend: rss, relay, recommendations, checkout optin,
-                    cart restore, privacy
+Controller/         frontend: rss, relay, recommendations, attribution
+                    landing, checkout optin, cart restore, privacy
 Controller/Adminhtml/  dashboard, wizard, settings, unified log, JSON api
 Cron/               queue flushers, abandoned cart, reconcile, backfill tick,
                     janitor, health check
@@ -1352,7 +1352,37 @@ per website as on 2.4.7.
 
 Landing capture is client-side (`view/frontend/web/js/attribution.js` —
 URL params → first-party cookies), because server-side capture never runs
-on FPC-cached pages. At order save (`Observer/Engine/OrderSaveAfter`, where
+on FPC-cached pages. The script reads and shape-checks the params, and the
+store's server sets the cookies (CON-211): Safari keeps a cookie that page
+JavaScript sets for 7 days at most (24 hours after a link with tracking
+parameters), so the 365-day visitor-token cookie lasted days; a cookie from a
+`Set-Cookie` header keeps its lifetime (contract §5). The script posts the
+click's values (`rec_id`, `visitor_token`, `context`, form-encoded) to
+`POST smaily/attribution/land` (`Controller\Attribution\Land`; `landUrl` in
+the script's config, `ViewModel\EngineState`), which the full-page cache
+never serves, and writes the cookies itself only when that request fails
+(network error or any non-2xx answer) or the config has no `landUrl`. The
+fallback is failure-only, not write-then-overwrite, because the server's
+cookie takes the store's cookie domain and path
+(`Session\Config\ConfigInterface`, as Magento's own JS cookies) while the
+script's has none, so writing both would leave two cookies of one name. The
+route sets all three click cookies, as the WooCommerce plugin's
+`LandingCapture`: the visitor token, the rec id and the context (both 30
+days, which Safari's cap cut too), with the engine config's names and
+lifetimes (`AttributionManager::getClientConfig()`), Secure on HTTPS,
+SameSite=Lax and no HttpOnly (contract "Cookie names"). It applies the
+script's rules — a well-formed rec id sets the rec id cookie and sets the
+context cookie to a well-formed context or deletes it, a visitor token only
+in the engine's `vt_` form (`AttributionShape::isEngineVisitorToken()`) — and
+answers 204, 400 when nothing has its shape, 404 when the engine is not
+connected, 429 over 30 requests a minute per address (`PerAddressLimiter`,
+own key) and 500 when the cookie manager refuses a cookie; every answer is
+empty with `Cache-Control: no-store, private`. CSRF-exempt like the relay:
+the cached landing page has no form key, and a request gives no more than a
+link with the same parameters. Like the script, it is not gated on consent.
+The tracker runs the capture again for its cookie helpers, so the capture
+lands once per page: a second run neither posts nor writes a script cookie
+over the server's. At order save (`Observer/Engine/OrderSaveAfter`, where
 `entity_id` exists) cookies are stamped into `smaily_order_attribution`;
 `OrderPayloadBuilder` forwards them on the order wire
 (`smaily_rec_id` / `smaily_visitor_token` / `smaily_rec_ctx` /
@@ -1361,8 +1391,8 @@ contract v1.7.0 the engine ignores the rec id/context echo on browse
 events, so the tracker no longer sends it. The rec id is shape-checked at
 both ends (`Engine\RecId`, contract §5 — a malformed `smaily_rec_id`
 rejects the whole order): the capture scripts write the cookie only for a
-well-formed UUID, from `smaily_rec` or the guarded `utm_content` fallback,
-and `OrderPayloadBuilder` omits a malformed stored value and sends the
+well-formed UUID, from `smaily_rec` or the guarded `utm_content` fallback
+(the landing route checks it again), and `OrderPayloadBuilder` omits a malformed stored value and sends the
 order without it. The context cookie follows the contract's context cookie
 rule: only a landing that writes the rec id cookie touches it, setting it
 to the link's `smaily_ctx` or deleting it when the link has none, so the

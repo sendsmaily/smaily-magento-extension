@@ -30,10 +30,11 @@ class ApiException extends SmailyClientException
     private const PERMANENT_CODES = [self::CODE_INVALID_DATA];
 
     /**
+     * @param string|Phrase $message no native type: see SmailyClientException::__construct()
      * @param array<string, mixed> $response
      */
     public function __construct(
-        string|Phrase $message,
+        $message,
         private readonly int $smailyCode,
         private readonly array $response = []
     ) {

@@ -20,10 +20,11 @@ class TransportException extends SmailyClientException
     use HttpStatusCode;
 
     /**
+     * @param string|Phrase $message no native type: see SmailyClientException::__construct()
      * @param int $httpStatus HTTP status code of the failed response, 0 for pure network failures
      */
     public function __construct(
-        string|Phrase $message,
+        $message,
         int $httpStatus = 0,
         ?\Throwable $previous = null,
         private readonly ?int $retryAfter = null

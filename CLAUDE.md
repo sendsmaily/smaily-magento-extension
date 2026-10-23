@@ -190,6 +190,15 @@ start one.
   ```
   The unit suite runs on 8.1 the same way after `apt-get install -y
   libicu-dev && docker-php-ext-install intl` in the container.
+- **Magento 2.4.4's `setup:di:compile` cannot read union types** (CON-204;
+  the sandbox's 2.4.8 can, so it never shows there): a union or intersection
+  type on any constructor parameter, or a union, intersection or `mixed`
+  type in a method of a class Magento may make an interceptor for (every
+  controller, most classes extending a Magento class), stops the compile
+  with "Call to undefined method ReflectionUnionType::getName()". Give
+  such a method one native type and the precise one in its docblock
+  (`execute(): ResultInterface` + `@return Page|Redirect`).
+  `Test/Unit/GeneratedCodeCompatibilityTest.php` (unit suite) fails on it.
 - Sandbox: `docker compose up -d` — real Magento 2 at
   `localhost:8080/admin` (admin / smailydev1, 2FA modules disabled). The repo
   is bind-mounted as the module; `vendor/` inside the container is shadowed by

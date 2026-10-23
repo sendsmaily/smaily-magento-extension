@@ -13,6 +13,7 @@ use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\Controller\Result\Forward;
 use Magento\Framework\Controller\Result\Redirect;
 use Magento\Framework\Controller\ResultFactory;
+use Magento\Framework\Controller\ResultInterface;
 use Magento\Framework\View\Result\Page;
 use Smaily\Connect\Model\Engine\Settings;
 
@@ -35,8 +36,10 @@ class Index implements HttpGetActionInterface
 
     /**
      * @inheritDoc
+     *
+     * @return Page|Redirect|Forward
      */
-    public function execute(): Page|Redirect|Forward
+    public function execute(): ResultInterface
     {
         if (!$this->engineSettings->isSendingAllowed()) {
             /** @var Forward $forward */

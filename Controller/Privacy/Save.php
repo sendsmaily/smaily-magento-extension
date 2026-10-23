@@ -14,6 +14,7 @@ use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\Forward;
 use Magento\Framework\Controller\Result\Redirect;
 use Magento\Framework\Controller\ResultFactory;
+use Magento\Framework\Controller\ResultInterface;
 use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
 use Magento\Framework\Message\ManagerInterface;
 use Smaily\Connect\Model\Engine\Settings;
@@ -39,8 +40,10 @@ class Save implements HttpPostActionInterface
 
     /**
      * @inheritDoc
+     *
+     * @return Redirect|Forward
      */
-    public function execute(): Redirect|Forward
+    public function execute(): ResultInterface
     {
         if (!$this->engineSettings->isSendingAllowed()) {
             /** @var Forward $forward */

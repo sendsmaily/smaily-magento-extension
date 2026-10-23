@@ -9,11 +9,14 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Integration\Setup;
 
 use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Setup\ModuleContextInterface;
 use Magento\Framework\Setup\SchemaSetupInterface;
+use Psr\Log\NullLogger;
 use Smaily\Connect\Model\Adminhtml\SetupNotice;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Engine\Disconnector;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\OrderOrigin;
 use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
@@ -31,6 +34,9 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  * revertable data patch (`module:uninstall --non-composer`, app/code
  * installs). Disabling runs neither, and the patch's apply() changes nothing.
  * PRO-3628: both paths also remove the "ready to set up" admin notice.
+ * CON-220: both paths first tell Campaign Intelligence that the connection
+ * ends (contract §16), with the stored key; whatever the engine answers,
+ * the settings still go.
  */
 class UninstallTest extends IntegrationTestCase
 {
@@ -53,11 +59,72 @@ class UninstallTest extends IntegrationTestCase
 
     public function testUninstallClassRemovesEverySmailySettingAndFlag(): void
     {
-        $setup = $this->createMock(SchemaSetupInterface::class);
-        $setup->method('getConnection')->willReturn($this->connection);
-        $setup->method('getTable')->willReturnArgument(0);
+        $this->uninstall($this->notCalledDisconnector())
+            ->uninstall($this->schemaSetup(), $this->createMock(ModuleContextInterface::class));
 
-        (new Uninstall())->uninstall($setup, $this->createMock(ModuleContextInterface::class));
+        $this->assertOnlyForeignRowsRemain();
+    }
+
+    /**
+     * @dataProvider engineAnswers
+     */
+    public function testBothPathsTellTheEngineBeforeTheKeyIsDeletedWhateverItAnswers(
+        string $path,
+        string $outcome
+    ): void {
+        $this->connectEngine();
+        $calls = [];
+        $disconnector = $this->createMock(Disconnector::class);
+        $disconnector->expects(self::once())->method('endConnection')->willReturnCallback(
+            function (mixed ...$args) use (&$calls, $outcome): string {
+                $calls[] = ['args' => $args, 'paths' => $this->configPaths()];
+
+                return $outcome;
+            }
+        );
+        $uninstall = $this->uninstall($disconnector);
+
+        if ($path === 'uninstall') {
+            $uninstall->uninstall($this->schemaSetup(), $this->createMock(ModuleContextInterface::class));
+        } else {
+            $this->patch($uninstall)->revert();
+        }
+
+        self::assertSame(
+            [
+                'sk_live_key',
+                ['store_uninstall' => 'https://intelligence.smaily.com/api/v1/store/uninstall'],
+                'https://intelligence.smaily.com',
+            ],
+            $calls[0]['args']
+        );
+        self::assertContains(EngineSettings::XML_PATH_API_KEY, $calls[0]['paths'], 'Told while the key is stored.');
+        $this->assertOnlyForeignRowsRemain();
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function engineAnswers(): array
+    {
+        $answers = [];
+        foreach (['uninstall', 'patch revert'] as $path) {
+            foreach ([Disconnector::PAUSED, Disconnector::KEY_REFUSED, Disconnector::NOT_TOLD] as $outcome) {
+                $answers[$path . ', ' . $outcome] = [$path, $outcome];
+            }
+        }
+
+        return $answers;
+    }
+
+    public function testAFailureWhileTellingTheEngineDoesNotStopTheRemoval(): void
+    {
+        $this->connectEngine();
+        $disconnector = $this->createMock(Disconnector::class);
+        $disconnector->method('endConnection')->willThrowException(new \RuntimeException('unexpected'));
+
+        $this->uninstall($disconnector)
+            ->uninstall($this->schemaSetup(), $this->createMock(ModuleContextInterface::class));
 
         $this->assertOnlyForeignRowsRemain();
     }
@@ -89,24 +156,75 @@ class UninstallTest extends IntegrationTestCase
     public function testWithoutTheNotificationTableBothPathsStillRemoveTheSettings(): void
     {
         $this->connection->query('DROP TABLE `adminnotification_inbox`');
-        $setup = $this->createMock(SchemaSetupInterface::class);
-        $setup->method('getConnection')->willReturn($this->connection);
-        $setup->method('getTable')->willReturnArgument(0);
 
-        (new Uninstall())->uninstall($setup, $this->createMock(ModuleContextInterface::class));
+        $this->uninstall($this->notCalledDisconnector())
+            ->uninstall($this->schemaSetup(), $this->createMock(ModuleContextInterface::class));
         $this->patch()->revert();
 
         self::assertSame(['general/locale/code', 'smailyXconnect/foo/bar'], $this->configPaths());
     }
 
-    private function patch(): RemoveSettingsOnUninstall
+    /**
+     * Without an Uninstall, the object manager builds one as Magento does,
+     * with the real Disconnector; the seeded store is not connected, so it
+     * sends nothing.
+     */
+    private function patch(?Uninstall $uninstall = null): RemoveSettingsOnUninstall
     {
         /** @var ResourceConnection $resourceConnection */
         $resourceConnection = $this->objectManager->get(ResourceConnection::class);
+        $arguments = ['moduleDataSetup' => new DataSetup($resourceConnection)];
+        if ($uninstall !== null) {
+            $arguments['uninstall'] = $uninstall;
+        }
 
-        return $this->objectManager->create(RemoveSettingsOnUninstall::class, [
-            'moduleDataSetup' => new DataSetup($resourceConnection),
-        ]);
+        return $this->objectManager->create(RemoveSettingsOnUninstall::class, $arguments);
+    }
+
+    private function uninstall(Disconnector $disconnector): Uninstall
+    {
+        return new Uninstall($disconnector, $this->objectManager->get(EncryptorInterface::class), new NullLogger());
+    }
+
+    private function notCalledDisconnector(): Disconnector
+    {
+        $disconnector = $this->createMock(Disconnector::class);
+        $disconnector->expects(self::never())->method('endConnection');
+
+        return $disconnector;
+    }
+
+    private function schemaSetup(): SchemaSetupInterface
+    {
+        $setup = $this->createMock(SchemaSetupInterface::class);
+        $setup->method('getConnection')->willReturn($this->connection);
+        $setup->method('getTable')->willReturnArgument(0);
+
+        return $setup;
+    }
+
+    /**
+     * A connected store: the key encrypted as Settings stores it.
+     */
+    private function connectEngine(): void
+    {
+        /** @var EncryptorInterface $encryptor */
+        $encryptor = $this->objectManager->get(EncryptorInterface::class);
+        $this->connection->delete('core_config_data', ['path = ?' => EngineSettings::XML_PATH_API_KEY]);
+        foreach ([
+            EngineSettings::XML_PATH_CONNECTED => '1',
+            EngineSettings::XML_PATH_API_KEY => $encryptor->encrypt('sk_live_key'),
+            EngineSettings::XML_PATH_BASE_URL => 'https://intelligence.smaily.com',
+            EngineSettings::XML_PATH_ENDPOINTS
+                => '{"store_uninstall":"https://intelligence.smaily.com/api/v1/store/uninstall"}',
+        ] as $path => $value) {
+            $this->connection->insert('core_config_data', [
+                'scope' => 'default',
+                'scope_id' => 0,
+                'path' => $path,
+                'value' => $value,
+            ]);
+        }
     }
 
     private function seedStoreData(): void

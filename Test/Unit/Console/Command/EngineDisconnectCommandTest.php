@@ -15,71 +15,116 @@ use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use PHPUnit\Framework\TestCase;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
-use ReflectionClass;
-use ReflectionNamedType;
 use Smaily\Connect\Console\Command\EngineDisconnectCommand;
+use Smaily\Connect\Model\Engine\Disconnector;
 use Smaily\Connect\Model\Engine\Settings;
-use Smaily\Connect\Setup\Patch\Data\RemoveSettingsOnUninstall;
-use Smaily\Connect\Setup\Uninstall;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
- * The extension never asks the engine to delete the store's data (CON-143).
- *
- * Contract §16 (`POST /api/v1/store/uninstall`) deletes ALL of a store's
- * engine data when the store's last connection calls it. Erkki's decision
- * (2026-10-22, with the WooCommerce plugin's CON-51): the extension never
- * sends it — not on removal, not on disconnect. Both only remove the
- * extension's own stored engine key; the store's data is deleted when the
- * merchant closes the Smaily account (a merchant who removes the extension
- * may only be changing platform).
+ * CON-220: Disconnect tells the engine that this connection ends (contract
+ * v1.18.0 §16), with the stored key and before the key is deleted, then
+ * removes the local connection whatever the engine answered. The engine
+ * pauses a store with no connection left and keeps its data; nothing tells
+ * the merchant that the store's data is deleted. Replaces CON-143's "no
+ * request to the engine" (Erkki's decision 2026-10-23, WooCommerce CON-219).
  */
 class EngineDisconnectCommandTest extends TestCase
 {
-    /** Namespaces whose classes can send a request; none may reach a disconnect. */
-    private const HTTP_NAMESPACES = [
-        'Smaily\\Connect\\Model\\Engine\\Client',
-        'GuzzleHttp\\',
-        'Psr\\Http\\',
-        'Magento\\Framework\\HTTP\\',
-    ];
+    private const ENDPOINTS = '{"store_uninstall":"https://intelligence.smaily.com/api/v1/store/uninstall"}';
 
-    /** The directories whose code ships in the package. */
-    private const SHIPPED_DIRS = [
-        'Api', 'Block', 'Console', 'Controller', 'Cron', 'Model', 'Observer', 'Plugin',
-        'Setup', 'Ui', 'ViewModel', 'etc', 'view', 'compat',
-    ];
+    /** @var array<string, string> */
+    private array $values = [];
 
-    public function testDisconnectRemovesTheStoredKeyAndSendsNothingToTheEngine(): void
+    /** @var array<int, array{args: array<int, mixed>, stored: array<string, string>}> */
+    private array $calls = [];
+
+    /**
+     * @dataProvider outcomes
+     */
+    public function testTheEngineIsToldBeforeTheKeyIsDeletedAndTheKeyGoesWhateverItAnswers(
+        string $outcome,
+        string $note
+    ): void {
+        $tester = $this->runCommand($outcome, ['--force' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertCount(1, $this->calls);
+        self::assertSame(
+            ['sk_live_key', json_decode(self::ENDPOINTS, true), 'https://intelligence.smaily.com'],
+            $this->calls[0]['args']
+        );
+        self::assertArrayHasKey(
+            Settings::XML_PATH_API_KEY,
+            $this->calls[0]['stored'],
+            'The engine is told while the key is still stored.'
+        );
+        self::assertSame([], $this->values, 'Disconnect removes the stored engine key and connection.');
+
+        $display = $tester->getDisplay();
+        self::assertStringContainsString($note, $display);
+        self::assertSame(1, substr_count(trim($display), "\n") + 1, 'One line.');
+        self::assertStringNotContainsStringIgnoringCase('delet', $display);
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function outcomes(): array
     {
-        $store = new class {
-            /** @var array<string, string> */
-            public array $values = [
-                Settings::XML_PATH_CONNECTED => '1',
-                Settings::XML_PATH_API_KEY => 'encrypted',
-                Settings::XML_PATH_BASE_URL => 'https://intelligence.smaily.com',
-                Settings::XML_PATH_ENDPOINTS
-                    => '{"store_uninstall":"https://intelligence.smaily.com/api/v1/store/uninstall"}',
-            ];
-        };
+        return [
+            'store paused' => [Disconnector::PAUSED, 'The engine paused the store and keeps its data'],
+            'another connection remains' => [Disconnector::CONNECTION_REMOVED, 'other connection keeps working'],
+            'another 200' => [Disconnector::ENDED, 'The engine ended this connection.'],
+            'key refused (401)' => [Disconnector::KEY_REFUSED, 'the connection had already ended there'],
+            'engine not reached' => [Disconnector::NOT_TOLD, 'the engine could not be told'],
+        ];
+    }
+
+    public function testWithoutForceNothingIsSentAndTheKeyStays(): void
+    {
+        $tester = $this->runCommand(Disconnector::PAUSED, []);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertSame([], $this->calls);
+        self::assertArrayHasKey(Settings::XML_PATH_API_KEY, $this->values);
+    }
+
+    public function testANotConnectedStoreSendsNothing(): void
+    {
+        $tester = $this->runCommand(Disconnector::PAUSED, ['--force' => true], connected: false);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertSame([], $this->calls);
+        self::assertStringContainsString('not connected', $tester->getDisplay());
+    }
+
+    /**
+     * @param array<string, bool> $input
+     */
+    private function runCommand(string $outcome, array $input, bool $connected = true): CommandTester
+    {
+        $this->values = [
+            Settings::XML_PATH_CONNECTED => $connected ? '1' : '',
+            Settings::XML_PATH_API_KEY => 'encrypted',
+            Settings::XML_PATH_BASE_URL => 'https://intelligence.smaily.com',
+            Settings::XML_PATH_ENDPOINTS => self::ENDPOINTS,
+        ];
+        $this->calls = [];
+
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $scopeConfig->method('isSetFlag')->willReturnCallback(
-            static fn (string $path): bool => ($store->values[$path] ?? '') === '1'
+            fn (string $path): bool => ($this->values[$path] ?? '') === '1'
         );
         $scopeConfig->method('getValue')->willReturnCallback(
-            static fn (string $path): ?string => $store->values[$path] ?? null
+            fn (string $path): ?string => $this->values[$path] ?? null
         );
         $writer = $this->createMock(WriterInterface::class);
-        $writer->method('delete')->willReturnCallback(
-            static function (string $path) use ($store): void {
-                unset($store->values[$path]);
-            }
-        );
+        $writer->method('delete')->willReturnCallback(function (string $path): void {
+            unset($this->values[$path]);
+        });
         $encryptor = $this->createMock(EncryptorInterface::class);
-        $encryptor->method('decrypt')->willReturn('sk_live_key');
+        $encryptor->method('decrypt')->with('encrypted')->willReturn('sk_live_key');
         $settings = new Settings(
             $scopeConfig,
             $writer,
@@ -89,69 +134,18 @@ class EngineDisconnectCommandTest extends TestCase
             $this->createMock(DateTime::class)
         );
 
-        $tester = new CommandTester(new EngineDisconnectCommand($settings));
-        $tester->execute(['--force' => true]);
+        $disconnector = $this->createMock(Disconnector::class);
+        $disconnector->method('endConnection')->willReturnCallback(
+            function (mixed ...$args) use ($outcome): string {
+                $this->calls[] = ['args' => $args, 'stored' => $this->values];
 
-        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
-        self::assertSame([], $store->values, 'Disconnect removes the stored engine key and connection.');
-    }
-
-    public function testNeitherDisconnectNorTheSettingsItClearsCanReachTheEngine(): void
-    {
-        foreach ([EngineDisconnectCommand::class, Settings::class] as $class) {
-            $constructor = (new ReflectionClass($class))->getConstructor();
-            self::assertNotNull($constructor);
-            foreach ($constructor->getParameters() as $parameter) {
-                $type = $parameter->getType();
-                self::assertInstanceOf(ReflectionNamedType::class, $type);
-                foreach (self::HTTP_NAMESPACES as $namespace) {
-                    self::assertStringStartsNotWith(
-                        $namespace,
-                        $type->getName(),
-                        "{$class} must not get anything that sends a request (CON-143)."
-                    );
-                }
+                return $outcome;
             }
-        }
-    }
+        );
 
-    public function testUninstallMakesNoEngineRequest(): void
-    {
-        foreach ([Uninstall::class, RemoveSettingsOnUninstall::class] as $class) {
-            $file = (string)(new ReflectionClass($class))->getFileName();
-            $source = (string)file_get_contents($file);
+        $tester = new CommandTester(new EngineDisconnectCommand($settings, $disconnector));
+        $tester->execute($input);
 
-            self::assertNotSame('', $source);
-            foreach (['Engine\\Client', 'GuzzleHttp', 'curl_', 'store/uninstall', 'store_uninstall'] as $needle) {
-                self::assertStringNotContainsString(
-                    $needle,
-                    $source,
-                    "{$class} must make no engine request (CON-143): found '{$needle}'."
-                );
-            }
-        }
-    }
-
-    public function testNoShippedCodeNamesTheStoreDeletionEndpoint(): void
-    {
-        $root = dirname(__DIR__, 4);
-        $found = [];
-        foreach (self::SHIPPED_DIRS as $dir) {
-            $files = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($root . '/' . $dir, RecursiveDirectoryIterator::SKIP_DOTS)
-            );
-            foreach ($files as $file) {
-                $path = (string)$file;
-                if (!preg_match('/\.(php|phtml|js|xml)$/', $path)) {
-                    continue;
-                }
-                $code = (string)file_get_contents($path);
-                if (str_contains($code, 'store/uninstall') || str_contains($code, 'store_uninstall')) {
-                    $found[] = substr($path, strlen($root) + 1);
-                }
-            }
-        }
-
-        self::assertSame([], $found, 'No extension code may call the §16 store-deletion endpoint (CON-143).');
+        return $tester;
     }
 }

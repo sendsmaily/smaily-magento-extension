@@ -887,7 +887,8 @@ below.
   `Cron/AbandonedCart` from mailing the same cart twice.
 - **Art. 17 erasure** does not wait for retention. `Model\Privacy\LocalEraser`
   (driven by `Console\Command\GdprCommand`) walks BOTH queue tables plus
-  `smaily_abandoned_cart` for one address: a row that could still send
+  `smaily_abandoned_cart` for one address, and clears the browser
+  identifiers on the shopper's `smaily_order_attribution` rows (below): a row that could still send
   (`pending`, `sending`) is DELETED, a row that is over (`sent`, `failed`)
   is ANONYMIZED in place — `entity_id`, `payload`, `sent_payload`,
   `last_response` and `last_error` become one placeholder, keys and
@@ -948,11 +949,21 @@ below.
   than the cutoff, or a guest's typed email the scan has not reached yet,
   would be mailed on the next sweep. The quote rows are only read. Its
   count is added to the cart rows' `anonymised` count.
+  **An order's attribution row loses its browser identifiers (CON-212)**:
+  `smaily_order_attribution` holds no address, but its `visitor_token` and
+  `anon_session_id` tie the shopper's orders to their browser, so the
+  erasure sets both to NULL on the rows of the shopper's orders — those
+  whose `sales_order.customer_email` is the address (case-insensitive), and
+  those of a `customer_entity` account with the address, in any website,
+  by `customer_id` (an order keeps the address it was placed with, so an
+  account whose address changed since is found only by its id). What led to
+  the sale — `rec_id`, `rec_ctx`, `created_at` — stays, the row stays, and
+  the core order rows are only read. The count is the rows that still had
+  an identifier, so a second run counts none. The export does not list
+  these rows. The engine-side erasure covers the engine's copy.
   Counts and exported rows come back under merchant-facing labels (Queued
-  messages, Engine queue, Abandoned carts), which is what the CLI prints.
-  `smaily_order_attribution` is deliberately untouched: it holds only
-  order id, recommendation id and visitor/session tokens, no contact
-  identifier, and the engine-side erasure covers the engine's copy.
+  messages, Engine queue, Abandoned carts, and for the erasure Order
+  attribution), which is what the CLI prints.
 
 ## Database tables
 

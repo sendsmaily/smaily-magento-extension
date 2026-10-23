@@ -47,6 +47,9 @@ class GdprEraseTest extends IntegrationTestCase
     private const QUEUE_LABEL = 'Queued messages';
     private const ENGINE_LABEL = 'Engine queue';
     private const CART_LABEL = 'Abandoned carts';
+    private const ATTRIBUTION_LABEL = 'Order attribution';
+
+    private const ATTRIBUTION_TABLE = 'smaily_order_attribution';
 
     private EventQueue $eventQueue;
     private IngestQueue $ingestQueue;
@@ -66,10 +69,15 @@ class GdprEraseTest extends IntegrationTestCase
         $schema = new SchemaInstaller($this->connection);
         $schema->createQuote();
         $schema->createQuoteAddress();
+        $schema->createSalesOrder();
+        $schema->createContactTables();
     }
 
     protected function tearDown(): void
     {
+        $schema = new SchemaInstaller($this->connection);
+        $schema->dropContactTables();
+        $schema->dropSalesOrder();
         $this->connection->query('DROP TABLE IF EXISTS `quote_address`');
         $this->connection->query('DROP TABLE IF EXISTS `quote`');
         parent::tearDown();
@@ -107,6 +115,7 @@ class GdprEraseTest extends IntegrationTestCase
                 self::QUEUE_LABEL => ['removed' => 2, 'anonymised' => 1],
                 self::ENGINE_LABEL => ['removed' => 1, 'anonymised' => 1],
                 self::CART_LABEL => ['removed' => 0, 'anonymised' => 1],
+                self::ATTRIBUTION_LABEL => ['removed' => 0, 'anonymised' => 0],
             ],
             $this->eraser->erase(self::SUBJECT),
             'Sendable rows go, terminal rows are kept anonymised'
@@ -150,6 +159,7 @@ class GdprEraseTest extends IntegrationTestCase
                 self::QUEUE_LABEL => ['removed' => 0, 'anonymised' => 0],
                 self::ENGINE_LABEL => ['removed' => 0, 'anonymised' => 0],
                 self::CART_LABEL => ['removed' => 0, 'anonymised' => 0],
+                self::ATTRIBUTION_LABEL => ['removed' => 0, 'anonymised' => 0],
             ],
             $this->eraser->erase(self::SUBJECT)
         );
@@ -364,6 +374,61 @@ class GdprEraseTest extends IntegrationTestCase
         self::assertStringContainsString('Queued messages: 1 removed, 1 anonymized', $tester->getDisplay());
         self::assertStringContainsString('Engine queue: 0 removed, 0 anonymized', $tester->getDisplay());
         self::assertStringContainsString('Abandoned carts: 0 removed, 1 anonymized', $tester->getDisplay());
+        self::assertStringContainsString('Order attribution: 0 removed, 0 anonymized', $tester->getDisplay());
+    }
+
+    /**
+     * CON-212: the erasure takes the visitor token and the anonymous session
+     * id off the attribution rows of the shopper's orders — a guest order by
+     * its address, an account's order by the account, whatever address the
+     * order carries. Which recommendation led to the sale stays, the orders
+     * are not changed, and another shopper's attribution is not touched.
+     */
+    public function testErasureClearsTheBrowserIdentifiersOnTheShoppersOrderAttribution(): void
+    {
+        $this->connection->insert('customer_entity', ['entity_id' => 7, 'website_id' => 1, 'email' => self::SUBJECT]);
+        $this->connection->insert('customer_entity', ['entity_id' => 8, 'website_id' => 1, 'email' => self::BYSTANDER]);
+        // A guest order, in another case.
+        $this->seedOrder(501, null, 'Erase-Test-1@Example.test');
+        // The account's order, placed before the account's address changed.
+        $this->seedOrder(502, 7, 'earlier-address@example.test');
+        // The other shopper's: a guest order and an account order.
+        $this->seedOrder(503, null, self::BYSTANDER);
+        $this->seedOrder(504, 8, self::BYSTANDER);
+        foreach ([501, 502, 503, 504] as $orderId) {
+            $this->seedAttribution($orderId);
+        }
+        $ordersBefore = $this->fetchAll('sales_order', 'entity_id');
+
+        self::assertSame(
+            ['removed' => 0, 'anonymised' => 2],
+            $this->eraser->erase(self::SUBJECT)[self::ATTRIBUTION_LABEL]
+        );
+
+        $rows = array_column($this->fetchAll(self::ATTRIBUTION_TABLE, 'order_id'), null, 'order_id');
+        self::assertSame(['501', '502', '503', '504'], array_map('strval', array_keys($rows)), 'No row is deleted');
+        foreach ([501, 502] as $orderId) {
+            self::assertNull($rows[$orderId]['visitor_token']);
+            self::assertNull($rows[$orderId]['anon_session_id']);
+            self::assertSame('0f8e3c1a-5b2d-4e6f-8a9b-' . $orderId . '000000000', $rows[$orderId]['rec_id']);
+            self::assertSame('welcome', $rows[$orderId]['rec_ctx'], 'What led to the sale stays');
+            self::assertSame('2026-10-01 10:00:00', $rows[$orderId]['created_at']);
+        }
+        foreach ([503, 504] as $orderId) {
+            self::assertSame(
+                'vt_visitor' . $orderId,
+                $rows[$orderId]['visitor_token'],
+                'Another shopper is not touched'
+            );
+            self::assertSame('sess-' . $orderId, $rows[$orderId]['anon_session_id']);
+        }
+        self::assertSame($ordersBefore, $this->fetchAll('sales_order', 'entity_id'), 'The orders are not changed');
+
+        // A second run finds nothing left to clear.
+        self::assertSame(
+            ['removed' => 0, 'anonymised' => 0],
+            $this->eraser->erase(self::SUBJECT)[self::ATTRIBUTION_LABEL]
+        );
     }
 
     public function testAFailingEngineStillLeavesTheLocalHalfErased(): void
@@ -465,6 +530,30 @@ class GdprEraseTest extends IntegrationTestCase
             0,
             $uuid
         );
+    }
+
+    private function seedOrder(int $orderId, ?int $customerId, string $email): void
+    {
+        $this->connection->insert('sales_order', [
+            'entity_id' => $orderId,
+            'increment_id' => (string)(100000000 + $orderId),
+            'store_id' => 1,
+            'customer_id' => $customerId,
+            'customer_is_guest' => $customerId === null ? 1 : 0,
+            'customer_email' => $email,
+        ]);
+    }
+
+    private function seedAttribution(int $orderId): void
+    {
+        $this->connection->insert($this->connection->getTableName(self::ATTRIBUTION_TABLE), [
+            'order_id' => $orderId,
+            'rec_id' => '0f8e3c1a-5b2d-4e6f-8a9b-' . $orderId . '000000000',
+            'visitor_token' => 'vt_visitor' . $orderId,
+            'rec_ctx' => 'welcome',
+            'anon_session_id' => 'sess-' . $orderId,
+            'created_at' => '2026-10-01 10:00:00',
+        ]);
     }
 
     /**

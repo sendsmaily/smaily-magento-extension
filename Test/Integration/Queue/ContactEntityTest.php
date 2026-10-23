@@ -126,15 +126,19 @@ class ContactEntityTest extends IntegrationTestCase
         $this->dispatcher->dispatchAutomation(Trigger::ABANDONED_CART, 1, ['email' => $this->longAddress]);
         $this->markDelivered((int)$this->fetchAll(EventResource::TABLE_NAME)[1]['id']);
 
-        // The erasure reads the store's carts too.
+        // The erasure reads the store's carts, orders and accounts too.
         $schema = new SchemaInstaller($this->connection);
         $schema->createQuote();
         $schema->createQuoteAddress();
+        $schema->createSalesOrder();
+        $schema->createContactTables();
         /** @var LocalEraser $eraser */
         $eraser = $this->objectManager->create(LocalEraser::class);
         try {
             $counts = $eraser->erase(strtoupper($this->longAddress));
         } finally {
+            $schema->dropContactTables();
+            $schema->dropSalesOrder();
             $this->connection->query('DROP TABLE IF EXISTS `quote_address`');
             $this->connection->query('DROP TABLE IF EXISTS `quote`');
         }

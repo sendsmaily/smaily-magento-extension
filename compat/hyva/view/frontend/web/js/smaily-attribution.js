@@ -10,9 +10,14 @@
  *
  * Recommendation attribution capture. Runs client-side so Full Page Cache
  * can never swallow a campaign-click landing: URL params -> first-party
- * cookies, later stamped onto the order server-side. Deliberately not gated
- * on analytics consent (functional first-party cookie for the merchant's
- * own email click) — matches the Woo/Shopify plugins.
+ * cookies, later stamped onto the order server-side. The script reads and
+ * checks the params, and the store's server sets the cookies (POST
+ * config.landUrl, Controller\Attribution\Land, CON-211): Safari keeps a
+ * cookie page JavaScript sets for 7 days at most, so the 365-day visitor
+ * token would last days. The script writes the cookies itself only when
+ * that request fails. Deliberately not gated on analytics consent
+ * (functional first-party cookie for the merchant's own email click) —
+ * matches the Woo/Shopify plugins.
  */
 (function () {
     'use strict';
@@ -31,6 +36,11 @@
     // guest order. A `vs_` token already in the cookie is left as it is.
     var VISITOR_TOKEN_PATTERN = /^vt_[A-Za-z0-9]{1,61}$/,
         CONTEXT_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+
+    // The tracker runs the capture too (its cookie helpers); a page lands
+    // once, so a second run neither posts again nor writes a script cookie
+    // over the one the server set.
+    var landed = false;
 
     function readParam(name) {
         return new URLSearchParams(window.location.search).get(name);
@@ -57,6 +67,29 @@
             + '; expires=' + expires
             + '; path=/; SameSite=Lax'
             + (window.location.protocol === 'https:' ? '; Secure' : '');
+    }
+
+    // Posts the click's values to the store route that sets the cookies;
+    // resolves true when the store set them.
+    function postLanding(url, values) {
+        var body = Object.keys(values).filter(function (key) {
+            return values[key];
+        }).map(function (key) {
+            return key + '=' + encodeURIComponent(values[key]);
+        }).join('&');
+
+        return window.fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            cache: 'no-store',
+            keepalive: true,
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: body
+        }).then(function (response) {
+            return response.ok;
+        }, function () {
+            return false;
+        });
     }
 
     function uuidv4() {
@@ -95,13 +128,33 @@
         // Contract "Cookie names", context cookie rule: the context cookie
         // describes the same landing as the rec id cookie, so a landing with
         // a rec id sets it to the link's context, or clears it when the link
-        // has none; any other landing leaves it alone (PRO-3911).
-        if (recId) {
-            setCookie(config.cookieRecId, recId, config.ttlRecIdDays);
-            setCookie(config.cookieContext, context || '', context ? config.ttlContextDays : -1);
+        // has none; any other landing leaves it alone (PRO-3911). The store
+        // route applies the same rule.
+        function writeCookies() {
+            if (recId) {
+                setCookie(config.cookieRecId, recId, config.ttlRecIdDays);
+                setCookie(config.cookieContext, context || '', context ? config.ttlContextDays : -1);
+            }
+            if (visitorToken) {
+                setCookie(config.cookieVisitor, visitorToken, config.ttlVisitorDays);
+            }
         }
-        if (visitorToken) {
-            setCookie(config.cookieVisitor, visitorToken, config.ttlVisitorDays);
+
+        if (!landed && (recId || visitorToken)) {
+            landed = true;
+            if (config.landUrl && typeof window.fetch === 'function') {
+                postLanding(config.landUrl, {
+                    rec_id: recId,
+                    visitor_token: visitorToken,
+                    context: recId ? context : null
+                }).then(function (stored) {
+                    if (!stored) {
+                        writeCookies();
+                    }
+                });
+            } else {
+                writeCookies();
+            }
         }
 
         // The anonymous session id of browse events is not written here: the

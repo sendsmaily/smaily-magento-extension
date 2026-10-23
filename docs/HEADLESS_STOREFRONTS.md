@@ -48,7 +48,7 @@ install, in this order. Each line links to its details below.
 **C. On the storefront (its developer)**
 
 1. Product links open: route `/<url-key>.html`, or redirect it to the product page keeping the query string — [Storefront URL](#storefront-url).
-2. Campaign clicks (`smaily_rec`, `smaily_vt`, `smaily_ctx`) are written into first-party cookies on every page load; a landing that writes `smaily_rec_id` but has no `smaily_ctx` deletes the context cookie — [hand-off item 2](#2-capture-campaign-clicks-into-cookies).
+2. Campaign clicks (`smaily_rec`, `smaily_vt`, `smaily_ctx`) are written into first-party cookies on every page load, by the storefront's server (`Set-Cookie`); a landing that writes `smaily_rec_id` but has no `smaily_ctx` deletes the context cookie — [hand-off item 2](#2-capture-campaign-clicks-into-cookies).
 3. Those cookies travel with the place-order request, and `smaily_anon_sid` and `smaily_rec_uid` with the login (customer token) request — [hand-off item 3](#3-carry-the-cookies-to-order-placement).
 4. A guest's email goes on the cart as soon as it is typed (`setGuestEmailOnCart`) — [hand-off item 7](#7-put-a-guests-email-on-the-cart).
 5. Browse events go to `/smaily/relay`, only with marketing-cookie consent — [hand-off item 4](#4-send-browse-events).
@@ -231,12 +231,15 @@ public. Allow these two paths too. The admin and the module's outbound calls
 to Smaily and Campaign Intelligence need nothing. The module's other
 storefront addresses — `smaily/cart/restore`, `smaily/checkout/optin` and
 `smaily/privacy` — serve Magento's own theme and are not used by a separate
-storefront. The guest-email route of item 7 is under `/rest`.
+storefront; `smaily/attribution/land` is used only through a proxy on the
+storefront's host (item 2). The guest-email route of item 7 is under `/rest`.
 
 ### 2. Capture campaign clicks into cookies
 
 On every page load, read these query parameters and store them as
-first-party cookies (`path=/`, `SameSite=Lax`, `Secure` on https). Write a
+first-party cookies (`path=/`, `SameSite=Lax`, `Secure` on https, not
+`HttpOnly`), set by the storefront's server with a `Set-Cookie` header (see
+[Set the cookies from the server](#set-the-cookies-from-the-server)). Write a
 value only when it has the shape shown; ignore it otherwise.
 
 | Query parameter | Shape | Cookie | Lifetime |
@@ -278,6 +281,39 @@ neither form is not sent.
 
 The anonymous session id of browse events, the cookie `smaily_anon_sid`,
 is not part of this capture: set it in step 4, with consent only.
+
+#### Set the cookies from the server
+
+Safari keeps a cookie that page JavaScript sets for 7 days at most (24
+hours after a link with tracking parameters), so a 365-day `smaily_rec_uid`
+written by a storefront script lasts days, and the shopper's later visits
+are no longer tied to the email click. A cookie from a `Set-Cookie` header
+keeps its lifetime. Either:
+
+- **Set them on the storefront's own domain**, from the storefront's
+  server: on the landing request itself when the page is rendered on the
+  server and not served from a cache, or from a small route of the
+  storefront that its script posts the click's values to after the checks
+  above. Magento's own storefront works the second way, because its pages
+  come from the full-page cache.
+- **Post them to the back end's route through the storefront's host**,
+  where a reverse proxy on the storefront's host passes `/smaily/` to the
+  back end (see [Base Link URL](#base-link-url)): `POST /smaily/attribution/land`,
+  form-encoded, with the fields `rec_id`, `visitor_token` and `context` —
+  the values that passed the checks above, `context` only with `rec_id` —
+  sent with the shopper's cookies. The route applies the same rules (a
+  `vs_` token or an off-shape value is ignored; a `rec_id` without a valid
+  `context` deletes the context cookie), sets the cookies with
+  `Set-Cookie` and the back end's **Cookie Domain** and **Cookie Path**
+  (**Stores > Configuration > General > Web > Default Cookie Settings**,
+  so the Cookie Domain must be empty or the domain the storefront's host
+  is under), and answers `204`; `400` when no value has its shape, `404`
+  while Campaign Intelligence is not connected, `429` over 30 requests a
+  minute from one address.
+
+On any answer other than `2xx`, or when the request fails, write the
+cookies from the script, as Magento's own storefront does: a cookie that
+lasts days is better than none.
 
 These are the default names and lifetimes. A Campaign Intelligence account
 can override them; ask Smaily support if the account was set up with other

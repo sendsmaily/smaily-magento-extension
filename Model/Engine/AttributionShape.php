@@ -32,9 +32,13 @@ namespace Smaily\Connect\Model\Engine;
  */
 class AttributionShape
 {
+    private const ENGINE_TOKEN = 'vt_[A-Za-z0-9]{1,61}';
+
     private const STORE_TOKEN = 'vs_[A-Za-z0-9]{22}';
 
-    private const VISITOR_TOKEN_PATTERN = '/^(?:vt_[A-Za-z0-9]{1,61}|' . self::STORE_TOKEN . ')$/D';
+    private const VISITOR_TOKEN_PATTERN = '/^(?:' . self::ENGINE_TOKEN . '|' . self::STORE_TOKEN . ')$/D';
+
+    private const ENGINE_VISITOR_TOKEN_PATTERN = '/^' . self::ENGINE_TOKEN . '$/D';
 
     private const STORE_VISITOR_TOKEN_PATTERN = '/^' . self::STORE_TOKEN . '$/D';
 
@@ -43,6 +47,16 @@ class AttributionShape
     public static function isVisitorToken(string $value): bool
     {
         return preg_match(self::VISITOR_TOKEN_PATTERN, $value) === 1;
+    }
+
+    /**
+     * An engine-issued `vt_` token: the only form a link's visitor token is
+     * taken in (CON-177), as the WooCommerce plugin's
+     * `is_engine_visitor_token()`.
+     */
+    public static function isEngineVisitorToken(string $value): bool
+    {
+        return preg_match(self::ENGINE_VISITOR_TOKEN_PATTERN, $value) === 1;
     }
 
     /**

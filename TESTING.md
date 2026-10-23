@@ -82,11 +82,15 @@ checks Magento's cookie notice consent: accepted on another website, on this
 website, not parseable, accepted later on the page, and the consent override
 first; and that no event names the visitor token, which the relay reads from
 the cookie on the server. `Test/Js/attribution-landing.html` runs the real Luma and Hyvä
-landing capture the same way (the query and document.cookie stubbed) and
-checks the context cookie rule: a recommendation link with a context sets
-it, one without clears it, and any other landing leaves both cookies alone;
-and that a link's visitor token is written only in the engine's `vt_` form:
-a store-created `vs_` token in a link leaves the cookie as it is.
+landing capture the same way (the query, document.cookie and fetch
+stubbed) and checks the context cookie rule: a recommendation link with a
+context sets it, one without clears it, and any other landing leaves both
+cookies alone; that a link's visitor token is written only in the engine's
+`vt_` form: a store-created `vs_` token in a link leaves the cookie as it
+is; and that the click is posted once to the store route that sets the
+cookies (`smaily/attribution/land`), which then writes no cookie from the
+script, while a failed request, an error answer or a config without the
+route has the script write them itself (the rules above run that way).
 `Test/Js/recommendations.html` runs the real Luma and Hyvä recommendations
 scripts the same way (document.cookie, fetch and the Luma script's jQuery
 stubbed, two widget containers per page) and checks that nothing is asked

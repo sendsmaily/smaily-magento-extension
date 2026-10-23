@@ -61,6 +61,7 @@ class FailureMessage
         AutomationHandler::SKIPPED_NO_LANGUAGE_WORKFLOW,
         AutomationHandler::SKIPPED_NO_OWN_ACCOUNT_WORKFLOW,
         AutomationHandler::SKIPPED_NO_MARKETING_CONSENT,
+        AutomationHandler::SKIPPED_UNSUBSCRIBED_IN_SMAILY,
         ProfilingConsentHandler::SKIPPED_REPLACED,
         IdentityMergeHandler::SKIPPED_OPTED_OUT,
         AbandonedCart::SKIPPED_RECENTLY_REMINDED,

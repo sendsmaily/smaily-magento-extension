@@ -40,11 +40,11 @@ use Smaily\Connect\Model\Logger\Logger;
  * as a skipped row in the Log.
  *
  * Who gets a reminder follows the website's contact-sync mode
- * (AbandonedCart\ReminderConsent, CON-195): in the consent and checkout
- * opt-in modes a shopper who agreed to marketing emails in the store, else
- * only a subscribed contact in Smaily (the queue reads the contact before it
- * sends); in the legitimate-interest mode every shopper but one unsubscribed
- * in the store, whose cart is closed as skipped with the reason in the Log.
+ * (AbandonedCart\ReminderConsent, CON-195, CON-196), not whether contact
+ * sync runs: a cart of a shopper unsubscribed in the store under legitimate
+ * interest is closed as skipped here, with the reason in the Log; every other
+ * reminder is queued with its cart, and the queue reads the contact in Smaily
+ * before it sends.
  */
 class AbandonedCart
 {
@@ -198,11 +198,12 @@ class AbandonedCart
             if ($remindedAddress !== '') {
                 $reminded[$remindedAddress] = true;
             }
-            if ($verdict === ReminderConsent::SEND) {
-                $this->dispatcher->dispatchAutomation(Trigger::ABANDONED_CART, $storeId, $address);
-            } else {
-                $this->dispatcher->dispatchReminderToSubscribedContact($quoteId, $storeId, $address);
-            }
+            $this->dispatcher->dispatchCartReminder(
+                $quoteId,
+                $storeId,
+                $address,
+                $verdict === ReminderConsent::SEND
+            );
             $mailed++;
         }
 

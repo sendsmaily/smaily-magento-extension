@@ -425,6 +425,7 @@
 "Skipped: this address already got an abandoned-cart reminder for another cart in the last 24 hours. Nothing was sent.","Vahele jäetud: sellele aadressile saadeti viimase 24 tunni jooksul juba teise ostukorvi meeldetuletus. Midagi ei saadetud."
 "Skipped: this shopper has not agreed to marketing emails in the store, and is not a subscribed contact in Smaily. Nothing was sent.","Vahele jäetud: see ostja pole poes turunduskirjadega nõustunud ega ole Smailys tellija. Midagi ei saadetud."
 "Skipped: this shopper unsubscribed from the store's newsletter. Nothing was sent.","Vahele jäetud: see ostja loobus poe uudiskirjast. Midagi ei saadetud."
+"Skipped: this shopper unsubscribed in Smaily. Nothing was sent.","Vahele jäetud: see ostja on Smailys loobunud. Midagi ei saadetud."
 "Smaily","Smaily"
 "Smaily account for %1","Smaily konto keelele %1"
 "Smaily API credentials are not configured (store scope: %1)","Smaily API kasutajaandmed on seadistamata (poe skoop: %1)"

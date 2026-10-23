@@ -60,13 +60,14 @@ use Smaily\Connect\Model\Queue\Skipped;
  * trigger's marker field (Trigger::MARKER_FIELDS) lets the merchant find or
  * exclude those contacts in a Smaily segment.
  *
- * An abandoned-cart reminder for a shopper who has not agreed to marketing
- * emails in the store (consent and checkout opt-in modes, CON-195) carries
- * SUBSCRIBED_CONTACT_CART: it goes only to a contact the workflow's Smaily
- * account has as subscribed. One read of the contact, through the account
- * that would send it; any other answer closes the row as Skipped and the
- * cart's tracker row as skipped, and a read that fails leaves the row on the
- * retry ladder with nothing sent.
+ * An abandoned-cart reminder carries CART_REMINDER (CON-195, CON-196): one
+ * read of the contact, through the account that would send the workflow,
+ * just before it is sent. A contact who unsubscribed there gets none, in
+ * every mode; an address the account does not have gets it only when the
+ * cron allowed a new contact (store consent, or legitimate interest). A skip
+ * closes the row as Skipped with the reason and the cart's tracker row as
+ * skipped; a read that fails leaves the row on the retry ladder with nothing
+ * sent.
  */
 class AutomationHandler implements EventHandlerInterface
 {
@@ -90,17 +91,21 @@ class AutomationHandler implements EventHandlerInterface
         . ' saved for all websites, and no workflow of its account is picked for this automation. Nothing was sent.';
 
     /**
-     * A reminder for a shopper without store consent that Smaily does not
-     * have as a subscribed contact (CON-195).
+     * A reminder for a shopper without store consent whom the Smaily account
+     * does not have as a contact (CON-195).
      */
     public const SKIPPED_NO_MARKETING_CONSENT = 'Skipped: this shopper has not agreed to marketing emails in the'
         . ' store, and is not a subscribed contact in Smaily. Nothing was sent.';
 
+    /** A reminder for a contact who unsubscribed in Smaily (CON-196). */
+    public const SKIPPED_UNSUBSCRIBED_IN_SMAILY = 'Skipped: this shopper unsubscribed in Smaily. Nothing was sent.';
+
     /**
-     * Payload key of a reminder that goes only to a subscribed contact in
-     * Smaily; holds the cart's quote id (SyncDispatcher, CON-195).
+     * Payload key of an abandoned-cart reminder: {quote_id, new_contact}, the
+     * cart and whether an address Smaily does not have may get it
+     * (SyncDispatcher::dispatchCartReminder()).
      */
-    public const SUBSCRIBED_CONTACT_CART = 'subscribed_contact_cart';
+    public const CART_REMINDER = 'cart_reminder';
 
     public function __construct(
         private readonly SmailyClientProvider $clientProvider,
@@ -146,18 +151,20 @@ class AutomationHandler implements EventHandlerInterface
                 continue;
             }
 
+            $reminder = $payload[self::CART_REMINDER] ?? null;
             try {
                 $client = $this->clientFor($match, (int)($payload['store_id'] ?? 0), $websiteId);
-                $skipped = isset($payload[self::SUBSCRIBED_CONTACT_CART])
-                    && !$this->isSubscribedContact($client, (string)$address['email']);
+                $skipReason = is_array($reminder)
+                    ? $this->reminderSkipReason($client, (string)$address['email'], !empty($reminder['new_contact']))
+                    : null;
             } catch (SmailyClientException $exception) {
                 // Nothing was posted: the row waits on the retry ladder.
                 $results[$id] = $exception;
                 continue;
             }
-            if ($skipped) {
-                $this->cartState->markReminderSkipped((int)$payload[self::SUBSCRIBED_CONTACT_CART]);
-                $results[$id] = new Skipped(self::SKIPPED_NO_MARKETING_CONSENT);
+            if ($skipReason !== null) {
+                $this->cartState->markReminderSkipped((int)($reminder['quote_id'] ?? 0));
+                $results[$id] = new Skipped($skipReason);
                 continue;
             }
 
@@ -203,24 +210,26 @@ class AutomationHandler implements EventHandlerInterface
     }
 
     /**
-     * Whether the account has the address as a subscribed contact. An
-     * address it does not have (code 206) is not one.
+     * Why a reminder may not go, or null when it may: the account's contact
+     * unsubscribed (any status but an explicit 0 counts), or the account does
+     * not have the address (code 206) and no new contact is allowed.
      *
      * @throws SmailyClientException when Smaily cannot be read
      */
-    private function isSubscribedContact(SmailyClient $client, string $email): bool
+    private function reminderSkipReason(SmailyClient $client, string $email, bool $newContact): ?string
     {
         try {
             $contact = $client->get(SmailyClient::ENDPOINT_CONTACT, ['email' => $email]);
         } catch (ApiException $exception) {
-            if ($exception->getSmailyCode() === ApiException::CODE_EMAIL_NOT_FOUND) {
-                return false;
+            if ($exception->getSmailyCode() !== ApiException::CODE_EMAIL_NOT_FOUND) {
+                throw $exception;
             }
-            throw $exception;
+
+            return $newContact ? null : self::SKIPPED_NO_MARKETING_CONSENT;
         }
         $fields = isset($contact[0]) && is_array($contact[0]) ? $contact[0] : $contact;
 
-        return (string)($fields['is_unsubscribed'] ?? '') === '0';
+        return (string)($fields['is_unsubscribed'] ?? '') === '0' ? null : self::SKIPPED_UNSUBSCRIBED_IN_SMAILY;
     }
 
     /**

@@ -353,20 +353,24 @@ The contact fields Smaily receives change too:
 - **Cron:** jobs moved into a dedicated `smaily_connect` cron group running
   in a separate process. Ensure `bin/magento cron:run` executes every
   minute for near-real-time delivery.
-- **The abandoned-cart reminder follows the contact sync mode.** Under
-  *Subscribers only (consent)* — the mode an upgrade starts in — and
-  *Checkout opt-in only*, a reminder goes to a shopper who agreed to
-  marketing emails in the store (a newsletter subscriber, or a shopper who
-  ticked the checkout newsletter box for the cart) or who is a subscribed
-  contact in Smaily; every other cart is skipped, and its Log row says why.
-  Under *All customers (legitimate interest)* every cart is reminded except
-  a shopper who unsubscribed in the store. See
-  [Abandoned cart](https://smaily.com/connect-magento/#set-abandoned).
-- **The store never undoes an unsubscribe made in Smaily.** The contacts
-  import, an admin save of a customer or subscriber and a subscription made
-  through Magento's API send a subscriber without a subscription status, so
-  a contact who unsubscribed in Smaily stays unsubscribed. Only the
-  shopper's own subscription in the store subscribes them again.
+- **The abandoned-cart reminder follows the contact sync mode.** It reads
+  the mode, not whether contact sync is switched on, and checks the contact
+  in Smaily just before it goes out: a contact who unsubscribed in Smaily
+  gets none, in every mode. Under *Subscribers only (consent)* — the mode an
+  upgrade starts in — and *Checkout opt-in only*, a reminder goes to a
+  shopper who agreed to marketing emails in the store (a newsletter
+  subscriber, or a shopper who ticked the checkout newsletter box for the
+  cart) or who is a subscribed contact in Smaily; every other cart is
+  skipped, and its Log row says why. Under *All customers (legitimate
+  interest)* every cart is reminded except a shopper who unsubscribed in the
+  store. See [Abandoned cart](https://smaily.com/connect-magento/#set-abandoned).
+- **A subscription status goes to Smaily only when it changes.** A change
+  of the newsletter status in Magento — on the storefront, in the admin,
+  through the API or by a Magento import — goes to Smaily, and a new
+  subscription subscribes again a contact who unsubscribed in Smaily. The
+  contacts import, a profile save without a status change, the purchase
+  marker and the automations send no status, so the contact keeps the one
+  it has in Smaily.
 - **Automations never re-subscribe.** A welcome, first-order or
   abandoned-cart trigger never overrides an unsubscribe the contact made in
   Smaily, in any contact sync mode (2.8.x behaved the same). A 3.0.0

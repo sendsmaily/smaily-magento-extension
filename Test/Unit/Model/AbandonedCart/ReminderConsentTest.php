@@ -29,6 +29,7 @@ class ReminderConsentTest extends TestCase
         5 => ['email' => 'renamed@example.com', 'customer_id' => 9],
         6 => ['email' => 'left@example.com', 'customer_id' => 0],
         7 => ['email' => 'both@example.com', 'customer_id' => 8],
+        8 => ['email' => 'ticked-again@example.com', 'customer_id' => 0],
     ];
 
     private const RECORDS = [
@@ -38,6 +39,7 @@ class ReminderConsentTest extends TestCase
         ['subscriber_email' => 'left@example.com', 'customer_id' => 0, 'subscriber_status' => 3],
         ['subscriber_email' => 'both@example.com', 'customer_id' => 0, 'subscriber_status' => 3],
         ['subscriber_email' => 'both-account@example.com', 'customer_id' => 8, 'subscriber_status' => 1],
+        ['subscriber_email' => 'ticked-again@example.com', 'customer_id' => 0, 'subscriber_status' => 3],
     ];
 
     public function testTheConsentModesSendToAShopperWhoAgreedInTheStoreAndCheckEveryOtherWithSmaily(): void
@@ -50,9 +52,14 @@ class ReminderConsentTest extends TestCase
             5 => ReminderConsent::SEND_TO_SUBSCRIBED_CONTACT,
             6 => ReminderConsent::SEND_TO_SUBSCRIBED_CONTACT,
             7 => ReminderConsent::SEND_TO_SUBSCRIBED_CONTACT,
+            8 => ReminderConsent::SEND,
         ], $this->consent(true)->verdicts(1, [1, 2], self::CARTS));
     }
 
+    /**
+     * A tick of the checkout newsletter box on the cart is a new consent in
+     * every mode, also over an earlier unsubscribe in the store (cart 8).
+     */
     public function testTheLegitimateInterestModeSendsToEveryoneButAStoreUnsubscribe(): void
     {
         self::assertSame([
@@ -63,6 +70,7 @@ class ReminderConsentTest extends TestCase
             5 => ReminderConsent::SKIP_UNSUBSCRIBED,
             6 => ReminderConsent::SKIP_UNSUBSCRIBED,
             7 => ReminderConsent::SKIP_UNSUBSCRIBED,
+            8 => ReminderConsent::SEND,
         ], $this->consent(false)->verdicts(1, [1, 2], self::CARTS));
     }
 
@@ -100,8 +108,7 @@ class ReminderConsentTest extends TestCase
         $resource->method('getTableName')->willReturnArgument(0);
 
         $stateManager = $this->createMock(StateManager::class);
-        $stateManager->method('optedInQuotes')->willReturn([2 => true]);
-        $stateManager->expects($requiresOptin ? self::once() : self::never())->method('optedInQuotes');
+        $stateManager->expects(self::once())->method('optedInQuotes')->willReturn([2 => true, 8 => true]);
 
         return new ReminderConsent($mode, $resource, $stateManager);
     }

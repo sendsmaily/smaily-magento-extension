@@ -13,25 +13,30 @@ use Magento\Newsletter\Model\Subscriber;
 use Smaily\Connect\Model\ContactSync\Mode;
 
 /**
- * Who gets an abandoned-cart reminder, by the website's contact-sync mode
- * (CON-195, the same rule in every Smaily connector):
+ * The store's half of who gets an abandoned-cart reminder, by the website's
+ * contact-sync mode (CON-195, CON-196 — the same rule in every Smaily
+ * connector). Smaily's half follows at send time: the queue reads every
+ * reminder's contact first, and a contact who unsubscribed in Smaily gets
+ * none, in every mode (Queue\Handler\AutomationHandler).
  *
- * - Consent and checkout opt-in modes (Mode::requiresOptin()): a shopper who
- *   agreed to marketing emails in the store — a newsletter subscriber of the
- *   website (a customer, or a guest who signed up), or a shopper who ticked
- *   the checkout newsletter box on this cart, ordered or not — gets the
- *   reminder. Any other cart goes only to a contact Smaily already has as
- *   subscribed: the queue reads the contact before it sends
- *   (Queue\Handler\AutomationHandler).
- * - Legitimate-interest mode: every cart, except a shopper whose newsletter
- *   record on the website is unsubscribed.
+ * - A shopper who ticked the checkout newsletter box on this cart (ordered or
+ *   not) gave a new consent, in every mode: SEND.
+ * - Consent and checkout opt-in modes (Mode::requiresOptin()): a newsletter
+ *   subscriber of the website (a customer, or a guest who signed up) has
+ *   consent in the store: SEND. Any other shopper gets the reminder only as a
+ *   subscribed contact in Smaily — also one unsubscribed in the store, since
+ *   the Smaily list is the one the merchant sends to:
+ *   SEND_TO_SUBSCRIBED_CONTACT.
+ * - Legitimate-interest mode: every cart (SEND), except a shopper whose
+ *   newsletter record on the website is unsubscribed (SKIP_UNSUBSCRIBED).
  *
- * In every mode the trigger goes with force_opt_in=false, so a reminder never
- * re-subscribes a contact who unsubscribed in Smaily.
+ * The trigger goes with force_opt_in=false and no status, so a reminder
+ * subscribes nobody; the tick subscribes the shopper again only through
+ * their own subscription when it syncs.
  */
 class ReminderConsent
 {
-    /** The reminder is sent. */
+    /** The reminder is sent, also to an address Smaily does not have, unless Smaily has it unsubscribed. */
     public const SEND = 'send';
 
     /** The reminder is sent only to a contact Smaily has as subscribed. */
@@ -62,20 +67,22 @@ class ReminderConsent
         }
         $statuses = $this->newsletterStatuses($storeIds, $carts);
         $requiresOptin = $this->mode->requiresOptin($websiteId);
-        $ticked = $requiresOptin ? $this->stateManager->optedInQuotes(array_keys($carts)) : [];
+        $ticked = $this->stateManager->optedInQuotes(array_keys($carts));
 
         $verdicts = [];
         foreach ($carts as $quoteId => $cart) {
             $status = $this->statusOf($cart, $statuses);
-            if (!$requiresOptin) {
+            if (isset($ticked[$quoteId])) {
+                $verdicts[$quoteId] = self::SEND;
+            } elseif (!$requiresOptin) {
                 $verdicts[$quoteId] = $status === Subscriber::STATUS_UNSUBSCRIBED
                     ? self::SKIP_UNSUBSCRIBED
                     : self::SEND;
-                continue;
+            } else {
+                $verdicts[$quoteId] = $status === Subscriber::STATUS_SUBSCRIBED
+                    ? self::SEND
+                    : self::SEND_TO_SUBSCRIBED_CONTACT;
             }
-            $verdicts[$quoteId] = $status === Subscriber::STATUS_SUBSCRIBED || isset($ticked[$quoteId])
-                ? self::SEND
-                : self::SEND_TO_SUBSCRIBED_CONTACT;
         }
 
         return $verdicts;

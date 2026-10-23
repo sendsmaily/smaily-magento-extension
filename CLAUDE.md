@@ -444,7 +444,9 @@ is written in English.
   Intelligence not yet connected — waits for the client); 2026-10-23
   evening: 4/5 (rc15 cut: Magento 2.4.4/2.4.5 compile fix, Safari-proof
   cookies; pilot stores on rc12, Campaign Intelligence waits for the
-  client).
+  client); 2026-10-23 session end: 4/5 (rc15 released; pilot stores on
+  rc12 waiting for their developer's rc15 upgrade; Campaign Intelligence
+  waits for the client; 3.0.0 gate CON-209).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Feature (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

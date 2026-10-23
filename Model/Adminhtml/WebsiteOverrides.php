@@ -66,6 +66,15 @@ class WebsiteOverrides
             Config::XML_PATH_ABANDONED_ENABLED,
             Config::XML_PATH_ABANDONED_WORKFLOW,
             Config::XML_PATH_ABANDONED_CUTOFF,
+            Config::XML_PATH_WELCOME_COUPON_ENABLED,
+            Config::XML_PATH_WELCOME_COUPON_RULE,
+            Config::XML_PATH_WELCOME_COUPON_DAYS,
+            Config::XML_PATH_FIRST_ORDER_COUPON_ENABLED,
+            Config::XML_PATH_FIRST_ORDER_COUPON_RULE,
+            Config::XML_PATH_FIRST_ORDER_COUPON_DAYS,
+            Config::XML_PATH_ABANDONED_COUPON_ENABLED,
+            Config::XML_PATH_ABANDONED_COUPON_RULE,
+            Config::XML_PATH_ABANDONED_COUPON_DAYS,
         ],
     ];
 

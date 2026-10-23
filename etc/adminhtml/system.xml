@@ -161,6 +161,60 @@
                     <validate>validate-digits digits-range-10-1440</validate>
                     <depends><field id="abandoned_enabled">1</field></depends>
                 </field>
+                <field id="welcome_coupon_enabled" translate="label" type="select" sortOrder="71"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Welcome: Send a Discount Code</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <depends><field id="welcome_enabled">1</field></depends>
+                </field>
+                <field id="welcome_coupon_rule" translate="label" type="text" sortOrder="72"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Welcome: Cart Price Rule ID</label>
+                    <validate>validate-digits</validate>
+                    <depends><field id="welcome_coupon_enabled">1</field></depends>
+                </field>
+                <field id="welcome_coupon_days" translate="label" type="text" sortOrder="73"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Welcome: Discount Code Valid For (Days)</label>
+                    <validate>validate-digits digits-range-1-365</validate>
+                    <depends><field id="welcome_coupon_enabled">1</field></depends>
+                </field>
+                <field id="first_order_coupon_enabled" translate="label" type="select" sortOrder="74"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>First Order: Send a Discount Code</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <depends><field id="first_order_enabled">1</field></depends>
+                </field>
+                <field id="first_order_coupon_rule" translate="label" type="text" sortOrder="75"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>First Order: Cart Price Rule ID</label>
+                    <validate>validate-digits</validate>
+                    <depends><field id="first_order_coupon_enabled">1</field></depends>
+                </field>
+                <field id="first_order_coupon_days" translate="label" type="text" sortOrder="76"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>First Order: Discount Code Valid For (Days)</label>
+                    <validate>validate-digits digits-range-1-365</validate>
+                    <depends><field id="first_order_coupon_enabled">1</field></depends>
+                </field>
+                <field id="abandoned_coupon_enabled" translate="label" type="select" sortOrder="77"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Abandoned Cart: Send a Discount Code</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <depends><field id="abandoned_enabled">1</field></depends>
+                </field>
+                <field id="abandoned_coupon_rule" translate="label" type="text" sortOrder="78"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Abandoned Cart: Cart Price Rule ID</label>
+                    <validate>validate-digits</validate>
+                    <depends><field id="abandoned_coupon_enabled">1</field></depends>
+                </field>
+                <field id="abandoned_coupon_days" translate="label" type="text" sortOrder="79"
+                       showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Abandoned Cart: Discount Code Valid For (Days)</label>
+                    <validate>validate-digits digits-range-1-365</validate>
+                    <depends><field id="abandoned_coupon_enabled">1</field></depends>
+                </field>
                 <field id="engine_automations" translate="label" type="label" sortOrder="100"
                        showInDefault="1" showInWebsite="0" showInStore="0">
                     <label/>

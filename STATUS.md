@@ -14,13 +14,13 @@ each with its `.sha256`), the Hyvä mirror carries the tag, Packagist
 lists both packages at rc15, and the live guide site names the rc15
 commands. **Both pilot stores still run 3.0.0-rc12** — their upgrade to
 rc15 waits for their developer; Campaign Intelligence is not connected
-in either yet — that waits for the client. Two PRs merged after the
-rc15 cut and are not released yet: #208 and #209 (below). Linear: the
+in either yet — that waits for the client. Four PRs merged after the
+rc15 cut and are not released yet: #208–#211 (below). Linear: the
 project's issues live in team Connect (key `CON`, a sub-team of Growth
 (lab)); moved issues keep their `PRO-####` identifiers as redirects
 (CLAUDE.md "Linear discipline").
 
-**On `master` since the rc15 cut (unreleased, #208–#209):** #208 CON-211 (docs
+**On `master` since the rc15 cut (unreleased, #208–#211):** #208 CON-211 (docs
 only: the guide site and `docs/INSTALLING.md` say that a firewall, WAF
 or CDN in front of the store must let `POST /smaily/attribution/land`
 and `POST /smaily/relay` through; Gotcha 2 of the rc15 cut is closed).
@@ -35,7 +35,15 @@ Woo CON-219. The uninstall path uses `Model/Engine/Disconnector`, not
 configuration missing. Changelog fragment `changelog.d/CON-220.md`).
 **Supersedes:** CON-143's rule "the extension never sends the §16
 store-deletion request" (#186, in the 2026-10-22 night entry below and
-in the 3.0.0 CHANGELOG bullet).
+in the 3.0.0 CHANGELOG bullet). #210 (docs only: this file's handoff at
+the end of the 2026-10-23 session). #211 CON-224: deleting a subscriber
+in the admin's **Newsletter Subscribers** grid no longer unsubscribes
+the contact in Smaily or stops profiling (Erkki, 2026-10-23: a deletion
+is not a withdrawal of consent, and the contact may come from another
+source; as in the WooCommerce plugin, which sends nothing on a user
+delete); unsubscribes are unchanged; changelog fragment
+`changelog.d/CON-224.md`. **Supersedes:** CON-176 / CON-187 (a deleted
+subscriber is unsubscribed in Smaily and loses personalization).
 
 **Decided (Erkki, 2026-10-23):** the 3.0.0 gate is CON-209 — 3.0.0 is
 released after both pilot stores run rc14 (or later) for a few days with
@@ -58,8 +66,9 @@ contract 1.18.0 §23 now gives them — see CON-31 below).
 **Verified:** the gates on each PR's branch (see the PRs). Sandbox: after
 #209 the first `setup:upgrade` failed with "Too few arguments" (stale
 generated DI — the known gotcha in CLAUDE.md "Build / test commands");
-`setup:di:compile`, then both again, passed. The live guide site's md5
-matches `master` (dc75083).
+`setup:di:compile`, then both again, passed. After #211
+`setup:di:compile` and `setup:upgrade` passed, the live guide site's md5
+matches `master` (b6055a2), and the sandbox is stopped.
 
 **Pilot:** the developer of both pilot stores ("the pilot store" and "the
 second pilot store") upgraded them to 3.0.0-rc12; Erkki ran the initial
@@ -70,8 +79,13 @@ Intelligence waits for the client. The gauge is CON-147 (4/5).
 bullet from CON-143 ("Removing the extension or disconnecting Campaign
 Intelligence never asks Campaign Intelligence to delete the store's
 data…") — since CON-220 it is untrue; the CON-220 fragment in
-`changelog.d/` states the new behaviour. #208 is docs only and has no
-fragment.
+`changelog.d/` states the new behaviour. Since CON-224 two statements
+in CHANGELOG.md are untrue: the CON-176 bullet under "Changes since
+3.0.0-rc12" (a subscriber deleted in the **Newsletter Subscribers**
+grid is unsubscribed in Smaily) and the aside in the CON-196 / CON-195
+bullet under "Changes since 3.0.0-rc13" ("a subscriber deleted … is
+still unsubscribed in Smaily") — reword both next to the CON-224
+fragment. #208 and #210 are docs only and have no fragment.
 
 **Open Stories:** CON-209 (the 3.0.0 gate: both pilot stores on rc15, a
 few days' Log check, Erkki's go). CON-210 (CI compiles on the oldest
@@ -83,7 +97,11 @@ reports saved/closed with `postMessage`, §23 a workflow id for every
 email incl. transactional plus `smaily_subdomain` / `created_by`, and the
 §19/§20 changes; build it after Woo CON-218 / CON-191). Transactional
 sending (Epic CON-31; §23 now gives transactional workflow ids; needs a
-transactional Smaily test account in a local credentials file). CON-192
+transactional Smaily test account in a local credentials file). CON-225
+(align with WooCommerce 3.20: the export and the erasure cover the
+discount codes the extension made, and the guide takes Erkki's
+proofread EN/ET wording from smaily.com/connect-woo/ for the discount,
+email-field, Disconnect/removal and privacy paragraphs). CON-192
 (rare: no store-wide login and different accounts per website). INT-148
 (engine-sent emails with discount codes — an engine contract change;
 Erkki approves before anything goes to the engine team). CON-151
@@ -127,7 +145,7 @@ Intelligence in the pilot stores; when to cut rc16.
 4. CON-168, after Woo CON-218 / CON-191.
 5. Transactional sending (CON-31) when the test account exists.
 6. The next release candidate (rc16) when the pilot or CON-168 needs
-   #208 / #209 (Notes for the next version cut above)._
+   #208–#211 (Notes for the next version cut above)._
 
 _Earlier (2026-10-23 evening): the 3.0.0-rc15 version cut (#207),
 tagged 2026-10-23. rc15 held #202–#206; its CHANGELOG section "Changes

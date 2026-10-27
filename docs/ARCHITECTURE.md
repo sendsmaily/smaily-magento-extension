@@ -208,8 +208,8 @@ below.
   requests, which one run sends — never behind the whole history. Per cron
   minute an import moves min(2,000, what the tick builds in its 15 s, what
   the run sends in 40 s: 40 / max(0.2 s, time per request) × rows per
-  request) rows; a store of 5,649 products, 21,517 customers and 79,944
-  orders takes about 3 + 11 + 40 = 54 minutes (it took about 31 hours at
+  request) rows; a store of 5,000 products, 20,000 customers and 80,000
+  orders takes about 3 + 10 + 40 = 53 minutes (it took about 31 hours at
   one batch per domain a minute). `Test/Integration/Backfill/ImportPaceTest`
   runs one such minute against a mock engine. The WooCommerce plugin's
   import is slower: it sends one batch inline per Action Scheduler tick,

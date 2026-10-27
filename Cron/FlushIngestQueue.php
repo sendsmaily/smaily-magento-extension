@@ -95,7 +95,7 @@ class FlushIngestQueue
                 $sent = $this->flushDomain($domain) || $sent;
             }
             $sent = $this->flushCatalogRemove() || $sent;
-        } while ($sent && !$this->stopped);
+        } while ($sent);
     }
 
     /**

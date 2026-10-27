@@ -10,6 +10,7 @@ namespace Smaily\Connect\Test\Unit\Model\Engine;
 
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\IngestPace;
+use Smaily\Connect\Test\Unit\Support\TestClockIngestPace;
 
 /**
  * CON-232: a send run makes at most REQUESTS_PER_SECOND requests a second
@@ -19,7 +20,7 @@ class IngestPaceTest extends TestCase
 {
     public function testRequestsAreSpacedToThePace(): void
     {
-        $pace = $this->pace();
+        $pace = new TestClockIngestPace();
         $pace->start();
 
         $starts = [];
@@ -34,7 +35,7 @@ class IngestPaceTest extends TestCase
 
     public function testASlowAnswerIsNotFollowedByAWait(): void
     {
-        $pace = $this->pace();
+        $pace = new TestClockIngestPace();
         $pace->start();
         $pace->awaitTurn();
         $pace->clock += 1.0; // The engine took a second to answer.
@@ -46,7 +47,7 @@ class IngestPaceTest extends TestCase
 
     public function testTheBudgetEndsTheRun(): void
     {
-        $pace = $this->pace();
+        $pace = new TestClockIngestPace();
         $pace->start();
         self::assertTrue($pace->hasTime());
 
@@ -58,29 +59,5 @@ class IngestPaceTest extends TestCase
 
         $pace->start();
         self::assertTrue($pace->hasTime(), 'The next run starts a budget of its own');
-    }
-
-    /**
-     * The pace on a clock the test moves; a pause moves it.
-     */
-    private function pace(): IngestPace
-    {
-        return new class extends IngestPace {
-            public float $clock = 0.0;
-
-            /** @var float[] */
-            public array $pauses = [];
-
-            protected function now(): float
-            {
-                return $this->clock;
-            }
-
-            protected function pause(float $seconds): void
-            {
-                $this->pauses[] = $seconds;
-                $this->clock += $seconds;
-            }
-        };
     }
 }

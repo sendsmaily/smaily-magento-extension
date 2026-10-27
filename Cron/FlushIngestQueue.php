@@ -28,7 +28,9 @@ use Smaily\Connect\Model\Privacy\OptOutReplay;
  * queues meanwhile waits behind at most the import's backlog, never the
  * whole history.
  * The run ends early, leaving the rest to the next run, on a 429 (also one a
- * retry got past), a batch that failed in transport, or a whole-batch 4xx.
+ * retry got past) or a batch that failed in transport; a whole-batch 4xx
+ * ends its own domain for the run, so a key the engine no longer takes
+ * fails one batch per domain a run, not the whole queue.
  *
  * Each run first builds the catalog rows of the products the stock hooks
  * only marked changed (CatalogIngest::buildChanged(), PRO-1967), so they go
@@ -51,6 +53,9 @@ class FlushIngestQueue
 {
     /** Set when this run must send nothing more. */
     private bool $stopped = false;
+
+    /** @var array<string, true> domains that send nothing more this run */
+    private array $haltedDomains = [];
 
     public function __construct(
         private readonly Settings $settings,
@@ -82,6 +87,7 @@ class FlushIngestQueue
         }
 
         $this->stopped = false;
+        $this->haltedDomains = [];
         $this->pace->start();
         do {
             $sent = false;
@@ -93,14 +99,14 @@ class FlushIngestQueue
     }
 
     /**
-     * Whether this run may claim another batch. Re-asked per batch: a
-     * refusal met by one batch stops the rest of this run instead of
-     * collecting more 403s. Only the refusal can appear mid-run — execute()
-     * proved connectedness.
+     * Whether this run may claim another batch of the domain. Re-asked per
+     * batch: a refusal met by one batch stops the rest of this run instead
+     * of collecting more 403s. Only the refusal can appear mid-run —
+     * execute() proved connectedness.
      */
-    private function maySend(): bool
+    private function maySend(string $domain): bool
     {
-        if ($this->stopped || $this->settings->isRefused()) {
+        if ($this->stopped || isset($this->haltedDomains[$domain]) || $this->settings->isRefused()) {
             return false;
         }
         if (!$this->pace->hasTime()) {
@@ -128,7 +134,7 @@ class FlushIngestQueue
      */
     private function flushDomain(string $domain): bool
     {
-        if (!$this->maySend()) {
+        if (!$this->maySend($domain)) {
             return false;
         }
 
@@ -157,14 +163,13 @@ class FlushIngestQueue
 
             return true;
         } catch (EngineRequestException $exception) {
-            $this->stopped = true;
+            $this->haltedDomains[$domain] = true;
             if ($this->releaseIfRefused($events)) {
                 return true;
             }
 
             // Whole-batch 4xx: the request shape is wrong; retrying the same
-            // rows cannot succeed. The run ends here, so a key the engine no
-            // longer takes fails one batch per run, not the whole queue.
+            // rows cannot succeed.
             $this->recordBatchExchange($domain, $events, $items);
             $this->queue->markFailedMany($events, $exception->getMessage(), true);
 
@@ -214,7 +219,7 @@ class FlushIngestQueue
      */
     private function flushCatalogRemove(): bool
     {
-        if (!$this->maySend()) {
+        if (!$this->maySend(Client::DOMAIN_CATALOG_REMOVE)) {
             return false;
         }
 
@@ -260,7 +265,7 @@ class FlushIngestQueue
 
             return true;
         } catch (EngineRequestException $exception) {
-            $this->stopped = true;
+            $this->haltedDomains[Client::DOMAIN_CATALOG_REMOVE] = true;
             if ($this->releaseIfRefused($this->keyedEvents($keyed))) {
                 return true;
             }

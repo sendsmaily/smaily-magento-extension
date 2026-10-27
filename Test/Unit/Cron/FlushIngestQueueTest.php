@@ -422,18 +422,16 @@ class FlushIngestQueueTest extends TestCase
 
     /**
      * A batch that failed in transport (429 or 5xx after the retries, or no
-     * answer) or a whole-batch 4xx ends the run: a key the engine no longer
-     * takes fails one batch a run, not the whole queue.
-     *
-     * @dataProvider runEndingFailures
+     * answer) ends the run; the rows wait for their retry.
      */
-    public function testAFailedBatchEndsTheRun(\Throwable $failure): void
+    public function testATransportFailureEndsTheRun(): void
     {
         $this->stubBatches([
             Client::DOMAIN_CATALOG => [[$this->createEvent(1)], [$this->createEvent(2)]],
             Client::DOMAIN_ORDERS => [[$this->createEvent(3, Client::DOMAIN_ORDERS)]],
         ]);
-        $this->client->expects(self::once())->method('ingest')->willThrowException($failure);
+        $this->client->expects(self::once())->method('ingest')
+            ->willThrowException(new EngineTransportException('engine down', 503));
 
         $this->createCron()->execute();
 
@@ -441,14 +439,35 @@ class FlushIngestQueueTest extends TestCase
     }
 
     /**
-     * @return array<string, array{\Throwable}>
+     * A whole-batch 4xx ends its domain for the run, and the other domains
+     * go on: a key the engine no longer takes fails one batch per domain a
+     * run, not the whole queue.
      */
-    public static function runEndingFailures(): array
+    public function testAWholeBatchRequestErrorEndsItsDomainForTheRun(): void
     {
-        return [
-            'transport' => [new EngineTransportException('engine down', 503)],
-            'whole-batch 4xx' => [new EngineRequestException('HTTP 401: invalid key', 401)],
-        ];
+        $this->stubBatches([
+            Client::DOMAIN_CATALOG => [[$this->createEvent(1)], [$this->createEvent(2)]],
+            Client::DOMAIN_ORDERS => [
+                [$this->createEvent(3, Client::DOMAIN_ORDERS)],
+                [$this->createEvent(4, Client::DOMAIN_ORDERS)],
+            ],
+        ]);
+        $sent = [];
+        $this->client->method('ingest')->willReturnCallback(
+            static function (string $domain) use (&$sent): array {
+                if ($domain === Client::DOMAIN_CATALOG) {
+                    throw new EngineRequestException('HTTP 400: bad wrapper', 400);
+                }
+                $sent[] = $domain;
+
+                return ['processed' => 1, 'deduplicated' => 0, 'errors' => []];
+            }
+        );
+
+        $this->createCron()->execute();
+
+        self::assertSame([Client::DOMAIN_ORDERS, Client::DOMAIN_ORDERS], $sent);
+        self::assertSame(1, array_count_values($this->claims)[Client::DOMAIN_CATALOG]);
     }
 
     /**

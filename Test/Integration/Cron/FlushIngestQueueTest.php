@@ -14,6 +14,7 @@ use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
+use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
@@ -466,7 +467,8 @@ class FlushIngestQueueTest extends IntegrationTestCase
             $client,
             $this->createMock(OptOutReplay::class),
             $serializer,
-            $logger
+            $logger,
+            new IngestPace()
         );
     }
 

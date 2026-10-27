@@ -232,6 +232,7 @@
 "Disconnect via CLI: bin/magento smaily:engine:disconnect","Ühenduse katkestamine käsurealt: bin/magento smaily:engine:disconnect"
 "Done","Valmis"
 "Done, %1 of %2 synced — %3 failed.","Valmis, %1 / %2 sünkroonitud — %3 ebaõnnestus."
+"Done, %1 of %2 synced — %3 skipped because Magento could not read them; var/log/smaily_connect.log on the server lists them by id.","Valmis, %1 / %2 sünkroonitud — %3 jäeti vahele, sest Magento ei saanud neid lugeda; serveri failis var/log/smaily_connect.log on need id järgi kirjas."
 "Done, %1 of %2 synced.","Valmis, %1 / %2 sünkroonitud."
 "Each event triggers the Smaily automation workflow you pick. The lists below come live from your Smaily account — create the workflows there first if they are missing, then press Refresh.","Iga sündmus käivitab sinu valitud Smaily automaatika töövoo. Allolevad loendid tulevad otse sinu Smaily kontolt — kui töövood puuduvad, loo need esmalt Smailys ja vajuta siis „Värskenda töövooge“."
 "Each language has its own Smaily account (subdomain and credentials) with its own contact list.","Igal keelel on oma Smaily konto (alamdomeen ja kasutajaandmed) koos oma kontaktide nimekirjaga."

@@ -9,6 +9,8 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Engine\Payload;
 
 use Magento\Customer\Api\Data\CustomerInterface;
+use Magento\Framework\Exception\NoSuchEntityException;
+use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
 
 /**
@@ -19,7 +21,8 @@ use Smaily\Connect\Model\Multilingual\LanguageResolver;
 class CustomerPayloadBuilder
 {
     public function __construct(
-        private readonly LanguageResolver $languageResolver
+        private readonly LanguageResolver $languageResolver,
+        private readonly Logger $logger
     ) {
     }
 
@@ -52,7 +55,7 @@ class CustomerPayloadBuilder
             $item['phone'] = $phone;
         }
 
-        $language = $this->languageResolver->forStore($customer->getStoreId());
+        $language = $this->language($customer);
         if ($language !== '') {
             $item['language'] = $language;
         }
@@ -66,6 +69,26 @@ class CustomerPayloadBuilder
         }
 
         return $item;
+    }
+
+    /**
+     * The language of the customer's store view. A customer can keep the id
+     * of a store view that no longer exists, and Magento then throws instead
+     * of reading the locale; the customer goes without a language, and the
+     * extension's log names it by its id (CON-227).
+     */
+    private function language(CustomerInterface $customer): string
+    {
+        try {
+            return $this->languageResolver->forStore($customer->getStoreId());
+        } catch (NoSuchEntityException) {
+            $this->logger->error('Customer sent without a language: its store view no longer exists', [
+                'customer_id' => (int)$customer->getId(),
+                'store_id' => (int)$customer->getStoreId(),
+            ]);
+
+            return '';
+        }
     }
 
     private function billingPhone(CustomerInterface $customer): ?string

@@ -23,8 +23,8 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
 
 /**
  * POST {action: start|status|cancel, job_type} -> aggregated progress:
- * {status, processed, failed, total, percent, finished_at, error, stalled, blocked_by,
- * sync_inactive}
+ * {status, processed, failed, skipped, total, percent, finished_at, error, stalled,
+ * blocked_by, sync_inactive}
  *
  * "start" starts jobs (per website for contacts, installation-wide for
  * engine types) and is idempotent — an already-active job is not an error.
@@ -43,7 +43,10 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * tick takes first (JobManager::nextActive()) — when that is another
  * import, else '' (PRO-3923, PRO-3927). `sync_inactive` names the websites
  * whose latest contacts job sent nothing because their contact sync was not
- * active (Job::REASON_CONTACT_SYNC_INACTIVE, PRO-4037).
+ * active (Job::REASON_CONTACT_SYNC_INACTIVE, PRO-4037). A Campaign
+ * Intelligence import's failed_count holds the rows it skipped because
+ * Magento could not read them (Model/Backfill/SkippedRow, CON-227): it is
+ * answered as `skipped`, and its `failed` stays 0.
  */
 class BackfillState extends AbstractJsonAction implements HttpPostActionInterface
 {
@@ -126,6 +129,7 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
             }
         }
 
+        $skipped = $target === Job::TARGET_ENGINE ? $failed : 0;
         $status = $this->statusAggregator->resolve($statuses);
         $stalled = in_array($status, [Job::STATUS_PENDING, Job::STATUS_RUNNING], true)
             && $this->jobManager->isStalled($jobType, $target);
@@ -138,7 +142,8 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
         return [
             'status' => $status,
             'processed' => $processed,
-            'failed' => $failed,
+            'failed' => $failed - $skipped,
+            'skipped' => $skipped,
             'total' => $total,
             'percent' => $total > 0 ? (int)floor(min(100, $processed / $total * 100)) : 0,
             'finished_at' => $this->formatFinishedAt($finishedAt),

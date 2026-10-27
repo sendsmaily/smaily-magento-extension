@@ -647,7 +647,8 @@ window.smailyPanelsInit = function ($) {
     // Terminal outcomes are honest (Shopify-parity copy): "Done, X of Y
     // synced" when everything landed; "N failed — view in the Log" when
     // individual rows failed (queue rows still pending retry are NOT
-    // failed); "Stopped before an error" when the job itself aborted;
+    // failed); "N skipped" when a Campaign Intelligence import skipped rows
+    // Magento could not read (CON-227); "Stopped before an error" when the job itself aborted;
     // "Cancelled" after an admin cancel; "Stalled" for a queued or running
     // import nothing has moved for an hour (PRO-3915), naming the import it
     // waits behind when that is another one (PRO-3923). A contacts import
@@ -726,7 +727,7 @@ window.smailyPanelsInit = function ($) {
             return 'stalled';
         }
         if (data.status === 'completed') {
-            return data.failed ? 'failures' : 'done';
+            return data.failed || data.skipped ? 'failures' : 'done';
         }
         if (data.status === 'failed') {
             return 'stopped';
@@ -785,6 +786,12 @@ window.smailyPanelsInit = function ($) {
             setProgress(ui, data, 100, 'done');
             text = '<?= $escaper->escapeJs(__('Done, %1 of %2 synced.')) ?>'
                 .replace('%1', data.processed).replace('%2', data.total || data.processed);
+        } else if (state === 'failures' && data.skipped) {
+            setProgress(ui, data, data.percent, 'failed');
+            text = '<?= $escaper->escapeJs(__('Done, %1 of %2 synced — %3 skipped because Magento could not read them; var/log/smaily_connect.log on the server lists them by id.')) ?>'
+                .replace('%1', data.processed)
+                .replace('%2', data.total || data.processed + data.skipped)
+                .replace('%3', data.skipped);
         } else if (state === 'failures') {
             setProgress(ui, data, data.percent, 'failed');
             text = '<?= $escaper->escapeJs(__('Done, %1 of %2 synced — %3 failed.')) ?>'

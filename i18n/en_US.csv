@@ -232,6 +232,7 @@
 "Disconnect via CLI: bin/magento smaily:engine:disconnect","Disconnect via CLI: bin/magento smaily:engine:disconnect"
 "Done","Done"
 "Done, %1 of %2 synced — %3 failed.","Done, %1 of %2 synced — %3 failed."
+"Done, %1 of %2 synced — %3 skipped because Magento could not read them; var/log/smaily_connect.log on the server lists them by id.","Done, %1 of %2 synced — %3 skipped because Magento could not read them; var/log/smaily_connect.log on the server lists them by id."
 "Done, %1 of %2 synced.","Done, %1 of %2 synced."
 "Each event triggers the Smaily automation workflow you pick. The lists below come live from your Smaily account — create the workflows there first if they are missing, then press Refresh.","Each event triggers the Smaily automation workflow you pick. The lists below come live from your Smaily account — create the workflows there first if they are missing, then press Refresh."
 "Each language has its own Smaily account (subdomain and credentials) with its own contact list.","Each language has its own Smaily account (subdomain and credentials) with its own contact list."

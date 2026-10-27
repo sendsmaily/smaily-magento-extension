@@ -264,6 +264,19 @@ class SchemaInstaller
     }
 
     /**
+     * The core sales_order_item table as Magento ships it (see createQuote()).
+     */
+    public function createSalesOrderItem(): void
+    {
+        $this->createMagentoTable(self::SALES_SCHEMA, 'sales_order_item');
+    }
+
+    public function dropSalesOrderItem(): void
+    {
+        $this->connection->query('DROP TABLE IF EXISTS `sales_order_item`');
+    }
+
+    /**
      * Drop and create one table of a Magento module's db_schema.xml (path
      * relative to the package root) — without its foreign keys, whose
      * referenced tables (store, ...) the harness does not have.
@@ -356,6 +369,8 @@ class SchemaInstaller
                 return 'TEXT';
             case 'mediumtext':
                 return 'MEDIUMTEXT';
+            case 'longtext':
+                return 'LONGTEXT';
             case 'timestamp':
                 return 'TIMESTAMP';
             case 'datetime':

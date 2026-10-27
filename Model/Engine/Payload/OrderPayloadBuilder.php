@@ -13,8 +13,10 @@ use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Api\Data\OrderItemInterface;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Creditmemo;
+use Magento\Sales\Model\ResourceModel\Order\Item\CollectionFactory as OrderItemCollectionFactory;
 use Smaily\Connect\Model\Engine\AttributionShape;
 use Smaily\Connect\Model\Engine\RecId;
+use Smaily\Connect\Model\Logger\Logger;
 
 /**
  * Order -> WireOrder (contract §5).
@@ -34,6 +36,9 @@ use Smaily\Connect\Model\Engine\RecId;
  * engine fully replaces an order's items on re-ingest, so a later sync that
  * omits returned_at ERASES the return. Deriving here means the live observer,
  * a flusher retry and the order backfill all re-send it for free.
+ *
+ * An order whose lines Magento cannot load because of a stored value it
+ * cannot read goes without that value (orderItems(), CON-227).
  */
 class OrderPayloadBuilder
 {
@@ -50,8 +55,25 @@ class OrderPayloadBuilder
     /** Magento's configurable product type code (no Magento_ConfigurableProduct dependency). */
     private const TYPE_CONFIGURABLE = 'configurable';
 
+    /**
+     * The order-line columns items() reads: every one but the serialized
+     * product_options, which the engine is never sent.
+     */
+    private const ITEM_FIELDS = [
+        'parent_item_id',
+        'sku',
+        'product_type',
+        'product_id',
+        'qty_ordered',
+        'row_total',
+        'row_total_incl_tax',
+        'discount_amount',
+    ];
+
     public function __construct(
-        private readonly ResourceConnection $resourceConnection
+        private readonly ResourceConnection $resourceConnection,
+        private readonly OrderItemCollectionFactory $orderItemCollectionFactory,
+        private readonly Logger $logger
     ) {
     }
 
@@ -91,16 +113,17 @@ class OrderPayloadBuilder
     private function items(OrderInterface $order): array
     {
         $returns = $this->returnsByOrderItem($order);
+        $orderItems = $this->orderItems($order);
         // The child line of each parent line: for a configurable, the
         // variant that was bought (PRO-3715).
         $childOf = [];
-        foreach ($order->getItems() as $orderItem) {
+        foreach ($orderItems as $orderItem) {
             if ($orderItem->getParentItemId()) {
                 $childOf[(int)$orderItem->getParentItemId()] ??= $orderItem;
             }
         }
         $items = [];
-        foreach ($order->getItems() as $orderItem) {
+        foreach ($orderItems as $orderItem) {
             // Product rows only: children of configurables carry the price on
             // the parent row, so skip items with a parent to avoid doubling.
             if ($orderItem->getParentItemId()) {
@@ -141,6 +164,37 @@ class OrderPayloadBuilder
         }
 
         return $items;
+    }
+
+    /**
+     * The order's lines.
+     *
+     * Magento unserializes every line's product_options while it loads the
+     * lines, and one stored value it cannot read (raw control characters in
+     * the JSON, say) stops the whole load with an InvalidArgumentException.
+     * The engine is never sent product_options, so the lines are then read
+     * again without that column and the order goes as usual (CON-227). The
+     * extension's log names the order by its id.
+     *
+     * @return OrderItemInterface[]
+     */
+    private function orderItems(OrderInterface $order): array
+    {
+        try {
+            return (array)$order->getItems();
+        } catch (\InvalidArgumentException) {
+            $this->logger->error('Order sent without the item options Magento could not read', [
+                'order_id' => (int)$order->getEntityId(),
+            ]);
+        }
+
+        /** @var OrderItemInterface[] $orderItems */
+        $orderItems = $this->orderItemCollectionFactory->create()
+            ->setOrderFilter((int)$order->getEntityId())
+            ->addFieldToSelect(self::ITEM_FIELDS)
+            ->getItems();
+
+        return $orderItems;
     }
 
     /**

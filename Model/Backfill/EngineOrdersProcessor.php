@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Backfill;
 
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Smaily\Connect\Model\Engine\Client;
@@ -17,7 +18,9 @@ use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 /**
  * Historical order import into the engine ingest queue. Orders whose state
  * is not representable in the engine enum are counted as processed and
- * skipped (same rule as the live observer).
+ * skipped (same rule as the live observer). An order whose row cannot be
+ * built from what Magento stores is skipped and the import goes on
+ * (SkippedRow, CON-227).
  */
 class EngineOrdersProcessor implements ProcessorInterface
 {
@@ -29,7 +32,8 @@ class EngineOrdersProcessor implements ProcessorInterface
         private readonly JobManager $jobManager,
         private readonly OrderCollectionFactory $orderCollectionFactory,
         private readonly OrderPayloadBuilder $payloadBuilder,
-        private readonly IngestQueue $ingestQueue
+        private readonly IngestQueue $ingestQueue,
+        private readonly SkippedRow $skippedRow
     ) {
     }
 
@@ -71,10 +75,17 @@ class EngineOrdersProcessor implements ProcessorInterface
             }
 
             $processed = 0;
+            $skipped = 0;
             $newCursor = $cursor;
             foreach ($orders as $order) {
                 $newCursor = max($newCursor, (int)$order->getEntityId());
-                $item = $this->payloadBuilder->build($order);
+                try {
+                    $item = $this->payloadBuilder->build($order);
+                } catch (\InvalidArgumentException | LocalizedException $exception) {
+                    $this->skippedRow->record($job, (int)$order->getEntityId(), $exception);
+                    $skipped++;
+                    continue;
+                }
                 if ($item !== null) {
                     $this->ingestQueue->enqueue(
                         Client::DOMAIN_ORDERS,
@@ -84,7 +95,7 @@ class EngineOrdersProcessor implements ProcessorInterface
                 }
                 $processed++;
             }
-            $this->jobManager->recordProgress($job, $processed, 0, (string)$newCursor);
+            $this->jobManager->recordProgress($job, $processed, $skipped, (string)$newCursor);
 
             if ($this->jobManager->isCancelled($job)) {
                 return; // Admin cancel — stop cleanly at the page boundary.

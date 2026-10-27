@@ -47,6 +47,7 @@
     var ONE_CONTACT = 'This import sends %1 contact from this website. It runs in the background, a chunk per minute, and never slows the storefront down.';
     var CONTACTS = 'This import sends %1 contacts from this website. It runs in the background, a chunk per minute, and never slows the storefront down.';
     var SYNC_OFF = 'Contact sync was off for %1, so nothing was sent from there. Turn it on and save the Contacts settings, then press Run again.';
+    var SKIPPED = 'Done, %1 of %2 synced — %3 skipped because Magento could not read them; var/log/smaily_connect.log on the server lists them by id.';
     var failures = 0;
     var passes = 0;
 
@@ -166,6 +167,7 @@
             frame,
             seen,
             blocked,
+            skipped,
             starts;
 
         log('# ' + locale);
@@ -227,6 +229,21 @@
             && seen.start === strings['Run again'] && seen.startPrimary);
         check(locale + ', stopped before an error: the hint names the button the card shows',
             seen.start !== '' && seen.verdict.indexOf(seen.start) !== -1);
+        frame.remove();
+
+        // A Campaign Intelligence import that skipped rows Magento could not
+        // read completes and says how many (CON-227).
+        if (locale !== 'en_US') {
+            check(locale + ': the skipped outcome is translated', strings[SKIPPED] !== SKIPPED);
+        }
+        skipped = catalog('completed', 1198, 1200, false);
+        skipped.skipped = 2;
+        frame = await open(page, {status: skipped});
+        seen = card(frame);
+        check(locale + ', skipped rows: the card is done and says how many it skipped',
+            seen.state === 'failures' && seen.pill === strings.Done
+            && seen.verdict === strings[SKIPPED].replace('%1', '1198').replace('%2', '1200').replace('%3', '2')
+            && seen.start === strings['Run again']);
         frame.remove();
 
         // An import that moves shows its progress as before.

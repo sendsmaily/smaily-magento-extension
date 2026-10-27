@@ -87,6 +87,10 @@
                     </arguments>
                 </block>
             </block>
+            <block class="Magento\Backend\Block\Template"
+                   name="smaily.version"
+                   template="Smaily_Connect::version.phtml"
+                   after="-"/>
         </referenceContainer>
     </body>
 </page>

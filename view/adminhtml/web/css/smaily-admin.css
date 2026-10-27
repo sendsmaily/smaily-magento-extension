@@ -186,6 +186,9 @@
 .smaily-dashboard .smaily-status-sent { color: #006400; }
 .smaily-dashboard .smaily-tile-link { display: inline-block; margin-top: 0.6rem; }
 
+/* --- Version line (CON-235): bottom of the Dashboard and Settings --------- */
+.smaily-version { margin: var(--sp-4) 0 0; font-size: var(--fs-12); color: var(--s-text-3); }
+
 /* --- Log page: failed banner + detail slide-out ----------------------------- */
 .smaily-log-failed-banner { margin-bottom: 2rem; }
 /* Details panel (PRO-3565): the design pack's 452 px right-docked panel, built

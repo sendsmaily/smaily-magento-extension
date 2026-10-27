@@ -1,0 +1,17 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * The installed extension version, a small grey line at the bottom of the
+ * Dashboard and Settings pages, so support can ask which release a store
+ * runs (CON-235). ModuleInfo::VERSION is the version the User-Agent sends,
+ * set by every version cut.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+$version = \Smaily\Connect\Model\ModuleInfo::VERSION;
+?>
+<p class="smaily-version"><?= $escaper->escapeHtml(__('Smaily Connect %1', $version)) ?></p>

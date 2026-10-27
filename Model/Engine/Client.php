@@ -110,6 +110,9 @@ class Client
      */
     private ?array $lastExchange = null;
 
+    /** Whether the last request met a 429 (see wasThrottled()). */
+    private bool $throttled = false;
+
     public function __construct(
         private readonly Settings $settings,
         private readonly HttpClientFactory $httpClientFactory,
@@ -434,6 +437,15 @@ class Client
     }
 
     /**
+     * Whether the engine answered the last request with 429 (it asked the
+     * plugin to slow down), even when a retry then went through.
+     */
+    public function wasThrottled(): bool
+    {
+        return $this->throttled;
+    }
+
+    /**
      * @param array<string, mixed>|null $body
      * @param bool $singleAttempt one short attempt, no retry and no wait (the storefront calls)
      * @param int $timeoutSeconds the whole request's bound
@@ -448,6 +460,7 @@ class Client
         int $timeoutSeconds = self::TIMEOUT_SECONDS
     ): array {
         $this->lastExchange = null;
+        $this->throttled = false;
         $retryDelays = $singleAttempt ? [] : self::RETRY_DELAYS_SECONDS;
         $options = [
             RequestOptions::TIMEOUT => $timeoutSeconds,
@@ -498,6 +511,9 @@ class Client
                 $rawBody = (string)$exception->getResponse()->getBody();
                 $this->lastExchange['response'] = ExchangeResponse::of($status, $rawBody);
                 $errorBody = $this->decodeSafely($rawBody);
+                if ($status === 429) {
+                    $this->throttled = true;
+                }
 
                 if ($status === 403 && ($errorBody['error'] ?? '') === 'tenant_inactive') {
                     // Contract §2: the key is valid, the account is not.

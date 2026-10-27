@@ -12,6 +12,7 @@ use Magento\Framework\Exception\LocalizedException;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 
@@ -26,7 +27,6 @@ class EngineOrdersProcessor implements ProcessorInterface
 {
     private const PAGE_SIZE = 100;
     private const TIME_BUDGET_SECONDS = 15;
-    private const QUEUE_BACKLOG_LIMIT = 500;
 
     public function __construct(
         private readonly JobManager $jobManager,
@@ -42,7 +42,7 @@ class EngineOrdersProcessor implements ProcessorInterface
      */
     public function process(Job $job): void
     {
-        if ($this->ingestQueue->countPending(Client::DOMAIN_ORDERS) >= self::QUEUE_BACKLOG_LIMIT) {
+        if ($this->ingestQueue->countPending(Client::DOMAIN_ORDERS) >= IngestPace::IMPORT_BACKLOG_ROWS) {
             return;
         }
 
@@ -101,7 +101,7 @@ class EngineOrdersProcessor implements ProcessorInterface
                 return; // Admin cancel — stop cleanly at the page boundary.
             }
 
-            if ($this->ingestQueue->countPending(Client::DOMAIN_ORDERS) >= self::QUEUE_BACKLOG_LIMIT) {
+            if ($this->ingestQueue->countPending(Client::DOMAIN_ORDERS) >= IngestPace::IMPORT_BACKLOG_ROWS) {
                 return;
             }
         } while (microtime(true) < $deadline);

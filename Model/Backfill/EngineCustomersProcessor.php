@@ -13,6 +13,7 @@ use Magento\Framework\Api\SearchCriteriaBuilder;
 use Magento\Framework\Api\SortOrderBuilder;
 use Magento\Framework\Exception\LocalizedException;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 
@@ -26,7 +27,6 @@ class EngineCustomersProcessor implements ProcessorInterface
 {
     private const PAGE_SIZE = 200;
     private const TIME_BUDGET_SECONDS = 15;
-    private const QUEUE_BACKLOG_LIMIT = 500;
 
     public function __construct(
         private readonly JobManager $jobManager,
@@ -44,7 +44,7 @@ class EngineCustomersProcessor implements ProcessorInterface
      */
     public function process(Job $job): void
     {
-        if ($this->ingestQueue->countPending(Client::DOMAIN_CUSTOMERS) >= self::QUEUE_BACKLOG_LIMIT) {
+        if ($this->ingestQueue->countPending(Client::DOMAIN_CUSTOMERS) >= IngestPace::IMPORT_BACKLOG_ROWS) {
             return;
         }
 
@@ -97,7 +97,7 @@ class EngineCustomersProcessor implements ProcessorInterface
                 return; // Admin cancel — stop cleanly at the page boundary.
             }
 
-            if ($this->ingestQueue->countPending(Client::DOMAIN_CUSTOMERS) >= self::QUEUE_BACKLOG_LIMIT) {
+            if ($this->ingestQueue->countPending(Client::DOMAIN_CUSTOMERS) >= IngestPace::IMPORT_BACKLOG_ROWS) {
                 return;
             }
         } while (microtime(true) < $deadline);

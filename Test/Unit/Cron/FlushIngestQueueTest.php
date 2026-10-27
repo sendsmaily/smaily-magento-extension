@@ -16,6 +16,7 @@ use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
+use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
@@ -30,6 +31,10 @@ class FlushIngestQueueTest extends TestCase
     private Settings&MockObject $settings;
     private CatalogIngest&MockObject $catalogIngest;
     private ProfilingConsent&MockObject $profilingConsent;
+    private IngestPace&MockObject $pace;
+
+    /** @var string[] the domains claimBatch was asked for, in order */
+    private array $claims = [];
 
     /** @var array<int, array<string, mixed>> payloads by event id (decodePayload stub) */
     private array $payloads = [];
@@ -42,6 +47,8 @@ class FlushIngestQueueTest extends TestCase
         $this->settings->method('isSendingAllowed')->willReturn(true);
         $this->catalogIngest = $this->createMock(CatalogIngest::class);
         $this->profilingConsent = $this->createMock(ProfilingConsent::class);
+        $this->pace = $this->createMock(IngestPace::class);
+        $this->pace->method('hasTime')->willReturn(true);
         $this->queue->method('decodePayload')->willReturnCallback(
             fn (IngestEvent $event): array => $this->payloads[(int)$event->getId()] ?? ['sku' => 'X']
         );
@@ -168,7 +175,8 @@ class FlushIngestQueueTest extends TestCase
             $this->client,
             new OptOutReplay($this->profilingConsent),
             new Json(),
-            $this->createMock(Logger::class)
+            $this->createMock(Logger::class),
+            $this->pace
         ))->execute();
     }
 
@@ -340,12 +348,136 @@ class FlushIngestQueueTest extends TestCase
     }
 
     /**
+     * CON-232: the run sends batch after batch, one domain after another in
+     * turn, until every domain's queue is empty — not one batch a minute.
+     */
+    public function testTheRunSendsUntilTheQueueIsEmptyTakingTheDomainsInTurn(): void
+    {
+        $this->stubBatches([
+            Client::DOMAIN_CATALOG => [[$this->createEvent(1)], [$this->createEvent(2)], [$this->createEvent(3)]],
+            Client::DOMAIN_ORDERS => [
+                [$this->createEvent(4, Client::DOMAIN_ORDERS)],
+                [$this->createEvent(5, Client::DOMAIN_ORDERS)],
+            ],
+        ]);
+        $sent = [];
+        $this->client->method('ingest')->willReturnCallback(
+            static function (string $domain) use (&$sent): array {
+                $sent[] = $domain;
+
+                return ['processed' => 1, 'deduplicated' => 0, 'errors' => []];
+            }
+        );
+        $this->pace->expects(self::exactly(5))->method('awaitTurn');
+
+        $this->createCron()->execute();
+
+        self::assertSame(['catalog', 'orders', 'catalog', 'orders', 'catalog'], $sent);
+        self::assertSame(
+            [Client::DOMAIN_CATALOG => 4, Client::DOMAIN_ORDERS => 4],
+            array_intersect_key(
+                array_count_values($this->claims),
+                [Client::DOMAIN_CATALOG => true, Client::DOMAIN_ORDERS => true]
+            ),
+            'Each domain is asked until a round finds nothing left'
+        );
+    }
+
+    public function testTheRunStopsWhenItsBudgetIsSpent(): void
+    {
+        $this->pace = $this->createMock(IngestPace::class);
+        $this->pace->method('hasTime')->willReturnOnConsecutiveCalls(true, true, false);
+        $this->stubBatches([
+            Client::DOMAIN_CATALOG => [[$this->createEvent(1)], [$this->createEvent(2)], [$this->createEvent(3)]],
+        ]);
+        $this->client->expects(self::once())->method('ingest')
+            ->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+
+        $this->createCron()->execute();
+
+        // catalog sent, customers asked (empty), then the budget is spent.
+        self::assertSame([Client::DOMAIN_CATALOG, Client::DOMAIN_CUSTOMERS], $this->claims);
+    }
+
+    /**
+     * A 429 a retry got past still ends the run: the engine asked to slow
+     * down, and the rest waits for the next run.
+     */
+    public function testTheRunStopsWhenTheEngineAsksToSlowDown(): void
+    {
+        $this->stubBatches([
+            Client::DOMAIN_CATALOG => [[$this->createEvent(1)], [$this->createEvent(2)]],
+            Client::DOMAIN_ORDERS => [[$this->createEvent(3, Client::DOMAIN_ORDERS)]],
+        ]);
+        $this->client->expects(self::once())->method('ingest')
+            ->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+        $this->client->method('wasThrottled')->willReturn(true);
+
+        $this->queue->expects(self::once())->method('markSent');
+
+        $this->createCron()->execute();
+
+        self::assertSame([Client::DOMAIN_CATALOG], $this->claims);
+    }
+
+    /**
+     * A batch that failed in transport (429 or 5xx after the retries, or no
+     * answer) or a whole-batch 4xx ends the run: a key the engine no longer
+     * takes fails one batch a run, not the whole queue.
+     *
+     * @dataProvider runEndingFailures
+     */
+    public function testAFailedBatchEndsTheRun(\Throwable $failure): void
+    {
+        $this->stubBatches([
+            Client::DOMAIN_CATALOG => [[$this->createEvent(1)], [$this->createEvent(2)]],
+            Client::DOMAIN_ORDERS => [[$this->createEvent(3, Client::DOMAIN_ORDERS)]],
+        ]);
+        $this->client->expects(self::once())->method('ingest')->willThrowException($failure);
+
+        $this->createCron()->execute();
+
+        self::assertSame([Client::DOMAIN_CATALOG], $this->claims);
+    }
+
+    /**
+     * @return array<string, array{\Throwable}>
+     */
+    public static function runEndingFailures(): array
+    {
+        return [
+            'transport' => [new EngineTransportException('engine down', 503)],
+            'whole-batch 4xx' => [new EngineRequestException('HTTP 401: invalid key', 401)],
+        ];
+    }
+
+    /**
+     * One batch per domain, handed out once, as the queue does.
+     *
      * @param array<string, IngestEvent[]> $byDomain
      */
     private function stubClaims(array $byDomain): void
     {
+        $this->stubBatches(array_map(static fn (array $batch): array => [$batch], $byDomain));
+    }
+
+    /**
+     * Batches per domain, each handed out once and in order, as the queue
+     * does; the domains' claims are recorded in $this->claims.
+     *
+     * @param array<string, IngestEvent[][]> $batchesByDomain
+     */
+    private function stubBatches(array $batchesByDomain): void
+    {
         $this->queue->method('claimBatch')->willReturnCallback(
-            static fn (string $domain): array => $byDomain[$domain] ?? []
+            function (string $domain) use (&$batchesByDomain): array {
+                $this->claims[] = $domain;
+                if (empty($batchesByDomain[$domain])) {
+                    return [];
+                }
+
+                return array_shift($batchesByDomain[$domain]);
+            }
         );
     }
 
@@ -358,7 +490,8 @@ class FlushIngestQueueTest extends TestCase
             $this->client,
             new OptOutReplay($this->profilingConsent),
             new Json(),
-            $this->createMock(Logger::class)
+            $this->createMock(Logger::class),
+            $this->pace
         );
     }
 

@@ -15,16 +15,67 @@ use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Api\Data\OrderItemInterface;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Creditmemo;
+use Magento\Sales\Model\ResourceModel\Order\Item\Collection as OrderItemCollection;
+use Magento\Sales\Model\ResourceModel\Order\Item\CollectionFactory as OrderItemCollectionFactory;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
+use Smaily\Connect\Model\Logger\Logger;
 
 class OrderPayloadBuilderTest extends TestCase
 {
     private OrderPayloadBuilder $builder;
 
+    /** @var OrderItemCollectionFactory&MockObject */
+    private OrderItemCollectionFactory $orderItemCollectionFactory;
+
+    /** @var Logger&MockObject */
+    private Logger $logger;
+
     protected function setUp(): void
     {
+        require_once __DIR__ . '/../../../Support/Stub/OrderItemCollectionFactory.php';
+        $this->orderItemCollectionFactory = $this->createMock(OrderItemCollectionFactory::class);
+        $this->logger = $this->createMock(Logger::class);
         $this->builder = $this->builderWithReturns([]);
+    }
+
+    /**
+     * CON-227: Magento unserializes every line's product_options while it
+     * loads an order's lines, and a stored value with raw control characters
+     * stops the load. The lines are then read again without that column, so
+     * the order still goes, and the extension's log names it by its id.
+     */
+    public function testAnOrderWhoseItemOptionsCannotBeReadGoesWithoutThem(): void
+    {
+        $order = $this->order([], 10.00, Order::STATE_COMPLETE);
+        $order->method('getItems')->willThrowException(new \InvalidArgumentException(
+            'Unable to unserialize value. Error: Control character error, possibly incorrectly encoded'
+        ));
+
+        $collection = $this->createMock(OrderItemCollection::class);
+        $collection->expects(self::once())->method('setOrderFilter')->with(0)->willReturnSelf();
+        $collection->expects(self::once())->method('addFieldToSelect')
+            ->with(self::callback(static fn (array $fields): bool => !in_array('product_options', $fields, true)
+                && in_array('sku', $fields, true)))
+            ->willReturnSelf();
+        $collection->method('getItems')->willReturn([$this->item('SKU-1', 1, 10.00, 0.0)]);
+        $this->orderItemCollectionFactory->method('create')->willReturn($collection);
+        $this->logger->expects(self::once())->method('error')
+            ->with('Order sent without the item options Magento could not read', ['order_id' => 0]);
+
+        $payload = $this->builder->build($order);
+
+        self::assertNotNull($payload);
+        self::assertSame([['sku' => 'SKU-1', 'qty' => 1, 'unit_price' => 10.0, 'line_total' => 10.0]], $payload['items']);
+    }
+
+    public function testAnOrderWhoseLinesLoadReadsNoSecondTime(): void
+    {
+        $this->orderItemCollectionFactory->expects(self::never())->method('create');
+        $this->logger->expects(self::never())->method('error');
+
+        self::assertNotNull($this->builder->build($this->order([['SKU-1', 1, 10.00, 0.0]], 10.00)));
     }
 
     /**
@@ -475,7 +526,7 @@ class OrderPayloadBuilderTest extends TestCase
         $resourceConnection->method('getConnection')->willReturn($connection);
         $resourceConnection->method('getTableName')->willReturnArgument(0);
 
-        return new OrderPayloadBuilder($resourceConnection);
+        return new OrderPayloadBuilder($resourceConnection, $this->orderItemCollectionFactory, $this->logger);
     }
 
     /**

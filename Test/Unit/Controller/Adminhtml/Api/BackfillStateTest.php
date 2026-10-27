@@ -261,6 +261,35 @@ class BackfillStateTest extends TestCase
         self::assertSame([], $this->response['sync_inactive']);
     }
 
+    /**
+     * CON-227: a Campaign Intelligence import counts the rows it skipped
+     * because Magento could not read them in its failed_count; the card
+     * reads them as skipped, not as failed rows to find in the Log.
+     */
+    public function testAnEngineImportAnswersItsFailedCountAsSkipped(): void
+    {
+        $job = $this->job(Job::STATUS_COMPLETED, Job::TYPE_ORDERS);
+        $job->method('getProcessedCount')->willReturn(98);
+        $job->method('getFailedCount')->willReturn(2);
+
+        $this->controller(true, ['action' => 'status', 'job_type' => Job::TYPE_ORDERS], [$job])->execute();
+
+        self::assertSame(98, $this->response['processed']);
+        self::assertSame(2, $this->response['skipped']);
+        self::assertSame(0, $this->response['failed']);
+    }
+
+    public function testAContactsImportAnswersItsFailedCountAsFailed(): void
+    {
+        $job = $this->job(Job::STATUS_COMPLETED, Job::TYPE_CONTACTS);
+        $job->method('getFailedCount')->willReturn(3);
+
+        $this->controller(true, ['action' => 'status', 'job_type' => Job::TYPE_CONTACTS], [$job])->execute();
+
+        self::assertSame(3, $this->response['failed']);
+        self::assertSame(0, $this->response['skipped']);
+    }
+
     private function job(string $status, string $jobType = Job::TYPE_CATALOG): Job&MockObject
     {
         $job = $this->createMock(Job::class);

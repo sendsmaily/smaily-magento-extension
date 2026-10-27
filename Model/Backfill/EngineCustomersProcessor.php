@@ -11,12 +11,16 @@ namespace Smaily\Connect\Model\Backfill;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Framework\Api\SearchCriteriaBuilder;
 use Magento\Framework\Api\SortOrderBuilder;
+use Magento\Framework\Exception\LocalizedException;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 
 /**
  * Historical customer import into the engine ingest queue.
+ *
+ * A customer whose row cannot be built from what Magento stores is skipped
+ * and the import goes on (SkippedRow, CON-227).
  */
 class EngineCustomersProcessor implements ProcessorInterface
 {
@@ -30,7 +34,8 @@ class EngineCustomersProcessor implements ProcessorInterface
         private readonly SearchCriteriaBuilder $searchCriteriaBuilder,
         private readonly SortOrderBuilder $sortOrderBuilder,
         private readonly CustomerPayloadBuilder $payloadBuilder,
-        private readonly IngestQueue $ingestQueue
+        private readonly IngestQueue $ingestQueue,
+        private readonly SkippedRow $skippedRow
     ) {
     }
 
@@ -70,19 +75,23 @@ class EngineCustomersProcessor implements ProcessorInterface
             }
 
             $processed = 0;
+            $skipped = 0;
             $newCursor = $cursor;
             foreach ($customers as $customer) {
                 $newCursor = max($newCursor, (int)$customer->getId());
                 if ((string)$customer->getEmail() !== '') {
-                    $this->ingestQueue->enqueue(
-                        Client::DOMAIN_CUSTOMERS,
-                        $this->payloadBuilder->build($customer),
-                        (string)$customer->getId()
-                    );
+                    try {
+                        $item = $this->payloadBuilder->build($customer);
+                    } catch (\InvalidArgumentException | LocalizedException $exception) {
+                        $this->skippedRow->record($job, (int)$customer->getId(), $exception);
+                        $skipped++;
+                        continue;
+                    }
+                    $this->ingestQueue->enqueue(Client::DOMAIN_CUSTOMERS, $item, (string)$customer->getId());
                 }
                 $processed++;
             }
-            $this->jobManager->recordProgress($job, $processed, 0, (string)$newCursor);
+            $this->jobManager->recordProgress($job, $processed, $skipped, (string)$newCursor);
 
             if ($this->jobManager->isCancelled($job)) {
                 return; // Admin cancel — stop cleanly at the page boundary.

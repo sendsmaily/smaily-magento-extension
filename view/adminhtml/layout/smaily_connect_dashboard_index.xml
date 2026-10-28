@@ -19,6 +19,10 @@
                     <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\DashboardData</argument>
                 </arguments>
             </block>
+            <block class="Magento\Backend\Block\Template"
+                   name="smaily.version"
+                   template="Smaily_Connect::version.phtml"
+                   after="-"/>
         </referenceContainer>
     </body>
 </page>

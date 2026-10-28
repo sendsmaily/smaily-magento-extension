@@ -462,6 +462,7 @@
 "Smaily API returned code %1: %2","Smaily API tagastas koodi %1: %2"
 "Smaily Campaign Intelligence is unreachable","Smaily Campaign Intelligence pole kättesaadav"
 "Smaily Connect","Smaily Connect"
+"Smaily Connect %1","Smaily Connect %1"
 "Smaily Connect is now syncing in near-real-time. Here is where everything lives from now on:","Smaily Connect sünkroonib nüüd peaaegu reaalajas. Edaspidi leiad kõik siit:"
 "Smaily Connect is ready to set up","Smaily Connect on seadistamiseks valmis"
 "Smaily Connect is running, but %1 deliveries failed in the last 24 hours.","Smaily Connect töötab, kuid viimase 24 tunni jooksul ebaõnnestus %1 saadetist."

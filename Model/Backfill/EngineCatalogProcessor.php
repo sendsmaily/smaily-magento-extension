@@ -70,7 +70,7 @@ class EngineCatalogProcessor implements ProcessorInterface
             $newCursor = $cursor;
             foreach ($products as $product) {
                 $newCursor = max($newCursor, (int)$product->getId());
-                if ($this->catalogIngest->enqueueProduct($product)) {
+                if ($this->catalogIngest->enqueueProduct($product, (int)$job->getId())) {
                     $processed++;
                 } else {
                     $failed++;

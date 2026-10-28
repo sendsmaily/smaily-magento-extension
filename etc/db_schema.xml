@@ -64,6 +64,7 @@
         <column xsi:type="text" name="last_error" nullable="true" comment="Last Error Message"/>
         <column xsi:type="mediumtext" name="sent_payload" nullable="true" comment="Payload As Sent"/>
         <column xsi:type="mediumtext" name="last_response" nullable="true" comment="Last API Response"/>
+        <column xsi:type="int" name="job_id" unsigned="true" nullable="true" comment="Backfill Job ID (import rows)"/>
         <column xsi:type="timestamp" name="created_at" on_update="false" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
         <column xsi:type="timestamp" name="updated_at" on_update="true" nullable="false" default="CURRENT_TIMESTAMP" comment="Updated At"/>
         <constraint xsi:type="primary" referenceId="PRIMARY">
@@ -79,6 +80,10 @@
         </index>
         <index referenceId="SMAILY_INGEST_QUEUE_CREATED_AT" indexType="btree">
             <column name="created_at"/>
+        </index>
+        <index referenceId="SMAILY_INGEST_QUEUE_JOB_ID_STATUS" indexType="btree">
+            <column name="job_id"/>
+            <column name="status"/>
         </index>
     </table>
 
@@ -138,6 +143,7 @@
         <column xsi:type="int" name="total_count" unsigned="true" nullable="true" comment="Total Items"/>
         <column xsi:type="int" name="processed_count" unsigned="true" nullable="false" default="0" comment="Processed Items"/>
         <column xsi:type="int" name="failed_count" unsigned="true" nullable="false" default="0" comment="Failed Items"/>
+        <column xsi:type="int" name="sent_count" unsigned="true" nullable="true" comment="Rows The Engine Accepted (null: not counted)"/>
         <column xsi:type="varchar" name="cursor_value" nullable="true" length="255" comment="Resume Cursor"/>
         <column xsi:type="text" name="error_message" nullable="true" comment="Failure Reason"/>
         <column xsi:type="timestamp" name="started_at" on_update="false" nullable="true" comment="Started At"/>

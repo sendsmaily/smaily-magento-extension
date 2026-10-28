@@ -12,6 +12,7 @@ use Magento\Framework\Serialize\Serializer\Json;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Cron\FlushIngestQueue;
+use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
@@ -32,6 +33,7 @@ class FlushIngestQueueTest extends TestCase
     private CatalogIngest&MockObject $catalogIngest;
     private ProfilingConsent&MockObject $profilingConsent;
     private IngestPace&MockObject $pace;
+    private JobManager&MockObject $jobManager;
 
     /** @var string[] the domains claimBatch was asked for, in order */
     private array $claims = [];
@@ -49,6 +51,7 @@ class FlushIngestQueueTest extends TestCase
         $this->profilingConsent = $this->createMock(ProfilingConsent::class);
         $this->pace = $this->createMock(IngestPace::class);
         $this->pace->method('hasTime')->willReturn(true);
+        $this->jobManager = $this->createMock(JobManager::class);
         $this->queue->method('decodePayload')->willReturnCallback(
             fn (IngestEvent $event): array => $this->payloads[(int)$event->getId()] ?? ['sku' => 'X']
         );
@@ -128,6 +131,35 @@ class FlushIngestQueueTest extends TestCase
         $this->createCron($logger)->execute();
 
         self::assertSame([41, 42], $sent);
+    }
+
+    /**
+     * CON-241: an import's rows the engine accepted are counted on the job
+     * that queued them; a row refused per item, an order skipped as older
+     * than the horizon and a live row (no job) are not.
+     */
+    public function testTheRowsTheEngineAcceptedAreCountedOnTheirImportJob(): void
+    {
+        $events = [
+            $this->createEvent(51, Client::DOMAIN_ORDERS, 7),
+            $this->createEvent(52, Client::DOMAIN_ORDERS, 7),
+            $this->createEvent(53, Client::DOMAIN_ORDERS, 7),
+            $this->createEvent(54, Client::DOMAIN_ORDERS, 7),
+            $this->createEvent(55, Client::DOMAIN_ORDERS),
+            $this->createEvent(56, Client::DOMAIN_ORDERS, 8),
+        ];
+        $this->stubClaims([Client::DOMAIN_ORDERS => $events]);
+        $this->client->method('ingest')->willReturn([
+            'ok' => true,
+            'processed' => 4,
+            'deduplicated' => 0,
+            'errors' => [['index' => 1, 'field' => 'status', 'message' => 'invalid']],
+            'skipped' => 1,
+            'skipped_orders' => [['index' => 3, 'external_order_id' => '104', 'reason' => 'older_than_retention']],
+        ]);
+        $this->jobManager->expects(self::once())->method('recordSent')->with([7 => 2, 8 => 1]);
+
+        $this->createCron()->execute();
     }
 
     public function testTransportFailureReschedulesBatchNonTerminally(): void
@@ -213,7 +245,8 @@ class FlushIngestQueueTest extends TestCase
             new OptOutReplay($this->profilingConsent),
             new Json(),
             $this->createMock(Logger::class),
-            $this->pace
+            $this->pace,
+            $this->jobManager
         ))->execute();
     }
 
@@ -547,15 +580,19 @@ class FlushIngestQueueTest extends TestCase
             new OptOutReplay($this->profilingConsent),
             new Json(),
             $logger ?? $this->createMock(Logger::class),
-            $this->pace
+            $this->pace,
+            $this->jobManager
         );
     }
 
-    private function createEvent(int $id, string $domain = 'catalog'): IngestEvent&MockObject
+    private function createEvent(int $id, string $domain = 'catalog', ?int $jobId = null): IngestEvent&MockObject
     {
         $event = $this->createMock(IngestEvent::class);
         $event->method('getId')->willReturn($id);
         $event->method('getDomain')->willReturn($domain);
+        $event->method('getData')->willReturnCallback(
+            static fn (string $key = '') => $key === 'job_id' ? $jobId : null
+        );
 
         return $event;
     }

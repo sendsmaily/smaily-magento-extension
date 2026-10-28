@@ -10,6 +10,7 @@ namespace Smaily\Connect\Test\Integration\Cron;
 
 use Magento\Framework\Serialize\Serializer\Json;
 use Smaily\Connect\Cron\FlushIngestQueue;
+use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
@@ -59,6 +60,41 @@ class FlushIngestQueueTest extends IntegrationTestCase
         self::assertSame(IngestEvent::STATUS_FAILED, $rows['fi-2']['status'], 'Per-item errors are terminal');
         self::assertSame('price: must be a number', $rows['fi-2']['last_error']);
         self::assertNull($rows['fi-2']['next_retry_at']);
+    }
+
+    /**
+     * CON-241: the job of an import counts the rows the engine accepted —
+     * not a row it refused, not an order it skipped as older than the
+     * horizon; a job from before the count began keeps none.
+     */
+    public function testAnImportJobCountsTheRowsTheEngineAccepted(): void
+    {
+        $jobManager = $this->objectManager->create(JobManager::class);
+        $job = $jobManager->start('orders', 'engine', 0);
+        $jobId = (int)$job->getId();
+        $old = $jobManager->start('customers', 'engine', 0);
+        $this->connection->update('smaily_backfill_job', ['sent_count' => null], ['id = ?' => (int)$old->getId()]);
+        foreach (['o-1', 'o-2', 'o-3', 'o-4'] as $uuid) {
+            $this->queue->enqueue('orders', ['external_order_id' => $uuid], null, null, $uuid, $jobId);
+        }
+        $this->queue->enqueue('orders', ['external_order_id' => 'live'], null, null, 'live');
+        $this->queue->enqueue('customers', ['email' => 'c@example.invalid'], null, null, 'c-1', (int)$old->getId());
+
+        $client = $this->createMock(Client::class);
+        $client->method('ingest')->willReturnCallback(static fn (string $domain, array $items): array => [
+            'processed' => count($items) - ($domain === 'orders' ? 2 : 0),
+            'deduplicated' => 0,
+            'errors' => $domain === 'orders' ? [['index' => 1, 'field' => 'status', 'message' => 'invalid']] : [],
+            'skipped' => $domain === 'orders' ? 1 : 0,
+            'skipped_orders' => $domain === 'orders'
+                ? [['index' => 3, 'external_order_id' => 'o-4', 'reason' => 'older_than_retention']]
+                : [],
+        ]);
+        $this->runCron($client);
+
+        self::assertSame(2, $jobManager->get($jobId)?->getSentCount());
+        self::assertNull($jobManager->get((int)$old->getId())?->getSentCount());
+        self::assertSame(0, $this->queue->countUndelivered([$jobId]));
     }
 
     /**
@@ -468,7 +504,8 @@ class FlushIngestQueueTest extends IntegrationTestCase
             $this->createMock(OptOutReplay::class),
             $serializer,
             $logger,
-            new IngestPace()
+            new IngestPace(),
+            $this->objectManager->create(JobManager::class)
         );
     }
 

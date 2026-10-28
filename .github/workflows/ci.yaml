@@ -161,8 +161,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # The 2.4.4 line's last patch: plain 2.4.4 no longer installs as it
+        # shipped, because its metapackages (MSI, reCAPTCHA) take any 1.x
+        # module version, and today's need classes 2.4.4's framework lacks.
+        # The patch releases pin every module.
         include:
-          - magento: '2.4.4'
+          - magento: '2.4.4-p13'
             php: '8.1'
           - magento: '2.4.9'
             php: '8.4'

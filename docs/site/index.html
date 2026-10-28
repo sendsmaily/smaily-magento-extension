@@ -919,18 +919,18 @@ bin/magento cache:flush</code></pre>
         <li>A website on another Smaily account than the one saved for all websites starts only the workflows picked for it from its own account — see <a href="#setup-website">If your store has several websites</a>.</li>
       </ul>
       <h3>Discount codes</h3>
-      <p>Each automation can give every shopper their own single-use discount code in its email. The discount itself — its percentage or amount, minimum order, products, customer groups and dates — is one of your Magento cart price rules; the extension only makes each shopper's code from it. Make the rule first:</p>
+      <p>The <strong>Welcome</strong>, <strong>First order</strong> and <strong>Abandoned cart</strong> cards each have a <strong>Send a discount code</strong> box. With it ticked, every email of that automation carries the shopper's own single-use discount code. The discount itself — its percentage or amount, minimum order, products, customer groups and dates — is one of your Magento cart price rules; the extension makes a new code from it for each shopper. Set it up like this:</p>
       <ol>
         <li>In Magento, open <span class="path">Marketing &gt; Cart Price Rules</span> and press <strong>Add New Rule</strong>. Set the discount and its conditions, set <strong>Coupon</strong> to <strong>Specific Coupon</strong>, tick <strong>Use Auto Generation</strong>, make the rule active for the websites the automation sends for, and save it.</li>
         <li>Reload this tab (or the initial setup's Automations step). On the automation's card, tick <strong>Send a discount code</strong>.</li>
-        <li>Pick the rule under <strong>Cart price rule</strong> and set <strong>Valid for (days)</strong>. The list shows only the active rules with <strong>Specific Coupon</strong> and <strong>Use Auto Generation</strong> for those websites; without one, the card says how to make it.</li>
+        <li>Pick the rule under <strong>Cart price rule</strong> and set <strong>Valid for (days)</strong> (1–365, 7 by default). The list shows only the active rules with <strong>Specific Coupon</strong> and <strong>Use Auto Generation</strong> for those websites. With none, the card says how to create one and links to Magento's new-rule page.</li>
         <li>Press <strong>Save Automations</strong>, and put the code and its last day into the workflow's email — see <a href="#ef-discount">Discount codes</a>.</li>
       </ol>
       <ul>
-        <li>A code works once, under the rule's conditions, until the end of its last valid day: that many days after the email, in the store's timezone, and never after the rule's <strong>To</strong> date. After that day the cart answers with Magento's own "The coupon code isn't valid".</li>
-        <li>Each email gets one code: a send that is retried, or sent again from the Log, sends the same code. A skipped abandoned-cart reminder makes no code.</li>
-        <li>The codes take the format under <span class="path">Stores &gt; Configuration &gt; Customers &gt; Promotions &gt; Auto Generated Specific Coupon Codes</span> and are listed under the rule's <strong>Manage Coupon Codes</strong>.</li>
-        <li>If the rule gives no code when the email goes — deleted, inactive, without <strong>Use Auto Generation</strong>, not for that website, or outside its dates — the email goes without one, and the send's <strong>Details</strong> in the Log say why.</li>
+        <li>A code works <strong>once</strong>, under the rule's conditions, until the end of its last valid day: that many days after the email, in your store's timezone (<span class="path">Stores &gt; Configuration &gt; General &gt; General &gt; Locale Options &gt; Timezone</span>), and never after the rule's <strong>To</strong> date. After that day, or once it was used, the cart answers with Magento's own "The coupon code isn't valid".</li>
+        <li>The code is made when the email is sent. A send that is retried, or sent again from the Log, gets the same code. A skipped abandoned-cart reminder, or an automation with no workflow, makes none.</li>
+        <li>The codes are ordinary coupon codes of the rule, in the format under <span class="path">Stores &gt; Configuration &gt; Customers &gt; Promotions &gt; Auto Generated Specific Coupon Codes</span>, listed under the rule's <strong>Manage Coupon Codes</strong>.</li>
+        <li>If the rule can't give a code when the email goes — deleted, inactive, without <strong>Use Auto Generation</strong>, not for that website, or outside its dates — the email goes without a code, and the row's <strong>Details</strong> in the Log say why.</li>
         <li>The discount code settings belong to the automations: a website with its own automations has its own (see <a href="#setup-website">If your store has several websites</a>).</li>
       </ul>
     </div>
@@ -956,18 +956,18 @@ bin/magento cache:flush</code></pre>
         <li>Veebisait, mis kasutab muud Smaily kontot kui kõigi veebisaitide jaoks salvestatu, käivitab ainult need töövood, mis on talle tema enda kontolt valitud — vt <a href="#setup-website">Kui poel on mitu veebisaiti</a>.</li>
       </ul>
       <h3>Sooduskoodid</h3>
-      <p>Iga automaatika võib anda oma e-kirjas igale ostjale tema enda ühekordse sooduskoodi. Soodustus ise — selle protsent või summa, minimaalne tellimus, tooted, kliendigrupid ja kuupäevad — on üks sinu Magento ostukorvi hinnareeglitest; laiendus loob sellest ainult iga ostja koodi. Loo kõigepealt reegel:</p>
+      <p>Kaartidel <strong>Tervitus</strong>, <strong>Esimene tellimus</strong> ja <strong>Hüljatud ostukorv</strong> on igaühel märkeruut <strong>Saada sooduskood</strong>. Kui see on märgitud, kannab selle automaatika iga e-kiri ostja enda ühekordset sooduskoodi. Soodustus ise — selle protsent või summa, minimaalne tellimus, tooted, kliendigrupid ja kuupäevad — on üks sinu Magento ostukorvi hinnareeglitest; laiendus loob sellest igale ostjale uue koodi. Seadista see nii:</p>
       <ol>
         <li>Ava Magentos <span class="path">Marketing &gt; Cart Price Rules</span> ja vajuta <strong>Add New Rule</strong>. Määra soodustus ja selle tingimused, vali väljale <strong>Coupon</strong> <strong>Specific Coupon</strong>, märgi <strong>Use Auto Generation</strong>, tee reegel aktiivseks veebisaitidel, mille jaoks automaatika saadab, ja salvesta see.</li>
         <li>Laadi see vahekaart uuesti (või algseadistuse samm Automaatikad). Märgi automaatika kaardil <strong>Saada sooduskood</strong>.</li>
-        <li>Vali reegel väljal <strong>Ostukorvi hinnareegel</strong> ja määra <strong>Kehtib (päeva)</strong>. Loendis on ainult nende veebisaitide aktiivsed reeglid, millel on <strong>Specific Coupon</strong> ja <strong>Use Auto Generation</strong>; kui sellist pole, ütleb kaart, kuidas see luua.</li>
+        <li>Vali reegel väljal <strong>Ostukorvi hinnareegel</strong> ja määra <strong>Kehtib (päeva)</strong> (1–365, vaikimisi 7). Loendis on ainult nende veebisaitide aktiivsed reeglid, millel on <strong>Specific Coupon</strong> ja <strong>Use Auto Generation</strong>. Kui ühtegi pole, ütleb kaart, kuidas see luua, ja viitab Magento uue reegli lehele.</li>
         <li>Vajuta <strong>Salvesta automaatikad</strong> ja lisa kood ning selle viimane päev töövoo e-kirja — vt <a href="#ef-discount">Sooduskoodid</a>.</li>
       </ol>
       <ul>
-        <li>Kood kehtib üks kord, reegli tingimustel, kuni oma viimase kehtivuspäeva lõpuni: nii mitu päeva pärast e-kirja, poe ajavööndis, ja mitte kunagi pärast reegli kuupäeva <strong>To</strong>. Pärast seda päeva vastab ostukorv Magento enda teatega „The coupon code isn't valid“.</li>
-        <li>Iga e-kiri saab ühe koodi: uuesti proovitud või logist uuesti saadetud saatmine saadab sama koodi. Vahele jäetud hüljatud ostukorvi meeldetuletus koodi ei loo.</li>
-        <li>Koodid on kujul, mis on määratud menüüs <span class="path">Stores &gt; Configuration &gt; Customers &gt; Promotions &gt; Auto Generated Specific Coupon Codes</span>, ja need on loetletud reegli jaotises <strong>Manage Coupon Codes</strong>.</li>
-        <li>Kui reegel e-kirja saatmise ajal koodi ei anna — kustutatud, mitteaktiivne, ilma <strong>Use Auto Generation</strong>'ita, mitte selle veebisaidi jaoks või väljaspool oma kuupäevi —, läheb e-kiri ilma koodita ja logi saatmise <strong>Üksikasjad</strong> ütlevad, miks.</li>
+        <li>Kood kehtib <strong>üks kord</strong>, reegli tingimustel, kuni oma viimase kehtivuspäeva lõpuni: nii mitu päeva pärast e-kirja, su poe ajavööndis (<span class="path">Stores &gt; Configuration &gt; General &gt; General &gt; Locale Options &gt; Timezone</span>), ja mitte kunagi pärast reegli kuupäeva <strong>To</strong>. Pärast seda päeva või pärast kasutamist vastab ostukorv Magento enda teatega „The coupon code isn't valid“.</li>
+        <li>Kood luuakse e-kirja saatmisel. Uuesti proovitud või logist uuesti saadetud saatmine saab sama koodi. Vahele jäetud hüljatud ostukorvi meeldetuletus või töövoota automaatika koodi ei loo.</li>
+        <li>Koodid on reegli tavalised kupongikoodid, kujul, mis on määratud menüüs <span class="path">Stores &gt; Configuration &gt; Customers &gt; Promotions &gt; Auto Generated Specific Coupon Codes</span>, ja need on loetletud reegli jaotises <strong>Manage Coupon Codes</strong>.</li>
+        <li>Kui reegel ei saa e-kirja saatmise ajal koodi anda — kustutatud, mitteaktiivne, ilma <strong>Use Auto Generation</strong>'ita, mitte selle veebisaidi jaoks või väljaspool oma kuupäevi —, läheb e-kiri ilma koodita ja logi rea <strong>Üksikasjad</strong> ütlevad, miks.</li>
         <li>Sooduskoodi seaded kuuluvad automaatikate juurde: veebisaidil, millel on oma automaatikad, on ka oma sooduskoodi seaded (vt <a href="#setup-website">Kui poel on mitu veebisaiti</a>).</li>
       </ul>
     </div>
@@ -1382,33 +1382,33 @@ window.smailyConnect.consentOverride = function () {
   <div class="sub" id="ef-discount">
     <h2><span data-lang="en">Discount codes</span><span data-lang="et">Sooduskoodid</span></h2>
     <div data-lang="en">
-      <p>Sent with an automation whose <strong>Send a discount code</strong> is on (see <a href="#set-automations">Automations</a>), each time it makes a code. Otherwise left out, so the code an earlier email gave stays on the contact. Put them in the workflow's email, for example <code>{{ welcome_coupon_code }}</code>, valid until <code>{{ welcome_coupon_expires_at }}</code>. The last day is a date, <code>YYYY-MM-DD</code>, in the store's timezone (not UTC): the code works until the end of that day.</p>
+      <p>Put them in the workflow's email, for example <code>{{ welcome_coupon_code }}</code>, valid until <code>{{ welcome_coupon_expires_at }}</code>.</p>
       <div class="tw">
         <table>
           <thead><tr><th scope="col">Field</th><th scope="col">Value</th></tr></thead>
           <tbody>
-            <tr><td><code>welcome_coupon_code</code></td><td>The shopper's single-use code from the <strong>Welcome</strong> email.</td></tr>
-            <tr><td><code>welcome_coupon_expires_at</code></td><td>The last day that code is valid.</td></tr>
-            <tr><td><code>first_order_coupon_code</code></td><td>The shopper's single-use code from the <strong>First order</strong> email.</td></tr>
-            <tr><td><code>first_order_coupon_expires_at</code></td><td>The last day that code is valid.</td></tr>
-            <tr><td><code>abandoned_cart_coupon_code</code></td><td>The shopper's single-use code from the <strong>Abandoned cart</strong> email.</td></tr>
-            <tr><td><code>abandoned_cart_coupon_expires_at</code></td><td>The last day that code is valid.</td></tr>
+            <tr><td><code>welcome_coupon_code</code></td><td>The shopper's single-use discount code from the <strong>Welcome</strong> email, when <a href="#set-automations">Send a discount code</a> is on and a code was made. Left out otherwise, so the code an earlier email gave stays on the contact.</td></tr>
+            <tr><td><code>welcome_coupon_expires_at</code></td><td>That code's last valid day, <code>YYYY-MM-DD</code> in your store's timezone (not UTC): the code works until the end of that day.</td></tr>
+            <tr><td><code>first_order_coupon_code</code></td><td>The shopper's single-use discount code from the <strong>First order</strong> email, when <a href="#set-automations">Send a discount code</a> is on and a code was made. Left out otherwise, so the code an earlier email gave stays on the contact.</td></tr>
+            <tr><td><code>first_order_coupon_expires_at</code></td><td>That code's last valid day, <code>YYYY-MM-DD</code> in your store's timezone (not UTC): the code works until the end of that day.</td></tr>
+            <tr><td><code>abandoned_cart_coupon_code</code></td><td>The shopper's single-use discount code from the <strong>Abandoned cart</strong> email, when <a href="#set-automations">Send a discount code</a> is on and a code was made. Left out otherwise, so the code an earlier email gave stays on the contact.</td></tr>
+            <tr><td><code>abandoned_cart_coupon_expires_at</code></td><td>That code's last valid day, <code>YYYY-MM-DD</code> in your store's timezone (not UTC): the code works until the end of that day.</td></tr>
           </tbody>
         </table>
       </div>
     </div>
     <div data-lang="et">
-      <p>Saadetakse automaatikaga, mille <strong>Saada sooduskood</strong> on sees (vt <a href="#set-automations">Automaatikad</a>), iga kord, kui see koodi loob. Muidu ei saadeta, nii et varasema e-kirja kood jääb kontaktile alles. Lisa need töövoo e-kirja, näiteks <code>{{ welcome_coupon_code }}</code>, kehtib kuni <code>{{ welcome_coupon_expires_at }}</code>. Viimane päev on kuupäev, <code>YYYY-MM-DD</code>, poe ajavööndis (mitte UTC-s): kood kehtib selle päeva lõpuni.</p>
+      <p>Lisa need töövoo e-kirja, näiteks <code>{{ welcome_coupon_code }}</code>, kehtib kuni <code>{{ welcome_coupon_expires_at }}</code>.</p>
       <div class="tw">
         <table>
           <thead><tr><th scope="col">Väli</th><th scope="col">Väärtus</th></tr></thead>
           <tbody>
-            <tr><td><code>welcome_coupon_code</code></td><td>Ostja ühekordne kood automaatika <strong>Tervitus</strong> e-kirjast.</td></tr>
-            <tr><td><code>welcome_coupon_expires_at</code></td><td>Selle koodi viimane kehtivuspäev.</td></tr>
-            <tr><td><code>first_order_coupon_code</code></td><td>Ostja ühekordne kood automaatika <strong>Esimene tellimus</strong> e-kirjast.</td></tr>
-            <tr><td><code>first_order_coupon_expires_at</code></td><td>Selle koodi viimane kehtivuspäev.</td></tr>
-            <tr><td><code>abandoned_cart_coupon_code</code></td><td>Ostja ühekordne kood automaatika <strong>Hüljatud ostukorv</strong> e-kirjast.</td></tr>
-            <tr><td><code>abandoned_cart_coupon_expires_at</code></td><td>Selle koodi viimane kehtivuspäev.</td></tr>
+            <tr><td><code>welcome_coupon_code</code></td><td>Ostja ühekordne sooduskood automaatika <strong>Tervitus</strong> e-kirjast, kui <a href="#set-automations">Saada sooduskood</a> on sees ja kood loodi. Muidu ei saadeta, nii et varasema e-kirja kood jääb kontaktile alles.</td></tr>
+            <tr><td><code>welcome_coupon_expires_at</code></td><td>Selle koodi viimane kehtivuspäev, <code>YYYY-MM-DD</code> su poe ajavööndis (mitte UTC-s): kood kehtib selle päeva lõpuni.</td></tr>
+            <tr><td><code>first_order_coupon_code</code></td><td>Ostja ühekordne sooduskood automaatika <strong>Esimene tellimus</strong> e-kirjast, kui <a href="#set-automations">Saada sooduskood</a> on sees ja kood loodi. Muidu ei saadeta, nii et varasema e-kirja kood jääb kontaktile alles.</td></tr>
+            <tr><td><code>first_order_coupon_expires_at</code></td><td>Selle koodi viimane kehtivuspäev, <code>YYYY-MM-DD</code> su poe ajavööndis (mitte UTC-s): kood kehtib selle päeva lõpuni.</td></tr>
+            <tr><td><code>abandoned_cart_coupon_code</code></td><td>Ostja ühekordne sooduskood automaatika <strong>Hüljatud ostukorv</strong> e-kirjast, kui <a href="#set-automations">Saada sooduskood</a> on sees ja kood loodi. Muidu ei saadeta, nii et varasema e-kirja kood jääb kontaktile alles.</td></tr>
+            <tr><td><code>abandoned_cart_coupon_expires_at</code></td><td>Selle koodi viimane kehtivuspäev, <code>YYYY-MM-DD</code> su poe ajavööndis (mitte UTC-s): kood kehtib selle päeva lõpuni.</td></tr>
           </tbody>
         </table>
       </div>
@@ -2202,7 +2202,7 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
           <thead><tr><th scope="col">Goes to</th><th scope="col">Data</th><th scope="col">When</th></tr></thead>
           <tbody>
             <tr><td><strong>Smaily</strong></td><td>Email, subscription status, store names, language and the <a href="#ef-contact">extra fields you tick</a>.</td><td>With contact sync on, for the contacts your sync mode covers.</td></tr>
-            <tr><td><strong>Smaily</strong></td><td>Automation fields: the first order's number and total; the abandoned cart's products and recovery link; the automation dates.</td><td>When an automation you enabled runs.</td></tr>
+            <tr><td><strong>Smaily</strong></td><td>Automation fields: the first order's number and total; the abandoned cart's products and recovery link; the discount code and its last day; the automation dates.</td><td>When an automation you enabled runs.</td></tr>
             <tr><td><strong>Campaign Intelligence</strong></td><td>Products (no personal data).</td><td>When connected.</td></tr>
             <tr><td><strong>Campaign Intelligence</strong></td><td>Customers: email, name, country, phone, language, customer ID, account creation date.</td><td>When connected.</td></tr>
             <tr><td><strong>Campaign Intelligence</strong></td><td>Orders: order number, the buyer's email, date, total, currency, status, items (SKU, quantity, price) and returned items; plus the recommendation-click data of <a href="#set-attribution">attribution</a>.</td><td>When connected.</td></tr>
@@ -2211,6 +2211,7 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
         </table>
       </div>
       <p>Your Magento database also keeps the delivery queues and the Log (sent rows 30 days, failed rows 90), and a small record of which carts were dealt with. While the abandoned-cart automation is on, the email a guest types on Magento's checkout is saved to the cart <em>before</em> the guest submits it; it reaches Smaily only with a reminder, and stays on the cart until Magento deletes the cart (its <strong>Quote Lifetime</strong> setting). Mention this in your privacy notice.</p>
+      <p><strong>Discount codes</strong> — when an automation's <a href="#set-automations">Send a discount code</a> is on, the single-use code the extension makes for a shopper is one of the cart price rule's coupon codes in Magento. The code holds no email address; the Log row of the email it went out in links it to the shopper. A used code stays with your store's coupon codes. An erasure deletes the shopper's unused codes (see <a href="#pr-gdpr">Export and erasure</a>).</p>
     </div>
     <div data-lang="et">
       <div class="tw">
@@ -2218,7 +2219,7 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
           <thead><tr><th scope="col">Kuhu</th><th scope="col">Andmed</th><th scope="col">Millal</th></tr></thead>
           <tbody>
             <tr><td><strong>Smaily</strong></td><td>E-post, tellimuse olek, poe nimed, keel ja <a href="#ef-contact">sinu märgitud lisaväljad</a>.</td><td>Kui kontaktide sünkroonimine on sees, sinu sünkroonimisrežiimi hõlmatud kontaktide kohta.</td></tr>
-            <tr><td><strong>Smaily</strong></td><td>Automaatikate väljad: esimese tellimuse number ja summa; hüljatud ostukorvi tooted ja taastamislink; automaatikate kuupäevad.</td><td>Kui sinu lubatud automaatika käivitub.</td></tr>
+            <tr><td><strong>Smaily</strong></td><td>Automaatikate väljad: esimese tellimuse number ja summa; hüljatud ostukorvi tooted ja taastamislink; sooduskood ja selle viimane kehtivuspäev; automaatikate kuupäevad.</td><td>Kui sinu lubatud automaatika käivitub.</td></tr>
             <tr><td><strong>Campaign Intelligence</strong></td><td>Tooted (isikuandmeid pole).</td><td>Kui ühendatud.</td></tr>
             <tr><td><strong>Campaign Intelligence</strong></td><td>Kliendid: e-post, nimi, riik, telefon, keel, kliendi ID, konto loomise kuupäev.</td><td>Kui ühendatud.</td></tr>
             <tr><td><strong>Campaign Intelligence</strong></td><td>Tellimused: tellimuse number, ostja e-post, kuupäev, summa, valuuta, olek, tooted (SKU, kogus, hind) ja tagastatud tooted; lisaks <a href="#set-attribution">omistamise</a> soovituskliki andmed.</td><td>Kui ühendatud.</td></tr>
@@ -2227,6 +2228,7 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
         </table>
       </div>
       <p>Sinu Magento andmebaas hoiab ka saatmisjärjekordi ja logi (saadetud read 30 päeva, ebaõnnestunud 90) ning väikest kirjet selle kohta, milliste ostukorvidega on tegeletud. Kui hüljatud ostukorvi automaatika on sees, salvestatakse e-post, mille külaline Magento kassas sisestab, ostukorvile <em>enne</em>, kui külaline selle esitab; Smailyni jõuab see ainult koos meeldetuletusega ja jääb ostukorvile, kuni Magento ostukorvi kustutab (selle seade <strong>Quote Lifetime</strong>). Maini seda oma privaatsusteates.</p>
+      <p><strong>Sooduskoodid</strong> — kui automaatika <a href="#set-automations">Saada sooduskood</a> on sees, on laienduse ostjale loodud ühekordne kood üks ostukorvi hinnareegli kupongikoodidest Magentos. Koodil endal e-posti aadressi ei ole; ostjaga seob selle logi rida e-kirjast, millega kood saadeti. Kasutatud kood jääb su poe kupongikoodide hulka. Kustutamine kustutab ostja kasutamata koodid (vt <a href="#pr-gdpr">Eksport ja kustutamine</a>).</p>
     </div>
   </div>
 
@@ -2300,6 +2302,7 @@ bin/magento smaily:gdpr erase shopper@example.com --force   # Art. 17</code></pr
         <li>removes the visitor token and the session identifier from the recommendation record of the shopper's orders — the orders placed with the address and those of a customer account that has it. The orders stay, and so does which recommendation or email led to each sale;</li>
         <li>erases the shopper in Campaign Intelligence.</li>
       </ul>
+      <p>The <strong>discount codes</strong> the extension made for that address are covered too. The export lists each one: the code, when it was made, its last valid day and whether it was used. The erasure deletes the codes that were never used. A used code stays, because its order still names it; the code holds no email address, and the erasure anonymizes the Log rows that linked it to the shopper. Codes you generated yourself in Magento are never changed. A code is found while the email it went out in is still in the Log.</p>
       <p>It prints one line per place it reached. The local part runs first; if Campaign Intelligence is unreachable or the account is deactivated, the command says so — run it again later to finish. Running it twice is harmless.</p>
       <p>The command does not touch Magento's own customer data (use Magento's tools) or the Smaily contact (delete it in Smaily).</p>
     </div>
@@ -2315,6 +2318,7 @@ bin/magento smaily:gdpr erase shopper@example.com --force   # art 17</code></pre
         <li>eemaldab ostja tellimuste soovituskirjest külastajatunnuse ja seansitunnuse — nii selle aadressiga esitatud tellimustelt kui ka selle aadressiga kliendikonto tellimustelt. Tellimused jäävad alles, samuti see, milline soovitus või e-kiri iga ostuni viis;</li>
         <li>kustutab ostja Campaign Intelligence'ist.</li>
       </ul>
+      <p>Eksport ja kustutamine hõlmavad ka <strong>sooduskoode</strong>, mille laiendus selle aadressi jaoks lõi. Eksport loetleb iga koodi: koodi, selle loomise aja, viimase kehtivuspäeva ning kas seda on kasutatud. Kustutamine kustutab koodid, mida pole kunagi kasutatud. Kasutatud kood jääb alles, sest tellimus viitab sellele; koodil endal e-posti aadressi ei ole ja kustutamine anonüümib logi read, mis seda ostjaga sidusid. Magentos ise loodud koode ei muudeta kunagi. Kood leitakse seni, kuni e-kiri, millega see saadeti, on veel logis.</p>
       <p>See väljastab ühe rea iga koha kohta, kuhu jõudis. Kohalik osa käib esimesena; kui Campaign Intelligence on kättesaamatu või konto deaktiveeritud, ütleb käsk seda — käivita see hiljem uuesti, et lõpetada. Kahekordne käivitamine ei tee kahju.</p>
       <p>Käsk ei puuduta Magento enda kliendiandmeid (kasuta Magento tööriistu) ega Smaily kontakti (kustuta see Smailys).</p>
     </div>

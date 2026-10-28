@@ -23,7 +23,8 @@ use Symfony\Component\Console\Output\OutputInterface;
  *
  * Data-subject tooling: Art. 15 export and Art. 17 erasure, covering both
  * the Campaign Intelligence record and the module's OWN local tables — the
- * two delivery queues and the abandoned-cart side table (PRO-2452).
+ * two delivery queues and the abandoned-cart side table (PRO-2452) — and
+ * the discount codes the module made for the address (CON-225).
  * Idempotent: repeating either is safe. Smaily marketing-contact deletion
  * is done in the Smaily UI; Magento's own customer data is handled by
  * Magento's native tooling.

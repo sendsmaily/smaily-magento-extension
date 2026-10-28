@@ -47,16 +47,17 @@ initial setup has the **Storefront URL** field on its **Connect** step
    that mode — §1.
 3. Connect Campaign Intelligence on the initial setup's **Intelligence**
    step; connecting starts the catalog import with the storefront's product
-   links, then the customers import — §2.
+   links, then the customers import, then the orders import (newest first)
+   — §2.
 4. Run the product-link check: `docs/HEADLESS_STOREFRONTS.md`, "Before
    switching anything on", step 2, and §2's last row (one catalog entry's
    product link and image link open on the storefront).
 5. Once the check passes, switch the abandoned-cart reminder on:
    **Settings > Automations** → tick **Enabled** on **Abandoned cart** (its
    workflow is mapped in the initial setup, §1) → **Save Automations**.
-6. Check that the customers import (started by connecting) ends *Done*, and
-   start the order history import, if wanted — §2, **Historical imports to
-   Campaign Intelligence**.
+6. Check that the customers and orders imports (started by connecting) end
+   *Done* — §2, **Historical imports to Campaign Intelligence**. The Orders
+   card says when the last 18 months are in.
 7. The engine operator switches the 25% holdout on before activation — §2.
    This is an engine-side step: Smaily Connect has no control for it.
 
@@ -114,7 +115,7 @@ initial setup's Intelligence step:
 | Open the admin notifications (the bell at the top of the admin page). | "Smaily Connect is ready to set up" is no longer listed as unread — finishing the initial setup marks it as read. |
 | On the server: `bin/magento smaily:engine:ping`. | `Connected. Tenant: …, engine version: …, ping: {…}`. "Ping failed: …" is red — see §9. |
 | Dashboard. | Connection strip: **Smaily** and **Campaign Intelligence** both **Connected**; **Browse tracking** shows **Script live on storefront**. |
-| **Settings > Intelligence** → **Historical imports to Campaign Intelligence**: the Catalog and Customers cards (both started by connecting, unless held back). **Start import** on the Orders card if the store's order history is wanted (a held-back catalog: **Run again** on the Catalog card when it should go). | Live sync covers changes from now on only. Each card shows *Running* with "n of total" under its progress bar and ends *Done* — "Done, n of total synced." — one chunk per cron minute. A held-back Catalog card shows *Canceled*. |
+| **Settings > Intelligence** → **Historical imports to Campaign Intelligence**: the Catalog, Customers and Orders cards (all started by connecting, unless held back or canceled; a held-back catalog: **Run again** on the Catalog card when it should go). | Live sync covers changes from now on only. Each card shows *Running* with "n of total" under its progress bar and ends *Done* — "Done, n of total synced." — one chunk per cron minute. A held-back Catalog card shows *Canceled*. |
 | After the Customers import ends *Done*, and before the engine side activates the store: the engine operator switches the holdout on — 25% of customers. | An engine-side step: Smaily Connect has no control for the holdout. The engine side confirms the holdout is on before activation; note it in PRO-2474. |
 | Once the catalog has entries in the engine (the Catalog import, or a product saved since connecting): in the engine tenant, open one catalog entry's image link and its product link. | Both open on the storefront: the image shows, the product page loads. |
 | The first night after connecting (03:30 store time): **Log**, one *catalog_manifest* row. | The nightly product list leaves out disabled products. The catalog import sent them (as out of stock), so the first list removes them. If they are more than a fifth of the catalog, the engine's safety guard holds the removals back (`guard_tripped` in **Details**) and the engine operator is warned — expected, not an error; stock corrections still apply. |

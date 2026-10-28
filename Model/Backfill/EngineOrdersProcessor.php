@@ -117,7 +117,8 @@ class EngineOrdersProcessor implements ProcessorInterface
                 $processed++;
             }
             $last = end($rows);
-            $this->jobManager->recordProgress($job, $processed, $skipped, $last['created_at'] . '|' . $last['entity_id']);
+            $cursor = $last['created_at'] . '|' . $last['entity_id'];
+            $this->jobManager->recordProgress($job, $processed, $skipped, $cursor);
 
             if ($this->jobManager->isCancelled($job)) {
                 return; // Admin cancel — stop cleanly at the page boundary.

@@ -38,7 +38,7 @@ class HistoryProgressTest extends TestCase
     /** @var array<int, Job&MockObject> */
     private array $jobs = [];
 
-    /** @var array<string, int> undelivered rows by "job ids[:up to id]" */
+    /** @var array<int|string, int> undelivered rows by "job ids[:up to id]" (PHP keeps a bare id as an int) */
     private array $undelivered = [];
 
     /** @var list<array<string, mixed>> */

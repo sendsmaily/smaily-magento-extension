@@ -247,8 +247,46 @@ rather than Magento's full integration TestFramework, which requires a
 complete application install plus a search engine and is disproportionately
 heavy for a single module's CI. Module tables are installed by translating
 `etc/db_schema.xml` directly into DDL; the declarative-schema pipeline itself
-(plus DI compilation) is still verified by `setup:upgrade` /
-`setup:di:compile` in the sandbox below.
+is still verified by `setup:upgrade` in the sandbox below, and DI compilation
+by the Magento compile job (next section) and `setup:di:compile` in the
+sandbox.
+
+## Magento compile (oldest and newest supported Magento)
+
+The sandbox runs one Magento version, so a difference in another one goes
+unseen there: earlier release candidates could not be compiled on Magento
+2.4.4 and 2.4.5 (a union type stops 2.4.4's `setup:di:compile` with "Call to
+undefined method ReflectionUnionType::getName()"), and the sandbox's newer
+Magento compiled them. CI's `Magento compile` job runs Magento's own compile
+step with the extension on two versions, on every push and pull request:
+
+| Magento | PHP | |
+|---|---|---|
+| 2.4.4-p13 | 8.1 | the oldest supported line, on its oldest PHP |
+| 2.4.9 | 8.4 | the newest line composer.json allows, on the newest PHP both support |
+
+Each run creates the Magento project from `mirror.mage-os.org`, installs the
+extension through composer from the release ZIP (`bin/build-release-zip.sh`,
+the files a merchant gets), enables every module (`bin/magento module:enable
+--all`) and runs `bin/magento setup:di:compile`; the job fails when the
+compile fails. `setup:di:compile` reads only the enabled modules from
+`app/etc/config.php` — it needs no database, no search engine and no
+`setup:install` — so the job runs without services, in about a minute and a
+half; the composer cache is kept between runs. A union type on a controller's
+constructor parameter fails the 2.4.4-p13 row with the error above while the
+2.4.9 row passes.
+
+**Why 2.4.4-p13 and not plain 2.4.4.** Plain 2.4.4 no longer installs as it
+shipped: its MSI and reCAPTCHA metapackages accept any module release of
+their line, composer now takes the releases made for later Magento versions,
+and those use framework classes 2.4.4 does not have
+(`ResetAfterRequestInterface`), so the compile stops before it reaches the
+extension. The 2.4.4 patch releases pin every module, and 2.4.4-p13 has the
+same compiler as 2.4.4.
+
+When Magento releases a newer line that composer.json allows, move the
+second row to it, on the newest PHP both allow. The Hyvä companion is not
+compiled there: it needs the Hyvä theme packages.
 
 ## Sandbox (manual / end-to-end)
 

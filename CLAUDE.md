@@ -177,6 +177,8 @@ start one.
     (Linux Chrome cut `tracker-consent.html` short without one; TESTING.md).
     A Chrome that prints nothing (killed at start-up on macOS, exit 137) is
     started again, up to three starts (PRO-3780).
+  - CI only: `Magento compile` — `setup:di:compile` with the extension on
+    the oldest and the newest supported Magento (CON-210; TESTING.md).
 - **Local PHP 8.5 accepts syntax PHP 8.1 rejects** (DNF types such as
   `(A&B)|null` are 8.2+, `new Foo()->bar()` without wrapping parens is
   8.4+), and neither phpstan (even with `phpVersion: 80100`) nor phpcs
@@ -198,7 +200,12 @@ start one.
   with "Call to undefined method ReflectionUnionType::getName()". Give
   such a method one native type and the precise one in its docblock
   (`execute(): ResultInterface` + `@return Page|Redirect`).
-  `Test/Unit/GeneratedCodeCompatibilityTest.php` (unit suite) fails on it.
+  `Test/Unit/GeneratedCodeCompatibilityTest.php` (unit suite) fails on it,
+  and so does CI's `Magento compile` job (CON-210), which runs
+  `setup:di:compile` with the extension on Magento 2.4.4-p13 / PHP 8.1 and
+  2.4.9 / PHP 8.4 on every PR (no database needed; TESTING.md "Magento
+  compile"). Plain 2.4.4 no longer installs from today's packages; the
+  2.4.4 patch releases do.
 - Sandbox: `docker compose up -d` — real Magento 2 at
   `localhost:8080/admin` (admin / smailydev1, 2FA modules disabled). The repo
   is bind-mounted as the module; `vendor/` inside the container is shadowed by

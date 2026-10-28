@@ -162,9 +162,9 @@ jobs:
       fail-fast: false
       matrix:
         # The 2.4.4 line's last patch: plain 2.4.4 no longer installs as it
-        # shipped, because its metapackages (MSI, reCAPTCHA) take any 1.x
-        # module version, and today's need classes 2.4.4's framework lacks.
-        # The patch releases pin every module.
+        # shipped, because its metapackages (MSI, reCAPTCHA) take any module
+        # release of their line, and today's releases need framework classes
+        # 2.4.4 lacks. The patch releases pin every module.
         include:
           - magento: '2.4.4-p13'
             php: '8.1'
@@ -199,8 +199,9 @@ jobs:
 
       # The project's composer.json points at repo.magento.com, which needs
       # keys; the Mage-OS mirror serves the same packages without them. The
-      # extension comes from the ZIP (an artifact repository). Composer would
-      # refuse the old Magento's packages that have security advisories.
+      # extension comes from the ZIP (an artifact repository). The dev tools
+      # are not needed to compile. Composer would refuse the old Magento's
+      # packages that have security advisories.
       - name: Create the Magento ${{ matrix.magento }} project
         run: |
           composer create-project --no-install --no-interaction \

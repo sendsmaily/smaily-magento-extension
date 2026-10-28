@@ -11,6 +11,7 @@ namespace Smaily\Connect\Model\Privacy;
 use Magento\Framework\App\ResourceConnection;
 use Smaily\Connect\Cron\QueueJanitor;
 use Smaily\Connect\Model\AbandonedCart\StateManager;
+use Smaily\Connect\Model\Discount\ShopperCodes;
 use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
@@ -55,6 +56,10 @@ use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
  *   address and those of a customer account that has it: an order keeps the
  *   address it was placed with, so an account whose address changed since
  *   is found only by its id.
+ * - **A discount code the extension made for the contact** (CON-225,
+ *   ShopperCodes) is deleted when unused; a used one stays with its order.
+ *   The codes are read from the queue rows before those are erased: an
+ *   anonymised row no longer ties a code to the address.
  *
  * Rows are found by decoding, never by searching the raw JSON text — see
  * PayloadAnonymizer. Erasure is idempotent by construction: an anonymised
@@ -85,6 +90,8 @@ class LocalEraser
     private const ABANDONED_CART_LABEL = 'Abandoned carts';
 
     private const ATTRIBUTION_LABEL = 'Order attribution';
+
+    private const DISCOUNT_CODES_LABEL = 'Discount codes';
 
     /**
      * The attribution side table and the orders it belongs to, on the sales
@@ -129,7 +136,8 @@ class LocalEraser
         private readonly ResourceConnection $resourceConnection,
         private readonly PayloadAnonymizer $anonymizer,
         private readonly StateManager $cartState,
-        private readonly ContactEntity $contactEntity
+        private readonly ContactEntity $contactEntity,
+        private readonly ShopperCodes $shopperCodes
     ) {
     }
 
@@ -145,6 +153,10 @@ class LocalEraser
             return [];
         }
 
+        // Before the queues: their erasure takes the address off the rows
+        // that tie the codes to it.
+        $codes = $this->shopperCodes->erase($this->discountCodes($email));
+
         $counts = [];
         foreach (QueueJanitor::TABLES as $table) {
             $counts[self::LABELS[$table]] = $this->eraseQueue($table, $email);
@@ -157,6 +169,7 @@ class LocalEraser
             'removed' => 0,
             'anonymised' => $this->eraseAttribution($email),
         ];
+        $counts[self::DISCOUNT_CODES_LABEL] = $codes;
 
         return $counts;
     }
@@ -164,7 +177,8 @@ class LocalEraser
     /**
      * The same rows the erasure would touch, for the Art. 15 export: what
      * the store queued for this address and when, never the message body
-     * (which is built from data Magento and Smaily already export).
+     * (which is built from data Magento and Smaily already export), and the
+     * discount codes the extension made for it.
      *
      * @return array<string, array<int, array<string, mixed>>> keyed by label
      */
@@ -191,8 +205,29 @@ class LocalEraser
             $rows[self::LABELS[$table]] = $exported;
         }
         $rows[self::ABANDONED_CART_LABEL] = $this->cartState->rowsForEmail($email);
+        $rows[self::DISCOUNT_CODES_LABEL] = $this->shopperCodes->export($this->discountCodes($email));
 
         return $rows;
+    }
+
+    /**
+     * The discount codes the event queue's rows carry for this contact,
+     * each once (a row sent again from the Log carries its code again).
+     *
+     * @return string[]
+     */
+    private function discountCodes(string $email): array
+    {
+        $codes = [];
+        foreach ($this->scan(EventResource::TABLE_NAME, $email) as $matched) {
+            foreach ($matched as [, $decoded]) {
+                foreach ($this->shopperCodes->inPayload($decoded['payload'], $email) as $code) {
+                    $codes[$code] = $code;
+                }
+            }
+        }
+
+        return array_values($codes);
     }
 
     /**

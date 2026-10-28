@@ -116,6 +116,7 @@ class GdprEraseTest extends IntegrationTestCase
                 self::ENGINE_LABEL => ['removed' => 1, 'anonymised' => 1],
                 self::CART_LABEL => ['removed' => 0, 'anonymised' => 1],
                 self::ATTRIBUTION_LABEL => ['removed' => 0, 'anonymised' => 0],
+                'Discount codes' => ['removed' => 0, 'anonymised' => 0],
             ],
             $this->eraser->erase(self::SUBJECT),
             'Sendable rows go, terminal rows are kept anonymised'
@@ -160,6 +161,7 @@ class GdprEraseTest extends IntegrationTestCase
                 self::ENGINE_LABEL => ['removed' => 0, 'anonymised' => 0],
                 self::CART_LABEL => ['removed' => 0, 'anonymised' => 0],
                 self::ATTRIBUTION_LABEL => ['removed' => 0, 'anonymised' => 0],
+                'Discount codes' => ['removed' => 0, 'anonymised' => 0],
             ],
             $this->eraser->erase(self::SUBJECT)
         );

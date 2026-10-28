@@ -983,9 +983,13 @@ below.
   the core order rows are only read. The count is the rows that still had
   an identifier, so a second run counts none. The export does not list
   these rows. The engine-side erasure covers the engine's copy.
+  **The discount codes the extension made for the address (CON-225)** are
+  read from the event queue before its rows are erased: an unused code is
+  deleted, a used one stays with its order (see "Discount codes in
+  automations").
   Counts and exported rows come back under merchant-facing labels (Queued
-  messages, Engine queue, Abandoned carts, and for the erasure Order
-  attribution), which is what the CLI prints.
+  messages, Engine queue, Abandoned carts, Discount codes, and for the
+  erasure Order attribution), which is what the CLI prints.
 
 ## Database tables
 
@@ -1411,6 +1415,28 @@ whatever the rule's Uses per Coupon, an order uses it up (Magento's
 `RejectExpiredCoupon` refuses a code after its last day and leaves a
 merchant's own generated code alone, and `RuleSource` lists the same rules
 per website as on 2.4.7.
+
+**Export and erasure (CON-225).** `smaily:gdpr` covers the codes the
+extension made for an address, as the WooCommerce plugin covers its own.
+A Magento coupon holds no address, so `Discount\ShopperCodes` finds them
+through the event queue: `LocalEraser` walks the queue rows that match the
+address and `inPayload()` takes `Trigger::COUPON_FIELDS` codes from a row's
+stored `address` only when its `email` is the address (any letter case; an
+accent or an extra character is another shopper). A code counts only while
+`salesrule_coupon` still has it as the extension's (type auto-generated,
+`expiration_date` at `CouponExpiry::END_OF_DAY`), so a code the merchant
+generated is never touched. A code is **used** when its `times_used` is
+above 0 or a `sales_order` carries it as `coupon_code` (Magento counts the
+use later, through its `sales.rule.update.coupon.usage` consumer). The
+export lists each code under "Discount codes": `code`, `created_at` (UTC),
+`expires_at` (the last valid day) and `used`. The erasure deletes an unused
+code and keeps a used one with its order; the code itself holds nothing of
+the shopper, and the same run anonymizes the queue rows that named the
+address, so the used code is counted as anonymized. The codes are read
+before the queues are erased, because an anonymized row no longer ties a
+code to the address. Once the janitor has removed a code's row (30 days
+after the send, 90 after a failure), nothing in the extension ties the code
+to the shopper, and neither command finds it.
 
 ### Attribution (FPC-safe by construction)
 

@@ -7,145 +7,128 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-10-23 — **end of the 2026-10-22…23 session.**
-**3.0.0-rc15 is released** (2026-10-23, Erkki's tag on the cut PR #207):
-its release run is green with four assets (the main and the Hyvä ZIP,
-each with its `.sha256`), the Hyvä mirror carries the tag, Packagist
-lists both packages at rc15, and the live guide site names the rc15
-commands. **Both pilot stores still run 3.0.0-rc12** — their upgrade to
-rc15 waits for their developer; Campaign Intelligence is not connected
-in either yet — that waits for the client. Four PRs merged after the
-rc15 cut and are not released yet: #208–#211 (below). Linear: the
-project's issues live in team Connect (key `CON`, a sub-team of Growth
-(lab)); moved issues keep their `PRO-####` identifiers as redirects
-(CLAUDE.md "Linear discipline").
+_Last updated: 2026-10-28 — **3.0.0-rc16 version cut.**
+**3.0.0-rc16 is cut** (the version-cut PR `release/3.0.0-rc16`); its tag
+waits for Erkki (CLAUDE.md "Release cut"). The cut collects 6 fragments
+into CHANGELOG's "Changes since 3.0.0-rc15", in landing order (CON-220,
+CON-224, CON-227, CON-235, CON-232, CON-233), and rewords the three
+bullets that CON-220 and CON-224 made untrue: the CON-143 privacy-template bullet
+(disconnecting or removing never deletes the store's data; since rc16
+both tell the engine the connection ends and the engine pauses the
+store), the CON-176 bullet (a grid deletion unsubscribed in Smaily only
+from rc13 to rc15) and the aside in the CON-195 bullet (a grid deletion
+sends no status). The first cut (#219, from before #218 merged) was
+closed and cut again on a fresh `release/3.0.0-rc16`, so rc16 holds #218
+CON-233 too.
 
-**On `master` since the rc15 cut (unreleased, #208–#211):** #208 CON-211 (docs
-only: the guide site and `docs/INSTALLING.md` say that a firewall, WAF
-or CDN in front of the store must let `POST /smaily/attribution/land`
-and `POST /smaily/relay` through; Gotcha 2 of the rc15 cut is closed).
-#209 CON-220 (engine contract 1.18.0, byte-identical; §16 is now
-"disconnect": the engine revokes the key and, when the store has no
-connection left, pauses the store and never deletes it.
-`smaily:engine:disconnect` and both uninstall paths send §16 with the
-stored key — one attempt of at most 3 s, no retry — before they delete
-the key; a failure never blocks the disconnect or the removal; mirrors
-Woo CON-219. The uninstall path uses `Model/Engine/Disconnector`, not
-`Engine\Client`, because Magento runs the removal with the module's DI
-configuration missing. Changelog fragment `changelog.d/CON-220.md`).
-**Supersedes:** CON-143's rule "the extension never sends the §16
-store-deletion request" (#186, in the 2026-10-22 night entry below and
-in the 3.0.0 CHANGELOG bullet). #210 (docs only: this file's handoff at
-the end of the 2026-10-23 session). #211 CON-224: deleting a subscriber
-in the admin's **Newsletter Subscribers** grid no longer unsubscribes
-the contact in Smaily or stops profiling (Erkki, 2026-10-23: a deletion
-is not a withdrawal of consent, and the contact may come from another
-source; as in the WooCommerce plugin, which sends nothing on a user
-delete); unsubscribes are unchanged; changelog fragment
-`changelog.d/CON-224.md`. **Supersedes:** CON-176 / CON-187 (a deleted
-subscriber is unsubscribed in Smaily and loses personalization).
+**On `master` since the rc15 cut (all in rc16):** #208 CON-211 (docs
+only: a firewall in front of the store must let
+`POST /smaily/attribution/land` and `POST /smaily/relay` through). #209
+CON-220 (engine contract 1.18.0; §16 "disconnect" is sent on
+`smaily:engine:disconnect` and on both removal paths, before the stored
+key is deleted; the engine revokes the key and pauses a store with no
+connection left, never deletes it). #210 / #212 (docs only: this file).
+#211 CON-224 (deleting a subscriber in the admin's **Newsletter
+Subscribers** grid leaves the Smaily contact unchanged and keeps
+profiling; unsubscribes are unchanged). #214 (engine contract 1.19.0,
+byte-identical: §24 a console sign-in link, not live yet; §22 the
+embedded design editor, live). #215 CON-227 (an import goes on past a
+customer whose store view is gone — sent without a language — and an
+order whose item options Magento cannot unserialize — sent without them;
+any other unreadable row is skipped and counted, logged by id only).
+#216 CON-235 (a version line at the bottom of Dashboard and Settings).
+#217 CON-232 (an ingest send run drains the queue within a 40 s budget
+at `IngestPace::REQUESTS_PER_SECOND` = 5, with an import backlog cap of
+2,000 rows; the pilot store's history takes ≈ 1 h instead of ≈ 31 h).
+#218 CON-233 (a stopped import stores and shows only where the error
+happened, "Class at file:line" (`Model/Backfill/ErrorLocation`); the
+card says "Details for your developer: …"; a raw message an earlier
+version stored is not shown).
 
-**Decided (Erkki, 2026-10-23):** the 3.0.0 gate is CON-209 — 3.0.0 is
-released after both pilot stores run rc14 (or later) for a few days with
-a clean Log check (reminders sent or skipped for the expected reasons; a
-discount code in a real email where switched on), CON-204 done (it is),
-and Erkki's go; Campaign Intelligence may follow in 3.0.x. The visitor
-cookie stays 365 days (as Woo). The export does not list attribution
-identifiers. **Supersedes:** the erasure entry further down (PRO-2452)
-that calls `smaily_order_attribution` "deliberately NOT touched" —
-since CON-212 the erasure clears its visitor and session tokens on the
-shopper's orders (marked inline there).
+**Pilot:** the first pilot store connected Campaign Intelligence on
+2026-10-26, most likely still on rc12. Its customers import stopped at
+8,400 / 21,517 and its orders import at 43,400 / 79,944 (the engine has
+orders up to April 2022) on rows Magento could not read. It needs an
+upgrade to rc16, then **Run again** on **Customers** and **Orders**. On
+rc12, picking another website opens the setup from the start; rc13+
+(CON-179) removed that. The second pilot store's state is unchanged
+(rc12). The gauge is CON-147 (4/5).
 
-**Decided (Erkki, 2026-10-22):** a guest's recommendations by an engine
-`vt_` token keep the browser-side consent rule — a platform-forced
-difference from Woo (CON-181). A website with its own Smaily account uses
-only that account's workflows (CON-190). Transactional sends use the
-workflow id until the engine answers INT-146 (transactional workflow ids;
-contract 1.18.0 §23 now gives them — see CON-31 below).
+**Decided (Erkki, 2026-10-27):** every engine page a connector opens
+(design editor, console sign-in) shows in an in-admin modal over a
+darkened page, a new tab only as fallback (CON-230; engine asked in
+INT-180). Each connector reports its installation to the engine — store,
+platform and extension versions, Smaily subdomain, features, last syncs,
+no personal data (engine INT-186, Magento CON-234).
 
-**Verified:** the gates on each PR's branch (see the PRs). Sandbox: after
-#209 the first `setup:upgrade` failed with "Too few arguments" (stale
-generated DI — the known gotcha in CLAUDE.md "Build / test commands");
-`setup:di:compile`, then both again, passed. After #211
-`setup:di:compile` and `setup:upgrade` passed, the live guide site's md5
-matches `master` (b6055a2), and the sandbox is stopped.
+**Decided (Erkki, 2026-10-28):** History import (engine INT-185),
+confirmed: the horizon is 36 months for consumable packs and 60 months
+for durable packs; the start part is the whole catalog plus the last 18
+months of orders; the rest follows in the background, newest first; the
+engine writes it into contract 1.20.0 (with a history-progress endpoint)
+and all three connectors implement it. Customers: every customer account
+and subscriber is sent, also one who never bought; only a buyer whose
+every order is older than the horizon is left out. When an import stops,
+the server log keeps the full exception message (`BackfillTick`'s
+"Backfill job failed" entry in `var/log/smaily_connect.log`); only the
+admin card shows the location form. Multi-website: Erkki asked to
+discuss whether the extension should also offer a fully separate setup
+per website (its own Smaily account, its own engine store) for very
+different websites, next to today's one store-wide setup; CON-148 and
+CON-161 wait for that discussion. **Decided (2026-10-24):** one Magento
+installation is one engine store (today's setup).
 
-**Pilot:** the developer of both pilot stores ("the pilot store" and "the
-second pilot store") upgraded them to 3.0.0-rc12; Erkki ran the initial
-setup in both. The rc15 upgrade waits for that developer. Campaign
-Intelligence waits for the client. The gauge is CON-147 (4/5).
-
-**Notes for the next version cut (rc16):** reword the 3.0.0 CHANGELOG
-bullet from CON-143 ("Removing the extension or disconnecting Campaign
-Intelligence never asks Campaign Intelligence to delete the store's
-data…") — since CON-220 it is untrue; the CON-220 fragment in
-`changelog.d/` states the new behaviour. Since CON-224 two statements
-in CHANGELOG.md are untrue: the CON-176 bullet under "Changes since
-3.0.0-rc12" (a subscriber deleted in the **Newsletter Subscribers**
-grid is unsubscribed in Smaily) and the aside in the CON-196 / CON-195
-bullet under "Changes since 3.0.0-rc13" ("a subscriber deleted … is
-still unsubscribed in Smaily") — reword both next to the CON-224
-fragment. #208 and #210 are docs only and have no fragment.
-
-**Open Stories:** CON-209 (the 3.0.0 gate: both pilot stores on rc15, a
-few days' Log check, Erkki's go). CON-210 (CI compiles on the oldest
-supported Magento, 2.4.4, and the newest). CON-215 (flaky
-`SharedConnectAndImportStartTest`: it fails across a second boundary,
-because it takes its times from the wall clock). CON-168 (contract
-1.18.0: the start button §21, "Edit design" §22 as an embedded page that
-reports saved/closed with `postMessage`, §23 a workflow id for every
-email incl. transactional plus `smaily_subdomain` / `created_by`, and the
-§19/§20 changes; build it after Woo CON-218 / CON-191). Transactional
-sending (Epic CON-31; §23 now gives transactional workflow ids; needs a
-transactional Smaily test account in a local credentials file). CON-225
-(align with WooCommerce 3.20: the export and the erasure cover the
-discount codes the extension made, and the guide takes Erkki's
-proofread EN/ET wording from smaily.com/connect-woo/ for the discount,
-email-field, Disconnect/removal and privacy paragraphs). CON-192
-(rare: no store-wide login and different accounts per website). INT-148
-(engine-sent emails with discount codes — an engine contract change;
-Erkki approves before anything goes to the engine team). CON-151
-Estonian proofread (large: everything changed on 22–23 Oct in the guide
-site and the admin); CON-146 native review of the ru/fi/lv/lt storefront
-texts.
-
-**Gotchas:** (1) Magento 2.4.4 / 2.4.5 stores cannot run
-`setup:di:compile` on rc14 or older — they need rc15 (#203). (2) The
-uninstall path cannot use DI-built module classes (#209): Magento runs
-the removal with the module disabled, so code there builds its own
-objects (`Model/Engine/Disconnector`). (3) After a constructor change
-the first sandbox `setup:upgrade` fails with "Too few arguments" —
-`setup:di:compile`, then both again (seen after #209). (4) On rc12 (both
-pilot stores): on a multi-website store the setup asks for a website,
-and when that website's Smaily login came over from 2.8.x the setup
-opens on the Contacts step — go back to step 1 (language mode,
-storefront address, connection test) for every website. (5) The
-synchronous first send attempt of transactional emails is a deliberate
-exception to "nothing user-facing waits on HTTP" — the sending slice
-records it in `docs/ARCHITECTURE.md` in the same PR. (6) Workers never
-clone a private Smaily repository without Erkki's OK. (7) Client details
-never go into this public repository (CLAUDE.md "No client details");
-say "the pilot store" / "the second pilot store". (8) Sandbox: an old
-pending contacts→Smaily backfill job (id 1, 2026-10-02) and 2 ingest
-rows wait there; `cron:run` sends them to the smailydemo account and the
-synthetic engine tenant.
-
-**Open for Erkki:** the pilot stores' rc15 upgrade (their developer);
-the CON-209 go for 3.0.0 after the Log check; INT-148 (whether to
-propose engine emails with discount codes); CON-151 (the Estonian
-proofread); CON-146 (native ru/fi/lv/lt review); a transactional Smaily
-test account in a local credentials file (like the FTPS one); the "Pilot
-store live" milestone date; when the client connects Campaign
-Intelligence in the pilot stores; when to cut rc16.
+**Open:** CON-209 (the 3.0.0 gate), CON-210, CON-215, CON-225, CON-230
+(the console button; waits for the engine), CON-168, CON-234 (waits for
+INT-186), CON-151 and CON-146 proofreads. Follow-ups:
+`smaily:backfill:status` prints a stored error unfiltered; **Run again** restarts from row 1;
+`ImportPaceTest` duplicates order-harness helpers; WooCommerce's slower
+import pace (CON-236).
 
 **Next session opens with:**
-1. The pilot stores' upgrade to rc15, then the CON-209 Log check.
-2. CON-210 (CI on Magento 2.4.4 and the newest).
-3. CON-215 (the second-boundary flake).
-4. CON-168, after Woo CON-218 / CON-191.
-5. Transactional sending (CON-31) when the test account exists.
-6. The next release candidate (rc16) when the pilot or CON-168 needs
-   #208–#211 (Notes for the next version cut above)._
+1. Erkki tags rc16.
+2. The pilot store upgrades to rc16 and presses **Run again** on
+   **Customers** and **Orders**.
+3. Contract 1.20.0 from the engine (INT-185) → newest-first history in
+   all connectors.
+4. The multi-website discussion (a separate setup per website) →
+   CON-148 / CON-161.
+
+**Notes for the next version cut (rc17):** none so far._
+
+_Earlier (2026-10-23, end of the 2026-10-22…23 session): 3.0.0-rc15
+released (Erkki's tag on #207; four assets, the Hyvä mirror and both
+Packagist packages at rc15). Both pilot stores ran rc12. Decided (Erkki,
+2026-10-23): the 3.0.0 gate is CON-209 — both pilot stores on rc14 or
+later for a few days with a clean Log check, CON-204 done, and Erkki's
+go; Campaign Intelligence may follow in 3.0.x; the visitor cookie stays
+365 days (as Woo); the export does not list attribution identifiers
+(since CON-212 the erasure clears the visitor and session tokens on the
+shopper's orders — supersedes the PRO-2452 entry further down). Decided
+(Erkki, 2026-10-22): a guest's recommendations by a `vt_` token keep the
+browser-side consent rule (CON-181); a website with its own Smaily
+account uses only that account's workflows (CON-190); transactional
+sends use the workflow id until INT-146 (contract 1.18.0 §23 now gives
+transactional workflow ids). CON-220 superseded CON-143's rule "the
+extension never sends the §16 store-deletion request"; CON-224
+superseded CON-176 / CON-187 (a deleted subscriber is unsubscribed in
+Smaily and loses personalization). Gotchas then, still true: Magento
+2.4.4 / 2.4.5 need rc15 or later to compile; the uninstall path cannot
+use DI-built module classes (`Model/Engine/Disconnector`); after a
+constructor change the first sandbox `setup:upgrade` fails with "Too few
+arguments" — `setup:di:compile`, then both again; on rc12 a
+multi-website store's setup asks for a website and may open on the
+Contacts step — go back to step 1 for every website; the synchronous
+first send of transactional emails is a deliberate exception, recorded
+in `docs/ARCHITECTURE.md` by the sending slice; the sandbox holds an old
+pending contacts backfill job (id 1) and 2 ingest rows that `cron:run`
+sends to the smailydemo account and the synthetic engine tenant. Open
+then: CON-192 (no store-wide login and different accounts per website),
+INT-148 (engine emails with discount codes; Erkki approves first),
+transactional sending (Epic CON-31; needs a transactional Smaily test
+account in a local credentials file). The rc16 notes of that header
+(reword the CON-143, CON-176 and CON-195 bullets) are done in the rc16
+cut._
 
 _Earlier (2026-10-23 evening): the 3.0.0-rc15 version cut (#207),
 tagged 2026-10-23. rc15 held #202–#206; its CHANGELOG section "Changes

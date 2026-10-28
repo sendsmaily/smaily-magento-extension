@@ -332,6 +332,14 @@ under `smaily/` is submitted from the `smaily` account, or from an account
 it adds as a maintainer — `smaily/module-connect-hyva` was submitted from
 it.
 
+**A `release/*` branch takes one push (gotcha, 2026-10-28, rc16):** the
+protected-branch hook accepts only the branch's first push and refuses
+every later one with "Changes must be made through a pull request". Run
+every gate before that push and push the cut as one commit. A cut that
+needs a fix (or a change merged after it) is redone: close the cut PR,
+delete the branch (deletion is allowed), and cut again on a fresh
+`release/<version>` from `origin/master`.
+
 ## The move into sendsmaily (PRO-1198) — done 2026-10-07
 
 The fork's `v3` (descended from upstream's last 2.8.x commit e2e5d45) reached
@@ -446,7 +454,10 @@ is written in English.
   cookies; pilot stores on rc12, Campaign Intelligence waits for the
   client); 2026-10-23 session end: 4/5 (rc15 released; pilot stores on
   rc12 waiting for their developer's rc15 upgrade; Campaign Intelligence
-  waits for the client; 3.0.0 gate CON-209).
+  waits for the client; 3.0.0 gate CON-209); 2026-10-28: 4/5 (rc16 cut:
+  imports go on past unreadable rows and send a store's history in about
+  an hour; the first pilot store connected Campaign Intelligence on 26.10
+  and waits for rc16).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Feature (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

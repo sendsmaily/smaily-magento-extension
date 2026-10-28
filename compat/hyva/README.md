@@ -67,7 +67,7 @@ command would install a second copy of Smaily Connect.
 One command installs Smaily Connect and this module. Until 3.0.0 is
 released, give the release candidate's exact version for both packages, as
 the [releases page](https://github.com/sendsmaily/smaily-magento-extension/releases)
-names it — `3.0.0-rc15` below: a standard Magento project accepts stable
+names it — `3.0.0-rc16` below: a standard Magento project accepts stable
 versions only. From 3.0.0 on, `composer require smaily/module-connect-hyva`
 is enough; it installs Smaily Connect too.
 
@@ -77,7 +77,7 @@ mode (`bin/magento deploy:mode:show`):
 
 ```bash
 bin/magento maintenance:enable
-composer require smaily/smailyformagento:3.0.0-rc15 smaily/module-connect-hyva:3.0.0-rc15
+composer require smaily/smailyformagento:3.0.0-rc16 smaily/module-connect-hyva:3.0.0-rc16
 bin/magento module:enable Smaily_Connect Hyva_SmailyConnect
 bin/magento setup:upgrade
 bin/magento setup:di:compile

@@ -281,8 +281,8 @@ shipped: its MSI and reCAPTCHA metapackages accept any module release of
 their line, composer now takes the releases made for later Magento versions,
 and those use framework classes 2.4.4 does not have
 (`ResetAfterRequestInterface`), so the compile stops before it reaches the
-extension. The 2.4.4 patch releases pin every module, and 2.4.4-p13 has the
-same compiler as 2.4.4.
+extension. The 2.4.4 patch releases pin every module, and 2.4.4-p13 stops
+on a union type as 2.4.4 does.
 
 When Magento releases a newer line that composer.json allows, move the
 second row to it, on the newest PHP both allow. The Hyvä companion is not

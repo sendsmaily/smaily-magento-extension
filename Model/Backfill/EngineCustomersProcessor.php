@@ -10,7 +10,6 @@ namespace Smaily\Connect\Model\Backfill;
 
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Framework\Api\SearchCriteriaBuilder;
-use Magento\Framework\Api\SortOrderBuilder;
 use Magento\Framework\Exception\LocalizedException;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\IngestPace;
@@ -18,7 +17,9 @@ use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 
 /**
- * Historical customer import into the engine ingest queue.
+ * Historical customer import into the engine ingest queue: the customers
+ * in scope (EngineCustomerScope, CON-241), by customer id. The horizon is
+ * the history import's (HistoryImport::horizonNow()).
  *
  * A customer whose row cannot be built from what Magento stores is skipped
  * and the import goes on (SkippedRow, CON-227).
@@ -32,10 +33,11 @@ class EngineCustomersProcessor implements ProcessorInterface
         private readonly JobManager $jobManager,
         private readonly CustomerRepositoryInterface $customerRepository,
         private readonly SearchCriteriaBuilder $searchCriteriaBuilder,
-        private readonly SortOrderBuilder $sortOrderBuilder,
         private readonly CustomerPayloadBuilder $payloadBuilder,
         private readonly IngestQueue $ingestQueue,
-        private readonly SkippedRow $skippedRow
+        private readonly SkippedRow $skippedRow,
+        private readonly EngineCustomerScope $scope,
+        private readonly HistoryImport $historyImport
     ) {
     }
 
@@ -49,49 +51,48 @@ class EngineCustomersProcessor implements ProcessorInterface
         }
 
         $this->jobManager->markRunning($job);
+        $horizon = $this->historyImport->horizonNow();
+        if ($job->getData('total_count') === null) {
+            $job->setData('total_count', $this->scope->count($horizon));
+        }
 
         $deadline = microtime(true) + self::TIME_BUDGET_SECONDS;
         do {
-            $cursor = (int)$job->getCursorValue();
-            $criteria = $this->searchCriteriaBuilder
-                ->addFilter('entity_id', $cursor, 'gt')
-                ->addSortOrder(
-                    $this->sortOrderBuilder->setField('entity_id')->setAscendingDirection()->create()
-                )
-                ->setPageSize(self::PAGE_SIZE)
-                ->setCurrentPage(1)
-                ->create();
-            $results = $this->customerRepository->getList($criteria);
-
-            if ($job->getData('total_count') === null) {
-                $job->setData('total_count', $results->getTotalCount() + $job->getProcessedCount());
-            }
-
-            $customers = $results->getItems();
-            if (!$customers) {
+            $ids = $this->scope->page($horizon, (int)$job->getCursorValue(), self::PAGE_SIZE);
+            if (!$ids) {
                 $this->jobManager->complete($job);
 
                 return;
             }
 
-            $processed = 0;
+            $criteria = $this->searchCriteriaBuilder
+                ->addFilter('entity_id', $ids, 'in')
+                ->setPageSize(self::PAGE_SIZE)
+                ->setCurrentPage(1)
+                ->create();
             $skipped = 0;
-            $newCursor = $cursor;
-            foreach ($customers as $customer) {
-                $newCursor = max($newCursor, (int)$customer->getId());
-                if ((string)$customer->getEmail() !== '') {
-                    try {
-                        $item = $this->payloadBuilder->build($customer);
-                    } catch (\InvalidArgumentException | LocalizedException $exception) {
-                        $this->skippedRow->record($job, (int)$customer->getId(), $exception);
-                        $skipped++;
-                        continue;
-                    }
-                    $this->ingestQueue->enqueue(Client::DOMAIN_CUSTOMERS, $item, (string)$customer->getId());
+            foreach ($this->customerRepository->getList($criteria)->getItems() as $customer) {
+                if ((string)$customer->getEmail() === '') {
+                    continue;
                 }
-                $processed++;
+                try {
+                    $item = $this->payloadBuilder->build($customer);
+                } catch (\InvalidArgumentException | LocalizedException $exception) {
+                    $this->skippedRow->record($job, (int)$customer->getId(), $exception);
+                    $skipped++;
+                    continue;
+                }
+                $this->ingestQueue->enqueue(
+                    Client::DOMAIN_CUSTOMERS,
+                    $item,
+                    (string)$customer->getId(),
+                    null,
+                    null,
+                    (int)$job->getId()
+                );
             }
-            $this->jobManager->recordProgress($job, $processed, $skipped, (string)$newCursor);
+            // A customer deleted since the page was read counts as processed.
+            $this->jobManager->recordProgress($job, count($ids) - $skipped, $skipped, (string)max($ids));
 
             if ($this->jobManager->isCancelled($job)) {
                 return; // Admin cancel — stop cleanly at the page boundary.

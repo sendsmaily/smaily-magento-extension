@@ -13,7 +13,6 @@ use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Customer\Api\Data\CustomerSearchResultsInterface;
 use Magento\Framework\Api\SearchCriteriaBuilder;
 use Magento\Framework\Api\SearchCriteriaInterface;
-use Magento\Framework\Api\SortOrderBuilder;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Data\Collection\EntityFactoryInterface;
@@ -28,11 +27,15 @@ use Magento\Sales\Model\ResourceModel\Order\Item\CollectionFactory as OrderItemC
 use Magento\SalesSequence\Model\Manager as SequenceManager;
 use Magento\Store\Model\ScopeInterface;
 use Smaily\Connect\Cron\BackfillTick;
+use Smaily\Connect\Model\Backfill\EngineCustomerScope;
 use Smaily\Connect\Model\Backfill\EngineCustomersProcessor;
 use Smaily\Connect\Model\Backfill\EngineOrdersProcessor;
+use Smaily\Connect\Model\Backfill\HistoryImport;
+use Smaily\Connect\Model\Backfill\HistoryProgress;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\SkippedRow;
+use Smaily\Connect\Model\Engine\HistoryConfig;
 use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
@@ -77,6 +80,7 @@ class UnreadableImportRowsTest extends IntegrationTestCase
         $schema = new SchemaInstaller($this->connection);
         $schema->createSalesOrder();
         $schema->createSalesOrderItem();
+        $schema->createFlag();
         $this->jobManager = $this->objectManager->create(JobManager::class);
     }
 
@@ -90,9 +94,11 @@ class UnreadableImportRowsTest extends IntegrationTestCase
 
     public function testRunAgainGoesPastTheUnreadableRowsAndCompletes(): void
     {
-        $this->seedOrder(1, '2013-05-02 10:00:00', '{"info_buyRequest":{"qty":1}}');
-        $this->seedOrder(2, '2022-04-06 10:00:00', self::UNREADABLE_OPTIONS);
-        $this->seedOrder(3, '2022-04-07 10:00:00', '{"info_buyRequest":{"qty":1}}');
+        // Inside the history horizon (CON-241), which counts back from now.
+        $unreadableAt = gmdate('Y-m-d H:i:s', strtotime('-30 months'));
+        $this->seedOrder(1, gmdate('Y-m-d H:i:s', strtotime('-50 months')), '{"info_buyRequest":{"qty":1}}');
+        $this->seedOrder(2, $unreadableAt, self::UNREADABLE_OPTIONS);
+        $this->seedOrder(3, gmdate('Y-m-d H:i:s', strtotime('-29 months')), '{"info_buyRequest":{"qty":1}}');
         // The jobs as the pilot store left them: stopped before an error.
         $this->seedFailedJob(Job::TYPE_CUSTOMERS, "The store that was requested wasn't found.");
         $this->seedFailedJob(Job::TYPE_ORDERS, 'Unable to unserialize value. Error: Control character error');
@@ -123,13 +129,13 @@ class UnreadableImportRowsTest extends IntegrationTestCase
         self::assertSame('et', $customers[3]['language']);
 
         $orders = $this->queued('orders');
-        self::assertSame([100000001, 100000002, 100000003], array_keys($orders));
+        self::assertSame([100000003, 100000002, 100000001], array_keys($orders), 'Newest first');
         self::assertEquals(
             [['sku' => 'SKU-2', 'qty' => 1, 'unit_price' => 20, 'line_total' => 20]],
             $orders[100000002]['items'],
             'The order with the unreadable item options goes with its line'
         );
-        self::assertSame('2022-04-06T10:00:00Z', $orders[100000002]['ordered_at']);
+        self::assertSame(str_replace(' ', 'T', $unreadableAt) . 'Z', $orders[100000002]['ordered_at']);
 
         self::assertSame([
             [
@@ -154,14 +160,29 @@ class UnreadableImportRowsTest extends IntegrationTestCase
         $engineSettings = $this->createMock(EngineSettings::class);
         $engineSettings->method('isRefused')->willReturn(false);
 
+        $historyConfig = $this->createMock(HistoryConfig::class);
+        $historyConfig->method('forNewImport')->willReturn(HistoryConfig::FALLBACK);
+        $historyConfig->method('stored')->willReturn(HistoryConfig::FALLBACK);
+        $historyImport = $this->objectManager->create(HistoryImport::class, ['historyConfig' => $historyConfig]);
+        // The customers in scope: all three (EngineCustomerScope has its own test).
+        $scope = $this->createMock(EngineCustomerScope::class);
+        $scope->method('count')->willReturn(3);
+        $scope->method('page')->willReturnCallback(
+            static fn (string $horizon, int $afterId): array => array_values(array_filter(
+                [1, 2, 3],
+                static fn (int $id): bool => $id > $afterId
+            ))
+        );
+
         $customers = new EngineCustomersProcessor(
             $this->jobManager,
             $this->customerRepository(),
             $this->objectManager->create(SearchCriteriaBuilder::class),
-            $this->objectManager->create(SortOrderBuilder::class),
             new CustomerPayloadBuilder(new LanguageResolver($this->storeLocales()), $logger),
             $ingestQueue,
-            $skippedRow
+            $skippedRow,
+            $scope,
+            $historyImport
         );
         $orders = new EngineOrdersProcessor(
             $this->jobManager,
@@ -172,10 +193,11 @@ class UnreadableImportRowsTest extends IntegrationTestCase
                 $logger
             ),
             $ingestQueue,
-            $skippedRow
+            $skippedRow,
+            $historyImport
         );
 
-        return new BackfillTick($this->jobManager, $engineSettings, $logger, [
+        return new BackfillTick($this->jobManager, $engineSettings, $logger, $historyImport, $this->createMock(HistoryProgress::class), [
             Job::TYPE_CUSTOMERS . ':' . Job::TARGET_ENGINE => $customers,
             Job::TYPE_ORDERS . ':' . Job::TARGET_ENGINE => $orders,
         ]);
@@ -199,12 +221,8 @@ class UnreadableImportRowsTest extends IntegrationTestCase
         $repository = $this->createMock(CustomerRepositoryInterface::class);
         $repository->method('getList')->willReturnCallback(
             function (SearchCriteriaInterface $criteria) use ($customers): CustomerSearchResultsInterface {
-                $after = (int)$criteria->getFilterGroups()[0]->getFilters()[0]->getValue();
-                $page = array_values(array_filter(
-                    $customers,
-                    static fn (int $id): bool => $id > $after,
-                    ARRAY_FILTER_USE_KEY
-                ));
+                $ids = (array)$criteria->getFilterGroups()[0]->getFilters()[0]->getValue();
+                $page = array_values(array_intersect_key($customers, array_flip(array_map('intval', $ids))));
                 $results = $this->createMock(CustomerSearchResultsInterface::class);
                 $results->method('getItems')->willReturn($page);
                 $results->method('getTotalCount')->willReturn(count($page));
@@ -248,31 +266,18 @@ class UnreadableImportRowsTest extends IntegrationTestCase
     {
         $factory = $this->createMock(OrderCollectionFactory::class);
         $factory->method('create')->willReturnCallback(function (): OrderCollection {
-            $after = 0;
-            $limit = 0;
+            $ids = [];
             $collection = $this->createMock(OrderCollection::class);
-            $collection->method('getSize')->willReturnCallback(
-                fn (): int => (int)$this->connection->fetchOne('SELECT COUNT(*) FROM sales_order')
-            );
             $collection->method('addFieldToFilter')->willReturnCallback(
-                function (string $field, array $condition) use (&$after, $collection): OrderCollection {
-                    $after = (int)$condition['gt'];
+                function (string $field, array $condition) use (&$ids, $collection): OrderCollection {
+                    $ids = array_map('intval', $condition['in']);
 
                     return $collection;
                 }
             );
-            $collection->method('setOrder')->willReturnSelf();
-            $collection->method('setPageSize')->willReturnCallback(
-                function (int $size) use (&$limit, $collection): OrderCollection {
-                    $limit = $size;
-
-                    return $collection;
-                }
-            );
-            $collection->method('getItems')->willReturnCallback(function () use (&$after, &$limit): array {
+            $collection->method('getItems')->willReturnCallback(function () use (&$ids): array {
                 $rows = $this->connection->fetchAll(
-                    $this->connection->select()->from('sales_order')
-                        ->where('entity_id > ?', $after)->order('entity_id ASC')->limit($limit)
+                    $this->connection->select()->from('sales_order')->where('entity_id IN (?)', $ids ?: [0])
                 );
 
                 return array_map(fn (array $row): Order => $this->order($row), $rows);

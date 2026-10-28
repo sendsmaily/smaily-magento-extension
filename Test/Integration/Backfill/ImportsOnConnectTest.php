@@ -10,6 +10,8 @@ namespace Smaily\Connect\Test\Integration\Backfill;
 
 use Smaily\Connect\Cron\BackfillTick;
 use Smaily\Connect\Model\Backfill\ImportsOnConnect;
+use Smaily\Connect\Model\Backfill\HistoryImport;
+use Smaily\Connect\Model\Backfill\HistoryProgress;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\ProcessorInterface;
@@ -130,6 +132,8 @@ class ImportsOnConnectTest extends IntegrationTestCase
         $this->objectManager->create(BackfillTick::class, [
             'jobManager' => $this->jobManager,
             'engineSettings' => $this->createMock(EngineSettings::class),
+            'historyImport' => $this->createMock(HistoryImport::class),
+            'historyProgress' => $this->createMock(HistoryProgress::class),
             'processors' => ['catalog:engine' => $processor],
         ])->execute();
 

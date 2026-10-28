@@ -11,6 +11,8 @@ namespace Smaily\Connect\Test\Unit\Cron;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Cron\BackfillTick;
+use Smaily\Connect\Model\Backfill\HistoryImport;
+use Smaily\Connect\Model\Backfill\HistoryProgress;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\ProcessorInterface;
@@ -67,6 +69,66 @@ class BackfillTickTest extends TestCase
         $processor->expects(self::once())->method('process')->with($job);
 
         $this->createTick($jobManager, false, ['catalog:engine' => $processor])->execute();
+    }
+
+    /**
+     * CON-241: before a Campaign Intelligence import runs, a queued orders
+     * import begins its history import, and the progress report runs every
+     * minute — also when no import is left, since `complete` follows the
+     * last delivery. A contacts import begins nothing.
+     */
+    public function testAnEngineImportBeginsTheHistoryImportAndEveryRunReports(): void
+    {
+        $historyImport = $this->createMock(HistoryImport::class);
+        $historyImport->expects(self::once())->method('beginQueued');
+        $historyProgress = $this->createMock(HistoryProgress::class);
+        $historyProgress->expects(self::once())->method('report');
+        $processor = $this->createMock(ProcessorInterface::class);
+        $processor->expects(self::once())->method('process');
+        $this->createTick(
+            $this->createJobManager($this->createJob(Job::TARGET_ENGINE, null)),
+            false,
+            ['catalog:engine' => $processor],
+            $historyImport,
+            $historyProgress
+        )->execute();
+
+        $historyImport = $this->createMock(HistoryImport::class);
+        $historyImport->expects(self::never())->method('beginQueued');
+        $historyProgress = $this->createMock(HistoryProgress::class);
+        $historyProgress->expects(self::once())->method('report');
+        $this->createTick(
+            $this->createJobManager($this->createJob(Job::TARGET_SMAILY, null)),
+            false,
+            ['contacts:smaily' => $this->createMock(ProcessorInterface::class)],
+            $historyImport,
+            $historyProgress
+        )->execute();
+
+        $jobManager = $this->createMock(JobManager::class);
+        $jobManager->method('nextActive')->willReturn(null);
+        $historyProgress = $this->createMock(HistoryProgress::class);
+        $historyProgress->expects(self::once())->method('report');
+        $this->createTick($jobManager, false, [], null, $historyProgress)->execute();
+    }
+
+    /**
+     * A history import that cannot begin is logged; the import the tick
+     * took up still runs.
+     */
+    public function testAHistoryImportThatCannotBeginLeavesTheImportRunning(): void
+    {
+        $historyImport = $this->createMock(HistoryImport::class);
+        $historyImport->method('beginQueued')->willThrowException(new \RuntimeException('database gone'));
+        $processor = $this->createMock(ProcessorInterface::class);
+        $processor->expects(self::once())->method('process');
+
+        $this->createTick(
+            $this->createJobManager($this->createJob(Job::TARGET_ENGINE, null)),
+            false,
+            ['catalog:engine' => $processor],
+            $historyImport
+        )->execute();
     }
 
     /**
@@ -136,11 +198,20 @@ class BackfillTickTest extends TestCase
     private function createTick(
         JobManager&MockObject $jobManager,
         bool $refused,
-        array $processors
+        array $processors,
+        ?HistoryImport $historyImport = null,
+        ?HistoryProgress $historyProgress = null
     ): BackfillTick {
         $settings = $this->createMock(EngineSettings::class);
         $settings->method('isRefused')->willReturn($refused);
 
-        return new BackfillTick($jobManager, $settings, $this->createMock(Logger::class), $processors);
+        return new BackfillTick(
+            $jobManager,
+            $settings,
+            $this->createMock(Logger::class),
+            $historyImport ?? $this->createMock(HistoryImport::class),
+            $historyProgress ?? $this->createMock(HistoryProgress::class),
+            $processors
+        );
     }
 }

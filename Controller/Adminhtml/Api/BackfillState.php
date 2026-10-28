@@ -15,6 +15,7 @@ use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use Smaily\Connect\Model\Backfill\ErrorLocation;
 use Smaily\Connect\Model\Backfill\ImportStarter;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
@@ -46,10 +47,16 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * active (Job::REASON_CONTACT_SYNC_INACTIVE, PRO-4037). A Campaign
  * Intelligence import's failed_count holds the rows it skipped because
  * Magento could not read them (Model/Backfill/SkippedRow, CON-227): it is
- * answered as `skipped`, and its `failed` stays 0.
+ * answered as `skipped`, and its `failed` stays 0. `error` is where the
+ * error that stopped an import happened (ErrorLocation, CON-233) or one of
+ * the import's own reasons, never an error's text: one an earlier version
+ * stored, which can quote a customer's data, answers as ''.
  */
 class BackfillState extends AbstractJsonAction implements HttpPostActionInterface
 {
+    /** The reasons the imports store themselves (ContactsProcessor, BackfillTick). */
+    private const OWN_REASONS = '/^(?:Website \d+ has no stores|No backfill processor registered for "[\w:]+")$/';
+
     public function __construct(
         Context $context,
         JsonFactory $jsonFactory,
@@ -124,8 +131,8 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
             $reason = (string)($job->getData('error_message') ?? '');
             if ($reason === Job::REASON_CONTACT_SYNC_INACTIVE) {
                 $syncInactive[] = $this->websiteName($job->getWebsiteId());
-            } elseif ($error === '' && $reason !== '') {
-                $error = $reason;
+            } elseif ($error === '') {
+                $error = $this->shownError($reason);
             }
         }
 
@@ -152,6 +159,15 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
             'blocked_by' => $ahead !== null && $ahead->getJobType() !== $jobType ? $ahead->getJobType() : '',
             'sync_inactive' => $syncInactive,
         ];
+    }
+
+    /**
+     * A stored reason as the card shows it: '' for anything that is not
+     * where an error happened or one of the imports' own reasons.
+     */
+    private function shownError(string $reason): string
+    {
+        return ErrorLocation::matches($reason) || preg_match(self::OWN_REASONS, $reason) === 1 ? $reason : '';
     }
 
     /**

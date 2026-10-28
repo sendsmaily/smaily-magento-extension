@@ -19,7 +19,8 @@ use Smaily\Connect\Model\Logger\Logger;
 
 /**
  * The engine-bound imports (catalog / customers / orders) share this router,
- * so the "the account is not active" gate lives here once (PRO-2451).
+ * so the "the account is not active" gate lives here once (PRO-2451). Every
+ * import stores the reason it stopped here (CON-233).
  */
 class BackfillTickTest extends TestCase
 {
@@ -68,11 +69,52 @@ class BackfillTickTest extends TestCase
         $this->createTick($jobManager, false, ['catalog:engine' => $processor])->execute();
     }
 
-    private function createJob(string $target, ?int $totalCount): Job&MockObject
+    /**
+     * CON-233: an import that stops stores where the error happened, never
+     * its message, which can quote a customer's data — the import card
+     * shows what is stored. Every import passes this router.
+     *
+     * @dataProvider imports
+     */
+    public function testAStoppedImportStoresWhereTheErrorHappenedNotItsMessage(string $jobType, string $target): void
+    {
+        $job = $this->createJob($target, null, $jobType);
+        $jobManager = $this->createJobManager($job);
+        $stored = null;
+        $jobManager->expects(self::once())->method('fail')
+            ->willReturnCallback(function (Job $failed, string $error) use (&$stored): void {
+                $stored = $error;
+            });
+        $processor = $this->createMock(ProcessorInterface::class);
+        $processor->method('process')->willThrowException(
+            new \InvalidArgumentException('Unable to unserialize value. Error: customer data 4711')
+        );
+
+        $this->createTick($jobManager, false, [$jobType . ':' . $target => $processor])->execute();
+
+        self::assertMatchesRegularExpression('/^InvalidArgumentException at BackfillTickTest\.php:\d+$/', $stored);
+        self::assertStringNotContainsString('4711', (string)$stored);
+        self::assertStringNotContainsString('unserialize', (string)$stored);
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function imports(): array
+    {
+        return [
+            'catalog' => [Job::TYPE_CATALOG, Job::TARGET_ENGINE],
+            'customers' => [Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE],
+            'orders' => [Job::TYPE_ORDERS, Job::TARGET_ENGINE],
+            'contacts' => [Job::TYPE_CONTACTS, Job::TARGET_SMAILY],
+        ];
+    }
+
+    private function createJob(string $target, ?int $totalCount, ?string $jobType = null): Job&MockObject
     {
         $job = $this->createMock(Job::class);
         $job->method('getId')->willReturn(3);
-        $job->method('getJobType')->willReturn($target === Job::TARGET_ENGINE ? 'catalog' : 'contacts');
+        $job->method('getJobType')->willReturn($jobType ?? ($target === Job::TARGET_ENGINE ? 'catalog' : 'contacts'));
         $job->method('getTarget')->willReturn($target);
         $job->method('getData')->willReturn($totalCount);
         $job->method('getStatus')->willReturn(Job::STATUS_RUNNING);

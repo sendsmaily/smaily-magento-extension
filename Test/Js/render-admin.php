@@ -608,6 +608,7 @@ $intelligenceStrings = [
         . ' Cancel that import, or press Run again on its card, and this one follows.',
     'Stopped',
     'Stopped before an error — %1 of %2 synced so far. Press Run again to run it again.',
+    'Details for your developer: %1',
     'Done',
     'Done, %1 of %2 synced — %3 skipped because Magento could not read them;'
         . ' var/log/smaily_connect.log on the server lists them by id.',

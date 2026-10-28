@@ -812,8 +812,10 @@ window.smailyPanelsInit = function ($) {
             setProgress(ui, data, data.percent, 'failed');
             text = '<?= $escaper->escapeJs(__('Stopped before an error — %1 of %2 synced so far. Press Run again to run it again.')) ?>'
                 .replace('%1', data.processed).replace('%2', data.total || '?');
+            // Where the error happened, never its text (CON-233).
             if (data.error) {
-                text += ' ' + data.error;
+                text += ' ' + '<?= $escaper->escapeJs(__('Details for your developer: %1')) ?>'
+                    .replace('%1', data.error);
             }
         } else {
             setProgress(ui, data, data.percent, 'stopped');

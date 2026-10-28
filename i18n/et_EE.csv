@@ -228,6 +228,7 @@
 "Delivery details","Saatmise üksikasjad"
 "Descending","Kahanev"
 "Details","Üksikasjad"
+"Details for your developer: %1","Üksikasjad arendajale: %1"
 "Disabled","Väljas"
 "Disconnect via CLI: bin/magento smaily:engine:disconnect","Ühenduse katkestamine käsurealt: bin/magento smaily:engine:disconnect"
 "Done","Valmis"

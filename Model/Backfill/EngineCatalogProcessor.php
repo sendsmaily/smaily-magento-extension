@@ -13,6 +13,7 @@ use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductColl
 use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\CatalogProductLoader;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 
@@ -26,7 +27,6 @@ class EngineCatalogProcessor implements ProcessorInterface
 {
     private const PAGE_SIZE = 100;
     private const TIME_BUDGET_SECONDS = 15;
-    private const QUEUE_BACKLOG_LIMIT = 500;
 
     public function __construct(
         private readonly JobManager $jobManager,
@@ -43,7 +43,7 @@ class EngineCatalogProcessor implements ProcessorInterface
      */
     public function process(Job $job): void
     {
-        if ($this->ingestQueue->countPending(Client::DOMAIN_CATALOG) >= self::QUEUE_BACKLOG_LIMIT) {
+        if ($this->ingestQueue->countPending(Client::DOMAIN_CATALOG) >= IngestPace::IMPORT_BACKLOG_ROWS) {
             return; // Let the flusher drain before enqueueing more.
         }
 
@@ -82,7 +82,7 @@ class EngineCatalogProcessor implements ProcessorInterface
                 return; // Admin cancel — stop cleanly at the page boundary.
             }
 
-            if ($this->ingestQueue->countPending(Client::DOMAIN_CATALOG) >= self::QUEUE_BACKLOG_LIMIT) {
+            if ($this->ingestQueue->countPending(Client::DOMAIN_CATALOG) >= IngestPace::IMPORT_BACKLOG_ROWS) {
                 return;
             }
         } while (microtime(true) < $deadline);

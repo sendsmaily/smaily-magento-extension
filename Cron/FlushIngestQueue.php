@@ -13,6 +13,7 @@ use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
+use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
@@ -20,7 +21,16 @@ use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\OptOutReplay;
 
 /**
- * Drains the engine ingest queue, one batch per domain per run.
+ * Drains the engine ingest queue: one batch per domain in turn, round after
+ * round, until the queue is empty, the run's budget is spent or the engine
+ * asks it to slow down (Engine\IngestPace, CON-232). A store's history
+ * import is not held to one batch per domain a minute, and a row the store
+ * queues meanwhile waits behind at most the import's backlog, never the
+ * whole history.
+ * The run ends early, leaving the rest to the next run, on a 429 (also one a
+ * retry got past) or a batch that failed in transport; a whole-batch 4xx
+ * ends its own domain for the run, so a key the engine no longer takes
+ * fails one batch per domain a run, not the whole queue.
  *
  * Each run first builds the catalog rows of the products the stock hooks
  * only marked changed (CatalogIngest::buildChanged(), PRO-1967), so they go
@@ -41,6 +51,12 @@ use Smaily\Connect\Model\Privacy\OptOutReplay;
  */
 class FlushIngestQueue
 {
+    /** Set when this run must send nothing more. */
+    private bool $stopped = false;
+
+    /** @var array<string, true> domains that send nothing more this run */
+    private array $haltedDomains = [];
+
     public function __construct(
         private readonly Settings $settings,
         private readonly IngestQueue $queue,
@@ -48,7 +64,8 @@ class FlushIngestQueue
         private readonly Client $client,
         private readonly OptOutReplay $optOutReplay,
         private readonly Json $serializer,
-        private readonly Logger $logger
+        private readonly Logger $logger,
+        private readonly IngestPace $pace
     ) {
     }
 
@@ -69,25 +86,61 @@ class FlushIngestQueue
             ]);
         }
 
-        foreach (array_keys(Client::DOMAIN_WRAPPERS) as $domain) {
-            $this->flushDomain($domain);
-        }
-
-        $this->flushCatalogRemove();
+        $this->stopped = false;
+        $this->haltedDomains = [];
+        $this->pace->start();
+        do {
+            $sent = false;
+            foreach (array_keys(Client::DOMAIN_WRAPPERS) as $domain) {
+                $sent = $this->flushDomain($domain) || $sent;
+            }
+            $sent = $this->flushCatalogRemove() || $sent;
+        } while ($sent);
     }
 
-    private function flushDomain(string $domain): void
+    /**
+     * Whether this run may claim another batch of the domain. Re-asked per
+     * batch: a refusal met by one batch stops the rest of this run instead
+     * of collecting more 403s. Only the refusal can appear mid-run —
+     * execute() proved connectedness.
+     */
+    private function maySend(string $domain): bool
     {
-        // Re-asked per domain: a refusal met by the first batch stops the
-        // rest of this run instead of collecting four more 403s. Only the
-        // refusal can appear mid-run — execute() proved connectedness.
-        if ($this->settings->isRefused()) {
-            return;
+        if ($this->stopped || isset($this->haltedDomains[$domain]) || $this->settings->isRefused()) {
+            return false;
+        }
+        if (!$this->pace->hasTime()) {
+            $this->stopped = true;
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * End the run when the engine asked to slow down, even though a retry
+     * got this batch through.
+     */
+    private function stopIfThrottled(): void
+    {
+        if ($this->client->wasThrottled()) {
+            $this->stopped = true;
+        }
+    }
+
+    /**
+     * Send one batch of the domain. True when a batch was claimed.
+     */
+    private function flushDomain(string $domain): bool
+    {
+        if (!$this->maySend($domain)) {
+            return false;
         }
 
         $events = $this->queue->claimBatch($domain, Client::DOMAIN_BATCH_LIMITS[$domain]);
         if (!$events) {
-            return;
+            return false;
         }
 
         $items = [];
@@ -95,9 +148,11 @@ class FlushIngestQueue
             $items[$index] = $this->queue->decodePayload($event);
         }
 
+        $this->pace->awaitTurn();
         try {
             $response = $this->client->ingest($domain, $items);
         } catch (EngineTransportException $exception) {
+            $this->stopped = true;
             $this->recordBatchExchange($domain, $events, $items);
             $this->queue->markFailedMany($events, $exception->getMessage());
             $this->logger->info('Ingest batch rescheduled', [
@@ -106,10 +161,11 @@ class FlushIngestQueue
                 'error' => $exception->getMessage(),
             ]);
 
-            return;
+            return true;
         } catch (EngineRequestException $exception) {
+            $this->haltedDomains[$domain] = true;
             if ($this->releaseIfRefused($events)) {
-                return;
+                return true;
             }
 
             // Whole-batch 4xx: the request shape is wrong; retrying the same
@@ -117,11 +173,14 @@ class FlushIngestQueue
             $this->recordBatchExchange($domain, $events, $items);
             $this->queue->markFailedMany($events, $exception->getMessage(), true);
 
-            return;
+            return true;
         }
 
+        $this->stopIfThrottled();
         $this->recordBatchExchange($domain, $events, $items);
         $this->applyD6Response($domain, $events, $items, $response);
+
+        return true;
     }
 
     /**
@@ -154,18 +213,19 @@ class FlushIngestQueue
     }
 
     /**
-     * Drain the §3b catalog/remove rows: one wrapper of unique product ids
-     * per run. §3b has no per-item errors[] — a 2xx applies to every id.
+     * Send one §3b catalog/remove batch: one wrapper of unique product ids.
+     * §3b has no per-item errors[] — a 2xx applies to every id. True when a
+     * batch was claimed.
      */
-    private function flushCatalogRemove(): void
+    private function flushCatalogRemove(): bool
     {
-        if ($this->settings->isRefused()) {
-            return;
+        if (!$this->maySend(Client::DOMAIN_CATALOG_REMOVE)) {
+            return false;
         }
 
         $events = $this->queue->claimBatch(Client::DOMAIN_CATALOG_REMOVE, Client::CATALOG_REMOVE_BATCH_LIMIT);
         if (!$events) {
-            return;
+            return false;
         }
 
         $keyed = [];
@@ -184,16 +244,18 @@ class FlushIngestQueue
             $this->queue->markFailedMany($keyless, 'catalog/remove row has no product_id', true);
         }
         if (!$keyed) {
-            return;
+            return true;
         }
 
         // The engine is idempotent per id; still no reason to repeat one
         // inside a single wrapper (two queued rows for one product).
         $ids = array_values(array_unique(array_map(static fn (array $pair): string => $pair[1], $keyed)));
 
+        $this->pace->awaitTurn();
         try {
             $response = $this->client->catalogRemove($ids);
         } catch (EngineTransportException $exception) {
+            $this->stopped = true;
             $this->recordRemoveExchange($keyed);
             $this->queue->markFailedMany($this->keyedEvents($keyed), $exception->getMessage());
             $this->logger->info('Catalog remove batch rescheduled', [
@@ -201,10 +263,11 @@ class FlushIngestQueue
                 'error' => $exception->getMessage(),
             ]);
 
-            return;
+            return true;
         } catch (EngineRequestException $exception) {
+            $this->haltedDomains[Client::DOMAIN_CATALOG_REMOVE] = true;
             if ($this->releaseIfRefused($this->keyedEvents($keyed))) {
-                return;
+                return true;
             }
 
             // 4xx is terminal: a malformed wrapper cannot improve by
@@ -213,10 +276,11 @@ class FlushIngestQueue
             $this->recordRemoveExchange($keyed);
             $this->queue->markFailedMany($this->keyedEvents($keyed), $exception->getMessage(), true);
 
-            return;
+            return true;
         }
 
         // On success the row's own outcome below replaces the batch reply.
+        $this->stopIfThrottled();
         $this->recordRemoveExchange($keyed);
         $notFound = array_map('strval', (array)($response['not_found'] ?? []));
         foreach ($keyed as [$event, $productId]) {
@@ -226,6 +290,8 @@ class FlushIngestQueue
                 'rows_tombstoned' => (int)($response['rows_tombstoned'] ?? 0),
             ]));
         }
+
+        return true;
     }
 
     /**

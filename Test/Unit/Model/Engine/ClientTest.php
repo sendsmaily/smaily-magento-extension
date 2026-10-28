@@ -129,6 +129,26 @@ class ClientTest extends TestCase
     }
 
     /**
+     * CON-232: the send run ends when the engine asked it to slow down, also
+     * when a retry then went through; the next request starts unthrottled.
+     */
+    public function testARateLimitedRequestIsReportedAsThrottledUntilTheNextRequest(): void
+    {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/ingest/ping');
+        $client = $this->createClient([
+            new Response(429, [], '{"error":"rate_limit_exceeded","retry_after_seconds":1}'),
+            new Response(200, [], '{"ok":true}'),
+            new Response(200, [], '{"ok":true}'),
+        ]);
+
+        $client->ping();
+        self::assertTrue($client->wasThrottled());
+
+        $client->ping();
+        self::assertFalse($client->wasThrottled());
+    }
+
+    /**
      * PRO-3575: every engine call bounds the connection phase as well as the
      * whole request.
      */

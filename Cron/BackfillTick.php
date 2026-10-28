@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Cron;
 
+use Smaily\Connect\Model\Backfill\ErrorLocation;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\ProcessorInterface;
@@ -56,7 +57,9 @@ class BackfillTick
         try {
             $processor->process($job);
         } catch (\Throwable $exception) {
-            $this->jobManager->fail($job, $exception->getMessage());
+            // Where it happened, never the message: the import card shows
+            // this, and a message can quote a customer's data (CON-233).
+            $this->jobManager->fail($job, ErrorLocation::of($exception));
             $this->logger->error('Backfill job failed', [
                 'job_id' => $job->getId(),
                 'type' => $key,

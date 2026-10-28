@@ -38,6 +38,7 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * import names it. PRO-3927: one the tick has set aside reads as stalled
  * and waits behind nothing. PRO-4037: a contacts import that sent nothing
  * because the website's contact sync was not active names the website.
+ * CON-233: a stopped import never answers an error's own text.
  */
 class BackfillStateTest extends TestCase
 {
@@ -288,6 +289,47 @@ class BackfillStateTest extends TestCase
 
         self::assertSame(3, $this->response['failed']);
         self::assertSame(0, $this->response['skipped']);
+    }
+
+    /**
+     * CON-233: a stopped import answers where the error happened, or one of
+     * the imports' own reasons; an error's text that an earlier version
+     * stored, which can quote a customer's data, answers as ''.
+     *
+     * @dataProvider storedReasons
+     */
+    public function testAStoppedImportAnswersOnlyWhereTheErrorHappened(string $stored, string $shown): void
+    {
+        $job = $this->job(Job::STATUS_FAILED, Job::TYPE_CUSTOMERS);
+        $job->method('getData')->willReturnMap([
+            ['total_count', null, 10],
+            ['completed_at', null, null],
+            ['error_message', null, $stored],
+        ]);
+
+        $this->controller(true, ['action' => 'status', 'job_type' => Job::TYPE_CUSTOMERS], [$job])->execute();
+
+        self::assertSame('failed', $this->response['status']);
+        self::assertSame($shown, $this->response['error']);
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function storedReasons(): array
+    {
+        $location = 'Magento\Framework\Exception\NoSuchEntityException at StoreRepository.php:110';
+
+        return [
+            'where the error happened' => [$location, $location],
+            'a website without stores' => ['Website 3 has no stores', 'Website 3 has no stores'],
+            'an earlier version\'s error text' => [
+                'Unable to unserialize value. Error: Control character error, possibly incorrectly encoded',
+                '',
+            ],
+            'an earlier version\'s text that ends like a location' => ['Order 17 failed at Json.php:42 for x', ''],
+            'nothing' => ['', ''],
+        ];
     }
 
     private function job(string $status, string $jobType = Job::TYPE_CATALOG): Job&MockObject

@@ -37,12 +37,7 @@ class SkippedRow
             'job_id' => (int)$job->getId(),
             'type' => $job->getJobType(),
             'entity_id' => $entityId,
-            'error' => sprintf(
-                '%s at %s:%d',
-                get_class($exception),
-                basename($exception->getFile()),
-                $exception->getLine()
-            ),
+            'error' => ErrorLocation::of($exception),
         ]);
     }
 }

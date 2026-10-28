@@ -17,7 +17,8 @@
   start; one that waits behind another stalled import names that import's
   card (`blocked_by`, PRO-3923) and offers only Cancel; an import that stopped
   before an error names the button the card shows (Run again) in both
-  languages (PRO-3957); an import that moves shows its progress as before.
+  languages (PRO-3957) and names where the error happened for the developer
+  (CON-233); an import that moves shows its progress as before.
   The contacts card (panel/subscribers.phtml, the Contacts tab) quotes the
   number of contacts its import sends for the mode picked on the panel, and
   no other total (PRO-1970); a contacts import that sent nothing because a
@@ -44,6 +45,7 @@
     var STALLED = 'Stalled — nothing has moved this import for over an hour; %1 of %2 synced so far. Press Run again to start a fresh import. If it stalls again, check that Magento\'s cron runs.';
     var BLOCKED = 'Stalled — this import waits behind another import that nothing has moved for over an hour: Settings > %1. Cancel that import, or press Run again on its card, and this one follows.';
     var STOPPED = 'Stopped before an error — %1 of %2 synced so far. Press Run again to run it again.';
+    var DETAILS = 'Details for your developer: %1';
     var ONE_CONTACT = 'This import sends %1 contact from this website. It runs in the background, a chunk per minute, and never slows the storefront down.';
     var CONTACTS = 'This import sends %1 contacts from this website. It runs in the background, a chunk per minute, and never slows the storefront down.';
     var SYNC_OFF = 'Contact sync was off for %1, so nothing was sent from there. Turn it on and save the Contacts settings, then press Run again.';
@@ -167,6 +169,7 @@
             frame,
             seen,
             blocked,
+            stopped,
             skipped,
             starts;
 
@@ -229,6 +232,22 @@
             && seen.start === strings['Run again'] && seen.startPrimary);
         check(locale + ', stopped before an error: the hint names the button the card shows',
             seen.start !== '' && seen.verdict.indexOf(seen.start) !== -1);
+        frame.remove();
+
+        // It names where the error happened for the developer, in the
+        // merchant's language (CON-233); the endpoint never answers the
+        // error's own text.
+        if (locale !== 'en_US') {
+            check(locale + ': the developer details are translated', strings[DETAILS] !== DETAILS);
+        }
+        stopped = catalog('failed', 400, 1200, false);
+        stopped.error = 'InvalidArgumentException at Json.php:42';
+        frame = await open(page, {status: stopped});
+        seen = card(frame);
+        check(locale + ', stopped before an error: the card names where the error happened',
+            seen.state === 'stopped'
+            && seen.verdict === strings[STOPPED].replace('%1', '400').replace('%2', '1200')
+                + ' ' + strings[DETAILS].replace('%1', stopped.error));
         frame.remove();
 
         // A Campaign Intelligence import that skipped rows Magento could not

@@ -228,6 +228,7 @@
 "Delivery details","Delivery details"
 "Descending","Descending"
 "Details","Details"
+"Details for your developer: %1","Details for your developer: %1"
 "Disabled","Disabled"
 "Disconnect via CLI: bin/magento smaily:engine:disconnect","Disconnect via CLI: bin/magento smaily:engine:disconnect"
 "Done","Done"

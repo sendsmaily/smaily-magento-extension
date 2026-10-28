@@ -189,11 +189,33 @@ below.
 - One wire item per row; the row UUID doubles as the wire `event_id`, so
   engine-side transport dedup makes retries safe.
 - `Cron/FlushIngestQueue` first builds the catalog rows of the products the
-  stock hooks marked changed (see Stock changes below), then sends one batch
-  per domain per run (batch caps
-  100/100/50/100 per the contract) and maps the D6 response's
+  stock hooks marked changed (see Stock changes below), then sends batches
+  (batch caps 100/100/50/100 per the contract), one domain after another in
+  turn, until the queue is empty, and maps the D6 response's
   `errors[].index` back onto individual rows — a 200 is never treated as
   all-or-nothing.
+- **The send pace (CON-232)** lives in one place, `Model/Engine/IngestPace`:
+  one request at a time, at most `REQUESTS_PER_SECOND` (5; the contract
+  allows 100 a second per ingest route, and engine contract 1.20.0 is to
+  name a target pace — its answer changes that one number), for at most
+  `SEND_BUDGET_SECONDS` (40) a run, under the minute between runs. A 429
+  (also one a retry got past, `Client::wasThrottled()`) or a batch that
+  failed in transport ends the run; a whole-batch 4xx ends its domain for
+  the run. An import queues at most `IMPORT_BACKLOG_ROWS` (2,000) rows of
+  its domain ahead of the send run (the processors stop their chunk there),
+  so an import moves up to 2,000 rows a minute, and a row the store queues
+  meanwhile (a new order) waits behind at most that backlog — 40 order
+  requests, which one run sends — never behind the whole history. Per cron
+  minute an import moves min(2,000, what the tick builds in its 15 s, what
+  the run sends in 40 s: 40 / max(0.2 s, time per request) × rows per
+  request) rows; a store of 5,000 products, 20,000 customers and 80,000
+  orders takes about 3 + 10 + 40 = 53 minutes (it took about 31 hours at
+  one batch per domain a minute). `Test/Integration/Backfill/ImportPaceTest`
+  runs one such minute against a mock engine. The WooCommerce plugin's
+  import is slower: it sends one batch inline per Action Scheduler tick,
+  30 s apart.
+- The same job code never runs in two processes at once (Magento's cron
+  locks a job while it runs), so two send runs never overlap.
 - Every catalog row carries `tags.product_id` — the platform parent product
   id (`Engine\Payload\ParentProductResolver`: a configurable child resolves
   to its parent's entity id, everything else to its own). It keys the
@@ -1058,8 +1080,8 @@ invoke `bin/magento cron:run` every minute.
 | Job | Schedule | Does |
 |---|---|---|
 | `smaily_flush_event_queue` | every minute | Drain marketing queue |
-| `smaily_flush_ingest_queue` | every minute | Build the rows of stock-changed products, then drain engine queue (all domains) |
-| `smaily_backfill_tick` | every minute | Advance the oldest active import one time-budgeted chunk |
+| `smaily_flush_ingest_queue` | every minute | Build the rows of stock-changed products, then drain engine queue (all domains, up to 40 s at the `IngestPace`) |
+| `smaily_backfill_tick` | every minute | Advance the oldest active import one time-budgeted chunk (up to 15 s, up to 2,000 queued rows) |
 | `smaily_abandoned_cart` | every 5 min | Scan idle quotes, enqueue automations |
 | `smaily_contact_reconcile` | every 15 min | Smaily→Magento consent mirror |
 | `smaily_health_check` | every 15 min | Engine-down / failure-volume / missing-consent-source notices |

@@ -382,9 +382,13 @@ class FlushIngestQueue
             ]);
         }
 
-        // D6 invariant: processed + deduplicated + errors == total sent.
+        // D6 invariant: processed + deduplicated + skipped + errors == total
+        // sent. `skipped` (contract §5, v1.20.0) counts orders older than the
+        // history horizon that the engine did not store; they are not errors
+        // and are not retried, so their rows stay marked sent.
         $accounted = (int)($response['processed'] ?? 0)
             + (int)($response['deduplicated'] ?? 0)
+            + (int)($response['skipped'] ?? 0)
             + count($errorsByIndex);
         if ($accounted !== count($events)) {
             $this->logger->info('D6 count invariant mismatch', [

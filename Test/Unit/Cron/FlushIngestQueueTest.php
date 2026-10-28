@@ -93,6 +93,43 @@ class FlushIngestQueueTest extends TestCase
         self::assertTrue($failed[12][1], 'Per-item validation errors are terminal');
     }
 
+    /**
+     * Contract §5 (v1.20.0): an order older than the history horizon is
+     * answered 200 and counted in `skipped`, not in `errors[]`. Its row is
+     * marked sent like the others, and the count holds, so no mismatch is
+     * logged.
+     */
+    public function testOrdersTheEngineSkipsAreMarkedSentAndKeepTheCountWhole(): void
+    {
+        $first = $this->createEvent(41, Client::DOMAIN_ORDERS);
+        $second = $this->createEvent(42, Client::DOMAIN_ORDERS);
+        $this->stubClaims([Client::DOMAIN_ORDERS => [$first, $second]]);
+        $this->client->method('ingest')->willReturn([
+            'ok' => true,
+            'processed' => 1,
+            'deduplicated' => 0,
+            'errors' => [],
+            'skipped' => 1,
+            'skipped_orders' => [
+                ['index' => 0, 'external_order_id' => '100', 'reason' => 'older_than_retention'],
+            ],
+        ]);
+
+        $sent = [];
+        $this->queue->method('markSent')->willReturnCallback(
+            static function (IngestEvent $event) use (&$sent): void {
+                $sent[] = (int)$event->getId();
+            }
+        );
+        $this->queue->expects(self::never())->method('markFailedMany');
+        $logger = $this->createMock(Logger::class);
+        $logger->expects(self::never())->method('info');
+
+        $this->createCron($logger)->execute();
+
+        self::assertSame([41, 42], $sent);
+    }
+
     public function testTransportFailureReschedulesBatchNonTerminally(): void
     {
         $event = $this->createEvent(5);
@@ -500,7 +537,7 @@ class FlushIngestQueueTest extends TestCase
         );
     }
 
-    private function createCron(): FlushIngestQueue
+    private function createCron(?Logger $logger = null): FlushIngestQueue
     {
         return new FlushIngestQueue(
             $this->settings,
@@ -509,7 +546,7 @@ class FlushIngestQueueTest extends TestCase
             $this->client,
             new OptOutReplay($this->profilingConsent),
             new Json(),
-            $this->createMock(Logger::class),
+            $logger ?? $this->createMock(Logger::class),
             $this->pace
         );
     }

@@ -27,7 +27,7 @@ class Index extends Action implements HttpGetActionInterface
 
     public function __construct(
         Context $context,
-        private readonly SetupGuard $setupGuard,
+        private readonly SetupGuard|WebsiteContext $setupGuard,
         private readonly WebsiteContext $websiteContext
     ) {
         parent::__construct($context);

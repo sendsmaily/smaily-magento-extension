@@ -21,8 +21,8 @@ use Smaily\Connect\Model\Engine\Settings;
 /**
  * CON-156: the one connect step the admin Connect and the configuration
  * save share — exchange the setup token, store the connection, then start
- * the catalog import and the customers import (PRO-3741, PRO-3790), in
- * that order.
+ * the catalog import, the customers import and the orders import
+ * (PRO-3741, PRO-3790, CON-241), in that order.
  */
 class ConnectorTest extends TestCase
 {
@@ -42,7 +42,7 @@ class ConnectorTest extends TestCase
         $this->jobManager = $this->createMock(JobManager::class);
     }
 
-    public function testConnectingExchangesStoresThenStartsTheCatalogAndTheCustomersImport(): void
+    public function testConnectingExchangesStoresThenStartsTheCatalogCustomersAndOrdersImports(): void
     {
         $exchange = ['tenant_name' => 'Pilot', 'engine_version' => '1.8.2'];
         $this->client->expects(self::once())->method('setupExchange')->with('tok_abc123')
@@ -70,9 +70,13 @@ class ConnectorTest extends TestCase
             'store',
             sprintf('start %s %s %d', Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID),
             sprintf('start %s %s %d', Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID),
+            sprintf('start %s %s %d', Job::TYPE_ORDERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID),
         ], $this->steps);
         self::assertSame($exchange, $result['exchange']);
-        self::assertSame([Job::TYPE_CATALOG => true, Job::TYPE_CUSTOMERS => false], $result['started']);
+        self::assertSame(
+            [Job::TYPE_CATALOG => true, Job::TYPE_CUSTOMERS => false, Job::TYPE_ORDERS => false],
+            $result['started']
+        );
     }
 
     public function testAFailedExchangeStoresNothingAndStartsNothing(): void

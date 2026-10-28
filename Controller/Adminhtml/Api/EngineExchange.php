@@ -18,11 +18,12 @@ use Smaily\Connect\Model\Engine\Connector;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 
 /**
- * POST {setup_url} -> {connected: true, tenantName, engineVersion, catalogImportStarted, customersImportStarted}
+ * POST {setup_url} -> {connected: true, tenantName, engineVersion, catalogImportStarted, customersImportStarted,
+ *                     ordersImportStarted}
  *                   | {connected: false, message}
  *
  * A successful connection starts the catalog import (PRO-3741) and the
- * customers import (PRO-3790) — Engine\Connector, the connect step the
+ * customers import (PRO-3790) and the orders import (CON-241) — Engine\Connector, the connect step the
  * configuration save shares; each *ImportStarted is false when that
  * import was already queued or running.
  */
@@ -59,6 +60,7 @@ class EngineExchange extends AbstractJsonAction implements HttpPostActionInterfa
                 'engineVersion' => (string)($response['engine_version'] ?? ''),
                 'catalogImportStarted' => $started[Job::TYPE_CATALOG],
                 'customersImportStarted' => $started[Job::TYPE_CUSTOMERS],
+                'ordersImportStarted' => $started[Job::TYPE_ORDERS],
             ]);
         } catch (EngineException $exception) {
             // Frame the (possibly technical) engine message in a translated

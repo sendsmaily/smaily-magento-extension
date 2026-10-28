@@ -29,8 +29,8 @@ use Smaily\Connect\Model\Engine\Settings;
 /**
  * PRO-3741, PRO-3790: connecting Campaign Intelligence by saving the setup
  * token in Stores > Configuration (or `bin/magento config:set`) starts the
- * catalog import, then the customers import, and says so for each; never
- * the orders import. A save without a token is no connection and starts
+ * catalog import, then the customers import, then the orders import (CON-241),
+ * and says so for each. A save without a token is no connection and starts
  * nothing.
  */
 class EngineSetupTokenTest extends TestCase
@@ -48,11 +48,11 @@ class EngineSetupTokenTest extends TestCase
         $this->messageManager = $this->createMock(ManagerInterface::class);
     }
 
-    public function testConnectingStartsTheCatalogAndCustomersImportsAndSaysSo(): void
+    public function testConnectingStartsTheCatalogCustomersAndOrdersImportsAndSaysSo(): void
     {
         $this->client->method('setupExchange')->willReturn(['tenant_name' => 'Pilot', 'engine_version' => '1.8.2']);
         $started = [];
-        $this->jobManager->expects(self::exactly(2))->method('startIfIdle')
+        $this->jobManager->expects(self::exactly(3))->method('startIfIdle')
             ->willReturnCallback(function (string $jobType, string $target, int $websiteId) use (&$started) {
                 $started[] = [$jobType, $target, $websiteId];
 
@@ -71,16 +71,18 @@ class EngineSetupTokenTest extends TestCase
         self::assertSame([
             [Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID],
             [Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID],
+            [Job::TYPE_ORDERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID],
         ], $started);
-        self::assertCount(2, $notices);
+        self::assertCount(3, $notices);
         self::assertStringStartsWith('The catalog import has started:', $notices[0]);
         self::assertStringStartsWith('The customers import has started:', $notices[1]);
+        self::assertStringStartsWith('The orders import has started:', $notices[2]);
     }
 
-    public function testAReconnectWhileBothImportsAreQueuedOrRunningStartsNoSecond(): void
+    public function testAReconnectWhileTheImportsAreQueuedOrRunningStartsNoSecond(): void
     {
         $this->client->method('setupExchange')->willReturn(['tenant_name' => 'Pilot', 'engine_version' => '1.8.2']);
-        $this->jobManager->expects(self::exactly(2))->method('startIfIdle')
+        $this->jobManager->expects(self::exactly(3))->method('startIfIdle')
             ->willReturn(null);
         $this->messageManager->expects(self::never())->method('addNoticeMessage');
 

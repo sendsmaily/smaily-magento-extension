@@ -17,7 +17,7 @@ use Smaily\Connect\Model\Engine\Exception\EngineException;
  * configuration save, also `bin/magento config:set`
  * (Model/Config/Backend/EngineSetupToken): exchange the pasted setup URL or
  * token, store the connection, then start the imports a connect starts
- * (ImportsOnConnect: the catalog, then the customers). Each caller words
+ * (ImportsOnConnect: the catalog, the customers, then the orders). Each caller words
  * the outcome for its own merchant; none of them repeats a step.
  */
 class Connector
@@ -32,7 +32,7 @@ class Connector
     /**
      * Connect with a setup URL or token; nothing is stored or started when the exchange fails.
      *
-     * @return array{exchange: array<string, mixed>, started: array{catalog: bool, customers: bool}}
+     * @return array{exchange: array<string, mixed>, started: array{catalog: bool, customers: bool, orders: bool}}
      *     the engine's setup-exchange answer, and per import whether this connect started it
      * @throws EngineException when the engine does not accept the setup URL or token
      */

@@ -148,3 +148,81 @@ jobs:
             smaily-connect-magento2.zip
             smaily-connect-magento2.zip.sha256
           retention-days: 5
+
+  # Magento's own compile step on the oldest and the newest supported Magento
+  # (CON-210). Rc1–rc14 could not be compiled on 2.4.4 and nothing noticed
+  # (CON-204). `setup:di:compile` needs only the enabled modules in
+  # app/etc/config.php, no database and no search engine, so the job installs
+  # Magento's code with composer and the extension from the release ZIP (what
+  # a merchant gets), enables every module and compiles.
+  compile:
+    name: Magento compile (${{ matrix.magento }}, PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - magento: '2.4.4'
+            php: '8.1'
+          - magento: '2.4.9'
+            php: '8.4'
+    env:
+      MAGENTO_DIR: ${{ github.workspace }}/../magento
+      ZIP_DIR: ${{ github.workspace }}/../smaily-zip
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: bcmath, gd, intl, pdo_mysql, soap, sockets, sodium, xsl, zip
+          ini-values: memory_limit=-1
+          coverage: none
+
+      - name: Locate the composer cache
+        id: composer-cache
+        run: echo "dir=$(composer config --global cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: magento-compile-${{ matrix.magento }}-php${{ matrix.php }}
+
+      - name: Build the release ZIP
+        run: |
+          mkdir -p "$ZIP_DIR"
+          bash bin/build-release-zip.sh "$ZIP_DIR/smaily-connect-magento2.zip"
+
+      # The project's composer.json points at repo.magento.com, which needs
+      # keys; the Mage-OS mirror serves the same packages without them. The
+      # extension comes from the ZIP (an artifact repository). Composer would
+      # refuse the old Magento's packages that have security advisories.
+      - name: Create the Magento ${{ matrix.magento }} project
+        run: |
+          composer create-project --no-install --no-interaction \
+            --repository-url=https://mirror.mage-os.org/ \
+            "magento/project-community-edition=${{ matrix.magento }}" "$MAGENTO_DIR"
+          cd "$MAGENTO_DIR"
+          version="$(jq -r .version "$GITHUB_WORKSPACE/composer.json")"
+          jq --arg zips "$ZIP_DIR" --arg version "$version" '
+            .repositories = [
+              {"type": "artifact", "url": $zips},
+              {"type": "composer", "url": "https://mirror.mage-os.org/"}
+            ]
+            | .require["smaily/smailyformagento"] = $version
+            | del(."require-dev")
+            | .config["allow-plugins"] = true
+            | .config.audit["block-insecure"] = false
+          ' composer.json > composer.json.new
+          mv composer.json.new composer.json
+          composer update --no-interaction --no-progress
+
+      - name: Enable the modules
+        working-directory: ${{ env.MAGENTO_DIR }}
+        run: |
+          php bin/magento module:enable --all
+          grep -q "'Smaily_Connect' => 1" app/etc/config.php
+
+      - name: setup:di:compile
+        working-directory: ${{ env.MAGENTO_DIR }}
+        run: php bin/magento setup:di:compile

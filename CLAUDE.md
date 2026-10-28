@@ -446,7 +446,10 @@ is written in English.
   cookies; pilot stores on rc12, Campaign Intelligence waits for the
   client); 2026-10-23 session end: 4/5 (rc15 released; pilot stores on
   rc12 waiting for their developer's rc15 upgrade; Campaign Intelligence
-  waits for the client; 3.0.0 gate CON-209).
+  waits for the client; 3.0.0 gate CON-209); 2026-10-28: 4/5 (rc16 cut:
+  imports go on past unreadable rows and send a store's history in about
+  an hour; the first pilot store connected Campaign Intelligence on 26.10
+  and waits for rc16).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Feature (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

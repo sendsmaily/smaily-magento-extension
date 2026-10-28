@@ -356,7 +356,9 @@ below.
   MSI's salable-per-website quantity. A catalog row is keyed on `sku` per
   tenant and one installation is one tenant, so a per-website salable answer
   has nowhere to go until the multi-website tenant work (RFC Phase 4, gated on
-  PRO-1459) gives each website its own tenant. `CatalogPayloadBuilder::
+  PRO-1459) gives each website its own tenant (superseded 2026-10-28: one
+  Smaily account is one engine store, CON-237; per-website stock inside one
+  engine store is the engine's INT-171). `CatalogPayloadBuilder::
   isInStock()` drops the stock registry's per-request memo immediately before
   it reads (MSI mirrors onto the legacy row with direct SQL and so never
   invalidates that memo — otherwise selling out publishes `in_stock: true`).
@@ -699,7 +701,9 @@ below.
   ingested, never skipped. The row's `currency` still names the canonical
   store's display currency: an install whose second website has a different
   base currency is mislabeled there, and per-website tenants (the
-  multi-website RFC's Phase 4, PRO-1762) are the fix for that, not this.
+  multi-website RFC's Phase 4, PRO-1762) are the fix for that, not this
+  (superseded 2026-10-28: one Smaily account is one engine store, CON-237;
+  per-website price inside one engine store is the engine's INT-171).
 - **Storefront URL (PRO-3660):** a store that sells on a separate
   (headless) storefront saves its address at website scope
   (`smaily_connect/connection/storefront_url`, Settings > Connection and

@@ -7,9 +7,10 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-10-28 — **3.0.0-rc16 version cut.**
-**3.0.0-rc16 is cut** (the version-cut PR `release/3.0.0-rc16`); its tag
-waits for Erkki (CLAUDE.md "Release cut"). The cut collects 6 fragments
+_Last updated: 2026-10-28 — **3.0.0-rc16 cut on `master`; the
+multi-website rule for Campaign Intelligence decided.**
+**3.0.0-rc16 is cut** on `master` (#220, the version-cut PR
+`release/3.0.0-rc16`); its tag waits for Erkki (CLAUDE.md "Release cut"). The cut collects 6 fragments
 into CHANGELOG's "Changes since 3.0.0-rc15", in landing order (CON-220,
 CON-224, CON-227, CON-235, CON-232, CON-233), and rewords the three
 bullets that CON-220 and CON-224 made untrue: the CON-143 privacy-template bullet
@@ -71,12 +72,20 @@ and subscriber is sent, also one who never bought; only a buyer whose
 every order is older than the horizon is left out. When an import stops,
 the server log keeps the full exception message (`BackfillTick`'s
 "Backfill job failed" entry in `var/log/smaily_connect.log`); only the
-admin card shows the location form. Multi-website: Erkki asked to
-discuss whether the extension should also offer a fully separate setup
-per website (its own Smaily account, its own engine store) for very
-different websites, next to today's one store-wide setup; CON-148 and
-CON-161 wait for that discussion. **Decided (2026-10-24):** one Magento
-installation is one engine store (today's setup).
+admin card shows the location form. Multi-website: **one Smaily account
+is one Campaign Intelligence (engine) store.** Websites that share a
+Smaily account (language versions; the same goods, stock and customers)
+share one engine store, as today. A website the merchant gives its own
+Smaily account gets its own engine store, built when the first store
+needs it (CON-237). There is no separate mode switch. CON-148 and
+CON-161 (an engine store per website, Phases 4–5 of
+`docs/internal/RFC_MULTI_WEBSITE.md`) are canceled. Per-website price,
+stock and links inside one engine store are the engine's INT-171.
+Klaviyo, Mailchimp and dotdigital also let a website connect its own
+account; none of them has an engine store to scope. **Decided
+(2026-10-24):** one Magento installation is one engine store (today's
+setup; the 2026-10-28 rule keeps it until a website has its own Smaily
+account).
 
 **Open:** CON-209 (the 3.0.0 gate), CON-210, CON-215, CON-225, CON-230
 (the console button; waits for the engine), CON-168, CON-234 (waits for
@@ -91,8 +100,6 @@ import pace (CON-236).
    **Customers** and **Orders**.
 3. Contract 1.20.0 from the engine (INT-185) → newest-first history in
    all connectors.
-4. The multi-website discussion (a separate setup per website) →
-   CON-148 / CON-161.
 
 **Notes for the next version cut (rc17):** none so far._
 

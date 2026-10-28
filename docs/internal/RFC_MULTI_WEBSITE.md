@@ -12,6 +12,13 @@
 > website's own values; §2's "wizard flow" and per-website `SetupGuard` are
 > replaced — `docs/ARCHITECTURE.md` "Multi-website" holds the current
 > model.
+>
+> **Phases 4–5 superseded (owner decision 2026-10-28):** one Smaily
+> account is one Campaign Intelligence (engine) store, not one website.
+> Websites that share a Smaily account share one engine store; a website
+> with its own Smaily account gets its own engine store, built when the
+> first store needs it (CON-237, which replaces the canceled CON-148 and
+> CON-161). §3–§5 and Phases 4–5 below stay as history.
 
 ## Decision
 

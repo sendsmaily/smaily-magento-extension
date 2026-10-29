@@ -1194,8 +1194,10 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
-     * Engine tenant scoping is Phase 4 (docs/internal/RFC_MULTI_WEBSITE.md §3) and RSS is
-     * outside §1's field list — both stay at default scope in this phase.
+     * One Smaily account is one engine store, and websites that share an
+     * account share it (2026-10-28, CON-237), so the engine settings are not
+     * per website; RSS is outside docs/internal/RFC_MULTI_WEBSITE.md §1's
+     * field list. Both stay at default scope.
      */
     public function testIntelligenceAndRssStayAtDefaultScope(): void
     {

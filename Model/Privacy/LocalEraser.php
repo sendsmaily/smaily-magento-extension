@@ -281,7 +281,7 @@ class LocalEraser
         $connection = $this->resourceConnection->getConnection(self::SALES_CONNECTION);
         $table = $this->resourceConnection->getTableName(self::ATTRIBUTION_TABLE, self::SALES_CONNECTION);
 
-        $owner = $connection->quoteInto('LOWER(sales_order.customer_email) = ?', $email);
+        $owner = $connection->quoteInto(AddressMatch::condition('sales_order.customer_email'), $email);
         $customerIds = $this->customerIds($email);
         if ($customerIds) {
             $owner .= ' OR ' . $connection->quoteInto('sales_order.customer_id IN (?)', $customerIds);
@@ -316,6 +316,11 @@ class LocalEraser
     /**
      * The customer accounts that hold the address, in any website.
      *
+     * The plain comparison lets the email + website unique index narrow the
+     * rows first: under the table's case- and accent-insensitive collation
+     * it finds every account the exact match can (Magento finds an account
+     * by its address the same way), and AddressMatch keeps the exact one.
+     *
      * @param string $email
      * @return int[]
      */
@@ -326,7 +331,8 @@ class LocalEraser
         return array_map('intval', $connection->fetchCol(
             $connection->select()
                 ->from($this->resourceConnection->getTableName('customer_entity'), ['entity_id'])
-                ->where('LOWER(email) = ?', $email)
+                ->where('email = ?', $email)
+                ->where(AddressMatch::condition('email'), $email)
         ));
     }
 

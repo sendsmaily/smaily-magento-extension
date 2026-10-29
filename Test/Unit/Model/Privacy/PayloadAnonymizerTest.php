@@ -72,6 +72,52 @@ class PayloadAnonymizerTest extends TestCase
         self::assertFalse($this->mentions($error, 'erase-test-2@example.test'));
     }
 
+    /**
+     * CON-240: a longer address that contains the erased one belongs to
+     * another shopper — in a JSON value and in plain text alike.
+     */
+    public function testALongerAddressContainingTheAddressNeverMatches(): void
+    {
+        $email = 'ane@example.test';
+        $longer = ['jane@example.test', 'x.ane@example.test', 'x+ane@example.test', 'ane@example.test.ee',
+            'ane@example.test-shop.ee', 'Jane@Example.Test'];
+
+        foreach ($longer as $other) {
+            self::assertFalse(
+                $this->mentions((string)json_encode(['contact' => ['email' => $other]]), $email),
+                $other . ' in a payload'
+            );
+            self::assertFalse($this->mentions('HTTP 422: ' . $other . ' is not valid', $email), $other . ' in text');
+        }
+    }
+
+    /**
+     * CON-240: the whole address still matches wherever it stands on its own
+     * — alone, quoted, bracketed, at the end of a sentence — in any letter
+     * case, a non-ASCII one too.
+     */
+    public function testTheWholeAddressMatchesOnItsOwnInAnyLetterCase(): void
+    {
+        $email = 'ane@example.test';
+        $texts = ['ANE@Example.Test', "'ane@example.test'", '<ane@example.test>', 'Sent to ane@example.test.',
+            'ane@example.test, jane@example.test'];
+
+        foreach ($texts as $text) {
+            self::assertTrue(
+                $this->mentions((string)json_encode(['message' => $text]), $email),
+                $text . ' in a payload'
+            );
+            self::assertTrue($this->mentions('HTTP 422: ' . $text, $email), $text . ' in text');
+        }
+        self::assertTrue($this->mentions((string)json_encode(['email' => 'MÕNI@NÄIDE.TEST']), 'mõni@näide.test'));
+    }
+
+    public function testAPlainTextBlobThatIsNotValidUtf8IsStillSearched(): void
+    {
+        self::assertTrue($this->mentions("\xff\xfe rejected ane@example.test", 'ane@example.test'));
+        self::assertFalse($this->mentions("\xff\xfe rejected jane@example.test", 'ane@example.test'));
+    }
+
     public function testEmptyInputNeverMatches(): void
     {
         self::assertFalse($this->mentions(null, 'erase-test-1@example.test'));

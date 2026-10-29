@@ -46,7 +46,8 @@ class ShopperCodes
 
     /**
      * The discount codes a queued automation payload carries for this
-     * address (already lowercased and trimmed).
+     * address. Both addresses are lowercased here, a capital with an accent
+     * too (CON-243): `JÄNE@…` is `jäne@…`, never `jane@…`.
      *
      * @param array<int|string, mixed>|null $payload a row's decoded payload
      * @return string[]
@@ -54,7 +55,7 @@ class ShopperCodes
     public function inPayload(?array $payload, string $email): array
     {
         $address = $payload['address'] ?? null;
-        if (!is_array($address) || strtolower(trim((string)($address['email'] ?? ''))) !== $email) {
+        if (!is_array($address) || self::key((string)($address['email'] ?? '')) !== self::key($email)) {
             return [];
         }
 
@@ -174,5 +175,14 @@ class ShopperCodes
             ],
             $coupons
         );
+    }
+
+    /**
+     * An address as the codes are matched by: trimmed, lower case — a
+     * capital with an accent too.
+     */
+    private static function key(string $email): string
+    {
+        return mb_strtolower(trim($email));
     }
 }

@@ -1251,9 +1251,12 @@ after the payloads are built, `AbandonedCart\ReminderConsent::verdicts()`
 weighs each cart by its website's mode, with one read of
 `newsletter_subscriber` (the website's store views, matched by the cart's
 address or its customer id; an unsubscribed record wins over a subscribed
-one) and one of the checkout ticks (`StateManager::optedInQuotes()`,
-`newsletter_optin` of an `open` row — the tick counts without an order, and
-is a new consent in every mode):
+one). The address matches through `Model\Privacy\AddressMatch` (CON-243):
+any letter case, a capital with an accent too, while `jäne@…` never reads
+`jane@…`'s record; a plain `subscriber_email IN (…)` in front lets the
+table's email index narrow the rows. Then one read of the checkout ticks
+(`StateManager::optedInQuotes()`, `newsletter_optin` of an `open` row — the
+tick counts without an order, and is a new consent in every mode):
 
 - a tick: the reminder may go to an address Smaily does not have.
 - consent and checkout opt-in only (`Mode::requiresOptin()`): a subscribed
@@ -1469,7 +1472,8 @@ extension made for an address, as the WooCommerce plugin covers its own.
 A Magento coupon holds no address, so `Discount\ShopperCodes` finds them
 through the event queue: `LocalEraser` walks the queue rows that match the
 address and `inPayload()` takes `Trigger::COUPON_FIELDS` codes from a row's
-stored `address` only when its `email` is the address (any letter case; an
+stored `address` only when its `email` is the address (any letter case, a
+capital with an accent too — `mb_strtolower` on both sides, CON-243; an
 accent or an extra character is another shopper). A code counts only while
 `salesrule_coupon` still has it as the extension's (type auto-generated,
 `expiration_date` at `CouponExpiry::END_OF_DAY`), so a code the merchant

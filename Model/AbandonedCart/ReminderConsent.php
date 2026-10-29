@@ -11,6 +11,7 @@ namespace Smaily\Connect\Model\AbandonedCart;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Newsletter\Model\Subscriber;
 use Smaily\Connect\Model\ContactSync\Mode;
+use Smaily\Connect\Model\Privacy\AddressMatch;
 
 /**
  * The store's half of who gets an abandoned-cart reminder, by the website's
@@ -33,6 +34,10 @@ use Smaily\Connect\Model\ContactSync\Mode;
  * The trigger goes with force_opt_in=false and no status, so a reminder
  * subscribes nobody; the tick subscribes the shopper again only through
  * their own subscription when it syncs.
+ *
+ * A newsletter record is the cart's when it holds the cart's address in any
+ * letter case, a capital with an accent too; an address that differs by an
+ * accent is another shopper's (CON-243, AddressMatch).
  */
 class ReminderConsent
 {
@@ -99,7 +104,7 @@ class ReminderConsent
     private function statusOf(array $cart, array $statuses): ?int
     {
         $found = array_merge(
-            $statuses['email'][strtolower($cart['email'])] ?? [],
+            $statuses['email'][self::key($cart['email'])] ?? [],
             $cart['customer_id'] > 0 ? ($statuses['customer'][$cart['customer_id']] ?? []) : []
         );
         if (in_array(Subscriber::STATUS_UNSUBSCRIBED, $found, true)) {
@@ -124,13 +129,21 @@ class ReminderConsent
             return $statuses;
         }
         $emails = array_values(array_unique(array_map(
-            static fn (array $cart): string => strtolower($cart['email']),
+            static fn (array $cart): string => self::key($cart['email']),
             $carts
         )));
         $customerIds = array_values(array_unique(array_filter(array_column($carts, 'customer_id'))));
 
         $connection = $this->resourceConnection->getConnection();
-        $match = $connection->quoteInto('LOWER(subscriber_email) IN (?)', $emails);
+        // The plain IN lets the subscriber_email index narrow the rows: under
+        // the table's case- and accent-insensitive collation it finds every
+        // record the exact match can, and AddressMatch keeps the exact ones.
+        $exact = [];
+        foreach ($emails as $email) {
+            $exact[] = $connection->quoteInto(AddressMatch::condition('subscriber_email'), $email);
+        }
+        $match = '(' . $connection->quoteInto('subscriber_email IN (?)', $emails)
+            . ' AND (' . implode(' OR ', $exact) . '))';
         if ($customerIds !== []) {
             $match .= ' OR ' . $connection->quoteInto('customer_id IN (?)', $customerIds);
         }
@@ -145,12 +158,21 @@ class ReminderConsent
 
         foreach ($connection->fetchAll($select) as $row) {
             $status = (int)$row['subscriber_status'];
-            $statuses['email'][strtolower((string)$row['subscriber_email'])][] = $status;
+            $statuses['email'][self::key((string)$row['subscriber_email'])][] = $status;
             if ((int)$row['customer_id'] > 0) {
                 $statuses['customer'][(int)$row['customer_id']][] = $status;
             }
         }
 
         return $statuses;
+    }
+
+    /**
+     * An address as the records are looked up by: lower case, a capital with
+     * an accent too, as the database's LOWER() makes it.
+     */
+    private static function key(string $email): string
+    {
+        return mb_strtolower($email);
     }
 }

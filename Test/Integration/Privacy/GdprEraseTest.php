@@ -511,6 +511,89 @@ class GdprEraseTest extends IntegrationTestCase
         self::assertSame($this->addressKey->of(self::BYSTANDER), $events['consent-other']['entity_id']);
     }
 
+    /**
+     * CON-240: erasing an address never reaches another shopper whose
+     * address contains it, in any table the erasure walks, and the export
+     * lists only the address's own rows. Letter case still does not matter.
+     */
+    public function testAnAddressInsideALongerAddressIsAnotherShopper(): void
+    {
+        $short = 'ane@example.test';
+        $longer = 'jane@example.test';
+        $schema = new SchemaInstaller($this->connection);
+        foreach (['short' => 'ANE@Example.Test', 'longer' => $longer] as $who => $email) {
+            $this->seedContactSync($email, $who . '-pending');
+            $this->seedContactSync($email, $who . '-sent');
+            $this->markRow(EventResource::TABLE_NAME, $who . '-sent', [
+                'status' => Event::STATUS_SENT,
+                'last_response' => (string)json_encode(['message' => 'queued for ' . $email]),
+            ]);
+            $this->ingestQueue->enqueue('orders', ['customer' => ['email' => $email]], '1000001', null, $who . '-ing');
+            $this->ingestQueue->enqueue('customers', [], '77', null, $who . '-ing-failed');
+            $this->markRow(IngestEventResource::TABLE_NAME, $who . '-ing-failed', [
+                'status' => IngestEvent::STATUS_FAILED,
+                'last_error' => 'rejected recipient ' . $email,
+            ]);
+        }
+        $this->stateManager->markMailed(11, 1, $short);
+        $this->stateManager->markMailed(12, 1, $longer);
+        $schema->seedQuote(21, ['is_active' => 1, 'items_count' => 1, 'customer_email' => $short]);
+        $schema->seedQuote(22, ['is_active' => 1, 'items_count' => 1, 'customer_email' => $longer]);
+        $this->connection->insert('customer_entity', ['entity_id' => 7, 'website_id' => 1, 'email' => $short]);
+        $this->connection->insert('customer_entity', ['entity_id' => 8, 'website_id' => 1, 'email' => $longer]);
+        $this->seedOrder(501, null, $short);
+        $this->seedOrder(502, 8, $longer);
+        $this->seedAttribution(501);
+        $this->seedAttribution(502);
+
+        $export = json_decode(
+            $this->runCommand(['action' => 'export', 'email' => $short])->getDisplay(),
+            true
+        )['local'];
+        self::assertSame(
+            [Event::STATUS_PENDING, Event::STATUS_SENT],
+            array_column($export[self::QUEUE_LABEL], 'status'),
+            'The export lists the address\'s own two rows'
+        );
+        self::assertCount(2, $export[self::ENGINE_LABEL]);
+        self::assertSame(['11'], array_map('strval', array_column($export[self::CART_LABEL], 'quote_id')));
+
+        self::assertSame(
+            [
+                self::QUEUE_LABEL => ['removed' => 1, 'anonymised' => 1],
+                self::ENGINE_LABEL => ['removed' => 1, 'anonymised' => 1],
+                self::CART_LABEL => ['removed' => 0, 'anonymised' => 2],
+                self::ATTRIBUTION_LABEL => ['removed' => 0, 'anonymised' => 1],
+                'Discount codes' => ['removed' => 0, 'anonymised' => 0],
+            ],
+            $this->eraser->erase($short)
+        );
+
+        $events = array_column($this->fetchAll(EventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(['short-sent', 'longer-pending', 'longer-sent'], array_keys($events));
+        self::assertSame(Erasure::PLACEHOLDER, $events['short-sent']['entity_id']);
+        self::assertSame($longer, $events['longer-sent']['entity_id'], 'The longer address\'s row is untouched');
+        self::assertStringContainsString($longer, (string)$events['longer-sent']['payload']);
+        self::assertStringContainsString($longer, (string)$events['longer-sent']['last_response']);
+
+        $ingest = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(['short-ing-failed', 'longer-ing', 'longer-ing-failed'], array_keys($ingest));
+        self::assertSame(Erasure::PLACEHOLDER, $ingest['short-ing-failed']['last_error']);
+        self::assertSame('rejected recipient ' . $longer, $ingest['longer-ing-failed']['last_error']);
+
+        self::assertSame([], $this->stateManager->rowsForEmail($short));
+        self::assertSame(
+            ['12'],
+            array_map('strval', array_column($this->stateManager->rowsForEmail($longer), 'quote_id'))
+        );
+        self::assertSame([], $this->passTheCronsGate([21]), 'The erased address\'s open cart is never mailed');
+        self::assertSame([22], $this->passTheCronsGate([22]), 'The longer address\'s open cart still is');
+
+        $attribution = array_column($this->fetchAll(self::ATTRIBUTION_TABLE, 'order_id'), null, 'order_id');
+        self::assertNull($attribution[501]['visitor_token']);
+        self::assertSame('vt_visitor502', $attribution[502]['visitor_token']);
+    }
+
     public function testAnAnonymisedRowIsNeverRevivedByRetry(): void
     {
         $this->seedContactSync(self::SUBJECT, 'retry-me');

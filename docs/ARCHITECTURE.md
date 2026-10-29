@@ -923,7 +923,10 @@ below.
   and a contact row of an address longer than the column, the opt-out
   record's keyed hash of it — PRO-3765, PRO-3767) or by DECODING the stored JSON (`Model\Privacy\PayloadAnonymizer`),
   never by searching its raw text: `json_encode` escapes a non-ASCII
-  address, which a substring search would miss. The walk reads a narrow
+  address, which a substring search would miss. Only the whole address
+  matches, in any letter case (CON-240): a decoded value that is the
+  address or free text that names it, never a longer address that contains
+  it (`jane@…` is not `ane@…`). The walk reads a narrow
   column list in 1000-row chunks and deletes or anonymizes each chunk's
   matches in one transaction before reading the next, so peak memory is one
   chunk; a blob is decoded once and the same decoding answers the match and

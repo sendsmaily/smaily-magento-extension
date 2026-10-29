@@ -22,6 +22,12 @@ namespace Smaily\Connect\Model\Privacy;
  * response) is searched as plain text — there is no escaping there to
  * defeat it.
  *
+ * **Only the whole address matches** (CON-240), in any letter case: a value
+ * that is the address, or free text (an error message) that names it. An
+ * address that merely contains it — `jane@example.test` for
+ * `ane@example.test` — is another shopper's, so the erasure and the export
+ * never reach that shopper's rows, as in the WooCommerce plugin.
+ *
  * **A blob is decoded once.** `decode()` is the caller's first step; the
  * result is then handed to `matches()` and, for a row that is kept, to
  * `anonymize()`, which is why both take the raw blob and its decoding.
@@ -50,7 +56,7 @@ class PayloadAnonymizer
     }
 
     /**
-     * Whether a stored blob mentions this contact.
+     * Whether a stored blob mentions this contact's whole address.
      *
      * @param array<int|string, mixed>|null $decoded what decode() made of it
      */
@@ -60,11 +66,12 @@ class PayloadAnonymizer
             return false;
         }
 
+        $pattern = $this->addressPattern($email);
         if ($decoded === null) {
-            return mb_stripos($stored, $email) !== false;
+            return preg_match($pattern, mb_scrub($stored)) === 1;
         }
 
-        return $this->containsEmail($decoded, $email);
+        return $this->containsEmail($decoded, $pattern);
     }
 
     /**
@@ -89,18 +96,31 @@ class PayloadAnonymizer
     }
 
     /**
+     * The address as a whole, in any letter case: not preceded by a
+     * character an address's local part goes on with, and not followed by
+     * one its domain goes on with — `jane@example.test` and
+     * `ane@example.test.ee` are other people's, while the address alone, in
+     * quotes or at the end of a sentence still is this one (CON-240).
+     */
+    private function addressPattern(string $email): string
+    {
+        return '/(?<![\p{L}\p{N}._%+\-])' . preg_quote(mb_scrub(trim($email)), '/')
+            . '(?![\p{L}\p{N}_\-]|\.[\p{L}\p{N}])/iu';
+    }
+
+    /**
      * @param array<int|string, mixed> $data
      */
-    private function containsEmail(array $data, string $email): bool
+    private function containsEmail(array $data, string $pattern): bool
     {
         foreach ($data as $value) {
             if (is_array($value)) {
-                if ($this->containsEmail($value, $email)) {
+                if ($this->containsEmail($value, $pattern)) {
                     return true;
                 }
                 continue;
             }
-            if (is_string($value) && mb_stripos($value, $email) !== false) {
+            if (is_string($value) && preg_match($pattern, $value) === 1) {
                 return true;
             }
         }

@@ -105,6 +105,35 @@ class DiscountCodeErasureTest extends IntegrationTestCase
         self::assertSame([], $this->eraser->export(self::SUBJECT)[self::LABEL]);
     }
 
+    /**
+     * CON-243: an address stored with an accented capital is the same
+     * shopper in any letter case — the erasure finds its code, whichever
+     * case the merchant types — while the address without the accent is
+     * another shopper's.
+     */
+    public function testAnAddressWithAnAccentedCapitalFindsItsCodes(): void
+    {
+        $this->seedCode('ACCENTED1');
+        $this->seedCode('PLAIN1');
+        $this->seedAutomation(Trigger::WELCOME, 'ÜLLE-Test@Example.test', 'ACCENTED1', 'accented', Event::STATUS_SENT);
+        $this->seedAutomation(Trigger::WELCOME, 'ulle-test@example.test', 'PLAIN1', 'plain', Event::STATUS_SENT);
+
+        self::assertSame(
+            ['ACCENTED1'],
+            array_column($this->eraser->export('ülle-test@example.test')[self::LABEL], 'code')
+        );
+
+        $tester = $this->runCommand(['action' => 'erase', 'email' => 'Ülle-Test@example.test', '--force' => true]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('Discount codes: 1 removed, 0 anonymized', $tester->getDisplay());
+        self::assertSame(
+            ['PLAIN1'],
+            array_column($this->fetchAll('salesrule_coupon', 'coupon_id'), 'code'),
+            'The other shopper\'s code stays'
+        );
+    }
+
     public function testAShopperWithoutCodesTouchesNoCode(): void
     {
         $this->seedShoppersCodes();

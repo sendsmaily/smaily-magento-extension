@@ -44,6 +44,18 @@ class ShopperCodesTest extends TestCase
     }
 
     /**
+     * CON-243: a capital with an accent is lowercased too, on either side.
+     */
+    public function testAnAccentedCapitalMatchesInAnyLetterCase(): void
+    {
+        $payload = ['address' => ['email' => 'ÜLLE-Test@Example.test', 'welcome_coupon_code' => 'CODE-1']];
+
+        self::assertSame(['CODE-1'], $this->codes()->inPayload($payload, 'ülle-test@example.test'));
+        self::assertSame(['CODE-1'], $this->codes()->inPayload($payload, 'Ülle-test@example.test'));
+        self::assertSame([], $this->codes()->inPayload($payload, 'ulle-test@example.test'));
+    }
+
+    /**
      * A row that only mentions the address somewhere else, or names an
      * address that merely contains it or differs by an accent, is another
      * shopper's code.

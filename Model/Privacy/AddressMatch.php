@@ -9,8 +9,9 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Privacy;
 
 /**
- * How an erasure and an export find a shopper's address in a table column
- * (CON-242): in any letter case, and an accent makes it another address.
+ * How an erasure and an export (CON-242), and the abandoned-cart reminder's
+ * newsletter-status check (CON-243), find a shopper's address in a table
+ * column: in any letter case, and an accent makes it another address.
  *
  * The collations Magento's tables use (utf8mb4_general_ci, utf8_general_ci,
  * utf8mb4_0900_ai_ci) ignore accents as well as case, so `LOWER(email) = ?`

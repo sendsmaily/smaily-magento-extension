@@ -14,17 +14,9 @@ use GuzzleHttp\Psr7\Response;
 use Magento\Framework\App\ProductMetadataInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\App\Request\Http;
-use Magento\Framework\Data\Collection\EntityFactoryInterface;
-use Magento\Framework\Model\AbstractModel;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Model\Order;
-use Magento\Sales\Model\ResourceModel\Order\Collection as OrderCollection;
-use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
-use Magento\Sales\Model\ResourceModel\Order\Item as OrderItemResource;
-use Magento\Sales\Model\ResourceModel\Order\Item\Collection as OrderItemCollection;
-use Magento\Sales\Model\ResourceModel\Order\Item\CollectionFactory as OrderItemCollectionFactory;
-use Magento\SalesSequence\Model\Manager as SequenceManager;
 use Magento\Store\Model\StoreManagerInterface;
 use Psr\Http\Message\RequestInterface;
 use Smaily\Connect\Cron\BackfillTick;
@@ -51,7 +43,9 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job as JobResource;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Model\StorefrontScript;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Integration\Support\SalesOrderHarness;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
+use Smaily\Connect\Test\Integration\Support\VirtualPace;
 
 /**
  * CON-232: one cron minute — the import tick, then the send run — moves a
@@ -65,18 +59,25 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  *
  * Real here: the sales_order and sales_order_item tables, the orders import
  * and its payload builder, the job table, the ingest queue, the send run,
- * the engine client with its JSON and D6 handling, and the pace with its
- * real clock and waits. The engine is a mock that answers each request with
- * a D6 reply at once and records when it came.
+ * the engine client with its JSON and D6 handling, and the pace and its
+ * send budget. The pace runs on a clock that moves only by its own waits
+ * (Support\VirtualPace), so how fast the database answers changes nothing
+ * (CON-215). The engine is a mock that answers each request with a D6
+ * reply at once and records when, on that clock, it came.
  */
 class ImportPaceTest extends IntegrationTestCase
 {
+    use SalesOrderHarness;
+
     /** Two pages more than the backlog: the second minute finishes the import. */
     private const ORDERS = IngestPace::IMPORT_BACKLOG_ROWS + 200;
 
     private JobManager $jobManager;
 
-    /** @var list<array{at: float, path: string, items: int}> the requests the engine got */
+    /** @var VirtualPace the send run's pace, whose clock tells when a request went */
+    private VirtualPace $pace;
+
+    /** @var list<array{at: float, path: string, items: int}> the requests the engine got, at pace time */
     private array $requests = [];
 
     /** @var list<string> the ordered_at of each order the engine got, in arrival order */
@@ -99,6 +100,7 @@ class ImportPaceTest extends IntegrationTestCase
         $schema->createSalesOrderItem();
         $schema->createFlag();
         $this->jobManager = $this->objectManager->create(JobManager::class);
+        $this->pace = new VirtualPace();
     }
 
     protected function tearDown(): void
@@ -123,19 +125,23 @@ class ImportPaceTest extends IntegrationTestCase
         $this->objectManager->get(IngestQueue::class)
             ->enqueue(Client::DOMAIN_ORDERS, ['external_order_id' => 'live-1'], 'live-1', null, 'live-order');
         // … and the send run sends all of it.
-        $started = microtime(true);
         $send->execute();
-        $sendSeconds = microtime(true) - $started;
 
         self::assertSame(0, $this->pending(), 'One send run empties the queue');
         $batches = (int)ceil((IngestPace::IMPORT_BACKLOG_ROWS + 1) / Client::DOMAIN_BATCH_LIMITS['orders']);
         self::assertCount($batches, $this->requests);
         self::assertSame(IngestEvent::STATUS_SENT, $this->statusOf('live-order'), 'The live order went in the same run');
-        self::assertLessThan(IngestPace::SEND_BUDGET_SECONDS, $sendSeconds);
-        self::assertGreaterThanOrEqual(
-            ($batches - 1) / IngestPace::REQUESTS_PER_SECOND - 0.05,
-            $this->requests[$batches - 1]['at'] - $this->requests[0]['at'],
-            'The requests keep to the pace'
+        for ($i = 1; $i < $batches; $i++) {
+            self::assertGreaterThanOrEqual(
+                1 / IngestPace::REQUESTS_PER_SECOND - 1e-9,
+                $this->requests[$i]['at'] - $this->requests[$i - 1]['at'],
+                'The requests keep to the pace'
+            );
+        }
+        self::assertLessThan(
+            IngestPace::SEND_BUDGET_SECONDS,
+            $this->requests[$batches - 1]['at'],
+            'The last request goes inside the send budget'
         );
 
         // Minute 2: the rest, and the import completes.
@@ -177,7 +183,7 @@ class ImportPaceTest extends IntegrationTestCase
         $this->jobManager->start(Job::TYPE_ORDERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
         $client = $this->client();
         $tick = $this->tick($client, $this->wireOrderBuilder());
-        $send = $this->sendRun($client, $this->paceWithoutWaiting());
+        $send = $this->sendRun($client);
 
         $startPartMinute = 0;
         $completeMinute = 0;
@@ -302,31 +308,10 @@ class ImportPaceTest extends IntegrationTestCase
     }
 
     /**
-     * The pace on a clock that moves only by its own waits: a send run
-     * makes as many requests as at the real pace, at once.
-     */
-    private function paceWithoutWaiting(): IngestPace
-    {
-        return new class extends IngestPace {
-            private float $virtualNow = 0.0;
-
-            protected function now(): float
-            {
-                return $this->virtualNow;
-            }
-
-            protected function pause(float $seconds): void
-            {
-                $this->virtualNow += $seconds;
-            }
-        };
-    }
-
-    /**
      * The send run with the real engine client, whose HTTP goes to the mock
-     * engine, and the real pace unless another is given.
+     * engine, at the pace on its own clock.
      */
-    private function sendRun(?Client $client = null, ?IngestPace $pace = null): FlushIngestQueue
+    private function sendRun(?Client $client = null): FlushIngestQueue
     {
         $client ??= $this->client();
 
@@ -338,7 +323,7 @@ class ImportPaceTest extends IntegrationTestCase
             $this->createMock(OptOutReplay::class),
             new Json(),
             $this->createMock(Logger::class),
-            $pace ?? new IngestPace(),
+            $this->pace,
             $this->jobManager
         );
     }
@@ -402,7 +387,7 @@ class ImportPaceTest extends IntegrationTestCase
             }
             $items = count((array)reset($body));
             $this->requests[] = [
-                'at' => microtime(true),
+                'at' => $this->pace->now(),
                 'path' => $request->getUri()->getPath(),
                 'items' => $items,
             ];
@@ -468,98 +453,5 @@ class ImportPaceTest extends IntegrationTestCase
                 $lines = [];
             }
         }
-    }
-
-    /**
-     * The orders, read from sales_order the way the import pages through
-     * them (as UnreadableImportRowsTest reads them).
-     */
-    private function orderCollectionFactory(bool $withLines = true): OrderCollectionFactory
-    {
-        $factory = $this->createMock(OrderCollectionFactory::class);
-        $factory->method('create')->willReturnCallback(function () use ($withLines): OrderCollection {
-            $ids = [];
-            $collection = $this->createMock(OrderCollection::class);
-            $collection->method('addFieldToFilter')->willReturnCallback(
-                function (string $field, array $condition) use (&$ids, $collection): OrderCollection {
-                    $ids = array_map('intval', $condition['in']);
-
-                    return $collection;
-                }
-            );
-            $collection->method('getItems')->willReturnCallback(function () use (&$ids, $withLines): array {
-                $rows = $this->connection->fetchAll(
-                    $this->connection->select()->from('sales_order')->where('entity_id IN (?)', $ids ?: [0])
-                );
-
-                return array_map(
-                    fn (array $row): Order => $withLines ? $this->order($row) : $this->plainOrder($row),
-                    $rows
-                );
-            });
-
-            return $collection;
-        });
-
-        return $factory;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     */
-    private function order(array $row): Order
-    {
-        $order = $this->getMockBuilder(Order::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['getItems'])
-            ->getMock();
-        $order->setData($row);
-        $order->method('getItems')->willReturnCallback(
-            fn (): array => $this->orderItemCollectionFactory()->create()
-                ->setOrderFilter((int)$row['entity_id'])
-                ->getItems()
-        );
-
-        return $order;
-    }
-
-    /**
-     * An order of its sales_order row alone, not a mock (see wireOrderBuilder()).
-     *
-     * @param array<string, mixed> $row
-     */
-    private function plainOrder(array $row): Order
-    {
-        $order = (new \ReflectionClass(Order::class))->newInstanceWithoutConstructor();
-        $order->setData($row);
-
-        return $order;
-    }
-
-    private function orderItemCollectionFactory(): OrderItemCollectionFactory
-    {
-        $resource = $this->objectManager->create(
-            OrderItemResource::class,
-            ['sequenceManager' => $this->createMock(SequenceManager::class)]
-        );
-        $entityFactory = $this->createMock(EntityFactoryInterface::class);
-        $entityFactory->method('create')->willReturnCallback(
-            static function (string $class) use ($resource): object {
-                $item = (new \ReflectionClass($class))->newInstanceWithoutConstructor();
-                (new \ReflectionProperty(AbstractModel::class, '_resource'))->setValue($item, $resource);
-
-                return $item;
-            }
-        );
-
-        $factory = $this->createMock(OrderItemCollectionFactory::class);
-        $factory->method('create')->willReturnCallback(
-            fn (): OrderItemCollection => $this->objectManager->create(
-                OrderItemCollection::class,
-                ['resource' => $resource, 'entityFactory' => $entityFactory]
-            )
-        );
-
-        return $factory;
     }
 }

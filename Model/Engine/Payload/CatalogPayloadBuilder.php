@@ -346,8 +346,9 @@ class CatalogPayloadBuilder
      * §3 keeps "one currency per tenant" as the assumed model, and the
      * catalog row is keyed on `sku` per tenant — a second store scope would
      * upsert onto the SAME row, so it can only overwrite, never coexist.
-     * Per-scope catalog rows need a tenant per scope, which is the
-     * multi-website RFC's Phase 4, not this field (PRO-1762).
+     * Per-website price inside one engine store is the engine's to add
+     * (INT-171), not this field: one Smaily account is one engine store,
+     * and websites that share an account share it (2026-10-28, CON-237).
      */
     public function canonicalStoreId(): int
     {
@@ -399,8 +400,10 @@ class CatalogPayloadBuilder
      *
      * This is still ONE payload per product (the PRO-1352/1353 tradeoff): a
      * product on several websites is priced at the canonical one whenever it
-     * belongs there, and per-website rows remain the multi-website RFC's
-     * Phase 4 (PRO-1762).
+     * belongs there. Per-website price, stock and links inside one engine
+     * store are the engine's INT-171: one Smaily account is one engine
+     * store, and websites that share an account share it (2026-10-28,
+     * CON-237).
      */
     private function storeIdForProduct(Product $product): int
     {

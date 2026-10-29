@@ -7,53 +7,84 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-10-28 — **3.0.0-rc16 cut on `master`; the
-multi-website rule for Campaign Intelligence decided.**
-**3.0.0-rc16 is cut** on `master` (#220, the version-cut PR
-`release/3.0.0-rc16`); its tag waits for Erkki (CLAUDE.md "Release cut"). The cut collects 6 fragments
-into CHANGELOG's "Changes since 3.0.0-rc15", in landing order (CON-220,
-CON-224, CON-227, CON-235, CON-232, CON-233), and rewords the three
-bullets that CON-220 and CON-224 made untrue: the CON-143 privacy-template bullet
-(disconnecting or removing never deletes the store's data; since rc16
-both tell the engine the connection ends and the engine pauses the
-store), the CON-176 bullet (a grid deletion unsubscribed in Smaily only
-from rc13 to rc15) and the aside in the CON-195 bullet (a grid deletion
-sends no status). The first cut (#219, from before #218 merged) was
-closed and cut again on a fresh `release/3.0.0-rc16`, so rc16 holds #218
-CON-233 too.
+_Last updated: 2026-10-29 — **3.0.0-rc17 cut on `master`: the history
+import goes newest first, and privacy requests match the exact address.**
+**3.0.0-rc17 is cut** on `master` (the version-cut PR
+`release/3.0.0-rc17`); its tag waits for Erkki (CLAUDE.md "Release cut").
+3.0.0-rc16 is released (Erkki's tag, 2026-10-28). The cut collects 5
+fragments into CHANGELOG's "Changes since 3.0.0-rc16", in landing order
+(CON-225, CON-241, CON-240, CON-215, CON-242); the CON-240 and CON-242
+bullets are merged into one (`smaily:gdpr erase` / `export` reach only
+the exact address, in any letter case; an accented and a plain address
+are two shoppers). It rewords the PRO-3790 bullet ("connecting starts the
+**Customers** import"), which said the **Orders** import is yours to
+start and that every customer account goes to the engine: since rc17
+connecting starts the **Orders** import too and the customers import
+sends only the customers in scope.
 
-**On `master` since the rc15 cut (all in rc16):** #208 CON-211 (docs
-only: a firewall in front of the store must let
-`POST /smaily/attribution/land` and `POST /smaily/relay` through). #209
-CON-220 (engine contract 1.18.0; §16 "disconnect" is sent on
-`smaily:engine:disconnect` and on both removal paths, before the stored
-key is deleted; the engine revokes the key and pauses a store with no
-connection left, never deletes it). #210 / #212 (docs only: this file).
-#211 CON-224 (deleting a subscriber in the admin's **Newsletter
-Subscribers** grid leaves the Smaily contact unchanged and keeps
-profiling; unsubscribes are unchanged). #214 (engine contract 1.19.0,
-byte-identical: §24 a console sign-in link, not live yet; §22 the
-embedded design editor, live). #215 CON-227 (an import goes on past a
-customer whose store view is gone — sent without a language — and an
-order whose item options Magento cannot unserialize — sent without them;
-any other unreadable row is skipped and counted, logged by id only).
-#216 CON-235 (a version line at the bottom of Dashboard and Settings).
-#217 CON-232 (an ingest send run drains the queue within a 40 s budget
-at `IngestPace::REQUESTS_PER_SECOND` = 5, with an import backlog cap of
-2,000 rows; the pilot store's history takes ≈ 1 h instead of ≈ 31 h).
-#218 CON-233 (a stopped import stores and shows only where the error
-happened, "Class at file:line" (`Model/Backfill/ErrorLocation`); the
-card says "Details for your developer: …"; a raw message an earlier
-version stored is not shown).
+**On `master` since the rc16 cut (all in rc17):** #221 (docs only: the
+multi-website rule — one Smaily account is one engine store). #224
+(engine contract 1.20.0, byte-identical; the §5 reply's `skipped` count
+is part of the ingest count check, and a skipped order stays sent).
+#222 CON-210 (CI compiles the release ZIP with `setup:di:compile` on
+Magento 2.4.4-p13 / PHP 8.1 and 2.4.9 / PHP 8.4 on every PR). #223
+CON-225 (`smaily:gdpr export` lists the discount codes the extension
+made for the address; `erase` deletes the unused ones). #225 CON-241
+(the history import: connecting queues the catalog, customers and
+orders imports in that order; the orders import goes newest first — a
+start part of the last 18 months, then older orders down to the
+60-month horizon — with both numbers from the contract's
+`config.history` (ping, else the setup exchange, else 18 / 60 /
+`newest_first`); progress `started` / `start_part_complete` /
+`complete` is reported to the engine's §25; the **Orders** card shows
+one bar for the part being sent and says when Campaign Intelligence can
+start; the customers scope is narrowed to rule B; schema:
+`smaily_ingest_queue.job_id` with an index and
+`smaily_backfill_job.sent_count`). #226 CON-240 (erase and export match
+the whole address, not a substring). #227 CON-215 (the import tests run
+off the wall clock; `smaily:backfill:status` shows only the error's
+location and a "Skipped (unreadable)" column). #228 CON-242 (erase and
+export match case-insensitively and accent-exactly through
+`AddressMatch`, as the WooCommerce plugin does).
 
 **Pilot:** the first pilot store connected Campaign Intelligence on
-2026-10-26, most likely still on rc12. Its customers import stopped at
-8,400 / 21,517 and its orders import at 43,400 / 79,944 (the engine has
-orders up to April 2022) on rows Magento could not read. It needs an
-upgrade to rc16, then **Run again** on **Customers** and **Orders**. On
-rc12, picking another website opens the setup from the start; rc13+
-(CON-179) removed that. The second pilot store's state is unchanged
-(rc12). The gauge is CON-147 (4/5).
+2026-10-26, most likely still on rc12; its customers and orders imports
+stopped on rows Magento could not read. It needs an upgrade to rc17,
+then **Run again** on **Customers** and then on **Orders**
+(Settings > Intelligence), so that its history is sent again newest
+first. The second pilot store's state is unchanged (rc12). The gauge is
+CON-147 (4/5).
+
+**Open:** CON-209 (the 3.0.0 gate), CON-230 (the engine-page modal;
+waits for INT-180), CON-234 (the installation report; waits for
+INT-186), CON-237 (an own engine store per Smaily account; later),
+CON-243 (the cart-reminder consent read is accent-blind; Low), CON-168,
+and Estonian proofreads of the new guide strings (CON-225, CON-241,
+CON-233; CON-151 and CON-146 still open). Follow-ups: **Run again**
+restarts from row 1; WooCommerce's slower import pace (CON-236).
+
+**Next session opens with:**
+1. Erkki tags rc17.
+2. The first pilot store upgrades to rc17 and presses **Run again** on
+   **Customers**, then on **Orders**.
+3. Watch its history progress reach `start_part_complete` in the engine.
+
+**Notes for the next version cut (rc18):** none so far._
+
+_Earlier (2026-10-28, the 3.0.0-rc16 cut): 3.0.0-rc16 was cut (#220)
+and tagged by Erkki the same day. It collected 6 fragments (CON-220,
+CON-224, CON-227, CON-235, CON-232, CON-233) and reworded the CON-143,
+CON-176 and CON-195 bullets. In rc16 since rc15: #208 CON-211 (docs: a
+firewall must let `POST /smaily/attribution/land` and
+`POST /smaily/relay` through), #209 CON-220 (contract 1.18.0; §16
+"disconnect" on `smaily:engine:disconnect` and both removal paths),
+#211 CON-224 (a grid deletion leaves the Smaily contact unchanged), #214
+(contract 1.19.0), #215 CON-227 (an import goes on past unreadable
+rows), #216 CON-235 (a version line on Dashboard and Settings), #217
+CON-232 (the ingest send run drains the queue at 5 requests a second;
+≈ 1 h for the pilot store's history), #218 CON-233 (a stopped import
+shows only where the error happened). The first cut (#219) was closed
+and cut again on a fresh `release/3.0.0-rc16`.
 
 **Decided (Erkki, 2026-10-27):** every engine page a connector opens
 (design editor, console sign-in) shows in an in-admin modal over a
@@ -62,46 +93,34 @@ INT-180). Each connector reports its installation to the engine — store,
 platform and extension versions, Smaily subdomain, features, last syncs,
 no personal data (engine INT-186, Magento CON-234).
 
-**Decided (Erkki, 2026-10-28):** History import (engine INT-185),
-confirmed: the horizon is 36 months for consumable packs and 60 months
-for durable packs; the start part is the whole catalog plus the last 18
-months of orders; the rest follows in the background, newest first; the
-engine writes it into contract 1.20.0 (with a history-progress endpoint)
-and all three connectors implement it. Customers: every customer account
-and subscriber is sent, also one who never bought; only a buyer whose
-every order is older than the horizon is left out. When an import stops,
-the server log keeps the full exception message (`BackfillTick`'s
-"Backfill job failed" entry in `var/log/smaily_connect.log`); only the
-admin card shows the location form. Multi-website: **one Smaily account
-is one Campaign Intelligence (engine) store.** Websites that share a
-Smaily account (language versions; the same goods, stock and customers)
-share one engine store, as today. A website the merchant gives its own
-Smaily account gets its own engine store, built when the first store
-needs it (CON-237). There is no separate mode switch. CON-148 and
-CON-161 (an engine store per website, Phases 4–5 of
-`docs/internal/RFC_MULTI_WEBSITE.md`) are canceled. Per-website price,
-stock and links inside one engine store are the engine's INT-171.
-Klaviyo, Mailchimp and dotdigital also let a website connect its own
-account; none of them has an engine store to scope. **Decided
-(2026-10-24):** one Magento installation is one engine store (today's
-setup; the 2026-10-28 rule keeps it until a website has its own Smaily
-account).
-
-**Open:** CON-209 (the 3.0.0 gate), CON-210, CON-215, CON-225, CON-230
-(the console button; waits for the engine), CON-168, CON-234 (waits for
-INT-186), CON-151 and CON-146 proofreads. Follow-ups:
-`smaily:backfill:status` prints a stored error unfiltered; **Run again** restarts from row 1;
-`ImportPaceTest` duplicates order-harness helpers; WooCommerce's slower
-import pace (CON-236).
-
-**Next session opens with:**
-1. Erkki tags rc16.
-2. The pilot store upgrades to rc16 and presses **Run again** on
-   **Customers** and **Orders**.
-3. Contract 1.20.0 from the engine (INT-185) → newest-first history in
-   all connectors.
-
-**Notes for the next version cut (rc17):** none so far._
+**Decided (Erkki, 2026-10-28; corrected 2026-10-29 to what contract
+1.20.0 and CON-241 hold):** History import (engine INT-185): the horizon
+is 60 months for every sector pack; the start part is the whole catalog,
+every customer in scope and the orders of the last 18 months; the rest
+follows in the background, newest first; the engine wrote it into
+contract 1.20.0 (with the §25 history-progress endpoint) and all three
+connectors implement it. Customers (rule B, contract §4): the customers
+the connector's own contact sync puts into Smaily by its sync mode, plus
+every customer with an order inside the 60-month horizon; whether
+someone is already a Smaily contact is never used. (This entry first
+said 36 months for consumable packs and 60 for durable ones, and that
+every customer account and subscriber is sent; neither holds.) When an
+import stops, the server log keeps the full exception message
+(`BackfillTick`'s "Backfill job failed" entry in
+`var/log/smaily_connect.log`); only the admin card shows the location
+form. Multi-website: **one Smaily account is one Campaign Intelligence
+(engine) store.** Websites that share a Smaily account (language
+versions; the same goods, stock and customers) share one engine store,
+as today. A website the merchant gives its own Smaily account gets its
+own engine store, built when the first store needs it (CON-237). There
+is no separate mode switch. CON-148 and CON-161 (an engine store per
+website, Phases 4–5 of `docs/internal/RFC_MULTI_WEBSITE.md`) are
+canceled. Per-website price, stock and links inside one engine store are
+the engine's INT-171. Klaviyo, Mailchimp and dotdigital also let a
+website connect its own account; none of them has an engine store to
+scope. **Decided (2026-10-24):** one Magento installation is one engine
+store (today's setup; the 2026-10-28 rule keeps it until a website has
+its own Smaily account)._
 
 _Earlier (2026-10-23, end of the 2026-10-22…23 session): 3.0.0-rc15
 released (Erkki's tag on #207; four assets, the Hyvä mirror and both

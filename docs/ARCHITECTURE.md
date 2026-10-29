@@ -964,7 +964,14 @@ below.
   address, which a substring search would miss. Only the whole address
   matches, in any letter case (CON-240): a decoded value that is the
   address or free text that names it, never a longer address that contains
-  it (`jane@…` is not `ane@…`). The walk reads a narrow
+  it (`jane@…` is not `ane@…`). The SQL lookups — the cart rows, the
+  active quotes and quote addresses, the orders and the customer accounts —
+  compare through `Model\Privacy\AddressMatch` (CON-242): the database
+  lowercases both sides, a capital with an accent too, then compares the
+  bytes, because Magento's collations ignore accents and `LOWER(email) = ?`
+  alone matched `jäne@…` to `jane@…`. The customer-account lookup keeps a
+  plain `email = ?` in front, so the email + website unique index still
+  narrows the rows; the others had no usable index before either. The walk reads a narrow
   column list in 1000-row chunks and deletes or anonymizes each chunk's
   matches in one transaction before reading the next, so peak memory is one
   chunk; a blob is decoded once and the same decoding answers the match and

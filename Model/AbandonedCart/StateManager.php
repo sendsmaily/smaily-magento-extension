@@ -11,6 +11,7 @@ namespace Smaily\Connect\Model\AbandonedCart;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\DB\Select;
 use Magento\Framework\Stdlib\DateTime\DateTime;
+use Smaily\Connect\Model\Privacy\AddressMatch;
 
 /**
  * State access for smaily_abandoned_cart (side table on the checkout
@@ -336,7 +337,7 @@ class StateManager
                 'status' => self::STATUS_ERASED,
                 'updated_at' => new \Zend_Db_Expr('updated_at'),
             ],
-            ['LOWER(email) = ?' => $email]
+            [AddressMatch::condition('email') => $email]
         );
     }
 
@@ -371,7 +372,7 @@ class StateManager
             ->from(['quote_table' => $quoteTable], ['entity_id', 'store_id'])
             ->joinLeft(['erased_state' => $this->table()], $erasedJoin('quote_table.entity_id'), [])
             ->where('quote_table.is_active = ?', 1)
-            ->where('LOWER(quote_table.customer_email) = ?', $email)
+            ->where(AddressMatch::condition('quote_table.customer_email'), $email)
             ->where('erased_state.quote_id IS NULL');
         $byAddress = $connection->select()
             ->from(['quote_table' => $quoteTable], ['entity_id', 'store_id'])
@@ -382,7 +383,7 @@ class StateManager
             )
             ->joinLeft(['erased_state' => $this->table()], $erasedJoin('quote_table.entity_id'), [])
             ->where('quote_table.is_active = ?', 1)
-            ->where('LOWER(address.email) = ?', $email)
+            ->where(AddressMatch::condition('address.email'), $email)
             ->where('erased_state.quote_id IS NULL');
         $either = $connection->select();
         $either->union([$byCart, $byAddress]);
@@ -418,7 +419,7 @@ class StateManager
         $connection = $this->resourceConnection->getConnection(self::CONNECTION);
         $select = $connection->select()
             ->from($this->table(), ['quote_id', 'store_id', 'status', 'created_at'])
-            ->where('LOWER(email) = ?', $email)
+            ->where(AddressMatch::condition('email'), $email)
             ->order('quote_id ASC');
 
         return $connection->fetchAll($select);

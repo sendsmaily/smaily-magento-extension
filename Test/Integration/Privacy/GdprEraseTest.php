@@ -594,6 +594,84 @@ class GdprEraseTest extends IntegrationTestCase
         self::assertSame('vt_visitor502', $attribution[502]['visitor_token']);
     }
 
+    /**
+     * CON-242: the tables compare addresses accent-blind (the test tables
+     * use the server's utf8mb4_0900_ai_ci), so an erasure and an export of
+     * an address never reach the same address with or without an accent,
+     * in any table they read. Letter case still does not matter, a capital
+     * with an accent included.
+     *
+     * @dataProvider accentedAndPlainAddresses
+     */
+    public function testAnAddressWithAnAccentIsAnotherShopper(string $erased, string $stored, string $other): void
+    {
+        $schema = new SchemaInstaller($this->connection);
+        $this->seedContactSync($stored, 'erased-pending');
+        $this->seedContactSync($other, 'other-pending');
+        $this->stateManager->markMailed(11, 1, $stored);
+        $this->stateManager->markMailed(12, 1, $other);
+        // Untracked active carts: one on the cart, one on its address.
+        $schema->seedQuote(21, ['is_active' => 1, 'items_count' => 1, 'customer_email' => $stored]);
+        $schema->seedQuote(22, ['is_active' => 1, 'items_count' => 1, 'customer_email' => $other]);
+        $schema->seedQuote(23, ['is_active' => 1, 'items_count' => 1]);
+        $schema->seedQuote(24, ['is_active' => 1, 'items_count' => 1]);
+        $this->connection->insert('quote_address', ['quote_id' => 23, 'address_type' => 'billing', 'email' => $stored]);
+        $this->connection->insert('quote_address', ['quote_id' => 24, 'address_type' => 'billing', 'email' => $other]);
+        // A guest order by its address, an account's order by the account.
+        $this->connection->insert('customer_entity', ['entity_id' => 7, 'website_id' => 1, 'email' => $stored]);
+        $this->connection->insert('customer_entity', ['entity_id' => 8, 'website_id' => 1, 'email' => $other]);
+        $this->seedOrder(501, null, $stored);
+        $this->seedOrder(502, 7, 'earlier-1@example.test');
+        $this->seedOrder(503, null, $other);
+        $this->seedOrder(504, 8, 'earlier-2@example.test');
+        foreach ([501, 502, 503, 504] as $orderId) {
+            $this->seedAttribution($orderId);
+        }
+
+        $export = json_decode(
+            $this->runCommand(['action' => 'export', 'email' => $erased])->getDisplay(),
+            true
+        )['local'];
+        self::assertCount(1, $export[self::QUEUE_LABEL]);
+        self::assertSame(['11'], array_map('strval', array_column($export[self::CART_LABEL], 'quote_id')));
+
+        self::assertSame(
+            [
+                self::QUEUE_LABEL => ['removed' => 1, 'anonymised' => 0],
+                self::ENGINE_LABEL => ['removed' => 0, 'anonymised' => 0],
+                self::CART_LABEL => ['removed' => 0, 'anonymised' => 3],
+                self::ATTRIBUTION_LABEL => ['removed' => 0, 'anonymised' => 2],
+                'Discount codes' => ['removed' => 0, 'anonymised' => 0],
+            ],
+            $this->eraser->erase($erased)
+        );
+
+        self::assertSame(['other-pending'], array_column($this->fetchAll(EventResource::TABLE_NAME), 'event_uuid'));
+        self::assertSame(
+            ['12'],
+            array_map('strval', array_column($this->stateManager->rowsForEmail($other), 'quote_id')),
+            'The other address\'s tracked cart is untouched'
+        );
+        self::assertSame([22, 24], $this->passTheCronsGate([21, 22, 23, 24]), 'Its active carts are still mailed');
+        $attribution = array_column($this->fetchAll(self::ATTRIBUTION_TABLE, 'order_id'), null, 'order_id');
+        self::assertNull($attribution[501]['visitor_token']);
+        self::assertNull($attribution[502]['visitor_token']);
+        self::assertSame('vt_visitor503', $attribution[503]['visitor_token']);
+        self::assertSame('vt_visitor504', $attribution[504]['visitor_token']);
+    }
+
+    /**
+     * @return array<string, array{string, string, string}> the erased address,
+     *         as it is stored, and the other shopper's
+     */
+    public static function accentedAndPlainAddresses(): array
+    {
+        return [
+            'the accented address is erased' => ['jäne@example.test', 'JÄNE@Example.Test', 'jane@example.test'],
+            'the plain address is erased' => ['jane@example.test', 'JANE@Example.Test', 'jäne@example.test'],
+        ];
+    }
+
     public function testAnAnonymisedRowIsNeverRevivedByRetry(): void
     {
         $this->seedContactSync(self::SUBJECT, 'retry-me');

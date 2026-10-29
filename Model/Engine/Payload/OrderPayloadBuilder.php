@@ -42,7 +42,8 @@ use Smaily\Connect\Model\Logger\Logger;
  */
 class OrderPayloadBuilder
 {
-    private const STATUS_MAP = [
+    /** Order state => engine status; an order in any other state is never sent (also read by the history import). */
+    public const STATUS_MAP = [
         Order::STATE_COMPLETE => 'completed',
         Order::STATE_NEW => 'processing',
         Order::STATE_PROCESSING => 'processing',

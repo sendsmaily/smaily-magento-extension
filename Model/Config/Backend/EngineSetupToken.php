@@ -25,7 +25,8 @@ use Smaily\Connect\Model\Engine\Exception\EngineException;
  * Exchanges a pasted setup token/URL on config save. The one-time token is
  * consumed immediately and never persisted — only the exchange result
  * (tenant credentials) is stored via Settings. A successful exchange starts
- * the catalog and customers imports and says so (PRO-3741, PRO-3790) —
+ * the catalog, customers and orders imports and says so (PRO-3741,
+ * PRO-3790, CON-241) —
  * Engine\Connector, the connect step the admin Connect shares.
  */
 class EngineSetupToken extends Value
@@ -73,7 +74,12 @@ class EngineSetupToken extends Value
                 }
                 if ($started[Job::TYPE_CUSTOMERS]) {
                     $this->messageManager->addNoticeMessage(
-                        __('The customers import has started: your existing customer accounts go to Campaign Intelligence once, in the background, after the catalog import. To hold it back, press Cancel import on the Customers card under Marketing > Smaily Connect > Settings > Intelligence.')->render()
+                        __('The customers import has started: the customer accounts your contact sync puts into Smaily, and every customer with an order in the order history Campaign Intelligence takes, go to Campaign Intelligence once, in the background, after the catalog import. To hold it back, press Cancel import on the Customers card under Marketing > Smaily Connect > Settings > Intelligence.')->render()
+                    );
+                }
+                if ($started[Job::TYPE_ORDERS]) {
+                    $this->messageManager->addNoticeMessage(
+                        __('The orders import has started: your order history goes to Campaign Intelligence once, in the background, after the customers import, newest first — the recent orders first, so that Campaign Intelligence can start, then the older ones. No order older than the history Campaign Intelligence takes is sent. To hold it back, press Cancel import on the Orders card under Marketing > Smaily Connect > Settings > Intelligence.')->render()
                     );
                 }
             } catch (EngineException $exception) {

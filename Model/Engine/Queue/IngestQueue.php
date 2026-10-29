@@ -69,7 +69,9 @@ class IngestQueue
 
     /**
      * Queue one wire item for a domain. Payload is stored as the final wire
-     * object; event_id is filled from the row UUID at flush time.
+     * object; event_id is filled from the row UUID at flush time. An
+     * import's row carries its job's id, so the send run can count the rows
+     * the engine accepted for that import (CON-241).
      *
      * @param array<string, mixed> $payload
      */
@@ -78,9 +80,10 @@ class IngestQueue
         array $payload,
         ?string $entityId = null,
         ?int $storeId = null,
-        ?string $eventUuid = null
+        ?string $eventUuid = null,
+        ?int $jobId = null
     ): bool {
-        return $this->enqueueReturningId($domain, $payload, $entityId, $storeId, $eventUuid) !== null;
+        return $this->enqueueReturningId($domain, $payload, $entityId, $storeId, $eventUuid, $jobId) !== null;
     }
 
     /**
@@ -95,10 +98,11 @@ class IngestQueue
         array $payload,
         ?string $entityId = null,
         ?int $storeId = null,
-        ?string $eventUuid = null
+        ?string $eventUuid = null,
+        ?int $jobId = null
     ): ?int {
         $event = $this->eventFactory->create();
-        $event->addData($this->row($domain, $payload, $entityId, $storeId, $eventUuid));
+        $event->addData($this->row($domain, $payload, $entityId, $storeId, $eventUuid, $jobId));
 
         try {
             $this->eventResource->save($event);
@@ -475,6 +479,69 @@ class IngestQueue
     }
 
     /**
+     * Number of these import jobs' rows not delivered yet (pending, also
+     * waiting for a retry, or being sent) — with $upToId, only the rows up
+     * to that queue row id. A row the engine refused for good counts as
+     * delivered here: no later run sends it.
+     *
+     * @param int[] $jobIds
+     * @phpstan-impure
+     */
+    public function countUndelivered(array $jobIds, ?int $upToId = null): int
+    {
+        if (!$jobIds) {
+            return 0;
+        }
+
+        $connection = $this->resourceConnection->getConnection();
+        $select = $connection->select()
+            ->from($this->table(), ['cnt' => 'COUNT(*)'])
+            ->where('job_id IN (?)', $jobIds)
+            ->where('status IN (?)', [IngestEvent::STATUS_PENDING, IngestEvent::STATUS_SENDING]);
+        if ($upToId !== null) {
+            $select->where('id <= ?', $upToId);
+        }
+
+        return (int)$connection->fetchOne($select);
+    }
+
+    /**
+     * The id of the import job's newest row, 0 when it queued none.
+     *
+     * @phpstan-impure
+     */
+    public function lastRowId(int $jobId): int
+    {
+        $connection = $this->resourceConnection->getConnection();
+
+        return (int)$connection->fetchOne(
+            $connection->select()->from($this->table(), ['last' => 'MAX(id)'])->where('job_id = ?', $jobId)
+        );
+    }
+
+    /**
+     * The stored payload of the import job's newest delivered row, null
+     * while none is delivered. An orders import queues newest first, so
+     * this is the oldest order it has sent so far.
+     *
+     * @return array<int|string, mixed>|null
+     * @phpstan-impure
+     */
+    public function lastSentPayload(int $jobId): ?array
+    {
+        $connection = $this->resourceConnection->getConnection();
+        $payload = $connection->fetchOne(
+            $connection->select()->from($this->table(), ['payload'])
+                ->where('job_id = ?', $jobId)
+                ->where('status = ?', IngestEvent::STATUS_SENT)
+                ->order('id DESC')
+                ->limit(1)
+        );
+
+        return is_string($payload) && $payload !== '' ? $this->payloadDecoder->decode($payload) : null;
+    }
+
+    /**
      * Decode a row payload and stamp the wire event_id from the row UUID.
      *
      * @return array<string, mixed>
@@ -498,7 +565,8 @@ class IngestQueue
         array $payload,
         ?string $entityId,
         ?int $storeId,
-        ?string $eventUuid = null
+        ?string $eventUuid = null,
+        ?int $jobId = null
     ): array {
         return [
             'domain' => $domain,
@@ -508,6 +576,7 @@ class IngestQueue
             'payload' => $this->serializer->serialize($payload),
             'status' => IngestEvent::STATUS_PENDING,
             'attempts' => 0,
+            'job_id' => $jobId,
         ];
     }
 

@@ -19,6 +19,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Controller\Adminhtml\Api\BackfillState;
 use Smaily\Connect\Model\Backfill\EngineImportGuard;
+use Smaily\Connect\Model\Backfill\HistoryProgress;
 use Smaily\Connect\Model\Backfill\ImportStarter;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
@@ -38,11 +39,14 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * import names it. PRO-3927: one the tick has set aside reads as stalled
  * and waits behind nothing. PRO-4037: a contacts import that sent nothing
  * because the website's contact sync was not active names the website.
- * CON-233: a stopped import never answers an error's own text.
+ * CON-233: a stopped import never answers an error's own text. CON-241:
+ * the Orders card gets the history import's running part.
  */
 class BackfillStateTest extends TestCase
 {
     private JobManager&MockObject $jobManager;
+
+    private HistoryProgress&MockObject $historyProgress;
 
     /** @var array<int|string, mixed> */
     private array $response = [];
@@ -50,6 +54,7 @@ class BackfillStateTest extends TestCase
     protected function setUp(): void
     {
         $this->jobManager = $this->createMock(JobManager::class);
+        $this->historyProgress = $this->createMock(HistoryProgress::class);
     }
 
     /**
@@ -100,6 +105,26 @@ class BackfillStateTest extends TestCase
                 'Campaign Intelligence is not connected, so there is nowhere to send the order data.',
             ],
         ];
+    }
+
+    /**
+     * CON-241: the Orders card's answer carries the running part of the
+     * history import of its latest job; another import's answer none.
+     */
+    public function testTheOrdersAnswerCarriesTheHistoryImportsRunningPart(): void
+    {
+        $card = ['part' => 'start', 'sent' => 120, 'expected' => 400, 'percent' => 30,
+            'start_months' => 18, 'horizon_months' => 60];
+        $latest = $this->job(Job::STATUS_RUNNING, Job::TYPE_ORDERS);
+        $this->historyProgress->expects(self::once())->method('card')->with($latest)->willReturn($card);
+
+        $this->controller(true, ['action' => 'status', 'job_type' => Job::TYPE_ORDERS], [$latest])->execute();
+        self::assertSame($card, $this->response['history']);
+
+        $this->controller(true, ['action' => 'status', 'job_type' => Job::TYPE_CATALOG], [
+            $this->job(Job::STATUS_RUNNING),
+        ])->execute();
+        self::assertNull($this->response['history']);
     }
 
     public function testTheContactsImportStartsWhileCampaignIntelligenceIsNotConnected(): void
@@ -389,7 +414,8 @@ class BackfillStateTest extends TestCase
             $storeManager,
             $this->createMock(TimezoneInterface::class),
             new JobStatusAggregator(),
-            new ImportStarter($this->jobManager, $storeManager, new EngineImportGuard($engineSettings))
+            new ImportStarter($this->jobManager, $storeManager, new EngineImportGuard($engineSettings)),
+            $this->historyProgress
         );
     }
 }

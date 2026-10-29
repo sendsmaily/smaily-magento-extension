@@ -91,4 +91,15 @@ class Job extends AbstractModel
     {
         return (int)$this->getData('failed_count');
     }
+
+    /**
+     * Rows of a Campaign Intelligence import the engine accepted (CON-241);
+     * null for a job from before they were counted.
+     */
+    public function getSentCount(): ?int
+    {
+        $sent = $this->getData('sent_count');
+
+        return $sent === null ? null : (int)$sent;
+    }
 }

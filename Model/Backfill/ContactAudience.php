@@ -130,6 +130,33 @@ class ContactAudience
     }
 
     /**
+     * The condition a registered customer (customer_entity as `e`) meets
+     * when this website's contact sync puts the customer into Smaily under
+     * $mode — for the Campaign Intelligence customers import (CON-241): a
+     * subscribed or unsubscribed subscriber of the website, by customer id
+     * or address; under legitimate_interest also every customer of the
+     * website. Null when the mode puts no account there (checkout_optin) or
+     * the website has no stores.
+     */
+    public function customerCondition(int $websiteId, string $mode): ?string
+    {
+        $storeIds = $this->storeIds($websiteId);
+        if ($mode === SyncMode::MODE_CHECKOUT_OPTIN || !$storeIds) {
+            return null;
+        }
+
+        $subscriber = 'EXISTS (' . $this->subscribers($storeIds)
+            ->columns(['subscriber_id'])
+            ->where('ns.customer_id = e.entity_id OR ns.subscriber_email = e.email')
+            ->assemble() . ')';
+        if ($mode !== SyncMode::MODE_LEGITIMATE_INTEREST) {
+            return $subscriber;
+        }
+
+        return '(' . $this->connection()->quoteInto('e.website_id = ?', $websiteId) . ' OR ' . $subscriber . ')';
+    }
+
+    /**
      * @return int[]
      */
     public function storeIds(int $websiteId): array

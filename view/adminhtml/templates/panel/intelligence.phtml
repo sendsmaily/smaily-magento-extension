@@ -110,11 +110,20 @@ $isRefused = $viewModel->isEngineRefused();
         <div class="smaily-banner smaily-banner--info" id="smaily-w-engine-customers-import" role="status" style="display:none;">
             <div class="smaily-banner__body">
                 <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('The customers import has started')) ?></div>
-                <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Your existing customer accounts go to Campaign Intelligence once, in the background, after the catalog import. To hold it back, press Cancel import on the Customers card under Marketing > Smaily Connect > Settings > Intelligence.')) ?></div>
+                <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('The customer accounts your contact sync puts into Smaily, and every customer with an order in the order history Campaign Intelligence takes, go to Campaign Intelligence once, in the background, after the catalog import. To hold it back, press Cancel import on the Customers card under Marketing > Smaily Connect > Settings > Intelligence.')) ?></div>
+            </div>
+        </div>
+        <?php // A Connect starts the orders import too (CON-241), newest
+        // first; panels-js shows this banner when it did. The Orders card's
+        // Cancel import stops it. ?>
+        <div class="smaily-banner smaily-banner--info" id="smaily-w-engine-orders-import" role="status" style="display:none;">
+            <div class="smaily-banner__body">
+                <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('The orders import has started')) ?></div>
+                <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Your order history goes to Campaign Intelligence once, in the background, after the customers import, newest first: the recent orders first, so that Campaign Intelligence can start, then the older ones. No order older than the history Campaign Intelligence takes is sent. To hold it back, press Cancel import on the Orders card under Marketing > Smaily Connect > Settings > Intelligence.')) ?></div>
             </div>
         </div>
         <?php if (!$isSettings): ?>
-        <p><?= $escaper->escapeHtml(__('Catalog, customer and order sync started automatically. Connecting also starts the catalog and customers imports, which send your whole catalog and your existing customer accounts once. Order history can be imported, and both imports run again, any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?></p>
+        <p><?= $escaper->escapeHtml(__('Catalog, customer and order sync started automatically. Connecting also starts the catalog, customers and orders imports, which send your catalog, your customers and your order history once, the orders newest first. Each import can run again any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?></p>
         <?php endif; ?>
         <div class="smaily-inline-toggle">
             <label><input type="checkbox" id="smaily-w-browse"/>

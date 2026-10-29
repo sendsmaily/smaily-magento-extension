@@ -775,6 +775,19 @@ window.smailyPanelsInit = function ($) {
             scheduleNextPoll(jobType, ui);
             return;
         }
+        if (state === 'running' && data.history) {
+            // The Orders card of a history import (CON-241): one bar for the
+            // running part, by the orders Campaign Intelligence has — the
+            // start part, then the share of the whole horizon.
+            setProgress(ui, {processed: data.history.sent, total: data.history.expected},
+                data.history.percent, 'running');
+            result(ui.result, (data.history.part === 'start'
+                ? '<?= $escaper->escapeJs(__('Sending the orders of the last %1 months first…')) ?>'
+                : '<?= $escaper->escapeJs(__('The last %1 months are in: Campaign Intelligence can start. Older orders, back to %2 months, follow in the background…')) ?>')
+                .replace('%1', data.history.start_months).replace('%2', data.history.horizon_months), true);
+            scheduleNextPoll(jobType, ui);
+            return;
+        }
         if (state === 'running') {
             setProgress(ui, data, data.percent, 'running');
             result(ui.result, '<?= $escaper->escapeJs(__('Importing…')) ?>', true);
@@ -855,8 +868,8 @@ window.smailyPanelsInit = function ($) {
         pollBackfill(jobType, ui, 'cancel');
     }
 
-    // The Catalog and Customers cards on Settings > Intelligence follow a
-    // Connect (PRO-3741, PRO-3790), the Catalog card a Hold back too; the
+    // The Catalog, Customers and Orders cards on Settings > Intelligence
+    // follow a Connect (PRO-3741, PRO-3790, CON-241), the Catalog card a Hold back too; the
     // setup step has no cards. The Hold back's cancel answers with the
     // import's state, which the card renders as is; after a Connect the
     // card asks for it.
@@ -1251,6 +1264,10 @@ window.smailyPanelsInit = function ($) {
                     if (data.customersImportStarted) {
                         $('#smaily-w-engine-customers-import').show();
                         refreshImportCard('customers');
+                    }
+                    if (data.ordersImportStarted) {
+                        $('#smaily-w-engine-orders-import').show();
+                        refreshImportCard('orders');
                     }
                 } else {
                     result('#smaily-w-engine-result',

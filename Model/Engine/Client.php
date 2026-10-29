@@ -105,6 +105,9 @@ class Client
      */
     private const RECOMMENDATIONS_TIMEOUT_SECONDS = 10;
 
+    /** The history progress call (§25) runs in cron; one short attempt. */
+    private const HISTORY_PROGRESS_TIMEOUT_SECONDS = 10;
+
     /**
      * @var array{request: array<int|string, mixed>, response: array{http_status: int, body: mixed}|null}|null
      */
@@ -280,6 +283,27 @@ class Client
             $this->endpoint('ingest_catalog_manifest', '/api/v1/ingest/catalog/manifest'),
             ['products' => $products],
             timeoutSeconds: self::MANIFEST_TIMEOUT_SECONDS
+        );
+    }
+
+    /**
+     * Where the store's history import stands — POST
+     * /api/v1/ingest/history/progress (contract v1.20.0 §25, CON-241): one
+     * attempt, never a retry or a wait — a call that fails is made again
+     * later, and never holds up the import. A connection set up before
+     * v1.20.0 falls back to the contract's path (§1 "map age").
+     *
+     * @param array<string, mixed> $progress
+     * @return array<string, mixed>
+     */
+    public function historyProgress(array $progress): array
+    {
+        return $this->request(
+            'POST',
+            $this->endpoint('ingest_history_progress', '/api/v1/ingest/history/progress'),
+            $progress,
+            singleAttempt: true,
+            timeoutSeconds: self::HISTORY_PROGRESS_TIMEOUT_SECONDS
         );
     }
 

@@ -64,13 +64,14 @@ class CatalogIngest
     /**
      * Queue the product's current catalog row — a tombstone once it has left
      * the sellable set (disabled, hidden); the engine never deletes.
+     * $jobId names the catalog import that queues it (CON-241).
      *
      * @return bool whether the row is queued (a collapsed duplicate counts:
      *     the row is already there), false when skipped or the build failed
      */
-    public function enqueueProduct(Product $product): bool
+    public function enqueueProduct(Product $product, ?int $jobId = null): bool
     {
-        return $this->enqueue($product, false);
+        return $this->enqueue($product, false, $jobId);
     }
 
     /**
@@ -233,7 +234,7 @@ class CatalogIngest
         });
     }
 
-    private function enqueue(Product $product, bool $forceTombstone): bool
+    private function enqueue(Product $product, bool $forceTombstone, ?int $jobId = null): bool
     {
         if (!$this->settings->isConnected()) {
             return false;
@@ -254,7 +255,9 @@ class CatalogIngest
             Client::DOMAIN_CATALOG,
             $item,
             (string)$product->getId(),
-            $this->payloadBuilder->canonicalStoreId()
+            $this->payloadBuilder->canonicalStoreId(),
+            null,
+            $jobId
         );
 
         return true;

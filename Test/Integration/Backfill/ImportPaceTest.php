@@ -17,6 +17,7 @@ use Magento\Framework\App\Request\Http;
 use Magento\Framework\Data\Collection\EntityFactoryInterface;
 use Magento\Framework\Model\AbstractModel;
 use Magento\Framework\Serialize\Serializer\Json;
+use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\ResourceModel\Order\Collection as OrderCollection;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
@@ -29,12 +30,15 @@ use Psr\Http\Message\RequestInterface;
 use Smaily\Connect\Cron\BackfillTick;
 use Smaily\Connect\Cron\FlushIngestQueue;
 use Smaily\Connect\Model\Backfill\EngineOrdersProcessor;
+use Smaily\Connect\Model\Backfill\HistoryImport;
+use Smaily\Connect\Model\Backfill\HistoryProgress;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\SkippedRow;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\HistoryConfig;
 use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
@@ -55,6 +59,10 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  * engine, at the pace, inside the send budget; an order the store places
  * meanwhile goes out in the same run, not after the history.
  *
+ * CON-241: a pilot-store-sized history goes newest first, its start part
+ * before anything older, nothing past the horizon, and the engine hears
+ * each phase of it (contract v1.20.0 §25).
+ *
  * Real here: the sales_order and sales_order_item tables, the orders import
  * and its payload builder, the job table, the ingest queue, the send run,
  * the engine client with its JSON and D6 handling, and the pace with its
@@ -71,6 +79,17 @@ class ImportPaceTest extends IntegrationTestCase
     /** @var list<array{at: float, path: string, items: int}> the requests the engine got */
     private array $requests = [];
 
+    /** @var list<string> the ordered_at of each order the engine got, in arrival order */
+    private array $orderTimes = [];
+
+    /** @var list<int> the minute each of those orders arrived */
+    private array $orderMinutes = [];
+
+    /** @var list<array{minute: int, phase: string, orders_sent: int}> the progress calls the engine got */
+    private array $progress = [];
+
+    private int $minute = 0;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -78,6 +97,7 @@ class ImportPaceTest extends IntegrationTestCase
         $schema = new SchemaInstaller($this->connection);
         $schema->createSalesOrder();
         $schema->createSalesOrderItem();
+        $schema->createFlag();
         $this->jobManager = $this->objectManager->create(JobManager::class);
     }
 
@@ -129,33 +149,201 @@ class ImportPaceTest extends IntegrationTestCase
         self::assertSame(self::ORDERS + 1, array_sum(array_column($this->requests, 'items')));
     }
 
-    private function tick(): BackfillTick
+    /**
+     * CON-241: a history the size of the pilot store's — 80,000 orders over
+     * thirteen years, 12,000 of them in the last 18 months and 40,000 inside
+     * 60 months — goes newest first: every order of the start part reaches
+     * the engine before any older one, no order older than 60 months is
+     * sent, and the engine hears `start_part_complete` once the start part
+     * is in, long before `complete`. One loop is one cron minute: the tick,
+     * the send run at its pace (on a clock that does not wait), and a minute
+     * passing.
+     */
+    public function testAPilotSizedHistorySendsItsStartPartFirst(): void
+    {
+        $month = 30.44 * 86400;
+        $now = $this->clock->now();
+        $this->seedOrders(80000, static function (int $id) use ($now, $month): string {
+            // 1..12,000 in the start part, 12,001..40,000 older inside the
+            // horizon, the rest older than 60 months (up to 13 years).
+            $age = match (true) {
+                $id <= 12000 => 3600 + ($id - 1) * (17.9 * $month - 3600) / 12000,
+                $id <= 40000 => 18.1 * $month + ($id - 12001) * 41.8 * $month / 28000,
+                default => 60.1 * $month + ($id - 40001) * 95.9 * $month / 40000,
+            };
+
+            return gmdate('Y-m-d H:i:s', (int)($now - $age));
+        }, false);
+        $this->jobManager->start(Job::TYPE_ORDERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
+        $client = $this->client();
+        $tick = $this->tick($client, $this->wireOrderBuilder());
+        $send = $this->sendRun($client, $this->paceWithoutWaiting());
+
+        $startPartMinute = 0;
+        $completeMinute = 0;
+        for ($this->minute = 1; $this->minute <= 60 && !$completeMinute; $this->minute++) {
+            $tick->execute();
+            $send->execute();
+            $this->clock->travel(60);
+            $phases = array_column($this->progress, 'phase', 'minute');
+            $startPartMinute = $startPartMinute ?: (int)array_search('start_part_complete', $phases, true);
+            $completeMinute = (int)array_search('complete', $phases, true);
+        }
+
+        $horizon = gmdate('Y-m-d\TH:i:s\Z', (int)($now - 60 * $month));
+        $startFrom = gmdate('Y-m-d\TH:i:s\Z', (int)($now - 18 * $month));
+        self::assertCount(40000, $this->orderTimes, 'Every order inside 60 months, and no other');
+        self::assertGreaterThan($horizon, min($this->orderTimes), 'No order older than the horizon');
+        $startPart = array_keys(array_filter($this->orderTimes, static fn (string $at): bool => $at >= $startFrom));
+        self::assertCount(12000, $startPart);
+        self::assertSame(11999, max($startPart), 'The start part arrives before any older order');
+        $sorted = $this->orderTimes;
+        rsort($sorted);
+        self::assertSame($sorted, $this->orderTimes, 'Newest first, throughout');
+
+        self::assertSame(
+            ['started', 'start_part_complete', 'complete'],
+            array_values(array_unique(array_column($this->progress, 'phase')))
+        );
+        // How many minutes it takes depends on how much a tick builds in its
+        // 15 s (when every tick queues its full 2,000 rows: the start part
+        // after 8 minutes, the whole horizon after 22). The phases do not:
+        // `start_part_complete` comes at most two minutes after the last
+        // start-part order was accepted (one for the tick to find the start
+        // part's end, one to report it), counting at least those 12,000
+        // orders, and `complete` at most two minutes after the last order.
+        self::assertContains(
+            $startPartMinute - $this->orderMinutes[11999],
+            [1, 2],
+            'start_part_complete within two minutes of the start part being in'
+        );
+        self::assertGreaterThanOrEqual(
+            12000,
+            $this->progress[array_search($startPartMinute, array_column($this->progress, 'minute'), true)]
+                ['orders_sent'],
+            'start_part_complete counts the orders the engine accepted'
+        );
+        self::assertContains(
+            $completeMinute - end($this->orderMinutes),
+            [1, 2],
+            'complete within two minutes of the last order'
+        );
+    }
+
+    private function tick(?Client $client = null, ?OrderPayloadBuilder $builder = null): BackfillTick
     {
         $logger = $this->createMock(Logger::class);
         $engineSettings = $this->createMock(EngineSettings::class);
         $engineSettings->method('isRefused')->willReturn(false);
+        $engineSettings->method('isSendingAllowed')->willReturn(true);
+        $historyConfig = $this->createMock(HistoryConfig::class);
+        $historyConfig->method('forNewImport')->willReturn(HistoryConfig::FALLBACK);
+        $historyImport = $this->objectManager->create(
+            HistoryImport::class,
+            ['historyConfig' => $historyConfig, 'dateTime' => $this->clock]
+        );
+        $queue = $this->objectManager->create(IngestQueue::class);
         $orders = new EngineOrdersProcessor(
             $this->jobManager,
-            $this->orderCollectionFactory(),
-            new OrderPayloadBuilder(
+            $this->orderCollectionFactory($builder === null),
+            $builder ?? new OrderPayloadBuilder(
                 $this->objectManager->get(ResourceConnection::class),
                 $this->orderItemCollectionFactory(),
                 $logger
             ),
-            $this->objectManager->create(IngestQueue::class),
-            new SkippedRow($logger)
+            $queue,
+            new SkippedRow($logger),
+            $historyImport
         );
+        $progress = $client === null
+            ? $this->createMock(HistoryProgress::class)
+            : new HistoryProgress(
+                $historyImport,
+                $this->jobManager,
+                $queue,
+                $client,
+                $engineSettings,
+                $this->clock,
+                $logger
+            );
 
-        return new BackfillTick($this->jobManager, $engineSettings, $logger, [
+        return new BackfillTick($this->jobManager, $engineSettings, $logger, $historyImport, $progress, [
             Job::TYPE_ORDERS . ':' . Job::TARGET_ENGINE => $orders,
         ]);
     }
 
     /**
-     * The send run with the real engine client, whose HTTP goes to the mock
-     * engine, and the real pace.
+     * The order's wire row from its sales_order row alone, without its
+     * lines: the pilot-sized history measures the order the rows go in. Not
+     * a mock, which would keep each of its 40,000 calls.
      */
-    private function sendRun(): FlushIngestQueue
+    private function wireOrderBuilder(): OrderPayloadBuilder
+    {
+        return new class extends OrderPayloadBuilder {
+            public function __construct()
+            {
+            }
+
+            /**
+             * @return array<string, mixed>
+             */
+            public function build(OrderInterface $order): array
+            {
+                return [
+                    'external_order_id' => (string)$order->getIncrementId(),
+                    'customer_email' => (string)$order->getCustomerEmail(),
+                    'ordered_at' => str_replace(' ', 'T', (string)$order->getCreatedAt()) . 'Z',
+                    'total_amount' => 10,
+                    'status' => 'completed',
+                    'items' => [],
+                ];
+            }
+        };
+    }
+
+    /**
+     * The pace on a clock that moves only by its own waits: a send run
+     * makes as many requests as at the real pace, at once.
+     */
+    private function paceWithoutWaiting(): IngestPace
+    {
+        return new class extends IngestPace {
+            private float $virtualNow = 0.0;
+
+            protected function now(): float
+            {
+                return $this->virtualNow;
+            }
+
+            protected function pause(float $seconds): void
+            {
+                $this->virtualNow += $seconds;
+            }
+        };
+    }
+
+    /**
+     * The send run with the real engine client, whose HTTP goes to the mock
+     * engine, and the real pace unless another is given.
+     */
+    private function sendRun(?Client $client = null, ?IngestPace $pace = null): FlushIngestQueue
+    {
+        $client ??= $this->client();
+
+        return new FlushIngestQueue(
+            $this->engineSettings(),
+            $this->objectManager->create(IngestQueue::class),
+            $this->createMock(CatalogIngest::class),
+            $client,
+            $this->createMock(OptOutReplay::class),
+            new Json(),
+            $this->createMock(Logger::class),
+            $pace ?? new IngestPace(),
+            $this->jobManager
+        );
+    }
+
+    private function engineSettings(): EngineSettings
     {
         $settings = $this->createMock(EngineSettings::class);
         $settings->method('isSendingAllowed')->willReturn(true);
@@ -165,12 +353,22 @@ class ImportPaceTest extends IntegrationTestCase
             static fn (string $key): string => 'https://engine.test/api/v1/ingest/' . substr($key, strlen('ingest_'))
         );
 
+        return $settings;
+    }
+
+    /**
+     * The real engine client, whose HTTP goes to the mock engine.
+     */
+    private function client(): Client
+    {
+        $settings = $this->engineSettings();
         $httpClientFactory = $this->createMock(HttpClientFactory::class);
         $httpClientFactory->method('create')->willReturnCallback(
             fn (array $config = []): HttpClient => new HttpClient(['handler' => $this->mockEngine()] + $config)
         );
         $storeManager = $this->createMock(StoreManagerInterface::class);
-        $client = new Client(
+
+        return new Client(
             $settings,
             $httpClientFactory,
             $this->createMock(ProductMetadataInterface::class),
@@ -179,26 +377,29 @@ class ImportPaceTest extends IntegrationTestCase
             $this->createMock(SleeperInterface::class),
             new StorefrontScript($storeManager, $this->createMock(Http::class))
         );
-
-        return new FlushIngestQueue(
-            $settings,
-            $this->objectManager->create(IngestQueue::class),
-            $this->createMock(CatalogIngest::class),
-            $client,
-            $this->createMock(OptOutReplay::class),
-            new Json(),
-            $this->createMock(Logger::class),
-            new IngestPace()
-        );
     }
 
     /**
-     * The engine: a D6 reply for every item at once; each request recorded.
+     * The engine: a D6 reply for every item at once, and `ok` to a progress
+     * call; each request recorded.
      */
     private function mockEngine(): callable
     {
         return function (RequestInterface $request) {
             $body = json_decode((string)$request->getBody(), true);
+            if (str_contains($request->getUri()->getPath(), 'history')) {
+                $this->progress[] = [
+                    'minute' => $this->minute,
+                    'phase' => $body['phase'],
+                    'orders_sent' => $body['entities']['orders']['sent'],
+                ];
+
+                return Create::promiseFor(new Response(200, ['Content-Type' => 'application/json'], '{"ok":true}'));
+            }
+            foreach ($body['orders'] ?? [] as $order) {
+                $this->orderTimes[] = (string)($order['ordered_at'] ?? '');
+                $this->orderMinutes[] = $this->minute;
+            }
             $items = count((array)reset($body));
             $this->requests[] = [
                 'at' => microtime(true),
@@ -228,9 +429,12 @@ class ImportPaceTest extends IntegrationTestCase
     }
 
     /**
-     * Orders 1..$count, one line each.
+     * Orders 1..$count, one line each unless $withLines is false; placed a
+     * month ago unless $createdAt says when, by order id.
+     *
+     * @param (callable(int): string)|null $createdAt
      */
-    private function seedOrders(int $count): void
+    private function seedOrders(int $count, ?callable $createdAt = null, bool $withLines = true): void
     {
         $orders = [];
         $lines = [];
@@ -242,23 +446,27 @@ class ImportPaceTest extends IntegrationTestCase
                 'customer_email' => 'o' . $id . '@example.invalid',
                 'grand_total' => 10,
                 'order_currency_code' => 'EUR',
-                'created_at' => '2024-01-01 10:00:00',
+                'created_at' => $createdAt !== null ? $createdAt($id) : $this->clockDate(-30 * 86400),
             ];
-            $lines[] = [
-                'order_id' => $id,
-                'sku' => 'SKU-' . $id,
-                'product_type' => 'simple',
-                'qty_ordered' => 1,
-                'row_total' => 10,
-                'row_total_incl_tax' => 10,
-                'product_options' => '{"info_buyRequest":{"qty":1}}',
-            ];
-        }
-        foreach (array_chunk($orders, 500) as $chunk) {
-            $this->connection->insertMultiple('sales_order', $chunk);
-        }
-        foreach (array_chunk($lines, 500) as $chunk) {
-            $this->connection->insertMultiple('sales_order_item', $chunk);
+            if ($withLines) {
+                $lines[] = [
+                    'order_id' => $id,
+                    'sku' => 'SKU-' . $id,
+                    'product_type' => 'simple',
+                    'qty_ordered' => 1,
+                    'row_total' => 10,
+                    'row_total_incl_tax' => 10,
+                    'product_options' => '{"info_buyRequest":{"qty":1}}',
+                ];
+            }
+            if (count($orders) === 500 || $id === $count) {
+                $this->connection->insertMultiple('sales_order', $orders);
+                $orders = [];
+            }
+            if ($lines && (count($lines) === 500 || $id === $count)) {
+                $this->connection->insertMultiple('sales_order_item', $lines);
+                $lines = [];
+            }
         }
     }
 
@@ -266,38 +474,28 @@ class ImportPaceTest extends IntegrationTestCase
      * The orders, read from sales_order the way the import pages through
      * them (as UnreadableImportRowsTest reads them).
      */
-    private function orderCollectionFactory(): OrderCollectionFactory
+    private function orderCollectionFactory(bool $withLines = true): OrderCollectionFactory
     {
         $factory = $this->createMock(OrderCollectionFactory::class);
-        $factory->method('create')->willReturnCallback(function (): OrderCollection {
-            $after = 0;
-            $limit = 0;
+        $factory->method('create')->willReturnCallback(function () use ($withLines): OrderCollection {
+            $ids = [];
             $collection = $this->createMock(OrderCollection::class);
-            $collection->method('getSize')->willReturnCallback(
-                fn (): int => (int)$this->connection->fetchOne('SELECT COUNT(*) FROM sales_order')
-            );
             $collection->method('addFieldToFilter')->willReturnCallback(
-                function (string $field, array $condition) use (&$after, $collection): OrderCollection {
-                    $after = (int)$condition['gt'];
+                function (string $field, array $condition) use (&$ids, $collection): OrderCollection {
+                    $ids = array_map('intval', $condition['in']);
 
                     return $collection;
                 }
             );
-            $collection->method('setOrder')->willReturnSelf();
-            $collection->method('setPageSize')->willReturnCallback(
-                function (int $size) use (&$limit, $collection): OrderCollection {
-                    $limit = $size;
-
-                    return $collection;
-                }
-            );
-            $collection->method('getItems')->willReturnCallback(function () use (&$after, &$limit): array {
+            $collection->method('getItems')->willReturnCallback(function () use (&$ids, $withLines): array {
                 $rows = $this->connection->fetchAll(
-                    $this->connection->select()->from('sales_order')
-                        ->where('entity_id > ?', $after)->order('entity_id ASC')->limit($limit)
+                    $this->connection->select()->from('sales_order')->where('entity_id IN (?)', $ids ?: [0])
                 );
 
-                return array_map(fn (array $row): Order => $this->order($row), $rows);
+                return array_map(
+                    fn (array $row): Order => $withLines ? $this->order($row) : $this->plainOrder($row),
+                    $rows
+                );
             });
 
             return $collection;
@@ -321,6 +519,19 @@ class ImportPaceTest extends IntegrationTestCase
                 ->setOrderFilter((int)$row['entity_id'])
                 ->getItems()
         );
+
+        return $order;
+    }
+
+    /**
+     * An order of its sales_order row alone, not a mock (see wireOrderBuilder()).
+     *
+     * @param array<string, mixed> $row
+     */
+    private function plainOrder(array $row): Order
+    {
+        $order = (new \ReflectionClass(Order::class))->newInstanceWithoutConstructor();
+        $order->setData($row);
 
         return $order;
     }

@@ -47,6 +47,11 @@ use Symfony\Component\Console\Tester\CommandTester;
  * connect step (Engine\Connector) and one import start (ImportStarter), so
  * each pair of callers leaves the same rows — the same stored connection
  * and the same queued jobs, in the same order — from the same start.
+ *
+ * Both callers of a pair run at the same frozen instant: the jobs'
+ * started_at and completed_at come from the application clock, and a pair
+ * whose second run began a wall-clock second later used to differ there
+ * (CON-215).
  */
 class SharedConnectAndImportStartTest extends IntegrationTestCase
 {
@@ -62,6 +67,15 @@ class SharedConnectAndImportStartTest extends IntegrationTestCase
         'config' => ['browse_tracking' => true],
         'issued_at' => '2026-10-23T08:00:00Z',
     ];
+
+    /** @var int the frozen instant every run of the test starts from */
+    private int $startedAt;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->startedAt = $this->clock->now();
+    }
 
     /**
      * @dataProvider connectStartStates
@@ -151,7 +165,7 @@ class SharedConnectAndImportStartTest extends IntegrationTestCase
      */
     private function afterConnect(bool $catalogQueued, callable $connect): array
     {
-        $this->env->resetState();
+        $this->resetState();
         $jobManager = $this->objectManager->create(JobManager::class);
         if ($catalogQueued) {
             $jobManager->startIfIdle(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
@@ -187,7 +201,7 @@ class SharedConnectAndImportStartTest extends IntegrationTestCase
      */
     private function afterImportStart(bool $connected, string $before, callable $start): array
     {
-        $this->env->resetState();
+        $this->resetState();
         $jobManager = $this->objectManager->create(JobManager::class);
         if ($before === 'stalled catalog') {
             $stalled = $jobManager->startIfIdle(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
@@ -207,6 +221,16 @@ class SharedConnectAndImportStartTest extends IntegrationTestCase
         $start(new ImportStarter($jobManager, $this->storeManager(), new EngineImportGuard($engineSettings)));
 
         return $this->jobRows();
+    }
+
+    /**
+     * Empty the tables and set the clock back to the test's start instant,
+     * which resetState() moves on to the wall clock's.
+     */
+    private function resetState(): void
+    {
+        $this->env->resetState();
+        $this->clock->travel($this->startedAt - $this->clock->now());
     }
 
     /**

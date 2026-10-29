@@ -15,16 +15,8 @@ use Magento\Framework\Api\SearchCriteriaBuilder;
 use Magento\Framework\Api\SearchCriteriaInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\ResourceConnection;
-use Magento\Framework\Data\Collection\EntityFactoryInterface;
 use Magento\Framework\Exception\NoSuchEntityException;
-use Magento\Framework\Model\AbstractModel;
 use Magento\Sales\Model\Order;
-use Magento\Sales\Model\ResourceModel\Order\Collection as OrderCollection;
-use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
-use Magento\Sales\Model\ResourceModel\Order\Item as OrderItemResource;
-use Magento\Sales\Model\ResourceModel\Order\Item\Collection as OrderItemCollection;
-use Magento\Sales\Model\ResourceModel\Order\Item\CollectionFactory as OrderItemCollectionFactory;
-use Magento\SalesSequence\Model\Manager as SequenceManager;
 use Magento\Store\Model\ScopeInterface;
 use Smaily\Connect\Cron\BackfillTick;
 use Smaily\Connect\Model\Backfill\EngineCustomerScope;
@@ -45,6 +37,7 @@ use Smaily\Connect\Model\Multilingual\LanguageResolver;
 use Smaily\Connect\Model\ResourceModel\Backfill\Job as JobResource;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Integration\Support\SalesOrderHarness;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
 
 /**
@@ -63,6 +56,8 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  */
 class UnreadableImportRowsTest extends IntegrationTestCase
 {
+    use SalesOrderHarness;
+
     private const MISSING_STORE_ID = 9;
 
     /** A JSON string with a raw tab inside: Magento's Json serializer refuses it. */
@@ -254,87 +249,6 @@ class UnreadableImportRowsTest extends IntegrationTestCase
         );
 
         return $scopeConfig;
-    }
-
-    /**
-     * The orders, read from sales_order the way the import pages through
-     * them; each order's getItems() loads its lines the way Magento's
-     * Order::getItems() does — a collection load that unserializes every
-     * line's product_options.
-     */
-    private function orderCollectionFactory(): OrderCollectionFactory
-    {
-        $factory = $this->createMock(OrderCollectionFactory::class);
-        $factory->method('create')->willReturnCallback(function (): OrderCollection {
-            $ids = [];
-            $collection = $this->createMock(OrderCollection::class);
-            $collection->method('addFieldToFilter')->willReturnCallback(
-                function (string $field, array $condition) use (&$ids, $collection): OrderCollection {
-                    $ids = array_map('intval', $condition['in']);
-
-                    return $collection;
-                }
-            );
-            $collection->method('getItems')->willReturnCallback(function () use (&$ids): array {
-                $rows = $this->connection->fetchAll(
-                    $this->connection->select()->from('sales_order')->where('entity_id IN (?)', $ids ?: [0])
-                );
-
-                return array_map(fn (array $row): Order => $this->order($row), $rows);
-            });
-
-            return $collection;
-        });
-
-        return $factory;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     */
-    private function order(array $row): Order
-    {
-        $order = $this->getMockBuilder(Order::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['getItems'])
-            ->getMock();
-        $order->setData($row);
-        $order->method('getItems')->willReturnCallback(
-            fn (): array => $this->orderItemCollectionFactory()->create()
-                ->setOrderFilter((int)$row['entity_id'])
-                ->getItems()
-        );
-
-        return $order;
-    }
-
-    private function orderItemCollectionFactory(): OrderItemCollectionFactory
-    {
-        $resource = $this->objectManager->create(
-            OrderItemResource::class,
-            ['sequenceManager' => $this->createMock(SequenceManager::class)]
-        );
-        // Order lines without Magento's Order\Item constructor, whose
-        // dependencies the harness does not have; the collection fills them.
-        $entityFactory = $this->createMock(EntityFactoryInterface::class);
-        $entityFactory->method('create')->willReturnCallback(
-            static function (string $class) use ($resource): object {
-                $item = (new \ReflectionClass($class))->newInstanceWithoutConstructor();
-                (new \ReflectionProperty(AbstractModel::class, '_resource'))->setValue($item, $resource);
-
-                return $item;
-            }
-        );
-
-        $factory = $this->createMock(OrderItemCollectionFactory::class);
-        $factory->method('create')->willReturnCallback(
-            fn (): OrderItemCollection => $this->objectManager->create(
-                OrderItemCollection::class,
-                ['resource' => $resource, 'entityFactory' => $entityFactory]
-            )
-        );
-
-        return $factory;
     }
 
     private function seedOrder(int $entityId, string $createdAt, string $productOptions): void

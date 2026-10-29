@@ -82,6 +82,9 @@ class ImportPaceTest extends IntegrationTestCase
     /** @var list<string> the ordered_at of each order the engine got, in arrival order */
     private array $orderTimes = [];
 
+    /** @var list<int> the minute each of those orders arrived */
+    private array $orderMinutes = [];
+
     /** @var list<array{minute: int, phase: string, orders_sent: int}> the progress calls the engine got */
     private array $progress = [];
 
@@ -202,13 +205,28 @@ class ImportPaceTest extends IntegrationTestCase
             ['started', 'start_part_complete', 'complete'],
             array_values(array_unique(array_column($this->progress, 'phase')))
         );
-        self::assertSame(8, $startPartMinute, 'The start part is in after 8 minutes');
-        self::assertSame(22, $completeMinute, 'The whole horizon after 22');
-        self::assertSame(
-            14000,
-            $this->progress[array_search(8, array_column($this->progress, 'minute'), true)]['orders_sent'],
-            'start_part_complete counts the orders the engine accepted: the start part\'s 12,000,'
-            . ' and the 2,000 older ones that went in the minute the start part was found complete'
+        // How many minutes it takes depends on how much a tick builds in its
+        // 15 s (when every tick queues its full 2,000 rows: the start part
+        // after 8 minutes, the whole horizon after 22). The phases do not:
+        // `start_part_complete` comes at most two minutes after the last
+        // start-part order was accepted (one for the tick to find the start
+        // part's end, one to report it), counting at least those 12,000
+        // orders, and `complete` at most two minutes after the last order.
+        self::assertContains(
+            $startPartMinute - $this->orderMinutes[11999],
+            [1, 2],
+            'start_part_complete within two minutes of the start part being in'
+        );
+        self::assertGreaterThanOrEqual(
+            12000,
+            $this->progress[array_search($startPartMinute, array_column($this->progress, 'minute'), true)]
+                ['orders_sent'],
+            'start_part_complete counts the orders the engine accepted'
+        );
+        self::assertContains(
+            $completeMinute - end($this->orderMinutes),
+            [1, 2],
+            'complete within two minutes of the last order'
         );
     }
 
@@ -380,6 +398,7 @@ class ImportPaceTest extends IntegrationTestCase
             }
             foreach ($body['orders'] ?? [] as $order) {
                 $this->orderTimes[] = (string)($order['ordered_at'] ?? '');
+                $this->orderMinutes[] = $this->minute;
             }
             $items = count((array)reset($body));
             $this->requests[] = [

@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Cron;
 
 use Magento\Framework\Serialize\Serializer\Json;
+use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
@@ -42,7 +43,9 @@ use Smaily\Connect\Model\Privacy\OptOutReplay;
  * with backoff; per-item validation errors are terminal for that row.
  *
  * The items the engine confirmed are handed to the privacy layer
- * (Privacy\OptOutReplay, PRO-3760).
+ * (Privacy\OptOutReplay, PRO-3760). An import's rows the engine accepted —
+ * not refused per item, not skipped as older than its history horizon —
+ * are counted on the import's job (sent_count, CON-241).
  *
  * The catalog_remove domain (§3b product-level removal, PRO-1231) is NOT
  * D6 and gets its own flush path: on a 2xx every batched id was applied —
@@ -65,7 +68,8 @@ class FlushIngestQueue
         private readonly OptOutReplay $optOutReplay,
         private readonly Json $serializer,
         private readonly Logger $logger,
-        private readonly IngestPace $pace
+        private readonly IngestPace $pace,
+        private readonly JobManager $jobManager
     ) {
     }
 
@@ -357,16 +361,30 @@ class FlushIngestQueue
             }
         }
 
+        $skippedIndexes = [];
+        foreach ((array)($response['skipped_orders'] ?? []) as $skipped) {
+            if (is_array($skipped) && isset($skipped['index'])) {
+                $skippedIndexes[(int)$skipped['index']] = true;
+            }
+        }
+
         $confirmedItems = [];
         $failed = [];
+        $acceptedByJob = [];
         foreach ($events as $index => $event) {
             if (isset($errorsByIndex[$index])) {
                 $failed[$errorsByIndex[$index]][] = $event;
             } else {
                 $this->queue->markSent($event);
                 $confirmedItems[] = $items[$index];
+                $jobId = (int)$event->getData('job_id');
+                if ($jobId > 0 && !isset($skippedIndexes[$index])) {
+                    $acceptedByJob[$jobId] = ($acceptedByJob[$jobId] ?? 0) + 1;
+                }
             }
         }
+        // An import's rows the engine accepted, for its progress (CON-241).
+        $this->jobManager->recordSent($acceptedByJob);
         // Per-item validation error: terminal, the data won't improve by
         // resending the identical payload. One write per reason (PRO-3962).
         foreach ($failed as $reason => $group) {

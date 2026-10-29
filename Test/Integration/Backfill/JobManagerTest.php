@@ -12,6 +12,8 @@ use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Smaily\Connect\Cron\BackfillTick;
 use Smaily\Connect\Model\Backfill\EngineCatalogProcessor;
+use Smaily\Connect\Model\Backfill\HistoryImport;
+use Smaily\Connect\Model\Backfill\HistoryProgress;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\ProcessorInterface;
@@ -317,6 +319,8 @@ class JobManagerTest extends IntegrationTestCase
             $this->jobManager,
             $this->createMock(EngineSettings::class),
             $this->createMock(Logger::class),
+            $this->createMock(HistoryImport::class),
+            $this->createMock(HistoryProgress::class),
             ['contacts:smaily' => $recorder, 'catalog:engine' => $recorder]
         );
 
@@ -388,6 +392,8 @@ class JobManagerTest extends IntegrationTestCase
             $this->jobManager,
             $this->createMock(EngineSettings::class),
             $this->createMock(Logger::class),
+            $this->createMock(HistoryImport::class),
+            $this->createMock(HistoryProgress::class),
             ['catalog:engine' => $dying, 'contacts:smaily' => $recorder]
         );
 

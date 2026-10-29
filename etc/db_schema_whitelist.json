@@ -44,12 +44,14 @@
             "last_error": true,
             "sent_payload": true,
             "last_response": true,
+            "job_id": true,
             "created_at": true,
             "updated_at": true
         },
         "index": {
             "SMAILY_INGEST_QUEUE_DOMAIN_STATUS_NEXT_RETRY_AT": true,
-            "SMAILY_INGEST_QUEUE_CREATED_AT": true
+            "SMAILY_INGEST_QUEUE_CREATED_AT": true,
+            "SMAILY_INGEST_QUEUE_JOB_ID_STATUS": true
         },
         "constraint": {
             "PRIMARY": true,
@@ -104,6 +106,7 @@
             "total_count": true,
             "processed_count": true,
             "failed_count": true,
+            "sent_count": true,
             "cursor_value": true,
             "error_message": true,
             "started_at": true,

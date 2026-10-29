@@ -26,9 +26,9 @@ use Smaily\Connect\Model\Engine\Settings;
 
 /**
  * PRO-3741, PRO-3790: connecting Campaign Intelligence in the admin starts
- * the catalog import, then the customers import — never the orders import —
- * and the answer says which of them it started, so the page can show their
- * notices (the catalog one with its Hold back action).
+ * the catalog import, then the customers import, then the orders import
+ * (CON-241) — and the answer says which of them it started, so the page can
+ * show their notices (the catalog one with its Hold back action).
  */
 class EngineExchangeTest extends TestCase
 {
@@ -45,11 +45,11 @@ class EngineExchangeTest extends TestCase
         $this->jobManager = $this->createMock(JobManager::class);
     }
 
-    public function testConnectingStartsTheCatalogImportThenTheCustomersImport(): void
+    public function testConnectingStartsTheCatalogThenTheCustomersThenTheOrdersImport(): void
     {
         $this->client->method('setupExchange')->willReturn(['tenant_name' => 'Pilot', 'engine_version' => '1.8.2']);
         $started = [];
-        $this->jobManager->expects(self::exactly(2))->method('startIfIdle')
+        $this->jobManager->expects(self::exactly(3))->method('startIfIdle')
             ->willReturnCallback(function (string $jobType, string $target, int $websiteId) use (&$started) {
                 $started[] = [$jobType, $target, $websiteId];
 
@@ -61,16 +61,18 @@ class EngineExchangeTest extends TestCase
         self::assertSame([
             [Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID],
             [Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID],
+            [Job::TYPE_ORDERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID],
         ], $started);
         self::assertTrue($this->response['connected']);
         self::assertTrue($this->response['catalogImportStarted']);
         self::assertTrue($this->response['customersImportStarted']);
+        self::assertTrue($this->response['ordersImportStarted']);
     }
 
-    public function testAReconnectWhileBothImportsAreQueuedOrRunningStartsNoSecond(): void
+    public function testAReconnectWhileTheImportsAreQueuedOrRunningStartsNoSecond(): void
     {
         $this->client->method('setupExchange')->willReturn(['tenant_name' => 'Pilot', 'engine_version' => '1.8.2']);
-        $this->jobManager->expects(self::exactly(2))->method('startIfIdle')
+        $this->jobManager->expects(self::exactly(3))->method('startIfIdle')
             ->willReturn(null);
 
         $this->controller()->execute();
@@ -78,6 +80,7 @@ class EngineExchangeTest extends TestCase
         self::assertTrue($this->response['connected']);
         self::assertFalse($this->response['catalogImportStarted']);
         self::assertFalse($this->response['customersImportStarted']);
+        self::assertFalse($this->response['ordersImportStarted']);
     }
 
     public function testTheAnswerSaysWhichImportStarted(): void

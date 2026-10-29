@@ -214,6 +214,43 @@ below.
   runs one such minute against a mock engine. The WooCommerce plugin's
   import is slower: it sends one batch inline per Action Scheduler tick,
   30 s apart.
+- **The history import (CON-241, contract v1.20.0 §25).** One orders job
+  is one history import (`Model/Backfill/HistoryImport`, kept in the
+  `smaily_connect_history_import` Magento flag). When it begins — the tick
+  begins a queued one before it runs the catalog or customers job ahead of
+  it, and the orders processor begins its own — it reads the engine's
+  `config.history` (`Model/Engine/HistoryConfig`: the ping first, so a
+  change reaches the store without reconnecting; else the block the setup
+  exchange stored; else 18 / 60 / `newest_first`, logged) and fixes its
+  window: `until` (now), `start_from` (now − `start_months`) and `horizon`
+  (now − `horizon_months`), with the counts the report needs (orders in
+  the start part and in the horizon, in a state the engine takes; distinct
+  buyers with a purchase). `EngineOrdersProcessor` walks the orders placed
+  from `start_from` to `until`, then from `horizon` to `start_from`, newest
+  first, by (`created_at`, `entity_id`); the cursor is the last order
+  queued (`created_at|entity_id`), so the walk resumes anywhere, and an
+  order placed during the import is never read (the live sync sends it).
+  When the start part is queued, the job's newest queue row id marks its
+  end. `EngineCustomersProcessor` reads only the customers in scope
+  (`Model/Backfill/EngineCustomerScope`, contract §4): those the website's
+  contact sync puts into Smaily under its mode while it is active
+  (`ContactAudience::customerCondition()`), and every customer with an
+  order since the horizon; Smaily is never asked. Each import row carries
+  its job (`smaily_ingest_queue.job_id`), and the send run counts the rows
+  the engine accepted — not refused per item, not skipped as older than
+  the horizon — on the job (`smaily_backfill_job.sent_count`; null for a
+  job from before the count). `Model/Backfill/HistoryProgress` reports to
+  §25 from every tick: `started`; `start_part_complete` once the start
+  part's rows and the latest catalog and customers jobs' rows are
+  delivered and neither job is queued or running; `complete` once the
+  orders job has completed and its rows are delivered; and the counts at
+  most every 5 minutes in between. A failed call is logged and tried again
+  5 minutes later, never failing the import. The Orders card shows one bar
+  for the running part (`BackfillState` `history`): the start part's
+  share, then the share of the horizon. A pilot-sized history (80,000
+  orders, 12,000 in the start part, 40,000 inside the horizon) has its
+  start part in after 8 cron minutes and is complete after 22
+  (`ImportPaceTest`).
 - The same job code never runs in two processes at once (Magento's cron
   locks a job while it runs), so two send runs never overlap.
 - Every catalog row carries `tags.product_id` — the platform parent product
@@ -384,7 +421,8 @@ below.
   `Model/Backfill/ImportsOnConnect::start()`; each caller only words the
   outcome (a JSON answer, or admin messages). ImportsOnConnect queues
   the catalog job, then the customers job
-  (PRO-3790), each through `JobManager::startIfIdle()`, as
+  (PRO-3790), then the orders job (CON-241, the history import below),
+  each through `JobManager::startIfIdle()`, as
   the admin Start import does, so the one-active-job lock keeps a reconnect
   from starting a second import while one is queued or running (a
   reconnect after it ended starts a fresh one, which the engine
@@ -406,16 +444,16 @@ below.
   or running (`findActive()`) unless it has stalled (`isStalled()`), and
   linked to the Settings tab
   (`?tab=intelligence`); nothing starts the import automatically.
-  The catalog job is queued first, so it has the
-  lower id and the tick (`nextActive()`, oldest first) runs it first; right
-  after a connect both jobs are `pending`. The orders import stays the
-  merchant's to start (PRO-3742). EngineExchange answers
-  `catalogImportStarted` and `customersImportStarted`, and
+  The jobs are queued in that order, so the tick (`nextActive()`, oldest
+  first) runs the catalog, then the customers, then the orders; right
+  after a connect all three jobs are `pending`. EngineExchange answers
+  `catalogImportStarted`, `customersImportStarted` and
+  `ordersImportStarted`, and
   `panels-js.phtml` then shows an info banner for each import started —
   the catalog one with **Hold back the
   import**, which posts the BackfillState `cancel` (`requestCancel()`);
-  the customers one points to its card's **Cancel import** — and asks
-  the Settings tab's Catalog and Customers cards for their state; the
+  the customers and orders ones point to their card's **Cancel import** — and asks
+  the Settings tab's Catalog, Customers and Orders cards for their state; the
   Catalog card renders the Hold back's cancel answer, which
   carries the import's state.
   The window: the job is `pending` until the next `smaily_backfill_tick`

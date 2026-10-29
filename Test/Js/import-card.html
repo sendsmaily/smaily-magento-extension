@@ -18,7 +18,10 @@
   card (`blocked_by`, PRO-3923) and offers only Cancel; an import that stopped
   before an error names the button the card shows (Run again) in both
   languages (PRO-3957) and names where the error happened for the developer
-  (CON-233); an import that moves shows its progress as before.
+  (CON-233); an import that moves shows its progress as before. The Orders
+  card of a history import (CON-241) shows one bar for the part being sent:
+  the last months first, then the share of the whole history, with the
+  months in the text under it.
   The contacts card (panel/subscribers.phtml, the Contacts tab) quotes the
   number of contacts its import sends for the mode picked on the panel, and
   no other total (PRO-1970); a contacts import that sent nothing because a
@@ -50,6 +53,8 @@
     var CONTACTS = 'This import sends %1 contacts from this website. It runs in the background, a chunk per minute, and never slows the storefront down.';
     var SYNC_OFF = 'Contact sync was off for %1, so nothing was sent from there. Turn it on and save the Contacts settings, then press Run again.';
     var SKIPPED = 'Done, %1 of %2 synced — %3 skipped because Magento could not read them; var/log/smaily_connect.log on the server lists them by id.';
+    var START_PART = 'Sending the orders of the last %1 months first…';
+    var BACKGROUND = 'The last %1 months are in: Campaign Intelligence can start. Older orders, back to %2 months, follow in the background…';
     var failures = 0;
     var passes = 0;
 
@@ -138,9 +143,12 @@
         });
     }
 
-    // The Catalog card's parts as the merchant reads them.
-    function card(frame) {
-        var element = frame.contentDocument.querySelector('.smaily-backfill-card[data-job-type="catalog"]'),
+    // An import card's parts as the merchant reads them (the Catalog card
+    // unless named).
+    function card(frame, jobType) {
+        var element = frame.contentDocument.querySelector(
+                '.smaily-backfill-card[data-job-type="' + (jobType || 'catalog') + '"]'
+            ),
             shown = function (selector) {
                 var part = element.querySelector(selector);
 
@@ -155,6 +163,8 @@
                 ? element.querySelector('.smaily-backfill-verdict__text').textContent : '',
             result: element.querySelector('.smaily-result').textContent,
             done: element.querySelector('.smaily-backfill-card__done').textContent,
+            pct: element.querySelector('.smaily-backfill-card__pct').textContent,
+            width: element.querySelector('.smaily-progress__fill').style.width,
             start: shown('.smaily-backfill-card__start')
                 ? element.querySelector('.smaily-backfill-card__start').textContent.trim() : '',
             startPrimary: element.querySelector('.smaily-backfill-card__start').classList.contains('action-primary'),
@@ -171,6 +181,7 @@
             blocked,
             stopped,
             skipped,
+            history,
             starts;
 
         log('# ' + locale);
@@ -273,6 +284,38 @@
             && seen.result === strings['Importing…'] && seen.verdict === ''
             && seen.done === strings['%1 of %2'].replace('%1', '400').replace('%2', '1200')
             && seen.start === '' && seen.cancel);
+        frame.remove();
+
+        // CON-241: the Orders card of a history import. While the start part
+        // goes, the bar is its share of the start part and the text says
+        // which months go first …
+        if (locale !== 'en_US') {
+            check(locale + ': the history import parts are translated',
+                strings[START_PART] !== START_PART && strings[BACKGROUND] !== BACKGROUND);
+        }
+        history = catalog('running', 2000, 40000, false);
+        history.history = {part: 'start', sent: 1200, expected: 12000, percent: 10, start_months: 18, horizon_months: 60};
+        frame = await open(page, {status: history}, 'orders');
+        seen = card(frame, 'orders');
+        check(locale + ', orders, start part: one bar for the start part',
+            seen.state === 'running' && seen.width === '10%' && seen.pct === '10%'
+            && seen.done === strings['%1 of %2'].replace('%1', '1200').replace('%2', '12000'));
+        check(locale + ', orders, start part: the text names the months that go first',
+            seen.result === strings[START_PART].replace('%1', '18'));
+        frame.remove();
+
+        // … and once the start part is in, the bar jumps to the share of the
+        // whole history the engine has, and the text says Campaign
+        // Intelligence can start while the older orders follow.
+        history.history = {part: 'background', sent: 14000, expected: 40000, percent: 35, start_months: 18,
+            horizon_months: 60};
+        frame = await open(page, {status: history}, 'orders');
+        seen = card(frame, 'orders');
+        check(locale + ', orders, older history: the bar is the share of the whole history',
+            seen.state === 'running' && seen.width === '35%' && seen.pct === '35%'
+            && seen.done === strings['%1 of %2'].replace('%1', '14000').replace('%2', '40000'));
+        check(locale + ', orders, older history: Campaign Intelligence can start, older orders follow',
+            seen.result === strings[BACKGROUND].replace('%1', '18').replace('%2', '60'));
         frame.remove();
     }
 

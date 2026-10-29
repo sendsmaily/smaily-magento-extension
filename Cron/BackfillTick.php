@@ -9,6 +9,8 @@ declare(strict_types=1);
 namespace Smaily\Connect\Cron;
 
 use Smaily\Connect\Model\Backfill\ErrorLocation;
+use Smaily\Connect\Model\Backfill\HistoryImport;
+use Smaily\Connect\Model\Backfill\HistoryProgress;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\ProcessorInterface;
@@ -18,6 +20,8 @@ use Smaily\Connect\Model\Logger\Logger;
 /**
  * Advances the oldest active backfill job one chunk per cron run.
  * Processors are registered per "{job_type}:{target}" key via di.xml.
+ * Each run also reports the history import's progress to the engine when
+ * it is due (Backfill\HistoryProgress, CON-241).
  */
 class BackfillTick
 {
@@ -28,6 +32,8 @@ class BackfillTick
         private readonly JobManager $jobManager,
         private readonly EngineSettings $engineSettings,
         private readonly Logger $logger,
+        private readonly HistoryImport $historyImport,
+        private readonly HistoryProgress $historyProgress,
         private readonly array $processors = []
     ) {
     }
@@ -35,6 +41,12 @@ class BackfillTick
     public function execute(): void
     {
         $job = $this->jobManager->nextActive();
+        if ($job !== null && $job->getTarget() === Job::TARGET_ENGINE && !$this->engineSettings->isRefused()) {
+            $this->beginHistoryImport();
+        }
+        // Every minute, also once the imports are done: `complete` is due
+        // when the last orders are delivered (CON-241).
+        $this->historyProgress->report();
         if ($job === null) {
             return;
         }
@@ -74,6 +86,21 @@ class BackfillTick
                 'processed' => $job->getProcessedCount(),
                 'failed' => $job->getFailedCount(),
             ]);
+        }
+    }
+
+    /**
+     * A queued orders import begins its history import before the catalog
+     * and customers imports ahead of it run, so the engine hears `started`
+     * before their rows (contract §25 sender rules). The orders import
+     * begins it itself too, so one that cannot begin here stops there.
+     */
+    private function beginHistoryImport(): void
+    {
+        try {
+            $this->historyImport->beginQueued();
+        } catch (\Throwable $exception) {
+            $this->logger->error('History import could not begin', ['error' => $exception->getMessage()]);
         }
     }
 

@@ -81,6 +81,7 @@ class JobManager
             'total_count' => $totalCount,
             'processed_count' => 0,
             'failed_count' => 0,
+            'sent_count' => 0,
         ]);
         $this->jobResource->save($job);
 
@@ -293,6 +294,50 @@ class JobManager
             ],
             ['id = ?' => (int)$job->getId()]
         );
+    }
+
+    /**
+     * Count rows the engine accepted for the import jobs that queued them
+     * (the send run, CON-241). A job from before this count began keeps
+     * none (sent_count null).
+     *
+     * @param array<int, int> $acceptedByJobId job id => rows accepted
+     */
+    public function recordSent(array $acceptedByJobId): void
+    {
+        foreach ($acceptedByJobId as $jobId => $accepted) {
+            $this->connection()->update(
+                $this->table(),
+                ['sent_count' => new \Zend_Db_Expr('sent_count + ' . (int)$accepted)],
+                ['id = ?' => (int)$jobId]
+            );
+        }
+    }
+
+    /**
+     * A job by its id, null when there is none.
+     */
+    public function get(int $jobId): ?Job
+    {
+        $job = $this->jobFactory->create();
+        $this->jobResource->load($job, $jobId);
+
+        return $job->getId() ? $job : null;
+    }
+
+    /**
+     * The newest job of this import, whatever its status.
+     */
+    public function latest(string $jobType, string $target): ?Job
+    {
+        $collection = $this->collectionFactory->create();
+        $collection->addFieldToFilter('job_type', $jobType)
+            ->addFieldToFilter('target', $target)
+            ->setOrder('id', 'DESC')
+            ->setPageSize(1);
+        $job = $collection->getFirstItem();
+
+        return $job instanceof Job && $job->getId() ? $job : null;
     }
 
     /**

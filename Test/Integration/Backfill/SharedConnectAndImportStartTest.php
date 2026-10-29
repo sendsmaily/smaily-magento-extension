@@ -27,6 +27,7 @@ use Smaily\Connect\Controller\Adminhtml\Api\EngineExchange;
 use Smaily\Connect\Model\Backfill\EngineImportGuard;
 use Smaily\Connect\Model\Backfill\ImportsOnConnect;
 use Smaily\Connect\Model\Backfill\ImportStarter;
+use Smaily\Connect\Model\Backfill\HistoryProgress;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\JobStatusAggregator;
@@ -78,9 +79,9 @@ class SharedConnectAndImportStartTest extends IntegrationTestCase
 
         self::assertSame($admin, $configSave);
         self::assertSame(
-            [Job::TYPE_CATALOG, Job::TYPE_CUSTOMERS],
+            [Job::TYPE_CATALOG, Job::TYPE_CUSTOMERS, Job::TYPE_ORDERS],
             array_column($admin['jobs'], 'job_type'),
-            'The catalog import, then the customers import'
+            'The catalog import, then the customers import, then the orders import'
         );
         self::assertContains(
             ['path' => EngineSettings::XML_PATH_CONNECTED, 'value' => '1'],
@@ -272,7 +273,8 @@ class SharedConnectAndImportStartTest extends IntegrationTestCase
             $this->storeManager(),
             new FakeTimezone(),
             new JobStatusAggregator(),
-            $starter
+            $starter,
+            $this->createMock(HistoryProgress::class)
         );
     }
 

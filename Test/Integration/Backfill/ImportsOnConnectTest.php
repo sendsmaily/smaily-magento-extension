@@ -10,6 +10,8 @@ namespace Smaily\Connect\Test\Integration\Backfill;
 
 use Smaily\Connect\Cron\BackfillTick;
 use Smaily\Connect\Model\Backfill\ImportsOnConnect;
+use Smaily\Connect\Model\Backfill\HistoryImport;
+use Smaily\Connect\Model\Backfill\HistoryProgress;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\ProcessorInterface;
@@ -18,9 +20,9 @@ use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 
 /**
- * PRO-3741, PRO-3790 against a real MySQL: connecting queues one catalog
- * import, then one customers import, and no orders import; the tick takes
- * the catalog first. A reconnect while they are queued or running queues no
+ * PRO-3741, PRO-3790, CON-241 against a real MySQL: connecting queues one
+ * catalog import, then one customers import, then one orders import; the
+ * tick takes the catalog first. A reconnect while they are queued or running queues no
  * second one, and holding the catalog back before its first cron run (the
  * admin cancel) sends nothing and leaves the import free to be started
  * again by hand.
@@ -43,19 +45,19 @@ class ImportsOnConnectTest extends IntegrationTestCase
         );
     }
 
-    public function testConnectingQueuesTheCatalogThenTheCustomersImportAndNoOrdersImport(): void
+    public function testConnectingQueuesTheCatalogThenTheCustomersThenTheOrdersImport(): void
     {
         self::assertSame(
-            [Job::TYPE_CATALOG => true, Job::TYPE_CUSTOMERS => true],
+            [Job::TYPE_CATALOG => true, Job::TYPE_CUSTOMERS => true, Job::TYPE_ORDERS => true],
             $this->importsOnConnect->start()
         );
 
         $rows = $this->fetchAll(self::TABLE);
         usort($rows, static fn (array $a, array $b): int => (int)$a['id'] <=> (int)$b['id']);
         self::assertSame(
-            [Job::TYPE_CATALOG, Job::TYPE_CUSTOMERS],
+            [Job::TYPE_CATALOG, Job::TYPE_CUSTOMERS, Job::TYPE_ORDERS],
             array_column($rows, 'job_type'),
-            'The catalog import is queued first, then the customers import; no orders import'
+            'The catalog import is queued first, then the customers import, then the orders import'
         );
         foreach ($rows as $row) {
             self::assertSame(Job::TARGET_ENGINE, $row['target']);
@@ -72,7 +74,7 @@ class ImportsOnConnectTest extends IntegrationTestCase
         $this->importsOnConnect->start();
 
         self::assertSame(
-            [Job::TYPE_CATALOG => false, Job::TYPE_CUSTOMERS => false],
+            [Job::TYPE_CATALOG => false, Job::TYPE_CUSTOMERS => false, Job::TYPE_ORDERS => false],
             $this->importsOnConnect->start(),
             'Reconnect while the imports are queued'
         );
@@ -80,12 +82,12 @@ class ImportsOnConnectTest extends IntegrationTestCase
         self::assertNotNull($job);
         $this->jobManager->markRunning($job);
         self::assertSame(
-            [Job::TYPE_CATALOG => false, Job::TYPE_CUSTOMERS => false],
+            [Job::TYPE_CATALOG => false, Job::TYPE_CUSTOMERS => false, Job::TYPE_ORDERS => false],
             $this->importsOnConnect->start(),
             'Reconnect while the catalog import is running'
         );
 
-        self::assertCount(2, $this->fetchAll(self::TABLE));
+        self::assertCount(3, $this->fetchAll(self::TABLE));
     }
 
     /**
@@ -105,7 +107,7 @@ class ImportsOnConnectTest extends IntegrationTestCase
         );
 
         self::assertSame(
-            [Job::TYPE_CATALOG => true, Job::TYPE_CUSTOMERS => false],
+            [Job::TYPE_CATALOG => true, Job::TYPE_CUSTOMERS => false, Job::TYPE_ORDERS => false],
             $this->importsOnConnect->start()
         );
 
@@ -118,9 +120,10 @@ class ImportsOnConnectTest extends IntegrationTestCase
     public function testHoldingTheCatalogImportBackBeforeItsFirstRunSendsNothing(): void
     {
         $this->importsOnConnect->start();
-        // The customers import is not held back; it is cancelled here only
-        // so that the tick below has nothing to run.
+        // The customers and orders imports are not held back; they are
+        // cancelled here only so that the tick below has nothing to run.
         $this->jobManager->requestCancel(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE);
+        $this->jobManager->requestCancel(Job::TYPE_ORDERS, Job::TARGET_ENGINE);
 
         // Hold back: the Settings > Intelligence endpoint's cancel.
         self::assertSame(1, $this->jobManager->requestCancel(Job::TYPE_CATALOG, Job::TARGET_ENGINE));
@@ -130,12 +133,14 @@ class ImportsOnConnectTest extends IntegrationTestCase
         $this->objectManager->create(BackfillTick::class, [
             'jobManager' => $this->jobManager,
             'engineSettings' => $this->createMock(EngineSettings::class),
+            'historyImport' => $this->createMock(HistoryImport::class),
+            'historyProgress' => $this->createMock(HistoryProgress::class),
             'processors' => ['catalog:engine' => $processor],
         ])->execute();
 
         self::assertSame([], $this->fetchAll(IngestEventResource::TABLE_NAME));
         self::assertSame(
-            [Job::STATUS_CANCELLED, Job::STATUS_CANCELLED],
+            [Job::STATUS_CANCELLED, Job::STATUS_CANCELLED, Job::STATUS_CANCELLED],
             array_column($this->fetchAll(self::TABLE), 'status')
         );
 

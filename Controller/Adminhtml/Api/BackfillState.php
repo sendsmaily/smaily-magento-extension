@@ -16,6 +16,7 @@ use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Backfill\ErrorLocation;
+use Smaily\Connect\Model\Backfill\HistoryProgress;
 use Smaily\Connect\Model\Backfill\ImportStarter;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
@@ -25,7 +26,7 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
 /**
  * POST {action: start|status|cancel, job_type} -> aggregated progress:
  * {status, processed, failed, skipped, total, percent, finished_at, error, stalled,
- * blocked_by, sync_inactive}
+ * blocked_by, sync_inactive, history}
  *
  * "start" starts jobs (per website for contacts, installation-wide for
  * engine types) and is idempotent — an already-active job is not an error.
@@ -50,7 +51,10 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * answered as `skipped`, and its `failed` stays 0. `error` is where the
  * error that stopped an import happened (ErrorLocation, CON-233) or one of
  * the import's own reasons, never an error's text: one an earlier version
- * stored, which can quote a customer's data, answers as ''.
+ * stored, which can quote a customer's data, answers as ''. `history` is,
+ * for the Orders card, the history import's running part — the start part
+ * or the older orders, the rows the engine accepted of it and its months
+ * (Model/Backfill/HistoryProgress::card(), CON-241) — else null.
  */
 class BackfillState extends AbstractJsonAction implements HttpPostActionInterface
 {
@@ -66,7 +70,8 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
         private readonly StoreManagerInterface $storeManager,
         private readonly TimezoneInterface $timezone,
         private readonly JobStatusAggregator $statusAggregator,
-        private readonly ImportStarter $importStarter
+        private readonly ImportStarter $importStarter,
+        private readonly HistoryProgress $historyProgress
     ) {
         parent::__construct($context, $jsonFactory, $serializer);
     }
@@ -118,10 +123,12 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
         $finishedAt = '';
         $error = '';
         $syncInactive = [];
+        $latest = null;
         foreach ($collection->getItems() as $job) {
             if (!$job instanceof Job || isset($seenWebsites[$job->getWebsiteId()])) {
                 continue;
             }
+            $latest ??= $job;
             $seenWebsites[$job->getWebsiteId()] = true;
             $processed += $job->getProcessedCount();
             $failed += $job->getFailedCount();
@@ -158,6 +165,9 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
             'stalled' => $stalled,
             'blocked_by' => $ahead !== null && $ahead->getJobType() !== $jobType ? $ahead->getJobType() : '',
             'sync_inactive' => $syncInactive,
+            'history' => $jobType === Job::TYPE_ORDERS && $latest !== null
+                ? $this->historyProgress->card($latest)
+                : null,
         ];
     }
 

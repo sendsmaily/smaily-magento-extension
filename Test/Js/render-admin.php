@@ -592,8 +592,16 @@ $intelligence = $intelligenceViewModel('');
 $intelligenceStrings = [
     'The catalog import has started',
     'The customers import has started',
-    'Your existing customer accounts go to Campaign Intelligence once, in the background, after the catalog import.'
+    'The customer accounts your contact sync puts into Smaily, and every customer with an order in the order history'
+        . ' Campaign Intelligence takes, go to Campaign Intelligence once, in the background, after the catalog import.'
         . ' To hold it back, press Cancel import on the Customers card under Marketing > Smaily Connect > Settings > Intelligence.',
+    'The orders import has started',
+    'Your order history goes to Campaign Intelligence once, in the background, after the customers import, newest first:'
+        . ' the recent orders first, so that Campaign Intelligence can start, then the older ones. No order older than the'
+        . ' history Campaign Intelligence takes is sent. To hold it back, press Cancel import on the Orders card under'
+        . ' Marketing > Smaily Connect > Settings > Intelligence.',
+    'Sending the orders of the last %1 months first…',
+    'The last %1 months are in: Campaign Intelligence can start. Older orders, back to %2 months, follow in the background…',
     'Held back: the catalog import is canceled. Start it any time under Marketing > Smaily Connect > Settings > Intelligence.',
     'Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.',
     'The catalog import had already finished, so there was nothing left to hold back.',

@@ -188,7 +188,10 @@ class Client
 
     /**
      * Send one ingest batch. Returns the D6 response
-     * {ok, processed, deduplicated, errors[]}.
+     * {ok, processed, deduplicated, errors[]}; for orders also, only when
+     * the batch held an order older than the history horizon, skipped and
+     * skipped_orders[] {index, external_order_id, reason} (contract v1.20.0
+     * §5).
      *
      * @param array<int, array<string, mixed>> $items
      * @return array<string, mixed>

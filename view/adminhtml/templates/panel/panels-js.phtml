@@ -27,8 +27,9 @@ $viewModel = $block->getData('view_model');
 // the target the page was rendered with — the selected website, or website 0
 // for the initial setup, which sets the whole store up (CON-179) — so
 // Model\Adminhtml\WebsiteContext resolves the same target, no further
-// plumbing. Intelligence/backfill stay installation-
-// wide in this phase (Phase 4/5), so their URLs are left as-is.
+// plumbing. Intelligence/backfill stay installation-wide — one Smaily
+// account is one engine store, and websites that share an account share it
+// (2026-10-28, CON-237) — so their URLs are left as-is.
 $websiteQuery = $viewModel->getWebsiteQuery();
 $urls = [
     'test' => $block->getUrl('smaily_connect/api/testsmaily', $websiteQuery),

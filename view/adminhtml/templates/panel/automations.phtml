@@ -9,8 +9,11 @@
  *
  * Each trigger is a card (name + run-mode pill + description + right-aligned
  * control row), not a dense checkbox+dropdown table (PRO-1357 finding #9). The
- * workflow select is disabled while the trigger is off; the pill follows the
- * enable toggle live.
+ * pill follows the enable toggle live. While a card is off it shows only its
+ * name, pill, description and Enabled switch (CON-256, as the WooCommerce
+ * plugin's CON-255): its workflow, its own settings ("Wait (minutes)") and its
+ * discount code block (.smaily-trigger-settings) hide, without clearing
+ * them, so the save keeps them and switching the card on again shows them.
  *
  * In multilingual modes A/B a per-language workflow mapping editor renders
  * below the trigger cards: one table per trigger with a workflow select per
@@ -18,9 +21,13 @@
  * live when the mode cards on the Connection panel change. In mode A it names
  * the languages a switched-on automation has no workflow for (CON-188).
  *
- * Each card has a "Send a discount code" switch (CON-198): a cart price rule
- * picker, listing the rules that can generate codes, and the days a code is
- * valid. Without such a rule it says how to make one in Magento.
+ * In the per-language editor each trigger's table follows its card's switch
+ * the same way, and the editor shows only while one of the cards is on.
+ *
+ * Each card, while it is on, has a "Send a discount code" switch (CON-198) as
+ * its last block: a cart price rule picker, listing the rules that can
+ * generate codes, and the days a code is valid. Without such a rule it says
+ * how to make one in Magento.
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
@@ -73,7 +80,7 @@ $storeTriggers = [
     <div class="smaily-engine-triggers smaily-store-triggers">
         <?php foreach ($storeTriggers as $trigger): ?>
         <?php $id = $escaper->escapeHtmlAttr($trigger['id']); ?>
-        <div class="smaily-engine-trigger smaily-store-trigger is-off">
+        <div class="smaily-engine-trigger smaily-store-trigger is-off is-closed">
             <div class="smaily-engine-trigger__top">
                 <div class="smaily-engine-trigger__head">
                     <div class="smaily-engine-trigger__name-row">
@@ -85,7 +92,7 @@ $storeTriggers = [
                         <span class="smaily-engine-trigger__ctrl"><label><input type="checkbox" id="smaily-w-<?= /* @noEscape */ $id ?>-enabled"/> <?= $escaper->escapeHtml(__('Enabled')) ?></label></span>
                     </div>
                 </div>
-                <div class="smaily-engine-trigger__controls">
+                <div class="smaily-engine-trigger__controls smaily-trigger-settings">
                     <label class="smaily-engine-trigger__ctrl">
                         <span><?= $escaper->escapeHtml(__('Smaily Workflow')) ?></span>
                         <select id="smaily-w-<?= /* @noEscape */ $id ?>-workflow" class="smaily-w-workflow"></select>
@@ -98,8 +105,8 @@ $storeTriggers = [
                     <?php endif; ?>
                 </div>
             </div>
-            <?php // The automation's discount code (CON-198); panels-js.phtml shows the fields while the switch is on. ?>
-            <div class="smaily-store-discount">
+            <?php // The automation's discount code (CON-198), the card's last block; panels-js.phtml shows the fields while the switch is on. ?>
+            <div class="smaily-store-discount smaily-trigger-settings">
                 <label class="smaily-store-discount__switch"><input type="checkbox" id="smaily-w-<?= /* @noEscape */ $id ?>-coupon-enabled" class="smaily-w-coupon-enabled"/> <?= $escaper->escapeHtml(__('Send a discount code')) ?></label>
                 <div class="smaily-store-discount__body" id="smaily-w-<?= /* @noEscape */ $id ?>-coupon" style="display:none;">
                     <div class="smaily-engine-trigger__controls">

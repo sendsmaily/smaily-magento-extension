@@ -117,6 +117,15 @@ Active without the note; a trigger left off stays Off; when the stored
 state could not be read, the result asks for a reload and the cards keep
 the page's state; while Campaign Intelligence refuses the account, the tab
 says so and shows no triggers and no save button.
+`Test/Js/automation-cards.html` loads the admin stylesheet with the
+Settings Automations tab, the transactional cards and the Campaign
+Intelligence cards, and checks in both languages that a switched-off card
+shows only its name, description and Enabled, and a switched-on one its
+workflow, its own settings and its discount code last; that switching a
+card off and on again keeps its values and the save posts them; that the
+per-language tables follow their card in mode A, which still hides the
+card's own workflow; and that a Campaign Intelligence trigger the engine
+refused over a field stays open while it is off (CON-256).
 `Test/Js/intelligence-connect.html` renders the
 Campaign Intelligence panel with its behaviour (`panel/intelligence.phtml`
 and `panel/panels-js.phtml`) as the initial setup's step and as the

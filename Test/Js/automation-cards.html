@@ -1,0 +1,375 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the automation cards' progressive disclosure
+  (CON-256, as the WooCommerce plugin's CON-255): the real Settings
+  templates, rendered in en_US and et_EE by Test/Js/render-admin.php into
+  Test/Js/build/, with the admin stylesheet (view/adminhtml/web/css/
+  smaily-admin.css) and jQuery from vendor/, one fresh frame per page and
+  locale. Stubbed: RequireJS's require() and the requests (fetch) — a
+  workflow list answers one workflow per account, a save answers as saved,
+  and the Campaign Intelligence save answers with the engine's refusal of
+  one field.
+
+  Every automation card — store-run, transactional and Campaign
+  Intelligence — shows only its name, description and switch while it is
+  off, and its workflow, its own settings and its discount code (last) while
+  it is on. Switching a card off hides its values without clearing them:
+  the save posts them, and switching it on again shows them as they were.
+  The per-language workflow tables follow their card's switch, and mode A
+  still hides the card's own workflow while it is on. A Campaign
+  Intelligence trigger with a field to fix stays open while it is off.
+
+  Run it with bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>automation cards harness</title>
+    <script src="build/settings-discount.en_US.js"></script>
+    <script src="build/settings-discount.et_EE.js"></script>
+    <script src="build/settings-modes.en_US.js"></script>
+    <script src="build/settings-modes.et_EE.js"></script>
+    <script src="build/transactional-connected.en_US.js"></script>
+    <script src="build/transactional-connected.et_EE.js"></script>
+    <script src="build/automations.en_US.js"></script>
+    <script src="build/automations.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var CSS = '../../view/adminhtml/web/css/smaily-admin.css';
+    var WORKFLOWS = {
+        workflows: [{id: '7', name: 'Flow'}, {id: '31', name: 'Tellimus'}, {id: '32', name: 'Order'}]
+    };
+    var SAVED = {saved: true, errors: [], workflows: [], status: 'idle', verified: true, transactionalVerified: true};
+    // The engine refuses the save over Replenishment due's cooldown
+    // (Controller/Adminhtml/Automations/Save's answer, contract §13).
+    var REFUSED = {
+        saved: false,
+        errors: ['replenish_due / cooldown_days: Too big', 'Nothing was saved: validation_failed'],
+        field_errors: [{trigger_key: 'replenish_due', field: 'cooldown_days', message: 'Too big'}]
+    };
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    function stubs() {
+        return [
+            '<link rel="stylesheet" href="' + CSS + '">',
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.confirm = function () { return true; };',
+            'window.requests = [];',
+            'window.fetch = function (url, options) {',
+            '  var body = options.body || "", answer;',
+            '  window.requests.push({url: url, body: body});',
+            '  if (url.indexOf("/workflows/") !== -1) {',
+            '    answer = ' + JSON.stringify(WORKFLOWS) + ';',
+            '  } else if (url.indexOf("automations/save") !== -1) {',
+            '    answer = ' + JSON.stringify(REFUSED) + ';',
+            '  } else {',
+            '    answer = ' + JSON.stringify(SAVED) + ';',
+            '  }',
+            '  return Promise.resolve(new Response(JSON.stringify(answer),',
+            '    {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>',
+            '<script>window.require = function (deps, callback) { callback(window.jQuery); };<\/script>'
+        ].join('\n');
+    }
+
+    // Settings pages open their Automations tab; a page without the
+    // Settings shell (the transactional cards) starts its panels itself.
+    function open(page, startPanels) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.onload = function () {
+                var tab = frame.contentDocument.querySelector('.smaily-tabs li[data-tab=automations]');
+                if (tab) {
+                    tab.click();
+                }
+                wait(100).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs()
+                + '</head><body>' + rendered.html
+                + (startPanels
+                    ? '<script>window.panels = window.smailyPanelsInit(window.jQuery); window.panels.initAll();<\/script>'
+                    : '')
+                + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function shown(element) {
+        return !!element && element.offsetParent !== null;
+    }
+
+    function tick(frame, element, on) {
+        element.checked = on;
+        frame.contentWindow.jQuery(element).trigger('change');
+    }
+
+    function before(first, second) {
+        return !!(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+    }
+
+    function lastSave(frame) {
+        var saves = frame.contentWindow.requests.filter(function (request) {
+            return request.body.indexOf('"step":"automations"') !== -1;
+        });
+
+        return saves.length ? JSON.parse(saves[saves.length - 1].body).data : null;
+    }
+
+    async function saveAutomations(frame) {
+        frame.contentDocument.getElementById('smaily-w-automations-save').click();
+        await wait(100);
+
+        return lastSave(frame);
+    }
+
+    // The store-run cards: Welcome and Abandoned cart.
+    async function storeCards(locale) {
+        var frame = await open('settings-discount.' + locale, false),
+            doc = frame.contentDocument,
+            byId = function (id) {
+                return doc.getElementById(id);
+            },
+            welcome = byId('smaily-w-welcome-enabled'),
+            card = welcome.closest('.smaily-store-trigger'),
+            data;
+
+        check(locale + ', Welcome off: the card shows its name, description and switch',
+            shown(card.querySelector('.smaily-engine-trigger__name'))
+            && shown(card.querySelector('.smaily-engine-trigger__desc')) && shown(welcome));
+        check(locale + ', Welcome off: no workflow and no discount code',
+            !shown(byId('smaily-w-welcome-workflow')) && !shown(byId('smaily-w-welcome-coupon-enabled')));
+        check(locale + ', Abandoned cart off: no workflow, no "Wait (minutes)" and no discount code',
+            !shown(byId('smaily-w-abandoned-workflow')) && !shown(byId('smaily-w-cutoff'))
+            && !shown(byId('smaily-w-abandoned-coupon-enabled')));
+
+        tick(frame, welcome, true);
+        tick(frame, byId('smaily-w-abandoned-enabled'), true);
+        check(locale + ', Welcome on: the workflow and the discount code show',
+            shown(byId('smaily-w-welcome-workflow')) && shown(byId('smaily-w-welcome-coupon-enabled')));
+        check(locale + ', Abandoned cart on: the workflow, then "Wait (minutes)", then the discount code last',
+            shown(byId('smaily-w-abandoned-workflow')) && shown(byId('smaily-w-cutoff'))
+            && shown(byId('smaily-w-abandoned-coupon-enabled'))
+            && before(byId('smaily-w-abandoned-workflow'), byId('smaily-w-cutoff'))
+            && before(byId('smaily-w-cutoff'), byId('smaily-w-abandoned-coupon-enabled')));
+
+        byId('smaily-w-welcome-workflow').value = '7';
+        tick(frame, byId('smaily-w-welcome-coupon-enabled'), true);
+        byId('smaily-w-welcome-coupon-rule').value = '14';
+        byId('smaily-w-welcome-coupon-days').value = '10';
+        byId('smaily-w-cutoff').value = '45';
+
+        tick(frame, welcome, false);
+        tick(frame, byId('smaily-w-abandoned-enabled'), false);
+        check(locale + ', switched off: the workflow, the settings and the discount code hide again',
+            !shown(byId('smaily-w-welcome-workflow')) && !shown(byId('smaily-w-welcome-coupon-rule'))
+            && !shown(byId('smaily-w-cutoff')) && card.classList.contains('is-off'));
+        data = await saveAutomations(frame);
+        check(locale + ', switched off: the save keeps the hidden workflow, discount code and wait',
+            !!data && data.welcome_enabled === false && data.welcome_workflow === '7'
+            && data.welcome_coupon_enabled === true && data.welcome_coupon_rule === 14
+            && data.welcome_coupon_days === 10 && data.abandoned_enabled === false && data.abandoned_cutoff === 45);
+
+        tick(frame, welcome, true);
+        check(locale + ', on again: the values are back as they were',
+            shown(byId('smaily-w-welcome-workflow')) && byId('smaily-w-welcome-workflow').value === '7'
+            && byId('smaily-w-welcome-coupon-enabled').checked && shown(byId('smaily-w-welcome-coupon-rule'))
+            && byId('smaily-w-welcome-coupon-rule').value === '14'
+            && byId('smaily-w-welcome-coupon-days').value === '10');
+        frame.remove();
+    }
+
+    // Mode A: the per-language tables follow their card's switch, and the
+    // card's own workflow stays hidden while the card is on.
+    async function perLanguage(locale) {
+        var frame = await open('settings-modes.' + locale, false),
+            doc = frame.contentDocument,
+            welcome = doc.getElementById('smaily-w-welcome-enabled'),
+            editor = doc.getElementById('smaily-ml-mapping'),
+            table = function (trigger) {
+                return doc.querySelector('.smaily-ml-trigger[data-trigger=' + trigger + ']');
+            },
+            data;
+
+        check(locale + ', mode A, every card off: no per-language workflow editor', !shown(editor));
+        tick(frame, welcome, true);
+        check(locale + ', mode A, Welcome on: its table shows, not the others\'',
+            shown(editor) && shown(table('welcome')) && !shown(table('first_order'))
+            && !shown(table('abandoned_cart')));
+        check(locale + ', mode A, Welcome on: the card opens, still without its own workflow',
+            shown(doc.getElementById('smaily-w-welcome-coupon-enabled'))
+            && !shown(doc.getElementById('smaily-w-welcome-workflow')));
+        tick(frame, welcome, false);
+        check(locale + ', mode A, Welcome off again: the editor hides', !shown(editor) && !shown(table('welcome')));
+        data = await saveAutomations(frame);
+        check(locale + ', mode A, Welcome off: the save keeps its hidden per-language workflow',
+            !!data && JSON.stringify(data.mappings) === JSON.stringify([
+                {trigger_type: 'welcome', language: 'et', account_key: 'et', workflow_id: 101, is_default_fallback: true}
+            ]));
+        frame.remove();
+    }
+
+    // The transactional cards, on a two-language website: a table each.
+    async function transactionalCards(locale) {
+        var frame = await open('transactional-connected.' + locale, true),
+            doc = frame.contentDocument,
+            order = doc.getElementById('smaily-tx-order_confirmation-enabled'),
+            card = order.closest('.smaily-tx-trigger'),
+            rows = function () {
+                return Array.prototype.map.call(card.querySelectorAll('.smaily-tx-workflow'), function (select) {
+                    return select.getAttribute('data-language') + '=' + select.value;
+                }).join(' ');
+            },
+            data;
+
+        await frame.contentWindow.panels.loadWorkflows(null);
+        await wait(20);
+        check(locale + ', Order confirmation off: name, description and switch only',
+            shown(card.querySelector('.smaily-engine-trigger__name')) && shown(order)
+            && !shown(card.querySelector('.smaily-ml-table')));
+        tick(frame, order, true);
+        check(locale + ', Order confirmation on: its workflow per language shows',
+            shown(card.querySelector('.smaily-ml-table')) && rows() === 'et=31 en=32');
+        tick(frame, order, false);
+        check(locale + ', Order confirmation off again: the workflows hide',
+            !shown(card.querySelector('.smaily-ml-table')));
+        data = frame.contentWindow.panels.collect.automations().transactional;
+        check(locale + ', Order confirmation off: the save keeps its hidden workflows',
+            data.order_confirmation_enabled === false && data.mappings.length === 2
+            && data.mappings[0].workflow_id === 31 && data.mappings[0].is_default_fallback === true);
+        tick(frame, order, true);
+        check(locale + ', on again: the workflows are back', rows() === 'et=31 en=32');
+        frame.remove();
+    }
+
+    // The Campaign Intelligence cards.
+    async function engineCards(locale) {
+        var frame = await open('automations.' + locale, false),
+            doc = frame.contentDocument,
+            card = function (key) {
+                return doc.querySelector('.smaily-engine-trigger[data-trigger="' + key + '"]');
+            },
+            field = function (key, name) {
+                return card(key).querySelector('[data-field="' + name + '"]');
+            },
+            settings = ['workflow_id', 'cooldown_days', 'daily_cap', 'test_mode', 'test_emails'],
+            hidden = function (key) {
+                return settings.every(function (name) {
+                    return !shown(field(key, name));
+                }) && !shown(card(key).querySelector('.smaily-engine-trigger__hint'));
+            },
+            body;
+
+        check(locale + ', engine trigger off: name and Enabled only',
+            shown(card('replenish_due').querySelector('.smaily-engine-trigger__name'))
+            && shown(field('replenish_due', 'enabled')) && hidden('replenish_due'));
+        tick(frame, field('replenish_due', 'enabled'), true);
+        check(locale + ', engine trigger on: the workflow, Cooldown, Daily Cap, Test mode and Test Emails show',
+            settings.every(function (name) {
+                return shown(field('replenish_due', name));
+            }));
+        field('replenish_due', 'workflow_id').value = '101';
+        field('replenish_due', 'cooldown_days').value = '900';
+        tick(frame, field('replenish_due', 'enabled'), false);
+        check(locale + ', engine trigger off again: its settings hide', hidden('replenish_due'));
+
+        // A missing workflow on an enabled trigger is fixed on the page; off,
+        // the trigger has nothing to fix and closes.
+        tick(frame, field('post_purchase', 'enabled'), true);
+        doc.getElementById('smaily-engine-automations-save').click();
+        await wait(20);
+        check(locale + ', an enabled trigger without a workflow shows its error',
+            !!card('post_purchase').querySelector('.smaily-engine-trigger__field-error')
+            && frame.contentWindow.requests.length === 0);
+        tick(frame, field('post_purchase', 'enabled'), false);
+        check(locale + ', switched off, it has nothing to fix and closes',
+            hidden('post_purchase') && !card('post_purchase').querySelector('.smaily-engine-trigger__field-error'));
+
+        // The engine refuses the save over the cooldown of a trigger that is off.
+        doc.getElementById('smaily-engine-automations-save').click();
+        await wait(50);
+        body = frame.contentWindow.requests.length ? frame.contentWindow.requests[0].body : '';
+        check(locale + ', the save posts the hidden workflow and cooldown of a trigger that is off',
+            body.indexOf(encodeURIComponent('triggers[replenish_due][workflow_id]') + '=101') !== -1
+            && body.indexOf(encodeURIComponent('triggers[replenish_due][cooldown_days]') + '=900') !== -1
+            && body.indexOf(encodeURIComponent('triggers[replenish_due][enabled]')) === -1);
+        check(locale + ', a trigger with a field to fix stays open while it is off',
+            !field('replenish_due', 'enabled').checked && shown(field('replenish_due', 'cooldown_days'))
+            && field('replenish_due', 'cooldown_days').closest('.smaily-engine-trigger__ctrl')
+                .classList.contains('is-invalid')
+            && card('replenish_due').querySelector('.smaily-engine-trigger__field-error').textContent === 'Too big'
+            && field('replenish_due', 'workflow_id').value === '101');
+        check(locale + ', the triggers without an error stay closed', hidden('post_purchase') && hidden('winback_risk'));
+        frame.remove();
+    }
+
+    (async function () {
+        try {
+            for (var locale of ['en_US', 'et_EE']) {
+                log('# ' + locale);
+                await storeCards(locale);
+                await perLanguage(locale);
+                await transactionalCards(locale);
+                await engineCards(locale);
+            }
+        } catch (error) {
+            failures++;
+            log('FAIL ' + (error && error.stack ? error.stack : error));
+        }
+        clearInterval(keepAlive);
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    })();
+</script>
+</body>
+</html>

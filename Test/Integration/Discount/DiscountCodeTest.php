@@ -191,6 +191,32 @@ class DiscountCodeTest extends IntegrationTestCase
     }
 
     /**
+     * CON-256: an automation switched off after its row was queued keeps its
+     * discount setting, and the row then goes without a code; switched on
+     * again, the next send makes one.
+     */
+    public function testAnAutomationSwitchedOffMakesNoCodeAndKeepsItsSetting(): void
+    {
+        $this->switchOn();
+        $this->env->getScopeConfig()->setValue(Config::XML_PATH_WELCOME_ENABLED, '0');
+        $queue = $this->objectManager->create(EventQueue::class);
+        $queue->enqueue(EventType::AUTOMATION_TRIGGER, $this->payload(), 'jane@example.com', self::WEBSITE_ID);
+        $queued = $this->fetchRow('smaily_event_queue', 1)['payload'];
+
+        self::assertSame(['email' => 'jane@example.com'], $this->sendAttempt($queue));
+        self::assertSame($queued, $this->fetchRow('smaily_event_queue', 1)['payload'], 'no code and no notice');
+        self::assertSame([], $this->fetchAll('salesrule_coupon', 'coupon_id'));
+        $config = $this->objectManager->create(Config::class);
+        self::assertTrue($config->isCouponEnabled(Trigger::WELCOME, self::WEBSITE_ID), 'the setting is kept');
+        self::assertSame(self::RULE_ID, $config->getCouponRuleId(Trigger::WELCOME, self::WEBSITE_ID));
+
+        $this->env->getScopeConfig()->setValue(Config::XML_PATH_WELCOME_ENABLED, '1');
+        [$codeField] = Trigger::COUPON_FIELDS[Trigger::WELCOME];
+        self::assertArrayHasKey($codeField, $this->sendAttempt($queue), 'switched on again, the code is made');
+        self::assertCount(1, $this->fetchAll('salesrule_coupon', 'coupon_id'));
+    }
+
+    /**
      * One send attempt of the queue's one row: the address it posts, then
      * the row back on the queue, as a failed send leaves it for its retry.
      *
@@ -217,6 +243,7 @@ class DiscountCodeTest extends IntegrationTestCase
     private function switchOn(): void
     {
         $scopeConfig = $this->env->getScopeConfig();
+        $scopeConfig->setValue(Config::XML_PATH_WELCOME_ENABLED, '1');
         $scopeConfig->setValue(Config::XML_PATH_WELCOME_COUPON_ENABLED, '1');
         $scopeConfig->setValue(Config::XML_PATH_WELCOME_COUPON_RULE, (string)self::RULE_ID);
         $scopeConfig->setValue(Config::XML_PATH_WELCOME_COUPON_DAYS, '7');

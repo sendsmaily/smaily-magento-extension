@@ -7,6 +7,14 @@
  * Saves via AJAX to smaily_connect/automations/save (the surrounding page
  * is already a <form>, so no nested form here).
  *
+ * A trigger whose Enabled is not ticked shows only its name, pill,
+ * description and Enabled (CON-256, as the WooCommerce plugin's CON-255):
+ * .is-closed hides its .smaily-trigger-settings — the workflow, Cooldown,
+ * Daily Cap, Test mode, Test Emails and the go-live note. They stay in the
+ * form, and the save posts every field of every trigger, so nothing hidden
+ * is lost. A trigger with a field to fix (the engine refused the save over
+ * one of its fields) stays open while it is off, so the field can be seen.
+ *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
  */
@@ -67,7 +75,7 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
                 $pillLabel = __('Active');
             }
             ?>
-            <div class="smaily-engine-trigger <?= /* @noEscape */ $modeClass ?>" data-trigger="<?= /* @noEscape */ $key ?>">
+            <div class="smaily-engine-trigger <?= /* @noEscape */ $modeClass ?><?= $row['enabled'] ? '' : ' is-closed' ?>" data-trigger="<?= /* @noEscape */ $key ?>">
                 <input type="hidden" data-field="language_mode" value="<?= $escaper->escapeHtmlAttr($row['language_mode']) ?>"/>
                 <input type="hidden" data-field="original_map" value="<?= $escaper->escapeHtmlAttr($row['original_map']) ?>"/>
                 <div class="smaily-engine-trigger__top">
@@ -79,13 +87,13 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
                         <div class="smaily-engine-trigger__desc"><?= $escaper->escapeHtml($row['description']) ?></div>
                         <div class="smaily-engine-trigger__controls" style="margin-top:8px;">
                             <span class="smaily-engine-trigger__ctrl"><label><input type="checkbox" data-field="enabled" <?= $row['enabled'] ? 'checked' : '' ?>/> <?= $escaper->escapeHtml(__('Enabled')) ?></label></span>
-                            <span class="smaily-engine-trigger__ctrl"><label><input type="checkbox" data-field="test_mode" <?= $row['test_mode'] ? 'checked' : '' ?>/> <?= $escaper->escapeHtml(__('Test mode')) ?></label></span>
+                            <span class="smaily-engine-trigger__ctrl smaily-trigger-settings"><label><input type="checkbox" data-field="test_mode" <?= $row['test_mode'] ? 'checked' : '' ?>/> <?= $escaper->escapeHtml(__('Test mode')) ?></label></span>
                         </div>
                         <?php // The go-live step (PRO-3734): the engine keeps a trigger in test
                             // mode until a Smaily operator switches real sends on. ?>
-                        <div class="smaily-engine-trigger__hint"<?= $modeClass === 'is-active' ? ' hidden' : '' ?>><?= $escaper->escapeHtml(__('Smaily switches real sends on after you confirm. Until then the trigger runs in test mode.')) ?></div>
+                        <div class="smaily-engine-trigger__hint smaily-trigger-settings"<?= $modeClass === 'is-active' ? ' hidden' : '' ?>><?= $escaper->escapeHtml(__('Smaily switches real sends on after you confirm. Until then the trigger runs in test mode.')) ?></div>
                     </div>
-                    <div class="smaily-engine-trigger__controls">
+                    <div class="smaily-engine-trigger__controls smaily-trigger-settings">
                         <label class="smaily-engine-trigger__ctrl">
                             <span><?= $escaper->escapeHtml(__('Smaily Workflow')) ?></span>
                             <select data-field="workflow_id" style="min-width:16rem;">
@@ -150,8 +158,54 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
         function clearValidation() {
             $('#smaily-engine-automations-errors').remove();
             $('#smaily-engine-automations-table .smaily-engine-trigger__ctrl')
-                .removeClass('is-invalid').find('.smaily-engine-trigger__field-error').remove();
+                .removeClass('is-invalid');
+            $('#smaily-engine-automations-table .smaily-engine-trigger__field-error').remove();
+            $('#smaily-engine-automations-table .smaily-engine-trigger').each(function () {
+                applyOpen($(this));
+            });
         }
+
+        // A trigger shows its settings while Enabled is ticked, or while one
+        // of its fields has an error to fix (CON-256): the save then says
+        // what to fix, and the field must be visible even on a trigger that
+        // is off. The values of a closed trigger stay in the form.
+        function applyOpen($card) {
+            var open = $card.find('[data-field="enabled"]').is(':checked')
+                || $card.find('.smaily-engine-trigger__field-error').length > 0;
+            $card.toggleClass('is-closed', !open);
+        }
+
+        // An error on one field of a trigger, under that field's control —
+        // or under the trigger's Enabled when the field has none on the card.
+        function fieldError($card, field, message, local) {
+            var name = String(field || '').split('.')[0],
+                $control = $card.find('[data-field="' + ({automation_map: 'workflow_id'}[name] || name) + '"]')
+                    .not('[type=hidden]').closest('.smaily-engine-trigger__ctrl'),
+                $error = $('<div class="smaily-engine-trigger__field-error"></div>').text(message);
+            if (local) {
+                $error.attr('data-local', '1');
+            }
+            if ($control.length) {
+                $control.addClass('is-invalid').append($error);
+            } else {
+                $card.find('.smaily-engine-trigger__head').append($error);
+            }
+            applyOpen($card);
+        }
+
+        // Switching a trigger off drops the errors only an enabled trigger
+        // has (a missing workflow); an error from the engine stays, and keeps
+        // the trigger open.
+        $('#smaily-engine-automations-table').on('change', '[data-field="enabled"]', function () {
+            var $card = $(this).closest('.smaily-engine-trigger');
+            if (!$(this).is(':checked')) {
+                $card.find('.smaily-engine-trigger__field-error[data-local]').remove();
+                $card.find('.smaily-engine-trigger__ctrl.is-invalid').filter(function () {
+                    return $(this).find('.smaily-engine-trigger__field-error').length === 0;
+                }).removeClass('is-invalid');
+            }
+            applyOpen($card);
+        });
 
         function validate() {
             clearValidation();
@@ -162,9 +216,8 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
                 var $workflow = $row.find('[data-field="workflow_id"]');
                 if (enabled && !$workflow.val()) {
                     invalid += 1;
-                    $workflow.closest('.smaily-engine-trigger__ctrl').addClass('is-invalid')
-                        .append($('<div class="smaily-engine-trigger__field-error"></div>')
-                            .text('<?= $escaper->escapeJs(__('A workflow is required when this trigger is enabled.')) ?>'));
+                    fieldError($row, 'workflow_id',
+                        '<?= $escaper->escapeJs(__('A workflow is required when this trigger is enabled.')) ?>', true);
                 }
             });
             if (invalid > 0) {
@@ -207,6 +260,7 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
                 $enabled.prop('checked', state.enabled);
                 $testMode.prop('checked', state.test_mode);
                 $card.removeClass('is-off is-test is-active').addClass('is-' + mode);
+                applyOpen($card);
                 $card.find('.smaily-pill')
                     .removeClass('smaily-pill--off smaily-pill--test smaily-pill--active')
                     .addClass('smaily-pill--' + mode)
@@ -262,6 +316,15 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
                     }
                     $result.text(message).css('color', '#006400');
                 } else {
+                    // The engine's refusal names each trigger's field to fix.
+                    (data.field_errors || []).forEach(function (error) {
+                        var $card = $('#smaily-engine-automations-table .smaily-engine-trigger').filter(function () {
+                            return String($(this).data('trigger')) === String(error.trigger_key);
+                        });
+                        if ($card.length) {
+                            fieldError($card, error.field, error.message, false);
+                        }
+                    });
                     $result.text((data.errors || []).join(' ')
                         || '<?= $escaper->escapeJs(__('Saving failed.')) ?>').css('color', '#e22626');
                 }

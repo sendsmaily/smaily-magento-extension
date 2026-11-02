@@ -367,7 +367,7 @@ window.smailyPanelsInit = function ($) {
         var mapping = isMultilingual && (mode === 'a' || mode === 'b');
         $('#smaily-w-default-account').toggle(!modeA);
         $('#smaily-w-accounts').toggle(modeA);
-        $('#smaily-ml-mapping').toggle(mapping);
+        applyMappingTables(mapping);
         $('#smaily-ml-mapping-off').toggle(isMultilingual && !mapping);
         $('#smaily-ml-mapping .smaily-ml-hint-a').toggle(mode === 'a');
         $('#smaily-ml-mapping .smaily-ml-hint-b').toggle(mode === 'b');
@@ -377,6 +377,22 @@ window.smailyPanelsInit = function ($) {
         $('#smaily-ml-modes .smaily-choice').removeClass('is-selected');
         $('input[name=smaily-w-mlmode][value=' + mode + ']').closest('.smaily-choice').addClass('is-selected');
         showUnmappedLanguages();
+    }
+
+    /**
+     * The per-language workflow tables follow their store-event card's
+     * switch, as the card's own workflow does (CON-256): a switched-off
+     * automation's table hides, keeping its picks for the save, and the
+     * editor shows only in a per-language mode while one of the cards is on.
+     */
+    function applyMappingTables(mapping) {
+        var anyOn = false;
+        $('.smaily-ml-trigger').each(function () {
+            var on = $('#' + $(this).data('switch')).is(':checked');
+            $(this).toggle(on);
+            anyOn = anyOn || on;
+        });
+        $('#smaily-ml-mapping').toggle(mapping && anyOn);
     }
 
     function mlAccountFields($block) {
@@ -901,6 +917,11 @@ window.smailyPanelsInit = function ($) {
     }
 
     // --- Live reactivity within panels --------------------------------------
+    // A switched-off card (store-event or transactional) shows only its name,
+    // pill, description and switch (CON-256, as the WooCommerce plugin's
+    // CON-255): .is-closed hides its .smaily-trigger-settings — workflow, own
+    // settings and discount code. Its values stay in the form, so the save
+    // keeps them and switching the card on again shows them as they were.
     function reactAutomationRow(checkboxSelector, selectSelector) {
         var apply = function () {
             var $cb = $(checkboxSelector);
@@ -909,7 +930,7 @@ window.smailyPanelsInit = function ($) {
             // Card + run-mode pill follow the enable toggle (store-event cards).
             var $card = $cb.closest('.smaily-store-trigger');
             if ($card.length) {
-                $card.toggleClass('is-active', on).toggleClass('is-off', !on);
+                $card.toggleClass('is-active', on).toggleClass('is-off', !on).toggleClass('is-closed', !on);
                 $card.find('.smaily-store-pill')
                     .toggleClass('smaily-pill--active', on).toggleClass('smaily-pill--off', !on)
                     .find('.smaily-store-pill__text')
@@ -921,8 +942,8 @@ window.smailyPanelsInit = function ($) {
     }
 
     // An automation's discount code fields (CON-198) show while its "Send a
-    // discount code" switch is on, and the switch follows the automation's
-    // own Enabled switch.
+    // discount code" switch is on; the whole block is the card's last one
+    // and shows only while the automation itself is on (CON-256).
     function reactCoupon(id) {
         var apply = function () {
             var enabled = $('#smaily-w-' + id + '-enabled').is(':checked');
@@ -1078,6 +1099,14 @@ window.smailyPanelsInit = function ($) {
             applyMlMode(next);
             loadMappingWorkflows();
         });
+        // The per-language tables follow their card's switch (CON-256).
+        $(document).on(
+            'change',
+            '#smaily-w-welcome-enabled, #smaily-w-firstorder-enabled, #smaily-w-abandoned-enabled',
+            function () {
+                applyMappingTables(isMultilingual && (mlModeCurrent === 'a' || mlModeCurrent === 'b'));
+            }
+        );
         // The mode-A notice of languages without a workflow follows every
         // control it reads (CON-188).
         $(document).on(

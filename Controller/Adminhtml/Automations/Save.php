@@ -30,7 +30,10 @@ use Smaily\Connect\ViewModel\Adminhtml\AutomationsForm;
  * all eight keys — no server-side defaults; validation is all-or-nothing.
  * The engine may store a row differently from the request (a row asking for
  * real sends stays in test mode until a Smaily operator switches them on), so
- * the AJAX answer carries each trigger's stored state from §12.
+ * the AJAX answer carries each trigger's stored state from §12. A save the
+ * engine refuses over fields (§13's 422 errors[]) answers each error's
+ * trigger and field as well, so the tab marks the field and keeps its trigger
+ * open even when the trigger is off (CON-256).
  */
 class Save extends Action implements HttpPostActionInterface
 {
@@ -55,7 +58,8 @@ class Save extends Action implements HttpPostActionInterface
     {
         $errors = [];
         $savedKeys = [];
-        $saved = $this->save($errors, $savedKeys);
+        $fieldErrors = [];
+        $saved = $this->save($errors, $savedKeys, $fieldErrors);
 
         // Embedded config-page block saves via AJAX; plain form posts get a
         // redirect back with flash messages.
@@ -67,6 +71,9 @@ class Save extends Action implements HttpPostActionInterface
             $data = ['saved' => $saved, 'errors' => $errors];
             if ($saved) {
                 $data['states'] = $this->storedStates($savedKeys);
+            }
+            if ($fieldErrors !== []) {
+                $data['field_errors'] = $fieldErrors;
             }
 
             return $json->setData($data);
@@ -81,8 +88,10 @@ class Save extends Action implements HttpPostActionInterface
     /**
      * @param string[] $errors collected error strings (also flashed)
      * @param string[] $savedKeys the trigger keys sent to the engine
+     * @param array<int, array{trigger_key: string, field: string, message: string}> $fieldErrors the engine's
+     *        errors that name a trigger (by key, or by its row's position in the request)
      */
-    private function save(array &$errors, array &$savedKeys): bool
+    private function save(array &$errors, array &$savedKeys, array &$fieldErrors): bool
     {
         // A page opened before Campaign Intelligence refused the account
         // (PRO-2451): explain the refusal as Settings > Intelligence does
@@ -125,6 +134,15 @@ class Save extends Action implements HttpPostActionInterface
         } catch (EngineRequestException $exception) {
             foreach ((array)($exception->getErrorBody()['errors'] ?? []) as $error) {
                 if (is_array($error)) {
+                    $triggerKey = (string)($error['trigger_key']
+                        ?? (isset($error['index']) ? ($rows[(int)$error['index']]['trigger_key'] ?? '') : ''));
+                    if ($triggerKey !== '') {
+                        $fieldErrors[] = [
+                            'trigger_key' => $triggerKey,
+                            'field' => (string)($error['field'] ?? ''),
+                            'message' => (string)($error['message'] ?? 'invalid'),
+                        ];
+                    }
                     $errors[] = sprintf(
                         '%s / %s: %s',
                         (string)($error['trigger_key'] ?? 'row'),

@@ -1447,7 +1447,17 @@ automations' scope model exactly: store-wide at the default scope, a
 website's own values as a website exception, kept, removed and returned with
 the rest of its automations (a website on another Smaily account keeps
 them as its own, CON-190). `WizardStepSaver::saveAutomations()` refuses the
-whole save when a switch is on without a rule. The picker
+whole save when a switch is on without a rule (only for an automation that
+is on, so a hidden discount setting never blocks a save). The discount block
+is the card's last one and shows only while the automation's Enabled is
+ticked: an off card (store-event, transactional or Campaign Intelligence)
+shows only its name, pill, description and Enabled — `.is-closed` on the
+card hides its `.smaily-trigger-settings` (CON-256). The values stay in the
+form and every save posts them, so switching a card off loses nothing. A
+Campaign Intelligence trigger stays open while one of its fields carries an
+error, a local one or one from the engine's 422 (`field_errors` in
+`Automations\Save`'s answer, bound by `trigger_key` or the row's `index`).
+The picker
 (`panel/automations.phtml`, Settings and the initial setup's Automations
 step) lists `Discount\RuleSource::forWebsites()`: active rules with Coupon
 "Specific Coupon" + "Use Auto Generation" (or the API-only type Auto),
@@ -1462,7 +1472,15 @@ Adobe Commerce's staged rules read as Magento reads them.
 **When the code is made.** In `AutomationHandler`, just before the post —
 after the workflow match and the abandoned-cart consent read — so a row
 that ends Skipped (no workflow, consent, the cron's 24-hour and
-unsubscribed skips, which never reach the handler) makes no code.
+unsubscribed skips, which never reach the handler) makes no code. Nor does
+a row whose automation is switched off when it is sent (CON-256, as the
+WooCommerce plugin's CON-255): `address()` reads the automation's own
+switch for the event's website (`AutomationDiscount::automationEnabled()`:
+`Config::isWelcomeEnabled()`, `isFirstOrderEnabled()`,
+`isAbandonedCartEnabled()`, the switches the observers and the cron read
+before they queue a row). A row queued while the automation was on, or a
+Log Send again of a row that has no code yet, goes without one, with no
+notice; the saved discount setting is not touched.
 `Discount\AutomationDiscount::address()` asks `Discount\CodeIssuer`, which
 uses Magento's own `Coupon\Massgenerator` (the generator behind the rule's
 Manage Coupon Codes): `qty` 1, the store's code format from
@@ -2092,7 +2110,9 @@ Initial setup, Settings, Log. Design rules:
   (`switchMappingRows()` in panels-js), so a mode-`b` save never posts a
   per-language account's workflow id (CON-184). In mode `a` the trigger
   cards hide their workflow select (mode `a` never starts it; hidden, it
-  keeps its saved value), and `showUnmappedLanguages()` lists live, under
+  keeps its saved value). Each trigger's table follows its card's Enabled
+  like the card's own settings, and the editor shows only while one of the
+  three is on (CON-256). In mode `a`, `showUnmappedLanguages()` lists live, under
   **Some languages have no workflow**, each switched-on automation with the
   languages the Router would find no row for — the language's own select,
   else the trigger's default-fallback radio, else the select of the default

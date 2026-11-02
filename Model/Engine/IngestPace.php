@@ -24,8 +24,8 @@ class IngestPace
      * The pace: ingest requests one send run makes in a second, at most.
      * The contract allows 100 a second on each ingest route; a store's
      * history (catalog 100, customers 100, orders 50 rows a request) needs
-     * far fewer. Engine contract 1.20.0 is to name a target pace — its
-     * answer changes this one number.
+     * far fewer. The engine contract is to name a target pace (1.21.0 does
+     * not yet) — its answer changes this one number.
      */
     public const REQUESTS_PER_SECOND = 5;
 

@@ -42,5 +42,6 @@
     <event name="newsletter_subscriber_save_after">
         <observer name="smaily_connect_engine_unsubscribe" instance="Smaily\Connect\Observer\Engine\SubscriberUnsubscribed"/>
         <observer name="smaily_connect_engine_resubscribe" instance="Smaily\Connect\Observer\Engine\SubscriberResubscribed"/>
+        <observer name="smaily_connect_engine_subscriber_customer" instance="Smaily\Connect\Observer\Engine\SubscriberJoined"/>
     </event>
 </config>

@@ -15,6 +15,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\CustomerIngest;
 use Smaily\Connect\Model\Engine\OrderIngest;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
@@ -25,17 +26,23 @@ use Smaily\Connect\Observer\Engine\OrderSaveAfter;
  * PRO-1762: the enqueue gate has to notice a refund, not just a state move.
  * A Magento PARTIAL credit memo leaves the order processing/complete, so a
  * state-only gate would never send its per-line return signal (contract §5).
+ *
+ * CON-266: an order of a registered account puts the buyer in the customer
+ * scope's group (b), so a new order, or an order just assigned to an
+ * account, offers the buyer to the live customer sync.
  */
 class OrderSaveAfterTest extends TestCase
 {
     private OrderPayloadBuilder&MockObject $payloadBuilder;
     private IngestQueue&MockObject $queue;
+    private CustomerIngest&MockObject $customerIngest;
 
     protected function setUp(): void
     {
         $this->payloadBuilder = $this->createMock(OrderPayloadBuilder::class);
         $this->payloadBuilder->method('build')->willReturn(['external_order_id' => '100000042']);
         $this->queue = $this->createMock(IngestQueue::class);
+        $this->customerIngest = $this->createMock(CustomerIngest::class);
     }
 
     public function testAPartialRefundEnqueuesEvenThoughTheStateDidNotMove(): void
@@ -75,6 +82,52 @@ class OrderSaveAfterTest extends TestCase
         )));
     }
 
+    public function testANewOrderOfAnAccountOffersTheBuyer(): void
+    {
+        $this->customerIngest->expects(self::once())->method('joined')->with(77);
+
+        $this->createObserver()->execute($this->observerFor($this->order(null, Order::STATE_NEW, 0.0, 0.0, null, 77)));
+    }
+
+    public function testAGuestOrderOffersNobody(): void
+    {
+        $this->customerIngest->expects(self::never())->method('joined');
+
+        $this->createObserver()->execute($this->observerFor($this->order(null, Order::STATE_NEW, 0.0, 0.0)));
+    }
+
+    /**
+     * Magento's "create an account" after a guest checkout assigns the
+     * order to the new account.
+     */
+    public function testAGuestOrderAssignedToAnAccountOffersTheBuyer(): void
+    {
+        $this->customerIngest->expects(self::once())->method('joined')->with(77);
+
+        $this->createObserver()->execute($this->observerFor($this->order(
+            Order::STATE_PROCESSING,
+            Order::STATE_PROCESSING,
+            0.0,
+            0.0,
+            null,
+            77
+        )));
+    }
+
+    public function testALaterSaveOfTheOrderOffersTheBuyerNoMore(): void
+    {
+        $this->customerIngest->expects(self::never())->method('joined');
+
+        $this->createObserver()->execute($this->observerFor($this->order(
+            Order::STATE_PROCESSING,
+            Order::STATE_COMPLETE,
+            0.0,
+            0.0,
+            77,
+            77
+        )));
+    }
+
     private function createObserver(): OrderSaveAfter
     {
         $settings = $this->createMock(Settings::class);
@@ -83,7 +136,8 @@ class OrderSaveAfterTest extends TestCase
         return new OrderSaveAfter(
             $settings,
             new OrderIngest($this->payloadBuilder, $this->queue),
-            $this->createMock(AttributionManager::class)
+            $this->createMock(AttributionManager::class),
+            $this->customerIngest
         );
     }
 
@@ -98,12 +152,15 @@ class OrderSaveAfterTest extends TestCase
     }
 
     private function order(
-        string $origState,
+        ?string $origState,
         string $state,
         float $origTotalRefunded,
-        float $totalRefunded
+        float $totalRefunded,
+        ?int $origCustomerId = null,
+        ?int $customerId = null
     ): Order&MockObject {
         $order = $this->createMock(Order::class);
+        $order->method('getCustomerId')->willReturn($customerId);
         $order->method('getState')->willReturn($state);
         $order->method('getTotalRefunded')->willReturn($totalRefunded);
         $order->method('getIncrementId')->willReturn('100000042');
@@ -112,6 +169,7 @@ class OrderSaveAfterTest extends TestCase
             static fn (?string $key = null) => [
                 'state' => $origState,
                 'total_refunded' => $origTotalRefunded,
+                'customer_id' => $origCustomerId,
             ][$key] ?? null
         );
 

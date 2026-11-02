@@ -12,6 +12,7 @@ use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Sales\Model\Order;
 use Smaily\Connect\Model\Engine\AttributionManager;
+use Smaily\Connect\Model\Engine\CustomerIngest;
 use Smaily\Connect\Model\Engine\OrderIngest;
 use Smaily\Connect\Model\Engine\Settings;
 
@@ -29,13 +30,22 @@ use Smaily\Connect\Model\Engine\Settings;
  * the visitor's cookies are still present. An admin request carries the
  * store's cookies too when the admin shares the storefront's host (path
  * `/`), so AttributionManager stamps nothing on an order an admin places.
+ *
+ * An order of a registered account puts its buyer in the Campaign
+ * Intelligence customer scope's group (b) (contract §4, CON-266): the
+ * buyer's account row is queued when the order is placed, or when a guest
+ * order is assigned to an account afterwards (Magento's "create an
+ * account" after checkout), once per order and without stored state
+ * (CustomerIngest::joined()). The order alone would create the engine's
+ * customer from its email without the account's id, name and language.
  */
 class OrderSaveAfter implements ObserverInterface
 {
     public function __construct(
         private readonly Settings $settings,
         private readonly OrderIngest $orderIngest,
-        private readonly AttributionManager $attributionManager
+        private readonly AttributionManager $attributionManager,
+        private readonly CustomerIngest $customerIngest
     ) {
     }
 
@@ -60,6 +70,13 @@ class OrderSaveAfter implements ObserverInterface
 
         if (!$this->settings->isConnected()) {
             return;
+        }
+
+        // A new order of an account, or an order just assigned to one: the
+        // buyer is in the customer scope now (group b).
+        $customerId = (int)$order->getCustomerId();
+        if ($customerId > 0 && (int)$order->getOrigData('customer_id') !== $customerId) {
+            $this->customerIngest->joined($customerId);
         }
 
         // Only enqueue when something the engine cares about actually changed

@@ -241,13 +241,47 @@ below.
   third group (contract v1.23.0 §4 group c, CON-262), every customer who
   logs in with marketing consent, is not in the import (§25 sender rule 4):
   it is sent at that login, before the identity merge (see "Identity
-  merge" below). Nothing takes a customer back out of the engine: the
-  import only adds the customers in scope, the live sync
-  (`Observer\Engine\CustomerSaveAfter`) queues a customer on every save
-  without a scope check, and the module has no "remove customer" call
-  (§4 has none; §9 is the Art. 17 erasure `smaily:gdpr erase`). So a group
-  (c) customer stays in the engine whatever the import or a later save
-  reads. Each import row carries
+  merge" below). **The live sync applies the same rule** (CON-266,
+  Erkki 2026-11-02): `Model\Engine\CustomerIngest` queues a customer's
+  row only when `EngineCustomerScope::includes()` — the import's query,
+  narrowed to the one customer id, horizon `HistoryImport::horizonNow()`
+  (the stored window, never a ping) — says yes, so the import and the
+  live sync cannot send different customers. Its triggers: a save of the
+  account (`Observer\Engine\CustomerSaveAfter`,
+  `customer_save_after_data_object`: a registration, the account page,
+  the admin, the REST and GraphQL APIs; a Magento ImportExport customer
+  import saves no account through the repository and queues nothing — the
+  customers import's Run again sends those accounts); a subscription that
+  enters a status the contact sync sends (`Observer\Engine\SubscriberJoined`,
+  `newsletter_subscriber_save_after`: the customer may join group a, and
+  a subscription saves no account); and an order of an account
+  (`Observer\Engine\OrderSaveAfter`: a new order, or a guest order
+  assigned to an account afterwards, joins group b — the order alone
+  would create the engine's customer from its email without the account's
+  id, name and language). A save always queues the account as saved; a
+  subscription or an order queues it unless the same request already did.
+  The cost per trigger is one flag read (the horizon) and one query on the
+  customer's primary key with two `EXISTS` subqueries (the customer's
+  orders by `customer_id`, its subscriber rows by customer id or address),
+  each on an indexed column. A change of a website's sync mode moves whole
+  groups and sends nobody live: the customers import's Run again sends
+  them. **Group (c) on a later save:** the contract names only the login;
+  a stale engine row is worse than an update, so a save the shopper makes
+  on Magento's own storefront pages, logged in as that customer and with
+  marketing consent there (`Model\Engine\ConsentingShopper`: the login's
+  consent rule, `MarketingConsent::isGiven()` and no Storefront URL), is
+  sent although (a) and (b) do not hold. The store keeps no record that a
+  login sent a customer, and the consent is a cookie of the shopper's
+  browser, so a save in the admin, through an API, by an import or a cron
+  job of a customer in group (c) only is not sent; their next consenting
+  login sends the account as it is then. Nothing takes a customer back
+  out of the engine: the module has no "remove customer" call (§4 has
+  none; §9 is the Art. 17 erasure `smaily:gdpr erase`), so a customer who
+  leaves every group stays in the engine and only stops getting updates.
+  The WooCommerce plugin applies the same rule (its CON-246), and queues
+  the buyer once per order by an order meta flag; Magento needs no stored
+  flag, because an order's first save (or its assignment to an account)
+  is the one save whose original customer id differs. Each import row carries
   its job (`smaily_ingest_queue.job_id`), and the send run counts the rows
   the engine accepted — not refused per item, not skipped as older than
   the horizon — on the job (`smaily_backfill_job.sent_count`; null for a
@@ -443,8 +477,8 @@ below.
   deduplicates); a config save without a token exchanges nothing and
   starts nothing. The customers import is there for the engine's
   customer id: storefront recommendations ask by the Magento customer id
-  (`external_id`, contract §4), which live sync sends only on a customer
-  save, so an account that existed before connecting, a customer the
+  (`external_id`, contract §4), which live sync sends only on a save, a
+  subscription or an order of a customer in scope (CON-266), so an account that existed before connecting, a customer the
   engine knows only from orders (§5 names the customer by email) and an
   account created by Magento's ImportExport customer import are unknown
   by id until the import runs. A connected store whose customers import
@@ -2022,7 +2056,7 @@ Subscribers grid, or a customer account, leaves profiling as it was.
   one outside the other two groups: the store cannot tell that the engine
   already has the customer, and the row is an idempotent upsert, one per
   merge. **Ordering.** The customer row a registration queues
-  (`CustomerSaveAfter`) travels in `smaily_ingest_queue`, the merge in
+  (`CustomerSaveAfter`, for a customer in scope) travels in `smaily_ingest_queue`, the merge in
   `smaily_event_queue`, and `smaily_flush_event_queue` is declared before
   `smaily_flush_ingest_queue` in the same cron group, so the merge reaches
   the engine first. Sending the customer inside the merge's own run makes
@@ -2034,7 +2068,8 @@ Subscribers grid, or a customer account, leaves profiling as it was.
   (`EventQueue::addToPayload()`) and sends the customer when the store
   sends them anyway — a consenting login, or a customer with a row in the
   ingest queue (`IngestQueue::hasRow()`: the live sync or an import queued
-  them, e.g. a customer who has just registered without consent) — and
+  them, e.g. a customer who has just registered without consent in the
+  "All customers" mode) — and
   once §4 answered 200 for the customer it tries the merge once more. It
   never merges again before that: §4 in transport trouble leaves the row
   on the ladder, and its next attempt sends the customer before it merges

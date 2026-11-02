@@ -7,69 +7,94 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-10-29 — **3.0.0-rc17 cut on `master`: the history
-import goes newest first, and privacy requests match the exact address.**
-**3.0.0-rc17 is cut** on `master` (the version-cut PR
-`release/3.0.0-rc17`); its tag waits for Erkki (CLAUDE.md "Release cut").
-3.0.0-rc16 is released (Erkki's tag, 2026-10-28). The cut collects 5
-fragments into CHANGELOG's "Changes since 3.0.0-rc16", in landing order
-(CON-225, CON-241, CON-240, CON-215, CON-242); the CON-240 and CON-242
-bullets are merged into one (`smaily:gdpr erase` / `export` reach only
-the exact address, in any letter case; an accented and a plain address
-are two shoppers). It rewords the PRO-3790 bullet ("connecting starts the
-**Customers** import"), which said the **Orders** import is yours to
-start and that every customer account goes to the engine: since rc17
-connecting starts the **Orders** import too and the customers import
-sends only the customers in scope.
+_Last updated: 2026-11-02 — **3.0.0-rc18 cut on `master`: per-website
+links, accounts and range for a multi-website store (contract 1.21.0).**
+**3.0.0-rc18 is cut** on `master` (the version-cut PR
+`release/3.0.0-rc18`); its tag waits for Erkki (CLAUDE.md "Release cut").
+3.0.0-rc17 is released (Erkki's tag, 2026-10-29: the release workflow
+was green, both ZIPs were attached, the Hyvä mirror was tagged and
+Packagist showed rc17). The cut collects 2 fragments into CHANGELOG's
+"Changes since 3.0.0-rc17", in landing order (CON-243, CON-253). It
+adds a cross-reference to the CON-241 bullet (rc17's "after upgrading,
+press **Run again** on **Customers** and then **Orders**"): on a
+multi-website store that upgrades to rc18 or later, rc18's **Run again**
+on **Catalog**, **Customers** and **Orders** does that too. No other
+earlier bullet became untrue.
 
-**On `master` since the rc16 cut (all in rc17):** #221 (docs only: the
-multi-website rule — one Smaily account is one engine store). #224
-(engine contract 1.20.0, byte-identical; the §5 reply's `skipped` count
-is part of the ingest count check, and a skipped order stays sent).
-#222 CON-210 (CI compiles the release ZIP with `setup:di:compile` on
-Magento 2.4.4-p13 / PHP 8.1 and 2.4.9 / PHP 8.4 on every PR). #223
-CON-225 (`smaily:gdpr export` lists the discount codes the extension
-made for the address; `erase` deletes the unused ones). #225 CON-241
-(the history import: connecting queues the catalog, customers and
-orders imports in that order; the orders import goes newest first — a
-start part of the last 18 months, then older orders down to the
-60-month horizon — with both numbers from the contract's
-`config.history` (ping, else the setup exchange, else 18 / 60 /
-`newest_first`); progress `started` / `start_part_complete` /
-`complete` is reported to the engine's §25; the **Orders** card shows
-one bar for the part being sent and says when Campaign Intelligence can
-start; the customers scope is narrowed to rule B; schema:
-`smaily_ingest_queue.job_id` with an index and
-`smaily_backfill_job.sent_count`). #226 CON-240 (erase and export match
-the whole address, not a substring). #227 CON-215 (the import tests run
-off the wall clock; `smaily:backfill:status` shows only the error's
-location and a "Skipped (unreadable)" column). #228 CON-242 (erase and
-export match case-insensitively and accent-exactly through
-`AddressMatch`, as the WooCommerce plugin does).
+**On `master` since the rc17 cut (all in rc18):** #230 CON-243 (the
+abandoned-cart reminder's consent check reads the newsletter status of
+the cart's exact address through `AddressMatch` + `mb_strtolower`, so
+`ÜLLE@` is `ülle@` and `jäne@` is never `jane@`; `ShopperCodes` finds
+the discount codes stored with an accented capital for
+`smaily:gdpr export` / `erase`). #231 (engine contract 1.21.0,
+byte-identical). #232 CON-253 (`Model/Engine/Websites`: a customer row's
+`website` is the code of `customer.website_id`; an order row's `website`
+is the website of `order.store_id`; every catalog row carries
+`websites: {code: {product_url: {lang: url}}}` for the websites that
+sell the product, leaving out a website where it is disabled or not
+visible, `{}` when no website sells it; the row's own language map takes
+each language from the website the row is priced at first;
+`store_config.customer_account_scope` goes on the setup exchange and on
+every §25 `started`; the §15 storefront request names the `website`, and
+the recommendation cache key is tenant + website + identifier; no schema
+change).
 
-**Pilot:** the first pilot store connected Campaign Intelligence on
-2026-10-26, most likely still on rc12; its customers and orders imports
-stopped on rows Magento could not read. It needs an upgrade to rc17,
-then **Run again** on **Customers** and then on **Orders**
-(Settings > Intelligence), so that its history is sent again newest
-first. The second pilot store's state is unchanged (rc12). The gauge is
-CON-147 (4/5).
+**Decided (Erkki, 2026-11-02), engine INT-171:** all three parts
+(per-website links, per-website customer accounts, per-website product
+range) went into contract 1.21.0, and every new field is optional.
+Price and stock stay single values: the first pilot store has Catalog
+Price Scope = Global, a global stock and Share Customer Accounts = Per
+Website. The contract does not state "one installation = one Smaily
+account"; the 2026-10-28 rule (one Smaily account = one engine store)
+stays in our docs only. The engine merges customers by email.
+
+**Pilot:** the first pilot store upgrades directly to rc18 and skips
+rc17. Then it presses **Run again** under **Settings > Intelligence** on
+**Catalog**, **Customers** and **Orders**, in that order. The second
+pilot store's state is unchanged (rc12). The gauge is CON-147 (4/5).
+
+**Gotchas:** a multi-website store's catalog build loads each product
+at every language store view of every website it is on; the cost is not
+measured, the estimate is 2–3× slower than rc17. The recommendation
+cache key changed, so every cached widget answer misses once after the
+upgrade.
 
 **Open:** CON-209 (the 3.0.0 gate), CON-230 (the engine-page modal;
 waits for INT-180), CON-234 (the installation report; waits for
 INT-186), CON-237 (an own engine store per Smaily account; later),
-CON-243 (the cart-reminder consent read is accent-blind; Low), CON-168,
-and Estonian proofreads of the new guide strings (CON-225, CON-241,
-CON-233; CON-151 and CON-146 still open). Follow-ups: **Run again**
-restarts from row 1; WooCommerce's slower import pace (CON-236).
+CON-252 (address normalisation is ASCII-only; Low; needs agreement with
+the engine), CON-146 (native-speaker review of ru/fi/lv/lt), CON-168,
+and the Estonian proofread of the new CON-253 guide paragraphs in
+`#setup-website`. Follow-ups: **Run again** restarts from row 1;
+WooCommerce's slower import pace (CON-236).
 
 **Next session opens with:**
-1. Erkki tags rc17.
-2. The first pilot store upgrades to rc17 and presses **Run again** on
-   **Customers**, then on **Orders**.
-3. Watch its history progress reach `start_part_complete` in the engine.
+1. Erkki tags rc18.
+2. The first pilot store upgrades to rc18 and presses **Run again** on
+   **Catalog**, **Customers** and **Orders**, in that order.
+3. Watch its history progress reach `start_part_complete` in the
+   engine, and check that its customer rows carry each website's
+   account.
 
-**Notes for the next version cut (rc18):** none so far._
+**Notes for the next version cut (rc19):** none so far._
+
+_Earlier (2026-10-29, the 3.0.0-rc17 cut): 3.0.0-rc17 was cut (#229)
+and tagged by Erkki the same day. It collected 5 fragments (CON-225,
+CON-241, CON-240, CON-215, CON-242), merged the CON-240 and CON-242
+bullets into one, and reworded the PRO-3790 bullet (since rc17
+connecting starts the **Orders** import too and the customers import
+sends only the customers in scope). In rc17 since rc16: #221 (docs: one
+Smaily account is one engine store), #224 (contract 1.20.0), #222
+CON-210 (CI `setup:di:compile` on Magento 2.4.4-p13 and 2.4.9), #223
+CON-225 (`smaily:gdpr export` / `erase` and the extension's discount
+codes), #225 CON-241 (the history import: catalog, customers and orders
+queued on connect; orders newest first, an 18-month start part, a
+60-month horizon, §25 progress; schema `smaily_ingest_queue.job_id`,
+`smaily_backfill_job.sent_count`), #226 CON-240 and #228 CON-242 (erase
+and export match the exact address, case-insensitively and
+accent-exactly, through `AddressMatch`), #227 CON-215
+(`smaily:backfill:status` shows only the error's location and a
+"Skipped (unreadable)" column)._
 
 _Earlier (2026-10-28, the 3.0.0-rc16 cut): 3.0.0-rc16 was cut (#220)
 and tagged by Erkki the same day. It collected 6 fragments (CON-220,

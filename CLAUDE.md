@@ -466,7 +466,11 @@ is written in English.
   an hour; the first pilot store connected Campaign Intelligence on 26.10
   and waits for rc16); 2026-10-29: 4/5 (rc17 cut: history import newest
   first with an 18-month start, privacy matching exact; first pilot store
-  waits for its upgrade and a Run again on Customers then Orders).
+  waits for its upgrade and a Run again on Customers then Orders);
+  2026-10-29: 4/5 (rc17 released); 2026-11-02: 4/5 (rc18 cut:
+  per-website links, accounts and range for a multi-website store
+  (contract 1.21.0); the first pilot store upgrades to rc18 and presses
+  Run again on Catalog, Customers and Orders).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Feature (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

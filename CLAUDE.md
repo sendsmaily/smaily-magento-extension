@@ -472,7 +472,9 @@ is written in English.
   (contract 1.21.0); the first pilot store upgrades to rc18 and presses
   Run again on Catalog, Customers and Orders); 2026-11-02 later: 4/5
   (rc18 released; rc19 cut: automation cards show their settings only
-  while switched on, as in WooCommerce).
+  while switched on, as in WooCommerce); 2026-11-02 evening: 4/5 (rc19
+  released; rc20 cut: Edit design in an in-admin modal, a visitor token
+  at a consenting login, login merges reach the engine again).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Feature (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

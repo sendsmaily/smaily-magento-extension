@@ -470,7 +470,9 @@ is written in English.
   2026-10-29: 4/5 (rc17 released); 2026-11-02: 4/5 (rc18 cut:
   per-website links, accounts and range for a multi-website store
   (contract 1.21.0); the first pilot store upgrades to rc18 and presses
-  Run again on Catalog, Customers and Orders).
+  Run again on Catalog, Customers and Orders); 2026-11-02 later: 4/5
+  (rc18 released; rc19 cut: automation cards show their settings only
+  while switched on, as in WooCommerce).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Feature (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

@@ -7,57 +7,49 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-11-02 — **3.0.0-rc18 cut on `master`: per-website
-links, accounts and range for a multi-website store (contract 1.21.0).**
-**3.0.0-rc18 is cut** on `master` (the version-cut PR
-`release/3.0.0-rc18`); its tag waits for Erkki (CLAUDE.md "Release cut").
-3.0.0-rc17 is released (Erkki's tag, 2026-10-29: the release workflow
+_Last updated: 2026-11-02 — **3.0.0-rc19 cut on `master`: automation
+cards show their settings only while switched on, as in WooCommerce.**
+**3.0.0-rc19 is cut** on `master` (the version-cut PR
+`release/3.0.0-rc19`); its tag waits for Erkki (CLAUDE.md "Release cut").
+3.0.0-rc18 is released (Erkki's tag, 2026-11-02: the release workflow
 was green, both ZIPs were attached, the Hyvä mirror was tagged and
-Packagist showed rc17). The cut collects 2 fragments into CHANGELOG's
-"Changes since 3.0.0-rc17", in landing order (CON-243, CON-253). It
-adds a cross-reference to the CON-241 bullet (rc17's "after upgrading,
-press **Run again** on **Customers** and then **Orders**"): on a
-multi-website store that upgrades to rc18 or later, rc18's **Run again**
-on **Catalog**, **Customers** and **Orders** does that too. No other
-earlier bullet became untrue.
+Packagist showed rc18). The cut collects 1 fragment into CHANGELOG's
+"Changes since 3.0.0-rc18" (CON-256). It adds cross-references to two
+earlier bullets: the discount-code bullet (under "Changes since
+3.0.0-rc13": "each email gets a new code") now says that an email of an
+automation that is switched off goes without a code, and the
+per-language-workflows mode bullet (under "Changes since 3.0.0-rc12":
+"the Automations tab shows the workflows of the mode you pick") now
+says it does so while an automation that uses them is switched on. No other earlier bullet became untrue: the transactional
+emails bullet names the **Customer details** switch, which stays
+outside the cards, and the Campaign Intelligence *Test mode* bullet
+describes a card after a save.
 
-**On `master` since the rc17 cut (all in rc18):** #230 CON-243 (the
-abandoned-cart reminder's consent check reads the newsletter status of
-the cart's exact address through `AddressMatch` + `mb_strtolower`, so
-`ÜLLE@` is `ülle@` and `jäne@` is never `jane@`; `ShopperCodes` finds
-the discount codes stored with an accented capital for
-`smaily:gdpr export` / `erase`). #231 (engine contract 1.21.0,
-byte-identical). #232 CON-253 (`Model/Engine/Websites`: a customer row's
-`website` is the code of `customer.website_id`; an order row's `website`
-is the website of `order.store_id`; every catalog row carries
-`websites: {code: {product_url: {lang: url}}}` for the websites that
-sell the product, leaving out a website where it is disabled or not
-visible, `{}` when no website sells it; the row's own language map takes
-each language from the website the row is priced at first;
-`store_config.customer_account_scope` goes on the setup exchange and on
-every §25 `started`; the §15 storefront request names the `website`, and
-the recommendation cache key is tenant + website + identifier; no schema
-change).
+**On `master` since the rc18 cut (all in rc19):** #234 CON-256 (every
+automation card — store-run, transactional and Campaign Intelligence —
+shows only its name, pill, description and **Enabled** while off;
+`.is-closed` hides `.smaily-trigger-settings`, so the settings are
+hidden, not cleared, and every save still posts them; each per-language
+table follows its card's switch, and the "Per-language workflows"
+editor shows only while one of the three store-run cards is on; the
+save controller returns the engine's 422 as `field_errors`, so a
+Campaign Intelligence card with a field to fix stays open while off;
+`AutomationDiscount` makes no code while the automation is off, read
+through `Config::isWelcomeEnabled()` / `isFirstOrderEnabled()` /
+`isAbandonedCartEnabled()`, so a row queued before the switch-off, or a
+Log "Send again", is sent without a code; mirrors Woo CON-255 / #289;
+no schema change, no new admin strings).
 
-**Decided (Erkki, 2026-11-02), engine INT-171:** all three parts
-(per-website links, per-website customer accounts, per-website product
-range) went into contract 1.21.0, and every new field is optional.
-Price and stock stay single values: the first pilot store has Catalog
-Price Scope = Global, a global stock and Share Customer Accounts = Per
-Website. The contract does not state "one installation = one Smaily
-account"; the 2026-10-28 rule (one Smaily account = one engine store)
-stays in our docs only. The engine merges customers by email.
+**Pilot:** the first pilot store upgrades directly to rc19 and skips
+rc17 and rc18. Then it presses **Run again** under **Settings >
+Intelligence** on **Catalog**, **Customers** and **Orders**, in that
+order. The second pilot store's state is unchanged (rc12). The gauge is
+CON-147 (4/5).
 
-**Pilot:** the first pilot store upgrades directly to rc18 and skips
-rc17. Then it presses **Run again** under **Settings > Intelligence** on
-**Catalog**, **Customers** and **Orders**, in that order. The second
-pilot store's state is unchanged (rc12). The gauge is CON-147 (4/5).
-
-**Gotchas:** a multi-website store's catalog build loads each product
-at every language store view of every website it is on; the cost is not
-measured, the estimate is 2–3× slower than rc17. The recommendation
-cache key changed, so every cached widget answer misses once after the
-upgrade.
+**Gotchas:** the rc18 gotchas hold (a multi-website store's catalog
+build is slower, estimated 2–3× rc17; every cached widget answer misses
+once after the upgrade). A merchant who switches an automation off and
+on again finds its settings as they were: switching off clears nothing.
 
 **Open:** CON-209 (the 3.0.0 gate), CON-230 (the engine-page modal;
 waits for INT-180), CON-234 (the installation report; waits for
@@ -65,18 +57,33 @@ INT-186), CON-237 (an own engine store per Smaily account; later),
 CON-252 (address normalisation is ASCII-only; Low; needs agreement with
 the engine), CON-146 (native-speaker review of ru/fi/lv/lt), CON-168,
 and the Estonian proofread of the new CON-253 guide paragraphs in
-`#setup-website`. Follow-ups: **Run again** restarts from row 1;
-WooCommerce's slower import pace (CON-236).
+`#setup-website` and of the CON-256 guide sentences (the step 3
+sentence, the "Kaart avaneb, kui märgid Lubatud" note in Automaatikad,
+the discount code wording and its new item, the transactional sentence
+and the new Campaign Intelligence item). Follow-ups: **Run again**
+restarts from row 1; WooCommerce's slower import pace (CON-236).
 
 **Next session opens with:**
-1. Erkki tags rc18.
-2. The first pilot store upgrades to rc18 and presses **Run again** on
+1. Erkki tags rc19.
+2. The first pilot store upgrades to rc19 and presses **Run again** on
    **Catalog**, **Customers** and **Orders**, in that order.
 3. Watch its history progress reach `start_part_complete` in the
    engine, and check that its customer rows carry each website's
    account.
 
-**Notes for the next version cut (rc19):** none so far._
+**Notes for the next version cut (rc20):** none so far._
+
+_Earlier (2026-11-02, the 3.0.0-rc18 cut): 3.0.0-rc18 was cut (#233)
+and tagged by Erkki the same day. It collected 2 fragments (CON-243,
+CON-253) and added a cross-reference to the CON-241 bullet (a
+multi-website store's rc18 **Run again** on **Catalog**, **Customers**
+and **Orders** covers rc17's). In rc18 since rc17: #230 CON-243 (the
+abandoned-cart consent check reads the cart's exact address), #231
+(contract 1.21.0), #232 CON-253 (per-website links, customer accounts
+and product range; `store_config.customer_account_scope`; the
+recommendation cache key adds the website). INT-171 (Erkki,
+2026-11-02): every new contract field optional; price and stock stay
+single values._
 
 _Earlier (2026-10-29, the 3.0.0-rc17 cut): 3.0.0-rc17 was cut (#229)
 and tagged by Erkki the same day. It collected 5 fragments (CON-225,

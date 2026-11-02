@@ -11,23 +11,21 @@ namespace Smaily\Connect\Observer\Engine;
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
-use Smaily\Connect\Model\Engine\Client;
-use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
-use Smaily\Connect\Model\Engine\Queue\IngestQueue;
-use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Engine\CustomerIngest;
 
 /**
- * Customer ingest on profile create/update. Separate from Smaily marketing
- * sync: the engine gets every registered customer (no consent fields on the
- * wire); once it confirms one, the flush sends the shopper's stored
- * profiling opt-out again (Cron\FlushIngestQueue, PRO-3760).
+ * Customer ingest on a save of the account (customer_save_after_data_object:
+ * a registration, the shopper's account page, the admin, the REST and
+ * GraphQL APIs). Separate from Smaily marketing sync: no consent fields on
+ * the wire; once the engine confirms a customer, the flush sends the
+ * shopper's stored profiling opt-out again (Cron\FlushIngestQueue,
+ * PRO-3760). Only a customer in the Campaign Intelligence customer scope
+ * is queued (Engine\CustomerIngest, CON-266).
  */
 class CustomerSaveAfter implements ObserverInterface
 {
     public function __construct(
-        private readonly Settings $settings,
-        private readonly CustomerPayloadBuilder $payloadBuilder,
-        private readonly IngestQueue $ingestQueue
+        private readonly CustomerIngest $customerIngest
     ) {
     }
 
@@ -36,19 +34,11 @@ class CustomerSaveAfter implements ObserverInterface
      */
     public function execute(Observer $observer): void
     {
-        if (!$this->settings->isConnected()) {
-            return;
-        }
-
         $customer = $observer->getEvent()->getData('customer_data_object');
-        if (!$customer instanceof CustomerInterface || !$customer->getEmail()) {
+        if (!$customer instanceof CustomerInterface) {
             return;
         }
 
-        $this->ingestQueue->enqueue(
-            Client::DOMAIN_CUSTOMERS,
-            $this->payloadBuilder->build($customer),
-            (string)$customer->getId()
-        );
+        $this->customerIngest->saved($customer);
     }
 }

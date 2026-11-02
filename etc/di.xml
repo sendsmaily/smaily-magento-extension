@@ -25,6 +25,14 @@
         </arguments>
     </virtualType>
 
+    <!-- The live customer sync reads the shopper's session only on a
+         storefront request (CON-266): the proxy starts no session elsewhere. -->
+    <type name="Smaily\Connect\Model\Engine\ConsentingShopper">
+        <arguments>
+            <argument name="customerSession" xsi:type="object">Magento\Customer\Model\Session\Proxy</argument>
+        </arguments>
+    </type>
+
     <type name="Smaily\Connect\Model\Logger\Logger">
         <arguments>
             <argument name="logger" xsi:type="object">Smaily\Connect\Logger</argument>

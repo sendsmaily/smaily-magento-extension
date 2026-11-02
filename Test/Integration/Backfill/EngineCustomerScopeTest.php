@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Backfill;
 
+use Magento\Customer\Api\CustomerRepositoryInterface;
+use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Newsletter\Model\Subscriber;
 use Magento\Sales\Model\Order;
@@ -15,9 +17,16 @@ use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
 use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Backfill\EngineCustomerScope;
+use Smaily\Connect\Model\Backfill\HistoryImport;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Source\SyncMode;
 use Smaily\Connect\Model\ContactSync\Mode;
+use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\ConsentingShopper;
+use Smaily\Connect\Model\Engine\CustomerIngest;
+use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
+use Smaily\Connect\Model\Engine\Queue\IngestQueue;
+use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
 
@@ -28,6 +37,10 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  * horizon; no other account. Real SQL on a three-website base: website 1
  * "Subscribers only", website 2 "All customers", website 3 "Checkout opt-in
  * only".
+ *
+ * CON-266: the live customer sync (Engine\CustomerIngest) asks the same
+ * rule for one customer, so a save queues exactly the customers the import
+ * sends, and a subscription or an order queues a customer who joins.
  */
 class EngineCustomerScopeTest extends IntegrationTestCase
 {
@@ -115,6 +128,126 @@ class EngineCustomerScopeTest extends IntegrationTestCase
 
         self::assertSame([4, 8], $this->walk());
         self::assertSame(2, $this->scope()->count($this->horizon));
+    }
+
+    /**
+     * The import and the live sync cannot drift: includes() answers yes for
+     * exactly the customers the import's pages walk, in every mode set-up.
+     */
+    public function testOneCustomerIsInScopeExactlyWhenTheImportSendsThem(): void
+    {
+        foreach ([[], [1 => SyncMode::MODE_LEGITIMATE_INTEREST], [2 => SyncMode::MODE_CONSENT]] as $modes) {
+            $this->modes = $modes + $this->modes;
+            $scope = $this->scope();
+            $included = array_values(array_filter(
+                range(1, 9),
+                fn (int $id): bool => $scope->includes($id, $this->horizon)
+            ));
+
+            self::assertSame($this->walk(), $included);
+        }
+        self::assertFalse($this->scope()->includes(0, $this->horizon));
+        self::assertFalse($this->scope()->includes(99, $this->horizon), 'No such account');
+    }
+
+    /**
+     * A save of each account queues the row of exactly the customers the
+     * import sends; the others are not queued.
+     */
+    public function testASaveQueuesOnlyACustomerInScope(): void
+    {
+        $ingest = $this->customerIngest();
+        foreach (range(1, 9) as $id) {
+            $ingest->saved($this->customer($id));
+        }
+
+        self::assertSame([1, 2, 4, 6, 8], $this->queuedCustomers());
+    }
+
+    /**
+     * Customer 3 (Subscribers only, never bought) subscribes: the
+     * subscription queues the account. Customer 5 (last order 70 months
+     * ago) orders again: the order queues the account. Customer 9 stays
+     * pending and out of scope.
+     */
+    public function testACustomerWhoJoinsTheScopeIsQueuedThen(): void
+    {
+        $ingest = $this->customerIngest();
+        $ingest->joined(9);
+        self::assertSame([], $this->queuedCustomers());
+
+        $this->subscriber(1, 3, 3, Subscriber::STATUS_SUBSCRIBED);
+        $ingest->joined(3);
+        $this->order(5, 5, 0);
+        $ingest->joined(5);
+
+        self::assertSame([3, 5], $this->queuedCustomers());
+    }
+
+    /**
+     * Group (c): a save the shopper makes logged in with marketing consent
+     * is queued although the account is in neither (a) nor (b).
+     */
+    public function testAConsentingShoppersOwnSaveIsQueued(): void
+    {
+        $this->customerIngest(3)->saved($this->customer(3));
+
+        self::assertSame([3], $this->queuedCustomers());
+    }
+
+    private function customerIngest(int $consentingCustomerId = 0): CustomerIngest
+    {
+        $settings = $this->createMock(Settings::class);
+        $settings->method('isConnected')->willReturn(true);
+        $builder = $this->createMock(CustomerPayloadBuilder::class);
+        $builder->method('build')->willReturnCallback(
+            static fn (CustomerInterface $customer): array => [
+                'email' => (string)$customer->getEmail(),
+                'external_id' => (string)$customer->getId(),
+            ]
+        );
+        $historyImport = $this->createMock(HistoryImport::class);
+        $historyImport->method('horizonNow')->willReturn($this->horizon);
+        $shopper = $this->createMock(ConsentingShopper::class);
+        $shopper->method('isLoggedInWithConsent')->willReturnCallback(
+            static fn (int $id): bool => $id === $consentingCustomerId
+        );
+        $repository = $this->createMock(CustomerRepositoryInterface::class);
+        $repository->method('getById')->willReturnCallback(fn (int $id): CustomerInterface => $this->customer($id));
+
+        return new CustomerIngest(
+            $settings,
+            $builder,
+            $this->objectManager->create(IngestQueue::class),
+            $this->scope(),
+            $historyImport,
+            $shopper,
+            $repository
+        );
+    }
+
+    private function customer(int $id): CustomerInterface
+    {
+        $customer = $this->createMock(CustomerInterface::class);
+        $customer->method('getId')->willReturn((string)$id);
+        $customer->method('getEmail')->willReturn('customer' . $id . '@example.invalid');
+
+        return $customer;
+    }
+
+    /**
+     * @return int[]
+     */
+    private function queuedCustomers(): array
+    {
+        $ids = $this->connection->fetchCol(
+            $this->connection->select()
+                ->from('smaily_ingest_queue', ['entity_id'])
+                ->where('domain = ?', Client::DOMAIN_CUSTOMERS)
+                ->order('id ASC')
+        );
+
+        return array_map('intval', $ids);
     }
 
     /**

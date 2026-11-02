@@ -24,6 +24,10 @@ use Smaily\Connect\Model\ContactSync\Mode;
  * account that never subscribed and never bought. Smaily itself is never
  * asked. A buyer is matched by the order's customer id; a guest buyer
  * reaches the engine with the order, as before.
+ *
+ * The live customer sync asks the same rule for one customer
+ * (includes(), Engine\CustomerIngest, CON-266), so the import and the
+ * live sync cannot send different customers.
  */
 class EngineCustomerScope
 {
@@ -60,6 +64,25 @@ class EngineCustomerScope
             ->limit($limit);
 
         return array_map('intval', $this->resourceConnection->getConnection()->fetchCol($select));
+    }
+
+    /**
+     * Whether one customer is in scope: the same rule as the import, read
+     * for one id (one query on the customer's primary key).
+     *
+     * @param string $horizon the oldest order time inside the horizon (GMT)
+     */
+    public function includes(int $customerId, string $horizon): bool
+    {
+        if ($customerId <= 0) {
+            return false;
+        }
+        $select = $this->select($horizon)
+            ->columns(['entity_id' => 'e.entity_id'])
+            ->where('e.entity_id = ?', $customerId)
+            ->limit(1);
+
+        return $this->resourceConnection->getConnection()->fetchOne($select) !== false;
     }
 
     private function select(string $horizon): Select

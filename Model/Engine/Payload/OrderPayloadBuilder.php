@@ -16,6 +16,7 @@ use Magento\Sales\Model\Order\Creditmemo;
 use Magento\Sales\Model\ResourceModel\Order\Item\CollectionFactory as OrderItemCollectionFactory;
 use Smaily\Connect\Model\Engine\AttributionShape;
 use Smaily\Connect\Model\Engine\RecId;
+use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
 
 /**
@@ -74,6 +75,7 @@ class OrderPayloadBuilder
     public function __construct(
         private readonly ResourceConnection $resourceConnection,
         private readonly OrderItemCollectionFactory $orderItemCollectionFactory,
+        private readonly Websites $websites,
         private readonly Logger $logger
     ) {
     }
@@ -103,6 +105,13 @@ class OrderPayloadBuilder
         $discount = abs((float)$order->getDiscountAmount());
         if ($discount > 0) {
             $item['discount_amount'] = round($discount, 4);
+        }
+
+        // The website the order was placed on (contract v1.21.0 §5,
+        // CON-253); the engine takes the customer's website from it.
+        $website = $this->websites->codeOfStore((int)$order->getStoreId());
+        if ($website !== null) {
+            $item['website'] = $website;
         }
 
         return array_merge($item, $this->attribution((int)$order->getEntityId()));

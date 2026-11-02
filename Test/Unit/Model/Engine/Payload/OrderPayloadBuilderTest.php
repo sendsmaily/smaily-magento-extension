@@ -20,6 +20,7 @@ use Magento\Sales\Model\ResourceModel\Order\Item\CollectionFactory as OrderItemC
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
+use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
 
 class OrderPayloadBuilderTest extends TestCase
@@ -32,12 +33,42 @@ class OrderPayloadBuilderTest extends TestCase
     /** @var Logger&MockObject */
     private Logger $logger;
 
+    /** @var Websites&MockObject */
+    private Websites $websites;
+
     protected function setUp(): void
     {
         require_once __DIR__ . '/../../../Support/Stub/OrderItemCollectionFactory.php';
         $this->orderItemCollectionFactory = $this->createMock(OrderItemCollectionFactory::class);
         $this->logger = $this->createMock(Logger::class);
+        $this->websites = $this->createMock(Websites::class);
+        $this->websites->method('codeOfStore')->willReturnMap([[1, 'base'], [4, 'lv']]);
         $this->builder = $this->builderWithReturns([]);
+    }
+
+    /**
+     * CON-253 (contract v1.21.0 §5): an order names the website of its store
+     * view; the engine takes the customer's website from their newest order.
+     */
+    public function testAnOrderNamesTheWebsiteOfItsStoreView(): void
+    {
+        $onFirst = $this->builder->build($this->order([['SKU-1', 1, 10.00, 0.0]], 10.00));
+        $onSecond = $this->builder->build(
+            $this->order([['SKU-1', 1, 10.00, 0.0]], 10.00, Order::STATE_COMPLETE, 0, null, 4)
+        );
+
+        self::assertSame('base', $onFirst['website'] ?? null);
+        self::assertSame('lv', $onSecond['website'] ?? null);
+    }
+
+    public function testAnOrderOfAStoreViewThatNoLongerExistsGoesWithoutAWebsite(): void
+    {
+        $payload = $this->builder->build(
+            $this->order([['SKU-1', 1, 10.00, 0.0]], 10.00, Order::STATE_COMPLETE, 0, null, 0)
+        );
+
+        self::assertNotNull($payload);
+        self::assertArrayNotHasKey('website', $payload);
     }
 
     /**
@@ -526,7 +557,12 @@ class OrderPayloadBuilderTest extends TestCase
         $resourceConnection->method('getConnection')->willReturn($connection);
         $resourceConnection->method('getTableName')->willReturnArgument(0);
 
-        return new OrderPayloadBuilder($resourceConnection, $this->orderItemCollectionFactory, $this->logger);
+        return new OrderPayloadBuilder(
+            $resourceConnection,
+            $this->orderItemCollectionFactory,
+            $this->websites,
+            $this->logger
+        );
     }
 
     /**
@@ -538,9 +574,11 @@ class OrderPayloadBuilderTest extends TestCase
         float $grandTotal,
         string $state = Order::STATE_COMPLETE,
         int $entityId = 0,
-        ?float $totalRefunded = null
+        ?float $totalRefunded = null,
+        int $storeId = 1
     ) {
         $order = $this->createMock(OrderInterface::class);
+        $order->method('getStoreId')->willReturn($storeId);
         $order->method('getState')->willReturn($state);
         $order->method('getCustomerEmail')->willReturn('Mari@Example.com ');
         $order->method('getCreatedAt')->willReturn('2026-07-01 10:00:00');

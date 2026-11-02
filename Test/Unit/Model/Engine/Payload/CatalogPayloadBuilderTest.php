@@ -443,6 +443,153 @@ class CatalogPayloadBuilderTest extends TestCase
 
         self::assertSame('SHIRT', $item['sku']);
         self::assertSame(19.99, $item['price']);
+        // Sold on no website (contract v1.21.0 §3, CON-253).
+        self::assertSame([], $item['websites']);
+    }
+
+    /**
+     * CON-253 (contract v1.21.0 §3 "Several websites"): two websites share
+     * the languages en and ru. Each website's entry carries the links of its
+     * own store views, so a shopper of the second website gets that
+     * website's link. The row's own language map takes each language from
+     * the website the row is priced at first; before, it took the first
+     * store view of the language in Magento's list, here the second
+     * website's.
+     */
+    public function testEachWebsiteCarriesTheLinksOfItsOwnStoreViewsWhereTwoWebsitesShareALanguage(): void
+    {
+        $item = $this->multiWebsiteBuilder()->build($this->multiWebsiteProduct([1, 2]));
+
+        self::assertSame([
+            'base' => ['product_url' => [
+                'et' => 'https://shop.example/s1/shirt',
+                'en' => 'https://shop.example/s2/shirt',
+                'ru' => 'https://shop.example/s3/shirt',
+            ]],
+            'lv' => ['product_url' => [
+                'lv' => 'https://shop.example/s4/shirt',
+                'en' => 'https://shop.example/s5/shirt',
+                'ru' => 'https://shop.example/s6/shirt',
+            ]],
+        ], $item['websites']);
+        self::assertSame([
+            'et' => 'https://shop.example/s1/shirt',
+            'en' => 'https://shop.example/s2/shirt',
+            'ru' => 'https://shop.example/s3/shirt',
+            'lv' => 'https://shop.example/s4/shirt',
+        ], $item['product_url']);
+    }
+
+    /**
+     * CON-253: a product assigned to some websites lists only those, so the
+     * engine never recommends it on another website.
+     */
+    public function testAProductOnSomeWebsitesListsOnlyThose(): void
+    {
+        $item = $this->multiWebsiteBuilder()->build($this->multiWebsiteProduct([2]));
+
+        self::assertSame(['lv'], array_keys($item['websites']));
+        self::assertSame([
+            'lv' => 'https://shop.example/s4/shirt',
+            'en' => 'https://shop.example/s5/shirt',
+            'ru' => 'https://shop.example/s6/shirt',
+        ], $item['product_url']);
+    }
+
+    /**
+     * CON-253: a website where the product is disabled does not sell it.
+     */
+    public function testAWebsiteWhereTheProductIsDisabledIsLeftOut(): void
+    {
+        $item = $this->multiWebsiteBuilder([4, 5, 6])->build($this->multiWebsiteProduct([1, 2]));
+
+        self::assertSame(['base'], array_keys($item['websites']));
+    }
+
+    /**
+     * Website 1 `base`: store views 1 et (its default), 2 en, 3 ru. Website 2
+     * `lv`: 4 lv (its default), 5 en, 6 ru, and 7 de, switched off. Magento
+     * lists the second website's store views first. The product's link at
+     * store view N is https://shop.example/sN/shirt.
+     *
+     * @param int[] $disabledStoreIds store views where the product is disabled
+     */
+    private function multiWebsiteBuilder(array $disabledStoreIds = []): CatalogPayloadBuilder
+    {
+        $languages = [1 => 'et', 2 => 'en', 3 => 'ru', 4 => 'lv', 5 => 'en', 6 => 'ru', 7 => 'de'];
+        $websiteOf = [1 => 1, 2 => 1, 3 => 1, 4 => 2, 5 => 2, 6 => 2, 7 => 2];
+        $stores = [];
+        foreach ([5, 6, 4, 7, 1, 2, 3] as $storeId) {
+            $store = $this->createMock(Store::class);
+            $store->method('getId')->willReturn($storeId);
+            $store->method('getWebsiteId')->willReturn($websiteOf[$storeId]);
+            $store->method('getIsActive')->willReturn($storeId === 7 ? '0' : '1');
+            $stores[$storeId] = $store;
+        }
+        $websites = [];
+        foreach ([1 => ['base', 1], 2 => ['lv', 4]] as $websiteId => [$code, $defaultStoreId]) {
+            $website = $this->createMock(Website::class);
+            $website->method('getId')->willReturn($websiteId);
+            $website->method('getCode')->willReturn($code);
+            $website->method('getDefaultStore')->willReturn($stores[$defaultStoreId]);
+            $websites[$websiteId] = $website;
+        }
+
+        $storeManager = $this->createMock(StoreManagerInterface::class);
+        $storeManager->method('getStores')->willReturn($stores);
+        $storeManager->method('getWebsites')->willReturn($websites);
+        $storeManager->method('getWebsite')->willReturnCallback(fn (int $id): Website => $websites[$id]);
+        $storeManager->method('getDefaultStoreView')->willReturn($stores[1]);
+
+        $languageResolver = $this->createMock(LanguageResolver::class);
+        $languageResolver->method('forStore')->willReturnCallback(
+            static fn (int|string|null $storeId): string => $languages[(int)$storeId] ?? ''
+        );
+
+        $productRepository = $this->createMock(ProductRepositoryInterface::class);
+        $productRepository->method('getById')->willReturnCallback(
+            function (int $id, bool $editMode, int $storeId) use ($disabledStoreIds): Product {
+                $product = $this->product(42, 'SHIRT', 19.99, [], 'https://shop.example/s' . $storeId . '/shirt');
+                $product->method('getStoreId')->willReturn($storeId);
+                $product->method('getStatus')->willReturn(
+                    in_array($storeId, $disabledStoreIds, true) ? Status::STATUS_DISABLED : Status::STATUS_ENABLED
+                );
+                $product->method('getVisibility')->willReturn(Visibility::VISIBILITY_BOTH);
+
+                return $product;
+            }
+        );
+
+        return $this->createBuilder(
+            '42',
+            null,
+            $storeManager,
+            null,
+            $productRepository,
+            null,
+            '',
+            $this->imageHelperFactory(self::IMAGE_URL),
+            [],
+            null,
+            null,
+            $languageResolver
+        );
+    }
+
+    /**
+     * Product 42 on the given websites, as an import page loads it: at the
+     * canonical store view 1.
+     *
+     * @param int[] $websiteIds
+     */
+    private function multiWebsiteProduct(array $websiteIds): Product&MockObject
+    {
+        $product = $this->product(42, 'SHIRT', 19.99, $websiteIds, 'https://shop.example/s1/shirt');
+        $product->method('getStoreId')->willReturn(1);
+        $product->method('getStatus')->willReturn(Status::STATUS_ENABLED);
+        $product->method('getVisibility')->willReturn(Visibility::VISIBILITY_BOTH);
+
+        return $product;
     }
 
     /**
@@ -721,7 +868,8 @@ class CatalogPayloadBuilderTest extends TestCase
         ?ImageHelperFactory $imageHelperFactory = null,
         array $parentCategoryIds = [],
         ?Http $request = null,
-        ?StockRegistryInterface $stockRegistry = null
+        ?StockRegistryInterface $stockRegistry = null,
+        ?LanguageResolver $languageResolver = null
     ): CatalogPayloadBuilder {
         $parentResolver = $this->createMock(ParentProductResolver::class);
         $parentResolver->method('productIdOf')->with(42)->willReturn($resolvedProductId);
@@ -746,7 +894,7 @@ class CatalogPayloadBuilderTest extends TestCase
             $stockRegistry,
             $stockRegistryStorage ?? $this->createMock(StockRegistryStorage::class),
             $imageHelperFactory ?? new ImageHelperFactory(),
-            $this->createMock(LanguageResolver::class),
+            $languageResolver ?? $this->createMock(LanguageResolver::class),
             $parentResolver,
             $emulation ?? $this->createMock(Emulation::class),
             $this->storefrontUrl($storefrontUrl),

@@ -32,6 +32,7 @@ use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
+use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
 use Smaily\Connect\Model\ResourceModel\Backfill\Job as JobResource;
@@ -173,7 +174,11 @@ class UnreadableImportRowsTest extends IntegrationTestCase
             $this->jobManager,
             $this->customerRepository(),
             $this->objectManager->create(SearchCriteriaBuilder::class),
-            new CustomerPayloadBuilder(new LanguageResolver($this->storeLocales()), $logger),
+            new CustomerPayloadBuilder(
+                new LanguageResolver($this->storeLocales()),
+                $this->createMock(Websites::class),
+                $logger
+            ),
             $ingestQueue,
             $skippedRow,
             $scope,
@@ -185,6 +190,7 @@ class UnreadableImportRowsTest extends IntegrationTestCase
             new OrderPayloadBuilder(
                 $this->objectManager->get(ResourceConnection::class),
                 $this->orderItemCollectionFactory(),
+                $this->createMock(Websites::class),
                 $logger
             ),
             $ingestQueue,

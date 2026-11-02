@@ -25,6 +25,7 @@ use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\MarketingConsent;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\StorefrontRecommendations;
+use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\OrderPlacer;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
@@ -64,6 +65,12 @@ class StorefrontRecommendationsTest extends TestCase
     /** @var array<string, mixed>|\Throwable */
     private array|\Throwable $engineAnswer = ['slots' => []];
 
+    /** The code of the website the shopper is on. */
+    private ?string $website = 'base';
+
+    /** @var list<string> the `website` of each engine call */
+    private array $engineWebsites = [];
+
     protected function setUp(): void
     {
         $this->settings = $this->createMock(Settings::class);
@@ -72,8 +79,9 @@ class StorefrontRecommendationsTest extends TestCase
 
         $this->client = $this->createMock(Client::class);
         $this->client->method('recommendations')->willReturnCallback(
-            function (array $identifier, int $limit): array {
+            function (array $identifier, int $limit, string $website = ''): array {
                 $this->engineCalls[] = [(string)array_key_first($identifier), current($identifier), $limit];
+                $this->engineWebsites[] = $website;
                 if ($this->engineAnswer instanceof \Throwable) {
                     throw $this->engineAnswer;
                 }
@@ -183,6 +191,36 @@ class StorefrontRecommendationsTest extends TestCase
         $this->visitorToken = 'vt_other1';
         $this->service()->slots();
         self::assertCount(2, $this->engineCalls, 'another shopper has their own entry');
+    }
+
+    /**
+     * CON-253 (contract v1.21.0 §15): the request names the website the
+     * shopper is on, and the answer — that website's links and products —
+     * is cached per website: the same shopper on another website is asked
+     * about again.
+     */
+    public function testTheRequestNamesTheWebsiteAndTheAnswerIsCachedPerWebsite(): void
+    {
+        $this->loggedIn(42, 'shopper@example.com', true);
+        $this->engineAnswer = ['slots' => [['rec_id' => self::REC_ID, 'external_id' => '7', 'sku' => 'MJ01']]];
+
+        $this->service()->slots();
+        $this->service()->slots();
+        $this->website = 'lv';
+        $this->service()->slots();
+
+        self::assertSame(['base', 'lv'], $this->engineWebsites);
+        self::assertCount(2, $this->cacheStore, 'one entry per website');
+    }
+
+    public function testWithoutAWebsiteCodeTheRequestNamesNone(): void
+    {
+        $this->website = null;
+        $this->guest('vt_8f3k2a');
+
+        $this->service()->slots();
+
+        self::assertSame([''], $this->engineWebsites);
     }
 
     public function testAnEmptyAnswerIsCachedAndNotAskedAgain(): void
@@ -315,6 +353,9 @@ class StorefrontRecommendationsTest extends TestCase
         $storeManager = $this->createMock(StoreManagerInterface::class);
         $storeManager->method('getStore')->willReturn($store);
 
+        $websites = $this->createMock(Websites::class);
+        $websites->method('current')->willReturnCallback(fn (): ?string => $this->website);
+
         $cache = $this->createMock(CacheInterface::class);
         $cache->method('load')->willReturnCallback(
             fn (string $key): string|false => $this->cacheStore[$key]['value'] ?? false
@@ -336,6 +377,7 @@ class StorefrontRecommendationsTest extends TestCase
             $this->cookieHelper,
             $storeManager,
             $cache,
+            $websites,
             $this->createMock(Logger::class)
         );
     }

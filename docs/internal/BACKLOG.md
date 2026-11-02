@@ -52,7 +52,8 @@ executed verification matrix (Luma / Hyvä / strict CSP — all pass) in
   each website has its own tenant (RFC Phase 4, gated on PRO-1459). The legacy
   `is_in_stock` flag, which MSI keeps synced, is the source until then.
   (Superseded 2026-10-28: one Smaily account is one engine store, CON-237;
-  per-website stock inside one engine store is the engine's INT-171.)
+  per-website stock inside one engine store is not in engine contract
+  1.21.0, whose INT-171 work gave per-website links only, CON-253.)
 - Per-product dedupe of PENDING catalog ingest rows from product saves: since
   PRO-1967 a burst of stock moves on one product inside a flush window builds
   one row, but repeated product saves still queue one row each (they build at

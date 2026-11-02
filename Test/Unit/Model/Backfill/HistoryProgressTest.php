@@ -19,6 +19,7 @@ use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
 
 /**
@@ -46,8 +47,12 @@ class HistoryProgressTest extends TestCase
 
     private ?\Throwable $engineFails = null;
 
+    private Websites&MockObject $websites;
+
     protected function setUp(): void
     {
+        $this->websites = $this->createMock(Websites::class);
+        $this->websites->method('storeConfig')->willReturn(['customer_account_scope' => 'website']);
         $this->state = [
             'import_id' => 'mag-2027-01-15-9',
             'orders_job_id' => 9,
@@ -88,6 +93,7 @@ class HistoryProgressTest extends TestCase
                 'orders' => ['expected' => 1000, 'sent' => 120, 'oldest_sent_at' => '2026-02-03'],
                 'buyers' => ['expected' => 650],
             ],
+            'store_config' => ['customer_account_scope' => 'website'],
         ], $this->calls[0]);
         self::assertSame('started', $this->state['reported_phase']);
     }
@@ -126,6 +132,8 @@ class HistoryProgressTest extends TestCase
         $this->undelivered['7,8'] = 0;
         $this->progress()->report();
         self::assertSame('start_part_complete', $this->calls[0]['phase'] ?? null);
+        // Only `started` takes the store setup (contract v1.21.0 §25).
+        self::assertArrayNotHasKey('store_config', $this->calls[0]);
         self::assertTrue($this->state['start_part_done']);
     }
 
@@ -268,6 +276,7 @@ class HistoryProgressTest extends TestCase
             $client,
             $settings,
             $dateTime,
+            $this->websites,
             $logger ?? $this->createMock(Logger::class)
         );
     }

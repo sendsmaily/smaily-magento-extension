@@ -23,6 +23,7 @@ use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Connector;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Engine\Websites;
 
 /**
  * PRO-3741, PRO-3790: connecting Campaign Intelligence in the admin starts
@@ -128,7 +129,12 @@ class EngineExchangeTest extends TestCase
             $context,
             $jsonFactory,
             new JsonSerializer(),
-            new Connector($this->client, $this->createMock(Settings::class), new ImportsOnConnect($this->jobManager))
+            new Connector(
+                $this->client,
+                $this->createMock(Settings::class),
+                new ImportsOnConnect($this->jobManager),
+                $this->createMock(Websites::class)
+            )
         );
     }
 }

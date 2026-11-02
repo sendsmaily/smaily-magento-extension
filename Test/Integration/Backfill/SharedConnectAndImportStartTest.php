@@ -36,6 +36,7 @@ use Smaily\Connect\Model\Config\Backend\EngineSetupToken;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Connector;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
+use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\ResourceModel\Backfill\Job\Collection;
 use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
@@ -178,7 +179,8 @@ class SharedConnectAndImportStartTest extends IntegrationTestCase
             $this->objectManager->create(EngineSettings::class, [
                 'cacheTypeList' => $this->createMock(TypeListInterface::class),
             ]),
-            new ImportsOnConnect($jobManager)
+            new ImportsOnConnect($jobManager),
+            $this->createMock(Websites::class)
         ));
 
         $config = [];

@@ -37,8 +37,10 @@ use Smaily\Connect\Model\Privacy\ProfilingConsent;
  * Always only while the engine may be called (`isSendingAllowed()`), in one
  * attempt (Client).
  *
- * The answer, an empty one included (§15: do not retry), is cached for an
- * hour under the tenant and a hash of the identifier type and value. A
+ * The request names the shopper's current website (v1.21.0, CON-253). The
+ * answer, an empty one included (§15: do not retry), is cached for an
+ * hour under a hash of the tenant, the website and the identifier type and
+ * value. A
  * failure is cached as an empty answer for 10 minutes, and a timeout, a
  * network failure or a 5xx also pauses every shopper's engine call for 2
  * minutes: a cache miss then answers empty at once, so a hanging engine
@@ -68,6 +70,7 @@ class StorefrontRecommendations
         private readonly CookieHelper $cookieHelper,
         private readonly StoreManagerInterface $storeManager,
         private readonly CacheInterface $cache,
+        private readonly Websites $websites,
         private readonly Logger $logger
     ) {
     }
@@ -89,9 +92,13 @@ class StorefrontRecommendations
             return [];
         }
 
+        // The website the shopper is on (contract v1.21.0 §15, CON-253): the
+        // engine finds that website's account and sends its links, so the
+        // answer is cached per website too.
+        $website = (string)$this->websites->current();
         $cacheKey = self::CACHE_PREFIX . hash(
             'sha256',
-            $this->settings->getTenantId() . '|' . $identity['type'] . '|' . $identity['id']
+            $this->settings->getTenantId() . '|' . $website . '|' . $identity['type'] . '|' . $identity['id']
         );
         $cached = $this->cache->load($cacheKey);
         if (is_string($cached)) {
@@ -105,7 +112,7 @@ class StorefrontRecommendations
         }
 
         try {
-            $answer = $this->client->recommendations([$identity['key'] => $identity['id']], self::LIMIT);
+            $answer = $this->client->recommendations([$identity['key'] => $identity['id']], self::LIMIT, $website);
         } catch (EngineException $exception) {
             $this->logger->debug('Storefront recommendations: the engine call failed', [
                 'error' => $exception->getMessage(),

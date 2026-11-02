@@ -197,7 +197,7 @@ below.
 - **The send pace (CON-232)** lives in one place, `Model/Engine/IngestPace`:
   one request at a time, at most `REQUESTS_PER_SECOND` (5; the contract
   allows 100 a second per ingest route, and the engine contract is to name
-  a target pace (1.21.0 does not yet) — its answer changes that one
+  a target pace (1.22.0 does not yet) — its answer changes that one
   number), for at most
   `SEND_BUDGET_SECONDS` (40) a run, under the minute between runs. A 429
   (also one a retry got past, `Client::wasThrottled()`) or a batch that
@@ -2282,7 +2282,7 @@ Initial setup, Settings, Log. Design rules:
 ## Wire contracts
 
 The authoritative engine contract is
-[RECENGINE_API_CONTRACT.md](RECENGINE_API_CONTRACT.md) (v1.21.0, byte-synced
+[RECENGINE_API_CONTRACT.md](RECENGINE_API_CONTRACT.md) (v1.22.0, byte-synced
 across the Smaily connect repositories). Load-bearing invariants
 implemented here:
 

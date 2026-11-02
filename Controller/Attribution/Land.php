@@ -16,9 +16,7 @@ use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\Raw;
 use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\Exception\LocalizedException;
-use Magento\Framework\Session\Config\ConfigInterface as SessionConfig;
-use Magento\Framework\Stdlib\Cookie\CookieMetadataFactory;
-use Magento\Framework\Stdlib\CookieManagerInterface;
+use Smaily\Connect\Model\Engine\AttributionCookieWriter;
 use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\AttributionShape;
 use Smaily\Connect\Model\Engine\RecId;
@@ -43,9 +41,9 @@ use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
  * store-created `vs_` one (CON-177). Not gated on consent, as the capture
  * script is not: a functional first-party cookie for the merchant's own
  * email click. Names and lifetimes come from the engine config
- * (AttributionManager::getClientConfig()); the cookies take the store's
- * cookie domain and path, Secure on HTTPS, SameSite=Lax and no HttpOnly
- * (contract "Cookie names").
+ * (AttributionManager::getClientConfig()); AttributionCookieWriter gives
+ * the cookies the store's cookie domain and path, Secure on HTTPS,
+ * SameSite=Lax and no HttpOnly (contract "Cookie names").
  *
  * CSRF-exempt: the landing page may come from the full-page cache, so it has
  * no session form key. A request gives no more than a link with the same
@@ -63,9 +61,7 @@ class Land implements HttpPostActionInterface, CsrfAwareActionInterface
         private readonly ResultFactory $resultFactory,
         private readonly Settings $settings,
         private readonly AttributionManager $attributionManager,
-        private readonly CookieManagerInterface $cookieManager,
-        private readonly CookieMetadataFactory $cookieMetadataFactory,
-        private readonly SessionConfig $sessionConfig,
+        private readonly AttributionCookieWriter $cookieWriter,
         private readonly PerAddressLimiter $limiter
     ) {
     }
@@ -105,7 +101,7 @@ class Land implements HttpPostActionInterface, CsrfAwareActionInterface
 
         try {
             foreach ($cookies as $name => [$value, $days]) {
-                $this->write($name, $value, $days);
+                $this->cookieWriter->write($name, $value, $days);
             }
         } catch (LocalizedException) {
             // The script writes the cookies itself when this request fails.
@@ -129,29 +125,6 @@ class Land implements HttpPostActionInterface, CsrfAwareActionInterface
     public function validateForCsrf(RequestInterface $request): ?bool
     {
         return true;
-    }
-
-    /**
-     * Sets cookie $name to $value for $days, or deletes it when $value is ''.
-     *
-     * @throws LocalizedException
-     */
-    private function write(string $name, string $value, int $days): void
-    {
-        $metadata = $this->cookieMetadataFactory->createPublicCookieMetadata();
-        $metadata->setDomain($this->sessionConfig->getCookieDomain());
-        $metadata->setPath($this->sessionConfig->getCookiePath());
-        $metadata->setSecure($this->request->isSecure());
-        $metadata->setHttpOnly(false);
-        $metadata->setSameSite('Lax');
-
-        if ($value === '') {
-            $this->cookieManager->deleteCookie($name, $metadata);
-
-            return;
-        }
-        $metadata->setDuration($days * 86400);
-        $this->cookieManager->setPublicCookie($name, $value, $metadata);
     }
 
     private function field(string $name): string

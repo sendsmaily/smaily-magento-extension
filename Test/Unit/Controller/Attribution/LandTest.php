@@ -24,6 +24,7 @@ use Magento\Framework\Stdlib\CookieManagerInterface;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Controller\Attribution\Land;
+use Smaily\Connect\Model\Engine\AttributionCookieWriter;
 use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
@@ -276,9 +277,7 @@ class LandTest extends TestCase
             $resultFactory,
             $settings,
             $attributionManager,
-            $cookieManager,
-            $metadataFactory,
-            $sessionConfig,
+            new AttributionCookieWriter($request, $cookieManager, $metadataFactory, $sessionConfig),
             new PerAddressLimiter(new FixedWindowCounter($cache), $dateTime, $remoteAddress)
         );
     }

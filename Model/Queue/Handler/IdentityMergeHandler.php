@@ -36,6 +36,18 @@ use Smaily\Connect\Model\Queue\Skipped;
  */
 class IdentityMergeHandler implements PausableEventHandlerInterface
 {
+    /**
+     * Contract §7 `merge_reason` of a login: one of the values the engine
+     * accepts (`user_logged_in`, `email_provided_at_checkout`, `manual_admin`).
+     */
+    public const MERGE_REASON_LOGIN = 'user_logged_in';
+
+    /**
+     * The `merge_reason` a login row carried before CON-260, which the
+     * engine refuses (400): such a row is sent with MERGE_REASON_LOGIN.
+     */
+    private const LEGACY_MERGE_REASON_LOGIN = 'login';
+
     public const SKIPPED_OPTED_OUT = 'Skipped: the shopper opted out of personalized recommendations,'
         . ' so their browsing is not linked to their address. Nothing was sent.';
 
@@ -82,6 +94,9 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
 
             // store_id is the store's own routing, not part of §7.
             unset($payload['store_id']);
+            if (($payload['merge_reason'] ?? null) === self::LEGACY_MERGE_REASON_LOGIN) {
+                $payload['merge_reason'] = self::MERGE_REASON_LOGIN;
+            }
             try {
                 $this->client->identityMerge($payload);
                 $results[$id] = true;

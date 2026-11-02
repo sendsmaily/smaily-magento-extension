@@ -468,8 +468,66 @@ class ClientTest extends TestCase
         $body = json_decode((string)$request->getBody(), true);
         self::assertSame('tok_abc123', $body['setup_token']);
         self::assertSame('magento', $body['plugin_info']['platform']);
+        self::assertArrayNotHasKey('store_config', $body);
         // Setup exchange is the only unauthenticated endpoint.
         self::assertSame('', $request->getHeaderLine('Authorization'));
+    }
+
+    /**
+     * CON-253 (contract v1.21.0 §1): the exchange reports how Magento shares
+     * customer accounts between websites.
+     */
+    public function testTheSetupExchangeCarriesTheStoreConfig(): void
+    {
+        $client = $this->createClient([
+            new Response(200, [], '{"tenant_id":"t1","api_key":"sk_x","endpoints":{}}'),
+        ]);
+
+        $client->setupExchange('tok_abc123', ['customer_account_scope' => 'website']);
+
+        $body = json_decode((string)$this->history[0]['request']->getBody(), true);
+        self::assertSame(['customer_account_scope' => 'website'], $body['store_config']);
+    }
+
+    /**
+     * CON-253 (contract v1.21.0 §3): a product no website sells goes as
+     * `websites: {}`, never `[]`, also after the queue's JSON round trip
+     * made it an empty array; a product some website sells goes with its
+     * websites as an object.
+     */
+    public function testACatalogRowOfAProductNoWebsiteSellsCarriesAnEmptyWebsitesObject(): void
+    {
+        $this->settings->method('getEndpoint')->with('ingest_catalog')
+            ->willReturn('https://engine.example/api/v1/ingest/catalog');
+        $client = $this->createClient([new Response(200, [], '{"ok":true,"processed":2}')]);
+
+        $client->ingest(Client::DOMAIN_CATALOG, [
+            ['sku' => 'A', 'websites' => []],
+            ['sku' => 'B', 'websites' => ['lv' => ['product_url' => ['lv' => 'https://shop.example/b']]]],
+        ]);
+
+        self::assertSame(
+            '{"products":[{"sku":"A","websites":{}},'
+            . '{"sku":"B","websites":{"lv":{"product_url":{"lv":"https:\/\/shop.example\/b"}}}}]}',
+            (string)$this->history[0]['request']->getBody()
+        );
+    }
+
+    /**
+     * CON-253 (contract v1.21.0 §15): the storefront request names the
+     * website the shopper is on.
+     */
+    public function testRecommendationsNameTheShoppersWebsite(): void
+    {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/recommendations/customer');
+        $client = $this->createClient([new Response(200, [], '{"slots":[]}')]);
+
+        $client->recommendations(['customer_external_id' => '1042'], 4, 'lv');
+
+        self::assertSame(
+            '{"customer_external_id":"1042","limit":4,"website":"lv"}',
+            (string)$this->history[0]['request']->getBody()
+        );
     }
 
     /**

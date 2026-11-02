@@ -36,6 +36,12 @@ use Smaily\Connect\Model\StorefrontUrl;
  * recommendations, matching the RSS feed behavior. Multilingual stores get
  * {lang: value} maps for name/description/product_url built from per-store
  * attribute values; the default store view is the canonical fallback.
+ *
+ * Every row also lists the websites that sell the product, with its link in
+ * each of their store-view languages (`websites`, contract v1.21.0 §3
+ * "Several websites", CON-253): one engine store serves every website, and
+ * the engine sends each customer the links of their own website and never a
+ * product their website does not sell.
  */
 class CatalogPayloadBuilder
 {
@@ -73,6 +79,16 @@ class CatalogPayloadBuilder
     /** @var array<int, int|null> website id -> its default store view id (memoized per backfill page) */
     private array $websiteStoreIds = [];
 
+    /**
+     * Memoized like $websiteStoreIds: see websiteIndex().
+     *
+     * @var array<int, array{code: string|null, stores: array<int, int>, languages: array<string, int>}>|null
+     */
+    private ?array $websiteIndex = null;
+
+    /** @var array<int, string> store view id -> the product's link there, for the row being built */
+    private array $storeUrls = [];
+
     public function __construct(
         private readonly StoreManagerInterface $storeManager,
         private readonly ProductRepositoryInterface $productRepository,
@@ -106,6 +122,7 @@ class CatalogPayloadBuilder
      */
     public function build(Product $product): array
     {
+        $this->storeUrls = [];
         $scopeStoreId = $this->storeIdForProduct($product);
         $priceProduct = $this->scopedTo($product, $scopeStoreId);
         $languageValues = $this->languageValues($product, $priceProduct, $scopeStoreId);
@@ -163,6 +180,10 @@ class CatalogPayloadBuilder
             'type_id' => (string)$product->getTypeId(),
             'attribute_set_id' => (string)$product->getAttributeSetId(),
         ];
+
+        // Always sent, also on a store with one website: a row without it
+        // reads as sold on every website (§3 "Send the whole row").
+        $item['websites'] = $this->websites($product, $priceProduct, $scopeStoreId);
 
         return $item;
     }
@@ -228,7 +249,7 @@ class CatalogPayloadBuilder
      */
     private function languageValues(Product $product, Product $scopedProduct, int $scopeStoreId): array
     {
-        $storesByLanguage = $this->storesByLanguage($product);
+        $storesByLanguage = $this->storesByLanguage($product, $scopeStoreId);
 
         if (count($storesByLanguage) <= 1) {
             $storeId = $storesByLanguage ? (int)reset($storesByLanguage) : $scopeStoreId;
@@ -236,7 +257,7 @@ class CatalogPayloadBuilder
             return [
                 'name' => (string)$product->getName(),
                 'description' => $this->description($product),
-                'product_url' => $this->productUrl(
+                'product_url' => $this->urlAt(
                     $storeId === $scopeStoreId ? $scopedProduct : $this->scopedTo($product, $storeId),
                     $storeId
                 ),
@@ -247,12 +268,8 @@ class CatalogPayloadBuilder
         $descriptions = [];
         $urls = [];
         foreach ($storesByLanguage as $language => $storeId) {
-            try {
-                $storeProduct = $this->productRepository->getById((int)$product->getId(), false, $storeId);
-            } catch (NoSuchEntityException) {
-                continue;
-            }
-            if (!$storeProduct instanceof Product) {
+            $storeProduct = $this->loadAt($product, $storeId);
+            if ($storeProduct === null) {
                 continue;
             }
             $names[$language] = (string)$storeProduct->getName();
@@ -260,34 +277,169 @@ class CatalogPayloadBuilder
             if ($description !== null) {
                 $descriptions[$language] = $description;
             }
-            $urls[$language] = $this->productUrl($storeProduct, (int)$storeId);
+            $urls[$language] = $this->urlAt($storeProduct, $storeId);
         }
 
         return [
             'name' => $names ?: (string)$product->getName(),
             'description' => $descriptions ?: $this->description($product),
-            'product_url' => $urls ?: $this->productUrl($scopedProduct, $scopeStoreId),
+            'product_url' => $urls ?: $this->urlAt($scopedProduct, $scopeStoreId),
         ];
     }
 
     /**
+     * The store view whose name, description and link the row carries for
+     * each language: the language's store view on the website the row is
+     * priced at, then on the product's other websites in id order (CON-253).
+     * Before, it was the language's first store view on any of them, so
+     * where two websites share a language the row could carry the other
+     * website's link. A product on no website takes every website's.
+     *
      * @return array<string, int> language code -> representative store ID
      */
-    private function storesByLanguage(Product $product): array
+    private function storesByLanguage(Product $product, int $scopeStoreId): array
     {
-        $websiteIds = array_map('intval', (array)$product->getWebsiteIds());
-        $byLanguage = [];
-        foreach ($this->storeManager->getStores() as $store) {
-            if ($websiteIds && !in_array((int)$store->getWebsiteId(), $websiteIds, true)) {
-                continue;
-            }
-            $language = $this->languageResolver->forStore((int)$store->getId());
-            if ($language !== '' && !isset($byLanguage[$language])) {
-                $byLanguage[$language] = (int)$store->getId();
+        $index = $this->websiteIndex();
+        $assigned = array_map('intval', (array)$product->getWebsiteIds());
+        $websiteIds = $assigned ? array_values(array_intersect($assigned, array_keys($index))) : array_keys($index);
+        sort($websiteIds);
+        foreach ($websiteIds as $position => $websiteId) {
+            if (in_array($scopeStoreId, $index[$websiteId]['stores'], true)) {
+                unset($websiteIds[$position]);
+                array_unshift($websiteIds, $websiteId);
+                break;
             }
         }
 
+        $byLanguage = [];
+        foreach ($websiteIds as $websiteId) {
+            $byLanguage += $index[$websiteId]['languages'];
+        }
+
         return $byLanguage;
+    }
+
+    /**
+     * The websites that sell the product, each with the product's link in
+     * every language of its store views (contract v1.21.0 §3 "Several
+     * websites", CON-253): the websites the product is assigned to, less a
+     * website where it is disabled or not visible in each store view. A
+     * website whose store views name no language gets the link of its
+     * default store view, as a plain string. Empty (`{}` on the wire) when
+     * no website sells the product.
+     *
+     * @return array<string, array{product_url: string|array<string, string>}>
+     */
+    private function websites(Product $product, Product $scopedProduct, int $scopeStoreId): array
+    {
+        $index = $this->websiteIndex();
+        $websiteIds = array_map('intval', (array)$product->getWebsiteIds());
+        sort($websiteIds);
+
+        $websites = [];
+        foreach ($websiteIds as $websiteId) {
+            $website = $index[$websiteId] ?? null;
+            if ($website === null || $website['code'] === null) {
+                continue;
+            }
+            $stores = $website['languages'] ?: ['' => $website['stores'][0] ?? 0];
+            $urls = [];
+            foreach ($stores as $language => $storeId) {
+                $storeProduct = $storeId === $scopeStoreId ? $scopedProduct : $this->loadAt($product, $storeId);
+                if ($storeProduct === null || !$this->isIngestible($storeProduct)) {
+                    continue;
+                }
+                $url = $this->urlAt($storeProduct, $storeId);
+                if ($url !== '') {
+                    $urls[$language] = $url;
+                }
+            }
+            if ($urls) {
+                $websites[$website['code']] = ['product_url' => $website['languages'] ? $urls : reset($urls)];
+            }
+        }
+
+        return $websites;
+    }
+
+    /**
+     * The installation's websites, by id, from their active store views: the
+     * website's code (null when Magento has none the engine accepts, 1–64
+     * characters), its store views (its default store view first, then the
+     * others in Magento's order) and the first of them for each language.
+     *
+     * @return array<int, array{code: string|null, stores: array<int, int>, languages: array<string, int>}>
+     */
+    private function websiteIndex(): array
+    {
+        if ($this->websiteIndex !== null) {
+            return $this->websiteIndex;
+        }
+
+        $codes = [];
+        $defaultStoreIds = [];
+        foreach ((array)$this->storeManager->getWebsites() as $website) {
+            $code = (string)$website->getCode();
+            $codes[(int)$website->getId()] = $code !== '' && strlen($code) <= 64 ? $code : null;
+            if ($website instanceof Website) {
+                $defaultStoreIds[(int)$website->getId()] = (int)($website->getDefaultStore()?->getId() ?? 0);
+            }
+        }
+
+        $storesByWebsite = [];
+        foreach ((array)$this->storeManager->getStores() as $store) {
+            // A store view switched off has no storefront to link to.
+            $isActive = $store->getIsActive();
+            if ($isActive !== null && !(bool)$isActive) {
+                continue;
+            }
+            $storesByWebsite[(int)$store->getWebsiteId()][] = (int)$store->getId();
+        }
+
+        $index = [];
+        foreach ($storesByWebsite as $websiteId => $storeIds) {
+            $defaultStoreId = $defaultStoreIds[$websiteId] ?? 0;
+            if (in_array($defaultStoreId, $storeIds, true)) {
+                $storeIds = array_values(array_merge([$defaultStoreId], array_diff($storeIds, [$defaultStoreId])));
+            }
+            $languages = [];
+            foreach ($storeIds as $storeId) {
+                $language = $this->languageResolver->forStore($storeId);
+                if ($language !== '' && !isset($languages[$language])) {
+                    $languages[$language] = $storeId;
+                }
+            }
+            $index[$websiteId] = [
+                'code' => $codes[$websiteId] ?? null,
+                'stores' => $storeIds,
+                'languages' => $languages,
+            ];
+        }
+
+        return $this->websiteIndex = $index;
+    }
+
+    /**
+     * The product loaded at a store view, or null when it cannot be.
+     */
+    private function loadAt(Product $product, int $storeId): ?Product
+    {
+        try {
+            $storeProduct = $this->productRepository->getById((int)$product->getId(), false, $storeId);
+        } catch (NoSuchEntityException) {
+            return null;
+        }
+
+        return $storeProduct instanceof Product ? $storeProduct : null;
+    }
+
+    /**
+     * The product's link at a store view, built once per row: the row's
+     * language map and its websites name the same store views.
+     */
+    private function urlAt(Product $storeProduct, int $storeId): string
+    {
+        return $this->storeUrls[$storeId] ??= $this->productUrl($storeProduct, $storeId);
     }
 
     /**
@@ -346,9 +498,10 @@ class CatalogPayloadBuilder
      * §3 keeps "one currency per tenant" as the assumed model, and the
      * catalog row is keyed on `sku` per tenant — a second store scope would
      * upsert onto the SAME row, so it can only overwrite, never coexist.
-     * Per-website price inside one engine store is the engine's to add
-     * (INT-171), not this field: one Smaily account is one engine store,
-     * and websites that share an account share it (2026-10-28, CON-237).
+     * Per-website price inside one engine store is the engine's to add, not
+     * this field (contract 1.21.0 gives per-website links only, CON-253):
+     * one Smaily account is one engine store, and websites that share an
+     * account share it (2026-10-28, CON-237).
      */
     public function canonicalStoreId(): int
     {
@@ -400,10 +553,10 @@ class CatalogPayloadBuilder
      *
      * This is still ONE payload per product (the PRO-1352/1353 tradeoff): a
      * product on several websites is priced at the canonical one whenever it
-     * belongs there. Per-website price, stock and links inside one engine
-     * store are the engine's INT-171: one Smaily account is one engine
-     * store, and websites that share an account share it (2026-10-28,
-     * CON-237).
+     * belongs there. Per-website links and the websites that sell it go in
+     * `websites` (contract 1.21.0, CON-253); per-website price and stock
+     * are not in the contract: one Smaily account is one engine store, and
+     * websites that share an account share it (2026-10-28, CON-237).
      */
     private function storeIdForProduct(Product $product): int
     {

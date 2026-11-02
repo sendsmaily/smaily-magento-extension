@@ -19,6 +19,16 @@
 > with its own Smaily account gets its own engine store, built when the
 > first store needs it (CON-237, which replaces the canceled CON-148 and
 > CON-161). §3–§5 and Phases 4–5 below stay as history.
+>
+> **Websites inside one engine store (CON-253, engine contract 1.21.0):**
+> customer, order and storefront rows name their website, every catalog
+> row lists the websites that sell the product with its links on each
+> (built per website, no longer the first store view of each language
+> across websites), and the setup exchange and the history import report
+> how Magento shares customer accounts. Price and stock stay one value per
+> product. `docs/ARCHITECTURE.md` "Several websites in one engine store"
+> holds the current model; the per-language store-view description in §5
+> below is history.
 
 ## Decision
 

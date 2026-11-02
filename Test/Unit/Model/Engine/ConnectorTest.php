@@ -17,12 +17,15 @@ use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Connector;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Engine\Websites;
 
 /**
  * CON-156: the one connect step the admin Connect and the configuration
  * save share — exchange the setup token, store the connection, then start
  * the catalog import, the customers import and the orders import
- * (PRO-3741, PRO-3790, CON-241), in that order.
+ * (PRO-3741, PRO-3790, CON-241), in that order. The exchange reports how
+ * Magento shares customer accounts (contract v1.21.0 §1 `store_config`,
+ * CON-253).
  */
 class ConnectorTest extends TestCase
 {
@@ -45,7 +48,8 @@ class ConnectorTest extends TestCase
     public function testConnectingExchangesStoresThenStartsTheCatalogCustomersAndOrdersImports(): void
     {
         $exchange = ['tenant_name' => 'Pilot', 'engine_version' => '1.8.2'];
-        $this->client->expects(self::once())->method('setupExchange')->with('tok_abc123')
+        $this->client->expects(self::once())->method('setupExchange')
+            ->with('tok_abc123', ['customer_account_scope' => 'website'])
             ->willReturnCallback(function () use ($exchange): array {
                 $this->steps[] = 'exchange';
 
@@ -92,6 +96,9 @@ class ConnectorTest extends TestCase
 
     private function connector(): Connector
     {
-        return new Connector($this->client, $this->settings, new ImportsOnConnect($this->jobManager));
+        $websites = $this->createMock(Websites::class);
+        $websites->method('storeConfig')->willReturn(['customer_account_scope' => 'website']);
+
+        return new Connector($this->client, $this->settings, new ImportsOnConnect($this->jobManager), $websites);
     }
 }

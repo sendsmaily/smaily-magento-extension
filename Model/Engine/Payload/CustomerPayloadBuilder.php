@@ -10,18 +10,21 @@ namespace Smaily\Connect\Model\Engine\Payload;
 
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Framework\Exception\NoSuchEntityException;
+use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
 
 /**
  * Customer -> WireCustomer (contract §4). Identity is the lowercased email;
  * NO consent fields ever — the engine is a separate lawful surface from
- * Smaily marketing consent.
+ * Smaily marketing consent. One row per customer account, with the code of
+ * the account's website (v1.21.0).
  */
 class CustomerPayloadBuilder
 {
     public function __construct(
         private readonly LanguageResolver $languageResolver,
+        private readonly Websites $websites,
         private readonly Logger $logger
     ) {
     }
@@ -58,6 +61,14 @@ class CustomerPayloadBuilder
         $language = $this->language($customer);
         if ($language !== '') {
             $item['language'] = $language;
+        }
+
+        // The account's website (contract v1.21.0 §4, CON-253): with
+        // Share Customer Accounts = Per Website one email has an account on
+        // each website, and the engine keeps each website's id and language.
+        $website = $this->websites->code((int)$customer->getWebsiteId());
+        if ($website !== null) {
+            $item['website'] = $website;
         }
 
         $createdAt = (string)$customer->getCreatedAt();

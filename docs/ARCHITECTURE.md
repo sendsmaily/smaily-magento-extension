@@ -241,7 +241,8 @@ below.
   the engine accepted — not refused per item, not skipped as older than
   the horizon — on the job (`smaily_backfill_job.sent_count`; null for a
   job from before the count). `Model/Backfill/HistoryProgress` reports to
-  §25 from every tick: `started`; `start_part_complete` once the start
+  §25 from every tick: `started` (with `store_config`, contract v1.21.0 —
+  see "Several websites in one engine store" below); `start_part_complete` once the start
   part's rows and the latest catalog and customers jobs' rows are
   delivered and neither job is queued or running; `complete` once the
   orders job has completed and its rows are delivered; and the counts at
@@ -396,7 +397,8 @@ below.
   has nowhere to go until the multi-website tenant work (RFC Phase 4, gated on
   PRO-1459) gives each website its own tenant (superseded 2026-10-28: one
   Smaily account is one engine store, CON-237; per-website stock inside one
-  engine store is the engine's INT-171). `CatalogPayloadBuilder::
+  engine store is not in contract 1.21.0, whose INT-171 work gave the
+  links and the websites that sell a product, CON-253). `CatalogPayloadBuilder::
   isInStock()` drops the stock registry's per-request memo immediately before
   it reads (MSI mirrors onto the legacy row with direct SQL and so never
   invalidates that memo — otherwise selling out publishes `in_stock: true`).
@@ -702,7 +704,58 @@ below.
   installation with divergent per-website prices ingests one website's price
   per product. Each `smaily_ingest_queue` catalog row's `store_id` column
   records that canonical ingest scope for audit — not necessarily the store
-  the price was read at, see the exception below.
+  the price was read at, see the exception below. Links and the websites
+  that sell the product are per website since CON-253 (`websites`, see
+  "Several websites in one engine store" below); price and stock are not.
+- **Several websites in one engine store (CON-253, contract v1.21.0).**
+  One engine store serves every website of the installation (one Smaily
+  account is one engine store, 2026-10-28), so the rows name the website,
+  by its Magento code (`Model/Engine/Websites`), on every store — one
+  website or many, as the fields are optional and the rows stay the same:
+  - **Catalog** (`CatalogPayloadBuilder::websites()`): every row of every
+    sync — live hooks, tombstones and the import alike — carries
+    `websites: {code: {product_url: {lang: url}}}`, one entry per website
+    the product is assigned to, from that website's active store views:
+    its default store view first, then the first store view of each other
+    language. A website where the product is disabled or not visible in
+    each store view is left out; a product no website sells sends
+    `websites: {}` (`Client::ingest()` keeps it an object after the
+    queue's JSON round trip — `[]` is not what the contract reads). A row
+    without the field reads as sold on every website, and §3 "send the
+    whole row" clears a field a later row leaves out, so it is never left
+    out. The row's own `name`/`description`/`product_url` language maps
+    stay (the engine's fallback for a customer without a website): each
+    language from the website the row is priced at first, then the
+    product's other websites in id order — before, the first store view of
+    the language in Magento's list, so where two websites share a language
+    the row could carry the other website's link. A product URL is built
+    once per store view per row (`urlAt()`); a store of several websites
+    loads the product at each language store view of each of its websites,
+    so a catalog import of such a store takes longer than before.
+  - **Customers** (`CustomerPayloadBuilder`): `website` = the code of
+    `customer.website_id`, one row per account — with Share Customer
+    Accounts = Per Website one email can have an account on each website,
+    and the engine keeps each website's customer id and language under one
+    customer per email.
+  - **Orders** (`OrderPayloadBuilder`): `website` = the code of the website
+    of `order.store_id`; none for an order whose store view no longer
+    exists. The engine takes the customer's website from their newest order.
+  - **Account sharing** (`Websites::storeConfig()`, from
+    `customer/account_share/scope`: 1 = `website`, 0 = `global`): sent as
+    `store_config` on the setup exchange (`Connector::connect()`) and on
+    every §25 `started` call (`HistoryProgress`), so a store connected
+    before 1.21.0, or one whose setting changed, reports it with its next
+    history import.
+  - **Storefront** (`StorefrontRecommendations`): the §15 request names the
+    current store's website, and the website is part of the recommendation
+    cache key.
+  - A store already connected sends the full rows only after a catalog
+    import and a history re-send: **Run again** on the Catalog, Customers
+    and Orders cards. Each orders job is a new history import with a new
+    `import_id` (`mag-<date>-<orders job id>`, `HistoryImport::begin()`).
+  - Not per website: price, compare price, currency, stock, name and
+    description (one value on every website); browse events and identity
+    merge carry no website (contract 1.21.0 "Not in 1.21.0").
 - **The backfill page holds every product (PRO-2506):**
   `CatalogProductLoader` calls neither `addPriceData()` nor any store/website filter, so it pages exactly
   what `countProducts()` counts. `addPriceData()` INNER JOINs
@@ -742,7 +795,9 @@ below.
   base currency is mislabeled there, and per-website tenants (the
   multi-website RFC's Phase 4, PRO-1762) are the fix for that, not this
   (superseded 2026-10-28: one Smaily account is one engine store, CON-237;
-  per-website price inside one engine store is the engine's INT-171).
+  per-website price inside one engine store is not in contract 1.21.0,
+  whose INT-171 work gave the links and the websites that sell a product,
+  CON-253).
 - **Storefront URL (PRO-3660):** a store that sells on a separate
   (headless) storefront saves its address at website scope
   (`smaily_connect/connection/storefront_url`, Settings > Connection and
@@ -1699,8 +1754,11 @@ in Magento's shape (PRO-3790). Nothing is placed automatically.
   `recommendations_customer`, falling back to the contract path for a
   connection set up before v1.9.0; one attempt, 10 s timeout. The answer's usable slots (well-formed rec id, an
   `external_id` or `sku`, at most 4) are cached in the application cache
-  for an hour under `smaily_recs_` + sha256(tenant | identifier type |
-  identifier), an empty answer included (§15: do not retry). Any failure
+  for an hour under `smaily_recs_` + sha256(tenant | website code |
+  identifier type | identifier), an empty answer included (§15: do not
+  retry). The request names the current store's website (`website`,
+  v1.21.0, CON-253), so the engine answers with that website's account,
+  links and products, and the cache keeps one answer per website. Any failure
   is cached empty for 10 minutes; a timeout, network failure or 5xx also
   sets `smaily_recs_paused` for 2 minutes, during which every cache miss
   answers empty without a call (Woo PRO-3857). The engine connection is

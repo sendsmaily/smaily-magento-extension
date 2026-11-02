@@ -25,7 +25,8 @@ class Connector
     public function __construct(
         private readonly Client $client,
         private readonly Settings $settings,
-        private readonly ImportsOnConnect $importsOnConnect
+        private readonly ImportsOnConnect $importsOnConnect,
+        private readonly Websites $websites
     ) {
     }
 
@@ -38,7 +39,9 @@ class Connector
      */
     public function connect(string $setupInput): array
     {
-        $exchange = $this->client->setupExchange($setupInput);
+        // How Magento shares customer accounts between websites (contract
+        // v1.21.0 §1 `store_config`, CON-253).
+        $exchange = $this->client->setupExchange($setupInput, $this->websites->storeConfig());
         $this->settings->storeExchange($exchange);
 
         return [

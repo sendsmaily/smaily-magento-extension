@@ -135,9 +135,10 @@ class Client
      * returned only when its engine base URL and every endpoint are https
      * addresses on ENGINE_HOSTS too.
      *
+     * @param array<string, string> $storeConfig the store's `store_config` (contract v1.21.0 §1), sent when not empty
      * @return array<string, mixed>
      */
-    public function setupExchange(string $setupInput): array
+    public function setupExchange(string $setupInput, array $storeConfig = []): array
     {
         [$baseUrl, $token] = $this->parseSetupInput($setupInput);
         if (!$this->isEngineUrl($baseUrl)) {
@@ -150,10 +151,14 @@ class Client
             throw new EngineRequestException((string)__('Setup token is empty or unrecognized'), 400);
         }
 
-        $response = $this->request('POST', $baseUrl . '/api/setup/exchange', [
+        $body = [
             'setup_token' => $token,
             'plugin_info' => $this->pluginInfo(),
-        ], false);
+        ];
+        if ($storeConfig) {
+            $body['store_config'] = $storeConfig;
+        }
+        $response = $this->request('POST', $baseUrl . '/api/setup/exchange', $body, false);
 
         $endpoints = $response['endpoints'] ?? [];
         $urls = is_array($endpoints) ? array_values($endpoints) : [$endpoints];
@@ -203,11 +208,33 @@ class Client
             throw new EngineRequestException((string)__('Unknown ingest domain "%1"', $domain), 400);
         }
 
+        if ($domain === self::DOMAIN_CATALOG) {
+            $items = array_map(self::catalogWireRow(...), $items);
+        }
+
         return $this->request(
             'POST',
             $this->endpoint('ingest_' . $domain),
             [$wrapper => array_values($items)]
         );
+    }
+
+    /**
+     * A catalog row as JSON must carry it: a product no website sells has
+     * `websites: {}` (contract v1.21.0 §3), and the queue's JSON round trip
+     * turns that empty object into an empty PHP array, which would go out as
+     * `[]`, not the empty object the engine reads as "sold on no website".
+     *
+     * @param array<string, mixed> $item
+     * @return array<string, mixed>
+     */
+    private static function catalogWireRow(array $item): array
+    {
+        if (($item['websites'] ?? null) === []) {
+            $item['websites'] = new \stdClass();
+        }
+
+        return $item;
     }
 
     /**
@@ -318,17 +345,25 @@ class Client
      * with marketing consent). One attempt, no retry and no wait. Response:
      * {slots: [...]}, empty for every shopper the engine has nothing for.
      * The endpoints map carries `recommendations_customer` since v1.9.0; a
-     * connection set up earlier falls back to the contract's path.
+     * connection set up earlier falls back to the contract's path. `website`
+     * (v1.21.0, CON-253) names the website the shopper is on, so the engine
+     * finds the account of that website and sends that website's links.
      *
      * @param array<string, string> $identifier exactly one identifier, keyed as the body names it
+     * @param string $website the current website's code; empty sends none
      * @return array<string, mixed>
      */
-    public function recommendations(array $identifier, int $limit): array
+    public function recommendations(array $identifier, int $limit, string $website = ''): array
     {
+        $body = $identifier + ['limit' => $limit];
+        if ($website !== '') {
+            $body['website'] = $website;
+        }
+
         return $this->request(
             'POST',
             $this->endpoint('recommendations_customer', '/api/v1/recommendations/customer'),
-            $identifier + ['limit' => $limit],
+            $body,
             singleAttempt: true,
             timeoutSeconds: self::RECOMMENDATIONS_TIMEOUT_SECONDS
         );

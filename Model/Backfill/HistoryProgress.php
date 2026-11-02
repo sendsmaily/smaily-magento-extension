@@ -12,6 +12,7 @@ use Magento\Framework\Stdlib\DateTime\DateTime;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
+use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
 
 /**
@@ -49,6 +50,7 @@ class HistoryProgress
         private readonly Client $client,
         private readonly EngineSettings $engineSettings,
         private readonly DateTime $dateTime,
+        private readonly Websites $websites,
         private readonly Logger $logger
     ) {
     }
@@ -187,7 +189,7 @@ class HistoryProgress
     {
         $oldest = $this->ingestQueue->lastSentPayload((int)$ordersJob->getId())['ordered_at'] ?? null;
 
-        return [
+        $body = [
             'import_id' => $state['import_id'],
             'phase' => $phase,
             'horizon_start' => substr((string)$state['horizon'], 0, 10),
@@ -202,6 +204,15 @@ class HistoryProgress
                 'buyers' => ['expected' => (int)$state['buyers_expected']],
             ],
         ];
+        // How Magento shares customer accounts (v1.21.0, CON-253): a store
+        // connected before it reports the setting with its next history
+        // import, and a later change of the setting reaches the engine the
+        // same way. Only `started` takes it.
+        if ($phase === self::PHASE_STARTED) {
+            $body['store_config'] = $this->websites->storeConfig();
+        }
+
+        return $body;
     }
 
     /**

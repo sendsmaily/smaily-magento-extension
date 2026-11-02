@@ -19,6 +19,7 @@ use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\CacheInterface;
+use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\ProductMetadataInterface;
 use Magento\Framework\App\Request\Http as HttpRequest;
 use Magento\Framework\Controller\Result\Raw;
@@ -31,6 +32,7 @@ use Magento\Framework\View\Element\AbstractBlock;
 use Magento\Framework\View\LayoutInterface;
 use Magento\Framework\View\Result\Layout;
 use Magento\Store\Api\Data\StoreInterface;
+use Magento\Store\Api\Data\WebsiteInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Controller\Recommendations\Index;
 use Smaily\Connect\Model\Client\HttpClientFactory;
@@ -41,6 +43,7 @@ use Smaily\Connect\Model\Engine\RecommendedProducts;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\SleeperInterface;
 use Smaily\Connect\Model\Engine\StorefrontRecommendations;
+use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\OrderPlacer;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
@@ -106,7 +109,7 @@ class StorefrontRecommendationsTest extends IntegrationTestCase
 
         $this->controller([new Response(200, [], self::ANSWER)])->execute();
 
-        self::assertSame(['customer_external_id' => '42', 'limit' => 4], $this->sentBody(0));
+        self::assertSame(['customer_external_id' => '42', 'limit' => 4, 'website' => 'base'], $this->sentBody(0));
         self::assertSame(self::ENDPOINT, (string)$this->history[0]['request']->getUri());
         self::assertSame('Bearer sk_test_key', $this->history[0]['request']->getHeaderLine('Authorization'));
         self::assertSame([['rec_id' => self::REC_ID, 'external_id' => '7', 'sku' => 'MJ07']], $this->answer['items']);
@@ -118,7 +121,7 @@ class StorefrontRecommendationsTest extends IntegrationTestCase
 
         $this->controller([new Response(200, [], self::ANSWER)])->execute();
 
-        self::assertSame(['smaily_visitor_token' => 'vt_8f3k2a', 'limit' => 4], $this->sentBody(0));
+        self::assertSame(['smaily_visitor_token' => 'vt_8f3k2a', 'limit' => 4, 'website' => 'base'], $this->sentBody(0));
     }
 
     /**
@@ -132,7 +135,7 @@ class StorefrontRecommendationsTest extends IntegrationTestCase
 
         $this->controller([new Response(200, [], self::ANSWER)])->execute();
 
-        self::assertSame(['smaily_visitor_token' => 'vs_4fK9a2LmQ7xZ0bR3tY8wP1', 'limit' => 4], $this->sentBody(0));
+        self::assertSame(['smaily_visitor_token' => 'vs_4fK9a2LmQ7xZ0bR3tY8wP1', 'limit' => 4, 'website' => 'base'], $this->sentBody(0));
     }
 
     public function testAGuestWithAStoreCreatedTokenWithoutAnExplicitYesIsNotAskedAbout(): void
@@ -281,8 +284,12 @@ class StorefrontRecommendationsTest extends IntegrationTestCase
 
         $store = $this->createMock(StoreInterface::class);
         $store->method('getId')->willReturn(1);
+        $store->method('getWebsiteId')->willReturn(1);
+        $website = $this->createMock(WebsiteInterface::class);
+        $website->method('getCode')->willReturn('base');
         $storeManager = $this->createMock(StoreManagerInterface::class);
         $storeManager->method('getStore')->willReturn($store);
+        $storeManager->method('getWebsite')->with(1)->willReturn($website);
 
         return new StorefrontRecommendations(
             $settings,
@@ -293,6 +300,7 @@ class StorefrontRecommendationsTest extends IntegrationTestCase
             $cookieHelper,
             $storeManager,
             $this->cache(),
+            new Websites($storeManager, $this->createMock(ScopeConfigInterface::class)),
             $this->createMock(Logger::class)
         );
     }

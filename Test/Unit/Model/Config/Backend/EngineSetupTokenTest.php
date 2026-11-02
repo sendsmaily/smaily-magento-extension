@@ -25,6 +25,7 @@ use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Connector;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Engine\Websites;
 
 /**
  * PRO-3741, PRO-3790: connecting Campaign Intelligence by saving the setup
@@ -129,7 +130,12 @@ class EngineSetupTokenTest extends TestCase
             $this->createMock(ScopeConfigInterface::class),
             $this->createMock(TypeListInterface::class),
             $this->messageManager,
-            new Connector($this->client, $this->createMock(Settings::class), new ImportsOnConnect($this->jobManager))
+            new Connector(
+                $this->client,
+                $this->createMock(Settings::class),
+                new ImportsOnConnect($this->jobManager),
+                $this->createMock(Websites::class)
+            )
         );
         $model->setValue($value);
 

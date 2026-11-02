@@ -37,6 +37,7 @@ use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Engine\SleeperInterface;
+use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\OptOutReplay;
 use Smaily\Connect\Model\ResourceModel\Backfill\Job as JobResource;
@@ -255,6 +256,7 @@ class ImportPaceTest extends IntegrationTestCase
             $builder ?? new OrderPayloadBuilder(
                 $this->objectManager->get(ResourceConnection::class),
                 $this->orderItemCollectionFactory(),
+                $this->createMock(Websites::class),
                 $logger
             ),
             $queue,
@@ -270,6 +272,7 @@ class ImportPaceTest extends IntegrationTestCase
                 $client,
                 $engineSettings,
                 $this->clock,
+                $this->createMock(Websites::class),
                 $logger
             );
 

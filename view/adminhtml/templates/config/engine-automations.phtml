@@ -12,7 +12,9 @@
  * .is-closed hides its .smaily-trigger-settings — the workflow, Cooldown,
  * Daily Cap, Test mode, Test Emails and the go-live note. They stay in the
  * form, and the save posts every field of every trigger, so nothing hidden
- * is lost. A trigger with a field to fix (the engine refused the save over
+ * is lost. "Edit design" (CON-257) follows the workflow when Campaign
+ * Intelligence lists the trigger's design (panel/email-designs.phtml). A
+ * trigger with a field to fix (the engine refused the save over
  * one of its fields) stays open while it is off, so the field can be seen.
  *
  * @var \Magento\Backend\Block\Template $block
@@ -116,6 +118,8 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
                                 <?php endif; ?>
                             </select>
                         </label>
+                        <?php // "Edit design" (CON-257) by the trigger's catalogue key: panel/email-designs.phtml. ?>
+                        <div class="smaily-engine-trigger__ctrl smaily-edit-design" data-email-key="<?= /* @noEscape */ $key ?>" hidden></div>
                         <label class="smaily-engine-trigger__ctrl">
                             <span><?= $escaper->escapeHtml(__('Cooldown (days)')) ?></span>
                             <input type="number" min="1" max="365" style="width: 6rem;"

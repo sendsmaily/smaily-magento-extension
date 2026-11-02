@@ -86,6 +86,13 @@
                         <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\WizardData</argument>
                     </arguments>
                 </block>
+                <block class="Magento\Backend\Block\Template"
+                       name="smaily.panel.email.designs" as="panel.email.designs"
+                       template="Smaily_Connect::panel/email-designs.phtml">
+                    <arguments>
+                        <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\EmailDesignsData</argument>
+                    </arguments>
+                </block>
             </block>
             <block class="Magento\Backend\Block\Template"
                    name="smaily.version"

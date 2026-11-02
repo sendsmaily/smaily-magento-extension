@@ -17,7 +17,8 @@ declare(strict_types=1);
  * holds the page's phrases in that locale for the checks.
  *
  * To add a screen: add an entry to $pages below ('template' may list several
- * templates, rendered one after another; 'data' is the block's other data).
+ * templates, rendered one after another, each a path or [path, view model,
+ * data] when it has a view model of its own; 'data' is the block's other data).
  */
 
 use Magento\Framework\Escaper;
@@ -1846,6 +1847,93 @@ $pages['dashboard-unsent'] = [
     'strings' => $dashboardStrings,
 ];
 
+/*
+ * "Edit design" on the email cards (CON-257): the three store-run cards
+ * (panel/automations.phtml), the two transactional cards with one workflow
+ * per language (panel/transactional-triggers.phtml), two Campaign
+ * Intelligence cards — Replenishment due on, Win-back off
+ * (config/engine-automations.phtml) — and panel/email-designs.phtml, with
+ * Campaign Intelligence connected on https://engine.invalid (a host that
+ * never answers). Each template has its own view model, as on the page. On
+ * email-designs the admin is on the site URL's origin, so the design page
+ * opens in the modal; on email-designs-tab it is not, so it opens in a tab.
+ */
+$emailDesignsViewModel = static fn (bool $frameable): object => new class ($frameable) {
+    /**
+     * @param bool $frameable
+     */
+    public function __construct(private readonly bool $frameable)
+    {
+    }
+
+    /**
+     * @return bool
+     */
+    public function isAvailable(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return string
+     */
+    public function getEngineOrigin(): string
+    {
+        return 'https://engine.invalid';
+    }
+
+    /**
+     * @return bool
+     */
+    public function isFrameable(): bool
+    {
+        return $this->frameable;
+    }
+};
+foreach (['email-designs' => true, 'email-designs-tab' => false] as $page => $frameable) {
+    $pages[$page] = [
+        'template' => [
+            [
+                $root . '/view/adminhtml/templates/panel/automations.phtml',
+                $discountViewModel([12 => 'Welcome 10%'], true),
+                ['context' => 'settings'],
+            ],
+            [
+                $root . '/view/adminhtml/templates/panel/transactional-triggers.phtml',
+                $transactionalViewModel(true),
+                ['context' => 'settings'],
+            ],
+            [
+                $root . '/view/adminhtml/templates/config/engine-automations.phtml',
+                $automationsViewModel([
+                    ['enabled' => true] + $trigger('replenish_due', 'Replenishment due', true),
+                    $trigger('winback_risk', 'Win-back', true),
+                ], false),
+                [],
+            ],
+            [
+                $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+                $transactionalViewModel(true),
+                ['context' => 'settings'],
+            ],
+            [$root . '/view/adminhtml/templates/panel/email-designs.phtml', $emailDesignsViewModel($frameable), []],
+        ],
+        'viewModel' => null,
+        'strings' => [
+            'Edit design',
+            'Edit design: %1',
+            'Email design',
+            'Starter design',
+            'Design edited',
+            'Subject: %1',
+            'Open in a new tab',
+            'Opening the design page…',
+            'Your browser blocked the new tab. Allow pop-ups for this page and try again.',
+            'Campaign Intelligence offers no design for this email.',
+        ],
+    ];
+}
+
 $render = static function (string $template, object $block, Escaper $escaper): string {
     ob_start();
     include $template;
@@ -1867,8 +1955,13 @@ foreach ($pages as $name => $page) {
             $strings[$phrase] = (string)__($phrase);
         }
         $html = '';
+        // A template is a path, rendered with the page's view model and
+        // data, or [path, view model, data] for its own (CON-257).
         foreach ((array)$page['template'] as $template) {
-            $html .= $render($template, $block($page['viewModel'], $page['data'] ?? []), $escaper);
+            [$file, $viewModel, $data] = is_array($template)
+                ? $template
+                : [$template, $page['viewModel'], $page['data'] ?? []];
+            $html .= $render($file, $block($viewModel, $data), $escaper);
         }
         $data = ['html' => $html, 'strings' => $strings];
         $file = $build . '/' . $name . '.' . $locale . '.js';

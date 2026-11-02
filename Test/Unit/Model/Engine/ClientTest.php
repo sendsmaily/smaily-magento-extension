@@ -701,6 +701,81 @@ class ClientTest extends TestCase
     }
 
     /**
+     * CON-257: the design list (§23) is read once from the map key, without
+     * a retry or a wait — the admin waits for it.
+     */
+    public function testTheEmailDesignListIsOneAttemptFromTheMapKey(): void
+    {
+        $this->settings->method('getEndpoint')->with('emails_designs')
+            ->willReturn('https://engine.example/api/v1/emails/designs');
+        $client = $this->createClient([new Response(503, [], '{"error":"unavailable"}')]);
+
+        try {
+            $client->emailDesigns();
+            self::fail('A 503 must fail at once');
+        } catch (EngineTransportException $exception) {
+            self::assertSame(503, $exception->getCode());
+        }
+
+        self::assertCount(1, $this->history);
+        self::assertSame([], $this->sleeps);
+        self::assertSame('GET', $this->history[0]['request']->getMethod());
+        self::assertSame(
+            'https://engine.example/api/v1/emails/designs',
+            (string)$this->history[0]['request']->getUri()
+        );
+    }
+
+    /**
+     * CON-257: a connection exchanged before the engine returned the design
+     * keys uses the fallback path; `{email_key}` is substituted, and an
+     * empty body goes as the JSON object `{}` (§22).
+     */
+    public function testTheDesignLinkFallsBackToThePathAndSendsAnEmptyObject(): void
+    {
+        $this->settings->method('getEndpoint')->with('emails_design_link')->willReturn(null);
+        $this->settings->method('getEngineBaseUrl')->willReturn('https://engine.example');
+        $client = $this->createClient([
+            new Response(200, [], '{"url":"https://engine.example/design/email/dl_1","expires_at":"x"}'),
+        ]);
+
+        $link = $client->emailDesignLink('plugin.abandoned_cart', []);
+
+        self::assertSame('https://engine.example/design/email/dl_1', $link['url']);
+        $request = $this->history[0]['request'];
+        self::assertSame('POST', $request->getMethod());
+        self::assertSame(
+            'https://engine.example/api/v1/emails/plugin.abandoned_cart/design-link',
+            (string)$request->getUri()
+        );
+        self::assertSame('{}', (string)$request->getBody());
+        self::assertSame('Bearer sk_test_key', $request->getHeaderLine('Authorization'));
+    }
+
+    public function testATooManyRequestsAnswerToTheDesignLinkIsNotWaitedFor(): void
+    {
+        $this->settings->method('getEndpoint')
+            ->willReturn('https://engine.example/api/v1/emails/{email_key}/design-link');
+        $client = $this->createClient([
+            new Response(429, [], '{"error":"rate_limit_exceeded","retry_after_seconds":30}'),
+        ]);
+
+        try {
+            $client->emailDesignLink('replenish_due', ['language' => 'et']);
+            self::fail('A 429 must fail at once');
+        } catch (EngineTransportException $exception) {
+            self::assertSame(429, $exception->getCode());
+        }
+
+        self::assertSame([], $this->sleeps);
+        self::assertSame('{"language":"et"}', (string)$this->history[0]['request']->getBody());
+        self::assertSame(
+            'https://engine.example/api/v1/emails/replenish_due/design-link',
+            (string)$this->history[0]['request']->getUri()
+        );
+    }
+
+    /**
      * @param array<int, Response|callable> $responses
      */
     private function createClient(

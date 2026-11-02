@@ -7,71 +7,102 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-11-02 — **3.0.0-rc19 cut on `master`: automation
-cards show their settings only while switched on, as in WooCommerce.**
-**3.0.0-rc19 is cut** on `master` (the version-cut PR
-`release/3.0.0-rc19`); its tag waits for Erkki (CLAUDE.md "Release cut").
-3.0.0-rc18 is released (Erkki's tag, 2026-11-02: the release workflow
+_Last updated: 2026-11-02 — **3.0.0-rc20 cut on `master`: Edit design
+opens the email design page in an in-admin modal, a consenting login
+sets a visitor token, and login merges reach the engine again.**
+**3.0.0-rc20 is cut** on `master` (the version-cut PR
+`release/3.0.0-rc20`); its tag waits for Erkki (CLAUDE.md "Release cut").
+3.0.0-rc19 is released (Erkki's tag, 2026-11-02: the release workflow
 was green, both ZIPs were attached, the Hyvä mirror was tagged and
-Packagist showed rc18). The cut collects 1 fragment into CHANGELOG's
-"Changes since 3.0.0-rc18" (CON-256). It adds cross-references to two
-earlier bullets: the discount-code bullet (under "Changes since
-3.0.0-rc13": "each email gets a new code") now says that an email of an
-automation that is switched off goes without a code, and the
-per-language-workflows mode bullet (under "Changes since 3.0.0-rc12":
-"the Automations tab shows the workflows of the mode you pick") now
-says it does so while an automation that uses them is switched on. No other earlier bullet became untrue: the transactional
-emails bullet names the **Customer details** switch, which stays
-outside the cards, and the Campaign Intelligence *Test mode* bullet
-describes a card after a save.
+Packagist showed rc19). The cut collects 2 fragments into CHANGELOG's
+"Changes since 3.0.0-rc19" (CON-257, then CON-260; the CON-260 bullet
+also covers CON-261 and tells the merchant that **Retry** on a failed
+identity-merge row in the Log now sends it). It adds cross-references
+to seven earlier bullets that became untrue: the contract v1.17.0 bullet
+(under "Changes since 3.0.0-rc12": designing the automated emails was
+an option the extension "does not use yet"), the store-created token
+consent bullet (rc12: "the extension creates none"), the widget bullet
+(under "Changes since 3.0.0-rc10": a guest sees recommendations "only
+after an earlier click on a Smaily email link"), the API-login merge
+bullet and the Login as Customer bullet (under "Changes since
+3.0.0-rc7": logins link browsing in Campaign Intelligence, which
+refused every such link until rc20), the checkout `vs_` token bullet
+(rc7: "the extension does not create these tokens itself") and the
+"New features" list ("identity merge").
 
-**On `master` since the rc18 cut (all in rc19):** #234 CON-256 (every
-automation card — store-run, transactional and Campaign Intelligence —
-shows only its name, pill, description and **Enabled** while off;
-`.is-closed` hides `.smaily-trigger-settings`, so the settings are
-hidden, not cleared, and every save still posts them; each per-language
-table follows its card's switch, and the "Per-language workflows"
-editor shows only while one of the three store-run cards is on; the
-save controller returns the engine's 422 as `field_errors`, so a
-Campaign Intelligence card with a field to fix stays open while off;
-`AutomationDiscount` makes no code while the automation is off, read
-through `Config::isWelcomeEnabled()` / `isFirstOrderEnabled()` /
-`isAbandonedCartEnabled()`, so a row queued before the switch-off, or a
-Log "Send again", is sent without a code; mirrors Woo CON-255 / #289;
-no schema change, no new admin strings).
+**On `master` since the rc19 cut (all in rc20):**
+- #237: engine contract 1.22.0 (INT-194).
+- #239: engine contract 1.23.0 (INT-195: a customer who logs in with
+  marketing consent is in the customer scope; §7 retry after 404) —
+  CON-262 implements it.
+- #236 CON-257: every email card gets **Edit design**, which opens the
+  §22 design page in an in-admin modal (§22 Embedding; Erkki's
+  decision, unlike Woo's tab). The `saved` and `closed` postMessages
+  re-read §23. **Open in a new tab** is always shown; an admin that is
+  not on the https `site_url` origin gets a tab. Sending with the pushed
+  workflow is split out to CON-258.
+- #238 CON-260 + CON-261: a consenting login without a token cookie
+  gets a server-set `vs_` token (`StoreVisitorToken`,
+  `AttributionCookieWriter`), which §7 sends. An existing token is kept,
+  and logout never clears it (Erkki, 2026-11-02). No token is created at
+  a store view with a Storefront URL. CON-261: `merge_reason` was
+  `login`, which the engine rejects, so no Magento identity merge had
+  ever reached the engine; it is now `user_logged_in`, and **Retry**
+  recovers the old rows.
 
-**Pilot:** the first pilot store upgrades directly to rc19 and skips
-rc17 and rc18. Then it presses **Run again** under **Settings >
-Intelligence** on **Catalog**, **Customers** and **Orders**, in that
-order. The second pilot store's state is unchanged (rc12). The gauge is
-CON-147 (4/5).
+**Decided (Erkki, 2026-11-02):** the login token stays after logout;
+the shared-browser risk is accepted. A customer who logs in with
+marketing consent belongs in the customer scope: engine ask INT-195,
+now contract 1.23.0 (#239); Magento CON-262 implements it.
 
-**Gotchas:** the rc18 gotchas hold (a multi-website store's catalog
-build is slower, estimated 2–3× rc17; every cached widget answer misses
-once after the upgrade). A merchant who switches an automation off and
-on again finds its settings as they were: switching off clears nothing.
+**Pilot:** the first pilot store upgrades directly to rc20. Then it
+presses **Run again** under **Settings > Intelligence** on **Catalog**,
+**Customers** and **Orders**, in that order. It may also press
+**Retry** on the failed identity merges (*engine.identity_merge*) in
+the Log. The second pilot store's state is unchanged (rc12). The gauge
+is CON-147 (4/5).
+
+**Gotchas:** the rc18 and rc19 gotchas hold. A shopper on a shared
+computer who logged in with marketing consent leaves the `smaily_rec_uid`
+token behind after logout: the next person on that browser sees that
+shopper's recommendations until the cookie expires or is deleted
+(accepted; the cookie policy text says so).
 
 **Open:** CON-209 (the 3.0.0 gate), CON-230 (the engine-page modal;
 waits for INT-180), CON-234 (the installation report; waits for
 INT-186), CON-237 (an own engine store per Smaily account; later),
 CON-252 (address normalisation is ASCII-only; Low; needs agreement with
-the engine), CON-146 (native-speaker review of ru/fi/lv/lt), CON-168,
-and the Estonian proofread of the new CON-253 guide paragraphs in
-`#setup-website` and of the CON-256 guide sentences (the step 3
-sentence, the "Kaart avaneb, kui märgid Lubatud" note in Automaatikad,
-the discount code wording and its new item, the transactional sentence
-and the new Campaign Intelligence item). Follow-ups: **Run again**
-restarts from row 1; WooCommerce's slower import pace (CON-236).
+the engine), CON-258 (sending with the pushed workflow; before the
+engine push goes live), CON-262 (a consenting login in the customer
+scope; contract 1.23.0 states it, #239), CON-146 (native-speaker review of
+ru/fi/lv/lt), CON-168, and the Estonian proofreads: the new CON-253
+guide paragraphs in `#setup-website`, the CON-256 guide sentences (the
+step 3 sentence, the "Kaart avaneb, kui märgid Lubatud" note in
+Automaatikad, the discount code wording and its new item, the
+transactional sentence and the new Campaign Intelligence item), the
+CON-257 admin strings (20) and the `#set-email-design` guide section,
+and the CON-260 guide text. Follow-ups: **Run again** restarts from
+row 1; WooCommerce's slower import pace (CON-236).
 
 **Next session opens with:**
-1. Erkki tags rc19.
-2. The first pilot store upgrades to rc19 and presses **Run again** on
-   **Catalog**, **Customers** and **Orders**, in that order.
+1. Erkki tags rc20.
+2. The first pilot store upgrades to rc20, presses **Run again** on
+   **Catalog**, **Customers** and **Orders**, in that order, and may
+   press **Retry** on its failed identity merges in the Log.
 3. Watch its history progress reach `start_part_complete` in the
-   engine, and check that its customer rows carry each website's
-   account.
+   engine, and check that its identity merges now reach the engine.
 
-**Notes for the next version cut (rc20):** none so far._
+**Notes for the next version cut (rc21):** none so far._
+
+_Earlier (2026-11-02, the 3.0.0-rc19 cut): 3.0.0-rc19 was cut (#235)
+and tagged by Erkki the same day (the release workflow was green, both
+ZIPs were attached, the Hyvä mirror was tagged and Packagist showed
+rc19). It collected 1 fragment (CON-256) and added cross-references to
+the discount-code bullet and the per-language-workflows mode bullet. In
+rc19 since rc18: #234 CON-256 (every automation card shows only its
+name, pill, description and **Enabled** while off; the settings are
+hidden, not cleared; `AutomationDiscount` makes no code while the
+automation is off; mirrors Woo CON-255 / #289)._
 
 _Earlier (2026-11-02, the 3.0.0-rc18 cut): 3.0.0-rc18 was cut (#233)
 and tagged by Erkki the same day. It collected 2 fragments (CON-243,

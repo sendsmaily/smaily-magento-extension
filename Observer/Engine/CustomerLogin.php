@@ -45,6 +45,18 @@ use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
  * storefront owns its shoppers' cookies and its own consent banner decides
  * (PRO-3918), so a token is sent there only when that storefront forwards
  * one.
+ *
+ * The same consenting login puts the customer in the Campaign Intelligence
+ * customer scope (contract v1.23.0 §4 group c; CON-262): the merge row
+ * carries IdentityMergeHandler::SEND_CUSTOMER, and the handler sends the
+ * customer (§4) right before the merge (§7 "Send the customer first"),
+ * also when the customer never bought and is not in the contact sync.
+ * Every consenting login does, not only one outside the other two groups:
+ * the store cannot tell that the engine already has the customer (an
+ * account from before the connection, from an ImportExport import), and
+ * the row is an idempotent upsert, one per merge. A login whose merge
+ * cannot be queued (no session cookie, and no token cookie could be set)
+ * sends no customer either: the customer is sent for the merge.
  */
 class CustomerLogin implements ObserverInterface
 {
@@ -88,7 +100,8 @@ class CustomerLogin implements ObserverInterface
         }
 
         $cookies = $this->attributionManager->readCookies();
-        $visitorToken = $cookies['visitor_token'] ?? $this->createVisitorToken();
+        $consenting = $this->isConsentingLogin();
+        $visitorToken = $cookies['visitor_token'] ?? ($consenting ? $this->storeVisitorToken->issue() : null);
         if ($cookies['anon_session_id'] === null && $visitorToken === null) {
             return;
         }
@@ -108,6 +121,11 @@ class CustomerLogin implements ObserverInterface
         if ($visitorToken !== null) {
             $payload['smaily_visitor_token'] = $visitorToken;
         }
+        if ($consenting) {
+            // Contract §4 group c: the customer goes first; stripped before
+            // the call to the engine.
+            $payload[IdentityMergeHandler::SEND_CUSTOMER] = true;
+        }
 
         $this->eventQueue->enqueue(
             EventType::ENGINE_IDENTITY_MERGE,
@@ -117,16 +135,13 @@ class CustomerLogin implements ObserverInterface
     }
 
     /**
-     * A new store-created token in the visitor-token cookie, for a shopper
-     * with marketing consent at a store view whose own pages the shopper
-     * logs in on; else null.
+     * A login with marketing consent at a store view whose own pages the
+     * shopper logs in on: such a shopper without a visitor token gets a
+     * store-created one (CON-260), and the customer is sent before the
+     * merge (CON-262).
      */
-    private function createVisitorToken(): ?string
+    private function isConsentingLogin(): bool
     {
-        if (!$this->marketingConsent->isGiven() || $this->config->hasStorefrontUrl()) {
-            return null;
-        }
-
-        return $this->storeVisitorToken->issue();
+        return $this->marketingConsent->isGiven() && !$this->config->hasStorefrontUrl();
     }
 }

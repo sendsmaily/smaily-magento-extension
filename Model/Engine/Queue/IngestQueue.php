@@ -234,6 +234,24 @@ class IngestQueue
     }
 
     /**
+     * Whether the queue holds any row of $domain for the entity, in any
+     * state: the store has queued it to be sent (CON-262: a customer the
+     * live sync or an import sends). Read only after an identity merge met
+     * `404 customer_not_found`, so it may walk the domain's rows.
+     */
+    public function hasRow(string $domain, string $entityId): bool
+    {
+        $connection = $this->resourceConnection->getConnection();
+        $select = $connection->select()
+            ->from($this->table(), ['id'])
+            ->where('domain = ?', $domain)
+            ->where('entity_id = ?', $entityId)
+            ->limit(1);
+
+        return $connection->fetchOne($select) !== false;
+    }
+
+    /**
      * Remove rows that have done their job without being sent.
      *
      * @param IngestEvent[] $events

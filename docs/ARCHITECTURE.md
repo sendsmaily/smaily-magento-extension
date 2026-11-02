@@ -236,8 +236,18 @@ below.
   end. `EngineCustomersProcessor` reads only the customers in scope
   (`Model/Backfill/EngineCustomerScope`, contract §4): those the website's
   contact sync puts into Smaily under its mode while it is active
-  (`ContactAudience::customerCondition()`), and every customer with an
-  order since the horizon; Smaily is never asked. Each import row carries
+  (`ContactAudience::customerCondition()`, group a), and every customer
+  with an order since the horizon (group b); Smaily is never asked. The
+  third group (contract v1.23.0 §4 group c, CON-262), every customer who
+  logs in with marketing consent, is not in the import (§25 sender rule 4):
+  it is sent at that login, before the identity merge (see "Identity
+  merge" below). Nothing takes a customer back out of the engine: the
+  import only adds the customers in scope, the live sync
+  (`Observer\Engine\CustomerSaveAfter`) queues a customer on every save
+  without a scope check, and the module has no "remove customer" call
+  (§4 has none; §9 is the Art. 17 erasure `smaily:gdpr erase`). So a group
+  (c) customer stays in the engine whatever the import or a later save
+  reads. Each import row carries
   its job (`smaily_ingest_queue.job_id`), and the send run counts the rows
   the engine accepted — not refused per item, not skipped as older than
   the horizon — on the job (`smaily_backfill_job.sent_count`; null for a
@@ -1995,6 +2005,51 @@ Subscribers grid, or a customer account, leaves profiling as it was.
   refused, or a pending row of a type `pausedEventTypes()` names, says it
   waits for the account to be active again, not for the next flush or
   retry.
+- **The customer before the merge** (CON-262; contract v1.23.0 §4 group c,
+  §7 "Send the customer first" and "Retry after 404"). The engine merges
+  only a customer it already has, and answers `404 customer_not_found`
+  otherwise. A customer who logs in with marketing consent but never
+  bought and is not in the contact sync was in neither group of the
+  customer scope, so the store's `vs_` token never bound. Now a consenting
+  login (`MarketingConsent::isGiven()`, no Storefront URL saved — the rule
+  the login token follows) puts the customer in scope: `CustomerLogin`
+  marks the merge row `IdentityMergeHandler::SEND_CUSTOMER`, and the
+  handler sends the customer with §4 right before the merge, in the same
+  run (`Model\Engine\MergeCustomerSender`: the account as it is now,
+  built by `CustomerPayloadBuilder`, one item with its own `event_id`; the
+  Log records it as a customers row — delivered, or failed with the
+  engine's reason for the item). Every consenting login does, not only
+  one outside the other two groups: the store cannot tell that the engine
+  already has the customer, and the row is an idempotent upsert, one per
+  merge. **Ordering.** The customer row a registration queues
+  (`CustomerSaveAfter`) travels in `smaily_ingest_queue`, the merge in
+  `smaily_event_queue`, and `smaily_flush_event_queue` is declared before
+  `smaily_flush_ingest_queue` in the same cron group, so the merge reaches
+  the engine first. Sending the customer inside the merge's own run makes
+  the order hold whatever the crons do; gating the merge on the ingest
+  row's delivery would tie the two queues together and delay every merge
+  by a run, and having the merge handler claim and send the pending ingest
+  row would race the ingest cron's claim. **Retry after 404.** On a 404
+  the handler stores `CUSTOMER_NOT_FOUND` in the row's payload
+  (`EventQueue::addToPayload()`) and sends the customer when the store
+  sends them anyway — a consenting login, or a customer with a row in the
+  ingest queue (`IngestQueue::hasRow()`: the live sync or an import queued
+  them, e.g. a customer who has just registered without consent) — and
+  once §4 answered 200 for the customer it tries the merge once more. It
+  never merges again before that: §4 in transport trouble leaves the row
+  on the ladder, and its next attempt sends the customer before it merges
+  (that merge is the one retry). A row the 404 leaves is parked
+  (`Failure::permanent()`, Retry in the Log) with one of three reasons the
+  Log shows translated (`FailureMessage::TRANSLATED`):
+  `IdentityMergeHandler::NOT_SENT` (the store does not send this customer:
+  no consent, no order, not in the contact sync),
+  `CUSTOMER_REFUSED` (§4 refused the item; the engine's reason in it) and
+  `NOT_FOUND_AFTER_SEND` (still 404 after §4 answered 200). A row parked
+  with `permanent_http_404` before CON-262 carries no flag; the handler
+  reads its last recorded answer instead, so its Retry sends the customer
+  the store sends before it merges, and links the login once the engine
+  has the customer. A shopper who opted out of profiling is neither sent
+  nor merged (the opt-out check comes first).
 
 ## Admin UI
 

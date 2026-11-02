@@ -126,6 +126,19 @@ card off and on again keeps its values and the save posts them; that the
 per-language tables follow their card in mode A, which still hides the
 card's own workflow; and that a Campaign Intelligence trigger the engine
 refused over a field stays open while it is off (CON-256).
+`Test/Js/email-designs.html` renders the store-run, transactional and
+Campaign Intelligence cards with `panel/email-designs.phtml`, the design
+list (contract §23) and the design links answered by stubs, and checks in
+both languages that a card shows **Edit design** after its workflow only
+while it is on and the list names its email; that a press shows the modal
+with its loading state before the link is asked for and puts the link in
+its frame; that Esc, the close button, the backdrop and a `closed` message
+from the engine's origin close it, that a message from another origin or of
+another type changes nothing and a `saved` one reads the list again; that
+focus stays in the modal; that **Open in a new tab** opens the tab before it
+asks for a fresh link; and that an admin that may not frame the page opens a
+tab before the request, reads the list again on its return, and closes the
+tab with the reason on the card when the link is refused (CON-257).
 `Test/Js/intelligence-connect.html` renders the
 Campaign Intelligence panel with its behaviour (`panel/intelligence.phtml`
 and `panel/panels-js.phtml`) as the initial setup's step and as the

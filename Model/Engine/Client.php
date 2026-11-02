@@ -109,6 +109,22 @@ class Client
     private const HISTORY_PROGRESS_TIMEOUT_SECONDS = 10;
 
     /**
+     * The email design calls (§22, §23) answer an admin's click or page
+     * load: one attempt, no retry and no wait, so the admin is never kept
+     * waiting behind a backoff (as the WooCommerce plugin, CON-173).
+     */
+    private const EMAIL_DESIGNS_TIMEOUT_SECONDS = 15;
+
+    /**
+     * Fallback paths of the email design endpoints (§1 map keys
+     * `emails_design_link`, `emails_designs`) for a connection exchanged
+     * before the engine returned them. `{email_key}` is a placeholder like
+     * `{email}`: substituted, never printf'd.
+     */
+    public const PATH_EMAILS_DESIGN_LINK = '/api/v1/emails/{email_key}/design-link';
+    public const PATH_EMAILS_DESIGNS = '/api/v1/emails/designs';
+
+    /**
      * @var array{request: array<int|string, mixed>, response: array{http_status: int, body: mixed}|null}|null
      */
     private ?array $lastExchange = null;
@@ -458,6 +474,51 @@ class Client
     }
 
     /**
+     * Every email design of the store (§23): `{emails: [...]}`, one item per
+     * email key the store can design, with its design state and Smaily ids.
+     * Read when the admin opens the email settings and when the admin
+     * returns from the design page — never before a send.
+     *
+     * @return array<string, mixed>
+     */
+    public function emailDesigns(): array
+    {
+        return $this->request(
+            'GET',
+            $this->endpoint('emails_designs', self::PATH_EMAILS_DESIGNS),
+            null,
+            singleAttempt: true,
+            timeoutSeconds: self::EMAIL_DESIGNS_TIMEOUT_SECONDS
+        );
+    }
+
+    /**
+     * A one-time link to the engine's design page for one email (§22):
+     * `{url, expires_at}`. The caller opens it at once and never stores or
+     * logs it. `$body` carries the optional `return_url` and `language`; an
+     * empty body is sent as the JSON object `{}`.
+     *
+     * @param array<string, string> $body
+     * @return array<string, mixed>
+     */
+    public function emailDesignLink(string $emailKey, array $body): array
+    {
+        $url = str_replace(
+            '{email_key}',
+            rawurlencode($emailKey),
+            $this->endpoint('emails_design_link', self::PATH_EMAILS_DESIGN_LINK)
+        );
+
+        return $this->request(
+            'POST',
+            $url,
+            $body,
+            singleAttempt: true,
+            timeoutSeconds: self::EMAIL_DESIGNS_TIMEOUT_SECONDS
+        );
+    }
+
+    /**
      * Resolve an endpoint from the stored map, with an optional fallback
      * path for keys added after the tenant's exchange (contract §1 map age).
      */
@@ -542,7 +603,8 @@ class Client
             $options[RequestOptions::HEADERS]['Authorization'] = 'Bearer ' . $apiKey;
         }
         if ($body !== null) {
-            $options[RequestOptions::JSON] = $body;
+            // An empty body is the JSON object `{}` (§22), not the list `[]`.
+            $options[RequestOptions::JSON] = $body === [] ? new \stdClass() : $body;
         }
 
         $httpClient = $this->httpClientFactory->create();
@@ -717,9 +779,11 @@ class Client
 
     /**
      * The default store view's storefront address, also when connected from
-     * bin/magento with web server rewrites off (PRO-3733).
+     * bin/magento with web server rewrites off (PRO-3733): what a setup
+     * exchange sends as `plugin_info.site_url`. The engine lets a design page
+     * be framed by its origin and takes a `return_url` on its host (§17, §22).
      */
-    private function siteUrl(): string
+    public function siteUrl(): string
     {
         try {
             $store = $this->storeManager->getDefaultStoreView();

@@ -24,6 +24,10 @@
  * In the per-language editor each trigger's table follows its card's switch
  * the same way, and the editor shows only while one of the cards is on.
  *
+ * A card that is on shows, in this order: its workflow, "Edit design" (CON-257,
+ * when Campaign Intelligence lists the email's design — panel/email-designs.phtml),
+ * its own settings and the discount code.
+ *
  * Each card, while it is on, has a "Send a discount code" switch (CON-198) as
  * its last block: a cart price rule picker, listing the rules that can
  * generate codes, and the days a code is valid. Without such a rule it says
@@ -62,10 +66,11 @@ $hasCartPriceRules = $discountRules === [] && $viewModel->hasCartPriceRules();
 // Store-event trigger cards. The id slug differs from the trigger key
 // (first_order -> firstorder, abandoned_cart -> abandoned) to match the
 // element ids panel/panels-js.phtml already binds; names reuse $triggers.
+// emailKey is the email's design key (contract §22) for "Edit design".
 $storeTriggers = [
-    ['id' => 'welcome', 'name' => $triggers['welcome'], 'desc' => __('Fires when a shopper subscribes to the newsletter in your store.')],
-    ['id' => 'firstorder', 'name' => $triggers['first_order'], 'desc' => __('Fires on a customer\'s first purchase.')],
-    ['id' => 'abandoned', 'name' => $triggers['abandoned_cart'], 'desc' => __('Fires when a cart is left behind.'), 'abandoned' => true],
+    ['id' => 'welcome', 'name' => $triggers['welcome'], 'desc' => __('Fires when a shopper subscribes to the newsletter in your store.'), 'emailKey' => 'plugin.welcome'],
+    ['id' => 'firstorder', 'name' => $triggers['first_order'], 'desc' => __('Fires on a customer\'s first purchase.'), 'emailKey' => 'plugin.first_order'],
+    ['id' => 'abandoned', 'name' => $triggers['abandoned_cart'], 'desc' => __('Fires when a cart is left behind.'), 'abandoned' => true, 'emailKey' => 'plugin.abandoned_cart'],
 ];
 ?>
 <div class="smaily-card">
@@ -97,6 +102,8 @@ $storeTriggers = [
                         <span><?= $escaper->escapeHtml(__('Smaily Workflow')) ?></span>
                         <select id="smaily-w-<?= /* @noEscape */ $id ?>-workflow" class="smaily-w-workflow"></select>
                     </label>
+                    <?php // "Edit design" (CON-257): filled by panel/email-designs.phtml when the engine lists the key. ?>
+                    <div class="smaily-engine-trigger__ctrl smaily-edit-design" data-email-key="<?= $escaper->escapeHtmlAttr($trigger['emailKey']) ?>" hidden></div>
                     <?php if (!empty($trigger['abandoned'])): ?>
                     <label class="smaily-engine-trigger__ctrl">
                         <span><?= $escaper->escapeHtml(__('Wait (minutes)')) ?></span>

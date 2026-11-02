@@ -792,6 +792,41 @@
 .smaily-store-trigger .smaily-w-coupon-rule { min-width: 16rem; }
 .smaily-store-trigger .smaily-w-coupon-days { width: 6rem; }
 
+/* "Edit design" on an email card (CON-257): a control beside the workflow,
+ * filled by panel/email-designs.phtml once the engine lists the email. */
+.smaily-edit-design[hidden] { display: none; }
+.smaily-edit-design__row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.smaily-ui .smaily-edit-design__button { white-space: nowrap; }
+.smaily-edit-design__meta { font-size: var(--fs-12); color: var(--s-text-3); max-width: 20rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smaily-edit-design__error { font-size: var(--fs-12); font-weight: 600; color: var(--s-danger); max-width: 34rem; }
+.smaily-edit-design__error[hidden] { display: none; }
+
+/* The design page over the admin (CON-257): a darkened page, a dialog that
+ * takes nearly the whole window, its header with the title, "Open in a new
+ * tab" and Close, and the engine's page in a frame below. Above Magento's
+ * own header and modals. */
+html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hidden; }
+.smaily-design-modal { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 24px; font-family: var(--font); }
+.smaily-design-modal[hidden] { display: none; }
+.smaily-design-modal__backdrop { position: absolute; inset: 0; background: rgba(20, 20, 20, .62); }
+.smaily-design-modal__dialog { position: relative; display: flex; flex-direction: column; width: 100%; max-width: 1440px; height: 100%; max-height: 1000px; background: var(--s-surface); border-radius: 6px; box-shadow: 0 12px 40px rgba(0, 0, 0, .35); overflow: hidden; outline: none; }
+.smaily-design-modal__header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-5); border-bottom: 1px solid var(--s-border); background: var(--s-surface); }
+.smaily-design-modal__title { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 var(--fs-16)/1.3 var(--font); color: var(--s-text); }
+.smaily-design-modal__actions { flex: 0 0 auto; display: flex; align-items: center; gap: var(--sp-2); }
+.smaily-design-modal__close { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 1px solid #d6d6d6; border-radius: var(--r-2); background: var(--s-surface); color: var(--s-text-2); font: 400 24px/1 var(--font); cursor: pointer; }
+.smaily-design-modal__close:hover { border-color: var(--s-border-strong); color: var(--s-text); }
+.smaily-design-modal :is(button, iframe):focus-visible { outline: 2px solid var(--s-link); outline-offset: 2px; box-shadow: none; }
+.smaily-design-modal__body { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: var(--s-surface-2); }
+.smaily-design-modal__loading { position: absolute; inset: 0; z-index: 2; background: var(--s-surface-2); display: flex; align-items: center; justify-content: center; gap: var(--sp-2); font-size: var(--fs-13); color: var(--s-text-2); }
+.smaily-design-modal__loading[hidden], .smaily-design-modal .smaily-banner[hidden] { display: none; }
+.smaily-design-modal .smaily-banner { position: relative; z-index: 3; margin: var(--sp-3) var(--sp-4) 0; }
+.smaily-design-modal__frame { flex: 1 1 auto; width: 100%; min-height: 0; border: 0; background: transparent; position: relative; }
+@media (max-width: 767px) {
+    .smaily-design-modal { padding: 0; }
+    .smaily-design-modal__dialog { max-height: none; border-radius: 0; }
+    .smaily-design-modal__header { flex-wrap: wrap; }
+}
+
 /* --- Log details slide-out: attempt timeline ------------------------------ */
 .smaily-log-details-retry { display: flex; gap: var(--sp-2); align-items: center; background: var(--s-info-soft); border: 1px solid var(--s-info-border); color: var(--s-info); border-radius: var(--r-3); padding: 11px 14px; font-size: var(--fs-13); line-height: 1.45; }
 .smaily-log-details-retry.is-terminal { background: var(--s-neutral-soft); border-color: var(--s-neutral-border); color: var(--s-text-2); }

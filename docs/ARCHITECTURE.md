@@ -25,7 +25,8 @@ Cron/               queue flushers, abandoned cart, reconcile, backfill tick,
 Model/
   Client/           Smaily marketing API client (Guzzle, Basic auth)
   Engine/           Campaign Intelligence: client, settings, ingest queue,
-                    payload builders, attribution, browse validation
+                    payload builders, attribution, browse validation,
+                    email designs
   Queue/            marketing event queue + per-type handlers
   ContactSync/      lawful-basis mode, payload builder, dispatcher, guard
   AbandonedCart/    quote-scan state, payload, restore tokens
@@ -2169,6 +2170,82 @@ Initial setup, Settings, Log. Design rules:
   change). Nothing reads these settings to send: no observer or plugin
   touches Magento's order or shipment emails
   (`ModuleDefinitionTest::testNothingHooksMagentosOrderOrShipmentEmails`).
+- **Email designs — "Edit design" on every email card (CON-257, contract
+  §22–§23; as the WooCommerce plugin's CON-173, except where named
+  below).** Each email card carries an empty slot,
+  `.smaily-edit-design[data-email-key]`, right after its workflow and
+  inside its `.smaily-trigger-settings`, so it shows only while the card is
+  on (CON-256): Welcome / First order / Abandoned cart →
+  `plugin.welcome` / `plugin.first_order` / `plugin.abandoned_cart`
+  (`panel/automations.phtml`); Order / Shipping confirmation →
+  `transactional.order_confirmation` / `transactional.shipping_confirmation`
+  (`panel/transactional-triggers.phtml`, after the per-language table when
+  there is one); each Campaign Intelligence card → its §11 catalogue key
+  (`config/engine-automations.phtml`). `panel/email-designs.phtml` (a block
+  of the Settings page and the initial setup, view model
+  `ViewModel\Adminhtml\EmailDesignsData`) renders nothing unless
+  `Engine\Settings::isSendingAllowed()` (connected, not refused). It reads
+  §23 through `Api\Designs` when the page opens, again when the admin
+  returns to the tab after a design page in a tab (window `focus` /
+  `visibilitychange`), after a modal closes and after a `saved` message,
+  and fills a slot only when the list names its key — the card-to-key map
+  is fixed, whether a button shows comes from §23. Nothing asks §23 before
+  a send. `Engine\EmailDesigns::designs()` keeps the items of kinds
+  `engine` / `plugin` / `transactional` with a valid key and passes on only
+  the key, kind, design state and subject. The engine's §17 "Set up" link
+  has no button of its own here: an engine card's "Edit design" is §22 with
+  its catalogue key, which opens that same setup page.
+  - **The click.** `Api\DesignLink` (POST, form key checked by Magento's
+    backend validator and again in `AbstractEmailDesignAction`, Settings ACL
+    `Smaily_Connect::config`; an engine email also needs
+    `Smaily_Connect::automations`, which saving those automations needs)
+    calls `Engine\Client::emailDesignLink()` — map key
+    `emails_design_link`, fallback `PATH_EMAILS_DESIGN_LINK`, `{email_key}`
+    substituted, an empty body sent as `{}` — one attempt, no retry and no
+    wait, like `emailDesigns()`. `return_url` (the admin page) goes along
+    only when it is https on the host of `Client::siteUrl()`, the site URL
+    the setup exchange sends as `plugin_info.site_url`; `language` is the
+    admin locale's two letters. Only an https link is passed on, and the
+    page takes only a link on the engine's origin. The answer is `{url}`
+    with `Cache-Control: no-store`; the link is never stored, logged or
+    cached (`DesignLinkTest::testTheLinkIsNeverLogged`). Engine failures
+    map to the admin's words: 404 `unknown_email`, any other 404 (route not
+    offered), 401, 403, 429 and the rest (5xx, no answer) each have their
+    message.
+  - **Modal first, new tab as the fallback (Erkki, 2026-10-27: every engine
+    page a connector opens shows in an in-admin modal over a darkened page;
+    a deliberate difference from the WooCommerce plugin, which opens a
+    tab).** The engine lets a design page be framed only by the origin of
+    `plugin_info.site_url`, on https (§22 Embedding rule 1).
+    `EmailDesignsData::isFrameable()` compares it with the admin request's
+    origin (`Http::getScheme()` — `isSecure()`, so a TLS proxy counts as
+    Magento counts it — and `getHttpHost(false)`). When they match, a press
+    opens the modal at once with a loading state, asks for the link, and
+    puts it in an iframe; Esc, the close button, a backdrop click and a
+    `closed` message close it, focus stays inside it and returns to the
+    button. A frame the browser refuses (CSP `frame-ancestors`, a
+    third-party cookie block) cannot be told apart from a slow one, so the
+    header always has **Open in a new tab** (a fresh link: the first one is
+    used) and a hint points at it when the frame has not loaded after 8 s.
+    When the origins differ — an admin on a host of its own, another port,
+    plain http — a press opens the page in a new tab as the WooCommerce
+    plugin does: a blank tab opened in the click itself (pop-up blockers
+    allow nothing later), its `opener` cut, sent to the link when it
+    arrives, closed with the reason on the card on a failure.
+  - **Messages.** Only a message from the origin of the engine base URL
+    with `type: 'smaily_intelligence_design'` counts; `saved` reads §23
+    again, `closed` closes the modal (which reads it). The message is a
+    hint: no state or id is taken from it.
+  - **No pushed workflow yet — a Magento difference.** The WooCommerce
+    plugin stores each plugin and transactional email's
+    `smaily_workflow_id` with its `smaily_subdomain` on every §23 read and
+    starts the email with it on that account, in the default language
+    (CON-173, CON-218). This extension stores no id and starts every email
+    with the workflow the merchant picked. The engine sends no ids yet
+    (the Smaily push is not live; §23 "Smaily dependency"), so nothing
+    differs for a store today; the follow-up adds it before the push goes
+    live. `created_by: "other"` (a hand-built workflow, edited in Smaily) is
+    not read either, as in the WooCommerce plugin.
 - **Dashboard is operational truth.** Every number on
   `dashboard/index.phtml` is a real local queue query
   (`Model\Adminhtml\DashboardStats`); the health verdict reuses the

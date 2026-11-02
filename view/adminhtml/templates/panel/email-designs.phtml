@@ -1,0 +1,402 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * "Edit design" on every email card (CON-257, after the WooCommerce
+ * plugin's CON-173) — the Settings page and the initial setup render it
+ * once, below the panels. Every email card carries an empty slot,
+ * .smaily-edit-design[data-email-key], right after its workflow and inside
+ * its .smaily-trigger-settings, so it shows only while the card is on
+ * (CON-256): the store-run cards (plugin.welcome, plugin.first_order,
+ * plugin.abandoned_cart), the transactional cards
+ * (transactional.order_confirmation, transactional.shipping_confirmation)
+ * and each Campaign Intelligence card (its §11 catalogue key).
+ *
+ * The script reads the engine's design list (contract §23, through
+ * smaily_connect/api/designs) when the page opens, and fills a slot only
+ * when the list names its key: the "Edit design" button, the design's
+ * state and its subject. Which emails exist comes from the list, never
+ * from this page. Without Campaign Intelligence (or with a refused
+ * account) nothing renders; a failed read shows no button.
+ *
+ * A press opens the email's design page (§22) in a frame over the admin
+ * (Erkki, 2026-10-27: every engine page a connector opens shows in an
+ * in-admin modal over the darkened page, a new tab only as a fallback;
+ * the WooCommerce plugin still opens a tab). The modal shows at once with
+ * a loading state, the server mints the one-time link
+ * (smaily_connect/api/designlink) and the frame gets it. The engine lets
+ * only the origin of the site URL the extension gave it frame the page
+ * (§22 Embedding rule 1), so an admin on another origin, or not on https,
+ * opens the page in a new tab instead: the tab is opened blank in the
+ * press itself (a pop-up blocker allows a tab only there), cut off from
+ * this page, and sent to the link when it arrives; on a failure it closes
+ * and the card says why. A frame the browser refuses cannot be told apart
+ * from a slow one, so the modal's header always offers "Open in a new
+ * tab" (a fresh link: the first one is used), and a hint points at it when
+ * the frame has not loaded after a few seconds.
+ *
+ * The design page posts {type: 'smaily_intelligence_design', event:
+ * 'saved' | 'closed'} to this page (§22 Embedding rule 4); only a message
+ * from the engine's origin counts. "saved" reads the list again; "closed"
+ * closes the modal, which reads it again too. After a design page in a
+ * tab, the list is read again when the admin comes back to this tab. The
+ * link is never kept: it lives only in the frame or the tab.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\Adminhtml\EmailDesignsData $viewModel */
+$viewModel = $block->getData('view_model');
+if (!$viewModel->isAvailable()) {
+    return;
+}
+$config = [
+    'designsUrl' => (string)$block->getUrl('smaily_connect/api/designs'),
+    'linkUrl' => (string)$block->getUrl('smaily_connect/api/designlink'),
+    'engineOrigin' => $viewModel->getEngineOrigin(),
+    'frameable' => $viewModel->isFrameable(),
+    // Milliseconds before the modal points at "Open in a new tab".
+    'hintDelay' => 8000,
+];
+$strings = [
+    'label' => (string)__('Email design'),
+    'button' => (string)__('Edit design'),
+    'title' => (string)__('Edit design: %1'),
+    'subject' => (string)__('Subject: %1'),
+    'failed' => (string)__('The design page could not be opened. Try again in a minute.'),
+    'popupBlocked' => (string)__('Your browser blocked the new tab. Allow pop-ups for this page and try again.'),
+    'states' => [
+        'none' => (string)__('No design saved yet'),
+        'starter' => (string)__('Starter design'),
+        'edited' => (string)__('Design edited'),
+        'check_failed' => (string)__('Design check failed — open the design to fix it'),
+    ],
+];
+?>
+<div class="smaily-design-modal" id="smaily-design-modal" hidden>
+    <div class="smaily-design-modal__backdrop"></div>
+    <div class="smaily-design-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="smaily-design-modal-title" tabindex="-1">
+        <div class="smaily-design-modal__header">
+            <h2 class="smaily-design-modal__title" id="smaily-design-modal-title"></h2>
+            <div class="smaily-design-modal__actions">
+                <button type="button" class="action-secondary smaily-design-modal__newtab"><span><?= $escaper->escapeHtml(__('Open in a new tab')) ?></span></button>
+                <button type="button" class="smaily-design-modal__close" aria-label="<?= $escaper->escapeHtmlAttr(__('Close')) ?>" title="<?= $escaper->escapeHtmlAttr(__('Close')) ?>">&times;</button>
+            </div>
+        </div>
+        <div class="smaily-design-modal__body">
+            <div class="smaily-design-modal__loading" role="status">
+                <span class="smaily-inline-status__spinner"></span>
+                <span><?= $escaper->escapeHtml(__('Opening the design page…')) ?></span>
+            </div>
+            <div class="smaily-banner smaily-banner--warning smaily-design-modal__hint" hidden>
+                <span class="smaily-banner__icon">&#9888;</span>
+                <div class="smaily-banner__body">
+                    <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Is the design page not showing? Your browser may not allow it inside the Magento admin. Press Open in a new tab.')) ?></div>
+                </div>
+            </div>
+            <div class="smaily-banner smaily-banner--error smaily-design-modal__error" role="alert" hidden>
+                <span class="smaily-banner__icon">&#9888;</span>
+                <div class="smaily-banner__body"><div class="smaily-banner__message"></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+require(['jquery'], function ($) {
+    'use strict';
+
+    var config = <?= /* @noEscape */ json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) ?>;
+    var strings = <?= /* @noEscape */ json_encode($strings, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
+    // The last design list read, by email key; null shows no button.
+    var designs = null;
+    // A design page is open in a tab: read the list when the admin returns.
+    var awaitingReturn = false;
+    // The open modal: {key, trigger}, null while it is closed. Each open
+    // counts up `opening`, so the answer to an earlier open is dropped.
+    var current = null;
+    var opening = 0;
+    var hintTimer = null;
+    var $modal = $('#smaily-design-modal').appendTo(document.body);
+    var $dialog = $modal.find('.smaily-design-modal__dialog');
+    var $body = $modal.find('.smaily-design-modal__body');
+    var $loading = $modal.find('.smaily-design-modal__loading');
+    var $hint = $modal.find('.smaily-design-modal__hint');
+    var $error = $modal.find('.smaily-design-modal__error');
+
+    function post(url, data) {
+        var separator = url.indexOf('?') === -1 ? '?' : '&';
+        return fetch(url + separator + 'form_key=' + encodeURIComponent(window.FORM_KEY), {
+            method: 'POST',
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+            body: JSON.stringify(data || {})
+        }).then(function (response) {
+            return response.json().catch(function () {
+                return {};
+            }).then(function (body) {
+                if (!response.ok) {
+                    throw new Error((body && body.message) || strings.failed);
+                }
+                return body || {};
+            });
+        });
+    }
+
+    // --- The buttons ----------------------------------------------------
+    function build($slot) {
+        $slot.append(
+            $('<span class="smaily-edit-design__label"></span>').text(strings.label),
+            $('<div class="smaily-edit-design__row"></div>').append(
+                $('<button type="button" class="action-secondary smaily-edit-design__button"></button>')
+                    .append($('<span></span>').text(strings.button)),
+                $('<span class="smaily-edit-design__meta"></span>')
+            ),
+            $('<div class="smaily-edit-design__error" role="alert" hidden></div>')
+        );
+    }
+
+    function render() {
+        $('.smaily-edit-design[data-email-key]').each(function () {
+            var $slot = $(this),
+                item = designs && designs[String($slot.attr('data-email-key'))],
+                meta;
+            if (!item) {
+                $slot.prop('hidden', true);
+                return;
+            }
+            if (!$slot.children().length) {
+                build($slot);
+            }
+            meta = [strings.states[item.design_state] || ''];
+            if (item.subject) {
+                meta.push(strings.subject.replace('%1', function () {
+                    return item.subject;
+                }));
+            }
+            meta = meta.filter(Boolean).join(' · ');
+            $slot.find('.smaily-edit-design__meta').text(meta).attr('title', meta);
+            $slot.prop('hidden', false);
+        });
+    }
+
+    function readDesigns() {
+        return post(config.designsUrl).then(function (body) {
+            var byKey = {};
+            (Array.isArray(body.emails) ? body.emails : []).forEach(function (item) {
+                if (item && typeof item.email_key === 'string') {
+                    byKey[item.email_key] = item;
+                }
+            });
+            designs = byKey;
+        }, function () {
+            designs = null;
+        }).then(render);
+    }
+
+    // The one-time link: only a page on the engine's own origin, the origin
+    // whose messages this page takes.
+    function requestLink(key) {
+        return post(config.linkUrl, {email_key: key, return_url: window.location.href}).then(function (body) {
+            if (typeof body.url !== 'string' || body.url.indexOf(config.engineOrigin + '/') !== 0) {
+                throw new Error(strings.failed);
+            }
+            return body.url;
+        });
+    }
+
+    function cardError($slot, message) {
+        $slot.find('.smaily-edit-design__error').text(message || '').prop('hidden', !message);
+    }
+
+    // --- A new tab --------------------------------------------------------
+    function openInTab(key, $slot) {
+        var tab;
+        cardError($slot, '');
+        tab = window.open('', '_blank');
+        if (!tab) {
+            cardError($slot, strings.popupBlocked);
+            return;
+        }
+        try {
+            tab.opener = null;
+        } catch (ignore) {
+            // A browser that keeps the opener read-only still opens the page.
+        }
+        awaitingReturn = true;
+        requestLink(key).then(function (url) {
+            tab.location.href = url;
+        }, function (error) {
+            tab.close();
+            awaitingReturn = false;
+            cardError($slot, error.message);
+        });
+    }
+
+    function onReturn() {
+        if (!awaitingReturn || document.visibilityState === 'hidden') {
+            return;
+        }
+        awaitingReturn = false;
+        readDesigns();
+    }
+    window.addEventListener('focus', onReturn);
+    document.addEventListener('visibilitychange', onReturn);
+
+    // --- The modal --------------------------------------------------------
+    function focusables() {
+        return $dialog.find('button, iframe, a[href]').filter(function () {
+            return !$(this).closest('[hidden]').length;
+        });
+    }
+
+    function openModal(key, $slot, $trigger) {
+        var ticket = ++opening,
+            name;
+        current = {key: key, slot: $slot, trigger: $trigger};
+        name = $slot.closest('.smaily-engine-trigger').find('.smaily-engine-trigger__name').first().text();
+        $modal.find('.smaily-design-modal__title').text(strings.title.replace('%1', function () {
+            return name;
+        }));
+        $body.find('iframe').remove();
+        $loading.prop('hidden', false);
+        $hint.prop('hidden', true);
+        $error.prop('hidden', true);
+        $modal.prop('hidden', false);
+        $('html').addClass('smaily-design-modal-open');
+        $modal.find('.smaily-design-modal__close').trigger('focus');
+
+        requestLink(key).then(function (url) {
+            var $frame;
+            if (ticket !== opening || !current) {
+                return;
+            }
+            $frame = $('<iframe class="smaily-design-modal__frame"></iframe>')
+                .attr('title', $modal.find('.smaily-design-modal__title').text())
+                .on('load', function () {
+                    clearTimeout(hintTimer);
+                    $loading.prop('hidden', true);
+                    $hint.prop('hidden', true);
+                });
+            $body.append($frame);
+            $frame.attr('src', url);
+            hintTimer = setTimeout(function () {
+                $hint.prop('hidden', false);
+            }, config.hintDelay);
+        }, function (error) {
+            if (ticket !== opening || !current) {
+                return;
+            }
+            $loading.prop('hidden', true);
+            $error.find('.smaily-banner__message').text(error.message);
+            $error.prop('hidden', false);
+        });
+    }
+
+    // Closing ends the frame and reads the list again, unless the design
+    // page moved to a tab, whose return reads it.
+    function closeModal(reread) {
+        var $trigger;
+        if (!current) {
+            return;
+        }
+        $trigger = current.trigger;
+        current = null;
+        opening++;
+        clearTimeout(hintTimer);
+        $body.find('iframe').remove();
+        $modal.prop('hidden', true);
+        $('html').removeClass('smaily-design-modal-open');
+        if ($trigger && $trigger.length && document.contains($trigger[0])) {
+            $trigger.trigger('focus');
+        }
+        if (reread !== false) {
+            readDesigns();
+        }
+    }
+
+    $modal.find('.smaily-design-modal__close').on('click', function () {
+        closeModal();
+    });
+    $modal.find('.smaily-design-modal__backdrop').on('click', function () {
+        closeModal();
+    });
+    // A fresh link in a new tab: the frame's link is used up once opened.
+    $modal.find('.smaily-design-modal__newtab').on('click', function () {
+        var key, $slot;
+        if (!current) {
+            return;
+        }
+        key = current.key;
+        $slot = current.slot;
+        closeModal(false);
+        openInTab(key, $slot);
+    });
+
+    $(document).on('keydown', function (event) {
+        var $items, first, last;
+        if (!current) {
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeModal();
+            return;
+        }
+        if (event.key !== 'Tab') {
+            return;
+        }
+        // Focus stays inside the modal while it is open.
+        $items = focusables();
+        first = $items.get(0);
+        last = $items.get($items.length - 1);
+        if (event.shiftKey && (document.activeElement === first || !$dialog[0].contains(document.activeElement))) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || !$dialog[0].contains(document.activeElement))) {
+            event.preventDefault();
+            first.focus();
+        }
+    });
+    document.addEventListener('focusin', function (event) {
+        if (current && !$dialog[0].contains(event.target)) {
+            focusables().first().trigger('focus');
+        }
+    });
+
+    // The design page's messages (§22 Embedding rule 4): a hint to read
+    // the list again, never a state or an id to take from the message.
+    window.addEventListener('message', function (event) {
+        var data = event.data;
+        if (event.origin !== config.engineOrigin || !data || typeof data !== 'object'
+            || data.type !== 'smaily_intelligence_design') {
+            return;
+        }
+        if (data.event === 'closed') {
+            if (current) {
+                closeModal();
+            } else {
+                readDesigns();
+            }
+        } else if (data.event === 'saved') {
+            readDesigns();
+        }
+    });
+
+    $(document).on('click', '.smaily-edit-design__button', function () {
+        var $button = $(this),
+            $slot = $button.closest('.smaily-edit-design'),
+            key = String($slot.attr('data-email-key'));
+        cardError($slot, '');
+        if (config.frameable) {
+            openModal(key, $slot, $button);
+        } else {
+            openInTab(key, $slot);
+        }
+    });
+
+    readDesigns();
+});
+</script>

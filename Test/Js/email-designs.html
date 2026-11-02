@@ -1,0 +1,426 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for "Edit design" on the email cards (CON-257): the real
+  templates — the store-run, transactional and Campaign Intelligence cards
+  and panel/email-designs.phtml — rendered in en_US and et_EE by
+  Test/Js/render-admin.php into Test/Js/build/, with the admin stylesheet
+  and jQuery from vendor/, one fresh frame per page and locale. Stubbed:
+  RequireJS's require(), the requests (fetch) and window.open. The design
+  list (contract §23) names Welcome, Abandoned cart, Order confirmation and
+  both Campaign Intelligence emails, not First order or Shipping
+  confirmation; a design link for Order confirmation is refused.
+
+  A card shows "Edit design" only while it is on and the list names its
+  key, after its workflow. On the email-designs page the admin may frame
+  the design page: a press shows the modal before the link is asked for,
+  and the frame gets the link. Esc, the close button, the backdrop and a
+  "closed" message from the engine's origin close the modal; a message
+  from another origin changes nothing; a "saved" message reads the list
+  again. "Open in a new tab" opens the tab before it asks for a fresh link.
+  On the email-designs-tab page the admin may not frame it: a press opens
+  the tab before the request, the admin's return reads the list again, and
+  a refused link closes the tab and says why on the card.
+
+  Run it with bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>email designs harness</title>
+    <script src="build/email-designs.en_US.js"></script>
+    <script src="build/email-designs.et_EE.js"></script>
+    <script src="build/email-designs-tab.en_US.js"></script>
+    <script src="build/email-designs-tab.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var CSS = '../../view/adminhtml/web/css/smaily-admin.css';
+    var ENGINE = 'https://engine.invalid';
+    var LINK = ENGINE + '/design/email/dl_test';
+    var DESIGNS = {emails: [
+        {email_key: 'plugin.welcome', kind: 'plugin', design_state: 'starter', subject: 'Welcome aboard'},
+        {email_key: 'plugin.abandoned_cart', kind: 'plugin', design_state: 'edited', subject: ''},
+        {email_key: 'transactional.order_confirmation', kind: 'transactional', design_state: 'none', subject: ''},
+        {email_key: 'replenish_due', kind: 'engine', design_state: 'starter', subject: ''},
+        {email_key: 'winback_risk', kind: 'engine', design_state: 'starter', subject: ''}
+    ]};
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    // window.events lists, in order, every tab opened and every request:
+    // "open", "designs" and "link <email key>". A design link answers after
+    // 30 ms, so a check can see the page while it waits; Order
+    // confirmation's link is refused.
+    function stubs() {
+        return [
+            '<link rel="stylesheet" href="' + CSS + '">',
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.events = [];',
+            'window.requests = [];',
+            'window.tabs = [];',
+            'window.blockTabs = false;',
+            'window.open = function () {',
+            '  window.events.push("open");',
+            '  if (window.blockTabs) { return null; }',
+            '  var tab = {opener: window, location: {href: ""}, closed: false,',
+            '    close: function () { this.closed = true; }};',
+            '  window.tabs.push(tab);',
+            '  return tab;',
+            '};',
+            'function answer(body, status) {',
+            '  return new Response(JSON.stringify(body), {status: status || 200,',
+            '    headers: {"Content-Type": "application/json"}}); }',
+            'window.fetch = function (url, options) {',
+            '  var body = options.body || "";',
+            '  window.requests.push({url: url, body: body});',
+            '  if (url.indexOf("api/designs/") !== -1) {',
+            '    window.events.push("designs");',
+            '    return Promise.resolve(answer(' + JSON.stringify(DESIGNS) + '));',
+            '  }',
+            '  if (url.indexOf("api/designlink/") !== -1) {',
+            '    var key = JSON.parse(body).email_key;',
+            '    window.events.push("link " + key);',
+            '    window.modalAtRequest = !document.getElementById("smaily-design-modal").hidden;',
+            '    return new Promise(function (resolve) { setTimeout(function () {',
+            '      resolve(key === "transactional.order_confirmation"',
+            '        ? answer({error: "unknown_email", message: "No design here"}, 404)',
+            '        : answer({url: "' + LINK + '"}));',
+            '    }, 30); });',
+            '  }',
+            '  if (url.indexOf("/workflows/") !== -1) {',
+            '    return Promise.resolve(answer({workflows: [{id: "7", name: "Flow"}]}));',
+            '  }',
+            '  return Promise.resolve(answer({saved: true}));',
+            '};',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>',
+            '<script>window.require = function (deps, callback) { callback(window.jQuery); };<\/script>'
+        ].join('\n');
+    }
+
+    function open(page) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.style.width = '1200px';
+            frame.style.height = '900px';
+            frame.onload = function () {
+                wait(100).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs()
+                + '</head><body>' + rendered.html
+                + '<script>window.panels = window.smailyPanelsInit(window.jQuery); window.panels.initAll();<\/script>'
+                + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function shown(element) {
+        return !!element && element.offsetParent !== null;
+    }
+
+    function tick(frame, element, on) {
+        element.checked = on;
+        frame.contentWindow.jQuery(element).trigger('change');
+    }
+
+    function before(first, second) {
+        return !!first && !!second && !!(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+    }
+
+    function count(frame, event) {
+        return frame.contentWindow.events.filter(function (entry) {
+            return entry === event;
+        }).length;
+    }
+
+    function slot(doc, key) {
+        return doc.querySelector('.smaily-edit-design[data-email-key="' + key + '"]');
+    }
+
+    function button(doc, key) {
+        var element = slot(doc, key);
+
+        return element ? element.querySelector('.smaily-edit-design__button') : null;
+    }
+
+    function modalOpen(doc) {
+        return !doc.getElementById('smaily-design-modal').hidden;
+    }
+
+    function message(frame, origin, data) {
+        frame.contentWindow.dispatchEvent(new frame.contentWindow.MessageEvent('message', {data: data, origin: origin}));
+    }
+
+    function key(doc, name, shift) {
+        doc.dispatchEvent(new doc.defaultView.KeyboardEvent('keydown', {key: name, shiftKey: !!shift, bubbles: true}));
+    }
+
+    async function cards(locale) {
+        var frame = await open('email-designs.' + locale),
+            doc = frame.contentDocument,
+            strings = window.smailyAdminPages['email-designs.' + locale].strings,
+            byId = function (id) {
+                return doc.getElementById(id);
+            },
+            engineCard = function (trigger) {
+                return doc.querySelector('.smaily-engine-trigger[data-trigger="' + trigger + '"]');
+            },
+            welcome;
+
+        check(locale + ', the design list is read once as the page opens', count(frame, 'designs') === 1);
+        check(locale + ', a card that is off shows no "Edit design"',
+            !shown(slot(doc, 'plugin.welcome')) && !shown(slot(doc, 'transactional.order_confirmation'))
+            && !shown(slot(doc, 'winback_risk')));
+
+        tick(frame, byId('smaily-w-welcome-enabled'), true);
+        tick(frame, byId('smaily-w-firstorder-enabled'), true);
+        tick(frame, byId('smaily-w-abandoned-enabled'), true);
+        welcome = slot(doc, 'plugin.welcome');
+        check(locale + ', Welcome on: "Edit design" shows with the design state and subject',
+            shown(button(doc, 'plugin.welcome'))
+            && button(doc, 'plugin.welcome').textContent === strings['Edit design']
+            && welcome.querySelector('.smaily-edit-design__label').textContent === strings['Email design']
+            && welcome.querySelector('.smaily-edit-design__meta').textContent
+                === strings['Starter design'] + ' · ' + strings['Subject: %1'].replace('%1', 'Welcome aboard'));
+        check(locale + ', First order on: no "Edit design", the design list does not name it',
+            shown(byId('smaily-w-firstorder-workflow')) && !shown(slot(doc, 'plugin.first_order')));
+        check(locale + ', Abandoned cart on: the workflow, "Edit design", "Wait (minutes)", the discount code last',
+            shown(button(doc, 'plugin.abandoned_cart'))
+            && before(byId('smaily-w-abandoned-workflow'), slot(doc, 'plugin.abandoned_cart'))
+            && before(slot(doc, 'plugin.abandoned_cart'), byId('smaily-w-cutoff'))
+            && before(byId('smaily-w-cutoff'), byId('smaily-w-abandoned-coupon-enabled'))
+            && slot(doc, 'plugin.abandoned_cart').querySelector('.smaily-edit-design__meta').textContent
+                === strings['Design edited']);
+
+        tick(frame, byId('smaily-tx-order_confirmation-enabled'), true);
+        tick(frame, byId('smaily-tx-shipment_confirmation-enabled'), true);
+        check(locale + ', Order confirmation on: "Edit design" after its workflows',
+            shown(button(doc, 'transactional.order_confirmation'))
+            && before(byId('smaily-tx-order_confirmation-enabled').closest('.smaily-tx-trigger')
+                .querySelector('.smaily-ml-table'), slot(doc, 'transactional.order_confirmation')));
+        check(locale + ', Shipping confirmation on: no "Edit design", the design list does not name it',
+            !shown(slot(doc, 'transactional.shipping_confirmation')));
+
+        check(locale + ', Replenishment due on: "Edit design" after its workflow',
+            shown(button(doc, 'replenish_due'))
+            && before(engineCard('replenish_due').querySelector('[data-field="workflow_id"]'), slot(doc, 'replenish_due'))
+            && before(slot(doc, 'replenish_due'), engineCard('replenish_due').querySelector('[data-field="cooldown_days"]')));
+        check(locale + ', Win-back off: no "Edit design"', !shown(slot(doc, 'winback_risk')));
+        tick(frame, engineCard('winback_risk').querySelector('[data-field="enabled"]'), true);
+        check(locale + ', Win-back on: "Edit design" shows', shown(button(doc, 'winback_risk')));
+        tick(frame, byId('smaily-w-welcome-enabled'), false);
+        check(locale + ', Welcome off again: "Edit design" hides', !shown(button(doc, 'plugin.welcome')));
+        tick(frame, byId('smaily-w-welcome-enabled'), true);
+        frame.remove();
+    }
+
+    async function modal(locale) {
+        var frame = await open('email-designs.' + locale),
+            doc = frame.contentDocument,
+            win = frame.contentWindow,
+            strings = window.smailyAdminPages['email-designs.' + locale].strings,
+            dialog = doc.querySelector('.smaily-design-modal__dialog'),
+            designFrame = function () {
+                return doc.querySelector('.smaily-design-modal__frame');
+            },
+            reads,
+            press = async function (emailKey) {
+                button(doc, emailKey).click();
+                await wait(100);
+            },
+            name;
+
+        tick(frame, doc.getElementById('smaily-w-welcome-enabled'), true);
+        tick(frame, doc.getElementById('smaily-tx-order_confirmation-enabled'), true);
+        name = doc.getElementById('smaily-w-welcome-enabled').closest('.smaily-engine-trigger')
+            .querySelector('.smaily-engine-trigger__name').textContent;
+
+        button(doc, 'plugin.welcome').click();
+        check(locale + ', a press shows the modal with its loading state before the link is asked for',
+            modalOpen(doc) && win.modalAtRequest === true
+            && shown(doc.querySelector('.smaily-design-modal__loading'))
+            && doc.querySelector('.smaily-design-modal__loading').textContent.trim() === strings['Opening the design page…']
+            && win.events.indexOf('open') === -1);
+        check(locale + ', the modal is titled with the email and offers "Open in a new tab"',
+            doc.querySelector('.smaily-design-modal__title').textContent === strings['Edit design: %1'].replace('%1', name)
+            && doc.querySelector('.smaily-design-modal__newtab').textContent.trim() === strings['Open in a new tab']);
+        check(locale + ', focus moves into the modal', dialog.contains(doc.activeElement));
+        await wait(100);
+        check(locale + ', the frame gets the link',
+            !!designFrame() && designFrame().getAttribute('src') === LINK
+            && JSON.parse(win.requests.filter(function (request) {
+                return request.url.indexOf('api/designlink/') !== -1;
+            })[0].body).email_key === 'plugin.welcome');
+
+        // Focus stays in the modal: Tab from the last control goes to the first.
+        designFrame().focus();
+        key(doc, 'Tab');
+        check(locale + ', Tab from the frame wraps to "Open in a new tab"',
+            doc.activeElement === doc.querySelector('.smaily-design-modal__newtab'));
+        key(doc, 'Tab', true);
+        check(locale + ', Shift+Tab from the first control wraps to the frame', doc.activeElement === designFrame());
+
+        reads = count(frame, 'designs');
+        key(doc, 'Escape');
+        check(locale + ', Esc closes the modal, ends the frame and gives the focus back to the button',
+            !modalOpen(doc) && !designFrame() && doc.activeElement === button(doc, 'plugin.welcome'));
+        await wait(20);
+        check(locale + ', closing reads the design list again', count(frame, 'designs') === reads + 1);
+
+        await press('plugin.welcome');
+        doc.querySelector('.smaily-design-modal__close').click();
+        check(locale + ', the close button closes the modal', !modalOpen(doc) && !designFrame());
+
+        await press('plugin.welcome');
+        doc.querySelector('.smaily-design-modal__backdrop').click();
+        check(locale + ', a backdrop click closes the modal', !modalOpen(doc));
+
+        await press('plugin.welcome');
+        reads = count(frame, 'designs');
+        message(frame, 'https://evil.example', {type: 'smaily_intelligence_design', event: 'closed', email_key: 'plugin.welcome'});
+        message(frame, 'https://evil.example', {type: 'smaily_intelligence_design', event: 'saved', email_key: 'plugin.welcome', version: 2});
+        await wait(20);
+        check(locale + ', a message from another origin changes nothing',
+            modalOpen(doc) && count(frame, 'designs') === reads);
+        message(frame, ENGINE, {type: 'other', event: 'closed'});
+        await wait(20);
+        check(locale + ', a message of another type changes nothing', modalOpen(doc) && count(frame, 'designs') === reads);
+        message(frame, ENGINE, {type: 'smaily_intelligence_design', event: 'saved', email_key: 'plugin.welcome', version: 2});
+        await wait(20);
+        check(locale + ', "saved" from the engine reads the design list again and keeps the modal',
+            modalOpen(doc) && count(frame, 'designs') === reads + 1);
+        message(frame, ENGINE, {type: 'smaily_intelligence_design', event: 'closed', email_key: 'plugin.welcome'});
+        await wait(20);
+        check(locale + ', "closed" from the engine closes the modal and reads the design list again',
+            !modalOpen(doc) && !designFrame() && count(frame, 'designs') === reads + 2);
+
+        // "Open in a new tab": the tab first, then a fresh link.
+        await press('plugin.welcome');
+        win.events.length = 0;
+        doc.querySelector('.smaily-design-modal__newtab').click();
+        check(locale + ', "Open in a new tab" opens the tab before it asks for a fresh link and closes the modal',
+            win.events[0] === 'open' && win.events[1] === 'link plugin.welcome' && !modalOpen(doc)
+            && win.tabs[0].opener === null);
+        await wait(100);
+        check(locale + ', the tab gets the fresh link', win.tabs[0].location.href === LINK && !win.tabs[0].closed);
+
+        // A refused link: the modal says why.
+        await press('transactional.order_confirmation');
+        check(locale + ', a refused link shows the reason in the modal, and no frame',
+            modalOpen(doc) && !designFrame()
+            && shown(doc.querySelector('.smaily-design-modal__error'))
+            && doc.querySelector('.smaily-design-modal__error .smaily-banner__message').textContent === 'No design here'
+            && !shown(doc.querySelector('.smaily-design-modal__loading')));
+        key(doc, 'Escape');
+        frame.remove();
+    }
+
+    async function tab(locale) {
+        var frame = await open('email-designs-tab.' + locale),
+            doc = frame.contentDocument,
+            win = frame.contentWindow,
+            strings = window.smailyAdminPages['email-designs-tab.' + locale].strings,
+            reads;
+
+        tick(frame, doc.getElementById('smaily-w-welcome-enabled'), true);
+        tick(frame, doc.getElementById('smaily-tx-order_confirmation-enabled'), true);
+        win.events.length = 0;
+        button(doc, 'plugin.welcome').click();
+        check(locale + ', an admin that may not frame the page: the press opens a tab before the request, no modal',
+            win.events[0] === 'open' && win.events[1] === 'link plugin.welcome' && !modalOpen(doc)
+            && win.tabs[0].opener === null);
+        await wait(100);
+        check(locale + ', the tab gets the link', win.tabs[0].location.href === LINK);
+        reads = count(frame, 'designs');
+        win.dispatchEvent(new win.Event('focus'));
+        await wait(20);
+        check(locale + ', the admin\'s return reads the design list again', count(frame, 'designs') === reads + 1);
+        win.dispatchEvent(new win.Event('focus'));
+        await wait(20);
+        check(locale + ', only the first return reads it', count(frame, 'designs') === reads + 1);
+
+        button(doc, 'transactional.order_confirmation').click();
+        await wait(100);
+        check(locale + ', a refused link closes the tab and says why on the card',
+            win.tabs[1].closed
+            && slot(doc, 'transactional.order_confirmation').querySelector('.smaily-edit-design__error').textContent
+                === 'No design here');
+
+        win.blockTabs = true;
+        win.events.length = 0;
+        button(doc, 'plugin.welcome').click();
+        await wait(50);
+        check(locale + ', a blocked tab asks for no link and says how to allow it',
+            win.events.join() === 'open'
+            && slot(doc, 'plugin.welcome').querySelector('.smaily-edit-design__error').textContent
+                === strings['Your browser blocked the new tab. Allow pop-ups for this page and try again.']);
+        frame.remove();
+    }
+
+    (async function () {
+        try {
+            for (var locale of ['en_US', 'et_EE']) {
+                log('# ' + locale);
+                await cards(locale);
+                await modal(locale);
+                await tab(locale);
+            }
+        } catch (error) {
+            failures++;
+            log('FAIL ' + (error && error.stack ? error.stack : error));
+        }
+        clearInterval(keepAlive);
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    })();
+</script>
+</body>
+</html>

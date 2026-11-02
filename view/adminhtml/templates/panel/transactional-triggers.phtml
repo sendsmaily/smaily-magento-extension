@@ -15,7 +15,9 @@
  * PRO-3187), else one workflow — shown only while the trigger is on (CON-256,
  * hidden, not cleared); below them the Customer details switch (off
  * by default, Woo PRO-3190). A successful Test connection or a connection
- * save that connects the account shows them without a reload. Saved with
+ * save that connects the account shows them without a reload. Below a
+ * trigger's workflow, "Edit design" (CON-257) opens the email's design page
+ * when Campaign Intelligence lists it (panel/email-designs.phtml). Saved with
  * Save Automations, or the setup's Continue. Behavior lives in
  * panel/panels-js.phtml. Nothing is sent yet.
  *
@@ -34,10 +36,12 @@ $triggers = [
     'order_confirmation' => [
         'name' => __('Order confirmation'),
         'desc' => __('Sent when a customer places an order.'),
+        'emailKey' => 'transactional.order_confirmation',
     ],
     'shipment_confirmation' => [
         'name' => __('Shipping confirmation'),
         'desc' => __('Sent when a shipment is created for the order.'),
+        'emailKey' => 'transactional.shipping_confirmation',
     ],
 ];
 ?>
@@ -72,6 +76,7 @@ $triggers = [
                                 data-language="default"
                                 data-saved="<?= $escaper->escapeHtmlAttr((string)($workflows['default']['workflowId'] ?? '')) ?>"></select>
                     </label>
+                    <div class="smaily-engine-trigger__ctrl smaily-edit-design" data-email-key="<?= $escaper->escapeHtmlAttr($labels['emailKey']) ?>" hidden></div>
                 </div>
                 <?php endif; ?>
             </div>
@@ -105,6 +110,9 @@ $triggers = [
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            <div class="smaily-engine-trigger__controls smaily-trigger-settings">
+                <div class="smaily-engine-trigger__ctrl smaily-edit-design" data-email-key="<?= $escaper->escapeHtmlAttr($labels['emailKey']) ?>" hidden></div>
+            </div>
             <?php endif; ?>
         </div>
         <?php endforeach; ?>

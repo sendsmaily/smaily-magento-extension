@@ -68,6 +68,10 @@ class FailureMessage
         AbandonedCart::SKIPPED_UNSUBSCRIBED_IN_STORE,
         // Why a nightly catalog manifest was not sent (PRO-3854).
         CatalogManifest::TOO_MANY_PRODUCTS,
+        // Why an identity merge that met `404 customer_not_found` was parked (CON-262).
+        IdentityMergeHandler::NOT_SENT,
+        IdentityMergeHandler::CUSTOMER_REFUSED,
+        IdentityMergeHandler::NOT_FOUND_AFTER_SEND,
     ];
 
     /**

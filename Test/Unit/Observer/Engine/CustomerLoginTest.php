@@ -376,6 +376,56 @@ class CustomerLoginTest extends TestCase
         self::assertSame([], $this->set);
     }
 
+    /**
+     * CON-262 (contract v1.23.0 §4 group c): a consenting login puts the
+     * customer in scope, so the merge row asks the handler to send the
+     * customer first — with a token the browser holds too.
+     */
+    public function testAConsentingLoginAsksForTheCustomerFirst(): void
+    {
+        $this->marketingConsent = true;
+        $this->eventQueue->expects(self::once())->method('enqueue')->with(
+            EventType::ENGINE_IDENTITY_MERGE,
+            self::callback(static fn (array $payload): bool => $payload[IdentityMergeHandler::SEND_CUSTOMER] === true
+                && $payload['smaily_visitor_token'] === self::VISITOR_TOKEN),
+            '42'
+        );
+
+        $this->observer()->execute($this->eventFor($this->customerModel('person@example.com')));
+    }
+
+    public function testALoginWithoutConsentDoesNotAskForTheCustomer(): void
+    {
+        $this->eventQueue->expects(self::once())->method('enqueue')->with(
+            EventType::ENGINE_IDENTITY_MERGE,
+            self::callback(
+                static fn (array $payload): bool => !array_key_exists(IdentityMergeHandler::SEND_CUSTOMER, $payload)
+            ),
+            '42'
+        );
+
+        $this->observer()->execute($this->eventFor($this->customerModel('person@example.com')));
+    }
+
+    /**
+     * PRO-3918: at a store view with a separate storefront, its own banner
+     * decides, so the store's consent check does not send the customer.
+     */
+    public function testAStoreViewWithASeparateStorefrontDoesNotAskForTheCustomer(): void
+    {
+        $this->marketingConsent = true;
+        $this->storefrontUrl = true;
+        $this->eventQueue->expects(self::once())->method('enqueue')->with(
+            EventType::ENGINE_IDENTITY_MERGE,
+            self::callback(
+                static fn (array $payload): bool => !array_key_exists(IdentityMergeHandler::SEND_CUSTOMER, $payload)
+            ),
+            '42'
+        );
+
+        $this->observer()->execute($this->eventFor($this->customerDataObject('person@example.com')));
+    }
+
     public function testTheLoginIsNamedAsTheEngineAcceptsIt(): void
     {
         self::assertSame('user_logged_in', IdentityMergeHandler::MERGE_REASON_LOGIN);

@@ -31,6 +31,7 @@ use Smaily\Connect\Model\Discount\AutomationDiscount;
 use Smaily\Connect\Model\Discount\CodeIssuer;
 use Smaily\Connect\Model\Engine\Client as EngineClient;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
+use Smaily\Connect\Model\Engine\MergeCustomerSender;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Log\QueueRowLoader;
 use Smaily\Connect\Model\Logger\Logger;
@@ -268,6 +269,7 @@ class FlushEventQueueTest extends IntegrationTestCase
             'client' => $client,
             'profilingConsent' => $consent,
             'customerRepository' => $this->createMock(CustomerRepositoryInterface::class),
+            'customerSender' => $this->createMock(MergeCustomerSender::class),
         ]);
     }
 

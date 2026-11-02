@@ -749,6 +749,9 @@
 .smaily-engine-triggers { display: flex; flex-direction: column; gap: var(--sp-3); margin: var(--sp-4) 0; }
 .smaily-engine-trigger { background: var(--s-surface); border: 1px solid var(--s-border); border-radius: var(--r-3); padding: 15px 17px; box-shadow: var(--shadow-1); }
 .smaily-engine-trigger.is-off { background: var(--s-surface-2); }
+/* A switched-off automation card shows only its name, pill, description and
+ * switch (CON-256): its settings hide, keeping their values for the save. */
+.smaily-engine-trigger.is-closed .smaily-trigger-settings { display: none; }
 .smaily-engine-trigger.is-test { border-left: 3px solid var(--s-info-border); }
 .smaily-engine-trigger.is-active { border-left: 3px solid var(--s-success-border); }
 .smaily-engine-trigger__top { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; }

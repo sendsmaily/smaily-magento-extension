@@ -73,7 +73,8 @@ use Smaily\Connect\Model\Queue\Skipped;
  * An automation whose "Send a discount code" is on gets its code just before
  * it is posted, after the checks above (AutomationDiscount, CON-198): a row
  * that is skipped makes no code, and a retried row sends the code its first
- * attempt made.
+ * attempt made. A row whose automation was switched off after it was queued
+ * still goes, without a code (CON-256).
  */
 class AutomationHandler implements EventHandlerInterface
 {

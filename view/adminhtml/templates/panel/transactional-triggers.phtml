@@ -12,7 +12,8 @@
  * each show Enabled (off by default) and their workflow, listed from that
  * account: one row per store language with a default fallback when the
  * website has more than one language, whatever the multilingual mode (Woo
- * PRO-3187), else one workflow; below them the Customer details switch (off
+ * PRO-3187), else one workflow — shown only while the trigger is on (CON-256,
+ * hidden, not cleared); below them the Customer details switch (off
  * by default, Woo PRO-3190). A successful Test connection or a connection
  * save that connects the account shows them without a reload. Saved with
  * Save Automations, or the setup's Continue. Behavior lives in
@@ -50,7 +51,7 @@ $triggers = [
         <?php foreach ($triggers as $trigger => $labels): ?>
         <?php $key = $escaper->escapeHtmlAttr($trigger); ?>
         <?php $workflows = $saved[$trigger]['workflows']; ?>
-        <div class="smaily-engine-trigger smaily-store-trigger smaily-tx-trigger is-off" data-trigger="<?= /* @noEscape */ $key ?>">
+        <div class="smaily-engine-trigger smaily-store-trigger smaily-tx-trigger is-off is-closed" data-trigger="<?= /* @noEscape */ $key ?>">
             <div class="smaily-engine-trigger__top">
                 <div class="smaily-engine-trigger__head">
                     <div class="smaily-engine-trigger__name-row">
@@ -63,7 +64,7 @@ $triggers = [
                     </div>
                 </div>
                 <?php if (!$perLanguage): ?>
-                <div class="smaily-engine-trigger__controls">
+                <div class="smaily-engine-trigger__controls smaily-trigger-settings">
                     <label class="smaily-engine-trigger__ctrl">
                         <span><?= $escaper->escapeHtml(__('Smaily Workflow')) ?></span>
                         <select class="smaily-tx-workflow"
@@ -75,7 +76,7 @@ $triggers = [
                 <?php endif; ?>
             </div>
             <?php if ($perLanguage): ?>
-            <table class="smaily-ml-table">
+            <table class="smaily-ml-table smaily-trigger-settings">
                 <thead>
                     <tr>
                         <th><?= $escaper->escapeHtml(__('Language')) ?></th>

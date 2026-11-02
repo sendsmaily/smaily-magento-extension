@@ -21,6 +21,7 @@ use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
+use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
 
 /**
@@ -86,6 +87,40 @@ class SaveTest extends TestCase
         $this->controller($client, ['replenish_due' => ['workflow_id' => '']])->execute();
 
         self::assertSame(['saved' => false, 'errors' => ['Saving failed: down']], $this->response);
+    }
+
+    /**
+     * CON-256: a save the engine refuses over fields answers each error's
+     * trigger and field, so the tab marks the field and keeps its trigger
+     * open while it is off. An error without trigger_key names its row by
+     * position; a wrapper-level error names none.
+     */
+    public function testARefusedSaveNamesEachTriggersFieldToFix(): void
+    {
+        $client = $this->createMock(Client::class);
+        $client->method('putAutomationsConfig')->willThrowException(new EngineRequestException(
+            'validation_failed',
+            422,
+            ['errors' => [
+                ['index' => 0, 'trigger_key' => 'replenish_due', 'field' => 'cooldown_days', 'message' => 'Too big'],
+                ['index' => 1, 'field' => 'test_emails.0', 'message' => 'Invalid email'],
+                ['field' => 'configs', 'message' => 'Required'],
+            ]]
+        ));
+
+        $this->controller($client, [
+            'replenish_due' => ['workflow_id' => '', 'cooldown_days' => '900'],
+            'winback_risk' => ['workflow_id' => '', 'test_emails' => 'nope'],
+        ])->execute();
+
+        self::assertFalse($this->response['saved']);
+        self::assertSame(
+            [
+                ['trigger_key' => 'replenish_due', 'field' => 'cooldown_days', 'message' => 'Too big'],
+                ['trigger_key' => 'winback_risk', 'field' => 'test_emails.0', 'message' => 'Invalid email'],
+            ],
+            $this->response['field_errors']
+        );
     }
 
     /**

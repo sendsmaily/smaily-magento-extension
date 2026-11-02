@@ -28,6 +28,12 @@ use Smaily\Connect\Model\Queue\EventQueue;
  * row's payload keeps the reason under NOTICE_KEY (shown in the Log's
  * Details), written to var/log/smaily_connect.log as well. A row stored
  * that way makes no code on a retry either.
+ *
+ * No code is made while the automation itself is switched off (CON-256, as
+ * the WooCommerce plugin's CON-255), read through the switch the automation's
+ * own sending reads (Config::isWelcomeEnabled() and its siblings): a row
+ * queued before the switch-off, or sent again from the Log, still goes,
+ * without a code. The automation's saved discount setting stays as it is.
  */
 class AutomationDiscount
 {
@@ -49,7 +55,8 @@ class AutomationDiscount
 
     /**
      * The row's address with the automation's discount code fields, or as
-     * it is when its "Send a discount code" is off.
+     * it is when its "Send a discount code" is off or the automation itself
+     * is switched off.
      *
      * @param array<int|string, mixed> $payload the row's decoded payload
      * @return array<string, mixed>
@@ -63,6 +70,7 @@ class AutomationDiscount
             || isset($address[$fields[0]])
             || isset($payload[self::NOTICE_KEY])
             || !$this->config->isCouponEnabled($trigger, $websiteId)
+            || !$this->automationEnabled($trigger, $websiteId)
         ) {
             return $address;
         }
@@ -84,5 +92,20 @@ class AutomationDiscount
         $this->eventQueue->addToPayload($event, ['address' => $address]);
 
         return $address;
+    }
+
+    /**
+     * Whether the automation a discount code belongs to is switched on for
+     * the website — the switch its observers and cron read before they
+     * queue it.
+     */
+    public function automationEnabled(string $trigger, int $websiteId): bool
+    {
+        return match ($trigger) {
+            Trigger::WELCOME => $this->config->isWelcomeEnabled($websiteId),
+            Trigger::FIRST_ORDER => $this->config->isFirstOrderEnabled($websiteId),
+            Trigger::ABANDONED_CART => $this->config->isAbandonedCartEnabled($websiteId),
+            default => false,
+        };
     }
 }

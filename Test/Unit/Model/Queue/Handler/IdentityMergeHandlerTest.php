@@ -32,7 +32,7 @@ class IdentityMergeHandlerTest extends TestCase
         'customer_email' => 'person@example.com',
         'customer_external_id' => '42',
         'merge_ts' => '2026-09-21T14:13:20Z',
-        'merge_reason' => 'login',
+        'merge_reason' => 'user_logged_in',
         'anon_session_id' => '0b7d3f7e-2c4f-4a8e-9d55-3f1d2e6c7a90',
     ];
 
@@ -60,6 +60,18 @@ class IdentityMergeHandlerTest extends TestCase
         $this->client->expects(self::once())->method('identityMerge')->with(self::PAYLOAD)->willReturn(['ok' => true]);
 
         self::assertSame([1 => true], $this->handle(self::PAYLOAD));
+    }
+
+    /**
+     * CON-260: a row queued before named the login `login`, which the
+     * engine's §7 enum refuses with 400; it goes with `user_logged_in`.
+     */
+    public function testARowQueuedWithTheOldLoginReasonIsSentWithTheOneTheEngineAccepts(): void
+    {
+        $this->profilingConsent->method('isAllowed')->willReturn(true);
+        $this->client->expects(self::once())->method('identityMerge')->with(self::PAYLOAD)->willReturn(['ok' => true]);
+
+        self::assertSame([1 => true], $this->handle(['merge_reason' => 'login'] + self::PAYLOAD));
     }
 
     public function testTheMergeIsRecordedOnTheRow(): void

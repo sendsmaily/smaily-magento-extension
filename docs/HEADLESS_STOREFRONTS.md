@@ -263,13 +263,22 @@ that writes no `smaily_rec_id` leaves both cookies as they are; a missing
 `smaily_vt` leaves its cookie as it is.
 
 The visitor token has two forms: `vt_`, issued by Campaign Intelligence in
-email links, and `vs_`, a token a store may create for a consenting guest at
-checkout (contract 1.11.0). A link carries only the `vt_` form: ignore a
+email links, and `vs_`, a token a store may create for a consenting shopper
+at checkout (contract 1.11.0) or at login (contract 1.22.0). A link carries only the `vt_` form: ignore a
 `smaily_vt` value of the `vs_` form and leave the cookie as it is.
 Campaign Intelligence never puts a `vs_` token in a link, so one there is a
 value its sender chose; written into the cookie, it would name the shopper
-to that sender at the shopper's next guest order. The module does not create
-`vs_` tokens. It sends a `vt_` token it finds in the `smaily_rec_uid`
+to that sender at the shopper's next guest order. On Magento's own pages the
+module creates a `vs_` token at the login of a customer with marketing
+consent who has no visitor token yet; at a store view with the
+[Storefront URL](https://smaily.com/connect-magento/#set-storefront) saved
+it creates none, because the storefront owns its shoppers' cookies. A
+storefront that wants its shoppers recognized after logout creates the
+token itself — `vs_` and exactly 22 letters or digits from a secure random
+source, only with the shopper's marketing consent, kept in `smaily_rec_uid`
+(365 days, set by the server, never replacing a token the cookie already
+holds) — and carries the cookie on the login request (item 3), which sends
+it to Campaign Intelligence. The module sends a `vt_` token it finds in the `smaily_rec_uid`
 cookie with the order, the login and the browse events, and a `vs_` token
 only with the shopper's marketing consent that the back end can see:
 Magento's **Cookie Restriction Mode** on in the store view, and Magento's

@@ -1587,7 +1587,9 @@ route sets all three click cookies, as the WooCommerce plugin's
 `LandingCapture`: the visitor token, the rec id and the context (both 30
 days, which Safari's cap cut too), with the engine config's names and
 lifetimes (`AttributionManager::getClientConfig()`), Secure on HTTPS,
-SameSite=Lax and no HttpOnly (contract "Cookie names"). It applies the
+SameSite=Lax and no HttpOnly (contract "Cookie names") — the attributes
+`Engine\AttributionCookieWriter` gives every server-set attribution cookie,
+the visitor token created at login included (CON-260). It applies the
 script's rules — a well-formed rec id sets the rec id cookie and sets the
 context cookie to a well-formed context or deletes it, a visitor token only
 in the engine's `vt_` form (`AttributionShape::isEngineVisitorToken()`) — and
@@ -1645,8 +1647,38 @@ on in the store view and the cookie notice accepted on this website
 (Magento's cookie helper, `isCookieRestrictionModeEnabled()` and
 `isUserNotAllowSaveCookie()`). The store's `consentOverride()` lives only in
 the browser, so with restriction mode off the server sees no consent and a
-`vs_` token is not sent. The module creates no `vs_` tokens itself; one
-comes from a separate storefront or a customization.
+`vs_` token is not sent. The module creates a `vs_` token only at a
+consenting customer's login (below); any other `vs_` token comes from a
+separate storefront or a customization.
+
+**A store-created token at login** (CON-260; contract §7 "Store-created
+token at login", v1.22.0). A shopper who only ever logs in has no visitor
+token, so after logout the storefront could not ask for their
+recommendations (§15). At login, `Observer\Engine\CustomerLogin` asks
+`readCookies()` for the visitor token; when there is none and
+`MarketingConsent::isGiven()` holds (the same rule a `vs_` token travels
+by, CON-181), `Engine\StoreVisitorToken::issue()` creates one — `vs_` + 22
+characters `[A-Za-z0-9]` from `random_int()`, the WooCommerce plugin's
+`LandingCapture::issue_visitor_token()` — sets it in the visitor-token
+cookie with the engine config's name and lifetime through
+`Engine\AttributionCookieWriter` (the click cookies' attributes, so Safari
+keeps it, CON-211), and the merge carries it on `smaily_visitor_token`. A
+token the browser holds (`vt_` or `vs_`) is kept and sent, never replaced,
+so each login of a consenting shopper renews it in the engine; a value that
+is no token in either shape reads as absent and is replaced. Without
+consent nothing is created, and a `vs_` cookie is neither sent nor
+replaced. A cookie the cookie manager refuses (headers sent, too many
+cookies) creates no token, and the merge goes without one. Nothing clears
+the cookie at logout (Erkki, 2026-11-02, accepting the shared-browser risk
+§15 names; `Test/Unit/Observer/Engine/LogoutKeepsVisitorTokenTest` pins
+that the module and the Hyvä companion act on no logout). At a store view
+with a Storefront URL saved, no token is created: the separate storefront
+owns its shoppers' cookies and its own consent banner decides (PRO-3918).
+The full-page cache keeps no login answer (a form or AJAX POST, a
+redirect, a token request), and the token goes into no page and no
+private-content section; the
+storefront recommendations route answers `no-store` and caches the
+engine's answer per token (below).
 
 An order an admin places with "Login as Customer" is stamped with nothing
 (PRO-3925): that browser's cookies are the admin's own. By order time the
@@ -1923,7 +1955,17 @@ Subscribers grid, or a customer account, leaves profiling as it was.
   (`Integration\Model\CustomerTokenService`: GraphQL
   `generateCustomerToken`, REST `integration/customer/token`) the customer
   data object; both are taken, so a separate storefront that forwards the
-  cookies on its login request gets the merge too (PRO-3917).
+  cookies on its login request gets the merge too (PRO-3917). Every
+  `customer_login` counts: the login form, a registration that logs in, the
+  checkout's AJAX login, and a social or one-step-checkout login that goes
+  through `Customer\Model\Session`. A consenting shopper without a visitor
+  token gets a new `vs_` token at each of them (see Attribution, CON-260),
+  the token logins included: the cookie goes on the token request's
+  answer. The row's `merge_reason` is `user_logged_in`
+  (`IdentityMergeHandler::MERGE_REASON_LOGIN`), one of the values the
+  engine's §7 enum accepts; a row queued before CON-260 named it `login`,
+  which the engine refuses with 400, and the handler sends such a row with
+  `user_logged_in`.
   An admin's "Login as Customer" queues nothing (PRO-3920): its storefront
   page (`loginascustomer/login/index`) logs the admin's browser in with
   `Session::loginById()`, so `customer_login` carries the admin's own

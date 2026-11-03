@@ -10,6 +10,7 @@ namespace Smaily\Connect\Test\Unit\Model\Engine;
 
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\EmailDesignWorkflows;
 use Smaily\Connect\Model\Engine\EmailDesigns;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
@@ -126,7 +127,11 @@ class EmailDesignsTest extends TestCase
         $settings = $this->createMock(Settings::class);
         $settings->method('isSendingAllowed')->willReturn(false);
 
-        self::assertFalse((new EmailDesigns($settings, $this->createMock(Client::class)))->isAvailable());
+        self::assertFalse((new EmailDesigns(
+            $settings,
+            $this->createMock(Client::class),
+            $this->createMock(EmailDesignWorkflows::class)
+        ))->isAvailable());
     }
 
     public function testEmailKeys(): void
@@ -149,8 +154,50 @@ class EmailDesignsTest extends TestCase
         self::assertSame('', EmailDesigns::origin(''));
     }
 
-    private function emailDesigns(Client $client): EmailDesigns
+    /**
+     * CON-258: every successful read hands the whole §23 list to the store
+     * of pushed workflows — engine items and ids included; it picks.
+     */
+    public function testEveryReadKeepsThePushedWorkflows(): void
     {
-        return new EmailDesigns($this->createMock(Settings::class), $client);
+        $emails = [
+            ['email_key' => 'plugin.welcome', 'kind' => 'plugin', 'smaily_workflow_id' => '456'],
+            ['email_key' => 'replenish_due', 'kind' => 'engine'],
+        ];
+        $client = $this->createMock(Client::class);
+        $client->method('emailDesigns')->willReturn(['emails' => $emails]);
+        $workflows = $this->createMock(EmailDesignWorkflows::class);
+        $workflows->expects(self::once())->method('remember')->with($emails);
+
+        $this->emailDesigns($client, $workflows)->designs();
+    }
+
+    /**
+     * CON-258: a read without a list, or one that fails, keeps what the last
+     * read stored (as the WooCommerce plugin does).
+     */
+    public function testAReadWithoutAListKeepsThePushedWorkflows(): void
+    {
+        $client = $this->createMock(Client::class);
+        $client->method('emailDesigns')->willReturnOnConsecutiveCalls(
+            ['error' => 'nothing'],
+            self::throwException(new EngineRequestException('unavailable', 503, []))
+        );
+        $workflows = $this->createMock(EmailDesignWorkflows::class);
+        $workflows->expects(self::never())->method('remember');
+        $emailDesigns = $this->emailDesigns($client, $workflows);
+
+        $emailDesigns->designs();
+        $this->expectException(EngineRequestException::class);
+        $emailDesigns->designs();
+    }
+
+    private function emailDesigns(Client $client, ?EmailDesignWorkflows $workflows = null): EmailDesigns
+    {
+        return new EmailDesigns(
+            $this->createMock(Settings::class),
+            $client,
+            $workflows ?? $this->createMock(EmailDesignWorkflows::class)
+        );
     }
 }

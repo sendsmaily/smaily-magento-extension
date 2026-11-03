@@ -13,6 +13,7 @@ use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Api\Queue\EventHandlerInterface;
 use Smaily\Connect\Model\AbandonedCart\StateManager;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
+use Smaily\Connect\Model\Automation\PushedWorkflow;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\WorkflowMatch;
 use Smaily\Connect\Model\Client\Exception\ApiException;
@@ -75,6 +76,12 @@ use Smaily\Connect\Model\Queue\Skipped;
  * that is skipped makes no code, and a retried row sends the code its first
  * attempt made. A row whose automation was switched off after it was queued
  * still goes, without a code (CON-256).
+ *
+ * The workflow posted is the matched one, or the one Campaign Intelligence
+ * pushed to Smaily for the email when the account that delivers it holds
+ * that workflow and the match is the website's default language
+ * (PushedWorkflow, CON-258). It is decided after clientFor(), because that
+ * account is chosen there.
  */
 class AutomationHandler implements EventHandlerInterface
 {
@@ -124,7 +131,8 @@ class AutomationHandler implements EventHandlerInterface
         private readonly WebsiteOverrides $overrides,
         private readonly StoreManagerInterface $storeManager,
         private readonly StateManager $cartState,
-        private readonly AutomationDiscount $discount
+        private readonly AutomationDiscount $discount,
+        private readonly PushedWorkflow $pushedWorkflow
     ) {
     }
 
@@ -191,7 +199,12 @@ class AutomationHandler implements EventHandlerInterface
 
             try {
                 $client->post(SmailyClient::ENDPOINT_AUTORESPONDER, [
-                    'autoresponder' => $match->workflowId,
+                    'autoresponder' => $this->pushedWorkflow->workflowId(
+                        $trigger,
+                        $match,
+                        $client->subdomain(),
+                        $this->accountResolver->defaultLanguage($websiteId)
+                    ),
                     'addresses' => [$address],
                     'force_opt_in' => false,
                 ]);

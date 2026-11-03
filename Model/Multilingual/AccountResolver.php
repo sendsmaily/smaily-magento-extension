@@ -92,6 +92,18 @@ class AccountResolver
     }
 
     /**
+     * The language of the website's default store view, or '' when the
+     * website or its default store view does not resolve, or its locale
+     * gives none: the website's default language (CON-258).
+     */
+    public function defaultLanguage(int $websiteId): string
+    {
+        $defaultStore = $this->website($websiteId)?->getDefaultStore();
+
+        return $defaultStore !== null ? $this->languageResolver->forStore((int)$defaultStore->getId()) : '';
+    }
+
+    /**
      * Distinct storefront languages within the given website, its default
      * store's language first.
      *

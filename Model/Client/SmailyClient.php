@@ -74,6 +74,14 @@ class SmailyClient
     }
 
     /**
+     * The subdomain of the Smaily account this client calls, as saved.
+     */
+    public function subdomain(): string
+    {
+        return $this->subdomain;
+    }
+
+    /**
      * Perform a GET request against an API endpoint.
      *
      * @param array<string, mixed> $query

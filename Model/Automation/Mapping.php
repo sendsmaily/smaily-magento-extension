@@ -36,6 +36,17 @@ class Mapping extends AbstractModel
     }
 
     /**
+     * The language the row's workflow is picked for: a language code, or
+     * 'default' for a language-less row (the 2.8.x migration's).
+     */
+    public function getLanguage(): string
+    {
+        $language = (string)$this->getData('language');
+
+        return $language === '' ? self::LANGUAGE_DEFAULT : $language;
+    }
+
+    /**
      * The Smaily account key ('default' or a language code, multilingual
      * mode A) whose credentials must deliver this row's workflow.
      */

@@ -140,5 +140,12 @@ class AccountResolverTest extends TestCase
         self::assertSame([], $resolver->detectedLanguages(99));
         self::assertSame([], $resolver->storeIdsForAccountKey('en', 99));
         self::assertNull($resolver->storeIdForAccountKey('en', 99));
+        self::assertSame('', $resolver->defaultLanguage(99));
+    }
+
+    /** CON-258: the website's default language is its default store view's. */
+    public function testTheDefaultLanguageIsTheDefaultStoreViewsLanguage(): void
+    {
+        self::assertSame('en', $this->resolver->defaultLanguage(self::WEBSITE_ONE));
     }
 }

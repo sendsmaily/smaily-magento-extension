@@ -14,6 +14,7 @@ use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\AbandonedCart\StateManager;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
+use Smaily\Connect\Model\Automation\PushedWorkflow;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\WorkflowMatch;
 use Smaily\Connect\Model\Client\Exception\ApiException;
@@ -22,6 +23,7 @@ use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Discount\AutomationDiscount;
+use Smaily\Connect\Model\Engine\EmailDesignWorkflows;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Queue\Event;
@@ -78,12 +80,59 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
             $this->createMock(StateManager::class),
-            $this->noDiscount()
+            $this->noDiscount(),
+            $this->noPushedWorkflow()
         );
 
         self::assertSame([1 => true], $handler->handle([$event]));
         self::assertCount(1, $posted);
         self::assertFalse($posted[0]['force_opt_in']);
+    }
+
+    /**
+     * CON-258: the workflow Campaign Intelligence pushed to Smaily goes out
+     * when the account that delivers the email holds it — the handler asks
+     * with the subdomain of the client it posts through.
+     */
+    public function testThePushedWorkflowGoesOutThroughTheAccountThatHoldsIt(): void
+    {
+        $posted = [];
+        $client = $this->createMock(SmailyClient::class);
+        $client->method('subdomain')->willReturn('shop');
+        $client->method('post')->willReturnCallback(
+            static function (string $endpoint, array $payload) use (&$posted): array {
+                $posted[] = $payload['autoresponder'];
+
+                return [];
+            }
+        );
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->method('forStore')->willReturn($client);
+        $router = $this->createMock(Router::class);
+        $router->method('resolve')->willReturn(new WorkflowMatch(7, null, 'default'));
+        $workflows = $this->createMock(EmailDesignWorkflows::class);
+        $workflows->method('workflowId')->willReturnCallback(
+            static fn (string $trigger, string $subdomain): int
+                => $trigger === 'welcome' && $subdomain === 'shop' ? 456 : 0
+        );
+
+        $event = $this->reminderEvent(null);
+        $handler = new AutomationHandler(
+            $clientProvider,
+            $router,
+            $this->eventQueue,
+            $this->createMock(Logger::class),
+            $this->createMock(AccountResolver::class),
+            $this->createMock(Config::class),
+            $this->createMock(WebsiteOverrides::class),
+            $this->createMock(StoreManagerInterface::class),
+            $this->createMock(StateManager::class),
+            $this->noDiscount(),
+            new PushedWorkflow($workflows)
+        );
+
+        self::assertSame([1 => true], $handler->handle([$event]));
+        self::assertSame([456], $posted);
     }
 
     /**
@@ -109,7 +158,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
             $this->createMock(StateManager::class),
-            $this->noDiscount()
+            $this->noDiscount(),
+            $this->noPushedWorkflow()
         );
 
         self::assertEquals([1 => Failure::permanent('Malformed automation payload')], $handler->handle([$event]));
@@ -149,7 +199,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
             $this->createMock(StateManager::class),
-            $this->noDiscount()
+            $this->noDiscount(),
+            $this->noPushedWorkflow()
         );
 
         self::assertEquals(
@@ -191,7 +242,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
             $this->createMock(StateManager::class),
-            $this->noDiscount()
+            $this->noDiscount(),
+            $this->noPushedWorkflow()
         );
 
         self::assertEquals(
@@ -238,7 +290,8 @@ class AutomationHandlerTest extends TestCase
             $overrides,
             $storeManager,
             $this->createMock(StateManager::class),
-            $this->noDiscount()
+            $this->noDiscount(),
+            $this->noPushedWorkflow()
         );
 
         self::assertEquals(
@@ -319,7 +372,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
             $this->createMock(StateManager::class),
-            $this->noDiscount()
+            $this->noDiscount(),
+            $this->noPushedWorkflow()
         );
 
         self::assertSame([1 => true], $handler->handle([$event]));
@@ -366,7 +420,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
             $this->createMock(StateManager::class),
-            $this->noDiscount()
+            $this->noDiscount(),
+            $this->noPushedWorkflow()
         );
 
         self::assertSame([1 => $refusal], $handler->handle([$event]));
@@ -537,7 +592,8 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(StoreManagerInterface::class),
             $cartState,
-            $discount ?? $this->noDiscount()
+            $discount ?? $this->noDiscount(),
+            $this->noPushedWorkflow()
         );
     }
 
@@ -567,6 +623,12 @@ class AutomationHandlerTest extends TestCase
     /**
      * An automation without a discount code: the address goes as queued.
      */
+    /** Campaign Intelligence pushed no workflow: every send keeps the matched one. */
+    private function noPushedWorkflow(): PushedWorkflow
+    {
+        return new PushedWorkflow($this->createMock(EmailDesignWorkflows::class));
+    }
+
     private function noDiscount(): AutomationDiscount
     {
         $discount = $this->createMock(AutomationDiscount::class);

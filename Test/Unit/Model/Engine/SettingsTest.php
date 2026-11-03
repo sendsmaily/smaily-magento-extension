@@ -23,6 +23,9 @@ use Smaily\Connect\Model\Engine\Settings;
  */
 class SettingsTest extends TestCase
 {
+    /** @var array<string, string> core_config_data at the default scope */
+    private array $values = [];
+
     public function testTheFirstRefusalTimestampIsKept(): void
     {
         $settings = $this->createSettings();
@@ -68,33 +71,50 @@ class SettingsTest extends TestCase
         self::assertSame('Campaign Intelligence account is not active', $settings->sendingBlockedReason());
     }
 
+    /**
+     * CON-258: the pushed workflows belong to the connection that read
+     * them, so a new setup exchange and a disconnect delete them.
+     */
+    public function testANewConnectionAndADisconnectDeleteThePushedWorkflows(): void
+    {
+        $settings = $this->createSettings();
+        $this->values[Settings::XML_PATH_EMAIL_WORKFLOWS] = '{"plugin.welcome":{"workflow_id":456,"subdomain":"shop"}}';
+
+        $settings->storeExchange(['api_key' => 'sk_live_new', 'tenant_id' => 't_2']);
+
+        self::assertArrayNotHasKey(Settings::XML_PATH_EMAIL_WORKFLOWS, $this->values);
+
+        $this->values[Settings::XML_PATH_EMAIL_WORKFLOWS] = '{"plugin.welcome":{"workflow_id":456,"subdomain":"shop"}}';
+        $settings->clear();
+
+        self::assertArrayNotHasKey(Settings::XML_PATH_EMAIL_WORKFLOWS, $this->values);
+    }
+
     private function createSettings(): Settings
     {
-        $store = new class {
-            /** @var array<string, string> */
-            public array $values = [Settings::XML_PATH_API_KEY => 'encrypted'];
-        };
+        $this->values = [Settings::XML_PATH_API_KEY => 'encrypted'];
 
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $scopeConfig->method('isSetFlag')->willReturn(true);
         $scopeConfig->method('getValue')->willReturnCallback(
-            static fn (string $path): ?string => $store->values[$path] ?? null
+            fn (string $path): ?string => $this->values[$path] ?? null
         );
 
         $writer = $this->createMock(WriterInterface::class);
         $writer->method('save')->willReturnCallback(
-            static function (string $path, string $value) use ($store): void {
-                $store->values[$path] = $value;
+            function (string $path, string $value): void {
+                $this->values[$path] = $value;
             }
         );
         $writer->method('delete')->willReturnCallback(
-            static function (string $path) use ($store): void {
-                unset($store->values[$path]);
+            function (string $path): void {
+                unset($this->values[$path]);
             }
         );
 
         $encryptor = $this->createMock(EncryptorInterface::class);
         $encryptor->method('decrypt')->willReturn('sk_live_key');
+        $encryptor->method('encrypt')->willReturn('encrypted');
 
         // A second refusal one day later must not overwrite the first.
         $dateTime = $this->createMock(DateTime::class);

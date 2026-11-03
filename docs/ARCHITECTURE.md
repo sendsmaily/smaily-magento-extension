@@ -136,7 +136,11 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   of the mode the panel posts them for (`mappings_mode`, else the saved
   mode; the same rule as `addModeFilter()`, CON-188), so a mode-A save keeps
   the website's mode-B rows and the other way round — the PRO-1286 keep
-  covers only an id missing from its account's list.
+  covers only an id missing from its account's list. A match carries the
+  language its workflow was picked for (`WorkflowMatch::$language`), and
+  the handler posts the workflow Campaign Intelligence pushed in its place
+  when the posting account holds it and that language is the website's
+  default (`Automation\PushedWorkflow`, CON-258; see "Email designs").
 - Handlers are registered per type in `di.xml`
   (`Model/Queue/HandlerPool`); adding an event type = adding a handler.
 - Payloads are built at enqueue time (`ContactSync\SubscriberPayloadBuilder`,
@@ -2368,16 +2372,50 @@ Initial setup, Settings, Log. Design rules:
     with `type: 'smaily_intelligence_design'` counts; `saved` reads §23
     again, `closed` closes the modal (which reads it). The message is a
     hint: no state or id is taken from it.
-  - **No pushed workflow yet — a Magento difference.** The WooCommerce
-    plugin stores each plugin and transactional email's
-    `smaily_workflow_id` with its `smaily_subdomain` on every §23 read and
-    starts the email with it on that account, in the default language
-    (CON-173, CON-218). This extension stores no id and starts every email
-    with the workflow the merchant picked. The engine sends no ids yet
-    (the Smaily push is not live; §23 "Smaily dependency"), so nothing
-    differs for a store today; the follow-up adds it before the push goes
-    live. `created_by: "other"` (a hand-built workflow, edited in Smaily) is
-    not read either, as in the WooCommerce plugin.
+  - **The pushed workflow (CON-258, as the WooCommerce plugin's CON-173
+    and CON-218).** Every successful §23 read hands the list to
+    `Engine\EmailDesignWorkflows::remember()`, which keeps
+    `{email_key: {workflow_id, subdomain}}` as JSON in core_config_data
+    (`Engine\Settings::XML_PATH_EMAIL_WORKFLOWS`, default scope) for the
+    extension's five emails (`EMAIL_KEYS`: `plugin.welcome`,
+    `plugin.first_order`, `plugin.abandoned_cart`,
+    `transactional.order_confirmation`,
+    `transactional.shipping_confirmation`) — only kinds `plugin` /
+    `transactional`, `sent_through` `workflow` / `transactional`,
+    `smaily_state` `pending` / `pushed` / `failed`, a numeric id and a §23
+    subdomain (trimmed, lower-case, `[a-z0-9-]{1,64}`); an id that names no
+    account is not kept. Each read replaces the last; it writes, and cleans
+    the config cache, only when the kept list changes, so the reads of a
+    store whose ids are all null write nothing. A failed read keeps it; a
+    setup exchange (`Settings::storeExchange()`) and a disconnect
+    (`Settings::clear()`) delete it; the module's removal deletes every
+    `smaily_connect/*` row. The page never gets the ids.
+    `Automation\PushedWorkflow::workflowId()` decides at send time — never
+    asking the engine — and `Queue\Handler\AutomationHandler` asks it with
+    the subdomain of the client it posts through (`SmailyClient::subdomain()`,
+    after `clientFor()`): the pushed id goes out in place of the matched one
+    only when that subdomain is the one the engine names (trimmed,
+    case-insensitive) AND the match is the website's default language —
+    `WorkflowMatch::$language` is `default` (the one workflow of modes
+    `single` / `c`, a language-less row, mode `b`'s catch-all for a contact
+    with no language) or the language of the website's default store view
+    (`AccountResolver::defaultLanguage()`; a mode `b` row, a fallback row or
+    mode `b`'s catch-all for a contact in that language). The match still
+    decides whether the email goes, its account and its language; no match
+    is still a skip. With null ids (the engine does not push yet) nothing
+    changes.
+    **Magento differences:** the WooCommerce plugin decides it inside its
+    `Multilingual\Router` from the mapped row's credentials; here the
+    account is picked after the `Router` (`AutomationHandler::clientFor()`:
+    a row's account, a website's own account, the event store view's), so
+    the check runs on the account that actually posts. "The store's default
+    language" is per website here (its default store view), as every
+    Magento website has its own. The transactional emails are kept but read
+    by nothing: Magento does not send them yet, and their send can ask
+    `PushedWorkflow` the same way. `created_by` is not read — the
+    WooCommerce plugin does not read it either, so an item with
+    `created_by: "other"` keeps "Edit design" as any other item (§23's
+    "link to Smaily instead" is not built in either plugin).
 - **Dashboard is operational truth.** Every number on
   `dashboard/index.phtml` is a real local queue query
   (`Model\Adminhtml\DashboardStats`); the health verdict reuses the

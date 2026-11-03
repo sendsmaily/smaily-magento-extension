@@ -18,8 +18,10 @@ use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
  * - designs() reads §23 — every email key the store can design, with its
  *   design state and subject. The admin reads it when the settings open
  *   and when the admin comes back from the design page; nothing before a
- *   send asks for it. The Smaily ids in it are not kept yet: Magento starts
- *   no email with a pushed workflow (docs/ARCHITECTURE.md "Email designs").
+ *   send asks for it. Every successful read hands the list to
+ *   EmailDesignWorkflows, which keeps the Smaily workflow and account the
+ *   engine pushed for each of the extension's emails (CON-258); a failed
+ *   read keeps what the last one stored.
  * - designLink() mints a §22 one-time link to one email's design page. The
  *   link goes to the admin's browser once and is never stored, logged or
  *   cached here.
@@ -43,7 +45,8 @@ class EmailDesigns
 
     public function __construct(
         private readonly Settings $settings,
-        private readonly Client $client
+        private readonly Client $client,
+        private readonly EmailDesignWorkflows $workflows
     ) {
     }
 
@@ -56,7 +59,9 @@ class EmailDesigns
     /**
      * The §23 list as the admin shows it: one item per email key, with the
      * design state and the subject. An item of an unknown kind, or without
-     * a valid email key, is left out.
+     * a valid email key, is left out. The pushed workflow ids in the list
+     * are kept for the sends (EmailDesignWorkflows::remember()), never
+     * passed to the page.
      *
      * @return array<int, array{email_key: string, kind: string, design_state: string, subject: string}>
      * @throws EngineException when the engine cannot answer
@@ -68,6 +73,7 @@ class EmailDesigns
         if (!is_array($items)) {
             return [];
         }
+        $this->workflows->remember($items);
 
         $designs = [];
         foreach ($items as $item) {

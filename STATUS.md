@@ -7,92 +7,105 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-11-02 — **3.0.0-rc20 cut on `master`: Edit design
-opens the email design page in an in-admin modal, a consenting login
-sets a visitor token, and login merges reach the engine again.**
-**3.0.0-rc20 is cut** on `master` (the version-cut PR
-`release/3.0.0-rc20`); its tag waits for Erkki (CLAUDE.md "Release cut").
-3.0.0-rc19 is released (Erkki's tag, 2026-11-02: the release workflow
+_Last updated: 2026-11-03 — **3.0.0-rc21 cut on `master`: a customer
+who logs in with marketing consent is sent to the engine before their
+login is linked, and the live customer sync sends only the customers in
+the Customers-import scope.**
+**3.0.0-rc21 is cut** on `master` (the version-cut PR
+`release/3.0.0-rc21`); its tag waits for Erkki (CLAUDE.md "Release cut").
+3.0.0-rc20 is released (Erkki's tag, 2026-11-02: the release workflow
 was green, both ZIPs were attached, the Hyvä mirror was tagged and
-Packagist showed rc19). The cut collects 2 fragments into CHANGELOG's
-"Changes since 3.0.0-rc19" (CON-257, then CON-260; the CON-260 bullet
-also covers CON-261 and tells the merchant that **Retry** on a failed
-identity-merge row in the Log now sends it). It adds cross-references
-to seven earlier bullets that became untrue: the contract v1.17.0 bullet
-(under "Changes since 3.0.0-rc12": designing the automated emails was
-an option the extension "does not use yet"), the store-created token
-consent bullet (rc12: "the extension creates none"), the widget bullet
-(under "Changes since 3.0.0-rc10": a guest sees recommendations "only
-after an earlier click on a Smaily email link"), the API-login merge
-bullet and the Login as Customer bullet (under "Changes since
-3.0.0-rc7": logins link browsing in Campaign Intelligence, which
-refused every such link until rc20), the checkout `vs_` token bullet
-(rc7: "the extension does not create these tokens itself") and the
-"New features" list ("identity merge").
+Packagist showed rc20). The cut collects 2 fragments into CHANGELOG's
+"Changes since 3.0.0-rc20" (CON-262, then CON-266). It adds
+cross-references to two earlier bullets that became untrue: the rc20
+login-token and identity-merge bullet (under "Changes since
+3.0.0-rc19": a consenting customer the engine did not have saw no own
+recommendations after logout, and **Retry** "now sends" a failed merge,
+which still failed with "customer not found" for a customer the engine
+did not have), and the fail-at-once bullet (under "Changes since
+3.0.0-rc7": every refused identity merge failed at once; since rc21 a
+"customer not found" merge is sent again once after the store has sent
+the customer).
 
-**On `master` since the rc19 cut (all in rc20):**
-- #237: engine contract 1.22.0 (INT-194).
-- #239: engine contract 1.23.0 (INT-195: a customer who logs in with
-  marketing consent is in the customer scope; §7 retry after 404) —
-  CON-262 implements it.
-- #236 CON-257: every email card gets **Edit design**, which opens the
-  §22 design page in an in-admin modal (§22 Embedding; Erkki's
-  decision, unlike Woo's tab). The `saved` and `closed` postMessages
-  re-read §23. **Open in a new tab** is always shown; an admin that is
-  not on the https `site_url` origin gets a tab. Sending with the pushed
-  workflow is split out to CON-258.
-- #238 CON-260 + CON-261: a consenting login without a token cookie
-  gets a server-set `vs_` token (`StoreVisitorToken`,
-  `AttributionCookieWriter`), which §7 sends. An existing token is kept,
-  and logout never clears it (Erkki, 2026-11-02). No token is created at
-  a store view with a Storefront URL. CON-261: `merge_reason` was
-  `login`, which the engine rejects, so no Magento identity merge had
-  ever reached the engine; it is now `user_logged_in`, and **Retry**
-  recovers the old rows.
+**On `master` since the rc20 cut (all in rc21):**
+- #241 CON-262: contract 1.23.0's group (c) — a consenting login (the
+  consent check and Storefront URL rule of the login token) marks the
+  merge row, and `IdentityMergeHandler` sends the customer with §4
+  (`MergeCustomerSender`) right before the §7 merge in the same run, so
+  the order holds whatever the crons do. On a §7 404 the row remembers
+  it and retries the merge once, only after §4 took the customer. A
+  merge whose customer the store does not send, or that still finds no
+  customer, is parked with a translated reason (3 new et_EE strings);
+  **Retry** links the login once the customer is sent, also for rows a
+  404 parked before rc21.
+- #242 CON-266: the live customer sync applies the import's scope
+  (Erkki, 2026-11-02): `Engine\CustomerIngest` queues an account save
+  only for a customer in group (a) or (b)
+  (`EngineCustomerScope::includes()`, the import's query for one id,
+  read with the import's horizon), or for the shopper's own save while
+  logged in with marketing consent on Magento's pages
+  (`ConsentingShopper`). A customer who joins the scope is sent then: a
+  subscription the contact sync sends (`Observer\Engine\SubscriberJoined`)
+  or a new order (`OrderSaveAfter`). A sync-mode change sends nobody
+  live; the Customers card's **Run again** does. Nothing removes a
+  customer from the engine. Mirrors Woo CON-246, except group (c).
 
-**Decided (Erkki, 2026-11-02):** the login token stays after logout;
-the shared-browser risk is accepted. A customer who logs in with
-marketing consent belongs in the customer scope: engine ask INT-195,
-now contract 1.23.0 (#239); Magento CON-262 implements it.
-
-**Pilot:** the first pilot store upgrades directly to rc20. Then it
-presses **Run again** under **Settings > Intelligence** on **Catalog**,
-**Customers** and **Orders**, in that order. It may also press
+**Pilot:** the first pilot store (still on rc12) upgrades directly to
+rc21. Then it presses **Run again** under **Settings > Intelligence**
+on **Catalog**, **Customers** and **Orders**, in that order, and
 **Retry** on the failed identity merges (*engine.identity_merge*) in
 the Log. The second pilot store's state is unchanged (rc12). The gauge
 is CON-147 (4/5).
 
-**Gotchas:** the rc18 and rc19 gotchas hold. A shopper on a shared
-computer who logged in with marketing consent leaves the `smaily_rec_uid`
-token behind after logout: the next person on that browser sees that
-shopper's recommendations until the cookie expires or is deleted
-(accepted; the cookie policy text says so).
+**Gotchas:** the rc18, rc19 and rc20 gotchas hold (the shared-browser
+`smaily_rec_uid` token after logout is accepted). Since rc21 a customer
+account saved in the admin, an API or a cron job reaches the engine
+only while the customer is in group (a) or (b); a group (c)-only
+customer's change goes at their next consenting login. Fewer customers
+reach the engine than before; none is removed.
 
 **Open:** CON-209 (the 3.0.0 gate), CON-230 (the engine-page modal;
 waits for INT-180), CON-234 (the installation report; waits for
 INT-186), CON-237 (an own engine store per Smaily account; later),
 CON-252 (address normalisation is ASCII-only; Low; needs agreement with
 the engine), CON-258 (sending with the pushed workflow; before the
-engine push goes live), CON-262 (a consenting login in the customer
-scope; contract 1.23.0 states it, #239), CON-146 (native-speaker review of
+engine push goes live), CON-265 (`ImportPaceTest:124` fails now and
+then on a local run; passes alone), CON-146 (native-speaker review of
 ru/fi/lv/lt), CON-168, and the Estonian proofreads: the new CON-253
 guide paragraphs in `#setup-website`, the CON-256 guide sentences (the
 step 3 sentence, the "Kaart avaneb, kui märgid Lubatud" note in
 Automaatikad, the discount code wording and its new item, the
 transactional sentence and the new Campaign Intelligence item), the
 CON-257 admin strings (20) and the `#set-email-design` guide section,
-and the CON-260 guide text. Follow-ups: **Run again** restarts from
-row 1; WooCommerce's slower import pace (CON-236).
+the CON-260 guide text, the CON-262 Log reasons (3 et_EE strings) and
+guide text (the Kliendid row of "Mida imporditakse", three rows in
+"Campaign Intelligence'i vead"), and the CON-266 guide text (the
+"Seadista" go-live paragraph, the Kliendid row). Follow-up: **Run
+again** restarts from row 1.
 
 **Next session opens with:**
-1. Erkki tags rc20.
-2. The first pilot store upgrades to rc20, presses **Run again** on
-   **Catalog**, **Customers** and **Orders**, in that order, and may
-   press **Retry** on its failed identity merges in the Log.
+1. Erkki tags rc21.
+2. The first pilot store upgrades to rc21, presses **Run again** on
+   **Catalog**, **Customers** and **Orders**, in that order, and
+   presses **Retry** on its failed identity merges in the Log.
 3. Watch its history progress reach `start_part_complete` in the
    engine, and check that its identity merges now reach the engine.
 
-**Notes for the next version cut (rc21):** none so far._
+**Notes for the next version cut (rc22):** none so far._
+
+_Earlier (2026-11-02, the 3.0.0-rc20 cut): 3.0.0-rc20 was cut (#240)
+and tagged by Erkki the same day (the release workflow was green, both
+ZIPs were attached, the Hyvä mirror was tagged and Packagist showed
+rc20). It collected 2 fragments (CON-257, CON-260; the CON-260 bullet
+also covers CON-261) and added cross-references to seven earlier
+bullets. In rc20 since rc19: #237 (contract 1.22.0), #239 (contract
+1.23.0), #236 CON-257 (**Edit design** opens the §22 design page in an
+in-admin modal), #238 CON-260 + CON-261 (a consenting login without a
+token cookie gets a server-set `vs_` token, kept after logout;
+`merge_reason` `user_logged_in`, so identity merges reach the engine).
+Decided (Erkki, 2026-11-02): the login token stays after logout; a
+customer who logs in with marketing consent belongs in the customer
+scope._
 
 _Earlier (2026-11-02, the 3.0.0-rc19 cut): 3.0.0-rc19 was cut (#235)
 and tagged by Erkki the same day (the release workflow was green, both

@@ -16,16 +16,23 @@ use Smaily\Connect\Model\Backfill\EngineImportGuard;
 use Smaily\Connect\Model\Backfill\ImportStarter;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-156: the one import start the admin import endpoint and
  * smaily:backfill:start share — the connection check first (PRO-1969,
  * PRO-3742), then one installation-wide job for an engine import, or one
  * per website for the contacts import.
+ *
+ * CON-237: an engine import's job is its connection's — website_id holds
+ * the connection's key; one store has the primary alone (key 0).
  */
 class ImportStarterTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private JobManager&MockObject $jobManager;
 
     /** @var array<int, array{string, string, int}> */
@@ -80,6 +87,32 @@ class ImportStarterTest extends TestCase
         ];
     }
 
+    /**
+     * CON-237: separate stores — an engine import for a website starts the
+     * job of the connection serving it; without a website, one job per
+     * connected connection; a website no connected connection serves is
+     * refused.
+     */
+    public function testAnEngineImportStartsTheJobOfTheConnectionServingTheWebsite(): void
+    {
+        $connected = $this->createMock(EngineSettings::class);
+        $connected->method('isConnected')->willReturn(true);
+        $connections = $this->engineConnections([
+            [$this->engineConnection(0, $connected, [1], [1], 1), null],
+            [$this->engineConnection(3, $connected, [3], [3], 3), null],
+        ]);
+        $starter = $this->starter(true, $connections);
+
+        self::assertSame([3], array_keys($starter->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 3)['jobs']));
+        self::assertSame([0, 3], array_keys($starter->start(Job::TYPE_ORDERS, Job::TARGET_ENGINE)['jobs']));
+        self::assertNotNull($starter->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 2)['refusal']);
+        self::assertSame([
+            [Job::TYPE_CATALOG, Job::TARGET_ENGINE, 3],
+            [Job::TYPE_ORDERS, Job::TARGET_ENGINE, 0],
+            [Job::TYPE_ORDERS, Job::TARGET_ENGINE, 3],
+        ], $this->started);
+    }
+
     public function testTheContactsImportStartsForEveryWebsiteWhileNotConnected(): void
     {
         $result = $this->starter(false)->start(Job::TYPE_CONTACTS, Job::TARGET_SMAILY);
@@ -104,7 +137,7 @@ class ImportStarterTest extends TestCase
         self::assertSame([[Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 3]], $this->started);
     }
 
-    private function starter(bool $connected): ImportStarter
+    private function starter(bool $connected, ?Connections $connections = null): ImportStarter
     {
         $engineSettings = $this->createMock(EngineSettings::class);
         $engineSettings->method('isConnected')->willReturn($connected);
@@ -118,6 +151,11 @@ class ImportStarterTest extends TestCase
         $storeManager = $this->createMock(StoreManagerInterface::class);
         $storeManager->method('getWebsites')->willReturn($websites);
 
-        return new ImportStarter($this->jobManager, $storeManager, new EngineImportGuard($engineSettings));
+        return new ImportStarter(
+            $this->jobManager,
+            $storeManager,
+            new EngineImportGuard(),
+            $connections ?? $this->oneEngineConnection($engineSettings)
+        );
     }
 }

@@ -201,11 +201,14 @@ below.
   all-or-nothing.
 - **Routed by engine connection (CON-237).** A row's `store_id` names the
   Campaign Intelligence connection it goes to (see "Engine connections"
-  below): every enqueue site passes the connection's `canonicalStoreId()`
-  — today always the primary's, `Connections::primary()`, as the flows
-  build one payload for the one installation-wide connection — and NULL
+  below): every enqueue site passes the canonical store view
+  (`canonicalStoreId()`) of the connection it builds the row for — the
+  catalog, customers and orders rows and their imports per connection
+  (see "Per-connection rows and imports" below); the marketing-queue
+  flows (identity merge, profiling consent) still the primary's — and NULL
   (every row queued before CON-237) is the primary. `IngestQueue::claimBatch()`,
-  `latestUndeliveredPayloads()` and `hasRow()` take the connection and read
+  `latestUndeliveredPayloads()`, `hasRow()` and `countPending()` (with a
+  connection; the nightly manifest's wait) take the connection and read
   its rows only: `store_id IN` its store views, for the primary also
   `store_id IS NULL`; a connection that serves every website (one store's
   primary) is not narrowed, so one store reads exactly the rows it always
@@ -214,8 +217,8 @@ below.
   connection serves, waits. `enqueueChangedPayloads()` takes the
   connection: it compares with that connection's unsent rows and stores
   its canonical store view. The `catalog_changed` markers belong to no
-  connection (claimed unfiltered, NULL), and `countPending()` (an
-  import's backlog guard) counts the whole queue. Each send-run round
+  connection (claimed unfiltered, NULL), and `countPending()` without a
+  connection (an import's backlog guard) counts the whole queue. Each send-run round
   gives every connection that may send (`Settings::isSendingAllowed()` of
   its own scope) its turn — one batch per domain of its rows, then its
   §3b batch — with its own client (`Connections::client()`); the pace and
@@ -251,7 +254,8 @@ below.
   30 s apart.
 - **The history import (CON-241, contract v1.20.0 §25).** One orders job
   is one history import (`Model/Backfill/HistoryImport`, kept in the
-  `smaily_connect_history_import` Magento flag). When it begins — the tick
+  `smaily_connect_history_import` Magento flag; each Campaign Intelligence
+  connection has its own, see "Per-connection rows and imports" below). When it begins — the tick
   begins a queued one before it runs the catalog or customers job ahead of
   it, and the orders processor begins its own — it reads the engine's
   `config.history` (`Model/Engine/HistoryConfig`: the ping first, so a
@@ -553,8 +557,9 @@ below.
   `smaily:backfill:status` and the card's Cancel import. The merchant
   starts the import again on the card or with `smaily:backfill:start
   catalog`. Both share one start, `Model/Backfill/ImportStarter::start()`:
-  the connection check, then the websites (one installation-wide job for
-  an engine import; for the contacts import one per website, or the
+  the connection check, then the websites (one job per Campaign
+  Intelligence connection for an engine import — under one store the one
+  installation-wide job; for the contacts import one per website, or the
   command's `--website`), then `JobManager::startIfIdle()` for each.
   ImportsOnConnect does not go through it: the connection check reads the
   configuration, which does not show the connection just stored until the
@@ -617,7 +622,9 @@ below.
   rows: it reads and prunes only the job codes its configuration lists.
 - **Nightly catalog manifest (PRO-3854; contract §3c, v1.12.0).** At 03:30
   in the admin's time zone (Magento reads `crontab.xml` schedules in it),
-  `Cron/SendCatalogManifest` runs `Model/Engine/CatalogManifest::send()`:
+  `Cron/SendCatalogManifest` runs `Model/Engine/CatalogManifest::send()`
+  for each Campaign Intelligence connection (one list per engine store,
+  see "Per-connection rows and imports" below):
   the store's complete product list as `{sku, in_stock}` only, in one
   `POST` to the setup map's `ingest_catalog_manifest`
   (`Engine\Client::catalogManifest()`; a connection set up before v1.12.0
@@ -841,9 +848,12 @@ below.
   store, and each separate store connects its own. The engine holds one
   engine store per Smaily account, so connections are grouped by the
   Smaily account. The ingest queue routes by it (see "Routed by engine
-  connection" above); every flow still builds and queues its rows for the
-  primary, so every store is still served by the one installation-wide
-  connection.
+  connection" above), and the catalog, customers and orders rows and
+  imports are built per connection (below); the storefront and
+  marketing-queue flows (browse, recommendations, attribution, identity
+  merge, profiling consent, pushed workflows) still use the primary, and
+  nothing creates a second connection yet, so every store is still served
+  by the one installation-wide connection.
   - `Model/Engine/Connection` is one connection: `key()` (0 = the primary,
     else the id of the website whose scope holds it), `settings()`,
     `websiteIds()`, `storeIds()`, `canonicalStoreId()` (the default store
@@ -889,6 +899,80 @@ below.
     records it, the same way, for a connection made before; config rows
     only, no schema change. The module's removal deletes every
     `smaily_connect/*` row at every scope, the new ones included.
+  - **Per-connection rows and imports.** A connection that serves every
+    website — every store run as one store — builds every payload, runs
+    every query and sends every request it did before; the single-connection
+    golden tests pin it (`CatalogPayloadBuilderTest`, the SQL of
+    `CatalogProductLoaderTest`, `EngineCustomerScopeTest` and
+    `HistoryImportTest`, and `QueueRoutingTest`'s request order). Under
+    separate stores:
+    - *Catalog.* A product goes to every connected connection that owns it
+      (`Connection::ownsProductOn()`: a product on one of its websites; the
+      primary also gets a product on no website). `CatalogIngest` builds
+      each connection's row with `CatalogPayloadBuilder::build($product,
+      $connection)`: `websites` and the language map hold only the
+      connection's websites, and price, link and currency are read at the
+      connection's canonical store view — or, for a product not on that
+      store view's website, at the default store view of the lowest-id
+      website of the connection it is on (PRO-1458's rule on the
+      connection's websites). The byte-identical-row collapse is per
+      connection. `buildChanged()` and `buildTombstones()` load the products
+      once per connected connection at its store view and hand
+      `enqueueBuilt()` rows keyed product id → connection key; a §3b
+      removal is one row per connected connection (`not_found` is a
+      success). A product that leaves a connection's websites is not
+      detected at its save: that connection's next nightly manifest leaves
+      it out, and its engine store removes it. The catalog observers'
+      gate is `Connections::anyConnected()`.
+    - *Manifest.* `Cron/SendCatalogManifest` calls
+      `CatalogManifest::send($connection)` for every connection, the
+      primary first: its list (`CatalogProductLoader::loadForManifest()`
+      narrowed by `applyConnection()`: `catalog_product_website` for its
+      websites, and for the primary `NOT EXISTS` any website row — never
+      the price index, PRO-2506), its client, its sending gate, its catalog
+      import (`isActiveAndMoving()` for its key), its `catalog` and
+      `catalog_remove` rows (a `catalog_changed` marker holds back every
+      connection), its 50,000 limit, its Log row (its canonical store view)
+      and its flag (`Connection::flagCode()`: the bare code for the
+      primary, `_c<key>` for any other). A connection that serves no
+      website sends no list — an empty list would remove its whole catalog.
+    - *Customers.* `EngineCustomerScope` takes the connection: group (a)
+      over its websites only, group (b) the buyers of an order placed in
+      one of its store views (`o.store_id IN`). `CustomerIngest` queues a
+      customer for each connected connection whose scope holds them, with
+      that connection's horizon (`HistoryImport::horizonNow($connection)`)
+      and row; group (c) holds only for the connection of the store view
+      the request is on. `CustomerPayloadBuilder::build($customer,
+      $connection)` names the account's `website` only when the
+      connection serves it (without a connection — the login merge, a
+      later step — as before).
+    - *Orders.* `OrderIngest` sends an order to `Connections::forStore()`
+      of its store view; nothing when no connected connection serves it;
+      an order whose store view is gone goes to the primary only while it
+      is the only connection. The refund collapse is unchanged.
+    - *Imports.* An engine job's `website_id` is its connection's key (0,
+      `Job::ENGINE_WEBSITE_ID`, the primary). `Backfill\EngineJobConnection`
+      reads it for the three processors and stops a job whose connection
+      is gone or (a website connection) refused, the way the tick stops
+      one when the primary is refused. The catalog import pages and counts
+      `loadPage()` / `count()` of its connection; the customers import its
+      scope; the orders import its history import. `HistoryImport`,
+      `HistoryProgress` and `HistoryConfig` take the connection: its flag
+      (`smaily_connect_history_import`, `_c<key>`), its window (its ping
+      through its client, else its stored `config.history`), its orders
+      (`store_id IN` its store views unless it serves every website), its
+      jobs' counts and its §25 report through its client; `beginQueued()`
+      and `report()` loop the connections, so `Cron\BackfillTick` is
+      unchanged. `JobManager::hasCompleted()`, `latest()`, `isStalled()`
+      and `requestCancel()` take an optional `?int $websiteId` (without
+      it, every website's, as before); `startIfIdle()` scopes its
+      stalled-import cancel to the connection for an engine import (a
+      contacts import still cancels any website's stalled import).
+      `ImportStarter` starts an engine import for the connection serving
+      the website it is given, or for every connected connection without
+      one; `EngineImportGuard::refusal()` asks that connection;
+      `ImportsOnConnect::start($connection)` queues that connection's
+      three imports (`Connector` passes the primary).
 - **The backfill page holds every product (PRO-2506):**
   `CatalogProductLoader` calls neither `addPriceData()` nor any store/website filter, so it pages exactly
   what `countProducts()` counts. `addPriceData()` INNER JOINs

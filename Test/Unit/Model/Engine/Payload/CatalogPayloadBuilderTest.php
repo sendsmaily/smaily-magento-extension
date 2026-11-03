@@ -32,9 +32,11 @@ use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Payload\ParentProductResolver;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
 use Smaily\Connect\Model\StorefrontScript;
 use Smaily\Connect\Model\StorefrontUrl;
@@ -57,7 +59,7 @@ class CatalogPayloadBuilderTest extends TestCase
     {
         $builder = $this->createBuilder('17');
 
-        $item = $builder->build($this->product(42, 'SHIRT-S'));
+        $item = $builder->build($this->product(42, 'SHIRT-S'), $this->oneStore());
 
         self::assertSame('SHIRT-S', $item['sku'], 'sku keying must stay untouched (PRO-1267)');
         self::assertSame('42', $item['external_id']);
@@ -69,7 +71,7 @@ class CatalogPayloadBuilderTest extends TestCase
     {
         $builder = $this->createBuilder('42');
 
-        $item = $builder->build($this->product(42, 'SHIRT'));
+        $item = $builder->build($this->product(42, 'SHIRT'), $this->oneStore());
 
         self::assertSame('42', $item['tags']['product_id']);
     }
@@ -78,7 +80,7 @@ class CatalogPayloadBuilderTest extends TestCase
     {
         $builder = $this->createBuilder('17');
 
-        $item = $builder->buildTombstone($this->product(42, 'SHIRT-S'));
+        $item = $builder->buildTombstone($this->product(42, 'SHIRT-S'), $this->oneStore());
 
         self::assertFalse($item['in_stock']);
         self::assertSame('17', $item['tags']['product_id']);
@@ -101,7 +103,7 @@ class CatalogPayloadBuilderTest extends TestCase
 
         $builder = $this->createBuilder('42', $emulation);
 
-        $item = $builder->build($this->product(42, 'SHIRT'));
+        $item = $builder->build($this->product(42, 'SHIRT'), $this->oneStore());
 
         self::assertSame('https://shop.example/shirt', $item['product_url']);
     }
@@ -123,7 +125,7 @@ class CatalogPayloadBuilderTest extends TestCase
             42,
             'OAK',
             productUrl: 'http://backend.example.com:8080/oak-table.html?___store=en&a=1'
-        ));
+        ), $this->oneStore());
 
         self::assertSame('https://shop.example.com/oak-table.html?___store=en&a=1', $item['product_url']);
         self::assertSame(self::IMAGE_URL, $item['image_url']);
@@ -133,7 +135,10 @@ class CatalogPayloadBuilderTest extends TestCase
     {
         $builder = $this->createBuilder('42', imageHelperFactory: $this->imageHelperFactory(self::IMAGE_URL));
 
-        $item = $builder->build($this->product(42, 'OAK', productUrl: 'https://backend.example.com/oak-table.html?x=1'));
+        $item = $builder->build(
+            $this->product(42, 'OAK', productUrl: 'https://backend.example.com/oak-table.html?x=1'),
+            $this->oneStore()
+        );
 
         self::assertSame('https://backend.example.com/oak-table.html?x=1', $item['product_url']);
         self::assertSame(self::IMAGE_URL, $item['image_url']);
@@ -189,7 +194,7 @@ class CatalogPayloadBuilderTest extends TestCase
             new StorefrontScript($storeManager, $this->createMock(Http::class))
         );
 
-        $item = $builder->build($loadedProduct);
+        $item = $builder->build($loadedProduct, $this->oneStore());
 
         self::assertSame(29.99, $item['price']);
         self::assertSame(1, $builder->canonicalStoreId());
@@ -237,7 +242,7 @@ class CatalogPayloadBuilderTest extends TestCase
             new StorefrontScript($storeManager, $this->createMock(Http::class))
         );
 
-        $item = $builder->build($product);
+        $item = $builder->build($product, $this->oneStore());
 
         self::assertSame(19.99, $item['price']);
     }
@@ -264,8 +269,8 @@ class CatalogPayloadBuilderTest extends TestCase
 
         $builder = $this->createBuilder('42', null, $storeManager);
 
-        self::assertSame('USD', $builder->build($product)['currency']);
-        self::assertSame('USD', $builder->buildTombstone($product)['currency']);
+        self::assertSame('USD', $builder->build($product, $this->oneStore())['currency']);
+        self::assertSame('USD', $builder->buildTombstone($product, $this->oneStore())['currency']);
     }
 
     /**
@@ -278,7 +283,8 @@ class CatalogPayloadBuilderTest extends TestCase
         $storeManager->method('getStores')->willReturn([]);
         $storeManager->method('getDefaultStoreView')->willReturn(null);
 
-        $item = $this->createBuilder('42', null, $storeManager)->build($this->product(42, 'SHIRT'));
+        $item = $this->createBuilder('42', null, $storeManager)
+            ->build($this->product(42, 'SHIRT'), $this->oneStore());
 
         self::assertSame('EUR', $item['currency']);
     }
@@ -295,7 +301,8 @@ class CatalogPayloadBuilderTest extends TestCase
         $storage = $this->createMock(StockRegistryStorage::class);
         $storage->expects(self::once())->method('removeStockItem')->with(42);
 
-        $item = $this->createBuilder('42', null, null, $storage)->build($this->product(42, 'SHIRT'));
+        $item = $this->createBuilder('42', null, null, $storage)
+            ->build($this->product(42, 'SHIRT'), $this->oneStore());
 
         self::assertTrue($item['in_stock']);
     }
@@ -308,7 +315,7 @@ class CatalogPayloadBuilderTest extends TestCase
     {
         $builder = $this->createBuilder('42', null, null, null, null, null, '', null, [], null, $this->stock(false));
         $product = $this->listedProduct('SHIRT', Status::STATUS_ENABLED, Visibility::VISIBILITY_BOTH);
-        $row = $builder->build($product);
+        $row = $builder->build($product, $this->oneStore());
 
         self::assertSame(['sku' => 'SHIRT', 'in_stock' => false], $builder->manifestItem($product));
         self::assertSame(['sku' => $row['sku'], 'in_stock' => $row['in_stock']], $builder->manifestItem($product));
@@ -389,7 +396,7 @@ class CatalogPayloadBuilderTest extends TestCase
             ->with(7, Area::AREA_FRONTEND, true);
 
         $item = $this->createBuilder('42', $emulation, $storeManager, null, $productRepository)
-            ->build($loadedProduct);
+            ->build($loadedProduct, $this->oneStore());
 
         self::assertSame(29.99, $item['price']);
         self::assertSame('https://second.example/shirt', $item['product_url']);
@@ -417,7 +424,7 @@ class CatalogPayloadBuilderTest extends TestCase
             ->with(1, Area::AREA_FRONTEND, true);
 
         $item = $this->createBuilder('42', $emulation, $storeManager, null, $productRepository)
-            ->build($product);
+            ->build($product, $this->oneStore());
 
         self::assertSame(19.99, $item['price']);
     }
@@ -439,7 +446,7 @@ class CatalogPayloadBuilderTest extends TestCase
             ->method('startEnvironmentEmulation')
             ->with(1, Area::AREA_FRONTEND, true);
 
-        $item = $this->createBuilder('42', $emulation, $storeManager)->build($product);
+        $item = $this->createBuilder('42', $emulation, $storeManager)->build($product, $this->oneStore());
 
         self::assertSame('SHIRT', $item['sku']);
         self::assertSame(19.99, $item['price']);
@@ -458,7 +465,7 @@ class CatalogPayloadBuilderTest extends TestCase
      */
     public function testEachWebsiteCarriesTheLinksOfItsOwnStoreViewsWhereTwoWebsitesShareALanguage(): void
     {
-        $item = $this->multiWebsiteBuilder()->build($this->multiWebsiteProduct([1, 2]));
+        $item = $this->multiWebsiteBuilder()->build($this->multiWebsiteProduct([1, 2]), $this->oneStore());
 
         self::assertSame([
             'base' => ['product_url' => [
@@ -486,7 +493,7 @@ class CatalogPayloadBuilderTest extends TestCase
      */
     public function testAProductOnSomeWebsitesListsOnlyThose(): void
     {
-        $item = $this->multiWebsiteBuilder()->build($this->multiWebsiteProduct([2]));
+        $item = $this->multiWebsiteBuilder()->build($this->multiWebsiteProduct([2]), $this->oneStore());
 
         self::assertSame(['lv'], array_keys($item['websites']));
         self::assertSame([
@@ -501,9 +508,74 @@ class CatalogPayloadBuilderTest extends TestCase
      */
     public function testAWebsiteWhereTheProductIsDisabledIsLeftOut(): void
     {
-        $item = $this->multiWebsiteBuilder([4, 5, 6])->build($this->multiWebsiteProduct([1, 2]));
+        $item = $this->multiWebsiteBuilder([4, 5, 6])
+            ->build($this->multiWebsiteProduct([1, 2]), $this->oneStore());
 
         self::assertSame(['base'], array_keys($item['websites']));
+    }
+
+    /**
+     * CON-237: the row of a separate store's engine store lists only its own
+     * websites, takes its language map from them, and is linked and priced
+     * at its canonical store view, in that store view's currency.
+     */
+    public function testAConnectionsRowHoldsOnlyItsOwnWebsitesReadAtItsStoreView(): void
+    {
+        $connection = new Connection(2, $this->createMock(Settings::class), [2], [4, 5, 6, 7], 4, false);
+
+        $item = $this->multiWebsiteBuilder()->build($this->multiWebsiteProduct([1, 2]), $connection);
+
+        self::assertSame(['lv'], array_keys($item['websites']));
+        self::assertSame([
+            'lv' => 'https://shop.example/s4/shirt',
+            'en' => 'https://shop.example/s5/shirt',
+            'ru' => 'https://shop.example/s6/shirt',
+        ], $item['product_url']);
+        self::assertSame('USD', $item['currency'], 'The currency of its canonical store view');
+    }
+
+    /**
+     * CON-237: the primary of separate stores lists only the websites it
+     * serves; the same product's row for the other engine store lists the
+     * others.
+     */
+    public function testThePrimaryOfSeparateStoresHoldsOnlyItsWebsites(): void
+    {
+        $primary = new Connection(0, $this->createMock(Settings::class), [1], [1, 2, 3], 1, false);
+
+        $item = $this->multiWebsiteBuilder()->build($this->multiWebsiteProduct([1, 2]), $primary);
+
+        self::assertSame(['base'], array_keys($item['websites']));
+        self::assertSame([
+            'et' => 'https://shop.example/s1/shirt',
+            'en' => 'https://shop.example/s2/shirt',
+            'ru' => 'https://shop.example/s3/shirt',
+        ], $item['product_url']);
+        self::assertSame('EUR', $item['currency']);
+    }
+
+    /**
+     * CON-237: one store — a connection that serves every website — gets the
+     * row it always got: every website, read at the installation's
+     * canonical store view.
+     */
+    public function testOneStoreGetsTheRowItAlwaysGot(): void
+    {
+        $everyWebsite = new Connection(0, $this->createMock(Settings::class), [1, 2], [1, 2, 3, 4, 5, 6, 7], 1, true);
+
+        self::assertSame(
+            $this->multiWebsiteBuilder()->build($this->multiWebsiteProduct([1, 2]), $this->oneStore()),
+            $this->multiWebsiteBuilder()->build($this->multiWebsiteProduct([1, 2]), $everyWebsite)
+        );
+    }
+
+    /**
+     * The one Campaign Intelligence connection of a store run as one store:
+     * the primary, serving every website.
+     */
+    private function oneStore(): Connection
+    {
+        return new Connection(0, $this->createMock(Settings::class), [1], [1], 1, true);
     }
 
     /**
@@ -524,6 +596,7 @@ class CatalogPayloadBuilderTest extends TestCase
             $store->method('getId')->willReturn($storeId);
             $store->method('getWebsiteId')->willReturn($websiteOf[$storeId]);
             $store->method('getIsActive')->willReturn($storeId === 7 ? '0' : '1');
+            $store->method('getDefaultCurrencyCode')->willReturn($websiteOf[$storeId] === 1 ? 'EUR' : 'USD');
             $stores[$storeId] = $store;
         }
         $websites = [];
@@ -540,6 +613,7 @@ class CatalogPayloadBuilderTest extends TestCase
         $storeManager->method('getWebsites')->willReturn($websites);
         $storeManager->method('getWebsite')->willReturnCallback(fn (int $id): Website => $websites[$id]);
         $storeManager->method('getDefaultStoreView')->willReturn($stores[1]);
+        $storeManager->method('getStore')->willReturnCallback(fn ($id): Store => $stores[(int)$id]);
 
         $languageResolver = $this->createMock(LanguageResolver::class);
         $languageResolver->method('forStore')->willReturnCallback(
@@ -646,7 +720,7 @@ class CatalogPayloadBuilderTest extends TestCase
             null,
             $productRepository,
             imageHelperFactory: $imageHelperFactory
-        )->build($loadedProduct);
+        )->build($loadedProduct, $this->oneStore());
 
         self::assertSame(self::IMAGE_URL, $item['image_url']);
         self::assertSame(
@@ -668,7 +742,7 @@ class CatalogPayloadBuilderTest extends TestCase
             '42',
             storeManager: $this->storeManagerWithLinkBase('http://shop.example/magento/'),
             request: $this->request('/var/www/html/bin/magento')
-        )->build($this->product(42, 'SHIRT', productUrl: 'http://shop.example/magento/shirt.html?a=1'));
+        )->build($this->product(42, 'SHIRT', productUrl: 'http://shop.example/magento/shirt.html?a=1'), $this->oneStore());
 
         self::assertSame('http://shop.example/index.php/shirt.html?a=1', $item['product_url']);
     }
@@ -679,7 +753,7 @@ class CatalogPayloadBuilderTest extends TestCase
             '42',
             storeManager: $this->storeManagerWithLinkBase('http://shop.example/'),
             request: $this->request('/var/www/html/bin/magento')
-        )->build($this->product(42, 'SHIRT', productUrl: 'http://shop.example/magento/shirt.html'));
+        )->build($this->product(42, 'SHIRT', productUrl: 'http://shop.example/magento/shirt.html'), $this->oneStore());
 
         self::assertSame('http://shop.example/magento/shirt.html', $item['product_url']);
     }
@@ -690,7 +764,7 @@ class CatalogPayloadBuilderTest extends TestCase
             '42',
             storeManager: $this->storeManagerWithLinkBase('http://shop.example/index.php/'),
             request: $this->request('/var/www/html/pub/index.php')
-        )->build($this->product(42, 'SHIRT', productUrl: 'http://shop.example/index.php/shirt.html'));
+        )->build($this->product(42, 'SHIRT', productUrl: 'http://shop.example/index.php/shirt.html'), $this->oneStore());
 
         self::assertSame('http://shop.example/index.php/shirt.html', $item['product_url']);
     }
@@ -705,8 +779,8 @@ class CatalogPayloadBuilderTest extends TestCase
     {
         $builder = $this->createBuilder('42');
 
-        $item = $builder->build($this->product(42, 'SHIRT'));
-        $tombstone = $builder->buildTombstone($this->product(42, 'SHIRT'));
+        $item = $builder->build($this->product(42, 'SHIRT'), $this->oneStore());
+        $tombstone = $builder->buildTombstone($this->product(42, 'SHIRT'), $this->oneStore());
 
         self::assertSame('uncategorized', $item['category_path']);
         self::assertSame('true', $item['tags']['category_defaulted']);
@@ -727,7 +801,7 @@ class CatalogPayloadBuilderTest extends TestCase
         $categoryRepository->method('get')->willReturnCallback(static fn (int $id) => $categories[$id]);
 
         $item = $this->createBuilder('42', null, null, null, null, $categoryRepository)
-            ->build($this->product(42, 'SHIRT', 19.99, [], 'https://shop.example/shirt', [5]));
+            ->build($this->product(42, 'SHIRT', 19.99, [], 'https://shop.example/shirt', [5]), $this->oneStore());
 
         self::assertSame('shirts', $item['category_path']);
         self::assertArrayNotHasKey('category_defaulted', $item['tags']);
@@ -743,7 +817,7 @@ class CatalogPayloadBuilderTest extends TestCase
         $categoryRepository->method('get')->willReturn($this->category(1, '1/2', 'default-category'));
 
         $item = $this->createBuilder('42', null, null, null, null, $categoryRepository)
-            ->build($this->product(42, 'SHIRT', 19.99, [], 'https://shop.example/shirt', [2]));
+            ->build($this->product(42, 'SHIRT', 19.99, [], 'https://shop.example/shirt', [2]), $this->oneStore());
 
         self::assertSame('uncategorized', $item['category_path']);
         self::assertSame('true', $item['tags']['category_defaulted']);
@@ -756,7 +830,7 @@ class CatalogPayloadBuilderTest extends TestCase
     public function testVariantWithoutACategoryOfItsOwnIsSentWithItsParentsCategory(): void
     {
         $item = $this->createBuilder('17', null, null, null, null, $this->shirtCategories(), '', null, [5])
-            ->build($this->product(42, 'SHIRT-S'));
+            ->build($this->product(42, 'SHIRT-S'), $this->oneStore());
 
         self::assertSame('shirts', $item['category_path']);
         self::assertSame('shirts', $item['tags']['category_path']);
@@ -769,7 +843,7 @@ class CatalogPayloadBuilderTest extends TestCase
     public function testVariantWithACategoryOfItsOwnKeepsIt(): void
     {
         $item = $this->createBuilder('17', null, null, null, null, $this->shirtCategories(), '', null, [5])
-            ->build($this->product(42, 'SHIRT-S', 19.99, [], 'https://shop.example/shirt', [6]));
+            ->build($this->product(42, 'SHIRT-S', 19.99, [], 'https://shop.example/shirt', [6]), $this->oneStore());
 
         self::assertSame('shirts/linen', $item['category_path']);
         self::assertArrayNotHasKey('category_defaulted', $item['tags']);
@@ -782,7 +856,7 @@ class CatalogPayloadBuilderTest extends TestCase
     public function testVariantWhoseParentHasNoCategoryEitherIsMarkedCategoryDefaulted(): void
     {
         $item = $this->createBuilder('17', null, null, null, null, $this->shirtCategories())
-            ->build($this->product(42, 'SHIRT-S'));
+            ->build($this->product(42, 'SHIRT-S'), $this->oneStore());
 
         self::assertSame('uncategorized', $item['category_path']);
         self::assertSame('true', $item['tags']['category_defaulted']);

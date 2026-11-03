@@ -15,7 +15,9 @@ use Magento\Store\Api\Data\WebsiteInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
+use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
@@ -86,6 +88,26 @@ class CustomerPayloadBuilderTest extends TestCase
             ['email' => 'shopper@example.com', 'external_id' => '19', 'language' => 'lv', 'website' => 'lv'],
             $onSecond
         );
+    }
+
+    /**
+     * CON-237: a row names the account's website only when that website is
+     * one of the connection's the row is for; one store — a connection that
+     * serves every website — names it as before.
+     */
+    public function testARowNamesTheAccountsWebsiteOnlyWhenTheConnectionServesIt(): void
+    {
+        $this->languageResolver->method('forStore')->willReturn('lv');
+        $customer = $this->customer(19, 4, 2, 'shopper@example.com');
+        $settings = $this->createMock(Settings::class);
+
+        $ownStore = $this->builder->build($customer, new Connection(2, $settings, [2], [4], 4, false));
+        $otherStore = $this->builder->build($customer, new Connection(0, $settings, [1], [1], 1, false));
+        $oneStore = $this->builder->build($customer, new Connection(0, $settings, [1, 2], [1, 4], 1, true));
+
+        self::assertSame('lv', $ownStore['website']);
+        self::assertArrayNotHasKey('website', $otherStore);
+        self::assertSame($this->builder->build($customer), $oneStore);
     }
 
     public function testAnAccountOfAWebsiteThatNoLongerExistsGoesWithoutAWebsite(): void

@@ -22,6 +22,8 @@ use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Source\SyncMode;
 use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connection;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\ConsentingShopper;
 use Smaily\Connect\Model\Engine\CustomerIngest;
 use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
@@ -42,12 +44,27 @@ use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
  * CON-266: the live customer sync (Engine\CustomerIngest) asks the same
  * rule for one customer, so a save queues exactly the customers the import
  * sends, and a subscription or an order queues a customer who joins.
+ *
+ * CON-237: the scope is a Campaign Intelligence connection's — its
+ * websites' contact-sync groups and the buyers of its store views. Under
+ * one store (the connection serves every website) the query is the one it
+ * always was.
  */
 class EngineCustomerScopeTest extends IntegrationTestCase
 {
     use EngineConnectionsStub;
 
     private const MONTH = 30 * 86400;
+
+    /** The customers import's page under one store, as the import read it before CON-237. */
+    private const ONE_STORE_PAGE_SQL = 'SELECT `e`.`entity_id` FROM `customer_entity` AS `e` WHERE (EXISTS ('
+        . 'SELECT `o`.`entity_id` FROM `sales_order` AS `o` WHERE (o.customer_id = e.entity_id)'
+        . " AND (o.created_at >= '<horizon>')) OR EXISTS (SELECT `ns`.`subscriber_id`"
+        . ' FROM `newsletter_subscriber` AS `ns` WHERE (ns.store_id IN (1, 2)) AND (ns.subscriber_status IN (1, 3))'
+        . ' AND (ns.customer_id = e.entity_id OR ns.subscriber_email = e.email)) OR (e.website_id = 2 OR EXISTS ('
+        . 'SELECT `ns`.`subscriber_id` FROM `newsletter_subscriber` AS `ns` WHERE (ns.store_id IN (3))'
+        . ' AND (ns.subscriber_status IN (1, 3)) AND (ns.customer_id = e.entity_id OR ns.subscriber_email = e.email))))'
+        . " AND (e.entity_id > 0) ORDER BY `e`.`entity_id` ASC\n LIMIT 2";
 
     private SchemaInstaller $schema;
 
@@ -61,6 +78,9 @@ class EngineCustomerScopeTest extends IntegrationTestCase
     /** @var array<int, bool> whether the website's contact sync is active */
     private array $active = [1 => true, 2 => true, 3 => true];
 
+    /** The connection whose scope is read: one store's primary, unless a test sets another. */
+    private Connection $scopeConnection;
+
     private string $horizon;
 
     protected function setUp(): void
@@ -70,6 +90,14 @@ class EngineCustomerScopeTest extends IntegrationTestCase
         $this->schema->createContactTables();
         $this->schema->createSalesOrder();
         $this->horizon = $this->clockDate(-60 * self::MONTH);
+        $this->scopeConnection = $this->engineConnection(
+            0,
+            $this->connectedSettings(),
+            [1, 2, 3],
+            [1, 2, 3, 4],
+            1,
+            true
+        );
 
         // id => website; then each one's subscriber row and orders.
         foreach ([1 => 1, 2 => 1, 3 => 1, 4 => 1, 5 => 1, 6 => 2, 7 => 3, 8 => 3, 9 => 1] as $id => $websiteId) {
@@ -110,7 +138,7 @@ class EngineCustomerScopeTest extends IntegrationTestCase
     public function testEachWebsiteSendsWhatItsSyncModePutsIntoSmailyPlusTheBuyers(): void
     {
         self::assertSame([1, 2, 4, 6, 8], $this->walk());
-        self::assertSame(5, $this->scope()->count($this->horizon));
+        self::assertSame(5, $this->scope()->count($this->horizon, $this->scopeConnection));
     }
 
     public function testAllCustomersOnTheFirstWebsiteSendsEveryAccountThere(): void
@@ -130,7 +158,7 @@ class EngineCustomerScopeTest extends IntegrationTestCase
         $this->active[2] = false;
 
         self::assertSame([4, 8], $this->walk());
-        self::assertSame(2, $this->scope()->count($this->horizon));
+        self::assertSame(2, $this->scope()->count($this->horizon, $this->scopeConnection));
     }
 
     /**
@@ -144,13 +172,13 @@ class EngineCustomerScopeTest extends IntegrationTestCase
             $scope = $this->scope();
             $included = array_values(array_filter(
                 range(1, 9),
-                fn (int $id): bool => $scope->includes($id, $this->horizon)
+                fn (int $id): bool => $scope->includes($id, $this->horizon, $this->scopeConnection)
             ));
 
             self::assertSame($this->walk(), $included);
         }
-        self::assertFalse($this->scope()->includes(0, $this->horizon));
-        self::assertFalse($this->scope()->includes(99, $this->horizon), 'No such account');
+        self::assertFalse($this->scope()->includes(0, $this->horizon, $this->scopeConnection));
+        self::assertFalse($this->scope()->includes(99, $this->horizon, $this->scopeConnection), 'No such account');
     }
 
     /**
@@ -198,10 +226,100 @@ class EngineCustomerScopeTest extends IntegrationTestCase
         self::assertSame([3], $this->queuedCustomers());
     }
 
-    private function customerIngest(int $consentingCustomerId = 0): CustomerIngest
+    /**
+     * CON-237: separate stores — the primary serves website 1 (store views
+     * 1 and 2), the connection of website 2 serves websites 2 and 3 (store
+     * views 3 and 4). Each scope holds its websites' contact-sync groups and
+     * the buyers of its store views; together they are one store's scope.
+     */
+    public function testEachConnectionsScopeHoldsItsWebsitesAndItsStoreViewsBuyers(): void
+    {
+        $this->connection->update('sales_order', ['store_id' => 1], 'entity_id = 1');
+        $this->connection->update('sales_order', ['store_id' => 4], 'entity_id = 2');
+        [$primary, $second] = $this->separateStores();
+
+        $this->scopeConnection = $primary;
+        self::assertSame([1, 2, 4], $this->walk());
+        self::assertSame(3, $this->scope()->count($this->horizon, $primary));
+        self::assertFalse($this->scope()->includes(8, $this->horizon, $primary), 'A buyer of the other store');
+
+        $this->scopeConnection = $second;
+        self::assertSame([6, 8], $this->walk());
+        self::assertSame(2, $this->scope()->count($this->horizon, $second));
+        self::assertTrue($this->scope()->includes(8, $this->horizon, $second));
+    }
+
+    /**
+     * CON-237: a save queues the customer for each connection whose scope
+     * holds them, with that connection's canonical store view.
+     */
+    public function testASaveQueuesTheCustomerForTheConnectionWhoseScopeHoldsThem(): void
+    {
+        $this->connection->update('sales_order', ['store_id' => 1], 'entity_id = 1');
+        $this->connection->update('sales_order', ['store_id' => 4], 'entity_id = 2');
+        $ingest = $this->customerIngest(0, $this->engineConnections(array_map(
+            static fn (Connection $connection): array => [$connection, null],
+            $this->separateStores()
+        )));
+        foreach (range(1, 9) as $id) {
+            $ingest->saved($this->customer($id));
+        }
+
+        $rows = $this->connection->fetchPairs(
+            $this->connection->select()
+                ->from('smaily_ingest_queue', ['entity_id', 'store_id'])
+                ->where('domain = ?', Client::DOMAIN_CUSTOMERS)
+                ->order('id ASC')
+        );
+        self::assertSame(['1' => '1', '2' => '1', '4' => '1', '6' => '3', '8' => '3'], $rows);
+    }
+
+    /**
+     * CON-237, the single-connection golden test: under one store the
+     * customers import reads its page with the query it always read — no
+     * store view or website narrowing.
+     */
+    public function testOneStoreReadsThePageWithTheQueryItAlwaysRead(): void
+    {
+        $connection = $this->connection;
+        if (!$connection instanceof \Zend_Db_Adapter_Abstract) {
+            self::fail('The test connection keeps no query profile');
+        }
+        $profiler = $connection->getProfiler();
+        $profiler->setEnabled(true);
+        $profiler->clear();
+        $this->scope()->page($this->horizon, 0, 2, $this->scopeConnection);
+        $queries = $profiler->getQueryProfiles();
+        $profiler->setEnabled(false);
+
+        self::assertIsArray($queries);
+        $sql = str_replace($this->horizon, '<horizon>', (string)end($queries)->getQuery());
+        self::assertStringNotContainsString('o.store_id', $sql);
+        self::assertSame(self::ONE_STORE_PAGE_SQL, $sql);
+    }
+
+    /**
+     * @return array{0: Connection, 1: Connection} the primary and the connection of website 2
+     */
+    private function separateStores(): array
+    {
+        return [
+            $this->engineConnection(0, $this->connectedSettings(), [1], [1, 2], 1),
+            $this->engineConnection(2, $this->connectedSettings(), [2, 3], [3, 4], 3),
+        ];
+    }
+
+    private function connectedSettings(): Settings
     {
         $settings = $this->createMock(Settings::class);
         $settings->method('isConnected')->willReturn(true);
+
+        return $settings;
+    }
+
+    private function customerIngest(int $consentingCustomerId = 0, ?Connections $connections = null): CustomerIngest
+    {
+        $settings = $this->connectedSettings();
         $builder = $this->createMock(CustomerPayloadBuilder::class);
         $builder->method('build')->willReturnCallback(
             static fn (CustomerInterface $customer): array => [
@@ -219,14 +337,14 @@ class EngineCustomerScopeTest extends IntegrationTestCase
         $repository->method('getById')->willReturnCallback(fn (int $id): CustomerInterface => $this->customer($id));
 
         return new CustomerIngest(
-            $settings,
             $builder,
             $this->objectManager->create(IngestQueue::class),
             $this->scope(),
             $historyImport,
             $shopper,
             $repository,
-            $this->oneEngineConnection($settings)
+            $connections ?? $this->oneEngineConnection($settings),
+            $this->createMock(StoreManagerInterface::class)
         );
     }
 
@@ -264,7 +382,7 @@ class EngineCustomerScopeTest extends IntegrationTestCase
         $scope = $this->scope();
         $ids = [];
         $after = 0;
-        while ($page = $scope->page($this->horizon, $after, 2)) {
+        while ($page = $scope->page($this->horizon, $after, 2, $this->scopeConnection)) {
             $ids = array_merge($ids, $page);
             $after = max($page);
         }

@@ -8,13 +8,10 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Backfill;
 
-use Magento\Catalog\Model\ResourceModel\Product\Collection;
-use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\CatalogProductLoader;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\IngestPace;
-use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 
 /**
@@ -22,6 +19,10 @@ use Smaily\Connect\Model\Engine\Queue\IngestQueue;
  * the same funnel the live hooks use, so a paged row can never disagree with
  * a live one — and the flusher delivers at the engine's batch pace. A flood guard pauses the
  * job while the queue backlog is high, so live events are never starved.
+ *
+ * An import is one Campaign Intelligence connection's (CON-237,
+ * EngineJobConnection): it pages the products of that connection's catalog
+ * (CatalogProductLoader::loadPage()) and queues their rows for it only.
  */
 class EngineCatalogProcessor implements ProcessorInterface
 {
@@ -30,12 +31,11 @@ class EngineCatalogProcessor implements ProcessorInterface
 
     public function __construct(
         private readonly JobManager $jobManager,
-        private readonly ProductCollectionFactory $productCollectionFactory,
-        private readonly CatalogPayloadBuilder $payloadBuilder,
         private readonly IngestQueue $ingestQueue,
         private readonly CatalogIngest $catalogIngest,
         private readonly CatalogProductLoader $productLoader,
-        private readonly ImportClock $clock
+        private readonly ImportClock $clock,
+        private readonly EngineJobConnection $jobConnection
     ) {
     }
 
@@ -47,19 +47,25 @@ class EngineCatalogProcessor implements ProcessorInterface
         if ($this->ingestQueue->countPending(Client::DOMAIN_CATALOG) >= IngestPace::IMPORT_BACKLOG_ROWS) {
             return; // Let the flusher drain before enqueueing more.
         }
+        $connection = $this->jobConnection->of($job);
+        if ($connection === null) {
+            return;
+        }
 
         // Taken up before the count, which can die on a large store: a job
         // that dies before its first page is then running and not moved,
         // so the tick sets it aside like any other (PRO-3950).
         $this->jobManager->markRunning($job);
         if ($job->getData('total_count') === null) {
-            $job->setData('total_count', $this->countProducts());
+            // Same scope as the page (PRO-1353) — otherwise the progress-bar
+            // total can disagree with the scoped pages on multi-store installs.
+            $job->setData('total_count', $this->productLoader->count($connection));
         }
 
         $deadline = $this->clock->now() + self::TIME_BUDGET_SECONDS;
         do {
             $cursor = (int)$job->getCursorValue();
-            $products = $this->productLoader->loadPage($cursor, self::PAGE_SIZE);
+            $products = $this->productLoader->loadPage($cursor, self::PAGE_SIZE, $connection);
             if (!$products) {
                 $this->jobManager->complete($job);
 
@@ -71,7 +77,7 @@ class EngineCatalogProcessor implements ProcessorInterface
             $newCursor = $cursor;
             foreach ($products as $product) {
                 $newCursor = max($newCursor, (int)$product->getId());
-                if ($this->catalogIngest->enqueueProduct($product, (int)$job->getId())) {
+                if ($this->catalogIngest->enqueueProduct($product, (int)$job->getId(), $connection)) {
                     $processed++;
                 } else {
                     $failed++;
@@ -87,18 +93,5 @@ class EngineCatalogProcessor implements ProcessorInterface
                 return;
             }
         } while ($this->clock->now() < $deadline);
-    }
-
-    private function countProducts(): int
-    {
-        $collection = $this->productCollectionFactory->create();
-        if ($collection instanceof Collection) {
-            // Same canonical scope as the page (PRO-1353) — otherwise the
-            // progress-bar total can disagree with the scoped pages on
-            // multi-store installs.
-            $collection->setStoreId($this->payloadBuilder->canonicalStoreId());
-        }
-
-        return $collection->getSize();
     }
 }

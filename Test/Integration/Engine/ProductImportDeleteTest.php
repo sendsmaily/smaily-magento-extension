@@ -221,18 +221,19 @@ class ProductImportDeleteTest extends IntegrationTestCase
         $payloadBuilder->method('buildTombstone')->willReturn(self::TOMBSTONE);
         $ingestQueue = $this->objectManager->create(IngestQueue::class);
 
+        $connections = $this->oneEngineConnection($settings);
+
         return new ProductImportDelete(
-            $settings,
+            $connections,
             $productResource,
             $parentResolver,
             new CatalogIngest(
-                $settings,
                 $productLoader,
                 $productResource,
                 $payloadBuilder,
                 $ingestQueue,
                 $this->createMock(Logger::class),
-                $this->oneEngineConnection($settings)
+                $connections
             )
         );
     }

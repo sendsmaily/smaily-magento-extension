@@ -12,7 +12,6 @@ use Magento\Framework\Exception\LocalizedException;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Smaily\Connect\Model\Engine\Client;
-use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
@@ -33,6 +32,10 @@ use Smaily\Connect\Model\Engine\Queue\IngestQueue;
  * counted as processed and not queued. An order whose row cannot be built
  * from what Magento stores is skipped and the import goes on (SkippedRow,
  * CON-227).
+ *
+ * An import is one Campaign Intelligence connection's (CON-237,
+ * EngineJobConnection): its history import, the orders placed in its store
+ * views (all orders when it serves every website), queued for it.
  */
 class EngineOrdersProcessor implements ProcessorInterface
 {
@@ -47,7 +50,7 @@ class EngineOrdersProcessor implements ProcessorInterface
         private readonly SkippedRow $skippedRow,
         private readonly HistoryImport $historyImport,
         private readonly ImportClock $clock,
-        private readonly Connections $connections
+        private readonly EngineJobConnection $jobConnection
     ) {
     }
 
@@ -59,31 +62,35 @@ class EngineOrdersProcessor implements ProcessorInterface
         if ($this->ingestQueue->countPending(Client::DOMAIN_ORDERS) >= IngestPace::IMPORT_BACKLOG_ROWS) {
             return;
         }
+        $connection = $this->jobConnection->of($job);
+        if ($connection === null) {
+            return;
+        }
 
         // Taken up before the count, which can die on a large store: a job
         // that dies before its first page is then running and not moved,
         // so the tick sets it aside like any other (PRO-3950).
         $this->jobManager->markRunning($job);
-        $history = $this->historyImport->begin($job);
+        $history = $this->historyImport->begin($job, $connection);
         if ($job->getData('total_count') === null) {
             $job->setData('total_count', $history['orders_expected']);
         }
 
         $jobId = (int)$job->getId();
         $deadline = $this->clock->now() + self::TIME_BUDGET_SECONDS;
-        // The primary connection's rows (CON-237; per-connection imports are a later step).
-        $storeId = $this->connections->primary()->canonicalStoreId();
+        $storeId = $connection->canonicalStoreId();
         do {
             $startPartQueued = $history['start_part_queued_to'] !== null;
             $rows = $this->historyImport->ordersPage(
                 $startPartQueued ? $history['horizon'] : $history['start_from'],
                 $history['until'],
                 $job->getCursorValue(),
-                self::PAGE_SIZE
+                self::PAGE_SIZE,
+                $connection
             );
             if (!$rows) {
                 if (!$startPartQueued) {
-                    $history = $this->historyImport->update([
+                    $history = $this->historyImport->update($connection, [
                         'start_part_queued_to' => $this->ingestQueue->lastRowId($jobId),
                     ]);
                     continue;

@@ -12,8 +12,8 @@ use Magento\Framework\Model\AbstractModel;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Creditmemo;
 use Magento\Sales\Model\ResourceModel\Order\Creditmemo as CreditmemoResource;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\OrderIngest;
-use Smaily\Connect\Model\Engine\Settings;
 
 /**
  * A new credit memo → its order's ingest row (PRO-1955). The order payload
@@ -40,7 +40,7 @@ use Smaily\Connect\Model\Engine\Settings;
 class CreditmemoSave
 {
     public function __construct(
-        private readonly Settings $settings,
+        private readonly Connections $connections,
         private readonly OrderIngest $orderIngest
     ) {
     }
@@ -58,7 +58,7 @@ class CreditmemoSave
         if (!$creditmemo instanceof Creditmemo
             || $creditmemo->getOrigData('entity_id') !== null
             || !$creditmemo->getId()
-            || !$this->settings->isConnected()
+            || !$this->connections->anyConnected()
         ) {
             return $result;
         }

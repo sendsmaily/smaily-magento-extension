@@ -9,9 +9,9 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Backfill;
 
 use Magento\Framework\Stdlib\DateTime\DateTime;
-use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connection;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
-use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
 
@@ -33,6 +33,10 @@ use Smaily\Connect\Model\Logger\Logger;
  * REPORT_EVERY_SECONDS; it never stops or fails the import. Nothing is
  * reported once `complete` is in, nor for an orders import that was
  * cancelled or stopped.
+ *
+ * Each Campaign Intelligence connection's history import is reported on
+ * its own (CON-237): its state, its imports (the jobs whose website_id is
+ * its key), its sending gate, to its engine store through its own client.
  */
 class HistoryProgress
 {
@@ -47,8 +51,7 @@ class HistoryProgress
         private readonly HistoryImport $historyImport,
         private readonly JobManager $jobManager,
         private readonly IngestQueue $ingestQueue,
-        private readonly Client $client,
-        private readonly EngineSettings $engineSettings,
+        private readonly Connections $connections,
         private readonly DateTime $dateTime,
         private readonly Websites $websites,
         private readonly Logger $logger
@@ -56,16 +59,28 @@ class HistoryProgress
     }
 
     /**
-     * Report the history import's progress when it is due. Never throws.
+     * Report each connection's history import progress when it is due.
+     * Never throws.
      */
     public function report(): void
     {
         try {
-            $this->reportDue();
+            $connections = $this->connections->all();
         } catch (\Throwable $exception) {
             $this->logger->error('Campaign Intelligence history progress could not be read', [
                 'error' => $exception->getMessage(),
             ]);
+
+            return;
+        }
+        foreach ($connections as $connection) {
+            try {
+                $this->reportDue($connection);
+            } catch (\Throwable $exception) {
+                $this->logger->error('Campaign Intelligence history progress could not be read', [
+                    'error' => $exception->getMessage(),
+                ]);
+            }
         }
     }
 
@@ -79,13 +94,14 @@ class HistoryProgress
      */
     public function card(Job $ordersJob): ?array
     {
-        $state = $this->historyImport->state();
-        if ($state === null || (int)$state['orders_job_id'] !== (int)$ordersJob->getId()) {
+        $connection = $this->connections->forKey($ordersJob->getWebsiteId());
+        $state = $connection === null ? null : $this->historyImport->state($connection);
+        if ($connection === null || $state === null || (int)$state['orders_job_id'] !== (int)$ordersJob->getId()) {
             return null;
         }
 
         $sent = (int)$ordersJob->getSentCount();
-        if ($this->phase($state, $ordersJob) === self::PHASE_STARTED) {
+        if ($this->phase($state, $ordersJob, $connection) === self::PHASE_STARTED) {
             $part = 'start';
             $expected = (int)$state['start_expected'];
             $sent = min($sent, $expected);
@@ -104,11 +120,11 @@ class HistoryProgress
         ];
     }
 
-    private function reportDue(): void
+    private function reportDue(Connection $connection): void
     {
-        $state = $this->historyImport->state();
+        $state = $this->historyImport->state($connection);
         if ($state === null || $state['reported_phase'] === self::PHASE_COMPLETE
-            || !$this->engineSettings->isSendingAllowed()
+            || !$connection->settings()->isSendingAllowed()
         ) {
             return;
         }
@@ -119,9 +135,9 @@ class HistoryProgress
             return;
         }
 
-        $phase = $this->phase($state, $ordersJob);
+        $phase = $this->phase($state, $ordersJob, $connection);
         if ($phase !== self::PHASE_STARTED && !$state['start_part_done']) {
-            $state = $this->historyImport->update(['start_part_done' => true]);
+            $state = $this->historyImport->update($connection, ['start_part_done' => true]);
         }
 
         $now = (int)$this->dateTime->gmtTimestamp();
@@ -132,9 +148,11 @@ class HistoryProgress
         }
 
         try {
-            $this->client->historyProgress($this->body($state, $ordersJob, $phase));
+            $this->connections->client($connection)->historyProgress(
+                $this->body($state, $ordersJob, $phase, $connection)
+            );
         } catch (\Throwable $exception) {
-            $this->historyImport->update(['failed_at' => $now]);
+            $this->historyImport->update($connection, ['failed_at' => $now]);
             $this->logger->info('Campaign Intelligence history progress report failed', [
                 'import_id' => $state['import_id'],
                 'phase' => $phase,
@@ -143,13 +161,16 @@ class HistoryProgress
 
             return;
         }
-        $this->historyImport->update(['reported_phase' => $phase, 'reported_at' => $now, 'failed_at' => 0]);
+        $this->historyImport->update(
+            $connection,
+            ['reported_phase' => $phase, 'reported_at' => $now, 'failed_at' => 0]
+        );
     }
 
     /**
      * @param array<string, mixed> $state HistoryImport::state()
      */
-    private function phase(array $state, Job $ordersJob): string
+    private function phase(array $state, Job $ordersJob, Connection $connection): string
     {
         $jobId = (int)$ordersJob->getId();
         if ($ordersJob->getStatus() === Job::STATUS_COMPLETED && $this->ingestQueue->countUndelivered([$jobId]) === 0) {
@@ -166,7 +187,7 @@ class HistoryProgress
 
         $before = [];
         foreach ([Job::TYPE_CATALOG, Job::TYPE_CUSTOMERS] as $type) {
-            $job = $this->jobManager->latest($type, Job::TARGET_ENGINE);
+            $job = $this->jobManager->latest($type, Job::TARGET_ENGINE, $connection->key());
             if ($job === null) {
                 continue;
             }
@@ -185,7 +206,7 @@ class HistoryProgress
      * @param array<string, mixed> $state HistoryImport::state()
      * @return array<string, mixed>
      */
-    private function body(array $state, Job $ordersJob, string $phase): array
+    private function body(array $state, Job $ordersJob, string $phase, Connection $connection): array
     {
         $oldest = $this->ingestQueue->lastSentPayload((int)$ordersJob->getId())['ordered_at'] ?? null;
 
@@ -194,8 +215,8 @@ class HistoryProgress
             'phase' => $phase,
             'horizon_start' => substr((string)$state['horizon'], 0, 10),
             'entities' => [
-                'catalog' => $this->entity(Job::TYPE_CATALOG),
-                'customers' => $this->entity(Job::TYPE_CUSTOMERS),
+                'catalog' => $this->entity(Job::TYPE_CATALOG, $connection),
+                'customers' => $this->entity(Job::TYPE_CUSTOMERS, $connection),
                 'orders' => [
                     'expected' => (int)$state['orders_expected'],
                     'sent' => (int)$ordersJob->getSentCount(),
@@ -221,9 +242,9 @@ class HistoryProgress
      *
      * @return array{expected: int|null, sent: int}
      */
-    private function entity(string $jobType): array
+    private function entity(string $jobType, Connection $connection): array
     {
-        $job = $this->jobManager->latest($jobType, Job::TARGET_ENGINE);
+        $job = $this->jobManager->latest($jobType, Job::TARGET_ENGINE, $connection->key());
         if ($job === null) {
             return ['expected' => null, 'sent' => 0];
         }

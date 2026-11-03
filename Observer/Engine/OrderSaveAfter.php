@@ -12,9 +12,9 @@ use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Sales\Model\Order;
 use Smaily\Connect\Model\Engine\AttributionManager;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\CustomerIngest;
 use Smaily\Connect\Model\Engine\OrderIngest;
-use Smaily\Connect\Model\Engine\Settings;
 
 /**
  * Order ingest on every order save whose state maps onto the engine enum, or
@@ -42,7 +42,7 @@ use Smaily\Connect\Model\Engine\Settings;
 class OrderSaveAfter implements ObserverInterface
 {
     public function __construct(
-        private readonly Settings $settings,
+        private readonly Connections $connections,
         private readonly OrderIngest $orderIngest,
         private readonly AttributionManager $attributionManager,
         private readonly CustomerIngest $customerIngest
@@ -68,7 +68,7 @@ class OrderSaveAfter implements ObserverInterface
             }
         }
 
-        if (!$this->settings->isConnected()) {
+        if (!$this->connections->anyConnected()) {
             return;
         }
 

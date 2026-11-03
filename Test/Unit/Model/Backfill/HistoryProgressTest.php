@@ -16,11 +16,13 @@ use Smaily\Connect\Model\Backfill\HistoryProgress;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-241 (contract v1.20.0 §25): the history import reports `started`,
@@ -28,10 +30,24 @@ use Smaily\Connect\Model\Logger\Logger;
  * at each phase change and at most every five minutes in between; a call
  * that fails is logged, tried again five minutes later and never stops the
  * import.
+ *
+ * CON-237: each connection reports its own history import, with its own
+ * imports' counts, through its own client.
  */
 class HistoryProgressTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const NOW = 1_800_000_000;
+
+    /** The key of the connection whose history import $state is; the others have none. */
+    private int $stateKey = 0;
+
+    /** @var list<int> the connection key of each call in $calls */
+    private array $callKeys = [];
+
+    /** @var list<int|null> the website id (connection key) each latest() read was for */
+    private array $latestFor = [];
 
     /** @var array<string, mixed> */
     private array $state;
@@ -224,11 +240,32 @@ class HistoryProgressTest extends TestCase
         self::assertNull($this->progress()->card($this->job(4, Job::TYPE_ORDERS, Job::STATUS_RUNNING, 10, 1)));
     }
 
-    private function progress(?Logger $logger = null, bool $sendingAllowed = true): HistoryProgress
+    /**
+     * CON-237: separate stores — the history import of the connection of
+     * website 2 is reported to its engine store, with the counts of its own
+     * imports; the primary, with no import of its own, reports nothing.
+     */
+    public function testEachConnectionReportsItsOwnHistoryImport(): void
     {
+        $this->stateKey = 2;
+
+        $this->progress(null, true, true)->report();
+
+        self::assertSame([2], $this->callKeys);
+        self::assertSame('started', $this->calls[0]['phase']);
+        self::assertSame([2, 2], $this->latestFor, 'Its own catalog and customers imports');
+    }
+
+    private function progress(
+        ?Logger $logger = null,
+        bool $sendingAllowed = true,
+        bool $separateStores = false
+    ): HistoryProgress {
         $historyImport = $this->createMock(HistoryImport::class);
-        $historyImport->method('state')->willReturnCallback(fn (): array => $this->state);
-        $historyImport->method('update')->willReturnCallback(function (array $changes): array {
+        $historyImport->method('state')->willReturnCallback(
+            fn (Connection $connection): ?array => $connection->key() === $this->stateKey ? $this->state : null
+        );
+        $historyImport->method('update')->willReturnCallback(function (Connection $connection, array $changes): array {
             $this->state = array_merge($this->state, $changes);
 
             return $this->state;
@@ -236,7 +273,8 @@ class HistoryProgressTest extends TestCase
 
         $jobManager = $this->createMock(JobManager::class);
         $jobManager->method('get')->willReturnCallback(fn (int $id): ?Job => $this->jobs[$id] ?? null);
-        $jobManager->method('latest')->willReturnCallback(function (string $type): ?Job {
+        $jobManager->method('latest')->willReturnCallback(function (string $type, string $target, ?int $websiteId): ?Job {
+            $this->latestFor[] = $websiteId;
             foreach ($this->jobs as $job) {
                 if ($job->getJobType() === $type) {
                     return $job;
@@ -254,9 +292,39 @@ class HistoryProgressTest extends TestCase
         );
         $queue->method('lastSentPayload')->willReturn(['ordered_at' => '2026-02-03T10:00:00Z']);
 
+        $client = fn (int $key): Client => $this->client($key);
+
+        $settings = $this->createMock(Settings::class);
+        $settings->method('isSendingAllowed')->willReturn($sendingAllowed);
+        $dateTime = $this->createMock(DateTime::class);
+        $dateTime->method('gmtTimestamp')->willReturn(self::NOW);
+        $connections = $separateStores
+            ? $this->engineConnections([
+                [$this->engineConnection(0, $settings, [1], [1], 1), $client(0)],
+                [$this->engineConnection(2, $settings, [2], [2], 2), $client(2)],
+            ])
+            : $this->oneEngineConnection($settings, $client(0));
+
+        return new HistoryProgress(
+            $historyImport,
+            $jobManager,
+            $queue,
+            $connections,
+            $dateTime,
+            $this->websites,
+            $logger ?? $this->createMock(Logger::class)
+        );
+    }
+
+    /**
+     * The engine client of the connection with this key, recording each call.
+     */
+    private function client(int $key): Client
+    {
         $client = $this->createMock(Client::class);
-        $client->method('historyProgress')->willReturnCallback(function (array $body): array {
+        $client->method('historyProgress')->willReturnCallback(function (array $body) use ($key): array {
             $this->calls[] = $body;
+            $this->callKeys[] = $key;
             if ($this->engineFails !== null) {
                 throw $this->engineFails;
             }
@@ -264,21 +332,7 @@ class HistoryProgressTest extends TestCase
             return ['ok' => true];
         });
 
-        $settings = $this->createMock(Settings::class);
-        $settings->method('isSendingAllowed')->willReturn($sendingAllowed);
-        $dateTime = $this->createMock(DateTime::class);
-        $dateTime->method('gmtTimestamp')->willReturn(self::NOW);
-
-        return new HistoryProgress(
-            $historyImport,
-            $jobManager,
-            $queue,
-            $client,
-            $settings,
-            $dateTime,
-            $this->websites,
-            $logger ?? $this->createMock(Logger::class)
-        );
+        return $client;
     }
 
     private function job(int $id, string $type, string $status, int $total, int $sent): Job&MockObject

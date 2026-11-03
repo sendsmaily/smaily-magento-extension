@@ -137,7 +137,7 @@ class OrderSaveAfterTest extends TestCase
         $settings->method('isConnected')->willReturn(true);
 
         return new OrderSaveAfter(
-            $settings,
+            $this->oneEngineConnection($settings),
             new OrderIngest($this->payloadBuilder, $this->queue, $this->oneEngineConnection($settings)),
             $this->createMock(AttributionManager::class),
             $this->customerIngest

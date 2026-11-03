@@ -17,6 +17,7 @@ use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Payload\ParentProductResolver;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Observer\Engine\ProductDeleteBefore;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-1231 delete routing: a parent/standalone hard-delete fires ONE §3b
@@ -26,6 +27,8 @@ use Smaily\Connect\Observer\Engine\ProductDeleteBefore;
  */
 class ProductDeleteBeforeTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private Settings&MockObject $settings;
     private ParentProductResolver&MockObject $parentResolver;
     private CatalogIngest&MockObject $catalogIngest;
@@ -64,7 +67,7 @@ class ProductDeleteBeforeTest extends TestCase
         $this->catalogIngest->expects(self::never())->method('enqueueRemovals');
 
         $observer = new ProductDeleteBefore(
-            $settings,
+            $this->oneEngineConnection($settings),
             $this->parentResolver,
             $this->catalogIngest
         );
@@ -83,7 +86,7 @@ class ProductDeleteBeforeTest extends TestCase
     private function createObserver(): ProductDeleteBefore
     {
         return new ProductDeleteBefore(
-            $this->settings,
+            $this->oneEngineConnection($this->settings),
             $this->parentResolver,
             $this->catalogIngest
         );

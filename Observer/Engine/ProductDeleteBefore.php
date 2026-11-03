@@ -12,8 +12,8 @@ use Magento\Catalog\Model\Product;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Smaily\Connect\Model\Engine\CatalogIngest;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Payload\ParentProductResolver;
-use Smaily\Connect\Model\Engine\Settings;
 
 /**
  * Product hard-delete → engine removal (contract §3b, PRO-1231; mirrors
@@ -37,7 +37,7 @@ use Smaily\Connect\Model\Engine\Settings;
 class ProductDeleteBefore implements ObserverInterface
 {
     public function __construct(
-        private readonly Settings $settings,
+        private readonly Connections $connections,
         private readonly ParentProductResolver $parentProductResolver,
         private readonly CatalogIngest $catalogIngest
     ) {
@@ -48,7 +48,7 @@ class ProductDeleteBefore implements ObserverInterface
      */
     public function execute(Observer $observer): void
     {
-        if (!$this->settings->isConnected()) {
+        if (!$this->connections->anyConnected()) {
             return;
         }
 

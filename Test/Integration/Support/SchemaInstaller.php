@@ -112,10 +112,12 @@ class SchemaInstaller
     {
         $this->createMagentoTable(self::CATALOG_SCHEMA, 'catalog_product_entity');
         $this->createMagentoTable(self::CATALOG_SCHEMA, 'catalog_product_entity_int');
+        $this->createMagentoTable(self::CATALOG_SCHEMA, 'catalog_product_website');
     }
 
     public function dropCatalogProductTables(): void
     {
+        $this->connection->query('DROP TABLE IF EXISTS `catalog_product_website`');
         $this->connection->query('DROP TABLE IF EXISTS `catalog_product_entity_int`');
         $this->connection->query('DROP TABLE IF EXISTS `catalog_product_entity`');
     }

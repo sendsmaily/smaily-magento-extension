@@ -26,6 +26,12 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * the persisted status at every page boundary (isCancelled), stopping
  * cleanly before the next page. A cancelled job is terminal — starting the
  * same import again creates a fresh job from the beginning.
+ *
+ * A job's website_id is its website for a contacts import and, for a
+ * Campaign Intelligence import, the key of its connection (CON-237; 0, the
+ * primary, for every job before it). The reads and the cancel that take a
+ * ?int $websiteId read one website's or connection's jobs; without it,
+ * every website's.
  */
 class JobManager
 {
@@ -65,8 +71,11 @@ class JobManager
      */
     public function startIfIdle(string $jobType, string $target, int $websiteId, ?int $totalCount = null): ?Job
     {
-        if ($this->isStalled($jobType, $target)) {
-            $this->requestCancel($jobType, $target);
+        // A connection's stalled import, not another connection's (CON-237);
+        // a contacts import, any website's, as before.
+        $scope = $target === Job::TARGET_ENGINE ? $websiteId : null;
+        if ($this->isStalled($jobType, $target, $scope)) {
+            $this->requestCancel($jobType, $target, $scope);
         }
         if ($this->findActive($jobType, $target, $websiteId) !== null) {
             return null;
@@ -156,17 +165,20 @@ class JobManager
     }
 
     /**
-     * Whether an import of this kind has ever completed, for any website —
-     * the customers-import notice (Model/Adminhtml/CustomersImportNotice,
-     * PRO-4007) reads it.
+     * Whether an import of this kind has ever completed, for one website or
+     * connection, or for any when $websiteId is null — the customers-import
+     * notice (Model/Adminhtml/CustomersImportNotice, PRO-4007) reads it.
      */
-    public function hasCompleted(string $jobType, string $target): bool
+    public function hasCompleted(string $jobType, string $target, ?int $websiteId = null): bool
     {
         $collection = $this->collectionFactory->create();
         $collection->addFieldToFilter('status', Job::STATUS_COMPLETED)
             ->addFieldToFilter('job_type', $jobType)
-            ->addFieldToFilter('target', $target)
-            ->setPageSize(1);
+            ->addFieldToFilter('target', $target);
+        if ($websiteId !== null) {
+            $collection->addFieldToFilter('website_id', ['eq' => $websiteId]);
+        }
+        $collection->setPageSize(1);
 
         return (bool)$collection->getFirstItem()->getId();
     }
@@ -193,24 +205,29 @@ class JobManager
     }
 
     /**
-     * Whether an import of this kind is queued or running, for any website,
-     * but stalled: one of its jobs is set aside (nextActive(), PRO-3927), or
-     * no queued or running job was written within STALLED_SECONDS —
-     * isActiveAndMoving()'s rule (PRO-3915). The admin's import card says
-     * so, and starting the import again cancels it first (startIfIdle()).
+     * Whether an import of this kind is queued or running, for one website
+     * or connection (any when $websiteId is null), but stalled: one of its
+     * jobs is set aside (nextActive(), PRO-3927), or no queued or running
+     * job was written within STALLED_SECONDS — isActiveAndMoving()'s rule
+     * (PRO-3915). The admin's import card says so, and starting the import
+     * again cancels it first (startIfIdle()).
      */
-    public function isStalled(string $jobType, string $target): bool
+    public function isStalled(string $jobType, string $target, ?int $websiteId = null): bool
     {
         $setAside = $this->collectionFactory->create();
         $setAside->addFieldToFilter('status', Job::STATUS_RUNNING)
             ->addFieldToFilter('job_type', $jobType)
-            ->addFieldToFilter('target', $target)
-            ->addFieldToFilter('updated_at', ['lt' => $this->stalledBefore()]);
+            ->addFieldToFilter('target', $target);
+        if ($websiteId !== null) {
+            $setAside->addFieldToFilter('website_id', ['eq' => $websiteId]);
+        }
+        $setAside->addFieldToFilter('updated_at', ['lt' => $this->stalledBefore()]);
         if ($setAside->getSize() > 0) {
             return true;
         }
 
-        return $this->firstActive($jobType, $target) !== null && !$this->activeMovedWithin(self::STALLED_SECONDS);
+        return $this->firstActive($jobType, $target, $websiteId) !== null
+            && !$this->activeMovedWithin(self::STALLED_SECONDS);
     }
 
     /**
@@ -326,14 +343,18 @@ class JobManager
     }
 
     /**
-     * The newest job of this import, whatever its status.
+     * The newest job of this import, whatever its status — of one website
+     * or connection, or of any when $websiteId is null.
      */
-    public function latest(string $jobType, string $target): ?Job
+    public function latest(string $jobType, string $target, ?int $websiteId = null): ?Job
     {
         $collection = $this->collectionFactory->create();
         $collection->addFieldToFilter('job_type', $jobType)
-            ->addFieldToFilter('target', $target)
-            ->setOrder('id', 'DESC')
+            ->addFieldToFilter('target', $target);
+        if ($websiteId !== null) {
+            $collection->addFieldToFilter('website_id', ['eq' => $websiteId]);
+        }
+        $collection->setOrder('id', 'DESC')
             ->setPageSize(1);
         $job = $collection->getFirstItem();
 
@@ -376,25 +397,31 @@ class JobManager
     }
 
     /**
-     * Admin cancel: flips every active job of the import type to cancelled
-     * in one conditional statement. The worker stops at its next page
-     * boundary; starting the import again begins a fresh job.
+     * Admin cancel: flips every active job of the import type — of one
+     * website or connection, or of every one when $websiteId is null — to
+     * cancelled in one conditional statement. The worker stops at its next
+     * page boundary; starting the import again begins a fresh job.
      *
      * @return int number of jobs cancelled
      */
-    public function requestCancel(string $jobType, string $target): int
+    public function requestCancel(string $jobType, string $target, ?int $websiteId = null): int
     {
+        $where = [
+            'job_type = ?' => $jobType,
+            'target = ?' => $target,
+            'status IN (?)' => [Job::STATUS_PENDING, Job::STATUS_RUNNING],
+        ];
+        if ($websiteId !== null) {
+            $where['website_id = ?'] = $websiteId;
+        }
+
         return $this->connection()->update(
             $this->table(),
             [
                 'status' => Job::STATUS_CANCELLED,
                 'completed_at' => $this->dateTime->gmtDate(),
             ],
-            [
-                'job_type = ?' => $jobType,
-                'target = ?' => $target,
-                'status IN (?)' => [Job::STATUS_PENDING, Job::STATUS_RUNNING],
-            ]
+            $where
         );
     }
 

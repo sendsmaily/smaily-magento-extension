@@ -32,17 +32,26 @@ use Smaily\Connect\Model\Logger\Logger;
  * The engine-connected gate lives here, once, rather than in every caller;
  * the delete paths ask it before they build anything, so their callers hold it.
  *
- * Every row goes to the primary Campaign Intelligence connection and
- * carries its canonical store view (CON-237; per-connection rows are a
- * later step). The `catalog_changed` markers belong to no connection.
+ * A product goes to every Campaign Intelligence connection that owns it
+ * (CON-237, Connection::ownsProductOn()): a connection whose engine store
+ * is connected and serves one of the product's websites, and the primary
+ * for a product on no website. Each connection gets the row built for it
+ * (CatalogPayloadBuilder::build()) carrying its canonical store view; under
+ * one store that is the primary alone, with the row it always got. A
+ * catalog import queues the rows of its own connection only. A §3b removal
+ * goes to every connected connection: the engine answers `not_found` for a
+ * product it never had, a success. A product that leaves a connection's
+ * websites is not detected at the save: the connection's next nightly
+ * manifest (CatalogManifest) leaves it out, and the engine removes it. The
+ * `catalog_changed` markers belong to no connection.
  *
  * Duplicates collapse in two places, neither of them queue-wide dedupe:
- * a byte-identical row queued twice in a row within one request (see
- * $lastPayloadHash); and in buildChanged(), several markers for one product
- * build one row, which the queue leaves out when the product's newest unsent
- * row is already that row (IngestQueue::enqueueChangedPayloads()) — one
- * product save reaches product save and the stock hooks, and queues one row,
- * not two.
+ * a byte-identical row queued twice in a row for one connection within one
+ * request (see $lastPayloadHashes); and in buildChanged(), several markers
+ * for one product build one row per connection, which the queue leaves out
+ * when the product's newest unsent row of that connection is already that
+ * row (IngestQueue::enqueueChangedPayloads()) — one product save reaches
+ * product save and the stock hooks, and queues one row, not two.
  */
 class CatalogIngest
 {
@@ -52,11 +61,10 @@ class CatalogIngest
     /** Markers built per flusher run: the catalog domain's send batch. */
     private const BUILD_BATCH = 100;
 
-    /** Hash of the row queued most recently in this request. */
-    private ?int $lastPayloadHash = null;
+    /** @var array<int, int> connection key => hash of the row queued for it most recently in this request */
+    private array $lastPayloadHashes = [];
 
     public function __construct(
-        private readonly Settings $settings,
         private readonly CatalogProductLoader $productLoader,
         private readonly ProductResource $productResource,
         private readonly CatalogPayloadBuilder $payloadBuilder,
@@ -68,15 +76,18 @@ class CatalogIngest
 
     /**
      * Queue the product's current catalog row — a tombstone once it has left
-     * the sellable set (disabled, hidden); the engine never deletes.
+     * the sellable set (disabled, hidden); the engine never deletes — for
+     * every connection that owns it, or with $connection for that one only
+     * (a catalog import, which pages the connection's own products).
      * $jobId names the catalog import that queues it (CON-241).
      *
-     * @return bool whether the row is queued (a collapsed duplicate counts:
-     *     the row is already there), false when skipped or the build failed
+     * @return bool whether the row is queued for every connection it is for
+     *     (a collapsed duplicate counts: the row is already there), false when
+     *     no connected connection owns it or a build failed
      */
-    public function enqueueProduct(Product $product, ?int $jobId = null): bool
+    public function enqueueProduct(Product $product, ?int $jobId = null, ?Connection $connection = null): bool
     {
-        return $this->enqueue($product, false, $jobId);
+        return $this->enqueue($product, false, $jobId, $connection);
     }
 
     /**
@@ -93,65 +104,64 @@ class CatalogIngest
      * Build these products' tombstone rows now, for a delete that removes
      * the products before any event sees it (a product import's Delete,
      * PRO-3768); enqueueBuilt() queues them once the delete happens. The
-     * products load as one collection, as in buildChanged(). The caller
-     * holds the engine-connected gate (ProductImportDelete::isProductDelete()).
+     * products load as one collection per connection, as in buildChanged().
+     * The caller holds the engine-connected gate
+     * (ProductImportDelete::isProductDelete()).
      *
      * @param int[] $productIds
-     * @return array<int, array<string, mixed>> product id => row (a failed build is left out, logged)
+     * @return array<int, array<int, array<string, mixed>>> product id => connection key => row
+     *     (a failed build is left out, logged)
      */
     public function buildTombstones(array $productIds): array
     {
-        if (!$productIds) {
-            return [];
-        }
-
-        $rows = [];
-        foreach ($this->loadProducts($productIds) as $product) {
-            $item = $this->build($product, true);
-            if ($item !== null) {
-                $rows[(int)$product->getId()] = $item;
-            }
-        }
-
-        return $rows;
+        return $productIds ? $this->buildForOwners($productIds, true) : [];
     }
 
     /**
-     * Queue rows buildTombstones() or buildChanged() built.
+     * Queue rows buildTombstones() or buildChanged() built, each connection's
+     * rows for that connection.
      *
-     * @param array<int|string, array<string, mixed>> $rows product id => row
+     * @param array<int|string, array<int, array<string, mixed>>> $rows product id => connection key => row
      */
     public function enqueueBuilt(array $rows): void
     {
-        if ($rows) {
-            $this->ingestQueue->enqueueChangedPayloads(
-                Client::DOMAIN_CATALOG,
-                $rows,
-                $this->connections->primary()
-            );
+        $byConnection = [];
+        foreach ($rows as $productId => $connectionRows) {
+            foreach ($connectionRows as $key => $row) {
+                $byConnection[$key][$productId] = $row;
+            }
+        }
+        foreach ($byConnection as $key => $payloads) {
+            $connection = $this->connections->forKey($key);
+            if ($connection !== null) {
+                $this->ingestQueue->enqueueChangedPayloads(Client::DOMAIN_CATALOG, $payloads, $connection);
+            }
         }
     }
 
     /**
      * Queue the §3b product-level removal of these products (contract §3b,
-     * PRO-1231): one catalog_remove row per product, carrying the raw entity
-     * id — the `tags.product_id` the catalog sync emits. For a product
-     * deleted in the admin (ProductDeleteBefore) and by a product import's
-     * Delete (ProductImportDelete); never for a configurable child, whose
-     * parent lives on. The caller holds the engine-connected gate.
+     * PRO-1231): one catalog_remove row per product and connected
+     * connection, carrying the raw entity id — the `tags.product_id` the
+     * catalog sync emits. For a product deleted in the admin
+     * (ProductDeleteBefore) and by a product import's Delete
+     * (ProductImportDelete); never for a configurable child, whose parent
+     * lives on. The caller holds the engine-connected gate.
      *
      * @param int[] $productIds
      */
     public function enqueueRemovals(array $productIds): void
     {
-        $storeId = $this->connections->primary()->canonicalStoreId();
-        $rows = [];
-        foreach ($productIds as $productId) {
-            $key = (string)$productId;
-            $rows[] = ['payload' => ['product_id' => $key], 'entity_id' => $key, 'store_id' => $storeId];
-        }
+        foreach ($this->connections->connected() as $connection) {
+            $storeId = $connection->canonicalStoreId();
+            $rows = [];
+            foreach ($productIds as $productId) {
+                $key = (string)$productId;
+                $rows[] = ['payload' => ['product_id' => $key], 'entity_id' => $key, 'store_id' => $storeId];
+            }
 
-        $this->ingestQueue->enqueueMany(Client::DOMAIN_CATALOG_REMOVE, $rows);
+            $this->ingestQueue->enqueueMany(Client::DOMAIN_CATALOG_REMOVE, $rows);
+        }
     }
 
     /**
@@ -159,7 +169,7 @@ class CatalogIngest
      */
     public function markProductChanged(int $productId): bool
     {
-        return $productId > 0 && $this->settings->isConnected() && $this->markChanged([$productId]);
+        return $productId > 0 && $this->connections->anyConnected() && $this->markChanged([$productId]);
     }
 
     /**
@@ -172,7 +182,7 @@ class CatalogIngest
     public function markSkusChanged(array $skus): bool
     {
         $skus = array_values(array_unique(array_filter($skus, static fn (string $sku): bool => trim($sku) !== '')));
-        if (!$skus || !$this->settings->isConnected()) {
+        if (!$skus || !$this->connections->anyConnected()) {
             return false;
         }
 
@@ -182,11 +192,12 @@ class CatalogIngest
     /**
      * Build the rows of the products the stock hooks marked changed — called
      * by the ingest flusher before it sends the catalog batch. The products
-     * load as one collection, as the backfill page loads them
-     * (CatalogProductLoader); a product deleted since its marker is not
-     * there, and its marker is dropped (the delete observer already told the
-     * engine). The queue leaves out a row identical to the product's newest
-     * unsent row.
+     * load as one collection per connected connection, as the backfill page
+     * loads them (CatalogProductLoader); a product deleted since its marker
+     * is not there, and its marker is dropped (the delete observer already
+     * told the engine). Each connection that owns a product gets its row;
+     * the queue leaves out a row identical to the product's newest unsent
+     * row of that connection.
      */
     public function buildChanged(): void
     {
@@ -200,16 +211,33 @@ class CatalogIngest
             $markers
         )));
 
-        $payloads = [];
-        foreach ($this->loadProducts($productIds) as $product) {
-            $item = $this->build($product, false);
-            if ($item !== null) {
-                $payloads[(string)$product->getId()] = $item;
+        $this->enqueueBuilt($this->buildForOwners($productIds, false));
+        $this->ingestQueue->delete($markers);
+    }
+
+    /**
+     * The rows of these products for each connected connection that owns
+     * them, loaded at that connection's store view.
+     *
+     * @param int[] $productIds
+     * @return array<int, array<int, array<string, mixed>>> product id => connection key => row
+     */
+    private function buildForOwners(array $productIds, bool $forceTombstone): array
+    {
+        $rows = [];
+        foreach ($this->connections->connected() as $connection) {
+            foreach ($this->loadProducts($productIds, $connection) as $product) {
+                if (!$connection->ownsProductOn((array)$product->getWebsiteIds())) {
+                    continue;
+                }
+                $item = $this->build($product, $forceTombstone, $connection);
+                if ($item !== null) {
+                    $rows[(int)$product->getId()][$connection->key()] = $item;
+                }
             }
         }
 
-        $this->enqueueBuilt($payloads);
-        $this->ingestQueue->delete($markers);
+        return $rows;
     }
 
     /**
@@ -233,35 +261,58 @@ class CatalogIngest
      * @param int[] $productIds
      * @return Product[]
      */
-    private function loadProducts(array $productIds): array
+    private function loadProducts(array $productIds, Connection $connection): array
     {
         return $this->productLoader->load(static function (Collection $collection) use ($productIds): void {
             $collection->addFieldToFilter('entity_id', ['in' => $productIds]);
-        });
+        }, $connection);
     }
 
-    private function enqueue(Product $product, bool $forceTombstone, ?int $jobId = null): bool
-    {
-        if (!$this->settings->isConnected()) {
+    private function enqueue(
+        Product $product,
+        bool $forceTombstone,
+        ?int $jobId = null,
+        ?Connection $only = null
+    ): bool {
+        if ($only !== null) {
+            $connections = $only->settings()->isConnected() ? [$only] : [];
+        } else {
+            $websiteIds = (array)$product->getWebsiteIds();
+            $connections = array_filter(
+                $this->connections->connected(),
+                static fn (Connection $connection): bool => $connection->ownsProductOn($websiteIds)
+            );
+        }
+        if (!$connections) {
             return false;
         }
 
-        $item = $this->build($product, $forceTombstone);
+        $queued = true;
+        foreach ($connections as $connection) {
+            $queued = $this->enqueueFor($product, $forceTombstone, $jobId, $connection) && $queued;
+        }
+
+        return $queued;
+    }
+
+    private function enqueueFor(Product $product, bool $forceTombstone, ?int $jobId, Connection $connection): bool
+    {
+        $item = $this->build($product, $forceTombstone, $connection);
         if ($item === null) {
             return false;
         }
 
         $hash = crc32((string)json_encode($item));
-        if ($hash === $this->lastPayloadHash) {
+        if ($hash === ($this->lastPayloadHashes[$connection->key()] ?? null)) {
             return true; // The same hop of the same save, seen through another hook.
         }
-        $this->lastPayloadHash = $hash;
+        $this->lastPayloadHashes[$connection->key()] = $hash;
 
         $this->ingestQueue->enqueue(
             Client::DOMAIN_CATALOG,
             $item,
             (string)$product->getId(),
-            $this->connections->primary()->canonicalStoreId(),
+            $connection->canonicalStoreId(),
             null,
             $jobId
         );
@@ -270,16 +321,16 @@ class CatalogIngest
     }
 
     /**
-     * The product's row, or null when the build failed (logged).
+     * The product's row for a connection, or null when the build failed (logged).
      *
      * @return array<string, mixed>|null
      */
-    private function build(Product $product, bool $forceTombstone): ?array
+    private function build(Product $product, bool $forceTombstone, Connection $connection): ?array
     {
         try {
             return $forceTombstone || !$this->payloadBuilder->isIngestible($product)
-                ? $this->payloadBuilder->buildTombstone($product)
-                : $this->payloadBuilder->build($product);
+                ? $this->payloadBuilder->buildTombstone($product, $connection)
+                : $this->payloadBuilder->build($product, $connection);
         } catch (\Throwable $exception) {
             $this->logger->error('Catalog payload build failed', [
                 'product_id' => $product->getId(),

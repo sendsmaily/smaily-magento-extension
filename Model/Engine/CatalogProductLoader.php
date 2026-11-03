@@ -19,6 +19,13 @@ use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
  * them — the catalog import page (EngineCatalogProcessor) and the
  * stock-change batch (CatalogIngest::buildChanged()) alike, and the nightly
  * manifest's page at the same scope. Each caller adds only its own filter.
+ *
+ * Loaded for one Campaign Intelligence connection (CON-237), a collection
+ * is read at the connection's canonical store view and the import page,
+ * its count and the manifest's page hold the connection's products only
+ * (applyConnection()). A connection that serves every website — every
+ * store run as one store — reads the store it always read, unfiltered:
+ * the same query.
  */
 class CatalogProductLoader
 {
@@ -48,25 +55,52 @@ class CatalogProductLoader
      * only in the frontend area (Flat\State's `isAvailable` is true only in
      * Magento_Catalog's etc/frontend/di.xml), and these loads run in cron.
      *
+     * Read at the connection's canonical store view; not filtered by its
+     * websites — the caller's filter picks the products.
+     *
      * @param callable(Collection): void $filter the caller's own filter, order and page size
      * @return Product[]
      */
-    public function load(callable $filter): array
+    public function load(callable $filter, Connection $connection): array
     {
-        return $this->loadSelecting(CatalogPayloadBuilder::PRODUCT_ATTRIBUTES, true, $filter);
+        return $this->loadSelecting(CatalogPayloadBuilder::PRODUCT_ATTRIBUTES, true, $filter, $connection);
     }
 
     /**
      * The catalog import's page (EngineCatalogProcessor): load() for the
-     * products after $afterId, in entity id order.
+     * connection's products after $afterId, in entity id order.
      *
      * @return Product[]
      */
-    public function loadPage(int $afterId, int $pageSize): array
+    public function loadPage(int $afterId, int $pageSize, Connection $connection): array
     {
-        return $this->load(static function (Collection $collection) use ($afterId, $pageSize): void {
+        if (!$this->hasProducts($connection)) {
+            return [];
+        }
+
+        return $this->load(static function (Collection $collection) use ($afterId, $pageSize, $connection): void {
+            self::applyConnection($collection, $connection);
             self::page($collection, $afterId, $pageSize);
-        });
+        }, $connection);
+    }
+
+    /**
+     * How many products the connection's catalog import pages through
+     * (EngineCatalogProcessor's total): every product, at the same store
+     * view and with the same website filter as loadPage().
+     */
+    public function count(Connection $connection): int
+    {
+        if (!$this->hasProducts($connection)) {
+            return 0;
+        }
+        $collection = $this->productCollectionFactory->create();
+        if ($collection instanceof Collection) {
+            $collection->setStoreId($this->storeId($connection));
+            self::applyConnection($collection, $connection);
+        }
+
+        return $collection->getSize();
     }
 
     /**
@@ -76,20 +110,80 @@ class CatalogProductLoader
      * payload attributes — so a page of a large catalog stays small. The
      * status filter is added after setStoreId(), so it reads the canonical
      * store's value, falling back to the default one, as the selected
-     * `status` does.
+     * `status` does. The connection's products only, as loadPage().
      *
      * @return Product[]
      */
-    public function loadForManifest(int $afterId, int $pageSize): array
+    public function loadForManifest(int $afterId, int $pageSize, Connection $connection): array
     {
+        if (!$this->hasProducts($connection)) {
+            return [];
+        }
+
         return $this->loadSelecting(
             ['status', 'visibility'],
             false,
-            static function (Collection $collection) use ($afterId, $pageSize): void {
+            static function (Collection $collection) use ($afterId, $pageSize, $connection): void {
                 $collection->addAttributeToFilter('status', ['eq' => Status::STATUS_ENABLED]);
+                self::applyConnection($collection, $connection);
                 self::page($collection, $afterId, $pageSize);
-            }
+            },
+            $connection
         );
+    }
+
+    /**
+     * Narrow a collection to the products of a connection's catalog
+     * (Connection::ownsProductOn()): the products on one of its websites
+     * (catalog_product_website), and for the primary also the products on
+     * no website. Never through the price index or a store filter
+     * (PRO-2506). A connection that serves every website is not narrowed.
+     */
+    private static function applyConnection(Collection $collection, Connection $connection): void
+    {
+        if ($connection->servesAllWebsites()) {
+            return;
+        }
+        $db = $collection->getConnection();
+        $productWebsite = $collection->getTable('catalog_product_website');
+        $conditions = [];
+        if ($connection->websiteIds()) {
+            $onWebsites = $db->select()
+                ->from(['pw' => $productWebsite], ['product_id'])
+                ->where('pw.website_id IN (?)', $connection->websiteIds());
+            $conditions[] = 'e.entity_id IN (' . $onWebsites->assemble() . ')';
+        }
+        if ($connection->isPrimary()) {
+            $anyWebsite = $db->select()
+                ->from(['pw_any' => $productWebsite], ['product_id'])
+                ->where('pw_any.product_id = e.entity_id');
+            $conditions[] = 'NOT EXISTS (' . $anyWebsite->assemble() . ')';
+        }
+        $collection->getSelect()->where(implode(' OR ', $conditions));
+    }
+
+    /**
+     * Whether the connection's catalog can hold any product: a connection
+     * that is not the primary and serves no website has none.
+     */
+    private function hasProducts(Connection $connection): bool
+    {
+        return $connection->isPrimary() || $connection->websiteIds() !== [];
+    }
+
+    /**
+     * The store view a connection's products are read at: the
+     * installation's canonical store for a connection that serves every
+     * website (CatalogPayloadBuilder::canonicalStoreId(), its canonical
+     * store view), else the connection's own canonical store view.
+     */
+    private function storeId(Connection $connection): int
+    {
+        $storeId = $connection->canonicalStoreId();
+
+        return $connection->servesAllWebsites() || $storeId === null
+            ? $this->payloadBuilder->canonicalStoreId()
+            : $storeId;
     }
 
     /**
@@ -107,13 +201,17 @@ class CatalogProductLoader
      * @param callable(Collection): void $filter
      * @return Product[]
      */
-    private function loadSelecting(array $attributes, bool $urlRewrite, callable $filter): array
-    {
+    private function loadSelecting(
+        array $attributes,
+        bool $urlRewrite,
+        callable $filter,
+        Connection $connection
+    ): array {
         $collection = $this->productCollectionFactory->create();
         if (!$collection instanceof Collection) {
             return [];
         }
-        $collection->setStoreId($this->payloadBuilder->canonicalStoreId());
+        $collection->setStoreId($this->storeId($connection));
         $collection->addAttributeToSelect($attributes);
         if ($urlRewrite) {
             $collection->addUrlRewrite();

@@ -10,6 +10,7 @@ namespace Smaily\Connect\Model\Engine\Payload;
 
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Framework\Exception\NoSuchEntityException;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
@@ -18,7 +19,8 @@ use Smaily\Connect\Model\Multilingual\LanguageResolver;
  * Customer -> WireCustomer (contract §4). Identity is the lowercased email;
  * NO consent fields ever — the engine is a separate lawful surface from
  * Smaily marketing consent. One row per customer account, with the code of
- * the account's website (v1.21.0).
+ * the account's website (v1.21.0) when that website is one of the
+ * Campaign Intelligence connection's the row is for (CON-237).
  */
 class CustomerPayloadBuilder
 {
@@ -30,9 +32,14 @@ class CustomerPayloadBuilder
     }
 
     /**
+     * The customer's row for a connection's engine store. Without one, the
+     * row names the account's website whatever its connection — for a
+     * caller that has not yet been given its connection (the login merge,
+     * MergeCustomerSender), which sends to the primary.
+     *
      * @return array<string, mixed>
      */
-    public function build(CustomerInterface $customer): array
+    public function build(CustomerInterface $customer, ?Connection $connection = null): array
     {
         $item = [
             'email' => strtolower(trim((string)$customer->getEmail())),
@@ -66,7 +73,12 @@ class CustomerPayloadBuilder
         // The account's website (contract v1.21.0 §4, CON-253): with
         // Share Customer Accounts = Per Website one email has an account on
         // each website, and the engine keeps each website's id and language.
-        $website = $this->websites->code((int)$customer->getWebsiteId());
+        // A website of another engine store is not this one's to name
+        // (CON-237): its engine store does not know it.
+        $websiteId = (int)$customer->getWebsiteId();
+        $website = $connection === null || $connection->servesWebsite($websiteId)
+            ? $this->websites->code($websiteId)
+            : null;
         if ($website !== null) {
             $item['website'] = $website;
         }

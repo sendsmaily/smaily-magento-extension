@@ -16,6 +16,7 @@ use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\OrderIngest;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Plugin\Engine\CreditmemoSave;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-1955: a new credit memo queues its order — a zero-value one too,
@@ -23,6 +24,8 @@ use Smaily\Connect\Plugin\Engine\CreditmemoSave;
  */
 class CreditmemoSaveTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private OrderIngest&MockObject $orderIngest;
 
     protected function setUp(): void
@@ -63,7 +66,7 @@ class CreditmemoSaveTest extends TestCase
         $settings = $this->createMock(Settings::class);
         $settings->method('isConnected')->willReturn($connected);
 
-        return new CreditmemoSave($settings, $this->orderIngest);
+        return new CreditmemoSave($this->oneEngineConnection($settings), $this->orderIngest);
     }
 
     private function resource(): CreditmemoResource

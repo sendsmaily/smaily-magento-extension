@@ -50,7 +50,9 @@ class Connector
 
         return [
             'exchange' => $exchange,
-            'started' => $this->importsOnConnect->start(),
+            // The primary's imports: the one connection a connect makes
+            // until website connections can be made (CON-237).
+            'started' => $this->importsOnConnect->start($this->connections->primary()),
         ];
     }
 }

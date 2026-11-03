@@ -13,6 +13,7 @@ use Magento\Framework\DB\Select;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\ContactSync\Mode;
+use Smaily\Connect\Model\Engine\Connection;
 
 /**
  * The registered customers the Campaign Intelligence customers import sends
@@ -28,6 +29,12 @@ use Smaily\Connect\Model\ContactSync\Mode;
  * The live customer sync asks the same rule for one customer
  * (includes(), Engine\CustomerIngest, CON-266), so the import and the
  * live sync cannot send different customers.
+ *
+ * The scope is a Campaign Intelligence connection's (CON-237): the
+ * contact-sync groups of its own websites, and the buyers of an order
+ * placed in one of its store views. A connection that serves every
+ * website — every store run as one store — has the scope it always had,
+ * read with the same query.
  */
 class EngineCustomerScope
 {
@@ -43,9 +50,9 @@ class EngineCustomerScope
     /**
      * @param string $horizon the oldest order time inside the horizon (GMT)
      */
-    public function count(string $horizon): int
+    public function count(string $horizon, Connection $engineConnection): int
     {
-        $select = $this->select($horizon)->columns(['cnt' => new \Zend_Db_Expr('COUNT(*)')]);
+        $select = $this->select($horizon, $engineConnection)->columns(['cnt' => new \Zend_Db_Expr('COUNT(*)')]);
 
         return (int)$this->resourceConnection->getConnection()->fetchOne($select);
     }
@@ -55,9 +62,9 @@ class EngineCustomerScope
      *
      * @return int[]
      */
-    public function page(string $horizon, int $afterId, int $limit): array
+    public function page(string $horizon, int $afterId, int $limit, Connection $engineConnection): array
     {
-        $select = $this->select($horizon)
+        $select = $this->select($horizon, $engineConnection)
             ->columns(['entity_id' => 'e.entity_id'])
             ->where('e.entity_id > ?', $afterId)
             ->order('e.entity_id ASC')
@@ -72,12 +79,12 @@ class EngineCustomerScope
      *
      * @param string $horizon the oldest order time inside the horizon (GMT)
      */
-    public function includes(int $customerId, string $horizon): bool
+    public function includes(int $customerId, string $horizon, Connection $engineConnection): bool
     {
         if ($customerId <= 0) {
             return false;
         }
-        $select = $this->select($horizon)
+        $select = $this->select($horizon, $engineConnection)
             ->columns(['entity_id' => 'e.entity_id'])
             ->where('e.entity_id = ?', $customerId)
             ->limit(1);
@@ -85,16 +92,26 @@ class EngineCustomerScope
         return $this->resourceConnection->getConnection()->fetchOne($select) !== false;
     }
 
-    private function select(string $horizon): Select
+    private function select(string $horizon, Connection $engineConnection): Select
     {
         $connection = $this->resourceConnection->getConnection();
+        $all = $engineConnection->servesAllWebsites();
         $buyer = $connection->select()
             ->from(['o' => $this->resourceConnection->getTableName('sales_order')], ['entity_id'])
             ->where('o.customer_id = e.entity_id')
             ->where('o.created_at >= ?', $horizon);
-        $conditions = ['EXISTS (' . $buyer->assemble() . ')'];
+        $conditions = [];
+        if ($all) {
+            $conditions[] = 'EXISTS (' . $buyer->assemble() . ')';
+        } elseif ($engineConnection->storeIds()) {
+            $buyer->where('o.store_id IN (?)', $engineConnection->storeIds());
+            $conditions[] = 'EXISTS (' . $buyer->assemble() . ')';
+        }
         foreach ($this->storeManager->getWebsites() as $website) {
             $websiteId = (int)$website->getId();
+            if (!$all && !$engineConnection->servesWebsite($websiteId)) {
+                continue;
+            }
             if (!$this->config->isContactSyncActive($websiteId)) {
                 continue;
             }
@@ -106,6 +123,6 @@ class EngineCustomerScope
 
         return $connection->select()
             ->from(['e' => $this->resourceConnection->getTableName('customer_entity')], [])
-            ->where(implode(' OR ', $conditions));
+            ->where($conditions ? implode(' OR ', $conditions) : '0 = 1');
     }
 }

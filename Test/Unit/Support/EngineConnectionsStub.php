@@ -9,10 +9,13 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Unit\Support;
 
 use PHPUnit\Framework\MockObject\MockObject;
+use Smaily\Connect\Model\Backfill\EngineJobConnection;
+use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Logger\Logger;
 
 /**
  * Engine\Connections for a test (CON-237): the connections it is handed,
@@ -35,6 +38,19 @@ trait EngineConnectionsStub
         return $this->engineConnections([
             [$this->engineConnection(Connection::PRIMARY_KEY, $settings, [1], [1], $canonicalStoreId, true), $client],
         ]);
+    }
+
+    /**
+     * The connection of an engine import's job (Backfill\EngineJobConnection)
+     * read from these connections.
+     */
+    private function engineJobConnection(Connections $connections, ?JobManager $jobManager = null): EngineJobConnection
+    {
+        return new EngineJobConnection(
+            $connections,
+            $jobManager ?? $this->createMock(JobManager::class),
+            $this->createMock(Logger::class)
+        );
     }
 
     /**
@@ -101,6 +117,12 @@ trait EngineConnectionsStub
         $stub->method('client')->willReturnCallback(
             static fn (Connection $connection): Client => $clients[$connection->key()]
         );
+        $connected = static fn (): array => array_values(array_filter(
+            $byKey,
+            static fn (Connection $connection): bool => $connection->settings()->isConnected()
+        ));
+        $stub->method('connected')->willReturnCallback($connected);
+        $stub->method('anyConnected')->willReturnCallback(static fn (): bool => $connected() !== []);
 
         return $stub;
     }

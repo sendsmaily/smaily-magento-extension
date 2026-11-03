@@ -45,9 +45,10 @@ class ProductImportDelete
     private const BEHAVIOR_DELETE = 'delete';
 
     /**
-     * The tombstone rows of the bunch being deleted, product id => row.
+     * The tombstone rows of the bunch being deleted, product id =>
+     * Campaign Intelligence connection key => row (CON-237).
      *
-     * @var array<int, array<string, mixed>>
+     * @var array<int, array<int, array<string, mixed>>>
      */
     private array $tombstones = [];
 
@@ -60,7 +61,7 @@ class ProductImportDelete
     private array $productDeletes = [];
 
     public function __construct(
-        private readonly Settings $settings,
+        private readonly Connections $connections,
         private readonly ProductResource $productResource,
         private readonly ParentProductResolver $parentProductResolver,
         private readonly CatalogIngest $catalogIngest
@@ -75,7 +76,7 @@ class ProductImportDelete
      */
     public function isProductDelete(object $dataSource, ?array $ids): bool
     {
-        if (!$this->settings->isConnected()
+        if (!$this->connections->anyConnected()
             || !method_exists($dataSource, 'getEntityTypeCode')
             || !method_exists($dataSource, 'getBehavior')
         ) {

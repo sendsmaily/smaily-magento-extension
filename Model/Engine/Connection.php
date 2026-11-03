@@ -101,4 +101,40 @@ class Connection
     {
         return $this->servesAllWebsites;
     }
+
+    /** Whether it serves this website. */
+    public function servesWebsite(int $websiteId): bool
+    {
+        return $this->servesAllWebsites || in_array($websiteId, $this->websiteIds, true);
+    }
+
+    /**
+     * Whether a product on these websites (its website ids) belongs to its
+     * catalog: a product on one of its websites, and for the primary also
+     * a product on no website — the catalog sync always sent one. A
+     * connection that serves every website owns every product.
+     *
+     * @param array<int|string> $productWebsiteIds
+     */
+    public function ownsProductOn(array $productWebsiteIds): bool
+    {
+        if ($this->servesAllWebsites) {
+            return true;
+        }
+        if ($productWebsiteIds === []) {
+            return $this->isPrimary();
+        }
+
+        return array_intersect(array_map('intval', $productWebsiteIds), $this->websiteIds) !== [];
+    }
+
+    /**
+     * The code of a Magento flag that holds state of this connection: the
+     * base code for the primary — the flag every store kept before CON-237
+     * — and the base code with `_c<key>` for any other.
+     */
+    public function flagCode(string $baseCode): string
+    {
+        return $this->isPrimary() ? $baseCode : $baseCode . '_c' . $this->key;
+    }
 }

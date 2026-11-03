@@ -43,6 +43,7 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\FakeTimezone;
 use Symfony\Component\Console\Tester\CommandTester;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-156 against a real MySQL: the admin and the command line share one
@@ -57,6 +58,8 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 class SharedConnectAndImportStartTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     private const JOB_TABLE = 'smaily_backfill_job';
 
     private const EXCHANGE = [
@@ -222,7 +225,12 @@ class SharedConnectAndImportStartTest extends IntegrationTestCase
 
         $engineSettings = $this->createMock(EngineSettings::class);
         $engineSettings->method('isConnected')->willReturn($connected);
-        $start(new ImportStarter($jobManager, $this->storeManager(), new EngineImportGuard($engineSettings)));
+        $start(new ImportStarter(
+            $jobManager,
+            $this->storeManager(),
+            new EngineImportGuard(),
+            $this->oneEngineConnection($engineSettings)
+        ));
 
         return $this->jobRows();
     }

@@ -21,6 +21,7 @@ use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\SkippedRow;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
@@ -86,7 +87,8 @@ class EngineOrdersProcessorTest extends TestCase
             [['entity_id' => '11', 'created_at' => '2022-01-01 10:00:00']],
             [],
         ], $calls);
-        $historyImport->expects(self::once())->method('update')->with(['start_part_queued_to' => 902])
+        $historyImport->expects(self::once())->method('update')
+            ->with(self::isInstanceOf(Connection::class), ['start_part_queued_to' => 902])
             ->willReturn(['start_part_queued_to' => 902] + self::HISTORY);
         $queue = $this->queue();
         $queue->method('lastRowId')->with(5)->willReturn(902);
@@ -326,7 +328,7 @@ class EngineOrdersProcessorTest extends TestCase
             $skippedRow ?? $this->createMock(SkippedRow::class),
             $historyImport,
             $clock ?? new ImportClock(),
-            $this->oneEngineConnection($this->createMock(Settings::class))
+            $this->engineJobConnection($this->oneEngineConnection($this->createMock(Settings::class)), $jobManager)
         );
     }
 

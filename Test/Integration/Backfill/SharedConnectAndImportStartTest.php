@@ -34,6 +34,7 @@ use Smaily\Connect\Model\Backfill\JobStatusAggregator;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Config\Backend\EngineSetupToken;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Connector;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Engine\Websites;
@@ -180,7 +181,8 @@ class SharedConnectAndImportStartTest extends IntegrationTestCase
                 'cacheTypeList' => $this->createMock(TypeListInterface::class),
             ]),
             new ImportsOnConnect($jobManager),
-            $this->createMock(Websites::class)
+            $this->createMock(Websites::class),
+            $this->createMock(Connections::class)
         ));
 
         $config = [];

@@ -26,7 +26,8 @@ class Connector
         private readonly Client $client,
         private readonly Settings $settings,
         private readonly ImportsOnConnect $importsOnConnect,
-        private readonly Websites $websites
+        private readonly Websites $websites,
+        private readonly Connections $connections
     ) {
     }
 
@@ -42,7 +43,10 @@ class Connector
         // How Magento shares customer accounts between websites (contract
         // v1.21.0 §1 `store_config`, CON-253).
         $exchange = $this->client->setupExchange($setupInput, $this->websites->storeConfig());
-        $this->settings->storeExchange($exchange);
+        // The Smaily account the connection is made for (CON-237): the
+        // answer names it (contract v1.25.0 §1), else the store's.
+        $this->settings->storeExchange($exchange, $this->connections->installationAccount());
+        $this->connections->reset();
 
         return [
             'exchange' => $exchange,

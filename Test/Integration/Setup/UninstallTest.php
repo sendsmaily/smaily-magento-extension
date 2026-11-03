@@ -235,6 +235,11 @@ class UninstallTest extends IntegrationTestCase
             ['default', 0, Config::XML_PATH_USERNAME, 'api-user'],
             ['default', 0, EngineSettings::XML_PATH_API_KEY, '0:3:encrypted-engine-key'],
             ['default', 0, EngineSettings::XML_PATH_TENANT_ID, 'tenant-1'],
+            ['default', 0, EngineSettings::XML_PATH_SMAILY_SUBDOMAIN, 'shop'],
+            // A website's own engine connection (CON-237).
+            ['websites', 2, EngineSettings::XML_PATH_WEBSITE_CONNECTION, '1'],
+            ['websites', 2, EngineSettings::XML_PATH_SMAILY_SUBDOMAIN, 'shop-lv'],
+            ['websites', 2, EngineSettings::XML_PATH_API_KEY, '0:3:encrypted-engine-key-2'],
             ['stores', 3, 'smaily_connect/subscribers/sync_enabled', '1'],
             // 2.8.x leftovers, the plaintext password among them.
             ['default', 0, 'smaily/general/password', 'plain-secret'],

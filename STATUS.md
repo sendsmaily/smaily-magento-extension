@@ -7,70 +7,102 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-11-03 — **3.0.0-rc21 is released; on `master` since
-then: sending with the workflow the engine pushed (CON-258) and contract
-1.24.0.**
-**3.0.0-rc21 is released** (Erkki's tag, 2026-11-03: the release
-workflow was green, both ZIPs and their `.sha256` were attached, the
-Hyvä mirror was tagged and Packagist showed rc21 for both packages).
+_Last updated: 2026-11-03 session end — **on `master` since rc21: the
+separate-stores setup (CON-279 phase 1) and steps 1–3 of 6 of Campaign
+Intelligence per store (CON-237), all dark for one-store installations.**
+3.0.0-rc21 is released (2026-11-03). Nothing since it is released.
 
 **On `master` since the rc21 cut (unreleased):**
-- #245: contract 1.24.0 (INT-193), byte-copied. No shape change the
-  extension relies on: catalog and browse take 1–1000 items a request
-  (100 recommended; the extension already sends at most 100), every bad
-  key answers one `401 unauthorised` (no more `api_key_revoked` /
-  `regenerate_url`; the extension handles every 401 alike), browse
-  `sku` / `category_path` / `search_query` are SHOULD, `merge_ts` is
-  optional, catalog `200`s carry `unmapped_attributes` (not read), and
-  timestamps with a UTC offset are accepted (the extension keeps sending
-  `Z`). Still no ingest pace named (`IngestPace`).
 - #244 CON-258: every §23 read stores each email's pushed workflow id
-  and Smaily account (`Engine\EmailDesignWorkflows`,
-  `smaily_connect/intelligence/email_workflows`; a new connection and a
-  disconnect clear it). **Welcome**, **First order** and **Abandoned
-  cart** start with it only when the account that sends the email holds
-  it and the email goes in the website's default language (its default
-  store view's), as in WooCommerce (CON-218); `PushedWorkflow`, asked by
-  `AutomationHandler` after `clientFor()`. Null ids (today) change
-  nothing. Transactional ids are stored, not read.
+  and Smaily account; **Welcome**, **First order** and **Abandoned cart**
+  start with it only on that account and in the website's default
+  language, as in WooCommerce (CON-218). Null ids (today) change nothing.
+- #245, #248: contract 1.24.0 (INT-193) and 1.25.0 (INT-207, INT-209),
+  byte-copied. No shape the extension relies on changed; 1.25.0's §1
+  `smaily_subdomain` is read from CON-237 step 1 on.
+- #246: STATUS. #247 CON-265: an import tick's time budget reads
+  `Model/Backfill/ImportClock`; tests use `Support\FrozenImportClock`
+  (the `ImportPaceTest:124` local flake).
+- #249 CON-279 phase 1 (+ CON-192): a 2+-website installation chooses
+  at setup **One store in several versions** or **Separate stores**.
+  Separate stores are set up and shown one website at a time, with a row
+  of website cards at the top and no "Use its own …" switches.
+  `Model\StoreLayout` reads the layout from the data or the mark
+  `smaily_connect/internal/separate_stores`; changing it later copies
+  (one → separate) or promotes the viewed website's values (separate →
+  one) and fires `smaily_connect_store_layout_joined`. Upgraded stores
+  with different accounts per website and no store-wide one get the
+  store-wide automations as each website's own (`MigrateLegacyConfig`,
+  data patch `CopyAutomationsToSeparateStores`).
+- #250–#252 CON-237 steps 1–3 (dark): the engine connection model
+  (`Engine\Connection(s)`, website-scope `Settings`, `ClientFactory`,
+  recorded `smaily_subdomain`, data patch `RecordEngineConnectionAccount`),
+  the ingest queue routed by connection (`store_id` = the connection's
+  canonical store view, NULL = primary; round-robin flush, per-connection
+  stop), and per-connection catalog/customer/order rows, §3c manifest and
+  imports (flags `_c<key>`, jobs `website_id` = connection key). Under
+  one store payloads, SQL and request order are byte-identical (golden
+  tests). The plan and each step's "as built" notes:
+  `docs/internal/ENGINE_CONNECTIONS_PLAN.md`.
 
-**Decided (Erkki, 2026-11-03):** the Estonian texts of CON-253, CON-256,
-CON-257, CON-260, CON-262 and CON-266 are approved. An email card whose
-§23 item has `created_by: "other"` keeps **Edit design**, as in
-WooCommerce; the contract's "link to Smaily" rule waits until the engine
-announces `created_by` and the contract names the address.
+**Decided (Erkki, 2026-11-03):**
+- The engine store follows the store, not the Smaily account: separate
+  stores each connect their own engine store; one store is one engine
+  store, also with per-language Smaily accounts (engine INT-208, a
+  one-way door: website × language decides the account, opt-out per
+  account, one setup link per account; not built, contract draft
+  pending). Two businesses never share one Smaily account.
+- A website moved to another Smaily account leaves its customers and
+  orders in the old engine store. Separate → one store disconnects the
+  websites' own engine connections, drops their pending rows and offers
+  **Run again** on the primary. The extension refuses a setup link whose
+  §1 `smaily_subdomain` is not the website's account.
+- Separate → one makes the viewed website's settings the store-wide
+  ones; one → separate copies them to each website and removes the
+  store-wide ones.
+- `created_by: "other"` email cards keep **Edit design** (as Woo).
+- Every Estonian text of the day is approved (CON-253, CON-256,
+  CON-257, CON-258, CON-260, CON-262, CON-266, CON-279, the #251 Log
+  strings).
 
 **Pilot:** the first pilot store (still on rc12) upgrades directly to
-rc21. Then it presses **Run again** under **Settings > Intelligence**
-on **Catalog**, **Customers** and **Orders**, in that order, and
-**Retry** on the failed identity merges (*engine.identity_merge*) in
-the Log. The second pilot store's state is unchanged (rc12). The gauge
-is CON-147 (4/5).
+rc21, then presses **Run again** under **Settings > Intelligence** on
+**Catalog**, **Customers** and **Orders**, in that order, and **Retry**
+on the failed identity merges in the Log. The second pilot store is
+unchanged (rc12). Both are one store; nothing of CON-279/CON-237 changes
+them. The gauge is CON-147 (4/5).
 
-**Gotchas:** the rc18–rc21 gotchas hold. The integration harness has a
-`TypeListInterface` preference (`FakeCacheTypeList`), so a class that
-cleans the config cache can be built there.
+**Gotchas:** the rc18–rc21 gotchas hold. The integration harness has
+`FakeCacheTypeList`; a test that builds `MigrateLegacyConfig` needs
+`IntegrationTestCase::storeLayoutFor()`. A full `vendor/bin/phpcs` run
+can take 30–105 minutes on the Mac under load. Under separate stores, a
+CON-192-shaped store keeps only the websites on the default website's
+account on today's engine connection once CON-237 routes (steps 4–5):
+the others need their own connection — step 5/6 adds the notice, guide
+note and changelog fragment.
 
-**Open:** CON-209 (the 3.0.0 gate), CON-230 (the engine-page modal;
-waits for INT-180), CON-234 (the installation report; waits for
-INT-186), CON-237 (an own engine store per Smaily account; later),
-CON-252 (address normalisation is ASCII-only; Low; needs agreement with
-the engine), CON-265 (`ImportPaceTest:124` fails now and then on a
-local run; in progress), CON-192 (no store-wide login, different
-accounts per website; Low), CON-163 (pinned engine URLs; waits for the
-engine), CON-146 (native-speaker review of ru/fi/lv/lt), CON-168, and
-the Estonian proofread of the CON-258 `#set-email-design` paragraph.
+**Open:** CON-237 steps 4–6 (storefront and event flows; connect,
+disconnect and health incl. the §1 `smaily_subdomain` check, the
+website-delete observer and the layout-joined listener; admin UI and
+guide), the CON-279 follow-ups (the Dashboard under separate stores, the
+transactional account on a layout change), CON-209 (the 3.0.0 gate),
+CON-230 (waits for INT-180), CON-234 (waits for INT-186), CON-252
+(ASCII-only address normalisation; needs the engine), CON-163 (waits for
+the engine), CON-146 (native-speaker review of ru/fi/lv/lt), CON-168.
 Follow-up: **Run again** restarts from row 1.
 
 **Next session opens with:**
-1. The first pilot store upgrades to rc21, presses **Run again** on
-   **Catalog**, **Customers** and **Orders**, in that order, and
-   presses **Retry** on its failed identity merges in the Log.
-2. Watch its history progress reach `start_part_complete` in the
-   engine, and check that its identity merges now reach the engine.
+1. CON-237 step 4 (brief: `docs/internal/ENGINE_CONNECTIONS_PLAN.md`).
+2. Steps 5 and 6, then cut rc22.
+3. The pilot store's rc21 upgrade, when its developer reports it.
 
-**Notes for the next version cut (rc22):** CON-258 has a fragment; no
-earlier bullet is known to need a change._
+**Notes for the next version cut (rc22):** fragments CON-258 and
+CON-279 so far; CON-237 adds one at step 5/6. The CON-279 bullet should
+say that Campaign Intelligence per separate store arrives with CON-237._
+
+_Earlier (2026-11-03, after the rc21 release): #244 CON-258, #245
+contract 1.24.0, #246 STATUS. Decided then: the Estonian texts up to
+CON-266 approved; `created_by: "other"` cards keep **Edit design**._
 
 _Earlier (2026-11-03, the 3.0.0-rc21 cut): 3.0.0-rc21 was cut (#243)
 and tagged by Erkki the same day. It collected 2 fragments (CON-262,

@@ -263,6 +263,13 @@ take MySQL's wall clock, which can cross a second between two inserts and
 reorder rows sorted by time — a test that passes alone then fails now and
 then in a full run.
 
+An engine import's tick stops when its 15 s budget is spent, on the clock
+`Model/Backfill/ImportClock` gives it. A test that asserts how much one tick
+queues gives the processor `Support\FrozenImportClock`, which does not move:
+on the wall clock a slow or busy machine ends the tick before the backlog
+is full, and the test fails now and then in a full run (CON-265). The send
+run's pace has its own clock for the same reason (`Support\VirtualPace`).
+
 **Scope note:** the suite boots a standalone `Magento\Framework` object graph
 (real DB adapter, model/resource/collection layer, encryptor, config writer)
 rather than Magento's full integration TestFramework, which requires a

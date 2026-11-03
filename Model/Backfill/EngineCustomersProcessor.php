@@ -37,7 +37,8 @@ class EngineCustomersProcessor implements ProcessorInterface
         private readonly IngestQueue $ingestQueue,
         private readonly SkippedRow $skippedRow,
         private readonly EngineCustomerScope $scope,
-        private readonly HistoryImport $historyImport
+        private readonly HistoryImport $historyImport,
+        private readonly ImportClock $clock
     ) {
     }
 
@@ -56,7 +57,7 @@ class EngineCustomersProcessor implements ProcessorInterface
             $job->setData('total_count', $this->scope->count($horizon));
         }
 
-        $deadline = microtime(true) + self::TIME_BUDGET_SECONDS;
+        $deadline = $this->clock->now() + self::TIME_BUDGET_SECONDS;
         do {
             $ids = $this->scope->page($horizon, (int)$job->getCursorValue(), self::PAGE_SIZE);
             if (!$ids) {
@@ -101,6 +102,6 @@ class EngineCustomersProcessor implements ProcessorInterface
             if ($this->ingestQueue->countPending(Client::DOMAIN_CUSTOMERS) >= IngestPace::IMPORT_BACKLOG_ROWS) {
                 return;
             }
-        } while (microtime(true) < $deadline);
+        } while ($this->clock->now() < $deadline);
     }
 }

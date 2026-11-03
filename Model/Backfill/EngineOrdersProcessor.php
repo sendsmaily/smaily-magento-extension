@@ -44,7 +44,8 @@ class EngineOrdersProcessor implements ProcessorInterface
         private readonly OrderPayloadBuilder $payloadBuilder,
         private readonly IngestQueue $ingestQueue,
         private readonly SkippedRow $skippedRow,
-        private readonly HistoryImport $historyImport
+        private readonly HistoryImport $historyImport,
+        private readonly ImportClock $clock
     ) {
     }
 
@@ -67,7 +68,7 @@ class EngineOrdersProcessor implements ProcessorInterface
         }
 
         $jobId = (int)$job->getId();
-        $deadline = microtime(true) + self::TIME_BUDGET_SECONDS;
+        $deadline = $this->clock->now() + self::TIME_BUDGET_SECONDS;
         do {
             $startPartQueued = $history['start_part_queued_to'] !== null;
             $rows = $this->historyImport->ordersPage(
@@ -127,7 +128,7 @@ class EngineOrdersProcessor implements ProcessorInterface
             if ($this->ingestQueue->countPending(Client::DOMAIN_ORDERS) >= IngestPace::IMPORT_BACKLOG_ROWS) {
                 return;
             }
-        } while (microtime(true) < $deadline);
+        } while ($this->clock->now() < $deadline);
     }
 
     /**

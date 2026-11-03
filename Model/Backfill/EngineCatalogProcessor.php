@@ -34,7 +34,8 @@ class EngineCatalogProcessor implements ProcessorInterface
         private readonly CatalogPayloadBuilder $payloadBuilder,
         private readonly IngestQueue $ingestQueue,
         private readonly CatalogIngest $catalogIngest,
-        private readonly CatalogProductLoader $productLoader
+        private readonly CatalogProductLoader $productLoader,
+        private readonly ImportClock $clock
     ) {
     }
 
@@ -55,7 +56,7 @@ class EngineCatalogProcessor implements ProcessorInterface
             $job->setData('total_count', $this->countProducts());
         }
 
-        $deadline = microtime(true) + self::TIME_BUDGET_SECONDS;
+        $deadline = $this->clock->now() + self::TIME_BUDGET_SECONDS;
         do {
             $cursor = (int)$job->getCursorValue();
             $products = $this->productLoader->loadPage($cursor, self::PAGE_SIZE);
@@ -85,7 +86,7 @@ class EngineCatalogProcessor implements ProcessorInterface
             if ($this->ingestQueue->countPending(Client::DOMAIN_CATALOG) >= IngestPace::IMPORT_BACKLOG_ROWS) {
                 return;
             }
-        } while (microtime(true) < $deadline);
+        } while ($this->clock->now() < $deadline);
     }
 
     private function countProducts(): int

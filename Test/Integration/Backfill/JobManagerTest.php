@@ -12,6 +12,7 @@ use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Smaily\Connect\Cron\BackfillTick;
 use Smaily\Connect\Model\Backfill\EngineCatalogProcessor;
+use Smaily\Connect\Model\Backfill\ImportClock;
 use Smaily\Connect\Model\Backfill\HistoryImport;
 use Smaily\Connect\Model\Backfill\HistoryProgress;
 use Smaily\Connect\Model\Backfill\Job;
@@ -357,7 +358,8 @@ class JobManagerTest extends IntegrationTestCase
             $this->createMock(CatalogPayloadBuilder::class),
             $this->objectManager->create(IngestQueue::class),
             $this->createMock(CatalogIngest::class),
-            $this->createMock(CatalogProductLoader::class)
+            $this->createMock(CatalogProductLoader::class),
+            new ImportClock()
         );
 
         $front = $this->jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0);

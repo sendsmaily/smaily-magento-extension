@@ -43,6 +43,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Backfill\EngineCatalogProcessor;
+use Smaily\Connect\Model\Backfill\ImportClock;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Config;
@@ -191,7 +192,8 @@ class EngineCatalogImportParityTest extends TestCase
             $payloadBuilder,
             $ingestQueue,
             $this->catalogIngest($sent),
-            new CatalogProductLoader($collectionFactory, $payloadBuilder)
+            new CatalogProductLoader($collectionFactory, $payloadBuilder),
+            new ImportClock()
         ))->process($job);
         self::assertCount(1, $sent);
 

@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Integration\Support;
 
 use Magento\Config\Model\ResourceModel\Config as ConfigResource;
+use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\CacheInterface;
 use Magento\Framework\App\Config\ConfigResource\ConfigInterface as ConfigResourceInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
@@ -68,6 +69,7 @@ use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Smaily\Connect\Test\Integration\Support\Fake\FakeCache;
+use Smaily\Connect\Test\Integration\Support\Fake\FakeCacheTypeList;
 use Smaily\Connect\Test\Integration\Support\Fake\FakeConfigScope;
 use Smaily\Connect\Test\Integration\Support\Fake\FakeEventManager;
 use Smaily\Connect\Test\Integration\Support\Fake\FakeNotifier;
@@ -266,6 +268,7 @@ class TestEnvironment
                 LoggerInterface::class => NullLogger::class,
                 EventManagerInterface::class => FakeEventManager::class,
                 CacheInterface::class => FakeCache::class,
+                TypeListInterface::class => FakeCacheTypeList::class,
                 ConfigScopeInterface::class => FakeConfigScope::class,
                 ScopeConfigInterface::class => FakeScopeConfig::class,
                 SerializerInterface::class => Json::class,

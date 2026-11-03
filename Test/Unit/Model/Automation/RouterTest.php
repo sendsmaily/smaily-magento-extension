@@ -324,11 +324,49 @@ class RouterTest extends TestCase
         self::assertNull($this->router()->resolve(Trigger::WELCOME, 3, 'et'), 'The store-wide Welcome workflow is not its own');
     }
 
-    private function mappingRow(int $workflowId, string $accountKey): Mapping
+    /**
+     * CON-258: a match carries the language its workflow was picked for —
+     * PushedWorkflow lets only the website's default language take the
+     * workflow Campaign Intelligence pushed.
+     */
+    public function testAMatchCarriesTheLanguageItsWorkflowWasPickedFor(): void
+    {
+        $this->config->method('getMultilingualMode')->willReturnOnConsecutiveCalls('single', 'c', 'b', 'b', 'b', 'a');
+        $this->config->method('getWelcomeWorkflow')->willReturn(11);
+        $this->lookupResults = [
+            // Mode b: the language's own row.
+            $this->mappingRow(55, 'default', 'et'),
+            // Mode b: no row and no fallback row for 'lv', nor for ''.
+            null, null, null, null,
+            // Mode a: no 'lv' row, the fallback row is the language-less one.
+            null, $this->mappingRow(66, 'default', 'default'),
+        ];
+
+        $router = $this->router();
+        $languages = [];
+        foreach (['et', 'et', 'et', 'lv', '', 'lv'] as $language) {
+            $languages[] = $router->resolve(Trigger::WELCOME, 1, $language)?->language;
+        }
+
+        self::assertSame(
+            [
+                'default', // Single: one workflow for every language.
+                'default', // Mode c: the same.
+                'et', // Mode b: the language's own row.
+                'lv', // Mode b's catch-all goes out in the contact's language.
+                'default', // ... and for a contact without one, in no language.
+                'default', // Mode a: the language-less fallback row.
+            ],
+            $languages
+        );
+    }
+
+    private function mappingRow(int $workflowId, string $accountKey, string $language = 'default'): Mapping
     {
         $mapping = $this->createMock(Mapping::class);
         $mapping->method('getWorkflowId')->willReturn($workflowId);
         $mapping->method('getAccountKey')->willReturn($accountKey);
+        $mapping->method('getLanguage')->willReturn($language);
 
         return $mapping;
     }

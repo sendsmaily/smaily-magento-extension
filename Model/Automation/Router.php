@@ -54,6 +54,11 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory;
  * resolutions (modes single, b and c) carry no account key: credentials
  * follow the event's store view as before.
  *
+ * The match carries the language the workflow was picked for
+ * (WorkflowMatch). The handler then lets PushedWorkflow put the workflow
+ * Campaign Intelligence pushed to Smaily in its place, once it knows the
+ * account that sends it (CON-258).
+ *
  * Returns null when no workflow is mapped — callers treat that as a
  * terminal skip (retrying cannot make a mapping appear).
  */
@@ -79,7 +84,7 @@ class Router
         $ownAccount = $this->overrides->usesOtherAccount($websiteId);
 
         if ($mode === MultilingualMode::MODE_SINGLE || $mode === MultilingualMode::MODE_SINGLE_WORKFLOW) {
-            return $this->configDefault($trigger, $websiteId, $ownAccount);
+            return $this->configDefault($trigger, $websiteId, $ownAccount, Mapping::LANGUAGE_DEFAULT);
         }
 
         $effectiveLanguage = $language !== '' ? $language : Mapping::LANGUAGE_DEFAULT;
@@ -93,7 +98,9 @@ class Router
             return $match;
         }
         if ($mode !== MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS) {
-            return $this->configDefault($trigger, $websiteId, $ownAccount);
+            // Mode b's one workflow for every language without its own: it
+            // goes out in the contact's language.
+            return $this->configDefault($trigger, $websiteId, $ownAccount, $effectiveLanguage);
         }
 
         // Mode A: the default fallback account's own row for the trigger.
@@ -143,14 +150,15 @@ class Router
             return null;
         }
 
-        return new WorkflowMatch($mapping->getWorkflowId(), $mapping->getAccountKey());
+        return new WorkflowMatch($mapping->getWorkflowId(), $mapping->getAccountKey(), $mapping->getLanguage());
     }
 
     /**
      * The trigger's workflow saved in system config: for a website that uses
      * another Smaily account only the one saved at its website scope.
+     * `$language` is the language it goes out in (WorkflowMatch).
      */
-    private function configDefault(string $trigger, int $websiteId, bool $ownAccount): ?WorkflowMatch
+    private function configDefault(string $trigger, int $websiteId, bool $ownAccount, string $language): ?WorkflowMatch
     {
         $workflowId = $ownAccount
             ? (int)$this->overrides->ownValue(
@@ -165,6 +173,6 @@ class Router
                 default => 0,
             };
 
-        return $workflowId > 0 ? new WorkflowMatch($workflowId, null) : null;
+        return $workflowId > 0 ? new WorkflowMatch($workflowId, null, $language) : null;
     }
 }

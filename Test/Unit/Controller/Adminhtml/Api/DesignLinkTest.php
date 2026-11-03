@@ -30,6 +30,7 @@ use Smaily\Connect\Controller\Adminhtml\Api\DesignLink;
 use Smaily\Connect\Controller\Adminhtml\Api\Designs;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\EmailDesignWorkflows;
 use Smaily\Connect\Model\Engine\EmailDesigns;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
@@ -268,7 +269,7 @@ class DesignLinkTest extends TestCase
             new StorefrontScript($storeManager, $this->createMock(HttpRequest::class))
         );
 
-        $this->designLink(new EmailDesigns($settings, $client), ['email_key' => 'plugin.welcome'])->execute();
+        $this->designLink(new EmailDesigns($settings, $client, $this->createMock(EmailDesignWorkflows::class)), ['email_key' => 'plugin.welcome'])->execute();
 
         self::assertSame(['url' => $link], $this->response);
         self::assertSame('no-store', $this->headers['Cache-Control'] ?? null);

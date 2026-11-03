@@ -43,6 +43,14 @@ class Settings
      */
     public const XML_PATH_REFUSED_AT = 'smaily_connect/intelligence/refused_at';
 
+    /**
+     * The Smaily workflow and account the engine pushed for each email of
+     * the extension (contract §23), as JSON — EmailDesignWorkflows keeps it.
+     * A setup exchange and a disconnect delete it: the ids belong to the
+     * connection that read them.
+     */
+    public const XML_PATH_EMAIL_WORKFLOWS = 'smaily_connect/intelligence/email_workflows';
+
     /** In-request memo: a refusal recorded mid-run must stop the rest of it. */
     private ?bool $refused = null;
 
@@ -230,6 +238,9 @@ class Settings
         );
         $this->configWriter->save(self::XML_PATH_ISSUED_AT, (string)($response['issued_at'] ?? ''));
         $this->configWriter->save(self::XML_PATH_CONNECTED, '1');
+        // The pushed workflows of an earlier connection — maybe another
+        // store's — are not this one's: the next §23 read brings its own.
+        $this->configWriter->delete(self::XML_PATH_EMAIL_WORKFLOWS);
         $this->apiKey = null;
         // A fresh exchange is a live account by definition — and possibly a
         // different one, so a remembered refusal must not survive it.
@@ -254,6 +265,7 @@ class Settings
             self::XML_PATH_CONFIG,
             self::XML_PATH_ISSUED_AT,
             self::XML_PATH_REFUSED_AT,
+            self::XML_PATH_EMAIL_WORKFLOWS,
         ] as $path) {
             $this->configWriter->delete($path);
         }

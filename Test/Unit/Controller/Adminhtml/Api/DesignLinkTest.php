@@ -197,8 +197,8 @@ class DesignLinkTest extends TestCase
                 'not_available',
                 'Campaign Intelligence does not offer email designs for this store yet.',
             ],
-            '401 api_key_revoked' => [
-                new EngineRequestException('x', 401, ['error' => 'api_key_revoked']),
+            '401 unauthorised' => [
+                new EngineRequestException('x', 401, ['error' => 'unauthorised']),
                 502,
                 'api_key_rejected',
                 'Campaign Intelligence did not accept this store\'s connection.'

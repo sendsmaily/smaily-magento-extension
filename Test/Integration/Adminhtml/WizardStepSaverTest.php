@@ -13,6 +13,7 @@ use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\Event\ManagerInterface as EventManagerInterface;
 use Magento\Framework\Notification\NotifierInterface;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
@@ -35,7 +36,9 @@ use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\ModuleVersion;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
+use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\SubdomainNormalizer;
+use Smaily\Connect\Setup\Patch\Data\CopyAutomationsToSeparateStores;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
 
@@ -57,6 +60,9 @@ class WizardStepSaverTest extends IntegrationTestCase
     private const SECOND = 7;
 
     private Config $config;
+
+    /** @var array<int, array{0: string, 1: array<string, mixed>}> the events the store's layout dispatched */
+    private array $events = [];
 
     protected function setUp(): void
     {
@@ -102,12 +108,13 @@ class WizardStepSaverTest extends IntegrationTestCase
             new CredentialCheck($this->createMock(SmailyClientFactory::class), $this->config),
             $this->createMock(SetupNotice::class),
             $this->createMock(TransactionalSettingsSaver::class),
-            new WebsiteOverrides(
+            $overrides = new WebsiteOverrides(
                 $this->objectManager->get(ResourceConnection::class),
                 $this->objectManager->get(WriterInterface::class),
                 $storeManager,
                 new SubdomainNormalizer()
-            )
+            ),
+            $this->storeLayout($storeManager, $overrides)
         );
     }
 
@@ -151,6 +158,36 @@ class WizardStepSaverTest extends IntegrationTestCase
             $this->objectManager->get(WriterInterface::class),
             $this->storeManager($websiteIds),
             new SubdomainNormalizer()
+        );
+    }
+
+    /**
+     * The store's layout over the real rows (CON-279); the events it
+     * dispatches are kept in $this->events.
+     *
+     * @param int[]|StoreManagerInterface $websites the store's websites
+     */
+    private function storeLayout(
+        array|StoreManagerInterface $websites = [self::MAIN, self::SECOND],
+        ?WebsiteOverrides $overrides = null
+    ): StoreLayout {
+        $storeManager = $websites instanceof StoreManagerInterface ? $websites : $this->storeManager($websites);
+        $eventManager = $this->createMock(EventManagerInterface::class);
+        $eventManager->method('dispatch')->willReturnCallback(function (string $name, array $data = []): void {
+            $this->events[] = [$name, $data];
+        });
+
+        return new StoreLayout(
+            $this->objectManager->get(ResourceConnection::class),
+            $this->objectManager->get(WriterInterface::class),
+            $storeManager,
+            $overrides ?? new WebsiteOverrides(
+                $this->objectManager->get(ResourceConnection::class),
+                $this->objectManager->get(WriterInterface::class),
+                $storeManager,
+                new SubdomainNormalizer()
+            ),
+            $eventManager
         );
     }
 
@@ -620,6 +657,363 @@ class WizardStepSaverTest extends IntegrationTestCase
         );
 
         self::assertFalse($guard->isSetupCompleted());
+    }
+
+    /**
+     * CON-279: the layout is read from the data. Websites that all hold the
+     * same Smaily account of their own (a 2.8.x upgrade often saved it on
+     * every website), or a store-wide account with a website on another one
+     * (CON-190), are one store; different accounts and no store-wide one are
+     * separate stores; a single-website install never is.
+     */
+    public function testTheStoresLayoutIsReadFromTheSmailyAccountsItsWebsitesHold(): void
+    {
+        foreach ([self::MAIN, self::SECOND] as $websiteId) {
+            $this->insertRow('websites', $websiteId, Config::XML_PATH_SUBDOMAIN, 'shop');
+            $this->insertRow('websites', $websiteId, Config::XML_PATH_USERNAME, 'api-user');
+        }
+        self::assertFalse($this->storeLayout()->isSeparateStores(), 'One account on every website: one store');
+
+        $this->setSubdomain(self::SECOND, 'second-shop');
+        self::assertTrue($this->storeLayout()->isSeparateStores(), 'Different accounts, none for all websites');
+        self::assertFalse($this->storeLayout([self::MAIN])->isSeparateStores(), 'One website is never separate');
+
+        $this->insertRow('default', 0, Config::XML_PATH_SUBDOMAIN, 'shop');
+        $this->insertRow('default', 0, Config::XML_PATH_USERNAME, 'api-user');
+        self::assertFalse($this->storeLayout()->isSeparateStores(), 'A store-wide account: one store (CON-190)');
+    }
+
+    /**
+     * CON-279: picked at the start of the initial setup, separate stores is
+     * kept before any website is saved; one store saves nothing.
+     */
+    public function testTheSetupsChoiceOfSeparateStoresIsKeptBeforeAnyWebsiteIsSaved(): void
+    {
+        $saver = $this->saver('0');
+        self::assertSame([], $saver->save('shape', ['shape' => 'one']));
+        self::assertFalse($saver->isShapeChanged());
+        self::assertSame([], $this->allConfigRows());
+
+        self::assertSame([], $saver->save('shape', ['shape' => 'separate']));
+        self::assertTrue($saver->isShapeChanged());
+        self::assertTrue($this->storeLayout()->isSeparateStores());
+        self::assertSame([['default', 0]], $this->allMarks());
+
+        self::assertNotSame([], $saver->save('shape', ['shape' => 'other']));
+        self::assertNotSame([], $this->saver('0', [self::MAIN])->save('shape', ['shape' => 'separate']));
+    }
+
+    /**
+     * CON-279: each separate store is set up as a single store is — every
+     * step saves the selected website's own values, with no "own" switch,
+     * per-language Smaily accounts included — and a page drawn for the
+     * whole store saves nothing.
+     */
+    public function testEachSeparateStoreSavesEveryStepForItself(): void
+    {
+        $this->storeLayout()->toSeparateStores();
+
+        $second = $this->saver((string)self::SECOND);
+        self::assertSame([], $second->save('connect', [
+            'subdomain' => 'second-shop',
+            'username' => 'api-second',
+            'password' => 'second-secret',
+            'multilingual_mode' => 'b',
+        ]));
+        self::assertSame([], $second->save('subscribers', ['sync_mode' => 'legitimate_interest']));
+        self::assertSame([], $second->save('automations', ['welcome_enabled' => true, 'mappings' => [
+            ['trigger_type' => 'welcome', 'language' => 'default', 'account_key' => 'default', 'workflow_id' => 321],
+        ]]));
+        self::assertFalse($second->isReturnedToStoreWide());
+
+        foreach ([
+            Config::XML_PATH_SUBDOMAIN,
+            Config::XML_PATH_PASSWORD,
+            Config::XML_PATH_MULTILINGUAL_MODE,
+            Config::XML_PATH_SYNC_MODE,
+            Config::XML_PATH_CONTACTS_CONFIRMED,
+            Config::XML_PATH_WELCOME_ENABLED,
+        ] as $path) {
+            self::assertSame([['websites', self::SECOND]], $this->scopesOf($path), $path);
+        }
+        self::assertSame('second-secret', $this->config->getWebsitePassword(self::SECOND));
+        self::assertSame('', $this->config->getWebsiteSubdomain(self::MAIN), 'Main is not set up yet');
+        self::assertSame(321, $this->router()->resolve('welcome', self::SECOND, 'default')?->workflowId);
+        self::assertNull($this->router()->resolve('welcome', self::MAIN, 'default'));
+
+        $errors = $this->saver('0')->save('subscribers', ['sync_mode' => 'consent']);
+        self::assertSame('step', $errors[0]['field'] ?? null, 'No values for all websites under separate stores');
+        self::assertSame([['websites', self::SECOND]], $this->scopesOf(Config::XML_PATH_SYNC_MODE));
+
+        // Per-language accounts are a separate store's own, as on a
+        // single-website store: the step does not refuse mode A.
+        self::assertSame([], $second->save('connect', [
+            'subdomain' => 'second-shop',
+            'username' => 'api-second',
+            'multilingual_mode' => 'a',
+        ]));
+        self::assertSame('a', $this->config->getMultilingualMode(self::SECOND));
+    }
+
+    /**
+     * CON-279: separate stores read from the data stay separate stores once
+     * one of them saves, also when that save gives two websites one account.
+     */
+    public function testSeparateStoresGivenTheSameSmailyAccountStaySeparate(): void
+    {
+        $this->insertRow('websites', self::MAIN, Config::XML_PATH_SUBDOMAIN, 'main-shop');
+        $this->insertRow('websites', self::MAIN, Config::XML_PATH_USERNAME, 'api-user');
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_SUBDOMAIN, 'second-shop');
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_USERNAME, 'api-user');
+        self::assertSame([], $this->allMarks());
+
+        self::assertSame([], $this->saver((string)self::SECOND)->save('connect', [
+            'subdomain' => 'main-shop',
+            'username' => 'api-user',
+            'password' => 'secret',
+        ]));
+
+        self::assertTrue($this->storeLayout()->isSeparateStores());
+        self::assertSame([['default', 0]], $this->allMarks());
+    }
+
+    /**
+     * CON-279, changing later: one store to separate stores copies the
+     * values for all websites to every website as its own, so each one
+     * reads and sends exactly as before; the values for all websites go.
+     */
+    public function testOneStoreToSeparateStoresGivesEveryWebsiteTheSharedValuesAsItsOwn(): void
+    {
+        $saver = $this->saver('0');
+        $saver->save('connect', [
+            'subdomain' => 'shop',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'multilingual_mode' => 'b',
+        ]);
+        $saver->save('subscribers', ['sync_mode' => 'consent', 'sync_fields' => ['first_name']]);
+        $saver->save('automations', ['welcome_enabled' => true, 'mappings' => [
+            ['trigger_type' => 'welcome', 'language' => 'default', 'account_key' => 'default', 'workflow_id' => 900],
+        ]]);
+        $this->saver((string)self::SECOND)->save('subscribers', ['own' => true, 'sync_mode' => 'legitimate_interest']);
+        $before = [];
+        foreach ([self::MAIN, self::SECOND] as $websiteId) {
+            $before[$websiteId] = $this->router()->resolve('welcome', $websiteId, 'default')?->workflowId;
+        }
+
+        $split = $this->saver((string)self::MAIN);
+        self::assertSame([], $split->save('shape', ['shape' => 'separate']));
+        self::assertTrue($split->isShapeChanged());
+
+        self::assertTrue($this->storeLayout()->isSeparateStores());
+        self::assertNotContains(['default', 0], $this->scopesOf(Config::XML_PATH_SUBDOMAIN), 'The store-wide account goes');
+        foreach ([self::MAIN, self::SECOND] as $websiteId) {
+            self::assertSame('shop', $this->config->getWebsiteSubdomain($websiteId));
+            self::assertSame('secret', $this->config->getWebsitePassword($websiteId));
+            self::assertSame('b', $this->config->getMultilingualMode($websiteId));
+            self::assertTrue($this->config->isWelcomeEnabled($websiteId));
+            self::assertTrue($this->config->isContactSyncActive($websiteId));
+            self::assertSame(
+                $before[$websiteId],
+                $this->router()->resolve('welcome', $websiteId, 'default')?->workflowId,
+                'Website ' . $websiteId . ' sends as before'
+            );
+        }
+        self::assertSame(900, $before[self::MAIN]);
+        self::assertSame('consent', $this->config->getSyncMode(self::MAIN));
+        self::assertSame('legitimate_interest', $this->config->getSyncMode(self::SECOND), 'Its own value stays');
+        self::assertSame([self::MAIN, self::SECOND], $this->mappingWebsites(), 'The store-wide rows are each website\'s');
+    }
+
+    /**
+     * CON-190 stays: a website on another Smaily account than the store-wide
+     * one never started the store-wide workflows, and does not after the split.
+     */
+    public function testAWebsiteOnAnotherAccountKeepsOnlyItsOwnWorkflowsWhenTheStoreSplits(): void
+    {
+        $this->saver('0')->save('connect', ['subdomain' => 'shop', 'username' => 'api-user', 'password' => 'secret']);
+        $this->insertRow('default', 0, Config::XML_PATH_WELCOME_WORKFLOW, '900');
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_SUBDOMAIN, 'other-shop');
+        self::assertNull($this->router()->resolve('welcome', self::SECOND, 'default'), 'CON-190 before');
+
+        $this->storeLayout()->toSeparateStores();
+
+        self::assertSame(900, $this->router()->resolve('welcome', self::MAIN, 'default')?->workflowId);
+        self::assertNull($this->router()->resolve('welcome', self::SECOND, 'default'), 'Still none of its own');
+        self::assertSame('other-shop', $this->config->getWebsiteSubdomain(self::SECOND));
+    }
+
+    /**
+     * CON-279, changing later: separate stores back to one store — the
+     * selected website's values become the values for all websites and
+     * every website's own values go.
+     */
+    public function testSeparateStoresBackToOneStoreUsesTheSelectedWebsitesValues(): void
+    {
+        $this->storeLayout()->toSeparateStores();
+        foreach ([self::MAIN => 'main-shop', self::SECOND => 'second-shop'] as $websiteId => $subdomain) {
+            $saver = $this->saver((string)$websiteId);
+            $saver->save('connect', [
+                'subdomain' => $subdomain,
+                'username' => 'api-user',
+                'password' => $subdomain,
+                'multilingual_mode' => 'b',
+            ]);
+            $saver->save('subscribers', ['sync_mode' => 'consent']);
+            $saver->save('automations', ['welcome_enabled' => true, 'mappings' => [
+                ['trigger_type' => 'welcome', 'language' => 'default', 'account_key' => 'default',
+                    'workflow_id' => $websiteId * 100],
+            ]]);
+        }
+
+        $saver = $this->saver((string)self::SECOND);
+        self::assertSame([], $saver->save('shape', ['shape' => 'one']));
+        self::assertTrue($saver->isShapeChanged());
+
+        self::assertFalse($this->storeLayout()->isSeparateStores());
+        self::assertSame([], $this->allMarks());
+        foreach ([Config::XML_PATH_SUBDOMAIN, Config::XML_PATH_PASSWORD, Config::XML_PATH_SYNC_MODE] as $path) {
+            self::assertSame([['default', 0]], $this->scopesOf($path), $path);
+        }
+        foreach ([self::MAIN, self::SECOND] as $websiteId) {
+            self::assertSame('second-shop', $this->config->getWebsiteSubdomain($websiteId));
+            self::assertSame('second-shop', $this->config->getWebsitePassword($websiteId));
+            self::assertSame(700, $this->router()->resolve('welcome', $websiteId, 'default')?->workflowId);
+            self::assertTrue($this->config->isContactSyncActive($websiteId), 'Confirmed contacts keep syncing');
+        }
+        self::assertSame([0], $this->mappingWebsites());
+    }
+
+    /**
+     * CON-279: leaving separate stores dispatches the joined event right
+     * before the websites' own values go (the seam for each website's own
+     * engine connection); from one store it dispatches nothing.
+     */
+    public function testLeavingSeparateStoresDispatchesTheJoinedEventFirst(): void
+    {
+        $layout = $this->storeLayout();
+        $layout->toSeparateStores();
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_SUBDOMAIN, 'second-shop');
+
+        $layout->toOneStore(self::SECOND);
+
+        self::assertSame([[StoreLayout::EVENT_JOINED, [
+            'website_ids' => [self::MAIN, self::SECOND],
+            'website_id' => self::SECOND,
+        ]]], $this->events);
+        self::assertSame([['default', 0]], $this->scopesOf(Config::XML_PATH_SUBDOMAIN));
+
+        $this->events = [];
+        $layout->toOneStore(self::SECOND);
+        self::assertSame([], $this->events, 'One store already: nothing joins');
+    }
+
+    /**
+     * CON-192: a store whose websites hold different Smaily accounts and no
+     * store-wide one gets the store-wide automations it sent with as each
+     * website's own, so every website sends exactly as before; a store whose
+     * websites share one account is left as it is.
+     */
+    public function testTheDataPatchGivesSeparateAccountsTheirAutomationsAndLeavesOneAccountAlone(): void
+    {
+        $this->insertRow('default', 0, Config::XML_PATH_WELCOME_ENABLED, '1');
+        $this->insertRow('default', 0, Config::XML_PATH_WELCOME_WORKFLOW, '55');
+        $this->insertRow('default', 0, Config::XML_PATH_ABANDONED_WORKFLOW, '77');
+        $this->insertRow('default', 0, Config::XML_PATH_MULTILINGUAL_MODE, 'b');
+        $this->connection->insert(MappingResource::TABLE_NAME, [
+            'website_id' => 0,
+            'trigger_type' => 'welcome',
+            'language' => 'et',
+            'account_key' => 'default',
+            'workflow_id' => 66,
+            'is_default_fallback' => 0,
+        ]);
+        foreach ([self::MAIN, self::SECOND] as $websiteId) {
+            $this->insertRow('websites', $websiteId, Config::XML_PATH_SUBDOMAIN, 'shop');
+            $this->insertRow('websites', $websiteId, Config::XML_PATH_USERNAME, 'api-user');
+        }
+        $rows = $this->allConfigRows();
+        $mappings = $this->mappingRows();
+
+        (new CopyAutomationsToSeparateStores($this->storeLayout()))->apply();
+
+        self::assertSame($rows, $this->allConfigRows(), 'One account on every website: unchanged');
+        self::assertSame($mappings, $this->mappingRows());
+
+        $this->setSubdomain(self::SECOND, 'second-shop');
+        $before = [];
+        foreach ([self::MAIN, self::SECOND] as $websiteId) {
+            foreach (['et', 'lv'] as $language) {
+                $before[$websiteId . $language] = $this->router()->resolve('welcome', $websiteId, $language)?->workflowId;
+            }
+        }
+
+        // A second run (the migration did it first on a 2.8.x upgrade) finds it done.
+        (new CopyAutomationsToSeparateStores($this->storeLayout()))->apply();
+        (new CopyAutomationsToSeparateStores($this->storeLayout()))->apply();
+
+        self::assertTrue($this->storeLayout()->isSeparateStores());
+        foreach ([self::MAIN, self::SECOND] as $websiteId) {
+            self::assertContains(['websites', $websiteId], $this->scopesOf(Config::XML_PATH_WELCOME_WORKFLOW));
+            self::assertContains(['websites', $websiteId], $this->scopesOf(Config::XML_PATH_WELCOME_ENABLED));
+            self::assertSame(77, $this->config->getAbandonedCartWorkflow($websiteId));
+            foreach (['et', 'lv'] as $language) {
+                self::assertSame(
+                    $before[$websiteId . $language],
+                    $this->router()->resolve('welcome', $websiteId, $language)?->workflowId,
+                    'Website ' . $websiteId . ', ' . $language . ' sends as before'
+                );
+            }
+        }
+        self::assertSame([66, 55], [$before[self::MAIN . 'et'], $before[self::MAIN . 'lv']]);
+        self::assertSame([0, self::MAIN, self::SECOND], $this->mappingWebsites(), 'One copy per website');
+        self::assertCount(3, $this->mappingRows());
+        self::assertSame(
+            [['default', 0], ['websites', self::MAIN], ['websites', self::SECOND]],
+            $this->scopesOf(Config::XML_PATH_WELCOME_WORKFLOW),
+            'The store-wide rows stay'
+        );
+    }
+
+    /**
+     * @return array<int, array{0: string, 1: int}> the scopes of the separate-stores mark
+     */
+    private function allMarks(): array
+    {
+        return $this->scopesOf(StoreLayout::XML_PATH_SEPARATE_STORES);
+    }
+
+    private function setSubdomain(int $websiteId, string $subdomain): void
+    {
+        $this->connection->update('core_config_data', ['value' => $subdomain], [
+            'scope = ?' => 'websites',
+            'scope_id = ?' => $websiteId,
+            'path = ?' => Config::XML_PATH_SUBDOMAIN,
+        ]);
+    }
+
+    /**
+     * @return int[] the websites that hold mapping rows, in order
+     */
+    private function mappingWebsites(): array
+    {
+        return array_map('intval', $this->connection->fetchCol(
+            $this->connection->select()->distinct()->from(MappingResource::TABLE_NAME, ['website_id'])
+                ->order('website_id')
+        ));
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function mappingRows(): array
+    {
+        return $this->connection->fetchAll(
+            $this->connection->select()
+                ->from(MappingResource::TABLE_NAME, ['website_id', 'trigger_type', 'language', 'account_key',
+                    'workflow_id', 'is_default_fallback'])
+                ->order(['website_id', 'trigger_type', 'language'])
+        );
     }
 
     private function insertRow(string $scope, int $scopeId, string $path, string $value): void

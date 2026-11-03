@@ -12,6 +12,7 @@ use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
+use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Automation\Mapping;
@@ -38,7 +39,9 @@ use Smaily\Connect\Model\SmailyUrl;
  *
  * The initial setup reads the store-wide values (CON-179): WebsiteContext
  * gives website 0 on a 2+-website install, whose reads resolve the default
- * scope, and the one website on a single-website install.
+ * scope, and the one website on a single-website install. On a store set
+ * up as separate stores (CON-279) both pages read the selected website, as
+ * a single store's pages do.
  */
 class WizardData implements ArgumentInterface
 {
@@ -72,7 +75,8 @@ class WizardData implements ArgumentInterface
         private readonly SetupGuard $setupGuard,
         private readonly WebsiteOverrides $overrides,
         private readonly RuleSource $ruleSource,
-        private readonly StoreDate $storeDate
+        private readonly StoreDate $storeDate,
+        private readonly StoreLayout $storeLayout
     ) {
     }
 
@@ -82,6 +86,74 @@ class WizardData implements ArgumentInterface
     public function isSetupCompleted(): bool
     {
         return $this->setupGuard->isSetupCompleted();
+    }
+
+    /**
+     * Whether the websites of this install are set up as separate stores
+     * (CON-279): each website is set up and shown on its own, with the
+     * website selector at the top of the page.
+     */
+    public function isSeparateStores(): bool
+    {
+        return $this->storeLayout->isSeparateStores();
+    }
+
+    /**
+     * Whether the initial setup asks first how the websites are run (CON-279):
+     * on a 2+-website install whose setup is not finished, while neither
+     * separate stores nor a Smaily account for all websites is saved.
+     */
+    public function isShapeChoiceFirst(): bool
+    {
+        return $this->websiteContext->hasMultipleWebsites()
+            && !$this->isSetupCompleted()
+            && !$this->storeLayout->isKnown();
+    }
+
+    /**
+     * Whether the initial setup opens on the Connect summary (PRO-3563): the
+     * setup is finished — for a website of separate stores (CON-279), once
+     * a Smaily account is saved for it as well; until then it opens on the
+     * form, as a new store's setup does.
+     */
+    public function isWebsiteSetUp(): bool
+    {
+        if (!$this->isSetupCompleted()) {
+            return false;
+        }
+
+        return !$this->isSeparateStoresView()
+            || ($this->getSavedSubdomain() !== '' && $this->getSavedUsername() !== '');
+    }
+
+    /**
+     * Every real website with the Smaily subdomain it uses ('' when none),
+     * for the website selector of separate stores (CON-279).
+     *
+     * @return array<int, array{name: string, subdomain: string}>
+     */
+    public function getWebsiteAccounts(): array
+    {
+        $websites = [];
+        foreach ($this->websiteContext->getWebsiteOptions() as $websiteId => $name) {
+            $websites[$websiteId] = [
+                'name' => $name,
+                'subdomain' => $this->config->getWebsiteSubdomain($websiteId),
+            ];
+        }
+
+        return $websites;
+    }
+
+    /**
+     * A website's page of separate stores: the selected website's values
+     * are all its own.
+     */
+    private function isSeparateStoresView(): bool
+    {
+        return $this->websiteContext->hasMultipleWebsites()
+            && !$this->websiteContext->isStoreWide()
+            && $this->storeLayout->isSeparateStores();
     }
 
     /**
@@ -103,7 +175,7 @@ class WizardData implements ArgumentInterface
      */
     public function getReachedStep(): int
     {
-        return $this->isSetupCompleted() ? 5 : $this->getStartStep();
+        return $this->isWebsiteSetUp() ? 5 : $this->getStartStep();
     }
 
     /**
@@ -127,10 +199,14 @@ class WizardData implements ArgumentInterface
      * Whether the selected website holds its own values of a section
      * (WebsiteOverrides) — the state of its "own" switch on the Settings
      * tab. Always false on a single-website install and in the initial
-     * setup.
+     * setup; always true for a website of separate stores (CON-279).
      */
     public function hasOwnValues(string $section): bool
     {
+        if ($this->isSeparateStoresView()) {
+            return true;
+        }
+
         return $this->isOwnRequired($section)
             || ($this->websiteContext->hasMultipleWebsites()
                 && !$this->websiteContext->isStoreWide()
@@ -150,6 +226,7 @@ class WizardData implements ArgumentInterface
         if ($section !== WebsiteOverrides::AUTOMATIONS
             || !$this->websiteContext->hasMultipleWebsites()
             || $this->websiteContext->isStoreWide()
+            || $this->storeLayout->isSeparateStores()
         ) {
             return false;
         }
@@ -169,7 +246,7 @@ class WizardData implements ArgumentInterface
     public function needsOwnWorkflows(): bool
     {
         $websiteId = $this->websiteContext->getWebsiteId();
-        if (!$this->overrides->usesOtherAccount($websiteId)) {
+        if (!$this->overrides->usesOtherAccount($websiteId) || $this->storeLayout->isSeparateStores()) {
             return false;
         }
         $own = $this->overrides->ownValues(WebsiteOverrides::AUTOMATIONS)[$websiteId] ?? [];
@@ -846,7 +923,9 @@ class WizardData implements ArgumentInterface
             'subdomain' => $this->config->getTransactionalSubdomain($websiteId),
             'username' => $this->config->getTransactionalUsername($websiteId),
             'hasPassword' => $this->config->getTransactionalPassword($websiteId) !== '',
-            'websiteAccount' => $this->config->hasTransactionalWebsiteAccount($websiteId),
+            // A website of separate stores always has its own (CON-279).
+            'websiteAccount' => $this->config->hasTransactionalWebsiteAccount($websiteId)
+                || $this->isSeparateStoresView(),
             // Smaily accepted it at the last real check (PRO-3560): the gate
             // of the trigger settings on the Automations tab.
             'verified' => $this->verifiedCredentials->isTransactionalVerified($websiteId),

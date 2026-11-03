@@ -21,6 +21,16 @@
  * except the automations of a website on another Smaily account than the
  * store-wide one, which it always keeps (CON-190).
  *
+ * On a 2+-website install the page opens with how the websites are run
+ * (CON-279, panel/store-shape.phtml): until that is known
+ * (WizardData::isShapeChoiceFirst()) it asks first, with the steps hidden.
+ * One store in several versions is the store-wide setup above. Separate
+ * stores set each website up on its own: the website selector sits at the
+ * top, and the steps read and save the selected website's values with no
+ * website lists, as a single store's setup does; a website's setup opens
+ * on its Connect summary once the setup is finished and a Smaily account is
+ * saved for it (WizardData::isWebsiteSetUp()).
+ *
  * As in the WooCommerce plugin's setup (CON-33), the Connect step offers the
  * optional transactional-email account below the Smaily account, saved for
  * the whole store (a website's own account is set in Settings only), and the
@@ -102,7 +112,7 @@ $stepTitles = [
 // A finished setup reopens on a read-only summary of the connection, with a
 // Completed marker and "Edit credentials" (PRO-3563, the pack's
 // completed-revisit frame); rendered server-side so the form never flashes.
-$setupCompleted = $viewModel->isSetupCompleted();
+$setupCompleted = $viewModel->isWebsiteSetUp();
 // The step the page opens on and the furthest step reached, from the server,
 // so the right step, rail and footer are drawn before the script runs and
 // the page does not jump (PRO-2456). The script starts from the same two.
@@ -124,7 +134,8 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
 ?>
 <div id="smaily-wizard" class="smaily-ui smaily-wizard">
     <!-- Styles live in view/adminhtml/web/css/smaily-admin.css (loaded via the wizard layout XML). -->
-    <div id="smaily-wizard-main">
+    <?= /* @noEscape */ $block->fetchView($block->getTemplateFile('Smaily_Connect::panel/store-shape.phtml')) ?>
+    <div id="smaily-wizard-main" data-shape-page="1"<?= $viewModel->isShapeChoiceFirst() ? ' style="display:none;"' : '' ?>>
     <?php // Each rail step carries the pack's short line under its name (the
     // WooCommerce plugin's step descriptions); the rail shows it, the narrow
     // strip across the top does not. ?>

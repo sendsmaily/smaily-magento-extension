@@ -1,0 +1,284 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for how the websites are run (CON-279,
+  panel/store-shape.phtml): the real templates, rendered in en_US and et_EE
+  by Test/Js/render-admin.php into Test/Js/build/, run with jQuery from
+  vendor/, one fresh frame per scenario. Stubbed: RequireJS's require(), the
+  requests (fetch, recorded in this page, answered as saved with website 2
+  to open) and window.confirm (recorded, answered as the scenario says).
+
+  The initial setup of a store with three websites whose layout is not known
+  opens on the choice, with the steps hidden and One store in several
+  versions picked: Continue on it shows the Connect step and saves nothing;
+  Separate stores and Continue saves the shape step from the whole store.
+
+  A store set up as separate stores, for Latvia: the setup and Settings name
+  the layout with Change, list the websites in the website selector, each
+  with its Smaily account (Not set up for Lithuania) and Latvia marked
+  current, and show no website lists, no "own" switches and no drop-down
+  next to the tabs; per-language Smaily accounts are offered, the
+  transactional account is the website's own, and Campaign Intelligence
+  says it is one connection for every website. Change opens the choice;
+  One store warns that Latvia's settings become the settings for all
+  websites, asks first, and saves only after a yes.
+
+  Run it with bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>store layout harness</title>
+    <script src="build/setup-layout-first.en_US.js"></script>
+    <script src="build/setup-layout-first.et_EE.js"></script>
+    <script src="build/setup-separate.en_US.js"></script>
+    <script src="build/setup-separate.et_EE.js"></script>
+    <script src="build/settings-separate.en_US.js"></script>
+    <script src="build/settings-separate.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var failures = 0;
+    var passes = 0;
+    // What the frames posted and the questions they asked.
+    window.recorded = [];
+    window.confirms = [];
+    window.confirmAnswer = false;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    function text(element) {
+        return element ? element.textContent.replace(/\s+/g, ' ').trim() : null;
+    }
+
+    function shown(element) {
+        return !!element && element.ownerDocument.defaultView.getComputedStyle(element).display !== 'none';
+    }
+
+    function format(phrase) {
+        var args = Array.prototype.slice.call(arguments, 1);
+
+        return phrase.replace(/%(\d)/g, function (match, n) {
+            return args[Number(n) - 1];
+        });
+    }
+
+    // Runs in the frame before the page. A save the page answers by opening
+    // another page goes nowhere: location changes are what the page does
+    // after the request, which is all this harness checks.
+    function stubs() {
+        return [
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.require = function (deps, callback) { callback(window.jQuery); };',
+            'window.confirm = function (message) { window.parent.confirms.push(message);',
+            '  return window.parent.confirmAnswer; };',
+            'window.fetch = function (url, options) {',
+            '  window.parent.recorded.push({url: url, body: JSON.parse(options.body || "{}")});',
+            '  return new Promise(function () {}); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>'
+        ].join('\n');
+    }
+
+    function open(page) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.onload = function () {
+                wait(50).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs()
+                + '</head><body>' + rendered.html + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function pick(frame, value) {
+        var input = frame.contentDocument.querySelector('input[name=smaily-shape][value=' + value + ']');
+        input.checked = true;
+        frame.contentWindow.jQuery(input).trigger('change');
+    }
+
+    function click(frame, id) {
+        frame.contentWindow.jQuery('#' + id).trigger('click');
+    }
+
+    async function first(locale) {
+        var strings = window.smailyAdminPages['setup-layout-first.' + locale].strings,
+            frame = await open('setup-layout-first.' + locale),
+            doc = frame.contentDocument;
+
+        window.recorded = [];
+        window.confirms = [];
+        check(locale + ', setup: opens on the choice', shown(doc.getElementById('smaily-shape-choice')));
+        check(locale + ', setup: the steps are hidden', !shown(doc.getElementById('smaily-wizard-main')));
+        check(locale + ', setup: the bar waits for the choice', !shown(doc.querySelector('.smaily-store-shape__bar')));
+        check(locale + ', setup: asks how the websites are run',
+            text(doc.querySelector('#smaily-shape-choice h2')) === strings['How are your websites run?']);
+        check(locale + ', setup: names the websites',
+            text(doc.querySelector('#smaily-shape-choice p')) === format(
+                strings['This installation has %1 websites: %2.'], 3, 'Estonia, Latvia, Lithuania'
+            ));
+        check(locale + ', setup: one store is picked',
+            doc.querySelector('input[name=smaily-shape][value=one]').checked);
+        check(locale + ', setup: Continue', text(doc.getElementById('smaily-shape-save')) === strings.Continue);
+        check(locale + ', setup: nothing to cancel', doc.getElementById('smaily-shape-cancel') === null);
+
+        window.recorded = [];
+        click(frame, 'smaily-shape-save');
+        await wait(20);
+        check(locale + ', one store: nothing is saved', window.recorded.length === 0);
+        check(locale + ', one store: the Connect step shows', shown(doc.getElementById('smaily-wizard-main'))
+            && !shown(doc.getElementById('smaily-shape-choice')));
+        check(locale + ', one store: the bar names it',
+            shown(doc.querySelector('.smaily-store-shape__bar'))
+            && text(doc.getElementById('smaily-shape-name')) === strings['One store in several versions']);
+
+        click(frame, 'smaily-shape-change');
+        pick(frame, 'separate');
+        check(locale + ', separate stores: the copy note is for changing later only',
+            !shown(doc.getElementById('smaily-shape-to-separate')));
+        click(frame, 'smaily-shape-save');
+        await wait(20);
+        check(locale + ', separate stores: no question', window.confirms.length === 0);
+        check(locale + ', separate stores: the shape step is saved for the whole store',
+            window.recorded.length === 1
+            && window.recorded[0].body.step === 'shape'
+            && window.recorded[0].body.data.shape === 'separate'
+            && window.recorded[0].url.indexOf('savestep') !== -1);
+        frame.remove();
+    }
+
+    async function separate(page, locale, settings) {
+        var strings = window.smailyAdminPages[page + '.' + locale].strings,
+            frame = await open(page + '.' + locale),
+            doc = frame.contentDocument,
+            label = locale + ', ' + page + ': ',
+            items = doc.querySelectorAll('.smaily-website-picker__item'),
+            note;
+
+        check(label + 'the bar names separate stores',
+            text(doc.getElementById('smaily-shape-name')) === strings['Separate stores']
+            && text(doc.getElementById('smaily-shape-change')) === strings.Change);
+        check(label + 'the choice is closed', !shown(doc.getElementById('smaily-shape-choice')));
+        check(label + 'the selector lists every website', items.length === 3);
+        check(label + 'each website with its Smaily account',
+            text(items[0]) === 'Estonia shop.sendsmaily.net'
+            && text(items[1]) === 'Latvia lv-shop.sendsmaily.net'
+            && text(items[2]) === 'Lithuania ' + strings['Not set up']);
+        check(label + 'Latvia is current',
+            items[1].classList.contains('is-active') && items[1].getAttribute('aria-current') === 'page'
+            && !items[0].classList.contains('is-active'));
+        check(label + 'no website lists', doc.querySelector('.smaily-website-overrides') === null);
+        check(label + 'no "own" switch', doc.querySelector('.smaily-own-switch') === null);
+        check(label + 'no drop-down next to the tabs', doc.getElementById('smaily-website-select') === null);
+        check(label + 'per-language Smaily accounts are offered',
+            shown(doc.querySelector('input[name=smaily-w-mlmode][value=a]').closest('.smaily-choice')));
+        check(label + 'the transactional account is the website\'s own',
+            doc.getElementById('smaily-tx-website-account') !== null
+            && doc.getElementById('smaily-tx-website-account').checked
+            && !shown(doc.getElementById('smaily-tx-website-account')));
+        note = doc.getElementById('smaily-w-engine-installation');
+        check(label + 'Campaign Intelligence is one connection for every website', text(note) === format(
+            strings['Campaign Intelligence is one connection for the whole installation, whichever website you pick:'
+                + ' it covers every website (%1).'], 'Estonia, Latvia, Lithuania'
+        ));
+
+        click(frame, 'smaily-shape-change');
+        check(label + 'Change opens the choice', shown(doc.getElementById('smaily-shape-choice'))
+            && !shown(doc.querySelector('[data-shape-page]')));
+        check(label + 'separate stores is picked',
+            doc.querySelector('input[name=smaily-shape][value=separate]').checked);
+        check(label + 'Save', text(doc.getElementById('smaily-shape-save')) === strings.Save);
+        pick(frame, 'one');
+        check(label + 'one store says Latvia\'s settings become everyone\'s', text(doc.getElementById('smaily-shape-to-one'))
+            === format(strings['All websites then use the settings of %1: its Smaily account, Contacts settings and'
+                + ' automations. The other websites\' own settings are removed.'], 'Latvia')
+            && shown(doc.getElementById('smaily-shape-to-one')));
+
+        window.recorded = [];
+        window.confirms = [];
+        window.confirmAnswer = false;
+        click(frame, 'smaily-shape-save');
+        await wait(20);
+        check(label + 'asks first', window.confirms.length === 1
+            && window.confirms[0] === text(doc.getElementById('smaily-shape-to-one')));
+        check(label + 'a no saves nothing', window.recorded.length === 0);
+
+        window.confirmAnswer = true;
+        click(frame, 'smaily-shape-save');
+        await wait(20);
+        check(label + 'a yes saves one store for Latvia', window.recorded.length === 1
+            && window.recorded[0].body.step === 'shape'
+            && window.recorded[0].body.data.shape === 'one');
+
+        click(frame, 'smaily-shape-cancel');
+        check(label + 'Cancel closes the choice', !shown(doc.getElementById('smaily-shape-choice'))
+            && shown(doc.querySelector('[data-shape-page]')));
+        check(label + (settings ? 'Settings' : 'the setup') + ' keeps its page',
+            doc.getElementById(settings ? 'smaily-settings' : 'smaily-wizard') !== null);
+        frame.remove();
+    }
+
+    (async function () {
+        try {
+            for (var locale of ['en_US', 'et_EE']) {
+                await first(locale);
+                await separate('setup-separate', locale, false);
+                await separate('settings-separate', locale, true);
+            }
+        } catch (error) {
+            failures++;
+            log('FAIL ' + (error && error.stack ? error.stack : error));
+        }
+        document.getElementById('result').textContent = failures === 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks)';
+        clearInterval(keepAlive);
+    })();
+</script>
+</body>
+</html>

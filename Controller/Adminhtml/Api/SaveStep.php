@@ -19,10 +19,14 @@ use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
- * POST {step: connect|subscribers|automations|intelligence|finish, data: {...}}
+ * POST {step: connect|subscribers|automations|intelligence|finish|shape, data: {...}}
  * -> {saved: bool, errors: [{field, message}], verified?: bool, accountName?: string,
  *     storefrontUrlChanged?: bool, transactionalVerified?: bool, returnedToStoreWide?: true,
- *     ownAccountStarted?: true}
+ *     ownAccountStarted?: true, shapeChanged?: bool, websiteId?: int}
+ *
+ * The shape step (CON-279) answers the website the page opens next: the
+ * selected one, or the default website when the page set the whole store
+ * up.
  *
  * A Settings save that returned the selected website to the store-wide
  * values of a tab says so (CON-179), so the page reloads to show them; so
@@ -87,6 +91,13 @@ class SaveStep extends AbstractJsonAction implements HttpPostActionInterface
             if (is_array($data['transactional'] ?? null) && !empty($data['transactional']['enabled'])) {
                 $response['transactionalVerified'] = $this->stepSaver->isTransactionalAccepted();
             }
+        }
+        if ($step === 'shape' && $errors === []) {
+            $response['shapeChanged'] = $this->stepSaver->isShapeChanged();
+            $websiteId = $this->websiteContext->getWebsiteId();
+            $response['websiteId'] = $websiteId === WebsiteContext::STORE_WIDE
+                ? $this->websiteContext->getDefaultWebsiteId()
+                : $websiteId;
         }
         if ($step === 'finish') {
             $response['verified'] = $this->verifiedCredentials->isWebsiteVerified(

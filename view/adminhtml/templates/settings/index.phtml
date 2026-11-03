@@ -31,6 +31,13 @@
  * that moves the website onto another account than the store-wide one
  * reloads the page: its automations then start from no workflow.
  *
+ * On a store set up as separate stores (CON-279, panel/store-shape.phtml at
+ * the top, which also changes the shape) every website is shown on its own,
+ * as a single store's Settings: the website selector sits at the top with
+ * each website's Smaily account, the tabs have no "own" switch (the
+ * website's values are always its own) and the drop-down next to the tabs
+ * is not drawn.
+ *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
  */
@@ -38,12 +45,14 @@
 /** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
 $viewModel = $block->getData('view_model');
 $hasMultipleWebsites = $viewModel->hasMultipleWebsites();
+$separateStores = $hasMultipleWebsites && $viewModel->isSeparateStores();
 $websiteOptions = $viewModel->getWebsiteOptions();
 $selectedWebsiteId = $viewModel->getSelectedWebsiteId();
 
 // The "own values" switch of a tab (2+-website installs only, CON-179).
-$ownSwitch = static function (string $section, string $label) use ($viewModel, $escaper, $hasMultipleWebsites): string {
-    if (!$hasMultipleWebsites) {
+// A website of separate stores has no switch: its values are its own (CON-279).
+$ownSwitch = static function (string $section, string $label) use ($viewModel, $escaper, $hasMultipleWebsites, $separateStores): string {
+    if (!$hasMultipleWebsites || $separateStores) {
         return '';
     }
     $own = $viewModel->hasOwnValues($section);
@@ -69,13 +78,15 @@ $tabs = [
 ];
 ?>
 <div id="smaily-settings" class="smaily-ui smaily-settings">
+    <?= /* @noEscape */ $block->fetchView($block->getTemplateFile('Smaily_Connect::panel/store-shape.phtml')) ?>
+    <div data-shape-page="1">
     <div class="smaily-settings-header">
         <ul class="smaily-tabs">
             <?php foreach ($tabs as $tabId => $tabLabel): ?>
             <li data-tab="<?= $escaper->escapeHtmlAttr($tabId) ?>"><?= $escaper->escapeHtml($tabLabel) ?></li>
             <?php endforeach; ?>
         </ul>
-        <?php if ($hasMultipleWebsites): ?>
+        <?php if ($hasMultipleWebsites && !$separateStores): ?>
         <div class="smaily-website-select" id="smaily-website-select">
             <label for="smaily-website-select-input"><?= $escaper->escapeHtml(__('Website')) ?></label>
             <select id="smaily-website-select-input">
@@ -167,6 +178,7 @@ $tabs = [
             </button>
             <span class="smaily-result" id="smaily-w-rss-result"></span>
         </div>
+    </div>
     </div>
 </div>
 

@@ -152,6 +152,15 @@ class WebsiteContext
         return $this->requestedId;
     }
 
+    /**
+     * The installation's default website — the one a page that names no
+     * website shows.
+     */
+    public function getDefaultWebsiteId(): int
+    {
+        return $this->defaultWebsiteId();
+    }
+
     private function defaultWebsiteId(): int
     {
         try {

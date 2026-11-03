@@ -12,6 +12,7 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\Adminhtml\TransactionalSettingsSaver;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Automation\MappingSaver;
@@ -44,6 +45,9 @@ class TransactionalSettingsSaverTest extends TestCase
 
     /** @var SmailyClient&\PHPUnit\Framework\MockObject\MockObject */
     private $client;
+
+    /** @var StoreLayout&\PHPUnit\Framework\MockObject\MockObject */
+    private $storeLayout;
 
     /** @var array<string, array{value: mixed, scope: string, scopeId: int}> path@scope/id => write */
     private array $saved = [];
@@ -86,6 +90,7 @@ class TransactionalSettingsSaverTest extends TestCase
         $this->config = $this->createMock(Config::class);
         $this->websiteContext = $this->createMock(WebsiteContext::class);
         $this->mappingSaver = $this->createMock(MappingSaver::class);
+        $this->storeLayout = $this->createMock(StoreLayout::class);
         $this->client = $this->createMock(SmailyClient::class);
         $clientFactory = $this->createMock(SmailyClientFactory::class);
         $clientFactory->method('create')->willReturn($this->client);
@@ -97,7 +102,8 @@ class TransactionalSettingsSaverTest extends TestCase
             $this->config,
             $this->websiteContext,
             new CredentialCheck($clientFactory, $this->config),
-            $this->mappingSaver
+            $this->mappingSaver,
+            $this->storeLayout
         );
     }
 
@@ -117,6 +123,25 @@ class TransactionalSettingsSaverTest extends TestCase
         self::assertContains(Config::XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT . '@websites/3', $this->deleted);
         self::assertTrue($this->saver->isAccountAccepted());
         self::assertSame('1', $this->saved[Config::XML_PATH_TRANSACTIONAL_ENABLED . '@websites/3']);
+    }
+
+    /**
+     * CON-279: a website of separate stores always saves its own account,
+     * with no "Use a separate account for this website" posted.
+     */
+    public function testAWebsiteOfSeparateStoresSavesItsOwnAccount(): void
+    {
+        $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
+        $this->websiteContext->method('getWebsiteId')->willReturn(self::WEBSITE_ID);
+        $this->storeLayout->method('isSeparateStores')->willReturn(true);
+        $account = ['enabled' => true, 'subdomain' => 'shop-tx', 'username' => 'api', 'password' => 'secret'];
+
+        self::assertSame([], $this->saver->accountErrors($account, self::WEBSITE_ID));
+        $this->saver->saveAccount($account, self::WEBSITE_ID);
+
+        self::assertSame('shop-tx', $this->saved[Config::XML_PATH_TRANSACTIONAL_SUBDOMAIN . '@websites/3']);
+        self::assertSame('1', $this->saved[Config::XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT . '@websites/3']);
+        self::assertArrayNotHasKey(Config::XML_PATH_TRANSACTIONAL_SUBDOMAIN . '@default/0', $this->saved);
     }
 
     /**

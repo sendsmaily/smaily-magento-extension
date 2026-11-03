@@ -358,6 +358,22 @@ $intelligenceViewModel = static fn (
     /**
      * @return bool
      */
+    public function isWebsiteSetUp(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isShapeChoiceFirst(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return bool
+     */
     public function isSetupCompleted(): bool
     {
         return true;
@@ -763,6 +779,14 @@ $transactionalViewModel = static fn (bool $connected): object => new class ($con
     }
 
     /**
+     * @return bool
+     */
+    public function isSeparateStores(): bool
+    {
+        return false;
+    }
+
+    /**
      * @return string[]
      */
     public function getDetectedLanguages(): array
@@ -1056,6 +1080,39 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
     public function getWebsiteQuery(): array
     {
         return ['_query' => ['website' => $this->storeWide ? 0 : 2]];
+    }
+
+    /**
+     * @return bool
+     */
+    public function isWebsiteSetUp(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isShapeChoiceFirst(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSeparateStores(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return array<int, array{name: string, subdomain: string}>
+     */
+    public function getWebsiteAccounts(): array
+    {
+        return [1 => ['name' => 'Estonia', 'subdomain' => 'shop'], 2 => ['name' => 'Latvia', 'subdomain' => 'lv-shop'],
+            3 => ['name' => 'Lithuania', 'subdomain' => '']];
     }
 
     /**
@@ -1370,6 +1427,14 @@ $reopenedViewModel = static fn (bool $storeWideAccount): object => new class (
     /**
      * @return bool
      */
+    public function isWebsiteSetUp(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return bool
+     */
     public function isSetupCompleted(): bool
     {
         return true;
@@ -1514,6 +1579,114 @@ $pages['settings-own-account'] = [
             . ' picked from its own account.'
             . ' No automation starts on it until you pick its workflows below and save.',
     ],
+];
+
+/*
+ * How the websites are run (CON-279) on the same three-website store. The
+ * setup-layout-first page renders the initial setup of a store whose layout
+ * is not known yet: it opens on the choice. The setup-separate and
+ * settings-separate pages render the initial setup and Settings of a store
+ * set up as separate stores, for Latvia: each website is a store of its own
+ * (Lithuania has no Smaily account yet), with the Connect step and the
+ * Connection tab, the transactional-email account and Campaign Intelligence.
+ */
+$layoutViewModel = static fn (bool $storeWide, bool $first, bool $separate): object => new class (
+    $websitesViewModel($storeWide),
+    $first,
+    $separate
+) {
+    /**
+     * @param object $inner
+     * @param bool $first
+     * @param bool $separate
+     */
+    public function __construct(
+        private readonly object $inner,
+        private readonly bool $first,
+        private readonly bool $separate
+    ) {
+    }
+
+    /**
+     * @param string $name
+     * @param array<int, mixed> $arguments
+     * @return mixed
+     */
+    public function __call(string $name, array $arguments): mixed
+    {
+        return $this->inner->$name(...$arguments);
+    }
+
+    /**
+     * @return bool
+     */
+    public function isShapeChoiceFirst(): bool
+    {
+        return $this->first;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSeparateStores(): bool
+    {
+        return $this->separate;
+    }
+
+    /**
+     * @param string $section
+     * @return bool
+     */
+    public function hasOwnValues(string $section): bool
+    {
+        return $this->separate || $this->inner->hasOwnValues($section);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getTransactionalAccount(): array
+    {
+        return ['websiteAccount' => $this->separate] + $this->inner->getTransactionalAccount();
+    }
+};
+$layoutStrings = [
+    'Your websites',
+    'One store in several versions',
+    'Separate stores',
+    'Change',
+    'Not set up',
+    'How are your websites run?',
+    'This installation has %1 websites: %2.',
+    'Each website keeps the settings it uses now, as its own. Change them for each website afterwards.',
+    'All websites then use the settings of %1: its Smaily account, Contacts settings and automations. The other'
+        . ' websites\' own settings are removed.',
+    'Campaign Intelligence is one connection for the whole installation, whichever website you pick: it covers every'
+        . ' website (%1).',
+    'Continue',
+    'Save',
+    'Websites with their own values',
+    'Use its own Smaily account on this website',
+];
+$pages['setup-layout-first'] = [
+    'viewModel' => $layoutViewModel(true, true, false),
+    'strings' => $layoutStrings,
+] + $pages['setup-websites'];
+$pages['setup-separate'] = [
+    'viewModel' => $layoutViewModel(false, false, true),
+    'strings' => $layoutStrings,
+] + $pages['setup-websites'];
+$pages['settings-separate'] = [
+    'template' => $root . '/view/adminhtml/templates/settings/index.phtml',
+    'viewModel' => $layoutViewModel(false, false, true),
+    'data' => ['context' => 'settings', 'children' => [
+        'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
+        'panel.transactional.account' => $root . '/view/adminhtml/templates/panel/transactional-account.phtml',
+        'panel.subscribers' => $root . '/view/adminhtml/templates/panel/subscribers.phtml',
+        'panel.intelligence' => $root . '/view/adminhtml/templates/panel/intelligence.phtml',
+        'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+    ]],
+    'strings' => $layoutStrings,
 ];
 
 /*

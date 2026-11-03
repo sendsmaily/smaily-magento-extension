@@ -17,6 +17,7 @@ use Magento\Store\Model\Website;
 use Smaily\Connect\Model\Automation\Mapping;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Config\Source\MultilingualMode;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
 use Smaily\Connect\Model\SubdomainNormalizer;
 
@@ -76,6 +77,13 @@ class WebsiteOverrides
             Config::XML_PATH_ABANDONED_COUPON_RULE,
             Config::XML_PATH_ABANDONED_COUPON_DAYS,
         ],
+    ];
+
+    /** The automations' workflows in system config. */
+    private const WORKFLOW_PATHS = [
+        Config::XML_PATH_WELCOME_WORKFLOW,
+        Config::XML_PATH_FIRST_ORDER_WORKFLOW,
+        Config::XML_PATH_ABANDONED_WORKFLOW,
     ];
 
     private const STORE_VIEW_CREDENTIALS = [
@@ -207,6 +215,228 @@ class WebsiteOverrides
         $username = trim((string)($values[Config::XML_PATH_USERNAME] ?? ''));
 
         return $subdomain === '' || $username === '' ? null : [$subdomain, $username];
+    }
+
+    /**
+     * Whether the websites of a 2+-website install hold separate Smaily
+     * accounts (CON-279, CON-192): no store-wide Smaily account is saved,
+     * and at least two websites hold different accounts of their own (each
+     * one's own subdomain and API username). Then each website sends with
+     * its own account, as separate stores do. Websites that all hold the
+     * same account of their own (a 2.8.x upgrade often saved it on every
+     * website) are one store, and so is a store where one website holds an
+     * account and the others none (a one-website store in per-language
+     * accounts mode that gains a second website).
+     */
+    public function holdsSeparateAccounts(): bool
+    {
+        $websiteIds = $this->websiteIds();
+        if (count($websiteIds) < 2 || $this->storeWideAccount() !== null) {
+            return false;
+        }
+        $own = $this->ownValues(self::CONNECTION);
+        $accounts = [];
+        foreach ($websiteIds as $websiteId) {
+            $subdomain = $this->normalizer->normalize((string)($own[$websiteId][Config::XML_PATH_SUBDOMAIN] ?? ''));
+            $username = trim((string)($own[$websiteId][Config::XML_PATH_USERNAME] ?? ''));
+            if ($subdomain !== '' || $username !== '') {
+                $accounts[$subdomain . "\n" . $username] = true;
+            }
+        }
+
+        return count($accounts) > 1;
+    }
+
+    /**
+     * Whether a store-wide Smaily account (subdomain and API username at the
+     * default scope) is saved.
+     */
+    public function hasStoreWideAccount(): bool
+    {
+        return $this->storeWideAccount() !== null;
+    }
+
+    /**
+     * Gives a website, as its own values, every store-wide value of the
+     * section it does not hold yet (CON-279): each default-scope row is
+     * copied to its website scope as stored (the password stays
+     * encrypted), and for the automations each store-wide mapping row
+     * (website 0) it has no row of its own for. What the website reads does
+     * not change.
+     *
+     * With $storeWideWorkflows false (a website on another Smaily account
+     * than the store-wide one, CON-190, which never started the store-wide
+     * workflows) a workflow it does not hold is saved as none, and no
+     * store-wide mapping row is copied.
+     */
+    public function copyStoreWideToWebsite(string $section, int $websiteId, bool $storeWideWorkflows = true): void
+    {
+        $own = $this->ownValues($section)[$websiteId] ?? [];
+        $storeWide = $this->storeWideValues($section);
+        $noWorkflow = $section === self::AUTOMATIONS && !$storeWideWorkflows ? self::WORKFLOW_PATHS : [];
+        foreach (self::PATHS[$section] as $path) {
+            if (array_key_exists($path, $own)) {
+                continue;
+            }
+            if (in_array($path, $noWorkflow, true)) {
+                $this->configWriter->save($path, '0', ScopeInterface::SCOPE_WEBSITES, $websiteId);
+            } elseif (array_key_exists($path, $storeWide)) {
+                $this->configWriter->save($path, $storeWide[$path], ScopeInterface::SCOPE_WEBSITES, $websiteId);
+            }
+        }
+        if ($section === self::AUTOMATIONS && $storeWideWorkflows) {
+            $this->copyMappingRows(0, $websiteId);
+        }
+    }
+
+    /**
+     * Makes a website's values of the section the store-wide ones (CON-279,
+     * separate stores back to one store): each of its own rows is written
+     * at the default scope as stored, and for the automations its own
+     * mapping rows join the store-wide rows (website 0), its own winning.
+     * The store-wide values never take per-language Smaily accounts: mode A
+     * becomes Single language there, and the rows of the per-language
+     * accounts stay the website's. The website's own values stay until
+     * removeOwnValues().
+     */
+    public function promoteToStoreWide(string $section, int $websiteId): void
+    {
+        foreach ($this->ownValues($section)[$websiteId] ?? [] as $path => $value) {
+            if ($path === 'mappings') {
+                continue;
+            }
+            if ($path === Config::XML_PATH_MULTILINGUAL_MODE && $value === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS) {
+                $value = MultilingualMode::MODE_SINGLE;
+            }
+            $this->configWriter->save($path, $value);
+        }
+        if ($section === self::AUTOMATIONS) {
+            $this->copyMappingRows($websiteId, 0, true);
+        }
+    }
+
+    /**
+     * Removes the store-wide values of the section (CON-279, one store to
+     * separate stores, once every website holds them as its own): its
+     * default-scope rows, and for the automations the store-wide mapping
+     * rows (website 0), the transactional ones apart.
+     */
+    public function removeStoreWideValues(string $section): void
+    {
+        foreach (self::PATHS[$section] as $path) {
+            $this->configWriter->delete($path);
+        }
+        if ($section === self::AUTOMATIONS) {
+            $this->resource->getConnection()->delete(
+                $this->resource->getTableName(MappingResource::TABLE_NAME),
+                [
+                    'website_id = ?' => 0,
+                    'trigger_type IN (?)' => Trigger::ALL,
+                    'account_key <> ?' => Mapping::ACCOUNT_TRANSACTIONAL,
+                ]
+            );
+        }
+    }
+
+    /**
+     * The section's default-scope rows, path => value as stored.
+     *
+     * @return array<string, string>
+     */
+    private function storeWideValues(string $section): array
+    {
+        $connection = $this->resource->getConnection();
+        $values = [];
+        foreach ($connection->fetchPairs(
+            $connection->select()
+                ->from($this->resource->getTableName('core_config_data'), ['path', 'value'])
+                ->where('scope = ?', ScopeConfigInterface::SCOPE_TYPE_DEFAULT)
+                ->where('scope_id = ?', 0)
+                ->where('path IN (?)', self::PATHS[$section])
+        ) as $path => $value) {
+            $values[(string)$path] = (string)$value;
+        }
+
+        return $values;
+    }
+
+    /**
+     * Copies the non-transactional mapping rows of one website id to
+     * another. A row the target holds for the same trigger, language and
+     * account stays, unless $replace; a copied row is a trigger's default
+     * fallback only where the target holds no fallback of that kind (the
+     * one account's rows, or the per-language accounts' rows) for the
+     * trigger, so the Router still finds one fallback.
+     */
+    private function copyMappingRows(int $fromWebsiteId, int $toWebsiteId, bool $replace = false): void
+    {
+        $connection = $this->resource->getConnection();
+        $table = $this->resource->getTableName(MappingResource::TABLE_NAME);
+        $rows = static fn (int $websiteId, bool $oneAccountOnly): array => $connection->fetchAll(
+            $connection->select()
+                ->from($table, ['trigger_type', 'language', 'account_key', 'workflow_id', 'is_default_fallback'])
+                ->where('website_id = ?', $websiteId)
+                ->where('trigger_type IN (?)', Trigger::ALL)
+                ->where(
+                    $oneAccountOnly ? 'account_key = ?' : 'account_key <> ?',
+                    $oneAccountOnly ? Mapping::ACCOUNT_DEFAULT : Mapping::ACCOUNT_TRANSACTIONAL
+                )
+        );
+        $key = static fn (array $row): string => $row['trigger_type'] . "\n" . $row['language'] . "\n"
+            . $row['account_key'];
+        $kind = static fn (array $row): string => $row['trigger_type'] . "\n"
+            . ($row['account_key'] === Mapping::ACCOUNT_DEFAULT ? 'one' : 'per-language');
+
+        // The store-wide rows never name a per-language account.
+        $source = $rows($fromWebsiteId, $toWebsiteId === 0);
+        if ($source === []) {
+            return;
+        }
+        $held = [];
+        $fallbacks = [];
+        foreach ($rows($toWebsiteId, false) as $row) {
+            $held[$key($row)] = true;
+            if ((int)$row['is_default_fallback'] === 1) {
+                $fallbacks[$kind($row)] = true;
+            }
+        }
+        if ($replace) {
+            // The copied rows win: a fallback among them takes over its kind.
+            foreach ($source as $row) {
+                if ((int)$row['is_default_fallback'] !== 1) {
+                    continue;
+                }
+                $where = ['website_id = ?' => $toWebsiteId, 'trigger_type = ?' => $row['trigger_type']];
+                if ($row['account_key'] === Mapping::ACCOUNT_DEFAULT) {
+                    $where['account_key = ?'] = Mapping::ACCOUNT_DEFAULT;
+                } else {
+                    $where['account_key NOT IN (?)'] = [Mapping::ACCOUNT_DEFAULT, Mapping::ACCOUNT_TRANSACTIONAL];
+                }
+                $connection->update($table, ['is_default_fallback' => 0], $where);
+                unset($fallbacks[$kind($row)]);
+            }
+        }
+        foreach ($source as $row) {
+            if (isset($held[$key($row)]) && !$replace) {
+                continue;
+            }
+            $fallback = (int)$row['is_default_fallback'] === 1 && !isset($fallbacks[$kind($row)]);
+            if ($fallback) {
+                $fallbacks[$kind($row)] = true;
+            }
+            $connection->insertOnDuplicate(
+                $table,
+                [
+                    'website_id' => $toWebsiteId,
+                    'trigger_type' => $row['trigger_type'],
+                    'language' => $row['language'],
+                    'account_key' => $row['account_key'],
+                    'workflow_id' => (int)$row['workflow_id'],
+                    'is_default_fallback' => $fallback ? 1 : 0,
+                ],
+                ['workflow_id', 'is_default_fallback']
+            );
+        }
     }
 
     /**

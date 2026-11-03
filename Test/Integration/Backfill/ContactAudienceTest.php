@@ -30,6 +30,7 @@ use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\OrderOrigin;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory as MappingCollectionFactory;
+use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
 use Smaily\Connect\ViewModel\Adminhtml\WizardData;
@@ -143,7 +144,8 @@ class ContactAudienceTest extends IntegrationTestCase
             $this->createMock(SetupGuard::class),
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(RuleSource::class),
-            $this->createMock(StoreDate::class)
+            $this->createMock(StoreDate::class),
+            $this->createMock(StoreLayout::class)
         );
 
         $walked = [];

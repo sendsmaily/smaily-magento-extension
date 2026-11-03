@@ -7,48 +7,38 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-11-03 — **3.0.0-rc21 cut on `master`: a customer
-who logs in with marketing consent is sent to the engine before their
-login is linked, and the live customer sync sends only the customers in
-the Customers-import scope.**
-**3.0.0-rc21 is cut** on `master` (the version-cut PR
-`release/3.0.0-rc21`); its tag waits for Erkki (CLAUDE.md "Release cut").
-3.0.0-rc20 is released (Erkki's tag, 2026-11-02: the release workflow
-was green, both ZIPs were attached, the Hyvä mirror was tagged and
-Packagist showed rc20). The cut collects 2 fragments into CHANGELOG's
-"Changes since 3.0.0-rc20" (CON-262, then CON-266). It adds
-cross-references to two earlier bullets that became untrue: the rc20
-login-token and identity-merge bullet (under "Changes since
-3.0.0-rc19": a consenting customer the engine did not have saw no own
-recommendations after logout, and **Retry** "now sends" a failed merge,
-which still failed with "customer not found" for a customer the engine
-did not have), and the fail-at-once bullet (under "Changes since
-3.0.0-rc7": every refused identity merge failed at once; since rc21 a
-"customer not found" merge is sent again once after the store has sent
-the customer).
+_Last updated: 2026-11-03 — **3.0.0-rc21 is released; on `master` since
+then: sending with the workflow the engine pushed (CON-258) and contract
+1.24.0.**
+**3.0.0-rc21 is released** (Erkki's tag, 2026-11-03: the release
+workflow was green, both ZIPs and their `.sha256` were attached, the
+Hyvä mirror was tagged and Packagist showed rc21 for both packages).
 
-**On `master` since the rc20 cut (all in rc21):**
-- #241 CON-262: contract 1.23.0's group (c) — a consenting login (the
-  consent check and Storefront URL rule of the login token) marks the
-  merge row, and `IdentityMergeHandler` sends the customer with §4
-  (`MergeCustomerSender`) right before the §7 merge in the same run, so
-  the order holds whatever the crons do. On a §7 404 the row remembers
-  it and retries the merge once, only after §4 took the customer. A
-  merge whose customer the store does not send, or that still finds no
-  customer, is parked with a translated reason (3 new et_EE strings);
-  **Retry** links the login once the customer is sent, also for rows a
-  404 parked before rc21.
-- #242 CON-266: the live customer sync applies the import's scope
-  (Erkki, 2026-11-02): `Engine\CustomerIngest` queues an account save
-  only for a customer in group (a) or (b)
-  (`EngineCustomerScope::includes()`, the import's query for one id,
-  read with the import's horizon), or for the shopper's own save while
-  logged in with marketing consent on Magento's pages
-  (`ConsentingShopper`). A customer who joins the scope is sent then: a
-  subscription the contact sync sends (`Observer\Engine\SubscriberJoined`)
-  or a new order (`OrderSaveAfter`). A sync-mode change sends nobody
-  live; the Customers card's **Run again** does. Nothing removes a
-  customer from the engine. Mirrors Woo CON-246, except group (c).
+**On `master` since the rc21 cut (unreleased):**
+- #245: contract 1.24.0 (INT-193), byte-copied. No shape change the
+  extension relies on: catalog and browse take 1–1000 items a request
+  (100 recommended; the extension already sends at most 100), every bad
+  key answers one `401 unauthorised` (no more `api_key_revoked` /
+  `regenerate_url`; the extension handles every 401 alike), browse
+  `sku` / `category_path` / `search_query` are SHOULD, `merge_ts` is
+  optional, catalog `200`s carry `unmapped_attributes` (not read), and
+  timestamps with a UTC offset are accepted (the extension keeps sending
+  `Z`). Still no ingest pace named (`IngestPace`).
+- #244 CON-258: every §23 read stores each email's pushed workflow id
+  and Smaily account (`Engine\EmailDesignWorkflows`,
+  `smaily_connect/intelligence/email_workflows`; a new connection and a
+  disconnect clear it). **Welcome**, **First order** and **Abandoned
+  cart** start with it only when the account that sends the email holds
+  it and the email goes in the website's default language (its default
+  store view's), as in WooCommerce (CON-218); `PushedWorkflow`, asked by
+  `AutomationHandler` after `clientFor()`. Null ids (today) change
+  nothing. Transactional ids are stored, not read.
+
+**Decided (Erkki, 2026-11-03):** the Estonian texts of CON-253, CON-256,
+CON-257, CON-260, CON-262 and CON-266 are approved. An email card whose
+§23 item has `created_by: "other"` keeps **Edit design**, as in
+WooCommerce; the contract's "link to Smaily" rule waits until the engine
+announces `created_by` and the contract names the address.
 
 **Pilot:** the first pilot store (still on rc12) upgrades directly to
 rc21. Then it presses **Run again** under **Settings > Intelligence**
@@ -57,41 +47,41 @@ on **Catalog**, **Customers** and **Orders**, in that order, and
 the Log. The second pilot store's state is unchanged (rc12). The gauge
 is CON-147 (4/5).
 
-**Gotchas:** the rc18, rc19 and rc20 gotchas hold (the shared-browser
-`smaily_rec_uid` token after logout is accepted). Since rc21 a customer
-account saved in the admin, an API or a cron job reaches the engine
-only while the customer is in group (a) or (b); a group (c)-only
-customer's change goes at their next consenting login. Fewer customers
-reach the engine than before; none is removed.
+**Gotchas:** the rc18–rc21 gotchas hold. The integration harness has a
+`TypeListInterface` preference (`FakeCacheTypeList`), so a class that
+cleans the config cache can be built there.
 
 **Open:** CON-209 (the 3.0.0 gate), CON-230 (the engine-page modal;
 waits for INT-180), CON-234 (the installation report; waits for
 INT-186), CON-237 (an own engine store per Smaily account; later),
 CON-252 (address normalisation is ASCII-only; Low; needs agreement with
-the engine), CON-258 (sending with the pushed workflow; before the
-engine push goes live), CON-265 (`ImportPaceTest:124` fails now and
-then on a local run; passes alone), CON-146 (native-speaker review of
-ru/fi/lv/lt), CON-168, and the Estonian proofreads: the new CON-253
-guide paragraphs in `#setup-website`, the CON-256 guide sentences (the
-step 3 sentence, the "Kaart avaneb, kui märgid Lubatud" note in
-Automaatikad, the discount code wording and its new item, the
-transactional sentence and the new Campaign Intelligence item), the
-CON-257 admin strings (20) and the `#set-email-design` guide section,
-the CON-260 guide text, the CON-262 Log reasons (3 et_EE strings) and
-guide text (the Kliendid row of "Mida imporditakse", three rows in
-"Campaign Intelligence'i vead"), and the CON-266 guide text (the
-"Seadista" go-live paragraph, the Kliendid row). Follow-up: **Run
-again** restarts from row 1.
+the engine), CON-265 (`ImportPaceTest:124` fails now and then on a
+local run; in progress), CON-192 (no store-wide login, different
+accounts per website; Low), CON-163 (pinned engine URLs; waits for the
+engine), CON-146 (native-speaker review of ru/fi/lv/lt), CON-168, and
+the Estonian proofread of the CON-258 `#set-email-design` paragraph.
+Follow-up: **Run again** restarts from row 1.
 
 **Next session opens with:**
-1. Erkki tags rc21.
-2. The first pilot store upgrades to rc21, presses **Run again** on
+1. The first pilot store upgrades to rc21, presses **Run again** on
    **Catalog**, **Customers** and **Orders**, in that order, and
    presses **Retry** on its failed identity merges in the Log.
-3. Watch its history progress reach `start_part_complete` in the
+2. Watch its history progress reach `start_part_complete` in the
    engine, and check that its identity merges now reach the engine.
 
-**Notes for the next version cut (rc22):** none so far._
+**Notes for the next version cut (rc22):** CON-258 has a fragment; no
+earlier bullet is known to need a change._
+
+_Earlier (2026-11-03, the 3.0.0-rc21 cut): 3.0.0-rc21 was cut (#243)
+and tagged by Erkki the same day. It collected 2 fragments (CON-262,
+CON-266) and added cross-references to the rc20 login-token bullet and
+the rc7 fail-at-once bullet. In rc21 since rc20: #241 CON-262 (a
+customer who logs in with marketing consent is sent with §4 right before
+the §7 merge; a 404 merge retries once after §4 took the customer),
+#242 CON-266 (the live customer sync sends only groups (a), (b) and the
+consenting shopper's own save; a subscription or a new order sends a
+customer who joins). Decided (Erkki, 2026-11-02): the live sync applies
+the import's scope._
 
 _Earlier (2026-11-02, the 3.0.0-rc20 cut): 3.0.0-rc20 was cut (#240)
 and tagged by Erkki the same day (the release workflow was green, both

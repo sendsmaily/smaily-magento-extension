@@ -12,6 +12,7 @@ use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Smaily\Connect\Api\Queue\PausableEventHandlerInterface;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\MergeCustomerSender;
@@ -108,7 +109,8 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
         private readonly CustomerRepositoryInterface $customerRepository,
         private readonly Logger $logger,
         private readonly MergeCustomerSender $customerSender,
-        private readonly IngestQueue $ingestQueue
+        private readonly IngestQueue $ingestQueue,
+        private readonly Connections $connections
     ) {
     }
 
@@ -280,7 +282,12 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
      */
     private function isQueuedCustomer(int $customerId): bool
     {
-        return $customerId > 0 && $this->ingestQueue->hasRow(Client::DOMAIN_CUSTOMERS, (string)$customerId);
+        // The primary connection's rows (CON-237; the row's own connection is a later step).
+        return $customerId > 0 && $this->ingestQueue->hasRow(
+            Client::DOMAIN_CUSTOMERS,
+            (string)$customerId,
+            $this->connections->primary()
+        );
     }
 
     /**

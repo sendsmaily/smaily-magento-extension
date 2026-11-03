@@ -29,6 +29,7 @@ use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-241 (contract v1.20.0 §4): the customers import sends the customers
@@ -44,6 +45,8 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  */
 class EngineCustomerScopeTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     private const MONTH = 30 * 86400;
 
     private SchemaInstaller $schema;
@@ -222,7 +225,8 @@ class EngineCustomerScopeTest extends IntegrationTestCase
             $this->scope(),
             $historyImport,
             $shopper,
-            $repository
+            $repository,
+            $this->oneEngineConnection($settings)
         );
     }
 

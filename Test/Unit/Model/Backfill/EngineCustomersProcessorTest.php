@@ -24,6 +24,8 @@ use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\SkippedRow;
 use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
+use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-227: a customer whose row Magento cannot read is skipped and counted
@@ -33,6 +35,8 @@ use Smaily\Connect\Model\Engine\Queue\IngestQueue;
  */
 class EngineCustomersProcessorTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     public function testACustomerMagentoCannotReadIsSkippedAndTheImportGoesOn(): void
     {
         $builder = $this->createMock(CustomerPayloadBuilder::class);
@@ -100,7 +104,8 @@ class EngineCustomersProcessorTest extends TestCase
             $skippedRow,
             $scope,
             $historyImport,
-            new ImportClock()
+            new ImportClock(),
+            $this->oneEngineConnection($this->createMock(Settings::class))
         ))->process($job);
 
         self::assertSame([['21', 6], ['23', 6]], $enqueued);

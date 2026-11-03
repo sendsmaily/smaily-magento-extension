@@ -47,6 +47,12 @@ class ProfilingConsentTest extends TestCase
     /** @var string[] consent-row entities with a profiling opt-out already waiting in the queue */
     private array $waitingOptOuts = [];
 
+    /** @var int[] the website id of each consent row queued, in order */
+    private array $enqueuedWebsites = [];
+
+    /** @var array<int, int|null> the website each waiting check asked about */
+    private array $waitingWebsites = [];
+
     /** @var array<string, string> */
     private array $cache = [];
 
@@ -565,6 +571,23 @@ class ProfilingConsentTest extends TestCase
         ]], $this->enqueued);
     }
 
+    /**
+     * CON-237: the opt-out goes to the Campaign Intelligence connection
+     * whose engine store confirmed the shopper, and only that
+     * connection's waiting rows hold it back; the primary's rows carry
+     * website 0, as every consent row did before.
+     */
+    public function testAnOptOutIsSentAgainToTheConnectionThatConfirmedTheShopper(): void
+    {
+        $this->records['u1@example.invalid'] = self::NOW - 3600;
+
+        $this->consent()->resendOptOuts(['u1@example.invalid'], 2);
+        $this->consent()->resendOptOuts(['u1@example.invalid']);
+
+        self::assertSame([2, 0], $this->enqueuedWebsites);
+        self::assertSame([2, 0], $this->waitingWebsites);
+    }
+
     public function testAShopperWhoDidNotOptOutGetsNoConsentCall(): void
     {
         $this->consent()->resendOptOuts(['u2@example.invalid', '']);
@@ -629,14 +652,19 @@ class ProfilingConsentTest extends TestCase
 
         $eventQueue = $this->createMock(EventQueue::class);
         $eventQueue->method('enqueue')->willReturnCallback(
-            function (string $eventType, array $payload, ?string $entityId = null): bool {
+            function (string $eventType, array $payload, ?string $entityId = null, int $websiteId = 0): bool {
                 $this->enqueued[] = ['event_type' => $eventType, 'payload' => $payload, 'entity_id' => $entityId];
+                $this->enqueuedWebsites[] = $websiteId;
 
                 return true;
             }
         );
         $eventQueue->method('waitingProfilingOptOuts')->willReturnCallback(
-            fn (array $entityIds): array => array_values(array_intersect($entityIds, $this->waitingOptOuts))
+            function (array $entityIds, ?int $websiteId = null): array {
+                $this->waitingWebsites[] = $websiteId;
+
+                return array_values(array_intersect($entityIds, $this->waitingOptOuts));
+            }
         );
 
         $optOuts = $this->createMock(ProfilingOptOuts::class);

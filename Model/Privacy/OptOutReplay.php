@@ -9,13 +9,16 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Privacy;
 
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connection;
 
 /**
  * A customer or an order the engine confirmed has its shopper's stored
  * profiling opt-out sent again (PRO-3760): the engine kept no opt-out made
  * before it knew the shopper, and customer and order data carry no consent.
  * The ingest flusher (Cron\FlushIngestQueue) hands over each batch's
- * confirmed items; ProfilingConsent::resendOptOuts() decides what goes.
+ * confirmed items and the connection whose engine store confirmed them;
+ * ProfilingConsent::resendOptOuts() decides what goes, to that connection
+ * (CON-237).
  */
 class OptOutReplay
 {
@@ -36,17 +39,21 @@ class OptOutReplay
     /**
      * @param string $domain the ingest domain of the batch
      * @param array<int, array<string, mixed>> $confirmedItems the items the engine took, as sent
+     * @param Connection $connection the connection the batch went to
      */
-    public function afterConfirmed(string $domain, array $confirmedItems): void
+    public function afterConfirmed(string $domain, array $confirmedItems, Connection $connection): void
     {
         $emailField = self::SHOPPER_EMAIL_FIELDS[$domain] ?? null;
         if ($emailField === null || !$confirmedItems) {
             return;
         }
 
-        $this->profilingConsent->resendOptOuts(array_map(
-            static fn (array $item): string => (string)($item[$emailField] ?? ''),
-            array_values($confirmedItems)
-        ));
+        $this->profilingConsent->resendOptOuts(
+            array_map(
+                static fn (array $item): string => (string)($item[$emailField] ?? ''),
+                array_values($confirmedItems)
+            ),
+            $connection->eventWebsiteId()
+        );
     }
 }

@@ -638,3 +638,5 @@
 "Your Smaily subdomain. For example, if your Smaily URL is https://demo.sendsmaily.net, enter ""demo"". Pasting the full URL also works.","Your Smaily subdomain. For example, if your Smaily URL is https://demo.sendsmaily.net, enter ""demo"". Pasting the full URL also works."
 "Your store views speak %1 languages (%2). Pick how contacts and automations should route between them — the sections below adapt right away.","Your store views speak %1 languages (%2). Pick how contacts and automations should route between them — the sections below adapt right away."
 "Your store’s connection to Campaign Intelligence, storefront browse tracking and historical imports.","Your store’s connection to Campaign Intelligence, storefront browse tracking and historical imports."
+"Campaign Intelligence store","Campaign Intelligence store"
+"None: no Campaign Intelligence store is connected for this row's website.","None: no Campaign Intelligence store is connected for this row's website."

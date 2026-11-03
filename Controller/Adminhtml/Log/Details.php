@@ -18,6 +18,7 @@ use Magento\Framework\UrlInterface;
 use Magento\Framework\View\LayoutInterface;
 use Smaily\Connect\Model\Log\AccountWait;
 use Smaily\Connect\Model\Log\AttemptHistory;
+use Smaily\Connect\Model\Log\EngineStore;
 use Smaily\Connect\Model\Log\EntityLabel;
 use Smaily\Connect\Model\Log\FailureMessage;
 use Smaily\Connect\Model\Log\PayloadRedactor;
@@ -39,7 +40,9 @@ use Smaily\Connect\Ui\Component\QueueStatusOptions;
  * The panel (PRO-3565) heads with the event id and its status pill, lists
  * the attempts in order and ends with "Send again" — offered only for a row
  * the guard clears, so the panel can never double-send — and "Copy payload",
- * which copies the redacted payload the panel shows.
+ * which copies the redacted payload the panel shows. While the installation
+ * has more than one Campaign Intelligence connection, an engine row names
+ * the engine store it goes to (Log\EngineStore, CON-237).
  */
 class Details extends Action implements HttpGetActionInterface
 {
@@ -59,7 +62,8 @@ class Details extends Action implements HttpGetActionInterface
         private readonly AttemptHistory $attemptHistory,
         private readonly StatusPill $statusPill,
         private readonly UrlInterface $urlBuilder,
-        private readonly AccountWait $accountWait
+        private readonly AccountWait $accountWait,
+        private readonly EngineStore $engineStore
     ) {
         parent::__construct($context);
     }
@@ -109,6 +113,7 @@ class Details extends Action implements HttpGetActionInterface
             'status_pill' => $this->statusPill->variant((string)($row['status'] ?? '')),
             'history' => $this->attemptHistory->entries($row),
             'waits_for_account' => $this->accountWait->waits($row),
+            'engine_store' => $row ? $this->engineStore->label($row) : null,
             // The same rule as the grid's "Send again" action (LogActions):
             // only a row the guard asked about AND cleared.
             'resend_url' => $row && $reason === ''

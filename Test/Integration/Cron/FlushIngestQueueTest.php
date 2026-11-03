@@ -23,6 +23,7 @@ use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\OptOutReplay;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * The engine ingest flush cron against a real queue table with the HTTP
@@ -30,6 +31,8 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
  */
 class FlushIngestQueueTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     private IngestQueue $queue;
 
     protected function setUp(): void
@@ -497,10 +500,9 @@ class FlushIngestQueueTest extends IntegrationTestCase
         $serializer = $this->objectManager->get(Json::class);
 
         return new FlushIngestQueue(
-            $settings,
+            $this->oneEngineConnection($settings, $client),
             $this->queue,
             $this->createMock(CatalogIngest::class),
-            $client,
             $this->createMock(OptOutReplay::class),
             $serializer,
             $logger,

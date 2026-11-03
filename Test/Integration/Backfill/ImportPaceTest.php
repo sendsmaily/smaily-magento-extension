@@ -48,6 +48,7 @@ use Smaily\Connect\Test\Integration\Support\FrozenImportClock;
 use Smaily\Connect\Test\Integration\Support\SalesOrderHarness;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
 use Smaily\Connect\Test\Integration\Support\VirtualPace;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-232: one cron minute — the import tick, then the send run — moves a
@@ -72,6 +73,7 @@ use Smaily\Connect\Test\Integration\Support\VirtualPace;
 class ImportPaceTest extends IntegrationTestCase
 {
     use SalesOrderHarness;
+    use EngineConnectionsStub;
 
     /** Two pages more than the backlog: the second minute finishes the import. */
     private const ORDERS = IngestPace::IMPORT_BACKLOG_ROWS + 200;
@@ -266,7 +268,8 @@ class ImportPaceTest extends IntegrationTestCase
             $queue,
             new SkippedRow($logger),
             $historyImport,
-            new FrozenImportClock()
+            new FrozenImportClock(),
+            $this->oneEngineConnection($engineSettings)
         );
         $progress = $client === null
             ? $this->createMock(HistoryProgress::class)
@@ -324,10 +327,9 @@ class ImportPaceTest extends IntegrationTestCase
         $client ??= $this->client();
 
         return new FlushIngestQueue(
-            $this->engineSettings(),
+            $this->oneEngineConnection($this->engineSettings(), $client),
             $this->objectManager->create(IngestQueue::class),
             $this->createMock(CatalogIngest::class),
-            $client,
             $this->createMock(OptOutReplay::class),
             new Json(),
             $this->createMock(Logger::class),

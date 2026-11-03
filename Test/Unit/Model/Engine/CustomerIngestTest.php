@@ -21,6 +21,7 @@ use Smaily\Connect\Model\Engine\CustomerIngest;
 use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-266 (contract v1.20.0 / v1.23.0 §4): the live customer sync queues a
@@ -30,6 +31,8 @@ use Smaily\Connect\Model\Engine\Settings;
  */
 class CustomerIngestTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const HORIZON = '2021-11-02 00:00:00';
 
     private Settings&MockObject $settings;
@@ -206,7 +209,8 @@ class CustomerIngestTest extends TestCase
             $this->scope,
             $historyImport,
             $this->shopper,
-            $this->repository
+            $this->repository,
+            $this->oneEngineConnection($this->settings)
         );
     }
 

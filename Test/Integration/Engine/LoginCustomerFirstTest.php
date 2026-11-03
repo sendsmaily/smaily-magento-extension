@@ -36,6 +36,7 @@ use Smaily\Connect\Model\Queue\HandlerPool;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-262 (contract v1.23.0 §4 group c, §7 "Send the customer first" and
@@ -48,6 +49,8 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
  */
 class LoginCustomerFirstTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     private const CUSTOMER_ID = 42;
     private const EMAIL = 'person@example.com';
     private const MERGE = [
@@ -343,6 +346,7 @@ class LoginCustomerFirstTest extends IntegrationTestCase
             'customerRepository' => $repository,
             'customerSender' => new MergeCustomerSender($repository, $builder, $this->client, $this->ingest),
             'ingestQueue' => $this->ingest,
+            'connections' => $this->oneEngineConnection($settings, $this->client),
         ]);
         /** @var FlushEventQueue $cron */
         $cron = $this->objectManager->create(FlushEventQueue::class, [
@@ -362,10 +366,9 @@ class LoginCustomerFirstTest extends IntegrationTestCase
         $serializer = $this->objectManager->get(Json::class);
 
         (new FlushIngestQueue(
-            $settings,
+            $this->oneEngineConnection($settings, $this->client),
             $this->ingest,
             $this->createMock(CatalogIngest::class),
-            $this->client,
             $this->createMock(OptOutReplay::class),
             $serializer,
             $logger,

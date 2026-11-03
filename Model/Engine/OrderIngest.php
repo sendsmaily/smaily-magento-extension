@@ -46,7 +46,8 @@ class OrderIngest
 
     public function __construct(
         private readonly OrderPayloadBuilder $payloadBuilder,
-        private readonly IngestQueue $ingestQueue
+        private readonly IngestQueue $ingestQueue,
+        private readonly Connections $connections
     ) {
     }
 
@@ -81,6 +82,12 @@ class OrderIngest
 
         $this->lastOrderId = $orderId;
         $this->lastPayload = $payload;
-        $this->lastRowId = $this->ingestQueue->enqueueReturningId(Client::DOMAIN_ORDERS, $item, $orderId);
+        // The primary connection's row (CON-237; per-connection rows are a later step).
+        $this->lastRowId = $this->ingestQueue->enqueueReturningId(
+            Client::DOMAIN_ORDERS,
+            $item,
+            $orderId,
+            $this->connections->primary()->canonicalStoreId()
+        );
     }
 }

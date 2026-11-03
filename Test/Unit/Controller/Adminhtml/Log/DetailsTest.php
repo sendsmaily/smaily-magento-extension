@@ -17,13 +17,17 @@ use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\UrlInterface;
 use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\LayoutInterface;
+use Magento\Store\Api\Data\WebsiteInterface;
+use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Api\Queue\EventHandlerInterface;
 use Smaily\Connect\Api\Queue\PausableEventHandlerInterface;
 use Smaily\Connect\Controller\Adminhtml\Log\Details;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Log\AccountWait;
 use Smaily\Connect\Model\Log\AttemptHistory;
+use Smaily\Connect\Model\Log\EngineStore;
 use Smaily\Connect\Model\Log\FailureMessage;
 use Smaily\Connect\Model\Log\PayloadRedactor;
 use Smaily\Connect\Model\Log\QueueRowLoader;
@@ -32,6 +36,7 @@ use Smaily\Connect\Model\Log\ResendGuard;
 use Smaily\Connect\Model\Log\StatusPill;
 use Smaily\Connect\Model\Queue\HandlerPool;
 use Smaily\Connect\Model\Queue\PayloadDecoder;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 use Smaily\Connect\Ui\Component\QueueStatusOptions;
 
 /**
@@ -41,11 +46,16 @@ use Smaily\Connect\Ui\Component\QueueStatusOptions;
  */
 class DetailsTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     /** @var array<string, mixed> */
     private array $blockData = [];
 
     /** Whether Campaign Intelligence refuses the account in render(). */
     private bool $refused = false;
+
+    /** The connections render() reads; null: one store, the primary only. */
+    private ?Connections $connections = null;
 
     public function testAFailedRowTheGuardClearsOffersSendAgain(): void
     {
@@ -150,12 +160,88 @@ class DetailsTest extends TestCase
         self::assertFalse($this->blockData['waits_for_account']);
     }
 
+    /**
+     * CON-237: under one Campaign Intelligence connection the panel shows
+     * no engine store, as before.
+     */
+    public function testOneConnectionShowsNoEngineStore(): void
+    {
+        $this->render(['source' => 'intelligence', 'type' => 'catalog', 'store_id' => '1'] + $this->failedRow(), '');
+
+        self::assertNull($this->blockData['engine_store']);
+    }
+
+    /**
+     * CON-237: with several connections an engine row names the engine
+     * store it goes to and the websites that store serves — an ingest row
+     * by its store view (NULL: the primary), an engine row of the
+     * marketing queue by its website; a contact sync names none, and a row
+     * no connection serves says so.
+     */
+    public function testSeveralConnectionsNameTheEngineStoreOfAnEngineRow(): void
+    {
+        $this->connections = $this->separateStores();
+        $ingest = ['source' => 'intelligence', 'type' => 'catalog'] + $this->failedRow();
+
+        $this->render(['store_id' => '3'] + $ingest, '');
+        self::assertSame('Shop LV (Latvia, Lithuania)', $this->blockData['engine_store']);
+
+        $this->render(['store_id' => null] + $ingest, '');
+        self::assertSame('Shop EE (Estonia)', $this->blockData['engine_store']);
+
+        $this->render(['type' => 'engine.identity_merge', 'website_id' => '3'] + $this->failedRow(), '');
+        self::assertSame('Shop LV (Latvia, Lithuania)', $this->blockData['engine_store']);
+
+        $this->render($this->failedRow(), '');
+        self::assertNull($this->blockData['engine_store'], 'A contact sync goes to Smaily');
+
+        $this->render(['store_id' => '9'] + $ingest, '');
+        self::assertSame(
+            "None: no Campaign Intelligence store is connected for this row's website.",
+            $this->blockData['engine_store']
+        );
+    }
+
+    /**
+     * CON-237: a pending ingest row waits for the account of its own
+     * connection.
+     */
+    public function testAPendingIngestRowWaitsForTheAccountOfItsOwnConnection(): void
+    {
+        $this->connections = $this->separateStores(latviaRefused: true);
+        $pending = ['source' => 'intelligence', 'type' => 'catalog', 'status' => 'pending', 'attempts' => '0'];
+
+        $this->render(['store_id' => '2'] + $pending + $this->failedRow(), '');
+        self::assertTrue($this->blockData['waits_for_account']);
+
+        $this->render(['store_id' => '1'] + $pending + $this->failedRow(), '');
+        self::assertFalse($this->blockData['waits_for_account']);
+    }
+
     public function testAMissingRowOffersNothing(): void
     {
         $this->render(null, '');
 
         self::assertNull($this->blockData['resend_url']);
         self::assertSame([], $this->blockData['history']);
+    }
+
+    /**
+     * Separate stores: the primary "Shop EE" serves website 1 (store view
+     * 1); "Shop LV" websites 2 and 3 (store views 2 and 3).
+     */
+    private function separateStores(bool $latviaRefused = false): Connections
+    {
+        $estonia = $this->createMock(EngineSettings::class);
+        $estonia->method('getTenantName')->willReturn('Shop EE');
+        $latvia = $this->createMock(EngineSettings::class);
+        $latvia->method('getTenantName')->willReturn('Shop LV');
+        $latvia->method('isRefused')->willReturn($latviaRefused);
+
+        return $this->engineConnections([
+            [$this->engineConnection(0, $estonia, [1], [1], 1), null],
+            [$this->engineConnection(2, $latvia, [2, 3], [2, 3], 2), null],
+        ]);
     }
 
     /**
@@ -237,6 +323,21 @@ class DetailsTest extends TestCase
             'contact.sync' => $this->createMock(EventHandlerInterface::class),
             'engine.profiling_consent' => $paused,
         ]);
+        $storeManager = $this->createMock(StoreManagerInterface::class);
+        $storeManager->method('getWebsite')->willReturnCallback(
+            function (mixed $websiteId): WebsiteInterface {
+                $website = $this->createMock(WebsiteInterface::class);
+                $website->method('getName')->willReturn(
+                    [1 => 'Estonia', 2 => 'Latvia', 3 => 'Lithuania'][(int)$websiteId] ?? ''
+                );
+
+                return $website;
+            }
+        );
+        $engineStore = new EngineStore(
+            $this->connections ?? $this->oneEngineConnection($engineSettings),
+            $storeManager
+        );
 
         (new Details(
             $context,
@@ -252,7 +353,8 @@ class DetailsTest extends TestCase
             new AttemptHistory(),
             new StatusPill(),
             $url,
-            new AccountWait($handlerPool, $engineSettings)
+            new AccountWait($handlerPool, $engineStore),
+            $engineStore
         ))->execute();
     }
 }

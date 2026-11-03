@@ -32,6 +32,10 @@ use Smaily\Connect\Model\Logger\Logger;
  * The engine-connected gate lives here, once, rather than in every caller;
  * the delete paths ask it before they build anything, so their callers hold it.
  *
+ * Every row goes to the primary Campaign Intelligence connection and
+ * carries its canonical store view (CON-237; per-connection rows are a
+ * later step). The `catalog_changed` markers belong to no connection.
+ *
  * Duplicates collapse in two places, neither of them queue-wide dedupe:
  * a byte-identical row queued twice in a row within one request (see
  * $lastPayloadHash); and in buildChanged(), several markers for one product
@@ -57,7 +61,8 @@ class CatalogIngest
         private readonly ProductResource $productResource,
         private readonly CatalogPayloadBuilder $payloadBuilder,
         private readonly IngestQueue $ingestQueue,
-        private readonly Logger $logger
+        private readonly Logger $logger,
+        private readonly Connections $connections
     ) {
     }
 
@@ -122,7 +127,7 @@ class CatalogIngest
             $this->ingestQueue->enqueueChangedPayloads(
                 Client::DOMAIN_CATALOG,
                 $rows,
-                $this->payloadBuilder->canonicalStoreId()
+                $this->connections->primary()
             );
         }
     }
@@ -139,10 +144,11 @@ class CatalogIngest
      */
     public function enqueueRemovals(array $productIds): void
     {
+        $storeId = $this->connections->primary()->canonicalStoreId();
         $rows = [];
         foreach ($productIds as $productId) {
             $key = (string)$productId;
-            $rows[] = ['payload' => ['product_id' => $key], 'entity_id' => $key, 'store_id' => null];
+            $rows[] = ['payload' => ['product_id' => $key], 'entity_id' => $key, 'store_id' => $storeId];
         }
 
         $this->ingestQueue->enqueueMany(Client::DOMAIN_CATALOG_REMOVE, $rows);
@@ -255,7 +261,7 @@ class CatalogIngest
             Client::DOMAIN_CATALOG,
             $item,
             (string)$product->getId(),
-            $this->payloadBuilder->canonicalStoreId(),
+            $this->connections->primary()->canonicalStoreId(),
             null,
             $jobId
         );

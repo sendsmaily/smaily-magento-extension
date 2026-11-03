@@ -12,6 +12,7 @@ use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Framework\Api\SearchCriteriaBuilder;
 use Magento\Framework\Exception\LocalizedException;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
@@ -38,7 +39,8 @@ class EngineCustomersProcessor implements ProcessorInterface
         private readonly SkippedRow $skippedRow,
         private readonly EngineCustomerScope $scope,
         private readonly HistoryImport $historyImport,
-        private readonly ImportClock $clock
+        private readonly ImportClock $clock,
+        private readonly Connections $connections
     ) {
     }
 
@@ -58,6 +60,8 @@ class EngineCustomersProcessor implements ProcessorInterface
         }
 
         $deadline = $this->clock->now() + self::TIME_BUDGET_SECONDS;
+        // The primary connection's rows (CON-237; per-connection imports are a later step).
+        $storeId = $this->connections->primary()->canonicalStoreId();
         do {
             $ids = $this->scope->page($horizon, (int)$job->getCursorValue(), self::PAGE_SIZE);
             if (!$ids) {
@@ -87,7 +91,7 @@ class EngineCustomersProcessor implements ProcessorInterface
                     Client::DOMAIN_CUSTOMERS,
                     $item,
                     (string)$customer->getId(),
-                    null,
+                    $storeId,
                     null,
                     (int)$job->getId()
                 );

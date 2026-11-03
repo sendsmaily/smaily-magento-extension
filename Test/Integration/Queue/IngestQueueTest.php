@@ -10,8 +10,10 @@ namespace Smaily\Connect\Test\Integration\Queue;
 
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
+use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * IngestQueue semantics against a real smaily_ingest_queue table:
@@ -20,6 +22,8 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
  */
 class IngestQueueTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     private IngestQueue $queue;
 
     protected function setUp(): void
@@ -187,12 +191,13 @@ class IngestQueueTest extends IntegrationTestCase
         $this->queue->enqueue('catalog', ['sku' => 'SKU-7'], '7', 1, 'c-7-old');
         $this->queue->enqueue('catalog', ['sku' => 'NEWER'], '7', 1, 'c-7-new');
 
+        $primary = $this->engineConnection(0, $this->createMock(Settings::class), [1], [1], 1, true);
         self::assertSame(2, $this->queue->enqueueChangedPayloads('catalog', [
             '7' => ['sku' => 'SKU-7'],
             '8' => ['sku' => 'SKU-8'],
             '9' => ['sku' => 'SKU-9'],
-        ], 1));
-        self::assertSame(0, $this->queue->enqueueChangedPayloads('catalog', [], 1));
+        ], $primary));
+        self::assertSame(0, $this->queue->enqueueChangedPayloads('catalog', [], $primary));
 
         $queued = array_slice($this->fetchAll(IngestEventResource::TABLE_NAME), 4);
         self::assertSame(['7', '9'], array_column($queued, 'entity_id'));

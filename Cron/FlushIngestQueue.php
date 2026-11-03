@@ -12,12 +12,13 @@ use Magento\Framework\Serialize\Serializer\Json;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connection;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
-use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\OptOutReplay;
 
@@ -28,10 +29,19 @@ use Smaily\Connect\Model\Privacy\OptOutReplay;
  * import is not held to one batch per domain a minute, and a row the store
  * queues meanwhile waits behind at most the import's backlog, never the
  * whole history.
- * The run ends early, leaving the rest to the next run, on a 429 (also one a
- * retry got past) or a batch that failed in transport; a whole-batch 4xx
- * ends its own domain for the run, so a key the engine no longer takes
- * fails one batch per domain a run, not the whole queue.
+ *
+ * Each Campaign Intelligence connection that may send (Engine\Connections,
+ * CON-237) takes its turn in every round — one batch per domain of its own
+ * rows (IngestQueue::claimBatch() with the connection), then its §3b
+ * batch — with its own client. The connections share the run's one pace
+ * and budget. Under one store the primary is the only connection, and the
+ * run makes exactly the requests it made before.
+ * A connection stops for the rest of the run, leaving its rows to the next
+ * run, on a 429 (also one a retry got past), a batch that failed in
+ * transport or its engine store's refusal; the other connections go on. A
+ * whole-batch 4xx ends that connection's domain for the run, so a key the
+ * engine no longer takes fails one batch per domain a run, not the whole
+ * queue.
  *
  * Each run first builds the catalog rows of the products the stock hooks
  * only marked changed (CatalogIngest::buildChanged(), PRO-1967), so they go
@@ -54,17 +64,19 @@ use Smaily\Connect\Model\Privacy\OptOutReplay;
  */
 class FlushIngestQueue
 {
-    /** Set when this run must send nothing more. */
-    private bool $stopped = false;
+    /** Set when the run's budget is spent: no connection sends more. */
+    private bool $outOfTime = false;
 
-    /** @var array<string, true> domains that send nothing more this run */
+    /** @var array<int, true> keys of the connections that send nothing more this run */
+    private array $stoppedConnections = [];
+
+    /** @var array<string, true> "<connection key>:<domain>" that send nothing more this run */
     private array $haltedDomains = [];
 
     public function __construct(
-        private readonly Settings $settings,
+        private readonly Connections $connections,
         private readonly IngestQueue $queue,
         private readonly CatalogIngest $catalogIngest,
-        private readonly Client $client,
         private readonly OptOutReplay $optOutReplay,
         private readonly Json $serializer,
         private readonly Logger $logger,
@@ -75,7 +87,11 @@ class FlushIngestQueue
 
     public function execute(): void
     {
-        if (!$this->settings->isSendingAllowed()) {
+        $sending = array_values(array_filter(
+            $this->connections->all(),
+            static fn (Connection $connection): bool => $connection->settings()->isSendingAllowed()
+        ));
+        if (!$sending) {
             return;
         }
 
@@ -90,31 +106,38 @@ class FlushIngestQueue
             ]);
         }
 
-        $this->stopped = false;
+        $this->outOfTime = false;
+        $this->stoppedConnections = [];
         $this->haltedDomains = [];
         $this->pace->start();
         do {
             $sent = false;
-            foreach (array_keys(Client::DOMAIN_WRAPPERS) as $domain) {
-                $sent = $this->flushDomain($domain) || $sent;
+            foreach ($sending as $connection) {
+                foreach (array_keys(Client::DOMAIN_WRAPPERS) as $domain) {
+                    $sent = $this->flushDomain($connection, $domain) || $sent;
+                }
+                $sent = $this->flushCatalogRemove($connection) || $sent;
             }
-            $sent = $this->flushCatalogRemove() || $sent;
         } while ($sent);
     }
 
     /**
-     * Whether this run may claim another batch of the domain. Re-asked per
-     * batch: a refusal met by one batch stops the rest of this run instead
-     * of collecting more 403s. Only the refusal can appear mid-run —
-     * execute() proved connectedness.
+     * Whether this run may claim another batch of the connection's domain.
+     * Re-asked per batch: a refusal met by one batch stops the rest of the
+     * connection's run instead of collecting more 403s. Only the refusal
+     * can appear mid-run — execute() proved connectedness.
      */
-    private function maySend(string $domain): bool
+    private function maySend(Connection $connection, string $domain): bool
     {
-        if ($this->stopped || isset($this->haltedDomains[$domain]) || $this->settings->isRefused()) {
+        if ($this->outOfTime
+            || isset($this->stoppedConnections[$connection->key()])
+            || isset($this->haltedDomains[$connection->key() . ':' . $domain])
+            || $connection->settings()->isRefused()
+        ) {
             return false;
         }
         if (!$this->pace->hasTime()) {
-            $this->stopped = true;
+            $this->outOfTime = true;
 
             return false;
         }
@@ -123,29 +146,39 @@ class FlushIngestQueue
     }
 
     /**
-     * End the run when the engine asked to slow down, even though a retry
-     * got this batch through.
+     * Stop the connection for the rest of the run.
      */
-    private function stopIfThrottled(): void
+    private function stop(Connection $connection): void
     {
-        if ($this->client->wasThrottled()) {
-            $this->stopped = true;
+        $this->stoppedConnections[$connection->key()] = true;
+    }
+
+    /**
+     * Stop the connection when the engine asked to slow down, even though a
+     * retry got this batch through.
+     */
+    private function stopIfThrottled(Connection $connection, Client $client): void
+    {
+        if ($client->wasThrottled()) {
+            $this->stop($connection);
         }
     }
 
     /**
-     * Send one batch of the domain. True when a batch was claimed.
+     * Send one batch of the connection's rows of the domain. True when a
+     * batch was claimed.
      */
-    private function flushDomain(string $domain): bool
+    private function flushDomain(Connection $connection, string $domain): bool
     {
-        if (!$this->maySend($domain)) {
+        if (!$this->maySend($connection, $domain)) {
             return false;
         }
 
-        $events = $this->queue->claimBatch($domain, Client::DOMAIN_BATCH_LIMITS[$domain]);
+        $events = $this->queue->claimBatch($domain, Client::DOMAIN_BATCH_LIMITS[$domain], $connection);
         if (!$events) {
             return false;
         }
+        $client = $this->connections->client($connection);
 
         $items = [];
         foreach ($events as $index => $event) {
@@ -154,10 +187,10 @@ class FlushIngestQueue
 
         $this->pace->awaitTurn();
         try {
-            $response = $this->client->ingest($domain, $items);
+            $response = $client->ingest($domain, $items);
         } catch (EngineTransportException $exception) {
-            $this->stopped = true;
-            $this->recordBatchExchange($domain, $events, $items);
+            $this->stop($connection);
+            $this->recordBatchExchange($client, $domain, $events, $items);
             $this->queue->markFailedMany($events, $exception->getMessage());
             $this->logger->info('Ingest batch rescheduled', [
                 'domain' => $domain,
@@ -167,22 +200,22 @@ class FlushIngestQueue
 
             return true;
         } catch (EngineRequestException $exception) {
-            $this->haltedDomains[$domain] = true;
-            if ($this->releaseIfRefused($events)) {
+            $this->haltedDomains[$connection->key() . ':' . $domain] = true;
+            if ($this->releaseIfRefused($connection, $events)) {
                 return true;
             }
 
             // Whole-batch 4xx: the request shape is wrong; retrying the same
             // rows cannot succeed.
-            $this->recordBatchExchange($domain, $events, $items);
+            $this->recordBatchExchange($client, $domain, $events, $items);
             $this->queue->markFailedMany($events, $exception->getMessage(), true);
 
             return true;
         }
 
-        $this->stopIfThrottled();
-        $this->recordBatchExchange($domain, $events, $items);
-        $this->applyD6Response($domain, $events, $items, $response);
+        $this->stopIfThrottled($connection, $client);
+        $this->recordBatchExchange($client, $domain, $events, $items);
+        $this->applyD6Response($connection, $domain, $events, $items, $response);
 
         return true;
     }
@@ -196,9 +229,9 @@ class FlushIngestQueue
      * @param IngestEvent[] $events indexed 0..n-1 in send order
      * @param array<int, array<string, mixed>> $items the same indexes
      */
-    private function recordBatchExchange(string $domain, array $events, array $items): void
+    private function recordBatchExchange(Client $client, string $domain, array $events, array $items): void
     {
-        $exchange = $this->client->lastExchange();
+        $exchange = $client->lastExchange();
         if ($exchange === null) {
             return;
         }
@@ -217,20 +250,25 @@ class FlushIngestQueue
     }
 
     /**
-     * Send one §3b catalog/remove batch: one wrapper of unique product ids.
-     * §3b has no per-item errors[] — a 2xx applies to every id. True when a
-     * batch was claimed.
+     * Send one §3b catalog/remove batch of the connection's rows: one
+     * wrapper of unique product ids. §3b has no per-item errors[] — a 2xx
+     * applies to every id. True when a batch was claimed.
      */
-    private function flushCatalogRemove(): bool
+    private function flushCatalogRemove(Connection $connection): bool
     {
-        if (!$this->maySend(Client::DOMAIN_CATALOG_REMOVE)) {
+        if (!$this->maySend($connection, Client::DOMAIN_CATALOG_REMOVE)) {
             return false;
         }
 
-        $events = $this->queue->claimBatch(Client::DOMAIN_CATALOG_REMOVE, Client::CATALOG_REMOVE_BATCH_LIMIT);
+        $events = $this->queue->claimBatch(
+            Client::DOMAIN_CATALOG_REMOVE,
+            Client::CATALOG_REMOVE_BATCH_LIMIT,
+            $connection
+        );
         if (!$events) {
             return false;
         }
+        $client = $this->connections->client($connection);
 
         $keyed = [];
         $keyless = [];
@@ -257,10 +295,10 @@ class FlushIngestQueue
 
         $this->pace->awaitTurn();
         try {
-            $response = $this->client->catalogRemove($ids);
+            $response = $client->catalogRemove($ids);
         } catch (EngineTransportException $exception) {
-            $this->stopped = true;
-            $this->recordRemoveExchange($keyed);
+            $this->stop($connection);
+            $this->recordRemoveExchange($client, $keyed);
             $this->queue->markFailedMany($this->keyedEvents($keyed), $exception->getMessage());
             $this->logger->info('Catalog remove batch rescheduled', [
                 'count' => count($keyed),
@@ -269,23 +307,23 @@ class FlushIngestQueue
 
             return true;
         } catch (EngineRequestException $exception) {
-            $this->haltedDomains[Client::DOMAIN_CATALOG_REMOVE] = true;
-            if ($this->releaseIfRefused($this->keyedEvents($keyed))) {
+            $this->haltedDomains[$connection->key() . ':' . Client::DOMAIN_CATALOG_REMOVE] = true;
+            if ($this->releaseIfRefused($connection, $this->keyedEvents($keyed))) {
                 return true;
             }
 
             // 4xx is terminal: a malformed wrapper cannot improve by
             // resending, and a 404 means the engine predates §3b — the
             // parked row can be retried from the Log once it has it.
-            $this->recordRemoveExchange($keyed);
+            $this->recordRemoveExchange($client, $keyed);
             $this->queue->markFailedMany($this->keyedEvents($keyed), $exception->getMessage(), true);
 
             return true;
         }
 
         // On success the row's own outcome below replaces the batch reply.
-        $this->stopIfThrottled();
-        $this->recordRemoveExchange($keyed);
+        $this->stopIfThrottled($connection, $client);
+        $this->recordRemoveExchange($client, $keyed);
         $notFound = array_map('strval', (array)($response['not_found'] ?? []));
         foreach ($keyed as [$event, $productId]) {
             $this->queue->markSent($event, $this->serializer->serialize([
@@ -304,9 +342,9 @@ class FlushIngestQueue
      *
      * @param array<int, array{0: IngestEvent, 1: string}> $keyed
      */
-    private function recordRemoveExchange(array $keyed): void
+    private function recordRemoveExchange(Client $client, array $keyed): void
     {
-        $exchange = $this->client->lastExchange();
+        $exchange = $client->lastExchange();
         if ($exchange === null) {
             return;
         }
@@ -326,15 +364,15 @@ class FlushIngestQueue
     }
 
     /**
-     * A 4xx met while the account is refused is not the rows' fault
-     * (contract §2): they go back to pending exactly as they were and wait
-     * for the account to be active again. True when they were released.
+     * A 4xx met while the connection's account is refused is not the rows'
+     * fault (contract §2): they go back to pending exactly as they were and
+     * wait for the account to be active again. True when they were released.
      *
      * @param IngestEvent[] $events
      */
-    private function releaseIfRefused(array $events): bool
+    private function releaseIfRefused(Connection $connection, array $events): bool
     {
-        if (!$this->settings->isRefused()) {
+        if (!$connection->settings()->isRefused()) {
             return false;
         }
 
@@ -348,7 +386,13 @@ class FlushIngestQueue
      * @param array<int, array<string, mixed>> $items the same indexes
      * @param array<string, mixed> $response
      */
-    private function applyD6Response(string $domain, array $events, array $items, array $response): void
+    private function applyD6Response(
+        Connection $connection,
+        string $domain,
+        array $events,
+        array $items,
+        array $response
+    ): void
     {
         $errorsByIndex = [];
         foreach ((array)($response['errors'] ?? []) as $error) {
@@ -390,7 +434,7 @@ class FlushIngestQueue
         foreach ($failed as $reason => $group) {
             $this->queue->markFailedMany($group, (string)$reason, true);
         }
-        $this->optOutReplay->afterConfirmed($domain, $confirmedItems);
+        $this->optOutReplay->afterConfirmed($domain, $confirmedItems, $connection);
 
         if ($errorsByIndex) {
             $this->logger->info('Ingest batch had per-item errors', [

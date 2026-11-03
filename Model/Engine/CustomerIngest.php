@@ -55,7 +55,8 @@ class CustomerIngest
         private readonly EngineCustomerScope $scope,
         private readonly HistoryImport $historyImport,
         private readonly ConsentingShopper $consentingShopper,
-        private readonly CustomerRepositoryInterface $customerRepository
+        private readonly CustomerRepositoryInterface $customerRepository,
+        private readonly Connections $connections
     ) {
     }
 
@@ -109,10 +110,12 @@ class CustomerIngest
     private function enqueue(CustomerInterface $customer): void
     {
         $customerId = (int)$customer->getId();
+        // The primary connection's row (CON-237; per-connection rows are a later step).
         $this->ingestQueue->enqueue(
             Client::DOMAIN_CUSTOMERS,
             $this->payloadBuilder->build($customer),
-            (string)$customerId
+            (string)$customerId,
+            $this->connections->primary()->canonicalStoreId()
         );
         $this->queued[$customerId] = true;
     }

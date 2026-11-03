@@ -638,3 +638,5 @@
 "Your Smaily subdomain. For example, if your Smaily URL is https://demo.sendsmaily.net, enter ""demo"". Pasting the full URL also works.","Sinu Smaily alamdomeen. Näiteks kui sinu Smaily URL on https://demo.sendsmaily.net, sisesta „demo“. Sobib ka täieliku URL-i kleepimine."
 "Your store views speak %1 languages (%2). Pick how contacts and automations should route between them — the sections below adapt right away.","Sinu poevaated räägivad %1 keelt (%2). Vali, kuidas kontaktid ja automaatikad nende vahel suunduvad — allolevad jaotised kohanduvad kohe."
 "Your store’s connection to Campaign Intelligence, storefront browse tracking and historical imports.","Sinu poe ühendus Campaign Intelligence'iga, poe sirvimise jälgimine ja ajaloolised impordid."
+"Campaign Intelligence store","Campaign Intelligence'i pood"
+"None: no Campaign Intelligence store is connected for this row's website.","Puudub: selle rea veebisaidi jaoks pole ühtegi Campaign Intelligence'i poodi ühendatud."

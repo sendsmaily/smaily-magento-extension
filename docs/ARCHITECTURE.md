@@ -805,6 +805,54 @@ below.
   - Not per website: price, compare price, currency, stock, name and
     description (one value on every website); browse events and identity
     merge carry no website (contract 1.21.0 "Not in 1.21.0").
+- **Engine connections (CON-237, phase 2 of CON-279).** The engine store
+  follows the store: one store — in one version or several — is one engine
+  store, and each separate store connects its own. The engine holds one
+  engine store per Smaily account, so connections are grouped by the
+  Smaily account. The model is in place; no flow routes by it yet, so
+  every store is still served by the one installation-wide connection.
+  - `Model/Engine/Connection` is one connection: `key()` (0 = the primary,
+    else the id of the website whose scope holds it), `settings()`,
+    `websiteIds()`, `storeIds()`, `canonicalStoreId()` (the default store
+    view of the installation's default website when it serves that
+    website, else the default store view of its lowest-id website; null
+    when it serves none — a queue row then carries NULL, the primary),
+    `isPrimary()`, `servesAllWebsites()`.
+  - `Model/Engine/Connections` (built once per request, `reset()`
+    rebuilds): `all()`, `primary()`, `forWebsite()`, `forStore()`,
+    `forKey()`, `forRowStoreId()` (NULL = the primary: every row queued
+    before CON-237), `client()` (the DI `Engine\Client` for the primary, a
+    `ClientFactory` client of its own for any other). One store
+    (`StoreLayout::isSeparateStores()` false): the primary serves every
+    website, connected or not, and nothing else is read. Separate stores: a
+    website is served by the connection whose recorded account
+    (`smaily_connect/intelligence/smaily_subdomain`) is its own Smaily
+    account's normalized subdomain (`accountOf()`: its own, in
+    per-language accounts mode its fallback account, else the store-wide
+    one); the primary takes part only while connected; a website no
+    connection was made for has none (null). A store whose websites hold
+    separate accounts and no store-wide one (CON-192) keeps the primary
+    for the default website's account.
+  - **Exact scope.** The primary's rows are the default-scope
+    `smaily_connect/intelligence/*` rows, as since the first release (the
+    DI `Engine\Settings`). A website connection's rows are the same paths
+    at its website scope (`Settings::withWebsite()`). Magento reads a
+    website scope with the default scope as fallback, so a website
+    connection is told by its own mark,
+    `smaily_connect/intelligence/website_connection` = 1 (never written at
+    the default scope), and its `Settings` writes every path — '' for none
+    (a cleared refusal, no pushed workflows, browse tracking off at the
+    first connect) — and never deletes a single one, so it never reads the
+    primary's refusal, pushed workflows or browse tracking; its `clear()`
+    removes every row of its scope (`Settings::WEBSITE_PATHS`).
+  - The account a connection was made for is recorded at the setup
+    exchange (`Settings::storeExchange()`): the answer's `smaily_subdomain`
+    (contract v1.25.0 §1) when it names one, else the connecting account
+    (`Connections::installationAccount()`: the store-wide account, else
+    the default website's). The data patch `RecordEngineConnectionAccount`
+    records it, the same way, for a connection made before; config rows
+    only, no schema change. The module's removal deletes every
+    `smaily_connect/*` row at every scope, the new ones included.
 - **The backfill page holds every product (PRO-2506):**
   `CatalogProductLoader` calls neither `addPriceData()` nor any store/website filter, so it pages exactly
   what `countProducts()` counts. `addPriceData()` INNER JOINs
@@ -2277,7 +2325,9 @@ Initial setup, Settings, Log. Design rules:
       phase: the Intelligence panel of a separate store says so and names
       the websites it covers (all). No `smaily_connect/intelligence/*` path
       is in `WebsiteOverrides::PATHS`, so no layout change moves the engine
-      connection.
+      connection. Phase 2 (CON-237) gives each separate store a connection
+      of its own; its model is in place (Engine connections, under "Engine
+      ingest" above), nothing routes by it yet.
   - The Settings page renders an explicit website selector next to the tab
     strip (own chrome, not Magento's native store-switcher), reloading with
     `?website=<id>`; single-website installs never see it or the switches.

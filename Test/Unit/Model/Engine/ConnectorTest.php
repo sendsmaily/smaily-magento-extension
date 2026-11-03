@@ -14,6 +14,7 @@ use Smaily\Connect\Model\Backfill\ImportsOnConnect;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Connector;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
@@ -55,7 +56,7 @@ class ConnectorTest extends TestCase
 
                 return $exchange;
             });
-        $this->settings->expects(self::once())->method('storeExchange')->with($exchange)
+        $this->settings->expects(self::once())->method('storeExchange')->with($exchange, 'shop')
             ->willReturnCallback(function (): void {
                 $this->steps[] = 'store';
             });
@@ -99,6 +100,15 @@ class ConnectorTest extends TestCase
         $websites = $this->createMock(Websites::class);
         $websites->method('storeConfig')->willReturn(['customer_account_scope' => 'website']);
 
-        return new Connector($this->client, $this->settings, new ImportsOnConnect($this->jobManager), $websites);
+        $connections = $this->createMock(Connections::class);
+        $connections->method('installationAccount')->willReturn('shop');
+
+        return new Connector(
+            $this->client,
+            $this->settings,
+            new ImportsOnConnect($this->jobManager),
+            $websites,
+            $connections
+        );
     }
 }

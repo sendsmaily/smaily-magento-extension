@@ -10,9 +10,11 @@ namespace Smaily\Connect\Model\Engine\Queue;
 
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\DataObject\IdentityGeneratorInterface;
+use Magento\Framework\DB\Select;
 use Magento\Framework\Exception\AlreadyExistsException;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\Stdlib\DateTime\DateTime;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Log\Resend;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\Erasure;
@@ -28,6 +30,13 @@ use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent\CollectionFactory;
  *
  * Rows store the final wire payload; event_uuid doubles as the wire
  * event_id, so engine-side transport dedup makes retries safe.
+ *
+ * A row's store_id names the Campaign Intelligence connection it goes to
+ * (CON-237): the connection's canonical store view
+ * (Engine\Connection::canonicalStoreId()) — every enqueue site passes it
+ * — and NULL for the primary (every row queued before CON-237).
+ * claimBatch(), latestUndeliveredPayloads() and hasRow() read one
+ * connection's rows when they are handed a connection (applyConnection()).
  */
 class IngestQueue
 {
@@ -118,13 +127,14 @@ class IngestQueue
      * the Log still records (the nightly catalog manifest, PRO-3854): the
      * caller records the exchange on it, and markSent() or markFailed()
      * saves it with the outcome, so no flusher ever sees it pending.
+     * $storeId names the connection it was sent to, as enqueue()'s does.
      *
      * @param array<string, mixed> $payload
      */
-    public function newEvent(string $domain, array $payload): IngestEvent
+    public function newEvent(string $domain, array $payload, ?int $storeId = null): IngestEvent
     {
         $event = $this->eventFactory->create();
-        $event->addData($this->row($domain, $payload, null, null));
+        $event->addData($this->row($domain, $payload, null, $storeId));
 
         return $event;
     }
@@ -180,12 +190,20 @@ class IngestQueue
      * (PRO-1967). Not a queue-wide dedupe: an older unsent row, or one
      * already delivered, does not stop a new row.
      *
+     * The rows are the connection's: compared with its own rows only, and
+     * stored with its canonical store view (CON-237).
+     *
      * @param array<int|string, array<string, mixed>> $payloads entity id => payload
      * @return int the number of rows queued
      */
-    public function enqueueChangedPayloads(string $domain, array $payloads, ?int $storeId): int
+    public function enqueueChangedPayloads(string $domain, array $payloads, Connection $connection): int
     {
-        $latest = $this->latestUndeliveredPayloads($domain, array_map('strval', array_keys($payloads)));
+        $storeId = $connection->canonicalStoreId();
+        $latest = $this->latestUndeliveredPayloads(
+            $domain,
+            array_map('strval', array_keys($payloads)),
+            $connection
+        );
 
         $rows = [];
         foreach ($payloads as $entityId => $payload) {
@@ -203,13 +221,17 @@ class IngestQueue
      * The stored payload of each entity's newest row that is not delivered
      * yet (pending or being sent) — one row per entity is read. Reads only
      * undelivered rows, so it stays on the domain/status index however many
-     * delivered rows are retained.
+     * delivered rows are retained. With $engineConnection, only that
+     * connection's rows.
      *
      * @param string[] $entityIds
      * @return array<string, string> entity id => payload as stored
      */
-    public function latestUndeliveredPayloads(string $domain, array $entityIds): array
-    {
+    public function latestUndeliveredPayloads(
+        string $domain,
+        array $entityIds,
+        ?Connection $engineConnection = null
+    ): array {
         if (!$entityIds) {
             return [];
         }
@@ -221,6 +243,9 @@ class IngestQueue
             ->where('status IN (?)', [IngestEvent::STATUS_PENDING, IngestEvent::STATUS_SENDING])
             ->where('entity_id IN (?)', $entityIds)
             ->group('entity_id');
+        if (!$this->applyConnection($newest, $engineConnection)) {
+            return [];
+        }
         $select = $connection->select()
             ->from(['queue' => $this->table()], ['entity_id', 'payload'])
             ->join(['newest' => $newest], 'newest.id = queue.id', []);
@@ -237,9 +262,10 @@ class IngestQueue
      * Whether the queue holds any row of $domain for the entity, in any
      * state: the store has queued it to be sent (CON-262: a customer the
      * live sync or an import sends). Read only after an identity merge met
-     * `404 customer_not_found`, so it may walk the domain's rows.
+     * `404 customer_not_found`, so it may walk the domain's rows. With
+     * $engineConnection, only that connection's rows.
      */
-    public function hasRow(string $domain, string $entityId): bool
+    public function hasRow(string $domain, string $entityId, ?Connection $engineConnection = null): bool
     {
         $connection = $this->resourceConnection->getConnection();
         $select = $connection->select()
@@ -247,6 +273,9 @@ class IngestQueue
             ->where('domain = ?', $domain)
             ->where('entity_id = ?', $entityId)
             ->limit(1);
+        if (!$this->applyConnection($select, $engineConnection)) {
+            return false;
+        }
 
         return $connection->fetchOne($select) !== false;
     }
@@ -266,11 +295,14 @@ class IngestQueue
     }
 
     /**
-     * Claim due pending events for one domain (marks them as sending).
+     * Claim due pending events for one domain (marks them as sending). With
+     * $engineConnection, only that connection's rows (CON-237); without
+     * one, every row of the domain — the `catalog_changed` markers, which
+     * belong to no connection.
      *
      * @return IngestEvent[]
      */
-    public function claimBatch(string $domain, int $limit): array
+    public function claimBatch(string $domain, int $limit, ?Connection $engineConnection = null): array
     {
         $now = $this->dateTime->gmtDate();
         $collection = $this->collectionFactory->create();
@@ -282,6 +314,9 @@ class IngestQueue
             ])
             ->setOrder('id', 'ASC')
             ->setPageSize($limit);
+        if (!$this->applyConnection($collection->getSelect(), $engineConnection)) {
+            return [];
+        }
 
         $events = [];
         foreach ($collection->getItems() as $item) {
@@ -570,6 +605,39 @@ class IngestQueue
         $payload['event_id'] = $event->getEventUuid();
 
         return $payload;
+    }
+
+    /**
+     * Narrow a select to one connection's rows: the rows that carry one of
+     * its store views, and for the primary also the rows that carry none
+     * (NULL — every row queued before CON-237). A connection that serves
+     * every website is not narrowed: no other connection serves a store
+     * view, so every row is its — a row of a store view deleted since it
+     * was queued too — and one store reads exactly the rows it always
+     * read. False when the connection can have no rows (it serves no
+     * website and is not the primary).
+     */
+    private function applyConnection(Select $select, ?Connection $engineConnection): bool
+    {
+        if ($engineConnection === null || $engineConnection->servesAllWebsites()) {
+            return true;
+        }
+        $storeIds = $engineConnection->storeIds();
+        if (!$engineConnection->isPrimary()) {
+            if (!$storeIds) {
+                return false;
+            }
+            $select->where('store_id IN (?)', $storeIds);
+
+            return true;
+        }
+        if ($storeIds) {
+            $select->where('(store_id IS NULL OR store_id IN (?))', $storeIds);
+        } else {
+            $select->where('store_id IS NULL');
+        }
+
+        return true;
     }
 
     /**

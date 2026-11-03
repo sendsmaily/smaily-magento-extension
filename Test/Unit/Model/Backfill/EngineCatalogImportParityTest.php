@@ -58,6 +58,7 @@ use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
 use Smaily\Connect\Model\StorefrontScript;
 use Smaily\Connect\Model\StorefrontUrl;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3692: a product sent by the catalog import carries the same price,
@@ -78,6 +79,8 @@ use Smaily\Connect\Model\StorefrontUrl;
  */
 class EngineCatalogImportParityTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const CANONICAL_STORE_ID = 1;
 
     /** A fixed bundle's own selection prices, added to its price. */
@@ -293,7 +296,8 @@ class EngineCatalogImportParityTest extends TestCase
             $this->createMock(ProductResource::class),
             $payloadBuilder,
             $ingestQueue,
-            $this->createMock(Logger::class)
+            $this->createMock(Logger::class),
+            $this->oneEngineConnection($settings)
         );
     }
 

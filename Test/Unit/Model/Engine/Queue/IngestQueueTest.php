@@ -11,10 +11,12 @@ namespace Smaily\Connect\Test\Unit\Model\Engine\Queue;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\Framework\DataObject\IdentityGeneratorInterface;
+use Magento\Framework\DB\Select;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestEventFactory;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
@@ -22,11 +24,14 @@ use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Queue\PayloadDecoder;
 use Smaily\Connect\Model\Queue\RowWriter;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
+use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent\Collection;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent\CollectionFactory;
 
 /**
  * PRO-3962: how the ingest queue records one failure that many rows share,
- * and the one error-log line it writes for the rows it parks.
+ * and the one error-log line it writes for the rows it parks. CON-237:
+ * which rows a claim reads for a Campaign Intelligence connection.
  */
 class IngestQueueTest extends TestCase
 {
@@ -157,6 +162,93 @@ class IngestQueueTest extends TestCase
     }
 
     /**
+     * CON-237: a claim for a connection reads its rows only — the store
+     * views it serves, and for the primary the rows of none (NULL, every
+     * row queued before) too. A connection that serves every website, as
+     * the primary of one store does, is not narrowed: the claim is the one
+     * it always was. Without a connection (the catalog_changed markers)
+     * nothing is narrowed either.
+     *
+     * @param string[] $expected the store_id conditions the claim adds
+     * @dataProvider claimFilters
+     */
+    public function testAClaimReadsTheRowsOfItsConnection(?Connection $connection, array $expected): void
+    {
+        $wheres = [];
+        $select = $this->createMock(Select::class);
+        $select->method('where')->willReturnCallback(
+            function (string $condition, mixed $value = null) use (&$wheres, $select): Select {
+                $wheres[] = [$condition, $value];
+
+                return $select;
+            }
+        );
+        $collection = $this->createMock(Collection::class);
+        $collection->method('addFieldToFilter')->willReturnSelf();
+        $collection->method('setOrder')->willReturnSelf();
+        $collection->method('setPageSize')->willReturnSelf();
+        $collection->method('getSelect')->willReturn($select);
+        $collection->method('getItems')->willReturn([]);
+        $collectionFactory = $this->createMock(CollectionFactory::class);
+        $collectionFactory->method('create')->willReturn($collection);
+
+        self::assertSame([], $this->queue(
+            $this->createMock(ResourceConnection::class),
+            $this->createMock(Logger::class),
+            $collectionFactory
+        )->claimBatch('catalog', 100, $connection));
+        self::assertSame($expected, $wheres);
+    }
+
+    /**
+     * @return array<string, array{0: Connection|null, 1: array<int, array{0: string, 1: mixed}>}>
+     */
+    public static function claimFilters(): array
+    {
+        $settings = (new \ReflectionClass(Settings::class))->newInstanceWithoutConstructor();
+
+        return [
+            'no connection' => [null, []],
+            'the primary of one store' => [new Connection(0, $settings, [1, 2], [1, 2, 3], 1, true), []],
+            'the primary of separate stores' => [
+                new Connection(0, $settings, [1], [1, 4], 1, false),
+                [['(store_id IS NULL OR store_id IN (?))', [1, 4]]],
+            ],
+            'a primary that serves no website' => [
+                new Connection(0, $settings, [], [], null, false),
+                [['store_id IS NULL', null]],
+            ],
+            'a website connection' => [
+                new Connection(2, $settings, [2], [2, 3], 2, false),
+                [['store_id IN (?)', [2, 3]]],
+            ],
+        ];
+    }
+
+    /**
+     * CON-237: a website connection that serves no website has no rows;
+     * the queue is not asked.
+     */
+    public function testAConnectionThatServesNoWebsiteClaimsNothing(): void
+    {
+        $collectionFactory = $this->createMock(CollectionFactory::class);
+        $collection = $this->createMock(Collection::class);
+        $collection->method('addFieldToFilter')->willReturnSelf();
+        $collection->method('setOrder')->willReturnSelf();
+        $collection->method('setPageSize')->willReturnSelf();
+        $collection->method('getSelect')->willReturn($this->createMock(Select::class));
+        $collection->expects(self::never())->method('getItems');
+        $collectionFactory->method('create')->willReturn($collection);
+        $settings = $this->createMock(Settings::class);
+
+        self::assertSame([], $this->queue(
+            $this->createMock(ResourceConnection::class),
+            $this->createMock(Logger::class),
+            $collectionFactory
+        )->claimBatch('catalog', 100, new Connection(5, $settings, [], [], null, false)));
+    }
+
+    /**
      * A queue row model with real data handling and no database behind it.
      *
      * @param array<string, mixed> $data
@@ -169,19 +261,22 @@ class IngestQueueTest extends TestCase
         return $event;
     }
 
-    private function queue(ResourceConnection $resource, Logger $logger): IngestQueue
-    {
+    private function queue(
+        ResourceConnection $resource,
+        Logger $logger,
+        ?CollectionFactory $collectionFactory = null
+    ): IngestQueue {
         $dateTime = $this->createMock(DateTime::class);
         $dateTime->method('gmtTimestamp')->willReturn(self::NOW_TIMESTAMP);
         $dateTime->method('gmtDate')->willReturnCallback(
-            static fn (string $format = 'Y-m-d H:i:s', $input = null): string =>
-                gmdate($format, $input === null ? self::NOW_TIMESTAMP : (int)$input)
+            static fn (?string $format = null, $input = null): string =>
+                gmdate($format ?? 'Y-m-d H:i:s', $input === null ? self::NOW_TIMESTAMP : (int)$input)
         );
 
         return new IngestQueue(
             $this->createMock(IngestEventFactory::class),
             $this->eventResource,
-            $this->createMock(CollectionFactory::class),
+            $collectionFactory ?? $this->createMock(CollectionFactory::class),
             $this->createMock(IdentityGeneratorInterface::class),
             new Json(),
             new PayloadDecoder(new Json()),

@@ -15,6 +15,8 @@ use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\OrderIngest;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
+use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-1955: a refund saves the credit memo and the order one after the
@@ -23,6 +25,8 @@ use Smaily\Connect\Model\Engine\Queue\IngestQueue;
  */
 class OrderIngestTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const OPEN = ['external_order_id' => '100000042', 'status' => 'processing', 'items' => []];
     private const RETURNED = [
         'external_order_id' => '100000042',
@@ -177,7 +181,11 @@ class OrderIngestTest extends TestCase
 
     private function ingest(): OrderIngest
     {
-        return new OrderIngest($this->payloadBuilder, $this->queue);
+        return new OrderIngest(
+            $this->payloadBuilder,
+            $this->queue,
+            $this->oneEngineConnection($this->createMock(Settings::class))
+        );
     }
 
     private function order(string $incrementId = '100000042'): Order&MockObject

@@ -15,6 +15,8 @@ use Smaily\Connect\Cron\FlushIngestQueue;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connection;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\IngestPace;
@@ -24,9 +26,12 @@ use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\OptOutReplay;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 class FlushIngestQueueTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private IngestQueue&MockObject $queue;
     private Client&MockObject $client;
     private Settings&MockObject $settings;
@@ -37,6 +42,9 @@ class FlushIngestQueueTest extends TestCase
 
     /** @var string[] the domains claimBatch was asked for, in order */
     private array $claims = [];
+
+    /** @var string[] "<connection key>:<domain>" claimBatch was asked for, in order */
+    private array $connectionClaims = [];
 
     /** @var array<int, array<string, mixed>> payloads by event id (decodePayload stub) */
     private array $payloads = [];
@@ -238,10 +246,9 @@ class FlushIngestQueueTest extends TestCase
         $this->catalogIngest->expects(self::never())->method('buildChanged');
 
         (new FlushIngestQueue(
-            $settings,
+            $this->oneEngineConnection($settings, $this->client),
             $this->queue,
             $this->catalogIngest,
-            $this->client,
             new OptOutReplay($this->profilingConsent),
             new Json(),
             $this->createMock(Logger::class),
@@ -541,6 +548,236 @@ class FlushIngestQueueTest extends TestCase
     }
 
     /**
+     * CON-237: under one store the primary is the only connection, and the
+     * run asks the queue for exactly what it asked before: each domain in
+     * turn, then §3b, round after round — every claim the primary's.
+     */
+    public function testOneConnectionClaimsInTheOrderItAlwaysDid(): void
+    {
+        $this->stubBatches([
+            Client::DOMAIN_CATALOG => [[$this->createEvent(1)]],
+            Client::DOMAIN_CATALOG_REMOVE => [[$this->createEvent(2, Client::DOMAIN_CATALOG_REMOVE)]],
+        ]);
+        $this->payloads = [2 => ['product_id' => '7']];
+        $this->client->method('ingest')->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+        $this->client->method('catalogRemove')->willReturn(['ok' => true]);
+
+        $this->createCron()->execute();
+
+        $round = ['0:catalog', '0:customers', '0:orders', '0:browse', '0:catalog_remove'];
+        self::assertSame(array_merge($round, $round), $this->connectionClaims);
+    }
+
+    /**
+     * CON-237: every connection that may send takes its turn in each round
+     * — one batch per domain of its own rows, then its §3b batch — with
+     * its own client, until no connection has a row left.
+     */
+    public function testEachConnectionTakesItsTurnWithItsOwnClient(): void
+    {
+        $other = $this->createMock(Client::class);
+        $this->stubBatches([
+            '0:catalog' => [[$this->createEvent(1)], [$this->createEvent(2)]],
+            '2:catalog' => [[$this->createEvent(3)]],
+            '2:orders' => [[$this->createEvent(4, Client::DOMAIN_ORDERS)]],
+        ]);
+        $sent = [];
+        $this->client->method('ingest')->willReturnCallback(
+            static function (string $domain) use (&$sent): array {
+                $sent[] = 'primary:' . $domain;
+
+                return ['processed' => 1, 'deduplicated' => 0, 'errors' => []];
+            }
+        );
+        $other->method('ingest')->willReturnCallback(
+            static function (string $domain) use (&$sent): array {
+                $sent[] = 'website:' . $domain;
+
+                return ['processed' => 1, 'deduplicated' => 0, 'errors' => []];
+            }
+        );
+
+        $this->createCron(null, $this->twoConnections($other))->execute();
+
+        self::assertSame(['primary:catalog', 'website:catalog', 'website:orders', 'primary:catalog'], $sent);
+        self::assertNotContains('-:catalog', $this->connectionClaims, 'Every claim names its connection');
+    }
+
+    /**
+     * CON-237: a 429 a retry got past stops the connection that met it;
+     * the other connection sends on.
+     */
+    public function testAThrottledConnectionStopsAloneWhileTheOtherSendsOn(): void
+    {
+        $other = $this->createMock(Client::class);
+        $this->stubBatches([
+            '0:catalog' => [[$this->createEvent(1)], [$this->createEvent(2)]],
+            '2:catalog' => [[$this->createEvent(3)], [$this->createEvent(4)]],
+        ]);
+        $this->client->expects(self::once())->method('ingest')
+            ->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+        $this->client->method('wasThrottled')->willReturn(true);
+        $other->expects(self::exactly(2))->method('ingest')
+            ->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+
+        $this->createCron(null, $this->twoConnections($other))->execute();
+
+        self::assertSame(['0:catalog'], array_values(array_filter(
+            $this->connectionClaims,
+            static fn (string $claim): bool => str_starts_with($claim, '0:')
+        )), 'The primary asks for nothing more once it is throttled');
+    }
+
+    /**
+     * CON-237: a batch that failed in transport stops its connection for
+     * the run; the other connection sends on.
+     */
+    public function testATransportFailureStopsOnlyItsConnection(): void
+    {
+        $other = $this->createMock(Client::class);
+        $this->stubBatches([
+            '0:catalog' => [[$this->createEvent(1)]],
+            '0:orders' => [[$this->createEvent(2, Client::DOMAIN_ORDERS)]],
+            '2:catalog' => [[$this->createEvent(3)]],
+            '2:orders' => [[$this->createEvent(4, Client::DOMAIN_ORDERS)]],
+        ]);
+        $this->client->expects(self::exactly(2))->method('ingest')
+            ->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+        $other->expects(self::once())->method('ingest')
+            ->willThrowException(new EngineTransportException('engine down', 503));
+
+        $this->createCron(null, $this->twoConnections($other))->execute();
+
+        self::assertSame(['2:catalog'], array_values(array_filter(
+            $this->connectionClaims,
+            static fn (string $claim): bool => str_starts_with($claim, '2:')
+        )));
+    }
+
+    /**
+     * CON-237: a whole-batch 4xx ends that connection's domain for the
+     * run, not the other connection's.
+     */
+    public function testAWholeBatchRequestErrorEndsTheDomainOfItsConnectionOnly(): void
+    {
+        $other = $this->createMock(Client::class);
+        $this->stubBatches([
+            '0:catalog' => [[$this->createEvent(1)], [$this->createEvent(2)]],
+            '2:catalog' => [[$this->createEvent(3)], [$this->createEvent(4)]],
+        ]);
+        $this->client->expects(self::once())->method('ingest')
+            ->willThrowException(new EngineRequestException('HTTP 400: bad wrapper', 400));
+        $other->expects(self::exactly(2))->method('ingest')
+            ->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+
+        $this->createCron(null, $this->twoConnections($other))->execute();
+    }
+
+    /**
+     * CON-237: a connection whose engine store refused it is left out of
+     * the run; the other connection sends. One refused mid-run releases
+     * its batch and stops; the other goes on.
+     */
+    public function testARefusedConnectionIsSkippedWhileTheOtherSends(): void
+    {
+        $refused = $this->createMock(Settings::class);
+        $refused->method('isSendingAllowed')->willReturn(false);
+        $refused->method('isRefused')->willReturn(true);
+        $other = $this->createMock(Client::class);
+        $this->stubBatches([
+            '0:catalog' => [[$this->createEvent(1)]],
+            '2:catalog' => [[$this->createEvent(3)]],
+        ]);
+        $this->client->expects(self::never())->method('ingest');
+        $other->expects(self::once())->method('ingest')
+            ->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+
+        $this->createCron(null, $this->twoConnections($other, $refused))->execute();
+
+        self::assertSame([], array_values(array_filter(
+            $this->connectionClaims,
+            static fn (string $claim): bool => str_starts_with($claim, '0:')
+        )), 'Nothing of the refused connection is claimed');
+    }
+
+    public function testAConnectionRefusedMidRunReleasesItsBatchAndStopsAlone(): void
+    {
+        $account = new class {
+            public bool $refused = false;
+        };
+        $website = $this->createMock(Settings::class);
+        $website->method('isSendingAllowed')->willReturn(true);
+        $website->method('isRefused')->willReturnCallback(static fn (): bool => $account->refused);
+        $other = $this->createMock(Client::class);
+        $refusedBatch = [$this->createEvent(3)];
+        $this->stubBatches([
+            '0:catalog' => [[$this->createEvent(1)], [$this->createEvent(2)]],
+            '2:catalog' => [$refusedBatch, [$this->createEvent(4)]],
+        ]);
+        $other->expects(self::once())->method('ingest')->willReturnCallback(
+            static function () use ($account): array {
+                $account->refused = true;
+
+                throw new EngineRequestException('HTTP 403: tenant_inactive', 403);
+            }
+        );
+        $this->client->expects(self::exactly(2))->method('ingest')
+            ->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+        $this->queue->expects(self::once())->method('release')->with($refusedBatch);
+
+        $connections = $this->engineConnections([
+            [$this->engineConnection(0, $this->settings, [1], [1], 1), $this->client],
+            [$this->engineConnection(2, $website, [2], [2, 3], 2), $other],
+        ]);
+        $this->createCron(null, $connections)->execute();
+    }
+
+    /**
+     * CON-237: the stored opt-outs of the shoppers a connection's engine
+     * store confirmed go to that connection.
+     */
+    public function testTheOptOutsGoToTheConnectionThatConfirmedTheShoppers(): void
+    {
+        $other = $this->createMock(Client::class);
+        $this->payloads = [
+            21 => ['email' => 'primary@example.invalid'],
+            22 => ['email' => 'website@example.invalid'],
+        ];
+        $this->stubBatches([
+            '0:customers' => [[$this->createEvent(21, Client::DOMAIN_CUSTOMERS)]],
+            '2:customers' => [[$this->createEvent(22, Client::DOMAIN_CUSTOMERS)]],
+        ]);
+        $this->client->method('ingest')->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+        $other->method('ingest')->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+        $resent = [];
+        $this->profilingConsent->method('resendOptOuts')->willReturnCallback(
+            static function (array $emails, int $websiteId) use (&$resent): void {
+                $resent[] = [$emails, $websiteId];
+            }
+        );
+
+        $this->createCron(null, $this->twoConnections($other))->execute();
+
+        self::assertSame([[['primary@example.invalid'], 0], [['website@example.invalid'], 2]], $resent);
+    }
+
+    /**
+     * The primary (website 1, store view 1) with $this->client, and the
+     * connection of website 2 (store views 2 and 3) with its own client.
+     */
+    private function twoConnections(Client $other, ?Settings $primarySettings = null): Connections
+    {
+        $website = $this->createMock(Settings::class);
+        $website->method('isSendingAllowed')->willReturn(true);
+        $website->method('isRefused')->willReturn(false);
+
+        return $this->engineConnections([
+            [$this->engineConnection(0, $primarySettings ?? $this->settings, [1], [1], 1), $this->client],
+            [$this->engineConnection(2, $website, [2], [2, 3], 2), $other],
+        ]);
+    }
+
+    /**
      * One batch per domain, handed out once, as the queue does.
      *
      * @param array<string, IngestEvent[]> $byDomain
@@ -552,31 +789,38 @@ class FlushIngestQueueTest extends TestCase
 
     /**
      * Batches per domain, each handed out once and in order, as the queue
-     * does; the domains' claims are recorded in $this->claims.
+     * does; the domains' claims are recorded in $this->claims. A key
+     * "<connection key>:<domain>" holds one connection's batches; a plain
+     * domain, the primary's.
      *
      * @param array<string, IngestEvent[][]> $batchesByDomain
      */
     private function stubBatches(array $batchesByDomain): void
     {
         $this->queue->method('claimBatch')->willReturnCallback(
-            function (string $domain) use (&$batchesByDomain): array {
+            function (string $domain, int $limit, ?Connection $connection = null) use (&$batchesByDomain): array {
                 $this->claims[] = $domain;
-                if (empty($batchesByDomain[$domain])) {
+                $key = $connection === null ? '-' : (string)$connection->key();
+                $this->connectionClaims[] = $key . ':' . $domain;
+                $batchKey = isset($batchesByDomain[$key . ':' . $domain]) ? $key . ':' . $domain : $domain;
+                if ($key !== '0' && $batchKey === $domain) {
+                    return [];
+                }
+                if (empty($batchesByDomain[$batchKey])) {
                     return [];
                 }
 
-                return array_shift($batchesByDomain[$domain]);
+                return array_shift($batchesByDomain[$batchKey]);
             }
         );
     }
 
-    private function createCron(?Logger $logger = null): FlushIngestQueue
+    private function createCron(?Logger $logger = null, ?Connections $connections = null): FlushIngestQueue
     {
         return new FlushIngestQueue(
-            $this->settings,
+            $connections ?? $this->oneEngineConnection($this->settings, $this->client),
             $this->queue,
             $this->catalogIngest,
-            $this->client,
             new OptOutReplay($this->profilingConsent),
             new Json(),
             $logger ?? $this->createMock(Logger::class),

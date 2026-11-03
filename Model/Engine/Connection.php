@@ -80,6 +80,17 @@ class Connection
         return $this->canonicalStoreId;
     }
 
+    /**
+     * The website id its rows in the marketing queue (smaily_event_queue)
+     * carry, which Connections::forWebsite() reads back: 0 for the primary
+     * — the value every engine row carried before CON-237 — else the
+     * lowest-id website it serves (0 when it serves none).
+     */
+    public function eventWebsiteId(): int
+    {
+        return $this->isPrimary() ? 0 : (int)($this->websiteIds[0] ?? 0);
+    }
+
     public function isPrimary(): bool
     {
         return $this->key === self::PRIMARY_KEY;

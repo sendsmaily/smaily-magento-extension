@@ -12,6 +12,7 @@ use Magento\Framework\Exception\LocalizedException;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
@@ -45,7 +46,8 @@ class EngineOrdersProcessor implements ProcessorInterface
         private readonly IngestQueue $ingestQueue,
         private readonly SkippedRow $skippedRow,
         private readonly HistoryImport $historyImport,
-        private readonly ImportClock $clock
+        private readonly ImportClock $clock,
+        private readonly Connections $connections
     ) {
     }
 
@@ -69,6 +71,8 @@ class EngineOrdersProcessor implements ProcessorInterface
 
         $jobId = (int)$job->getId();
         $deadline = $this->clock->now() + self::TIME_BUDGET_SECONDS;
+        // The primary connection's rows (CON-237; per-connection imports are a later step).
+        $storeId = $this->connections->primary()->canonicalStoreId();
         do {
             $startPartQueued = $history['start_part_queued_to'] !== null;
             $rows = $this->historyImport->ordersPage(
@@ -110,7 +114,7 @@ class EngineOrdersProcessor implements ProcessorInterface
                         Client::DOMAIN_ORDERS,
                         $item,
                         (string)$order->getIncrementId(),
-                        null,
+                        $storeId,
                         null,
                         $jobId
                     );

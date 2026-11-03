@@ -49,6 +49,7 @@ use Smaily\Connect\Model\ResourceModel\Log\Collection;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\RecordingHandler;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * The queue flush cron end-to-end against a real database: delivery
@@ -59,6 +60,8 @@ use Smaily\Connect\Test\Integration\Support\RecordingHandler;
  */
 class FlushEventQueueTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     private EventQueue $queue;
 
     /** @var array<int, array{request: Request}> what the fake transport received */
@@ -270,6 +273,7 @@ class FlushEventQueueTest extends IntegrationTestCase
             'profilingConsent' => $consent,
             'customerRepository' => $this->createMock(CustomerRepositoryInterface::class),
             'customerSender' => $this->createMock(MergeCustomerSender::class),
+            'connections' => $this->oneEngineConnection($settings, $client),
         ]);
     }
 

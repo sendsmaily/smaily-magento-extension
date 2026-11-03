@@ -21,6 +21,7 @@ use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Observer\Engine\OrderSaveAfter;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-1762: the enqueue gate has to notice a refund, not just a state move.
@@ -33,6 +34,8 @@ use Smaily\Connect\Observer\Engine\OrderSaveAfter;
  */
 class OrderSaveAfterTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private OrderPayloadBuilder&MockObject $payloadBuilder;
     private IngestQueue&MockObject $queue;
     private CustomerIngest&MockObject $customerIngest;
@@ -135,7 +138,7 @@ class OrderSaveAfterTest extends TestCase
 
         return new OrderSaveAfter(
             $settings,
-            new OrderIngest($this->payloadBuilder, $this->queue),
+            new OrderIngest($this->payloadBuilder, $this->queue, $this->oneEngineConnection($settings)),
             $this->createMock(AttributionManager::class),
             $this->customerIngest
         );

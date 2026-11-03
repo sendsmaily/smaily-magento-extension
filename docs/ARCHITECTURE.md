@@ -199,19 +199,48 @@ below.
   turn, until the queue is empty, and maps the D6 response's
   `errors[].index` back onto individual rows — a 200 is never treated as
   all-or-nothing.
+- **Routed by engine connection (CON-237).** A row's `store_id` names the
+  Campaign Intelligence connection it goes to (see "Engine connections"
+  below): every enqueue site passes the connection's `canonicalStoreId()`
+  — today always the primary's, `Connections::primary()`, as the flows
+  build one payload for the one installation-wide connection — and NULL
+  (every row queued before CON-237) is the primary. `IngestQueue::claimBatch()`,
+  `latestUndeliveredPayloads()` and `hasRow()` take the connection and read
+  its rows only: `store_id IN` its store views, for the primary also
+  `store_id IS NULL`; a connection that serves every website (one store's
+  primary) is not narrowed, so one store reads exactly the rows it always
+  read — a row of a store view deleted since it was queued included —
+  and under separate stores such a row, or a row of a website no
+  connection serves, waits. `enqueueChangedPayloads()` takes the
+  connection: it compares with that connection's unsent rows and stores
+  its canonical store view. The `catalog_changed` markers belong to no
+  connection (claimed unfiltered, NULL), and `countPending()` (an
+  import's backlog guard) counts the whole queue. Each send-run round
+  gives every connection that may send (`Settings::isSendingAllowed()` of
+  its own scope) its turn — one batch per domain of its rows, then its
+  §3b batch — with its own client (`Connections::client()`); the pace and
+  the send budget below are one for the run, shared by the connections.
+  Under one store the primary is the only connection and the run makes
+  exactly the requests it made before
+  (`Test/Integration/Engine/QueueRoutingTest` pins both). The column
+  comment in `db_schema.xml` still reads "i18n context"; the column now
+  also carries the connection's canonical store view — no schema change.
 - **The send pace (CON-232)** lives in one place, `Model/Engine/IngestPace`:
   one request at a time, at most `REQUESTS_PER_SECOND` (5; the contract
   allows 100 a second per ingest route, and the engine contract is to name
   a target pace (1.25.0 does not yet) — its answer changes that one
   number), for at most
   `SEND_BUDGET_SECONDS` (40) a run, under the minute between runs. A 429
-  (also one a retry got past, `Client::wasThrottled()`) or a batch that
-  failed in transport ends the run; a whole-batch 4xx ends its domain for
-  the run. An import queues at most `IMPORT_BACKLOG_ROWS` (2,000) rows of
-  its domain ahead of the send run (the processors stop their chunk there),
-  so an import moves up to 2,000 rows a minute, and a row the store queues
-  meanwhile (a new order) waits behind at most that backlog — 40 order
-  requests, which one run sends — never behind the whole history. Per cron
+  (also one a retry got past, `Client::wasThrottled()`), a batch that
+  failed in transport or the engine store's refusal stops that
+  connection for the run, and the other connections send on; a
+  whole-batch 4xx ends that connection's domain for the run (CON-237;
+  with one connection, the run ends as before). An import queues at most
+  `IMPORT_BACKLOG_ROWS` (2,000) rows of its domain ahead of the send run
+  (the processors stop their chunk there), so an import moves up to 2,000
+  rows a minute, and a row the store queues meanwhile (a new order) waits
+  behind at most that backlog — 40 order requests, which one run sends —
+  never behind the whole history. Per cron
   minute an import moves min(2,000, what the tick builds in its 15 s, what
   the run sends in 40 s: 40 / max(0.2 s, time per request) × rows per
   request) rows; a store of 5,000 products, 20,000 customers and 80,000
@@ -718,7 +747,8 @@ below.
   `Engine\CatalogManifest`. The
   paths that loop re-ask it as they go, because a mid-run 403 can change
   its refusal half: the flusher only that half, per domain, once
-  connectedness is proved (so one refusal ends the run); the merge and
+  connectedness is proved (so one refusal ends the run for that
+  connection's engine store, CON-237); the merge and
   profiling-consent handlers per row (`Settings::sendingBlockedReason()`:
   a refusal leaves the row `Queue\Pending`, not connected names the
   reason).
@@ -752,8 +782,9 @@ below.
   per-website fan-out: still one payload per product, so a multi-website
   installation with divergent per-website prices ingests one website's price
   per product. Each `smaily_ingest_queue` catalog row's `store_id` column
-  records that canonical ingest scope for audit — not necessarily the store
-  the price was read at, see the exception below. Links and the websites
+  records the canonical store view of the connection it goes to (CON-237;
+  under one store, that canonical ingest scope) — not necessarily the
+  store the price was read at, see the exception below. Links and the websites
   that sell the product are per website since CON-253 (`websites`, see
   "Several websites in one engine store" below); price and stock are not.
 - **Several websites in one engine store (CON-253, contract v1.21.0).**
@@ -809,15 +840,20 @@ below.
   follows the store: one store — in one version or several — is one engine
   store, and each separate store connects its own. The engine holds one
   engine store per Smaily account, so connections are grouped by the
-  Smaily account. The model is in place; no flow routes by it yet, so
-  every store is still served by the one installation-wide connection.
+  Smaily account. The ingest queue routes by it (see "Routed by engine
+  connection" above); every flow still builds and queues its rows for the
+  primary, so every store is still served by the one installation-wide
+  connection.
   - `Model/Engine/Connection` is one connection: `key()` (0 = the primary,
     else the id of the website whose scope holds it), `settings()`,
     `websiteIds()`, `storeIds()`, `canonicalStoreId()` (the default store
     view of the installation's default website when it serves that
     website, else the default store view of its lowest-id website; null
     when it serves none — a queue row then carries NULL, the primary),
-    `isPrimary()`, `servesAllWebsites()`.
+    `isPrimary()`, `servesAllWebsites()`, `eventWebsiteId()` (the
+    `website_id` its rows in the marketing queue carry: 0 for the
+    primary, as every engine row did before, else the lowest website it
+    serves).
   - `Model/Engine/Connections` (built once per request, `reset()`
     rebuilds): `all()`, `primary()`, `forWebsite()`, `forStore()`,
     `forKey()`, `forRowStoreId()` (NULL = the primary: every row queued
@@ -1003,7 +1039,9 @@ below.
   between pages.
 - **Claiming:** rows are claimed with a per-worker `claim_token`; only rows
   the worker actually won are processed, so concurrent flushes (manual cron,
-  multi-node) can never double-send. Rows stuck in `sending` (killed
+  multi-node) can never double-send. The ingest queue claims one Campaign
+  Intelligence connection's rows at a time (CON-237, see "Routed by engine
+  connection"). Rows stuck in `sending` (killed
   worker) are requeued after 15 minutes. Every outcome of a row —
   `markSent()`, `markFailed()`, `markSkipped()` and the batched
   `markFailedMany()` — clears `claim_token` and `claimed_at` and sets
@@ -2028,9 +2066,13 @@ Subscribers grid, or a customer account, leaves profiling as it was.
   the customer/order history import creates them. So `Cron\FlushIngestQueue`,
   where the engine's D6 answer marks each row delivered, hands the items the
   engine confirmed (processed or deduplicated, not a per-item error) to
-  `Model\Privacy\OptOutReplay::afterConfirmed()`, once per batch; that
+  `Model\Privacy\OptOutReplay::afterConfirmed()`, once per batch, with the
+  connection the batch went to; that
   knows which field names the shopper in a customer and in an order item
-  and passes their addresses to `ProfilingConsent::resendOptOuts()`. That
+  and passes their addresses to `ProfilingConsent::resendOptOuts()`, with
+  the connection's `eventWebsiteId()` (0 for the primary): the opt-out row
+  goes to that connection, and only its waiting rows hold one back
+  (CON-237). That
   reads the record once for the whole batch (`ProfilingOptOuts::moments()`,
   which hands back each address's key with its moment, so each address is
   hashed once) and queues an opt-out row with the stored
@@ -2087,10 +2129,16 @@ Subscribers grid, or a customer account, leaves profiling as it was.
   claiming them, rather than claiming and releasing, keeps a long refusal's
   backlog from filling every batch ahead of the contact syncs. The Log's
   Details reads the same two facts (`Model\Log\AccountWait::waits()`,
-  PRO-3753): a pending ingest row while the account is
+  PRO-3753): a pending ingest row while the account of its connection is
   refused, or a pending row of a type `pausedEventTypes()` names, says it
   waits for the account to be active again, not for the next flush or
-  retry.
+  retry. While the installation has more than one Campaign Intelligence
+  connection, Details names an engine row's engine store and the
+  websites it serves ("Campaign Intelligence store",
+  `Model\Log\EngineStore`, CON-237): an ingest row by its `store_id`
+  (NULL: the primary), an engine row of the marketing queue by its
+  `website_id` (0: the primary); a row no connection serves says so.
+  Under one connection Details shows no such line.
 - **The customer before the merge** (CON-262; contract v1.23.0 §4 group c,
   §7 "Send the customer first" and "Retry after 404"). The engine merges
   only a customer it already has, and answers `404 customer_not_found`

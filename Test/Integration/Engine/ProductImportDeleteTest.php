@@ -31,6 +31,7 @@ use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource
 use Smaily\Connect\Observer\Engine\ProductImportBunchDelete;
 use Smaily\Connect\Plugin\Engine\ProductImportBunch;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3768 against a real MySQL: Magento's import data source (the real
@@ -46,6 +47,8 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
  */
 class ProductImportDeleteTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     private const TABLES = ['catalog_product_super_link', 'catalog_product_entity', 'importexport_importdata'];
     private const TOMBSTONE = ['sku' => 'TENT-RED', 'in_stock' => false];
 
@@ -228,7 +231,8 @@ class ProductImportDeleteTest extends IntegrationTestCase
                 $productResource,
                 $payloadBuilder,
                 $ingestQueue,
-                $this->createMock(Logger::class)
+                $this->createMock(Logger::class),
+                $this->oneEngineConnection($settings)
             )
         );
     }

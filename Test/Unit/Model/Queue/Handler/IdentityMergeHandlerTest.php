@@ -27,9 +27,12 @@ use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
 use Smaily\Connect\Model\Queue\Pending;
 use Smaily\Connect\Model\Queue\Skipped;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 class IdentityMergeHandlerTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const PAYLOAD = [
         'customer_email' => 'person@example.com',
         'customer_external_id' => '42',
@@ -459,7 +462,8 @@ class IdentityMergeHandlerTest extends TestCase
             $this->customerRepository,
             $this->createMock(Logger::class),
             $this->sender,
-            $this->ingestQueue
+            $this->ingestQueue,
+            $this->oneEngineConnection($settings)
         );
     }
 

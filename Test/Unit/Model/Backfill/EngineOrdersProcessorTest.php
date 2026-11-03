@@ -23,7 +23,9 @@ use Smaily\Connect\Model\Backfill\SkippedRow;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
+use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3950: the job is taken up before the order count, so a worker that
@@ -33,6 +35,8 @@ use Smaily\Connect\Model\Logger\Logger;
  */
 class EngineOrdersProcessorTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const HISTORY = [
         'import_id' => 'mag-2026-10-28-5',
         'orders_job_id' => 5,
@@ -321,7 +325,8 @@ class EngineOrdersProcessorTest extends TestCase
             $ingestQueue,
             $skippedRow ?? $this->createMock(SkippedRow::class),
             $historyImport,
-            $clock ?? new ImportClock()
+            $clock ?? new ImportClock(),
+            $this->oneEngineConnection($this->createMock(Settings::class))
         );
     }
 

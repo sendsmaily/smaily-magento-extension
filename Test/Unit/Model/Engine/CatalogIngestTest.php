@@ -17,11 +17,13 @@ use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\CatalogProductLoader;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-1951: one Magento product save reaches three catalog hooks (product
@@ -36,6 +38,8 @@ use Smaily\Connect\Model\Logger\Logger;
  */
 class CatalogIngestTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private ProductCollectionFactory&MockObject $collectionFactory;
     private ProductResource&MockObject $productResource;
     private CatalogPayloadBuilder&MockObject $payloadBuilder;
@@ -213,7 +217,9 @@ class CatalogIngestTest extends TestCase
         $this->queue->expects(self::once())->method('enqueueChangedPayloads')->with(Client::DOMAIN_CATALOG, [
             '8' => ['sku' => 'SKU-8'],
             '9' => ['sku' => 'SKU-9'],
-        ], 1);
+        ], self::callback(
+            static fn (Connection $connection): bool => $connection->isPrimary()
+        ));
         $this->queue->expects(self::once())->method('delete')->with($markers);
 
         $this->ingest()->buildChanged();
@@ -244,7 +250,9 @@ class CatalogIngestTest extends TestCase
         $this->collectionFactory->method('create')->willReturn($this->collection([$this->product(8)]));
         $this->queue->expects(self::once())->method('enqueueChangedPayloads')->with(Client::DOMAIN_CATALOG, [
             '8' => ['sku' => 'TENT', 'in_stock' => false],
-        ], 1);
+        ], self::callback(
+            static fn (Connection $connection): bool => $connection->isPrimary()
+        ));
 
         $this->ingest($payloadBuilder)->buildChanged();
     }
@@ -267,7 +275,9 @@ class CatalogIngestTest extends TestCase
         $logger->expects(self::once())->method('error');
         $this->queue->expects(self::once())->method('enqueueChangedPayloads')->with(Client::DOMAIN_CATALOG, [
             '9' => ['sku' => 'SKU-9'],
-        ], 1);
+        ], self::callback(
+            static fn (Connection $connection): bool => $connection->isPrimary()
+        ));
         $this->queue->expects(self::once())->method('delete');
 
         $this->ingest(null, $logger)->buildChanged();
@@ -292,7 +302,9 @@ class CatalogIngestTest extends TestCase
             9 => ['sku' => 'SKU-9', 'in_stock' => false],
         ];
         $this->queue->expects(self::once())->method('enqueueChangedPayloads')
-            ->with(Client::DOMAIN_CATALOG, $rows, 1);
+            ->with(Client::DOMAIN_CATALOG, $rows, self::callback(
+                static fn (Connection $connection): bool => $connection->isPrimary()
+            ));
 
         $ingest = $this->ingest();
         $built = $ingest->buildTombstones([8, 9]);
@@ -314,11 +326,15 @@ class CatalogIngestTest extends TestCase
      * §3b (PRO-1231): one catalog_remove row per product, carrying the raw
      * entity id, for the admin delete and the import's Delete alike.
      */
+    /**
+     * CON-237: each row carries the primary connection's canonical store
+     * view.
+     */
     public function testRemovalsAreQueuedAsOneSection3bRowPerProduct(): void
     {
         $this->queue->expects(self::once())->method('enqueueMany')->with(Client::DOMAIN_CATALOG_REMOVE, [
-            ['payload' => ['product_id' => '42'], 'entity_id' => '42', 'store_id' => null],
-            ['payload' => ['product_id' => '43'], 'entity_id' => '43', 'store_id' => null],
+            ['payload' => ['product_id' => '42'], 'entity_id' => '42', 'store_id' => 1],
+            ['payload' => ['product_id' => '43'], 'entity_id' => '43', 'store_id' => 1],
         ]);
 
         $this->ingest()->enqueueRemovals([42, 43]);
@@ -342,7 +358,8 @@ class CatalogIngestTest extends TestCase
             $this->productResource,
             $payloadBuilder,
             $this->queue,
-            $logger ?? $this->createMock(Logger::class)
+            $logger ?? $this->createMock(Logger::class),
+            $this->oneEngineConnection($settings)
         );
     }
 

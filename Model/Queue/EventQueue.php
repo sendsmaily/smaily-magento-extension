@@ -610,25 +610,29 @@ class EventQueue
      * pending — a retry in its backoff too — or being sent. One query. The
      * entity is the opt-out record's keyed hash of the address (PRO-3765);
      * ProfilingConsent asks for the plain address too, the form of a row
-     * queued before.
+     * queued before. With $websiteId, only the rows of the Campaign
+     * Intelligence connection whose rows carry it (CON-237,
+     * Engine\Connection::eventWebsiteId()).
      *
      * @param string[] $entityIds
      * @return string[] the entities among them that wait
      */
-    public function waitingProfilingOptOuts(array $entityIds): array
+    public function waitingProfilingOptOuts(array $entityIds, ?int $websiteId = null): array
     {
         if (!$entityIds) {
             return [];
         }
 
         $connection = $this->resourceConnection->getConnection();
-        $rows = $connection->fetchAll(
-            $connection->select()
-                ->from($this->resourceConnection->getTableName(EventResource::TABLE_NAME), ['entity_id', 'payload'])
-                ->where('event_type = ?', EventType::ENGINE_PROFILING_CONSENT)
-                ->where('entity_id IN (?)', array_values($entityIds))
-                ->where('status IN (?)', [Event::STATUS_PENDING, Event::STATUS_SENDING])
-        );
+        $select = $connection->select()
+            ->from($this->resourceConnection->getTableName(EventResource::TABLE_NAME), ['entity_id', 'payload'])
+            ->where('event_type = ?', EventType::ENGINE_PROFILING_CONSENT)
+            ->where('entity_id IN (?)', array_values($entityIds))
+            ->where('status IN (?)', [Event::STATUS_PENDING, Event::STATUS_SENDING]);
+        if ($websiteId !== null) {
+            $select->where('website_id = ?', $websiteId);
+        }
+        $rows = $connection->fetchAll($select);
 
         $waiting = [];
         foreach ($rows as $row) {

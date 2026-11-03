@@ -30,6 +30,7 @@ use Smaily\Connect\Model\Queue\HandlerPool;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3760: an opt-out made before the engine knew the shopper (the engine
@@ -41,6 +42,8 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  */
 class ProfilingOptOutReplayTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     /** @var array<string, true> the shoppers the fake engine holds */
     private array $engineShoppers = [];
 
@@ -295,10 +298,9 @@ class ProfilingOptOutReplayTest extends IntegrationTestCase
     {
         /** @var FlushIngestQueue $cron */
         $cron = $this->objectManager->create(FlushIngestQueue::class, [
-            'settings' => $this->settings,
+            'connections' => $this->oneEngineConnection($this->settings, $this->client),
             'queue' => $this->ingestQueue,
             'catalogIngest' => $this->createMock(CatalogIngest::class),
-            'client' => $this->client,
             'optOutReplay' => new OptOutReplay($this->consent()),
         ]);
         $cron->execute();

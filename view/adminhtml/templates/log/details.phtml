@@ -44,6 +44,8 @@ $history = (array)$block->getData('history');
 $resendUrl = $block->getData('resend_url');
 // A pending row that is not sent until Campaign Intelligence is active again (PRO-3753).
 $waitsForAccount = (bool)$block->getData('waits_for_account');
+// The engine store the row goes to; null under one connection (CON-237).
+$engineStore = $block->getData('engine_store');
 
 if (!$row) {
     ?>
@@ -154,6 +156,10 @@ $formatDate = static fn (string $date): string => (string)$block->formatDate($da
         <?php if ($entity !== ''): ?>
         <dt><?= $escaper->escapeHtml(__('Entity')) ?></dt>
         <dd><?= $escaper->escapeHtml($entity) ?></dd>
+        <?php endif; ?>
+        <?php if ($engineStore !== null): ?>
+        <dt><?= $escaper->escapeHtml(__('Campaign Intelligence store')) ?></dt>
+        <dd><?= $escaper->escapeHtml((string)$engineStore) ?></dd>
         <?php endif; ?>
         <dt><?= $escaper->escapeHtml(__('Attempts')) ?></dt>
         <dd><?= $escaper->escapeHtml(__('%1 of %2', $attempts, $maxAttempts)) ?></dd>

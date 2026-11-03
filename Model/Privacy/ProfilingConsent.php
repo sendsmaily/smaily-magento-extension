@@ -281,10 +281,13 @@ class ProfilingConsent
      * opted out is queued again with its moment, through the same queue
      * row, so the newest choice still wins at delivery. Not for a shopper
      * whose opt-out already waits in the queue: many orders make one row.
+     * The rows go to the Campaign Intelligence connection whose engine
+     * store confirmed the shoppers (CON-237): $websiteId is its
+     * Engine\Connection::eventWebsiteId(), 0 for the primary.
      *
      * @param string[] $emails
      */
-    public function resendOptOuts(array $emails): void
+    public function resendOptOuts(array $emails, int $websiteId = 0): void
     {
         $emails = array_values(array_unique(array_filter(array_map(
             [AddressKey::class, 'normalise'],
@@ -301,7 +304,7 @@ class ProfilingConsent
             // A row queued before PRO-3765 carries the plain address.
             $entities[$email] = $this->contactEntity->forms((string)$email, $optOut['key']);
         }
-        $waiting = $this->eventQueue->waitingProfilingOptOuts(array_merge(...array_values($entities)));
+        $waiting = $this->eventQueue->waitingProfilingOptOuts(array_merge(...array_values($entities)), $websiteId);
         foreach ($moments as $email => ['moment' => $moment, 'key' => $key]) {
             if (array_intersect($entities[$email], $waiting)) {
                 continue;
@@ -312,7 +315,8 @@ class ProfilingConsent
                 (string)$email,
                 true,
                 gmdate(self::TIMESTAMP_FORMAT, $moment > 0 ? $moment : $this->dateTime->gmtTimestamp()),
-                $key
+                $key,
+                $websiteId
             );
         }
     }
@@ -410,9 +414,15 @@ class ProfilingConsent
      * too, and only the payload the engine needs names the shopper.
      *
      * @param string|null $key the address's keyed hash, when the caller holds it
+     * @param int $websiteId the connection's Engine\Connection::eventWebsiteId(), 0 for the primary
      */
-    private function queueForEngine(string $email, bool $optOut, string $timestamp, ?string $key = null): void
-    {
+    private function queueForEngine(
+        string $email,
+        bool $optOut,
+        string $timestamp,
+        ?string $key = null,
+        int $websiteId = 0
+    ): void {
         if (!$this->engineSettings->isConnected()) {
             return;
         }
@@ -424,7 +434,8 @@ class ProfilingConsent
         $this->eventQueue->enqueue(
             EventType::ENGINE_PROFILING_CONSENT,
             $payload,
-            $key ?? $this->addressKey->of($email)
+            $key ?? $this->addressKey->of($email),
+            $websiteId
         );
     }
 }

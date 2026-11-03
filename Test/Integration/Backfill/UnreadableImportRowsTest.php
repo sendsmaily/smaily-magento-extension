@@ -41,6 +41,7 @@ use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\SalesOrderHarness;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-227: on the pilot store the customers import stopped at a customer
@@ -59,6 +60,7 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
 class UnreadableImportRowsTest extends IntegrationTestCase
 {
     use SalesOrderHarness;
+    use EngineConnectionsStub;
 
     private const MISSING_STORE_ID = 9;
 
@@ -184,7 +186,8 @@ class UnreadableImportRowsTest extends IntegrationTestCase
             $skippedRow,
             $scope,
             $historyImport,
-            new ImportClock()
+            new ImportClock(),
+            $this->oneEngineConnection($engineSettings)
         );
         $orders = new EngineOrdersProcessor(
             $this->jobManager,
@@ -198,7 +201,8 @@ class UnreadableImportRowsTest extends IntegrationTestCase
             $ingestQueue,
             $skippedRow,
             $historyImport,
-            new ImportClock()
+            new ImportClock(),
+            $this->oneEngineConnection($engineSettings)
         );
 
         return new BackfillTick($this->jobManager, $engineSettings, $logger, $historyImport, $this->createMock(HistoryProgress::class), [

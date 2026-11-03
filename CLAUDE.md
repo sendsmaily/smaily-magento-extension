@@ -487,6 +487,9 @@ is written in English.
   2026-11-03 later: 4/5 (rc21 released; sending with the workflow
   Campaign Intelligence pushed is on master; the first pilot store
   upgrades straight to rc21).
+  2026-11-03 session end: 4/5 (separate-stores setup and three of six
+  Campaign Intelligence per-store steps on master, dark for one store;
+  the first pilot store upgrades straight to rc21).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Feature (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

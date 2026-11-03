@@ -44,6 +44,7 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job as JobResource;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Model\StorefrontScript;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Integration\Support\FrozenImportClock;
 use Smaily\Connect\Test\Integration\Support\SalesOrderHarness;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
 use Smaily\Connect\Test\Integration\Support\VirtualPace;
@@ -63,7 +64,9 @@ use Smaily\Connect\Test\Integration\Support\VirtualPace;
  * the engine client with its JSON and D6 handling, and the pace and its
  * send budget. The pace runs on a clock that moves only by its own waits
  * (Support\VirtualPace), so how fast the database answers changes nothing
- * (CON-215). The engine is a mock that answers each request with a D6
+ * (CON-215); the tick's 15 s budget runs on a clock that does not move
+ * (Support\FrozenImportClock), so a slow machine cannot end a tick before
+ * it has queued the backlog (CON-265). The engine is a mock that answers each request with a D6
  * reply at once and records when, on that clock, it came.
  */
 class ImportPaceTest extends IntegrationTestCase
@@ -213,8 +216,9 @@ class ImportPaceTest extends IntegrationTestCase
             array_values(array_unique(array_column($this->progress, 'phase')))
         );
         // How many minutes it takes depends on how much a tick builds in its
-        // 15 s (when every tick queues its full 2,000 rows: the start part
-        // after 8 minutes, the whole horizon after 22). The phases do not:
+        // 15 s — here, on the frozen import clock, every tick queues its full
+        // 2,000 rows: the start part after 8 minutes, the whole horizon
+        // after 22. On a store the phases do not depend on it:
         // `start_part_complete` comes at most two minutes after the last
         // start-part order was accepted (one for the tick to find the start
         // part's end, one to report it), counting at least those 12,000
@@ -261,7 +265,8 @@ class ImportPaceTest extends IntegrationTestCase
             ),
             $queue,
             new SkippedRow($logger),
-            $historyImport
+            $historyImport,
+            new FrozenImportClock()
         );
         $progress = $client === null
             ? $this->createMock(HistoryProgress::class)

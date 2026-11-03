@@ -16,6 +16,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Backfill\EngineOrdersProcessor;
 use Smaily\Connect\Model\Backfill\HistoryImport;
+use Smaily\Connect\Model\Backfill\ImportClock;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\SkippedRow;
@@ -209,6 +210,39 @@ class EngineOrdersProcessorTest extends TestCase
     }
 
     /**
+     * CON-265: the tick's budget is spent on the import clock, not on the
+     * wall clock: once that clock passes the budget, the tick stops at the
+     * page boundary and leaves the next page to the next tick.
+     */
+    public function testTheTickStopsAtAPageBoundaryOnceItsBudgetIsSpentOnTheImportClock(): void
+    {
+        $calls = [];
+        $historyImport = $this->historyImport([
+            [['entity_id' => '13', 'created_at' => '2026-10-01 10:00:00']],
+            [['entity_id' => '12', 'created_at' => '2026-09-01 10:00:00']],
+        ], $calls);
+        $enqueued = [];
+        $queue = $this->queue();
+        $queue->method('enqueue')->willReturnCallback(
+            static function (string $domain, array $item) use (&$enqueued): bool {
+                $enqueued[] = $item['external_order_id'];
+
+                return true;
+            }
+        );
+        $jobManager = $this->createMock(JobManager::class);
+        $jobManager->expects(self::never())->method('complete');
+        $clock = $this->createMock(ImportClock::class);
+        $clock->method('now')->willReturnOnConsecutiveCalls(1000.0, 1016.0);
+
+        $this->processor($jobManager, $historyImport, $this->builder(), $queue, [12, 13], null, $clock)
+            ->process($this->job(3));
+
+        self::assertSame(['13'], $enqueued);
+        self::assertCount(1, $calls, 'The second page waits for the next tick');
+    }
+
+    /**
      * @param list<list<array{entity_id: string, created_at: string}>> $pages
      * @param list<array{string, string}> $calls the window start and cursor each page was read with
      */
@@ -254,7 +288,8 @@ class EngineOrdersProcessorTest extends TestCase
         OrderPayloadBuilder $builder,
         IngestQueue $ingestQueue,
         array $orderIds = [],
-        ?SkippedRow $skippedRow = null
+        ?SkippedRow $skippedRow = null,
+        ?ImportClock $clock = null
     ): EngineOrdersProcessor {
         $collectionFactory = $this->createMock(CollectionFactory::class);
         $collectionFactory->method('create')->willReturnCallback(function () use ($orderIds): Collection {
@@ -285,7 +320,8 @@ class EngineOrdersProcessorTest extends TestCase
             $builder,
             $ingestQueue,
             $skippedRow ?? $this->createMock(SkippedRow::class),
-            $historyImport
+            $historyImport,
+            $clock ?? new ImportClock()
         );
     }
 

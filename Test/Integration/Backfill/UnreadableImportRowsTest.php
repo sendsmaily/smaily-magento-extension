@@ -24,6 +24,7 @@ use Smaily\Connect\Model\Backfill\EngineCustomersProcessor;
 use Smaily\Connect\Model\Backfill\EngineOrdersProcessor;
 use Smaily\Connect\Model\Backfill\HistoryImport;
 use Smaily\Connect\Model\Backfill\HistoryProgress;
+use Smaily\Connect\Model\Backfill\ImportClock;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\SkippedRow;
@@ -182,7 +183,8 @@ class UnreadableImportRowsTest extends IntegrationTestCase
             $ingestQueue,
             $skippedRow,
             $scope,
-            $historyImport
+            $historyImport,
+            new ImportClock()
         );
         $orders = new EngineOrdersProcessor(
             $this->jobManager,
@@ -195,7 +197,8 @@ class UnreadableImportRowsTest extends IntegrationTestCase
             ),
             $ingestQueue,
             $skippedRow,
-            $historyImport
+            $historyImport,
+            new ImportClock()
         );
 
         return new BackfillTick($this->jobManager, $engineSettings, $logger, $historyImport, $this->createMock(HistoryProgress::class), [

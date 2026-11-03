@@ -14,6 +14,7 @@ use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductColl
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Backfill\EngineCatalogProcessor;
+use Smaily\Connect\Model\Backfill\ImportClock;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Engine\CatalogIngest;
@@ -66,7 +67,8 @@ class EngineCatalogProcessorTest extends TestCase
             $payloadBuilder,
             $ingestQueue,
             $this->createMock(CatalogIngest::class),
-            new CatalogProductLoader($collectionFactory, $payloadBuilder)
+            new CatalogProductLoader($collectionFactory, $payloadBuilder),
+            new ImportClock()
         );
 
         $processor->process($job);
@@ -106,7 +108,8 @@ class EngineCatalogProcessorTest extends TestCase
             $payloadBuilder,
             $ingestQueue,
             $this->createMock(CatalogIngest::class),
-            new CatalogProductLoader($collectionFactory, $payloadBuilder)
+            new CatalogProductLoader($collectionFactory, $payloadBuilder),
+            new ImportClock()
         );
 
         $processor->process($job);
@@ -140,7 +143,8 @@ class EngineCatalogProcessorTest extends TestCase
             $payloadBuilder,
             $ingestQueue,
             $this->createMock(CatalogIngest::class),
-            new CatalogProductLoader($collectionFactory, $payloadBuilder)
+            new CatalogProductLoader($collectionFactory, $payloadBuilder),
+            new ImportClock()
         );
 
         $this->expectExceptionMessage('count died');
@@ -214,7 +218,8 @@ class EngineCatalogProcessorTest extends TestCase
             $payloadBuilder,
             $ingestQueue,
             $catalogIngest,
-            new CatalogProductLoader($collectionFactory, $payloadBuilder)
+            new CatalogProductLoader($collectionFactory, $payloadBuilder),
+            new ImportClock()
         );
 
         $processor->process($job);

@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Backfill\EngineCustomerScope;
 use Smaily\Connect\Model\Backfill\EngineCustomersProcessor;
 use Smaily\Connect\Model\Backfill\HistoryImport;
+use Smaily\Connect\Model\Backfill\ImportClock;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\SkippedRow;
@@ -98,7 +99,8 @@ class EngineCustomersProcessorTest extends TestCase
             $ingestQueue,
             $skippedRow,
             $scope,
-            $historyImport
+            $historyImport,
+            new ImportClock()
         ))->process($job);
 
         self::assertSame([['21', 6], ['23', 6]], $enqueued);

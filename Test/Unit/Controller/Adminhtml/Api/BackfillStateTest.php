@@ -27,6 +27,7 @@ use Smaily\Connect\Model\Backfill\JobStatusAggregator;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\ResourceModel\Backfill\Job\Collection;
 use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-1969, PRO-3742: a Campaign Intelligence import (catalog, customers,
@@ -44,6 +45,8 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  */
 class BackfillStateTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private JobManager&MockObject $jobManager;
 
     private HistoryProgress&MockObject $historyProgress;
@@ -414,7 +417,12 @@ class BackfillStateTest extends TestCase
             $storeManager,
             $this->createMock(TimezoneInterface::class),
             new JobStatusAggregator(),
-            new ImportStarter($this->jobManager, $storeManager, new EngineImportGuard($engineSettings)),
+            new ImportStarter(
+                $this->jobManager,
+                $storeManager,
+                new EngineImportGuard(),
+                $this->oneEngineConnection($engineSettings)
+            ),
             $this->historyProgress
         );
     }

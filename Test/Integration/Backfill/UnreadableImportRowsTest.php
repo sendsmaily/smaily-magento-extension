@@ -162,7 +162,10 @@ class UnreadableImportRowsTest extends IntegrationTestCase
         $historyConfig = $this->createMock(HistoryConfig::class);
         $historyConfig->method('forNewImport')->willReturn(HistoryConfig::FALLBACK);
         $historyConfig->method('stored')->willReturn(HistoryConfig::FALLBACK);
-        $historyImport = $this->objectManager->create(HistoryImport::class, ['historyConfig' => $historyConfig]);
+        $historyImport = $this->objectManager->create(HistoryImport::class, [
+            'historyConfig' => $historyConfig,
+            'connections' => $this->oneEngineConnection($engineSettings),
+        ]);
         // The customers in scope: all three (EngineCustomerScope has its own test).
         $scope = $this->createMock(EngineCustomerScope::class);
         $scope->method('count')->willReturn(3);
@@ -187,7 +190,7 @@ class UnreadableImportRowsTest extends IntegrationTestCase
             $scope,
             $historyImport,
             new ImportClock(),
-            $this->oneEngineConnection($engineSettings)
+            $this->engineJobConnection($this->oneEngineConnection($engineSettings), $this->jobManager)
         );
         $orders = new EngineOrdersProcessor(
             $this->jobManager,
@@ -202,7 +205,7 @@ class UnreadableImportRowsTest extends IntegrationTestCase
             $skippedRow,
             $historyImport,
             new ImportClock(),
-            $this->oneEngineConnection($engineSettings)
+            $this->engineJobConnection($this->oneEngineConnection($engineSettings), $this->jobManager)
         );
 
         return new BackfillTick($this->jobManager, $engineSettings, $logger, $historyImport, $this->createMock(HistoryProgress::class), [

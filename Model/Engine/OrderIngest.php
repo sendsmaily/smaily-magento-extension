@@ -29,6 +29,13 @@ use Smaily\Connect\Model\Engine\Queue\IngestQueue;
  * nothing. Only builds next to each other for one order, one of them a
  * credit memo's, collapse; consecutive saves of an order without a refund
  * each queue their row, as before.
+ *
+ * An order goes to the Campaign Intelligence connection of the store view
+ * it was placed in (CON-237, Connections::forStore()), with its canonical
+ * store view; nothing is queued when no connected connection serves that
+ * store view. An order whose store view no longer exists goes to the
+ * primary while it is the only connection, else nowhere. Under one store
+ * every order goes to the primary, as before.
  */
 class OrderIngest
 {
@@ -59,6 +66,10 @@ class OrderIngest
      */
     public function enqueue(Order $order, bool $refund = false): void
     {
+        $connection = $this->connectionOf($order);
+        if ($connection === null || !$connection->settings()->isConnected()) {
+            return;
+        }
         $item = $this->payloadBuilder->build($order);
         if ($item === null) {
             return;
@@ -82,12 +93,25 @@ class OrderIngest
 
         $this->lastOrderId = $orderId;
         $this->lastPayload = $payload;
-        // The primary connection's row (CON-237; per-connection rows are a later step).
         $this->lastRowId = $this->ingestQueue->enqueueReturningId(
             Client::DOMAIN_ORDERS,
             $item,
             $orderId,
-            $this->connections->primary()->canonicalStoreId()
+            $connection->canonicalStoreId()
         );
+    }
+
+    /**
+     * The connection the order's row goes to, null for none.
+     */
+    private function connectionOf(Order $order): ?Connection
+    {
+        $storeId = (int)$order->getStoreId();
+        $connection = $storeId > 0 ? $this->connections->forStore($storeId) : null;
+        if ($connection === null && count($this->connections->all()) === 1) {
+            return $this->connections->primary();
+        }
+
+        return $connection;
     }
 }

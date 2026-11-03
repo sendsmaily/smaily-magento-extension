@@ -82,6 +82,30 @@ class Connections
     }
 
     /**
+     * The connections whose engine store is connected, the primary first.
+     * Under one store, the primary when it is connected.
+     *
+     * @return Connection[]
+     */
+    public function connected(): array
+    {
+        return array_values(array_filter(
+            $this->all(),
+            static fn (Connection $connection): bool => $connection->settings()->isConnected()
+        ));
+    }
+
+    /**
+     * Whether any connection is connected — the gate of a flow that sends
+     * to every connection that owns its data (the catalog, an order). The
+     * primary's settings answer first, without reading the websites.
+     */
+    public function anyConnected(): bool
+    {
+        return $this->settings->isConnected() || $this->connected() !== [];
+    }
+
+    /**
      * The connection serving a website, or null when none does (separate
      * stores only). Website 0 — a row queued before CON-237 — is the
      * primary's.

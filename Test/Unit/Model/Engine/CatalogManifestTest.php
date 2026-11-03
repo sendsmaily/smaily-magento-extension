@@ -19,6 +19,7 @@ use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\CatalogManifest;
 use Smaily\Connect\Model\Engine\CatalogProductLoader;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
@@ -26,13 +27,19 @@ use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3854: the nightly catalog manifest — when it is not sent, how the
  * list is read, and the one Log row a send leaves.
+ *
+ * CON-237: each Campaign Intelligence connection's list, with its own
+ * client, gate, import, queue rows and flag.
  */
 class CatalogManifestTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private Settings&MockObject $settings;
     private JobManager&MockObject $jobManager;
     private IngestQueue&MockObject $queue;
@@ -49,6 +56,9 @@ class CatalogManifestTest extends TestCase
     /** @var array<string, int> undelivered rows per queue domain */
     private array $pending = [];
 
+    /** @var array<int, array<string, int>> undelivered rows per connection key and queue domain */
+    private array $pendingOf = [];
+
     /** @var int[] the cursor each page was read after */
     private array $cursors = [];
 
@@ -59,7 +69,9 @@ class CatalogManifestTest extends TestCase
         $this->jobManager = $this->createMock(JobManager::class);
         $this->queue = $this->createMock(IngestQueue::class);
         $this->queue->method('countPending')->willReturnCallback(
-            fn (string $domain): int => $this->pending[$domain] ?? 0
+            fn (string $domain, ?Connection $connection = null): int => $connection === null || $connection->isPrimary()
+                ? $this->pending[$domain] ?? 0
+                : $this->pendingOf[$connection->key()][$domain] ?? 0
         );
         $this->event = $this->createMock(IngestEvent::class);
         $this->loader = $this->createMock(CatalogProductLoader::class);
@@ -130,7 +142,7 @@ class CatalogManifestTest extends TestCase
                 $this->client->method('catalogManifest')->willReturn(['ok' => true]);
         }
 
-        $this->manifest()->send();
+        $this->manifest()->send($this->primary());
 
         self::assertSame($after, $this->flags[CatalogManifest::FLAG_UNSENT] ?? null);
     }
@@ -173,7 +185,7 @@ class CatalogManifestTest extends TestCase
         $this->queue->expects(self::once())->method('markSent')->with($this->event);
         $this->queue->expects(self::never())->method('markFailed');
 
-        $this->manifest()->send();
+        $this->manifest()->send($this->primary());
 
         self::assertSame([0, 2, 3], $this->cursors);
     }
@@ -195,7 +207,7 @@ class CatalogManifestTest extends TestCase
             self::anything()
         );
 
-        $this->manifest()->send();
+        $this->manifest()->send($this->primary());
     }
 
     /**
@@ -220,7 +232,7 @@ class CatalogManifestTest extends TestCase
         $this->queue->expects(self::once())->method('markFailed')
             ->with($this->event, CatalogManifest::TOO_MANY_PRODUCTS, true);
 
-        $this->manifest()->send();
+        $this->manifest()->send($this->primary());
     }
 
     /**
@@ -238,7 +250,7 @@ class CatalogManifestTest extends TestCase
         $this->queue->expects(self::once())->method('markFailed')->with($this->event, $failure->getMessage(), true);
         $this->queue->expects(self::never())->method('markSent');
 
-        $this->manifest()->send();
+        $this->manifest()->send($this->primary());
     }
 
     /**
@@ -274,7 +286,7 @@ class CatalogManifestTest extends TestCase
         $this->logger->expects(self::once())->method('info')
             ->with('Nightly catalog manifest not sent', self::arrayHasKey('reason'));
 
-        $this->manifest()->send();
+        $this->manifest()->send($this->primary());
     }
 
     /**
@@ -291,6 +303,49 @@ class CatalogManifestTest extends TestCase
         ];
     }
 
+    /**
+     * CON-237: a website connection's list holds its own products, goes
+     * through its own client, waits for its own import and queue rows only,
+     * and counts its nights in its own flag.
+     */
+    public function testAWebsiteConnectionSendsItsOwnList(): void
+    {
+        $lv = $this->engineConnection(2, $this->settings, [2], [4], 4);
+        $this->catalog([[$this->product(1)]]);
+        $this->pending[Client::DOMAIN_CATALOG] = 1; // the primary's rows
+        $this->flags[CatalogManifest::FLAG_UNSENT] = ['nights' => 1, 'reason' => 'queue'];
+        $this->flags[CatalogManifest::FLAG_UNSENT . '_c2'] = ['nights' => 2, 'reason' => 'queue'];
+        $this->jobManager->expects(self::once())->method('isActiveAndMoving')
+            ->with(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 2, CatalogManifest::STALLED_IMPORT_SECONDS)
+            ->willReturn(false);
+        $this->queue->method('newEvent')->with(CatalogManifest::DOMAIN, self::anything(), 4)->willReturn($this->event);
+        $lvClient = $this->createMock(Client::class);
+        $lvClient->expects(self::once())->method('catalogManifest')->with([['sku' => 'SKU-1', 'in_stock' => true]]);
+        $this->client->expects(self::never())->method('catalogManifest');
+
+        $this->manifest([[$lv, $lvClient]])->send($lv);
+
+        self::assertSame([0, 1], $this->cursors);
+        self::assertArrayNotHasKey(CatalogManifest::FLAG_UNSENT . '_c2', $this->flags, 'Its nights are cleared');
+        self::assertSame(1, $this->flags[CatalogManifest::FLAG_UNSENT]['nights'], 'The primary\'s are its own');
+    }
+
+    /**
+     * CON-237: a connection that serves no website sends no list — an empty
+     * list would remove its whole catalog — and no list is due.
+     */
+    public function testAConnectionThatServesNoWebsiteSendsNoList(): void
+    {
+        $idle = $this->engineConnection(3, $this->settings, [], [], null);
+        $this->flags[CatalogManifest::FLAG_UNSENT . '_c3'] = ['nights' => 2, 'reason' => 'queue'];
+        $this->loader->expects(self::never())->method('loadForManifest');
+        $this->queue->expects(self::never())->method('newEvent');
+
+        $this->manifest([[$idle, null]])->send($idle);
+
+        self::assertSame([], $this->flags);
+    }
+
     public function testAListThatCannotBeBuiltIsNotSent(): void
     {
         $this->loader->method('loadForManifest')->willThrowException(new \RuntimeException('Lost connection'));
@@ -298,7 +353,7 @@ class CatalogManifestTest extends TestCase
         $this->queue->expects(self::never())->method('newEvent');
         $this->logger->expects(self::once())->method('error');
 
-        $this->manifest()->send();
+        $this->manifest()->send($this->primary());
     }
 
     /**
@@ -326,19 +381,29 @@ class CatalogManifestTest extends TestCase
         return $product;
     }
 
-    private function manifest(): CatalogManifest
+    /**
+     * @param array<int, array{0: Connection, 1: Client|null}> $more connections besides the primary
+     */
+    private function manifest(array $more = []): CatalogManifest
     {
         return new CatalogManifest(
-            $this->settings,
+            $this->engineConnections([[$this->primary(), $this->client], ...$more]),
             $this->jobManager,
             $this->queue,
             $this->loader,
             $this->builder,
             $this->stockStorage,
-            $this->client,
             $this->logger,
             $this->flagManager()
         );
+    }
+
+    /**
+     * The one connection of a store run as one store, with $this->settings.
+     */
+    private function primary(): Connection
+    {
+        return $this->engineConnection(0, $this->settings, [1], [1], 1, true);
     }
 
     private function flagManager(): FlagManager&MockObject

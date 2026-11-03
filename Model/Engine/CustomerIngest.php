@@ -11,6 +11,7 @@ namespace Smaily\Connect\Model\Engine;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Backfill\EngineCustomerScope;
 use Smaily\Connect\Model\Backfill\HistoryImport;
 use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
@@ -42,81 +43,111 @@ use Smaily\Connect\Model\Engine\Queue\IngestQueue;
  * the customers import's Run again sends them. A save always queues the
  * account as saved; a joining event queues it only when this request has
  * not queued it already (the row is the same).
+ *
+ * The scope is each Campaign Intelligence connection's (CON-237): a
+ * customer is queued for every connected connection whose scope holds
+ * them — groups (a) and (b) on its websites and store views, with its own
+ * horizon — each with the row built for it; group (c) holds only for the
+ * connection of the store view the shopper is on. Under one store that is
+ * the primary alone, as before.
  */
 class CustomerIngest
 {
-    /** @var array<int, true> customers queued in this request */
+    /** @var array<int, array<int, true>> connection key => customers queued for it in this request */
     private array $queued = [];
 
     public function __construct(
-        private readonly Settings $settings,
         private readonly CustomerPayloadBuilder $payloadBuilder,
         private readonly IngestQueue $ingestQueue,
         private readonly EngineCustomerScope $scope,
         private readonly HistoryImport $historyImport,
         private readonly ConsentingShopper $consentingShopper,
         private readonly CustomerRepositoryInterface $customerRepository,
-        private readonly Connections $connections
+        private readonly Connections $connections,
+        private readonly StoreManagerInterface $storeManager
     ) {
     }
 
     /**
-     * The account was saved: queue its row when the customer is in scope.
+     * The account was saved: queue its row for each connection whose scope
+     * holds the customer.
      */
     public function saved(CustomerInterface $customer): void
     {
-        if (!$this->settings->isConnected() || !$customer->getEmail()) {
+        if (!$customer->getEmail()) {
             return;
         }
         $customerId = (int)$customer->getId();
-        if (!$this->inScope($customerId)) {
-            return;
+        foreach ($this->connections->connected() as $connection) {
+            if ($this->inScope($customerId, $connection)) {
+                $this->enqueue($customer, $connection);
+            }
         }
-
-        $this->enqueue($customer);
     }
 
     /**
      * The customer may have just joined the scope (a subscription, an
-     * order): queue the account's row when the customer is in scope and
-     * this request has not queued it already.
+     * order): queue the account's row for each connection whose scope holds
+     * the customer and that this request has not queued it for already.
      */
     public function joined(int $customerId): void
     {
-        if ($customerId <= 0 || isset($this->queued[$customerId]) || !$this->settings->isConnected()) {
+        if ($customerId <= 0) {
             return;
         }
-        if (!$this->inScope($customerId)) {
-            return;
+        $customer = null;
+        foreach ($this->connections->connected() as $connection) {
+            if (isset($this->queued[$connection->key()][$customerId]) || !$this->inScope($customerId, $connection)) {
+                continue;
+            }
+            if ($customer === null) {
+                try {
+                    $customer = $this->customerRepository->getById($customerId);
+                } catch (LocalizedException) {
+                    return;
+                }
+            }
+            if (!$customer->getEmail()) {
+                return;
+            }
+
+            $this->enqueue($customer, $connection);
+        }
+    }
+
+    private function inScope(int $customerId, Connection $connection): bool
+    {
+        return ($this->consentingShopper->isLoggedInWithConsent($customerId) && $this->isCurrent($connection))
+            || $this->scope->includes($customerId, $this->historyImport->horizonNow($connection), $connection);
+    }
+
+    /**
+     * Whether the connection is the one of the store view this request is
+     * on — group (c): the shopper consented there.
+     */
+    private function isCurrent(Connection $connection): bool
+    {
+        if ($connection->servesAllWebsites()) {
+            return true;
         }
         try {
-            $customer = $this->customerRepository->getById($customerId);
+            $storeId = (int)$this->storeManager->getStore()->getId();
         } catch (LocalizedException) {
-            return;
-        }
-        if (!$customer->getEmail()) {
-            return;
+            return false;
         }
 
-        $this->enqueue($customer);
+        return $this->connections->forStore($storeId)?->key() === $connection->key();
     }
 
-    private function inScope(int $customerId): bool
-    {
-        return $this->consentingShopper->isLoggedInWithConsent($customerId)
-            || $this->scope->includes($customerId, $this->historyImport->horizonNow());
-    }
-
-    private function enqueue(CustomerInterface $customer): void
+    private function enqueue(CustomerInterface $customer, Connection $connection): void
     {
         $customerId = (int)$customer->getId();
-        // The primary connection's row (CON-237; per-connection rows are a later step).
         $this->ingestQueue->enqueue(
             Client::DOMAIN_CUSTOMERS,
-            $this->payloadBuilder->build($customer),
+            $this->payloadBuilder->build($customer, $connection),
             (string)$customerId,
-            $this->connections->primary()->canonicalStoreId()
+            $connection->canonicalStoreId()
         );
-        $this->queued[$customerId] = true;
+        $this->queued[$connection->key()][$customerId] = true;
     }
 }

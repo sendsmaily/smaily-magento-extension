@@ -25,6 +25,7 @@ use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * Backfill job lifecycle against a real MySQL: the page-boundary cancel
@@ -34,6 +35,8 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
  */
 class JobManagerTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     private const TABLE = 'smaily_backfill_job';
 
     private JobManager $jobManager;
@@ -354,12 +357,14 @@ class JobManagerTest extends IntegrationTestCase
         $collectionFactory->method('create')->willReturn($collection);
         $dying = new EngineCatalogProcessor(
             $this->jobManager,
-            $collectionFactory,
-            $this->createMock(CatalogPayloadBuilder::class),
             $this->objectManager->create(IngestQueue::class),
             $this->createMock(CatalogIngest::class),
-            $this->createMock(CatalogProductLoader::class),
-            new ImportClock()
+            new CatalogProductLoader($collectionFactory, $this->createMock(CatalogPayloadBuilder::class)),
+            new ImportClock(),
+            $this->engineJobConnection(
+                $this->oneEngineConnection($this->createMock(EngineSettings::class)),
+                $this->jobManager
+            )
         );
 
         $front = $this->jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0);
@@ -454,6 +459,38 @@ class JobManagerTest extends IntegrationTestCase
         // The fresh job moves, so the next website's start cancels nothing.
         self::assertNotNull($this->jobManager->startIfIdle(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 2));
         self::assertSame(Job::STATUS_PENDING, $this->fetchRow(self::TABLE, (int)$fresh->getId())['status']);
+    }
+
+    /**
+     * CON-237: a Campaign Intelligence import's job carries its connection's
+     * key as its website_id; asked for one key, the reads and the cancel
+     * see that connection's jobs only, and without one, every connection's.
+     */
+    public function testTheReadsAndTheCancelOfOneConnectionSeeItsJobsOnly(): void
+    {
+        $primary = $this->jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0);
+        $this->jobManager->complete($primary);
+        $second = $this->jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 2);
+        $this->jobManager->markRunning($second);
+        $this->movedAt($second, -JobManager::STALLED_SECONDS - 1);
+
+        self::assertTrue($this->jobManager->hasCompleted(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0));
+        self::assertFalse($this->jobManager->hasCompleted(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 2));
+        self::assertSame((int)$primary->getId(), (int)$this->jobManager->latest(
+            Job::TYPE_CATALOG,
+            Job::TARGET_ENGINE,
+            0
+        )?->getId());
+        self::assertSame((int)$second->getId(), (int)$this->jobManager->latest(Job::TYPE_CATALOG, Job::TARGET_ENGINE)?->getId());
+        self::assertFalse($this->jobManager->isStalled(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0));
+        self::assertTrue($this->jobManager->isStalled(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 2));
+
+        // The primary's start leaves the other connection's stalled import alone.
+        self::assertNotNull($this->jobManager->startIfIdle(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0));
+        self::assertSame(Job::STATUS_RUNNING, $this->fetchRow(self::TABLE, (int)$second->getId())['status']);
+
+        self::assertSame(1, $this->jobManager->requestCancel(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 2));
+        self::assertSame(Job::STATUS_PENDING, $this->jobManager->latest(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0)?->getStatus());
     }
 
     private function inProgress(): bool

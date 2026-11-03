@@ -24,6 +24,7 @@ use Magento\Store\Model\App\Emulation;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
 use Smaily\Connect\Model\StorefrontScript;
 use Smaily\Connect\Model\StorefrontUrl;
@@ -42,6 +43,13 @@ use Smaily\Connect\Model\StorefrontUrl;
  * "Several websites", CON-253): one engine store serves every website, and
  * the engine sends each customer the links of their own website and never a
  * product their website does not sell.
+ *
+ * A row is built for one Campaign Intelligence connection (CON-237): its
+ * `websites`, its language map and the website it is priced at are the
+ * connection's own websites only, and its price, link and currency are
+ * read at the connection's canonical store view (see storeIdForProduct()).
+ * A connection that serves every website — every store run as one store —
+ * gets the row it always got.
  */
 class CatalogPayloadBuilder
 {
@@ -89,6 +97,9 @@ class CatalogPayloadBuilder
     /** @var array<int, string> store view id -> the product's link there, for the row being built */
     private array $storeUrls = [];
 
+    /** @var array<int, StoreInterface|null> store view id -> the store view (memoized) */
+    private array $stores = [];
+
     public function __construct(
         private readonly StoreManagerInterface $storeManager,
         private readonly ProductRepositoryInterface $productRepository,
@@ -118,14 +129,16 @@ class CatalogPayloadBuilder
     }
 
     /**
+     * The product's row for one connection's engine store.
+     *
      * @return array<string, mixed>
      */
-    public function build(Product $product): array
+    public function build(Product $product, Connection $connection): array
     {
         $this->storeUrls = [];
-        $scopeStoreId = $this->storeIdForProduct($product);
+        $scopeStoreId = $this->storeIdForProduct($product, $connection);
         $priceProduct = $this->scopedTo($product, $scopeStoreId);
-        $languageValues = $this->languageValues($product, $priceProduct, $scopeStoreId);
+        $languageValues = $this->languageValues($product, $priceProduct, $scopeStoreId, $connection);
         // A variant without a category of its own takes its configurable
         // parent's (PRO-3714); only when neither has one is it defaulted.
         $categoryPath = $this->categoryPath((array)$product->getCategoryIds())
@@ -139,7 +152,7 @@ class CatalogPayloadBuilder
                 (float)$priceProduct->getPriceInfo()->getPrice('final_price')->getAmount()->getValue(),
                 4
             ),
-            'currency' => $this->currency(),
+            'currency' => $this->currency($connection),
             'in_stock' => $this->isInStock($product),
             'product_url' => $languageValues['product_url'],
             'external_id' => (string)$product->getId(),
@@ -183,7 +196,7 @@ class CatalogPayloadBuilder
 
         // Always sent, also on a store with one website: a row without it
         // reads as sold on every website (§3 "Send the whole row").
-        $item['websites'] = $this->websites($product, $priceProduct, $scopeStoreId);
+        $item['websites'] = $this->websites($product, $priceProduct, $scopeStoreId, $connection);
 
         return $item;
     }
@@ -194,9 +207,9 @@ class CatalogPayloadBuilder
      *
      * @return array<string, mixed>
      */
-    public function buildTombstone(Product $product): array
+    public function buildTombstone(Product $product, Connection $connection): array
     {
-        $item = $this->build($product);
+        $item = $this->build($product, $connection);
         $item['in_stock'] = false;
 
         return $item;
@@ -247,9 +260,13 @@ class CatalogPayloadBuilder
      *     description: string|array<string, string>|null,
      *     product_url: string|array<string, string>}
      */
-    private function languageValues(Product $product, Product $scopedProduct, int $scopeStoreId): array
-    {
-        $storesByLanguage = $this->storesByLanguage($product, $scopeStoreId);
+    private function languageValues(
+        Product $product,
+        Product $scopedProduct,
+        int $scopeStoreId,
+        Connection $connection
+    ): array {
+        $storesByLanguage = $this->storesByLanguage($product, $scopeStoreId, $connection);
 
         if (count($storesByLanguage) <= 1) {
             $storeId = $storesByLanguage ? (int)reset($storesByLanguage) : $scopeStoreId;
@@ -293,13 +310,14 @@ class CatalogPayloadBuilder
      * priced at, then on the product's other websites in id order (CON-253).
      * Before, it was the language's first store view on any of them, so
      * where two websites share a language the row could carry the other
-     * website's link. A product on no website takes every website's.
+     * website's link. A product on no website takes every website's. Only
+     * the connection's own websites count (CON-237).
      *
      * @return array<string, int> language code -> representative store ID
      */
-    private function storesByLanguage(Product $product, int $scopeStoreId): array
+    private function storesByLanguage(Product $product, int $scopeStoreId, Connection $connection): array
     {
-        $index = $this->websiteIndex();
+        $index = $this->connectionWebsites($this->websiteIndex(), $connection);
         $assigned = array_map('intval', (array)$product->getWebsiteIds());
         $websiteIds = $assigned ? array_values(array_intersect($assigned, array_keys($index))) : array_keys($index);
         sort($websiteIds);
@@ -326,13 +344,19 @@ class CatalogPayloadBuilder
      * website where it is disabled or not visible in each store view. A
      * website whose store views name no language gets the link of its
      * default store view, as a plain string. Empty (`{}` on the wire) when
-     * no website sells the product.
+     * no website sells the product. Only the connection's own websites are
+     * listed (CON-237): a website of another engine store is not this
+     * engine store's to send.
      *
      * @return array<string, array{product_url: string|array<string, string>}>
      */
-    private function websites(Product $product, Product $scopedProduct, int $scopeStoreId): array
-    {
-        $index = $this->websiteIndex();
+    private function websites(
+        Product $product,
+        Product $scopedProduct,
+        int $scopeStoreId,
+        Connection $connection
+    ): array {
+        $index = $this->connectionWebsites($this->websiteIndex(), $connection);
         $websiteIds = array_map('intval', (array)$product->getWebsiteIds());
         sort($websiteIds);
 
@@ -360,6 +384,22 @@ class CatalogPayloadBuilder
         }
 
         return $websites;
+    }
+
+    /**
+     * The part of the website index a connection serves: the whole index
+     * for a connection that serves every website.
+     *
+     * @param array<int, array{code: string|null, stores: array<int, int>, languages: array<string, int>}> $index
+     * @return array<int, array{code: string|null, stores: array<int, int>, languages: array<string, int>}>
+     */
+    private function connectionWebsites(array $index, Connection $connection): array
+    {
+        if ($connection->servesAllWebsites()) {
+            return $index;
+        }
+
+        return array_intersect_key($index, array_flip($connection->websiteIds()));
     }
 
     /**
@@ -529,11 +569,12 @@ class CatalogPayloadBuilder
      * `final_price` resolves through) already convert the stored base amount
      * into the store's display currency, so on a store whose base and display
      * currencies differ, labelling the number with the base code would state
-     * a price that was never charged in it.
+     * a price that was never charged in it. For a connection, its canonical
+     * store's (connectionStore(), CON-237).
      */
-    private function currency(): string
+    private function currency(Connection $connection): string
     {
-        $store = $this->canonicalStore();
+        $store = $this->connectionStore($connection);
         $code = $store instanceof Store ? (string)$store->getDefaultCurrencyCode() : '';
 
         return $code !== '' ? $code : self::DEFAULT_CURRENCY;
@@ -557,15 +598,27 @@ class CatalogPayloadBuilder
      * `websites` (contract 1.21.0, CON-253); per-website price and stock
      * are not in the contract: one Smaily account is one engine store, and
      * websites that share an account share it (2026-10-28, CON-237).
+     *
+     * For a connection (CON-237) the same rule runs on its own websites:
+     * its canonical store view (connectionStore()) when the product is on
+     * that store view's website, else the default store view of the
+     * lowest-id website of the connection the product is on. A connection
+     * that serves every website reads at the installation's canonical
+     * store, as before.
      */
-    private function storeIdForProduct(Product $product): int
+    private function storeIdForProduct(Product $product, Connection $connection): int
     {
+        $scopeStore = $this->connectionStore($connection);
+        $scopeStoreId = (int)$scopeStore?->getId();
         $websiteIds = array_map('intval', (array)$product->getWebsiteIds());
-        $canonicalWebsiteId = (int)($this->canonicalStore()?->getWebsiteId() ?? 0);
+        $canonicalWebsiteId = (int)($scopeStore?->getWebsiteId() ?? 0);
         if (!$websiteIds || in_array($canonicalWebsiteId, $websiteIds, true)) {
-            return $this->canonicalStoreId();
+            return $scopeStoreId;
         }
 
+        if (!$connection->servesAllWebsites()) {
+            $websiteIds = array_values(array_intersect($websiteIds, $connection->websiteIds()));
+        }
         sort($websiteIds);
         foreach ($websiteIds as $websiteId) {
             $storeId = $this->websiteStoreId($websiteId);
@@ -574,7 +627,31 @@ class CatalogPayloadBuilder
             }
         }
 
-        return $this->canonicalStoreId();
+        return $scopeStoreId;
+    }
+
+    /**
+     * The store view a connection's rows are read at: the installation's
+     * canonical store for a connection that serves every website (its
+     * canonical store view is that store), else the connection's own
+     * canonical store view — the installation's when it has none or it
+     * cannot be read.
+     */
+    private function connectionStore(Connection $connection): ?StoreInterface
+    {
+        $storeId = $connection->canonicalStoreId();
+        if ($connection->servesAllWebsites() || $storeId === null) {
+            return $this->canonicalStore();
+        }
+        if (!array_key_exists($storeId, $this->stores)) {
+            try {
+                $this->stores[$storeId] = $this->storeManager->getStore($storeId);
+            } catch (NoSuchEntityException) {
+                $this->stores[$storeId] = null;
+            }
+        }
+
+        return $this->stores[$storeId] ?? $this->canonicalStore();
     }
 
     /**

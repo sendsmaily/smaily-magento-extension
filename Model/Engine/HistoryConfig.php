@@ -23,27 +23,30 @@ use Smaily\Connect\Model\Logger\Logger;
  * reached, and 18 / 60 / newest_first when neither has it (logged). The
  * ping's block is not stored over the exchange's: the import keeps the one
  * it started with (Backfill\HistoryImport).
+ *
+ * Each Campaign Intelligence connection has its own window (CON-237): its
+ * engine store's ping, through its own client, and the block its setup
+ * exchange stored at its scope.
  */
 class HistoryConfig
 {
     public const FALLBACK = ['start_months' => 18, 'horizon_months' => 60, 'order' => 'newest_first'];
 
     public function __construct(
-        private readonly Client $client,
-        private readonly Settings $settings,
+        private readonly Connections $connections,
         private readonly Logger $logger
     ) {
     }
 
     /**
-     * The window for a history import that starts now.
+     * The window for a history import of the connection that starts now.
      *
      * @return array{start_months: int, horizon_months: int, order: string}
      */
-    public function forNewImport(): array
+    public function forNewImport(Connection $connection): array
     {
         try {
-            $ping = $this->client->ping();
+            $ping = $this->connections->client($connection)->ping();
             $fromPing = $this->valid(is_array($ping['config'] ?? null) ? ($ping['config']['history'] ?? null) : null);
         } catch (EngineException) {
             $fromPing = null;
@@ -52,7 +55,7 @@ class HistoryConfig
             return $fromPing;
         }
 
-        $stored = $this->fromExchange();
+        $stored = $this->fromExchange($connection);
         if ($stored === null) {
             $this->logger->info('Campaign Intelligence sent no history window; the import uses the default', [
                 'start_months' => self::FALLBACK['start_months'],
@@ -64,22 +67,22 @@ class HistoryConfig
     }
 
     /**
-     * The window the setup exchange stored, or the default — without asking
-     * the engine.
+     * The window the connection's setup exchange stored, or the default —
+     * without asking the engine.
      *
      * @return array{start_months: int, horizon_months: int, order: string}
      */
-    public function stored(): array
+    public function stored(Connection $connection): array
     {
-        return $this->fromExchange() ?? self::FALLBACK;
+        return $this->fromExchange($connection) ?? self::FALLBACK;
     }
 
     /**
      * @return array{start_months: int, horizon_months: int, order: string}|null
      */
-    private function fromExchange(): ?array
+    private function fromExchange(Connection $connection): ?array
     {
-        return $this->valid($this->settings->getEngineConfig()['history'] ?? null);
+        return $this->valid($connection->settings()->getEngineConfig()['history'] ?? null);
     }
 
     /**

@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Backfill;
 
+use Smaily\Connect\Model\Engine\Connection;
+
 /**
  * Connecting Campaign Intelligence starts the history import (contract
  * v1.20.0 §25, CON-241): the full catalog import (PRO-3741), the customers
@@ -30,6 +32,10 @@ namespace Smaily\Connect\Model\Backfill;
  * catalog and the orders import follows the customers. The jobs wait for
  * the next smaily_backfill_tick run; cancelled before then (the admin's
  * Hold back, or a card's Cancel import), they send nothing.
+ *
+ * The imports are the connected Campaign Intelligence connection's
+ * (CON-237): their jobs carry its key as their website_id (the primary's,
+ * 0, under one store), and another connection's imports are left alone.
  */
 class ImportsOnConnect
 {
@@ -39,26 +45,27 @@ class ImportsOnConnect
     }
 
     /**
-     * Queue the catalog import, then the customers import, then the orders import.
+     * Queue the connection's catalog import, then its customers import,
+     * then its orders import.
      *
      * @return array{catalog: bool, customers: bool, orders: bool} per import, true when this
      *     call queued it, false when one was already queued or running
      */
-    public function start(): array
+    public function start(Connection $connection): array
     {
         // In this order: the lower id runs first.
-        $catalog = $this->startOne(Job::TYPE_CATALOG);
-        $customers = $this->startOne(Job::TYPE_CUSTOMERS);
+        $catalog = $this->startOne(Job::TYPE_CATALOG, $connection);
+        $customers = $this->startOne(Job::TYPE_CUSTOMERS, $connection);
 
         return [
             Job::TYPE_CATALOG => $catalog,
             Job::TYPE_CUSTOMERS => $customers,
-            Job::TYPE_ORDERS => $this->startOne(Job::TYPE_ORDERS),
+            Job::TYPE_ORDERS => $this->startOne(Job::TYPE_ORDERS, $connection),
         ];
     }
 
-    private function startOne(string $jobType): bool
+    private function startOne(string $jobType, Connection $connection): bool
     {
-        return $this->jobManager->startIfIdle($jobType, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID) !== null;
+        return $this->jobManager->startIfIdle($jobType, Job::TARGET_ENGINE, $connection->key()) !== null;
     }
 }

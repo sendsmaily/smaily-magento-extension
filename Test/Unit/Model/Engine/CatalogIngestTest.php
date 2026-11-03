@@ -18,6 +18,7 @@ use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\CatalogProductLoader;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Connection;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
@@ -35,6 +36,10 @@ use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
  * PRO-1967: a stock change only records the product as changed — no product
  * load, no payload build inside the stock write's transaction; the ingest
  * flusher builds the rows in a batch, one collection load per run.
+ *
+ * CON-237: a product goes to every connected Campaign Intelligence
+ * connection that owns it, each with the row built for it; an import
+ * queues its own connection's row only.
  */
 class CatalogIngestTest extends TestCase
 {
@@ -308,7 +313,7 @@ class CatalogIngestTest extends TestCase
 
         $ingest = $this->ingest();
         $built = $ingest->buildTombstones([8, 9]);
-        self::assertSame($rows, $built);
+        self::assertSame([8 => [0 => $rows[8]], 9 => [0 => $rows[9]]], $built, 'Per connection');
         $ingest->enqueueBuilt($built);
     }
 
@@ -325,8 +330,6 @@ class CatalogIngestTest extends TestCase
     /**
      * §3b (PRO-1231): one catalog_remove row per product, carrying the raw
      * entity id, for the admin delete and the import's Delete alike.
-     */
-    /**
      * CON-237: each row carries the primary connection's canonical store
      * view.
      */
@@ -340,10 +343,125 @@ class CatalogIngestTest extends TestCase
         $this->ingest()->enqueueRemovals([42, 43]);
     }
 
+    /**
+     * CON-237: separate stores — the primary serves website 1, the
+     * connection of website 2 serves it. A product goes to each connection
+     * that owns it, with the row built for that connection and its
+     * canonical store view; a product on no website to the primary only.
+     */
+    public function testAProductGoesToEveryConnectionThatOwnsIt(): void
+    {
+        $this->payloadBuilder->method('build')->willReturnCallback(
+            static fn (Product $product, Connection $connection): array => [
+                'sku' => 'SKU-' . $product->getId(),
+                'c' => $connection->key(),
+            ]
+        );
+        $queued = [];
+        $this->queue->method('enqueue')->willReturnCallback(
+            static function (string $domain, array $payload, string $entityId, ?int $storeId) use (&$queued): bool {
+                $queued[] = [$entityId, $storeId, $payload['c']];
+
+                return true;
+            }
+        );
+
+        $ingest = $this->ingest(null, null, null, $this->separateStores());
+        self::assertTrue($ingest->enqueueProduct($this->product(8, [1, 2])));
+        self::assertTrue($ingest->enqueueProduct($this->product(9, [2])));
+        self::assertTrue($ingest->enqueueProduct($this->product(10)));
+
+        self::assertSame([['8', 1, 0], ['8', 4, 2], ['9', 4, 2], ['10', 1, 0]], $queued);
+    }
+
+    /**
+     * CON-237: a catalog import is one connection's: its product's row is
+     * queued for that connection only, with the import's job.
+     */
+    public function testAnImportQueuesTheRowOfItsConnectionOnly(): void
+    {
+        $connections = $this->separateStores();
+        $this->payloadBuilder->method('build')->willReturn(['sku' => 'TENT']);
+        $this->queue->expects(self::once())->method('enqueue')
+            ->with(Client::DOMAIN_CATALOG, ['sku' => 'TENT'], '8', 4, null, 5);
+
+        self::assertTrue(
+            $this->ingest(null, null, null, $connections)
+                ->enqueueProduct($this->product(8, [1, 2]), 5, $connections->forKey(2))
+        );
+    }
+
+    /**
+     * CON-237: a §3b removal goes to every connected connection, each row
+     * with its canonical store view; a disconnected one gets none.
+     */
+    public function testARemovalGoesToEveryConnectedConnection(): void
+    {
+        $stored = [];
+        $this->queue->method('enqueueMany')->willReturnCallback(
+            static function (string $domain, array $rows) use (&$stored): int {
+                $stored[] = array_column($rows, 'store_id');
+
+                return count($rows);
+            }
+        );
+        $disconnected = $this->createMock(Settings::class);
+        $connections = $this->separateStores([
+            $this->engineConnection(3, $disconnected, [3], [9], 9),
+        ]);
+
+        $this->ingest(null, null, null, $connections)->enqueueRemovals([42, 43]);
+
+        self::assertSame([[1, 1], [4, 4]], $stored);
+    }
+
+    /**
+     * CON-237: the stock-change batch loads the products once per connected
+     * connection, at its canonical store view, and queues each connection
+     * the rows of the products it owns.
+     */
+    public function testChangedProductsAreBuiltForEachConnectionThatOwnsThem(): void
+    {
+        $markers = [$this->marker(1, '8'), $this->marker(2, '9')];
+        $this->queue->method('claimBatch')->willReturn($markers);
+        $storeIds = [];
+        $this->collectionFactory->method('create')->willReturnCallback(
+            function () use (&$storeIds): Collection {
+                $collection = $this->collection([$this->product(8, [1]), $this->product(9, [2])]);
+                $collection->method('setStoreId')->willReturnCallback(
+                    static function (int $storeId) use (&$storeIds, $collection): Collection {
+                        $storeIds[] = $storeId;
+
+                        return $collection;
+                    }
+                );
+
+                return $collection;
+            }
+        );
+        $this->payloadBuilder->method('build')->willReturnCallback(
+            static fn (Product $product, Connection $connection): array => ['sku' => 'SKU-' . $product->getId()]
+        );
+        $queued = [];
+        $this->queue->method('enqueueChangedPayloads')->willReturnCallback(
+            static function (string $domain, array $payloads, Connection $connection) use (&$queued): int {
+                $queued[$connection->key()] = array_keys($payloads);
+
+                return count($payloads);
+            }
+        );
+
+        $this->ingest(null, null, null, $this->separateStores())->buildChanged();
+
+        self::assertSame([1, 4], $storeIds);
+        self::assertSame([0 => [8], 2 => [9]], $queued);
+    }
+
     private function ingest(
         ?CatalogPayloadBuilder $payloadBuilder = null,
         ?Logger $logger = null,
-        ?Settings $settings = null
+        ?Settings $settings = null,
+        ?Connections $connections = null
     ): CatalogIngest {
         if ($settings === null) {
             $settings = $this->createMock(Settings::class);
@@ -353,14 +471,34 @@ class CatalogIngestTest extends TestCase
         $payloadBuilder ??= $this->payloadBuilder;
 
         return new CatalogIngest(
-            $settings,
             new CatalogProductLoader($this->collectionFactory, $payloadBuilder),
             $this->productResource,
             $payloadBuilder,
             $this->queue,
             $logger ?? $this->createMock(Logger::class),
-            $this->oneEngineConnection($settings)
+            $connections ?? $this->oneEngineConnection($settings)
         );
+    }
+
+    /**
+     * Separate stores, both connected: the primary serves website 1 (store
+     * view 1), the connection of website 2 serves website 2 (store view 4).
+     *
+     * @param Connection[] $more further connections
+     */
+    private function separateStores(array $more = []): Connections
+    {
+        $connected = $this->createMock(Settings::class);
+        $connected->method('isConnected')->willReturn(true);
+        $connections = [
+            [$this->engineConnection(0, $connected, [1], [1], 1), null],
+            [$this->engineConnection(2, $connected, [2], [4], 4), null],
+        ];
+        foreach ($more as $connection) {
+            $connections[] = [$connection, null];
+        }
+
+        return $this->engineConnections($connections);
     }
 
     /**
@@ -387,10 +525,14 @@ class CatalogIngestTest extends TestCase
         return $marker;
     }
 
-    private function product(int $id): Product&MockObject
+    /**
+     * @param int[] $websiteIds
+     */
+    private function product(int $id, array $websiteIds = []): Product&MockObject
     {
         $product = $this->createMock(Product::class);
         $product->method('getId')->willReturn($id);
+        $product->method('getWebsiteIds')->willReturn($websiteIds);
 
         return $product;
     }

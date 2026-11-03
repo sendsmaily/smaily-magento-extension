@@ -45,7 +45,9 @@ use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
 use Smaily\Connect\Model\Engine\CatalogProductLoader;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
+use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
 
@@ -60,6 +62,11 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  * to the default one — the value CatalogPayloadBuilder::manifestItem()
  * reads — so a product disabled on that store view only stays out of the
  * list, as it did when manifestItem() alone left it out.
+ *
+ * CON-237: a Campaign Intelligence connection's page holds its catalog —
+ * the products on one of its websites, for the primary also the products
+ * on no website — read at its canonical store view. Under one store the
+ * page is read with the query it always was.
  */
 class CatalogProductLoaderTest extends IntegrationTestCase
 {
@@ -67,6 +74,16 @@ class CatalogProductLoaderTest extends IntegrationTestCase
     private const OTHER_STORE = 2;
     private const STATUS_ID = 97;
     private const VISIBILITY_ID = 99;
+
+    /** The manifest's page under one store, as it was read before CON-237. */
+    private const ONE_STORE_MANIFEST_SQL = 'SELECT `e`.*, IF(at_status.value_id > 0, at_status.value,'
+        . ' at_status_default.value) AS `status` FROM `catalog_product_entity` AS `e`' . "\n"
+        . ' INNER JOIN `catalog_product_entity_int` AS `at_status_default` ON (`at_status_default`.`entity_id` ='
+        . ' `e`.`entity_id`) AND (`at_status_default`.`attribute_id` = 97) AND `at_status_default`.`store_id` = 0'
+        . "\n" . ' LEFT JOIN `catalog_product_entity_int` AS `at_status` ON (`at_status`.`entity_id` = `e`.`entity_id`)'
+        . ' AND (`at_status`.`attribute_id` = 97) AND (`at_status`.`store_id` = 1) WHERE (IF(at_status.value_id > 0,'
+        . ' at_status.value, at_status_default.value) = 1) AND (`e`.`entity_id` > 0) ORDER BY `e`.`entity_id` ASC'
+        . "\n" . ' LIMIT 1000';
 
     private SchemaInstaller $schema;
 
@@ -97,7 +114,7 @@ class CatalogProductLoaderTest extends IntegrationTestCase
         $this->product(4, [0 => $disabled]);
         $this->product(5, [0 => $enabled, self::OTHER_STORE => $disabled], [self::CANONICAL_STORE => 1]);
 
-        $page = $this->loader()->loadForManifest(0, 1000);
+        $page = $this->loader()->loadForManifest(0, 1000, $this->oneStore());
 
         self::assertSame([1, 3, 5], $this->ids($page), 'disabled on the canonical store view: 2; by default only: 4');
         foreach ($page as $product) {
@@ -116,9 +133,73 @@ class CatalogProductLoaderTest extends IntegrationTestCase
             $this->product($id, [0 => $id === 2 ? Status::STATUS_DISABLED : Status::STATUS_ENABLED]);
         }
 
-        self::assertSame([3, 4], $this->ids($this->loader()->loadForManifest(1, 2)));
-        self::assertSame([4], $this->ids($this->loader()->loadForManifest(3, 2)));
-        self::assertSame([], $this->ids($this->loader()->loadForManifest(4, 2)));
+        self::assertSame([3, 4], $this->ids($this->loader()->loadForManifest(1, 2, $this->oneStore())));
+        self::assertSame([4], $this->ids($this->loader()->loadForManifest(3, 2, $this->oneStore())));
+        self::assertSame([], $this->ids($this->loader()->loadForManifest(4, 2, $this->oneStore())));
+    }
+
+    /**
+     * CON-237: separate stores — the primary serves website 1, the
+     * connection of website 2 serves websites 2 and 3, read at its store
+     * view 2. Each page and count holds that connection's catalog; a
+     * product on no website is the primary's; a connection that serves no
+     * website has none.
+     */
+    public function testAConnectionsPageHoldsTheProductsOfItsWebsites(): void
+    {
+        $enabled = Status::STATUS_ENABLED;
+        foreach ([1 => [1], 2 => [2], 3 => [1, 2], 4 => [], 5 => [3]] as $id => $websiteIds) {
+            $this->product($id, [0 => $enabled]);
+            foreach ($websiteIds as $websiteId) {
+                $this->connection->insert('catalog_product_website', ['product_id' => $id, 'website_id' => $websiteId]);
+            }
+        }
+        // Disabled at the second connection's store view only.
+        $this->attributeValue(3, self::STATUS_ID, self::OTHER_STORE, Status::STATUS_DISABLED);
+        $settings = $this->createMock(Settings::class);
+        $primary = new Connection(0, $settings, [1], [1], self::CANONICAL_STORE, false);
+        $second = new Connection(2, $settings, [2, 3], [2], self::OTHER_STORE, false);
+        $none = new Connection(4, $settings, [], [], null, false);
+        $loader = $this->loader();
+
+        self::assertSame([1, 3, 4], $this->ids($loader->loadForManifest(0, 1000, $primary)));
+        self::assertSame([2, 5], $this->ids($loader->loadForManifest(0, 1000, $second)), 'Read at its store view');
+        self::assertSame([], $loader->loadForManifest(0, 1000, $none));
+        self::assertSame([1, 2, 3, 4, 5], $this->ids($loader->loadForManifest(0, 1000, $this->oneStore())));
+        self::assertSame(3, $loader->count($primary));
+        self::assertSame(3, $loader->count($second));
+        self::assertSame(0, $loader->count($none));
+        self::assertSame(5, $loader->count($this->oneStore()));
+    }
+
+    /**
+     * CON-237, the single-connection golden test: under one store the
+     * manifest's page is read with the query it always read — no website
+     * narrowing (PRO-2506).
+     */
+    public function testOneStoreReadsTheManifestPageWithTheQueryItAlwaysRead(): void
+    {
+        $connection = $this->connection;
+        if (!$connection instanceof \Zend_Db_Adapter_Abstract) {
+            self::fail('The test connection keeps no query profile');
+        }
+        $profiler = $connection->getProfiler();
+        $profiler->setEnabled(true);
+        $profiler->clear();
+        $this->loader()->loadForManifest(0, 1000, $this->oneStore());
+        $queries = $profiler->getQueryProfiles();
+        $profiler->setEnabled(false);
+
+        self::assertIsArray($queries);
+        self::assertSame(self::ONE_STORE_MANIFEST_SQL, (string)end($queries)->getQuery());
+    }
+
+    /**
+     * The one connection of a store run as one store.
+     */
+    private function oneStore(): Connection
+    {
+        return new Connection(0, $this->createMock(Settings::class), [1, 2], [1, 2], self::CANONICAL_STORE, true);
     }
 
     /**

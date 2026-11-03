@@ -21,6 +21,7 @@ use Smaily\Connect\Model\Engine\ProductImportDelete;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Observer\Engine\ProductImportBunchDelete;
 use Smaily\Connect\Plugin\Engine\ProductImportBunch;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3768: products a product import deletes (Delete behaviour) get the
@@ -32,6 +33,8 @@ use Smaily\Connect\Plugin\Engine\ProductImportBunch;
  */
 class ProductImportDeleteTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private Settings&MockObject $settings;
     private ProductResource&MockObject $productResource;
     private ParentProductResolver&MockObject $parentResolver;
@@ -115,7 +118,7 @@ class ProductImportDeleteTest extends TestCase
         $dataSource->expects(self::never())->method('getBehavior');
 
         $deletes = new ProductImportDelete(
-            $settings,
+            $this->oneEngineConnection($settings),
             $this->productResource,
             $this->parentResolver,
             $this->catalogIngest
@@ -146,7 +149,7 @@ class ProductImportDeleteTest extends TestCase
     private function deletes(): ProductImportDelete
     {
         return new ProductImportDelete(
-            $this->settings,
+            $this->oneEngineConnection($this->settings),
             $this->productResource,
             $this->parentResolver,
             $this->catalogIngest

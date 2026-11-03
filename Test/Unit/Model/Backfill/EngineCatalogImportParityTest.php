@@ -189,14 +189,15 @@ class EngineCatalogImportParityTest extends TestCase
         $ingestQueue = $this->createMock(IngestQueue::class);
         $ingestQueue->method('countPending')->willReturn(0);
         $payloadBuilder = $this->payloadBuilder();
+        $settings = $this->createMock(Settings::class);
+        $settings->method('isConnected')->willReturn(true);
         (new EngineCatalogProcessor(
             $jobManager,
-            $collectionFactory,
-            $payloadBuilder,
             $ingestQueue,
             $this->catalogIngest($sent),
             new CatalogProductLoader($collectionFactory, $payloadBuilder),
-            new ImportClock()
+            new ImportClock(),
+            $this->engineJobConnection($this->oneEngineConnection($settings), $jobManager)
         ))->process($job);
         self::assertCount(1, $sent);
 
@@ -288,7 +289,6 @@ class EngineCatalogImportParityTest extends TestCase
         $payloadBuilder = $this->payloadBuilder();
 
         return new CatalogIngest(
-            $settings,
             new CatalogProductLoader(
                 $collectionFactory ?? $this->createMock(ProductCollectionFactory::class),
                 $payloadBuilder

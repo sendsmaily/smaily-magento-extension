@@ -20,6 +20,7 @@ use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-1969, PRO-3742: `smaily:backfill:start catalog|customers|orders` does
@@ -31,6 +32,8 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 class BackfillStartCommandTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private JobManager&MockObject $jobManager;
 
     protected function setUp(): void
@@ -188,7 +191,8 @@ class BackfillStartCommandTest extends TestCase
             new ImportStarter(
                 $this->jobManager,
                 $this->createMock(StoreManagerInterface::class),
-                new EngineImportGuard($engineSettings)
+                new EngineImportGuard(),
+                $this->oneEngineConnection($engineSettings)
             ),
             $config
         ));

@@ -16,6 +16,7 @@ use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\CatalogManifest;
 use Smaily\Connect\Model\Engine\CatalogProductLoader;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
@@ -26,6 +27,7 @@ use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource
 use Smaily\Connect\Model\ResourceModel\Log\Collection;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3854 against a real MySQL: the nightly catalog manifest's waits read
@@ -37,9 +39,17 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  * (CatalogPayloadBuilderTest) and checked on the sandbox catalog. The
  * nights without a list are counted in Magento's real flag table
  * (PRO-3914).
+ *
+ * CON-237: each connection's list waits for its own catalog rows and
+ * import only, and counts its nights in its own flag.
  */
 class CatalogManifestTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
+    /** The connection manifest() sends for: one store's primary, unless a test sets another. */
+    private ?Connection $for = null;
+
     private const ANSWER = [
         'ok' => true,
         'products_in_manifest' => 3,
@@ -66,7 +76,7 @@ class CatalogManifestTest extends IntegrationTestCase
 
     public function testANightThatSendsLeavesOneLogRowWithTheEnginesAnswer(): void
     {
-        $this->manifest()->send();
+        $this->manifest()->send($this->for);
 
         self::assertSame([[
             ['sku' => 'SKU-1', 'in_stock' => true],
@@ -94,7 +104,7 @@ class CatalogManifestTest extends IntegrationTestCase
     {
         $this->failure = new EngineTransportException('Engine request failed with HTTP 503 after retries', 503);
 
-        $this->manifest()->send();
+        $this->manifest()->send($this->for);
 
         $row = $this->fetchAll(IngestEventResource::TABLE_NAME)[0];
         self::assertSame(IngestEvent::STATUS_FAILED, $row['status']);
@@ -114,7 +124,7 @@ class CatalogManifestTest extends IntegrationTestCase
         // One more enabled product than the list can hold: product 2 is disabled.
         $this->catalogSize = CatalogManifest::MAX_PRODUCTS + 2;
 
-        $this->manifest()->send();
+        $this->manifest()->send($this->for);
 
         self::assertCount(0, $this->sent);
         $row = $this->fetchAll(IngestEventResource::TABLE_NAME)[0];
@@ -128,7 +138,7 @@ class CatalogManifestTest extends IntegrationTestCase
         // Exactly 50,000 enabled products: product 2 is disabled.
         $this->catalogSize = CatalogManifest::MAX_PRODUCTS + 1;
 
-        $this->manifest()->send();
+        $this->manifest()->send($this->for);
 
         self::assertCount(1, $this->sent);
         self::assertCount(CatalogManifest::MAX_PRODUCTS, $this->sent[0]);
@@ -152,7 +162,7 @@ class CatalogManifestTest extends IntegrationTestCase
             [CatalogIngest::DOMAIN_CHANGED, IngestEvent::STATUS_PENDING],
         ] as [$domain, $status]) {
             $this->queueRow($domain, $status);
-            $this->manifest()->send();
+            $this->manifest()->send($this->for);
             self::assertSame([], $this->sent, $domain);
             $this->connection->delete(IngestEventResource::TABLE_NAME);
         }
@@ -165,7 +175,7 @@ class CatalogManifestTest extends IntegrationTestCase
 
         $this->queueRow(Client::DOMAIN_CATALOG, IngestEvent::STATUS_FAILED);
         $this->queueRow(Client::DOMAIN_ORDERS, IngestEvent::STATUS_PENDING);
-        $this->manifest()->send();
+        $this->manifest()->send($this->for);
         self::assertCount(1, $this->sent);
         self::assertNull($this->objectManager->create(FlagManager::class)->getFlagData(CatalogManifest::FLAG_UNSENT));
     }
@@ -181,11 +191,11 @@ class CatalogManifestTest extends IntegrationTestCase
         $jobManager->markRunning($job);
         $this->jobMovedAt((int)$job->getId(), -120);
 
-        $this->manifest()->send();
+        $this->manifest()->send($this->for);
         self::assertSame([], $this->sent);
 
         $this->jobMovedAt((int)$job->getId(), -CatalogManifest::STALLED_IMPORT_SECONDS - 1);
-        $this->manifest()->send();
+        $this->manifest()->send($this->for);
         self::assertCount(1, $this->sent);
     }
 
@@ -204,18 +214,47 @@ class CatalogManifestTest extends IntegrationTestCase
         $jobManager->markRunning($contacts);
         $this->jobMovedAt((int)$contacts->getId(), -30);
 
-        $this->manifest()->send();
+        $this->manifest()->send($this->for);
         self::assertCount(1, $this->sent, 'the set-aside import holds nothing back');
 
         $jobManager->requestCancel(Job::TYPE_CATALOG, Job::TARGET_ENGINE);
         $jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
-        $this->manifest()->send();
+        $this->manifest()->send($this->for);
         self::assertCount(1, $this->sent, 'a queued import behind one that moves still does');
+    }
+
+    /**
+     * CON-237: separate stores — the connection of website 2 (store view 3)
+     * waits for its own catalog rows and its own catalog import; the
+     * primary's do not hold its list back, and its nights are its own.
+     */
+    public function testAConnectionsListWaitsForItsOwnCatalogRowsAndImportOnly(): void
+    {
+        $settings = $this->createMock(Settings::class);
+        $settings->method('isSendingAllowed')->willReturn(true);
+        $this->for = $this->engineConnection(2, $settings, [2], [3], 3);
+        $this->queueRow(Client::DOMAIN_CATALOG, IngestEvent::STATUS_PENDING, 1);
+        $jobManager = $this->objectManager->create(JobManager::class);
+        $jobManager->markRunning($jobManager->start(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0));
+
+        $this->manifest()->send($this->for);
+        self::assertCount(1, $this->sent, 'The primary\'s row and import hold nothing back');
+        self::assertSame('3', (string)$this->fetchAll(IngestEventResource::TABLE_NAME)[1]['store_id'], 'Its Log row');
+
+        $this->queueRow(Client::DOMAIN_CATALOG_REMOVE, IngestEvent::STATUS_PENDING, 3);
+        $this->manifest()->send($this->for);
+        self::assertCount(1, $this->sent, 'Its own removal holds its list back');
+        $flags = $this->objectManager->create(FlagManager::class);
+        self::assertSame(
+            ['nights' => 1, 'reason' => CatalogManifest::REASON_QUEUE],
+            $flags->getFlagData(CatalogManifest::FLAG_UNSENT . '_c2')
+        );
+        self::assertNull($flags->getFlagData(CatalogManifest::FLAG_UNSENT));
     }
 
     public function testNothingIsSentWhileSendingIsNotAllowed(): void
     {
-        $this->manifest(sendingAllowed: false)->send();
+        $this->manifest(sendingAllowed: false)->send($this->for);
 
         self::assertSame([], $this->sent);
         self::assertSame([], $this->fetchAll(IngestEventResource::TABLE_NAME));
@@ -243,11 +282,17 @@ class CatalogManifestTest extends IntegrationTestCase
             ];
         });
 
+        $primary = $this->engineConnection(0, $settings, [1], [1], 1, true);
+        $connections = [[$primary, $client]];
+        if ($this->for !== null) {
+            $connections = [[$this->engineConnection(0, $settings, [1], [1], 1), null], [$this->for, $client]];
+        }
+        $this->for ??= $primary;
+
         return $this->objectManager->create(CatalogManifest::class, [
-            'settings' => $settings,
+            'connections' => $this->engineConnections($connections),
             'productLoader' => $this->catalogPages(),
             'payloadBuilder' => $this->itemBuilder(),
-            'client' => $client,
         ]);
     }
 
@@ -318,7 +363,7 @@ class CatalogManifestTest extends IntegrationTestCase
         };
     }
 
-    private function queueRow(string $domain, string $status): void
+    private function queueRow(string $domain, string $status, ?int $storeId = null): void
     {
         $this->connection->insert(IngestEventResource::TABLE_NAME, [
             'domain' => $domain,
@@ -326,6 +371,7 @@ class CatalogManifestTest extends IntegrationTestCase
             'event_uuid' => uniqid('', true),
             'payload' => '{}',
             'status' => $status,
+            'store_id' => $storeId,
         ]);
     }
 

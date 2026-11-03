@@ -251,9 +251,10 @@ class ImportPaceTest extends IntegrationTestCase
         $engineSettings->method('isSendingAllowed')->willReturn(true);
         $historyConfig = $this->createMock(HistoryConfig::class);
         $historyConfig->method('forNewImport')->willReturn(HistoryConfig::FALLBACK);
+        $connections = $this->oneEngineConnection($engineSettings, $client);
         $historyImport = $this->objectManager->create(
             HistoryImport::class,
-            ['historyConfig' => $historyConfig, 'dateTime' => $this->clock]
+            ['historyConfig' => $historyConfig, 'dateTime' => $this->clock, 'connections' => $connections]
         );
         $queue = $this->objectManager->create(IngestQueue::class);
         $orders = new EngineOrdersProcessor(
@@ -269,7 +270,7 @@ class ImportPaceTest extends IntegrationTestCase
             new SkippedRow($logger),
             $historyImport,
             new FrozenImportClock(),
-            $this->oneEngineConnection($engineSettings)
+            $this->engineJobConnection($connections, $this->jobManager)
         );
         $progress = $client === null
             ? $this->createMock(HistoryProgress::class)
@@ -277,8 +278,7 @@ class ImportPaceTest extends IntegrationTestCase
                 $historyImport,
                 $this->jobManager,
                 $queue,
-                $client,
-                $engineSettings,
+                $connections,
                 $this->clock,
                 $this->createMock(Websites::class),
                 $logger

@@ -13,6 +13,8 @@ use Magento\Framework\DB\Select;
 use Magento\Framework\FlagManager;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Sales\Model\Order;
+use Smaily\Connect\Model\Engine\Connection;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\HistoryConfig;
 use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
 
@@ -29,6 +31,13 @@ use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
  * order goes through the live sync). It is kept in one Magento flag with
  * the counts the progress report needs and the report's own state
  * (HistoryProgress); a new orders import replaces it.
+ *
+ * Each Campaign Intelligence connection has its own history import
+ * (CON-237): its orders import (the job whose website_id is its key), its
+ * window (HistoryConfig, its engine store's), its flag
+ * (Connection::flagCode(FLAG)), and its orders — those placed in one of
+ * its store views, unless it serves every website. Under one store the
+ * primary's is the import it always was, read with the same queries.
  *
  * @phpstan-type State array{
  *     import_id: string,
@@ -61,36 +70,38 @@ class HistoryImport
         private readonly HistoryConfig $historyConfig,
         private readonly JobManager $jobManager,
         private readonly ResourceConnection $resourceConnection,
-        private readonly DateTime $dateTime
+        private readonly DateTime $dateTime,
+        private readonly Connections $connections
     ) {
     }
 
     /**
-     * The current (or last) history import, null when none has begun.
+     * The connection's current (or last) history import, null when none has begun.
      *
      * @return State|null
      */
-    public function state(): ?array
+    public function state(Connection $connection): ?array
     {
-        $state = $this->flagManager->getFlagData(self::FLAG);
+        $state = $this->flagManager->getFlagData($connection->flagCode(self::FLAG));
 
         return is_array($state) && isset($state['orders_job_id']) ? $state : null;
     }
 
     /**
-     * Begin the history import of this orders import, once: a second call
-     * for the same job answers the state the first one stored.
+     * Begin the history import of this orders import of the connection,
+     * once: a second call for the same job answers the state the first one
+     * stored.
      *
      * @return State
      */
-    public function begin(Job $ordersJob): array
+    public function begin(Job $ordersJob, Connection $connection): array
     {
-        $state = $this->state();
+        $state = $this->state($connection);
         if ($state !== null && (int)$state['orders_job_id'] === (int)$ordersJob->getId()) {
             return $state;
         }
 
-        $history = $this->historyConfig->forNewImport();
+        $history = $this->historyConfig->forNewImport($connection);
         $now = (int)$this->dateTime->gmtTimestamp();
         $until = gmdate('Y-m-d H:i:s', $now);
         $startFrom = $this->monthsBefore($now, $history['start_months']);
@@ -104,55 +115,60 @@ class HistoryImport
             'until' => $until,
             'start_from' => $startFrom,
             'horizon' => $horizon,
-            'start_expected' => $this->countOrders($startFrom, $until),
-            'orders_expected' => $this->countOrders($horizon, $until),
-            'buyers_expected' => $this->countBuyers($horizon, $until),
+            'start_expected' => $this->countOrders($startFrom, $until, $connection),
+            'orders_expected' => $this->countOrders($horizon, $until, $connection),
+            'buyers_expected' => $this->countBuyers($horizon, $until, $connection),
             'start_part_queued_to' => null,
             'start_part_done' => false,
             'reported_phase' => null,
             'reported_at' => 0,
             'failed_at' => 0,
         ];
-        $this->flagManager->saveFlag(self::FLAG, $state);
+        $this->flagManager->saveFlag($connection->flagCode(self::FLAG), $state);
 
         return $state;
     }
 
     /**
-     * Begin the history import of the orders import that is queued or
-     * running, if any — for the tick, before it runs the catalog and the
-     * customers imports ahead of it, so the engine hears `started` first.
+     * Begin the history import of each connection's orders import that is
+     * queued or running, if any — for the tick, before it runs the catalog
+     * and the customers imports ahead of it, so the engine hears `started`
+     * first.
      */
     public function beginQueued(): void
     {
-        $ordersJob = $this->jobManager->findActive(Job::TYPE_ORDERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
-        if ($ordersJob !== null) {
-            $this->begin($ordersJob);
+        foreach ($this->connections->all() as $connection) {
+            $ordersJob = $this->jobManager->findActive(Job::TYPE_ORDERS, Job::TARGET_ENGINE, $connection->key());
+            if ($ordersJob !== null) {
+                $this->begin($ordersJob, $connection);
+            }
         }
     }
 
     /**
-     * Store changes to the current history import's state.
+     * Store changes to the connection's current history import's state.
      *
      * @param array<string, mixed> $changes
      * @return State
      */
-    public function update(array $changes): array
+    public function update(Connection $connection, array $changes): array
     {
-        $state = array_merge((array)$this->state(), $changes);
-        $this->flagManager->saveFlag(self::FLAG, $state);
+        $state = array_merge((array)$this->state($connection), $changes);
+        $this->flagManager->saveFlag($connection->flagCode(self::FLAG), $state);
 
         /** @var State $state */
         return $state;
     }
 
     /**
-     * The oldest order time inside the horizon now (GMT), for the customers
-     * import: the current import's horizon months, else the stored ones.
+     * The oldest order time inside the connection's horizon now (GMT), for
+     * the customers import and the live customer sync: its current import's
+     * horizon months, else its stored ones.
      */
-    public function horizonNow(): string
+    public function horizonNow(Connection $connection): string
     {
-        $months = $this->state()['horizon_months'] ?? $this->historyConfig->stored()['horizon_months'];
+        $months = $this->state($connection)['horizon_months']
+            ?? $this->historyConfig->stored($connection)['horizon_months'];
 
         return $this->monthsBefore((int)$this->dateTime->gmtTimestamp(), (int)$months);
     }
@@ -166,10 +182,15 @@ class HistoryImport
      *
      * @return list<array{entity_id: string, created_at: string}>
      */
-    public function ordersPage(string $from, string $until, string $cursor, int $limit): array
-    {
+    public function ordersPage(
+        string $from,
+        string $until,
+        string $cursor,
+        int $limit,
+        Connection $engineConnection
+    ): array {
         $connection = $this->resourceConnection->getConnection();
-        $select = $this->ordersSelect($from, $until)
+        $select = $this->ordersSelect($from, $until, $engineConnection)
             ->columns(['entity_id' => 'o.entity_id', 'created_at' => 'o.created_at'])
             ->order(['o.created_at DESC', 'o.entity_id DESC'])
             ->limit($limit);
@@ -191,31 +212,37 @@ class HistoryImport
 
     /**
      * The orders an orders import sends: placed from $from to $until, in a
-     * state the engine takes (OrderPayloadBuilder::STATUS_MAP).
+     * state the engine takes (OrderPayloadBuilder::STATUS_MAP), in one of
+     * the connection's store views.
      */
-    private function ordersSelect(string $from, string $until): Select
+    private function ordersSelect(string $from, string $until, Connection $engineConnection): Select
     {
         $connection = $this->resourceConnection->getConnection();
 
-        return $connection->select()
+        $select = $connection->select()
             ->from(['o' => $this->resourceConnection->getTableName('sales_order')], [])
             ->where('o.created_at >= ?', $from)
             ->where('o.created_at <= ?', $until)
             ->where('o.state IN (?)', array_keys(OrderPayloadBuilder::STATUS_MAP));
+        $this->inStores($select, 'o.store_id', $engineConnection);
+
+        return $select;
     }
 
-    private function countOrders(string $from, string $until): int
+    private function countOrders(string $from, string $until, Connection $engineConnection): int
     {
-        $select = $this->ordersSelect($from, $until)->columns(['cnt' => new \Zend_Db_Expr('COUNT(*)')]);
+        $select = $this->ordersSelect($from, $until, $engineConnection)
+            ->columns(['cnt' => new \Zend_Db_Expr('COUNT(*)')]);
 
         return (int)$this->resourceConnection->getConnection()->fetchOne($select);
     }
 
     /**
      * Distinct buyers with a purchase from $from to $until (contract §25
-     * `entities.buyers`), by email: a guest buyer counts too.
+     * `entities.buyers`), by email: a guest buyer counts too. In the
+     * connection's store views.
      */
-    private function countBuyers(string $from, string $until): int
+    private function countBuyers(string $from, string $until, Connection $engineConnection): int
     {
         $connection = $this->resourceConnection->getConnection();
         $select = $connection->select()
@@ -226,8 +253,27 @@ class HistoryImport
             ->where('created_at >= ?', $from)
             ->where('created_at <= ?', $until)
             ->where('state IN (?)', self::PURCHASE_STATES);
+        $this->inStores($select, 'store_id', $engineConnection);
 
         return (int)$connection->fetchOne($select);
+    }
+
+    /**
+     * Narrow an orders select to the orders placed in one of the
+     * connection's store views; a connection that serves every website is
+     * not narrowed (an order of a store view deleted since stays its).
+     */
+    private function inStores(Select $select, string $column, Connection $engineConnection): void
+    {
+        if ($engineConnection->servesAllWebsites()) {
+            return;
+        }
+        $storeIds = $engineConnection->storeIds();
+        if ($storeIds) {
+            $select->where($column . ' IN (?)', $storeIds);
+        } else {
+            $select->where('0 = 1');
+        }
     }
 
     /**

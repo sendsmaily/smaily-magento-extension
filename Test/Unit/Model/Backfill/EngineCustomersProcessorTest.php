@@ -22,6 +22,7 @@ use Smaily\Connect\Model\Backfill\ImportClock;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\SkippedRow;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
@@ -87,7 +88,7 @@ class EngineCustomersProcessorTest extends TestCase
         $historyImport = $this->createMock(HistoryImport::class);
         $historyImport->method('horizonNow')->willReturn('2021-10-28 12:00:00');
         $scope = $this->createMock(EngineCustomerScope::class);
-        $scope->method('count')->with('2021-10-28 12:00:00')->willReturn(3);
+        $scope->method('count')->with('2021-10-28 12:00:00', self::isInstanceOf(Connection::class))->willReturn(3);
         $pages = [[21, 22, 23], []];
         $scope->method('page')->willReturnCallback(
             static function (string $horizon, int $afterId) use (&$pages): array {
@@ -105,7 +106,7 @@ class EngineCustomersProcessorTest extends TestCase
             $scope,
             $historyImport,
             new ImportClock(),
-            $this->oneEngineConnection($this->createMock(Settings::class))
+            $this->engineJobConnection($this->oneEngineConnection($this->createMock(Settings::class)), $jobManager)
         ))->process($job);
 
         self::assertSame([['21', 6], ['23', 6]], $enqueued);

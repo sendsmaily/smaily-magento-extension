@@ -12,7 +12,6 @@ use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Framework\Api\SearchCriteriaBuilder;
 use Magento\Framework\Exception\LocalizedException;
 use Smaily\Connect\Model\Engine\Client;
-use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
@@ -24,6 +23,10 @@ use Smaily\Connect\Model\Engine\Queue\IngestQueue;
  *
  * A customer whose row cannot be built from what Magento stores is skipped
  * and the import goes on (SkippedRow, CON-227).
+ *
+ * An import is one Campaign Intelligence connection's (CON-237,
+ * EngineJobConnection): the customers in its scope, with its horizon, each
+ * row built for it and queued for it.
  */
 class EngineCustomersProcessor implements ProcessorInterface
 {
@@ -40,7 +43,7 @@ class EngineCustomersProcessor implements ProcessorInterface
         private readonly EngineCustomerScope $scope,
         private readonly HistoryImport $historyImport,
         private readonly ImportClock $clock,
-        private readonly Connections $connections
+        private readonly EngineJobConnection $jobConnection
     ) {
     }
 
@@ -52,18 +55,21 @@ class EngineCustomersProcessor implements ProcessorInterface
         if ($this->ingestQueue->countPending(Client::DOMAIN_CUSTOMERS) >= IngestPace::IMPORT_BACKLOG_ROWS) {
             return;
         }
+        $connection = $this->jobConnection->of($job);
+        if ($connection === null) {
+            return;
+        }
 
         $this->jobManager->markRunning($job);
-        $horizon = $this->historyImport->horizonNow();
+        $horizon = $this->historyImport->horizonNow($connection);
         if ($job->getData('total_count') === null) {
-            $job->setData('total_count', $this->scope->count($horizon));
+            $job->setData('total_count', $this->scope->count($horizon, $connection));
         }
 
         $deadline = $this->clock->now() + self::TIME_BUDGET_SECONDS;
-        // The primary connection's rows (CON-237; per-connection imports are a later step).
-        $storeId = $this->connections->primary()->canonicalStoreId();
+        $storeId = $connection->canonicalStoreId();
         do {
-            $ids = $this->scope->page($horizon, (int)$job->getCursorValue(), self::PAGE_SIZE);
+            $ids = $this->scope->page($horizon, (int)$job->getCursorValue(), self::PAGE_SIZE, $connection);
             if (!$ids) {
                 $this->jobManager->complete($job);
 
@@ -81,7 +87,7 @@ class EngineCustomersProcessor implements ProcessorInterface
                     continue;
                 }
                 try {
-                    $item = $this->payloadBuilder->build($customer);
+                    $item = $this->payloadBuilder->build($customer, $connection);
                 } catch (\InvalidArgumentException | LocalizedException $exception) {
                     $this->skippedRow->record($job, (int)$customer->getId(), $exception);
                     $skipped++;

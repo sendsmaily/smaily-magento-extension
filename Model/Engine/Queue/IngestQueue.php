@@ -516,17 +516,22 @@ class IngestQueue
     }
 
     /**
-     * Number of undelivered rows for a domain (backfill flood guard).
+     * Number of undelivered rows for a domain (backfill flood guard) — with
+     * $engineConnection, of that connection's rows only (the nightly
+     * manifest's wait, CON-237).
      *
      * @phpstan-impure
      */
-    public function countPending(string $domain): int
+    public function countPending(string $domain, ?Connection $engineConnection = null): int
     {
         $connection = $this->resourceConnection->getConnection();
         $select = $connection->select()
             ->from($this->resourceConnection->getTableName(IngestEventResource::TABLE_NAME), ['cnt' => 'COUNT(*)'])
             ->where('domain = ?', $domain)
             ->where('status IN (?)', [IngestEvent::STATUS_PENDING, IngestEvent::STATUS_SENDING]);
+        if (!$this->applyConnection($select, $engineConnection)) {
+            return 0;
+        }
 
         return (int)$connection->fetchOne($select);
     }

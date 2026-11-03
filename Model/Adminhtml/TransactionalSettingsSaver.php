@@ -18,6 +18,7 @@ use Smaily\Connect\Model\Client\Exception\InvalidSubdomainException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\SmailyUrl;
+use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
@@ -42,7 +43,8 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * Config::XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT. Saving a website without
  * its own account removes that website's own rows, so it follows the account
  * saved for all websites. All three fields empty removes the account at the
- * scope the save targets.
+ * scope the save targets. A website of separate stores (CON-279) always
+ * saves its own account.
  */
 class TransactionalSettingsSaver
 {
@@ -62,7 +64,8 @@ class TransactionalSettingsSaver
         private readonly Config $config,
         private readonly WebsiteContext $websiteContext,
         private readonly CredentialCheck $credentialCheck,
-        private readonly MappingSaver $mappingSaver
+        private readonly MappingSaver $mappingSaver,
+        private readonly StoreLayout $storeLayout
     ) {
     }
 
@@ -256,13 +259,20 @@ class TransactionalSettingsSaver
 
     /**
      * Whether the post saves the website's own account: only on an install
-     * with more than one website.
+     * with more than one website, and always for a website of separate
+     * stores (CON-279), which has no account for all websites.
      *
      * @param array<string, mixed> $posted
      */
     private function ownAccount(array $posted): bool
     {
-        return !empty($posted['website_account']) && $this->websiteContext->hasMultipleWebsites();
+        if (!$this->websiteContext->hasMultipleWebsites()) {
+            return false;
+        }
+
+        return !empty($posted['website_account'])
+            || ($this->websiteContext->getWebsiteId() !== WebsiteContext::STORE_WIDE
+                && $this->storeLayout->isSeparateStores());
     }
 
     /**

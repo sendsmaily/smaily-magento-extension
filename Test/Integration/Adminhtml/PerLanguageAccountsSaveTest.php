@@ -45,6 +45,7 @@ use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
 use Smaily\Connect\Model\OrderOrigin;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory as MappingCollectionFactory;
+use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\SubdomainNormalizer;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
@@ -203,7 +204,8 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
                 $this->objectManager->get(WriterInterface::class),
                 $storeManager,
                 new SubdomainNormalizer()
-            )
+            ),
+            $this->createMock(StoreLayout::class)
         );
 
         // The other website's store view holds its own Estonian account.
@@ -533,7 +535,8 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
             $this->createMock(SetupGuard::class),
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(RuleSource::class),
-            $this->createMock(StoreDate::class)
+            $this->createMock(StoreDate::class),
+            $this->createMock(StoreLayout::class)
         );
     }
 

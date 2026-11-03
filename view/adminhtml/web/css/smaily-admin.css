@@ -1125,3 +1125,33 @@ html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hi
 .smaily-dashboard .smaily-quick-links li:last-child { border-bottom: 0; }
 .smaily-dashboard .smaily-activity > .smaily-empty { margin: 0; padding: var(--sp-3) var(--sp-4); }
 .smaily-dashboard .smaily-activity .admin__table-wrapper { padding: 0 var(--sp-4) var(--sp-1); }
+
+/* --- How the websites are run (CON-279, panel/store-shape.phtml) ----------- *
+ * A slim bar naming the shape with Change, the website picker of separate
+ * stores (one tab-like card per website with the Smaily account it uses),
+ * and the choice card the initial setup opens on. */
+.smaily-store-shape { margin: 0 0 var(--sp-4); }
+.smaily-store-shape__bar {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2);
+    margin: 0 0 var(--sp-3); font-size: var(--fs-13); color: var(--s-text-2);
+}
+.smaily-store-shape__name { color: var(--s-text); }
+.smaily-store-shape__change {
+    padding: 0; border: 0; background: none; cursor: pointer;
+    color: var(--s-link); font-size: var(--fs-13); font-weight: 600;
+}
+.smaily-store-shape__change:hover { color: var(--s-link-hover); text-decoration: underline; }
+.smaily-website-picker { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0 0 var(--sp-2); }
+.smaily-website-picker__item {
+    display: flex; flex-direction: column; gap: 2px; min-width: 150px; max-width: 260px;
+    padding: 10px 14px; border: 1px solid var(--s-border); border-radius: var(--r-3);
+    background: var(--s-surface); color: var(--s-text); text-decoration: none;
+}
+.smaily-website-picker__item:hover { border-color: var(--s-border-strong); text-decoration: none; color: var(--s-text); }
+.smaily-website-picker__item.is-active {
+    border-color: var(--s-accent); box-shadow: inset 0 -3px 0 var(--s-accent); background: var(--s-surface);
+}
+.smaily-website-picker__name { font-size: var(--fs-14); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smaily-website-picker__account { font-size: var(--fs-12); color: var(--s-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smaily-shape-choice { max-width: 760px; }
+.smaily-shape-choice__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-top: var(--sp-4); }

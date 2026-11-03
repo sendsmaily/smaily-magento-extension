@@ -31,6 +31,7 @@ use Smaily\Connect\Model\Config\Source\SyncMode;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\SmailyUrl;
+use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\StorefrontUrl;
 use Smaily\Connect\Model\SubdomainNormalizer;
 
@@ -75,6 +76,13 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  *   another account to the store-wide one returns to the store-wide
  *   automations as well. A website whose own login is the store-wide
  *   account keeps its automations either way.
+ * - Separate stores (CON-279, StoreLayout): on a 2+-website install whose
+ *   websites are set up as separate stores, every section's save writes the
+ *   selected website's own values, as a single store's setup does — the
+ *   initial setup and Settings alike, with no "own" switch and no
+ *   store-wide save — and the CON-190 rules about the store-wide account do
+ *   not apply: there is none. The `shape` step changes the shape
+ *   (StoreLayout::toSeparateStores() / toOneStore()).
  * Store-wide mapping rows are website 0's. The setup-completed flag is one
  * mark for the store (default scope). Intelligence and RSS are default
  * scope as before.
@@ -105,6 +113,9 @@ class WizardStepSaver
     /** Whether the last save moved the website onto another Smaily account than the store-wide one (CON-190). */
     private bool $ownAccountStarted = false;
 
+    /** Whether the last save changed how the websites are run (CON-279). */
+    private bool $shapeChanged = false;
+
     public function __construct(
         private readonly WriterInterface $configWriter,
         private readonly EncryptorInterface $encryptor,
@@ -120,7 +131,8 @@ class WizardStepSaver
         private readonly CredentialCheck $credentialCheck,
         private readonly SetupNotice $setupNotice,
         private readonly TransactionalSettingsSaver $transactionalSaver,
-        private readonly WebsiteOverrides $overrides
+        private readonly WebsiteOverrides $overrides,
+        private readonly StoreLayout $storeLayout
     ) {
     }
 
@@ -132,10 +144,28 @@ class WizardStepSaver
     {
         $this->returnedToStoreWide = false;
         $this->ownAccountStarted = false;
+        $this->shapeChanged = false;
         // The scope the section's saved values are read from: the selected
         // website, or for the initial setup the store (WebsiteContext).
         $websiteId = $this->websiteContext->getWebsiteId();
+        // Separate stores have no values for all websites (CON-279): a page
+        // drawn for the whole store before the change saves nothing.
+        $separate = $this->storeLayout->isSeparateStores();
+        if ($separate && $websiteId === WebsiteContext::STORE_WIDE
+            && in_array($step, ['connect', 'subscribers', 'automations'], true)
+        ) {
+            return [[
+                'field' => 'step',
+                'message' => (string)__('These websites are set up as separate stores. Reload the page and set each website up on its own.'),
+            ]];
+        }
+        // A website saved as a separate store keeps the shape, also once its
+        // save gives it the Smaily account of another website (StoreLayout).
+        if ($separate && in_array($step, ['connect', 'subscribers', 'automations'], true)) {
+            $this->storeLayout->remember();
+        }
         $errors = match ($step) {
+            'shape' => $this->saveShape($data, $websiteId),
             'connect' => $this->saveConnection($data, $websiteId),
             'subscribers' => $this->saveSection(
                 WebsiteOverrides::SUBSCRIBERS,
@@ -158,6 +188,44 @@ class WizardStepSaver
         $this->cacheTypeList->cleanType(ConfigCache::TYPE_IDENTIFIER);
 
         return $errors;
+    }
+
+    /**
+     * Whether the last save changed how the websites are run (CON-279): the
+     * page reloads to show the new shape.
+     */
+    public function isShapeChanged(): bool
+    {
+        return $this->shapeChanged;
+    }
+
+    /**
+     * The `shape` step (CON-279): `one` sets the websites up as one store —
+     * from separate stores, the values of the selected website become the
+     * values for all websites and every website's own values go (the page
+     * asks first) — and `separate` as separate stores, each website with
+     * the values it reads now as its own. Only on a 2+-website install.
+     *
+     * @param array<string, mixed> $data
+     * @return array<int, array{field: string, message: string}>
+     */
+    private function saveShape(array $data, int $websiteId): array
+    {
+        $shape = (string)($data['shape'] ?? '');
+        if (!$this->websiteContext->hasMultipleWebsites()
+            || !in_array($shape, [StoreLayout::ONE_STORE, StoreLayout::SEPARATE_STORES], true)
+        ) {
+            return [['field' => 'shape', 'message' => (string)__('Pick how your websites are run.')]];
+        }
+        $separate = $this->storeLayout->isSeparateStores();
+        if ($shape === StoreLayout::SEPARATE_STORES) {
+            $this->storeLayout->toSeparateStores();
+        } else {
+            $this->storeLayout->toOneStore($websiteId === WebsiteContext::STORE_WIDE ? null : $websiteId);
+        }
+        $this->shapeChanged = $separate !== ($shape === StoreLayout::SEPARATE_STORES);
+
+        return [];
     }
 
     /**
@@ -192,7 +260,8 @@ class WizardStepSaver
     private function saveSection(string $section, array $data, int $websiteId, callable $save): array
     {
         [$target, $remove, $write] = $this->sectionTarget($section, $data, $websiteId);
-        $multiple = $this->websiteContext->hasMultipleWebsites();
+        // Separate stores have no store-wide account to compare with (CON-279).
+        $multiple = $this->websiteContext->hasMultipleWebsites() && !$this->storeLayout->isSeparateStores();
         // A Smaily account saved for one website of a 2+-website install
         // (CON-190): whether it used another account than the store-wide
         // one before this save.
@@ -244,6 +313,10 @@ class WizardStepSaver
             return $perLanguage
                 ? [$websiteId, [], true]
                 : [null, array_values(array_intersect($withOwn, [$websiteId])), true];
+        }
+        // A separate store's values are always its own (CON-279).
+        if ($this->storeLayout->isSeparateStores()) {
+            return [$websiteId, [], true];
         }
         if ($this->websiteContext->isStoreWide()) {
             $chosen = array_map('intval', is_array($data['use_store_wide'] ?? null) ? $data['use_store_wide'] : []);

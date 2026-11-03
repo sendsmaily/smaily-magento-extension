@@ -16,6 +16,7 @@ use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Adminhtml\SetupNotice;
+use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\Adminhtml\TransactionalSettingsSaver;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
@@ -72,6 +73,9 @@ class WizardStepSaverTest extends TestCase
     /** @var WebsiteOverrides&\PHPUnit\Framework\MockObject\MockObject */
     private $overrides;
 
+    /** @var StoreLayout&\PHPUnit\Framework\MockObject\MockObject */
+    private $storeLayout;
+
     /** @var array<int, array{path: string, value: mixed, scope: string, scopeId: int}> */
     private array $saved = [];
 
@@ -101,6 +105,7 @@ class WizardStepSaverTest extends TestCase
         $this->setupNotice = $this->createMock(SetupNotice::class);
         $this->transactionalSaver = $this->createMock(TransactionalSettingsSaver::class);
         $this->overrides = $this->createMock(WebsiteOverrides::class);
+        $this->storeLayout = $this->createMock(StoreLayout::class);
 
         $this->saved = [];
         $this->configWriter->method('save')->willReturnCallback(
@@ -131,7 +136,8 @@ class WizardStepSaverTest extends TestCase
             new CredentialCheck($this->clientFactory, $this->config),
             $this->setupNotice,
             $this->transactionalSaver,
-            $this->overrides
+            $this->overrides,
+            $this->storeLayout
         );
     }
 
@@ -234,6 +240,83 @@ class WizardStepSaverTest extends TestCase
         }
 
         return $scope;
+    }
+
+    /**
+     * CON-279: a website of separate stores saves every section as its own,
+     * with no "own" switch posted and nothing removed, and keeps the layout.
+     */
+    public function testAWebsiteOfSeparateStoresSavesEverySectionAsItsOwn(): void
+    {
+        $this->onStoreWithWebsites(2);
+        $this->storeLayout->method('isSeparateStores')->willReturn(true);
+        $this->storeLayout->expects(self::exactly(2))->method('remember');
+        $this->withOwnValues([WebsiteOverrides::SUBSCRIBERS => [2]]);
+        $this->recordRemovals();
+
+        self::assertSame([], $this->saver->save('subscribers', ['sync_mode' => 'consent']));
+        self::assertSame([], $this->saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'multilingual_mode' => 'a',
+        ]));
+
+        self::assertTrue($this->wasSavedAtScope(Config::XML_PATH_SYNC_MODE, 'websites', 2));
+        self::assertTrue($this->wasSavedAtScope(Config::XML_PATH_MULTILINGUAL_MODE, 'websites', 2));
+        self::assertSame('a', $this->savedValue(Config::XML_PATH_MULTILINGUAL_MODE));
+        self::assertSame([], $this->removed);
+        self::assertFalse($this->saver->isReturnedToStoreWide());
+    }
+
+    /**
+     * CON-279: separate stores have no values for all websites; a page drawn
+     * for the whole store saves nothing.
+     */
+    public function testSeparateStoresRefuseAStoreWideSave(): void
+    {
+        $this->onStoreWithWebsites(0, true);
+        $this->storeLayout->method('isSeparateStores')->willReturn(true);
+
+        $errors = $this->saver->save('subscribers', ['sync_mode' => 'consent']);
+
+        self::assertSame('step', $errors[0]['field'] ?? null);
+        self::assertSame([], $this->saved);
+    }
+
+    /**
+     * CON-279: the shape step changes the layout — separate stores, or one
+     * store with the selected website's values (the default website's from
+     * the store-wide setup) — and says whether it changed.
+     */
+    public function testTheShapeStepChangesTheStoresLayout(): void
+    {
+        $this->onStoreWithWebsites(2);
+        $this->storeLayout->method('isSeparateStores')->willReturnOnConsecutiveCalls(false, false, true, true, true);
+        $this->storeLayout->expects(self::once())->method('toSeparateStores');
+        $this->storeLayout->expects(self::once())->method('toOneStore')->with(2);
+
+        self::assertSame([], $this->saver->save('shape', ['shape' => 'separate']));
+        self::assertTrue($this->saver->isShapeChanged());
+        self::assertSame([], $this->saver->save('shape', ['shape' => 'one']));
+        self::assertTrue($this->saver->isShapeChanged());
+        self::assertSame('shape', $this->saver->save('shape', ['shape' => 'neither'])[0]['field'] ?? null);
+    }
+
+    public function testTheShapeStepFromTheStoreWideSetupJoinsOnTheDefaultWebsite(): void
+    {
+        $this->onStoreWithWebsites(0, true);
+        $this->storeLayout->method('isSeparateStores')->willReturn(true);
+        $this->storeLayout->expects(self::once())->method('toOneStore')->with(null);
+
+        self::assertSame([], $this->saver->save('shape', ['shape' => 'one']));
+    }
+
+    public function testASingleWebsiteStoreHasNoShapeToChoose(): void
+    {
+        $this->websiteContext->method('hasMultipleWebsites')->willReturn(false);
+        $this->storeLayout->expects(self::never())->method('toSeparateStores');
+
+        self::assertNotSame([], $this->saver->save('shape', ['shape' => 'separate']));
     }
 
     public function testMissingSavedWorkflowIsPreservedOnEmptyPost(): void
@@ -958,7 +1041,8 @@ class WizardStepSaverTest extends TestCase
             new CredentialCheck($this->clientFactory, $config),
             $this->setupNotice,
             $this->createMock(TransactionalSettingsSaver::class),
-            $this->overrides
+            $this->overrides,
+            $this->storeLayout
         );
 
         $errors = $saver->save('connect', [

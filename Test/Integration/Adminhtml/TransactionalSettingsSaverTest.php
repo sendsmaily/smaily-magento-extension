@@ -16,6 +16,7 @@ use Smaily\Connect\Model\Automation\MappingSaver;
 use Smaily\Connect\Model\Client\CredentialCheck;
 use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\SubdomainNormalizer;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
@@ -51,7 +52,8 @@ class TransactionalSettingsSaverTest extends IntegrationTestCase
             $websiteContext,
             // Smaily is never asked: the client factory returns a mock.
             new CredentialCheck($this->createMock(SmailyClientFactory::class), $this->config),
-            $this->objectManager->get(MappingSaver::class)
+            $this->objectManager->get(MappingSaver::class),
+            $this->createMock(StoreLayout::class)
         );
     }
 

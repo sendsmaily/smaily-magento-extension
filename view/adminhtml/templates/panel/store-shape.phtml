@@ -1,0 +1,201 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * How the websites are run (CON-279) — the top of the initial setup and of
+ * Settings on a 2+-website install; a single-website install renders
+ * nothing. Fetched by wizard/index.phtml and settings/index.phtml with their
+ * own block, whose view model is WizardData.
+ *
+ * - The bar names the shape — One store in several versions, or Separate
+ *   stores — with Change, which opens the choice below.
+ * - Separate stores: the website selector, one link per website with the
+ *   Smaily subdomain it uses (or Not set up), reloading the page with
+ *   `?website=<id>`; the page then shows that website on its own, as a
+ *   single store's page does.
+ * - The choice: two cards and a save, posted as the `shape` step
+ *   (WizardStepSaver::saveShape()). The initial setup of a store whose shape
+ *   is not known yet (WizardData::isShapeChoiceFirst()) opens on it, with the
+ *   steps hidden: One store moves on to the store-wide Connect step and
+ *   saves nothing; Separate stores saves the shape and opens the setup of
+ *   the first website. From separate stores back to one store the page asks
+ *   first: the selected website's values become the values for all
+ *   websites and every website's own values are removed.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
+$viewModel = $block->getData('view_model');
+if (!$viewModel->hasMultipleWebsites()) {
+    return;
+}
+$separate = $viewModel->isSeparateStores();
+$first = $viewModel->isShapeChoiceFirst();
+$websites = $viewModel->getWebsiteAccounts();
+$selectedWebsiteId = $viewModel->getSelectedWebsiteId();
+$selectedName = $websites[$selectedWebsiteId]['name'] ?? (reset($websites)['name'] ?? '');
+$shapes = [
+    'one' => [
+        'label' => __('One store in several versions'),
+        'note' => __('The websites are country or language versions of one business, on one Smaily account. You set the store up once; a website differs only where you give it its own settings.'),
+    ],
+    'separate' => [
+        'label' => __('Separate stores'),
+        'note' => __('Each website is a business of its own, with its own Smaily account, contacts and automations. You set each website up on its own, as a single store.'),
+    ],
+];
+$current = $separate ? 'separate' : 'one';
+$toOne = __('All websites then use the settings of %1: its Smaily account, Contacts settings and automations. The other websites\' own settings are removed.', $selectedName);
+?>
+<div class="smaily-store-shape" id="smaily-store-shape"
+     data-shape="<?= $escaper->escapeHtmlAttr($current) ?>"
+     data-first="<?= $first ? '1' : '0' ?>"
+     data-save-url="<?= $escaper->escapeUrl($block->getUrl('smaily_connect/api/savestep', $viewModel->getWebsiteQuery())) ?>">
+    <div class="smaily-store-shape__bar"<?= $first ? ' style="display:none;"' : '' ?>>
+        <span class="smaily-store-shape__label"><?= $escaper->escapeHtml(__('Your websites')) ?></span>
+        <strong class="smaily-store-shape__name" id="smaily-shape-name"><?= $escaper->escapeHtml($shapes[$current]['label']) ?></strong>
+        <button type="button" class="smaily-store-shape__change" id="smaily-shape-change"><?= $escaper->escapeHtml(__('Change')) ?></button>
+    </div>
+    <?php if ($separate): ?>
+    <nav class="smaily-website-picker" id="smaily-website-picker" aria-label="<?= $escaper->escapeHtmlAttr(__('Website')) ?>">
+        <?php foreach ($websites as $websiteId => $website): ?>
+        <?php $active = $websiteId === $selectedWebsiteId; ?>
+        <a class="smaily-website-picker__item<?= $active ? ' is-active' : '' ?>"
+           href="?website=<?= (int)$websiteId ?>" data-website-id="<?= (int)$websiteId ?>"<?= $active ? ' aria-current="page"' : '' ?>>
+            <span class="smaily-website-picker__name"><?= $escaper->escapeHtml($website['name']) ?></span>
+            <span class="smaily-website-picker__account"><?= $escaper->escapeHtml($website['subdomain'] !== '' ? $website['subdomain'] . '.sendsmaily.net' : __('Not set up')) ?></span>
+        </a>
+        <?php endforeach; ?>
+    </nav>
+    <?php endif; ?>
+    <div class="smaily-card smaily-shape-choice" id="smaily-shape-choice"<?= $first ? '' : ' style="display:none;"' ?>>
+        <h2><?= $escaper->escapeHtml(__('How are your websites run?')) ?></h2>
+        <p><?= $escaper->escapeHtml(__('This installation has %1 websites: %2.', count($websites), implode(', ', array_column($websites, 'name')))) ?></p>
+        <?php foreach ($shapes as $value => $shape): ?>
+        <label class="smaily-choice<?= $value === $current ? ' is-selected' : '' ?>">
+            <input class="smaily-choice__input" type="radio" name="smaily-shape"
+                   value="<?= $escaper->escapeHtmlAttr($value) ?>"<?= $value === $current ? ' checked' : '' ?>/>
+            <span class="smaily-choice__radio"></span>
+            <span class="smaily-choice__body">
+                <span class="smaily-choice__title-row"><span class="smaily-choice__title"><?= $escaper->escapeHtml($shape['label']) ?></span></span>
+                <span class="smaily-choice__desc"><?= $escaper->escapeHtml($shape['note']) ?></span>
+            </span>
+        </label>
+        <?php endforeach; ?>
+        <p class="note" id="smaily-shape-to-separate" style="display:none;"><?= $escaper->escapeHtml(__('Each website keeps the settings it uses now, as its own. Change them for each website afterwards.')) ?></p>
+        <p class="note" id="smaily-shape-to-one" style="display:none;"><?= $escaper->escapeHtml($toOne) ?></p>
+        <div class="smaily-shape-choice__actions">
+            <button type="button" class="action-primary" id="smaily-shape-save"><span><?= $escaper->escapeHtml($first ? __('Continue') : __('Save')) ?></span></button>
+            <?php if (!$first): ?>
+            <button type="button" class="action-secondary" id="smaily-shape-cancel"><span><?= $escaper->escapeHtml(__('Cancel')) ?></span></button>
+            <?php endif; ?>
+            <span class="smaily-result" id="smaily-shape-result"></span>
+        </div>
+    </div>
+</div>
+<script>
+require(['jquery'], function ($) {
+    'use strict';
+
+    // The page's steps or tabs come after this block: wait for them.
+    $(function () {
+    var $root = $('#smaily-store-shape');
+    var current = String($root.data('shape'));
+    var first = String($root.data('first')) === '1';
+    // The setup opened on the choice: nothing is saved yet to copy.
+    var askedFirst = first;
+    // The page's steps or tabs, hidden while the setup asks first.
+    var $page = $root.siblings('[data-shape-page]');
+
+    function chosen() {
+        return $root.find('input[name=smaily-shape]:checked').val();
+    }
+
+    function applyChoice() {
+        var value = chosen();
+        $root.find('.smaily-choice').each(function () {
+            $(this).toggleClass('is-selected', $(this).find('input').val() === value);
+        });
+        $('#smaily-shape-to-separate').toggle(!askedFirst && current === 'one' && value === 'separate');
+        $('#smaily-shape-to-one').toggle(current === 'separate' && value === 'one');
+    }
+
+    function showChoice(open) {
+        $('#smaily-shape-choice').toggle(open);
+        $root.find('.smaily-store-shape__bar').toggle(!open || !first);
+        $page.toggle(!open);
+        $('#smaily-shape-result').text('');
+    }
+
+    // Opens the page again with ?website=<id> (or without one), keeping the
+    // rest of its address (Settings' tab).
+    function reload(websiteId) {
+        var url = new URL(window.location.href);
+        if (websiteId) {
+            url.searchParams.set('website', String(websiteId));
+        } else {
+            url.searchParams.delete('website');
+        }
+        window.location.href = url.toString();
+    }
+
+    $root.on('change', 'input[name=smaily-shape]', applyChoice);
+    $('#smaily-shape-change').on('click', function () {
+        first = false;
+        showChoice(true);
+        applyChoice();
+    });
+    $('#smaily-shape-cancel').on('click', function () {
+        $root.find('input[name=smaily-shape][value=' + current + ']').prop('checked', true);
+        applyChoice();
+        showChoice(false);
+    });
+    // A website link keeps the page's other query parameters (Settings' tab).
+    $root.on('click', '.smaily-website-picker__item', function (event) {
+        event.preventDefault();
+        reload($(this).data('website-id'));
+    });
+
+    $('#smaily-shape-save').on('click', function () {
+        var value = chosen();
+        if (value === current) {
+            // One store, as it is: the setup moves on, nothing is saved.
+            showChoice(false);
+
+            return;
+        }
+        if (current === 'separate' && !window.confirm($('#smaily-shape-to-one').text())) {
+            return;
+        }
+        var $button = $(this).prop('disabled', true);
+        var url = String($root.data('save-url'));
+        $('#smaily-shape-result').text('<?= $escaper->escapeJs(__('Saving…')) ?>');
+        fetch(url + (url.indexOf('?') === -1 ? '?' : '&') + 'form_key=' + encodeURIComponent(window.FORM_KEY), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+            body: JSON.stringify({step: 'shape', data: {shape: value}})
+        }).then(function (response) {
+            return response.json();
+        }).then(function (response) {
+            if (!response.saved) {
+                throw new Error((response.errors || []).map(function (e) { return e.message; }).join(' '));
+            }
+            // Separate stores open on a website; one store on the whole store.
+            reload(value === 'separate' ? (response.websiteId || 0) : 0);
+        }).catch(function (error) {
+            $('#smaily-shape-result').text(error.message || '<?= $escaper->escapeJs(__('Saving failed.')) ?>');
+            $button.prop('disabled', false);
+        });
+    });
+
+    applyChoice();
+    if (first) {
+        $page.hide();
+    }
+    });
+});
+</script>

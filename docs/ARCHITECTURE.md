@@ -2208,9 +2208,80 @@ Initial setup, Settings, Log. Design rules:
     account with the store-wide automations before CON-190 starts nothing
     until its workflows are picked; no data patch moves rows. A
     single-website install has no exceptions and is unchanged.
+  - **Separate stores (CON-279, owner decision 2026-11-03).** On a
+    2+-website install the merchant says how the websites are run: one
+    store in several versions (everything above) or separate stores, each
+    website a business of its own, set up and shown on its own as a
+    single-website store is. `Model\StoreLayout` (a runtime service, not an
+    admin one: crons and the storefront may read `isSeparateStores()`)
+    reads the layout from the data — `WebsiteOverrides::holdsSeparateAccounts()`:
+    no store-wide Smaily account and at least two websites holding different
+    accounts of their own (CON-192's shape) — or from one default-scope mark,
+    `smaily_connect/internal/separate_stores`. The mark exists because the
+    data cannot tell separate stores whose websites share one account (right
+    after the change from one store, or by choice) from one store whose
+    websites all hold its one account as their own (a 2.8.x upgrade often
+    saved it per website), nor carry the choice the setup asks before the
+    first website is saved. A website saved as a separate store writes the
+    mark (`remember()`), so the layout does not flip when two websites later
+    share an account. A single-website install is never separate stores.
+    - The initial setup asks first (`panel/store-shape.phtml`,
+      `WizardData::isShapeChoiceFirst()`) while the layout is unknown: no
+      mark, no separate accounts and no store-wide account. The `shape`
+      step of `WizardStepSaver` writes it (`StoreLayout::toSeparateStores()`
+      / `toOneStore()`); one store as it is saves nothing.
+    - Under separate stores the setup is not store-wide
+      (`Wizard\Index` skips `useStoreWide()`): both pages read the selected
+      website (`?website=<id>`, else the default website) and show the
+      website picker at the top (each website with the Smaily subdomain it
+      uses); `sectionTarget()` writes every section at the website's scope
+      with nothing removed, mode A included; the "own" switches, the
+      website lists and the drop-down next to the tabs are not drawn
+      (`WizardData::hasOwnValues()` is true, `isOwnRequired()` false); the
+      CON-190 account comparison is off (there is no store-wide account); a
+      store-wide save is refused; the transactional-email account is always
+      the website's own (`TransactionalSettingsSaver::ownAccount()`). A
+      website's setup opens on its Connect summary once the setup is
+      finished and the website holds a Smaily account
+      (`WizardData::isWebsiteSetUp()`); the setup-completed mark stays one
+      for the store.
+    - One store → separate stores copies, for every website, each
+      default-scope row of the three sections it does not hold to its
+      website scope as stored (the password stays encrypted) and the
+      store-wide mapping rows (website 0) it has no row for
+      (`WebsiteOverrides::copyStoreWideToWebsite()`; a copied default
+      fallback only where the website has none of that kind); a website on
+      another account (CON-190) gets its missing workflows as none and no
+      store-wide rows, as the Router read it. Then the store-wide values of
+      the three sections and website 0's non-transactional rows go
+      (`removeStoreWideValues()`), so a website added later starts with
+      nothing set. Every website reads and sends exactly as before.
+    - Separate stores → one store (the page asks first): the selected
+      website's own values become the store-wide ones
+      (`promoteToStoreWide()`: mode A becomes Single language; its
+      one-account mapping rows join website 0's, its own winning), then
+      `StoreLayout::EVENT_JOINED` (`smaily_connect_store_layout_joined`,
+      `website_ids`, `website_id`) is dispatched — the seam where phase 2
+      (CON-237) will disconnect each website's own engine connection; today
+      nothing listens — and every website's own values of the three
+      sections are removed (with its store views' accounts). Contacts
+      confirmations stay.
+    - Upgrades (CON-192): a store whose websites hold different Smaily
+      accounts and no store-wide one gets the store-wide automations it
+      sent with as each website's own (`StoreLayout::copyAutomationsToSeparateAccounts()`,
+      config and mapping rows, store-wide rows kept) — in
+      `MigrateLegacyConfig` for a 2.8.x upgrade and in the data patch
+      `CopyAutomationsToSeparateStores` for a store already upgraded; a
+      second run finds every value held. Any other store is left as it is.
+    - Campaign Intelligence stays one installation-wide connection in this
+      phase: the Intelligence panel of a separate store says so and names
+      the websites it covers (all). No `smaily_connect/intelligence/*` path
+      is in `WebsiteOverrides::PATHS`, so no layout change moves the engine
+      connection.
   - The Settings page renders an explicit website selector next to the tab
     strip (own chrome, not Magento's native store-switcher), reloading with
     `?website=<id>`; single-website installs never see it or the switches.
+    Under separate stores the website picker at the top replaces it.
     Campaign Intelligence and RSS stay installation-wide (default scope).
   - The store-wide setup reads the default scope on a 2+-website install,
     with every website's languages and every website's contacts in the

@@ -16,6 +16,7 @@ use Magento\Framework\Notification\NotifierInterface;
 use Magento\Framework\Setup\ModuleDataSetupInterface;
 use Magento\Framework\Setup\Patch\DataPatchInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Migration\LegacyConfigMapper;
@@ -52,6 +53,14 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
  * marked saved, so it keeps syncing; on a new install contact sync waits
  * for the Contacts step (PRO-4036).
  *
+ * Websites with separate Smaily accounts and no store-wide one (each
+ * website's own login, the default scope none) are separate stores
+ * (CON-279, CON-192): each website gets the store-wide automations it sent
+ * with in 2.8.x as its own — config rows and mapping rows at its website
+ * scope (StoreLayout::copyAutomationsToSeparateAccounts()) — so it sends on
+ * exactly as before. A store whose websites share one account is left as
+ * migrated.
+ *
  * Store-view rows: 2.8.x read every setting per website, so it never read a
  * store-view row. v3 reads the Smaily account per store view, so the
  * store-view account rows (and Enable Module) are not carried over, and an
@@ -73,7 +82,8 @@ class MigrateLegacyConfig implements DataPatchInterface
         private readonly EncryptorInterface $encryptor,
         private readonly NotifierInterface $notifier,
         private readonly MigrationOutcome $migrationOutcome,
-        private readonly StoreManagerInterface $storeManager
+        private readonly StoreManagerInterface $storeManager,
+        private readonly StoreLayout $storeLayout
     ) {
     }
 
@@ -153,6 +163,7 @@ class MigrateLegacyConfig implements DataPatchInterface
             $allNotices = array_merge($allNotices, $result['notices']);
         }
         $this->confirmSyncingWebsites();
+        $this->storeLayout->copyAutomationsToSeparateAccounts();
 
         // Every scope is migrated: the 2.8.x rows go, the plaintext password
         // among them. Only "smaily/" itself matches, not smaily_connect/*.

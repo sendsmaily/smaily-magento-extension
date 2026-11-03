@@ -171,6 +171,11 @@ start one.
     MySQL (`docker run --rm -d -e MYSQL_ROOT_PASSWORD=root -p 3316:3306
     mysql:8.4` + `SMAILY_IT_DB_PORT=3316`, see TESTING.md); NEVER point
     `SMAILY_IT_DB_*` at the sandbox DB — the suite drops/recreates tables.
+    The harness's object manager has no `StoreManagerInterface`
+    preference: a class it builds that needs one (directly or through a
+    dependency, e.g. `MigrateLegacyConfig` → `StoreLayout`) gets it passed
+    in — `IntegrationTestCase::storeLayoutFor()` builds a `StoreLayout` on
+    a mocked store manager (CON-279).
   - `bin/test-js.sh` — the browser harnesses in headless Chrome. Chrome's
     virtual time jumps to the end of its budget when no timer is pending, so
     every page keeps a short interval running until its result is written

@@ -35,6 +35,12 @@ $isRefused = $viewModel->isEngineRefused();
         <p><?= $escaper->escapeHtml(__('Campaign Intelligence uses your store’s product, customer and order data to create personalized product recommendations for Smaily campaigns and automations. This helps you send more relevant emails with less manual work.')) ?></p>
         <p><?= $escaper->escapeHtml(__('Campaign Intelligence is an optional paid add-on (€250/month), added to your regular Smaily monthly payment. Contact Smaily to activate it, or set it up later.')) ?></p>
     </div>
+    <?php // Separate stores (CON-279): Campaign Intelligence stays one
+    // connection for the installation in this release, reached from every
+    // website's page; it says so, and names the websites it covers. ?>
+    <?php if ($viewModel->hasMultipleWebsites() && $viewModel->isSeparateStores()): ?>
+    <p class="note" id="smaily-w-engine-installation"><?= $escaper->escapeHtml(__('Campaign Intelligence is one connection for the whole installation, whichever website you pick: it covers every website (%1).', implode(', ', $viewModel->getWebsiteNames()))) ?></p>
+    <?php endif; ?>
     <div id="smaily-w-engine-disconnected">
         <div class="smaily-field">
             <label for="smaily-w-setup-url"><?= $escaper->escapeHtml(__('Setup URL or token from Smaily')) ?></label>

@@ -160,6 +160,15 @@ settings are filled in, and the Automations step shows the migrated
 workflows and wait time. Compare each step with your notes, in particular
 each automation's *Enabled* tick, then finish the setup.
 
+On a store with more than one website, the setup first asks **How are
+your websites run?** — **One store in several versions** or **Separate
+stores** — unless the migrated settings tell: a Smaily login at the 2.8.x
+default scope makes one store, and websites with different Smaily logins
+and none at the default scope make separate stores (see the guide's
+[If your store has several websites](https://smaily.com/connect-magento/#setup-website)).
+Separate stores are set up one website at a time, each as a store with one
+website; the rest of this section describes one store.
+
 On a store with more than one website, a website whose 2.8.x settings had
 their own values (a website-scope value in the 2.8.x scope switcher)
 keeps them: the Connect, Contacts and Automations steps list each such
@@ -177,8 +186,12 @@ all websites come from that other account. The account decides, not
 where its login is saved: a website whose 2.8.x settings repeat the
 default scope's Smaily login (the same subdomain and API username) uses
 the same account and keeps the workflows saved for all websites. So does
-every website when 2.8.x had no Smaily login at the default scope, only
-per website. A website whose 2.8.x Smaily login named another account
+every website when 2.8.x had no Smaily login at the default scope and every
+website the same login of its own. When 2.8.x had no Smaily login at the
+default scope and the websites had different logins of their own, the
+store is separate stores: the update gives each website the workflows it
+sent with in 2.8.x as its own automations, so every website sends on as
+before. A website whose 2.8.x Smaily login named another account
 than the default scope's, and whose workflows were set only for all
 websites, starts no automation after the update: on **Settings >
 Automations**, pick the website, pick its workflows from its own account

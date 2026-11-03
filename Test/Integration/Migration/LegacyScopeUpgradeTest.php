@@ -547,6 +547,55 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
         self::assertCount(1, $this->noticeDescriptions(self::ABANDONED_CART_NOTICE_TITLE));
     }
 
+    /**
+     * CON-279, CON-192: websites with different Smaily accounts of their own
+     * and none for all websites are separate stores. Each one gets the
+     * workflows it sent with in 2.8.x as its own automations, and sends on
+     * with them; websites that share one account are left as migrated.
+     */
+    public function testWebsitesOnDifferentAccountsGetTheWorkflowsTheySentWithAsTheirOwn(): void
+    {
+        foreach (['different' => ['ee-shop', 'lv-shop'], 'shared' => ['shop', 'shop']] as $case => $subdomains) {
+            $this->env->resetState();
+            $this->seed('default', 0, [
+                'smaily/subscribe/workflowId' => '55',
+                'smaily/abandoned/autoresponderId' => '77',
+            ]);
+            foreach ([1, 2] as $index => $websiteId) {
+                $this->seed('websites', $websiteId, [
+                    'smaily/general/subdomain' => $subdomains[$index],
+                    'smaily/general/username' => 'api-user',
+                    'smaily/general/password' => 'plain-secret',
+                ]);
+            }
+
+            $this->migrate();
+
+            $own = array_map('intval', $this->connection->fetchCol(
+                $this->connection->select()->from('core_config_data', ['scope_id'])
+                    ->where('scope = ?', 'websites')
+                    ->where('path = ?', Config::XML_PATH_WELCOME_WORKFLOW)
+                    ->order('scope_id')
+            ));
+            $rows = array_map('intval', $this->connection->fetchCol(
+                $this->connection->select()->from('smaily_automation_mapping', ['website_id'])
+                    ->where('trigger_type = ?', Trigger::WELCOME)
+                    ->order('website_id')
+            ));
+            if ($case === 'shared') {
+                self::assertSame([], $own, 'One account on every website: one store, as migrated');
+                self::assertSame([0], $rows);
+                continue;
+            }
+            self::assertSame([1, 2, 3, 4], $own, 'Every website holds its own workflows');
+            self::assertSame([0, 1, 2, 3, 4], $rows);
+            foreach ([1, 2, 3, 4] as $websiteId) {
+                self::assertSame(55, $this->config->getWelcomeWorkflow($websiteId), 'Website ' . $websiteId);
+                self::assertSame(77, $this->config->getAbandonedCartWorkflow($websiteId), 'Website ' . $websiteId);
+            }
+        }
+    }
+
     public function testEveryStoreViewLanguageResolvesAndRoutesToItsWebsiteWorkflowThroughTheOneAccount(): void
     {
         /** @var LanguageResolver $languages */
@@ -614,6 +663,7 @@ class LegacyScopeUpgradeTest extends IntegrationTestCase
         $this->objectManager->create(MigrateLegacyConfig::class, [
             'moduleDataSetup' => new DataSetup($resourceConnection),
             'storeManager' => $storeManager,
+            'storeLayout' => $this->storeLayoutFor($storeManager),
         ])->apply();
 
         $this->config = $this->objectManager->create(Config::class, ['scopeConfig' => $this->configScope()]);

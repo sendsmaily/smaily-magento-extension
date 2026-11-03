@@ -116,6 +116,7 @@ class ConfirmContactsOfConnectedWebsitesTest extends IntegrationTestCase
             'moduleDataSetup' => new DataSetup($resourceConnection),
             'migrationOutcome' => $outcome,
             'storeManager' => $storeManager,
+            'storeLayout' => $this->storeLayoutFor($storeManager),
         ])->apply();
         $this->objectManager->create(ConfirmContactsOfConnectedWebsites::class, [
             'config' => $this->config(),

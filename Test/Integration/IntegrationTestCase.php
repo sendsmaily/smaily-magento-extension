@@ -9,8 +9,12 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Integration;
 
 use Magento\Framework\DB\Adapter\AdapterInterface;
+use Magento\Framework\Event\ManagerInterface as EventManagerInterface;
 use Magento\Framework\ObjectManagerInterface;
+use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
+use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Test\Integration\Support\TestClock;
 use Smaily\Connect\Test\Integration\Support\TestEnvironment;
 
@@ -35,6 +39,19 @@ abstract class IntegrationTestCase extends TestCase
         $this->objectManager = $this->env->getObjectManager();
         $this->connection = $this->env->getConnection();
         $this->clock = $this->env->getClock();
+    }
+
+    /**
+     * The store's layout (CON-279) over the real tables, on the websites
+     * the store manager lists; the events it dispatches go nowhere.
+     */
+    protected function storeLayoutFor(StoreManagerInterface $storeManager): StoreLayout
+    {
+        return $this->objectManager->create(StoreLayout::class, [
+            'storeManager' => $storeManager,
+            'overrides' => $this->objectManager->create(WebsiteOverrides::class, ['storeManager' => $storeManager]),
+            'eventManager' => $this->createMock(EventManagerInterface::class),
+        ]);
     }
 
     /**

@@ -12,6 +12,7 @@ use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
+use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Config\Source\MultilingualMode;
@@ -68,6 +69,9 @@ class WizardDataTest extends TestCase
     /** @var OrderOrigin&\PHPUnit\Framework\MockObject\MockObject */
     private $orderOrigin;
 
+    /** @var StoreLayout&\PHPUnit\Framework\MockObject\MockObject */
+    private $storeLayout;
+
     private WizardData $viewModel;
 
     protected function setUp(): void
@@ -87,6 +91,7 @@ class WizardDataTest extends TestCase
         $this->contactAudience = $this->createMock(ContactAudience::class);
 
         $this->orderOrigin = $this->createMock(OrderOrigin::class);
+        $this->storeLayout = $this->createMock(StoreLayout::class);
         $this->viewModel = $this->viewModel($this->websiteContext);
     }
 
@@ -108,7 +113,8 @@ class WizardDataTest extends TestCase
             $this->setupGuard,
             $this->overrides,
             $this->createMock(RuleSource::class),
-            $this->createMock(StoreDate::class)
+            $this->createMock(StoreDate::class),
+            $this->storeLayout
         );
     }
 
@@ -373,6 +379,54 @@ class WizardDataTest extends TestCase
 
         self::assertSame(1, $this->viewModel->getStartStep());
         self::assertSame(5, $this->viewModel->getReachedStep());
+    }
+
+    /**
+     * CON-279: the initial setup of a store with more than one website asks
+     * first how they are run, until the layout is known or the setup is
+     * finished; a single-website store is never asked.
+     */
+    public function testTheSetupAsksHowTheWebsitesAreRunUntilTheLayoutIsKnown(): void
+    {
+        $this->setupGuard->method('isSetupCompleted')->willReturn(false);
+        $this->storeLayout->method('isKnown')->willReturnOnConsecutiveCalls(false, true);
+        $multiple = $this->createMock(WebsiteContext::class);
+        $multiple->method('hasMultipleWebsites')->willReturn(true);
+        $viewModel = $this->viewModel($multiple);
+
+        self::assertTrue($viewModel->isShapeChoiceFirst());
+        self::assertFalse($viewModel->isShapeChoiceFirst(), 'Known: separate stores, or an account for all websites');
+        self::assertFalse($this->viewModel->isShapeChoiceFirst(), 'One website');
+    }
+
+    /**
+     * CON-279: a website of separate stores shows its values as its own,
+     * with no switch to keep, and its setup opens on the Connect summary
+     * only once a Smaily account is saved for it.
+     */
+    public function testAWebsiteOfSeparateStoresIsShownAsAStoreOfItsOwn(): void
+    {
+        $this->websiteContext->method('hasMultipleWebsites')->willReturn(true);
+        $this->websiteContext->method('getWebsiteOptions')->willReturn([1 => 'Main', 2 => 'Second']);
+        $this->storeLayout->method('isSeparateStores')->willReturn(true);
+        $this->setupGuard->method('isSetupCompleted')->willReturn(true);
+        $this->config->method('getWebsiteSubdomain')->willReturnCallback(
+            static fn (int $websiteId): string => $websiteId === 1 ? 'main-shop' : ''
+        );
+        $this->config->method('getWebsiteUsername')->willReturn('api-user');
+
+        self::assertTrue($this->viewModel->isSeparateStores());
+        foreach ([WebsiteOverrides::CONNECTION, WebsiteOverrides::SUBSCRIBERS, WebsiteOverrides::AUTOMATIONS] as $section) {
+            self::assertTrue($this->viewModel->hasOwnValues($section), $section);
+            self::assertFalse($this->viewModel->isOwnRequired($section), $section);
+        }
+        self::assertFalse($this->viewModel->needsOwnWorkflows());
+        self::assertFalse($this->viewModel->isWebsiteSetUp(), 'Second has no Smaily account yet');
+        self::assertSame(1, $this->viewModel->getReachedStep());
+        self::assertSame(
+            [1 => ['name' => 'Main', 'subdomain' => 'main-shop'], 2 => ['name' => 'Second', 'subdomain' => '']],
+            $this->viewModel->getWebsiteAccounts()
+        );
     }
 
     public function testSelectorHelpersDelegateToWebsiteContext(): void

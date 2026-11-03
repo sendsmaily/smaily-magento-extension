@@ -48,7 +48,11 @@ $isSettings = $block->getData('context') === 'settings';
     <div id="smaily-tx-account-fields" <?= $account['enabled'] ? '' : 'style="display:none;"' ?>>
         <h3><?= $escaper->escapeHtml(__('Transactional Smaily account')) ?></h3>
         <p class="note"><?= $escaper->escapeHtml(__('A separate Smaily account used only for transactional sends.')) ?></p>
-        <?php if ($isSettings && $viewModel->hasMultipleWebsites()): ?>
+        <?php // A website of separate stores always uses its own account (CON-279): the
+        // switch is implied, kept ticked and out of sight for the page script. ?>
+        <?php if ($viewModel->hasMultipleWebsites() && $viewModel->isSeparateStores() && !$viewModel->isStoreWide()): ?>
+        <input type="checkbox" id="smaily-tx-website-account" checked hidden/>
+        <?php elseif ($isSettings && $viewModel->hasMultipleWebsites()): ?>
         <div class="smaily-inline-toggle">
             <label>
                 <input type="checkbox" id="smaily-tx-website-account" <?= $account['websiteAccount'] ? 'checked' : '' ?>/>

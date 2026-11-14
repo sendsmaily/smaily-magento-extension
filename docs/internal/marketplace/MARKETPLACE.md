@@ -12,6 +12,7 @@ Files here:
 |---|---|
 | `smaily-connect-user-guide.pdf` | Documentation upload: the user guide, in English (Marketplace wants a PDF) |
 | `user-guide.html` | Source of the PDF; print it with Chrome to rebuild it (see below) |
+| `smaily-icon-240.png` | Extension icon, 240 × 240 px |
 | `screenshots/1-dashboard.png` | Gallery image: Dashboard |
 | `screenshots/2-initial-setup.png` | Gallery image: the initial setup, step 2, the contact sync mode |
 | `screenshots/3-automations.png` | Gallery image: Settings › Automations |
@@ -153,7 +154,7 @@ allowed).
 **Support:** support@smaily.com · documentation
 https://smaily.com/connect-magento/
 
-**Icon:** keep the listing's current icon (the Smaily mark).
+**Icon:** `smaily-icon-240.png` — the Smaily mark from smaily.com (`Smly-favicon-500x500.png`, the site's own icon), scaled to the 240 × 240 px the portal asks for.
 
 ## Submission steps (portal)
 

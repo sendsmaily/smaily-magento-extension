@@ -95,10 +95,14 @@ confirms you downloaded the archive we built.
    delivery, with retry).
 
 Everything is configured on the module's own pages — there is no separate
-Stores > Configuration entry. The initial setup sets the whole store up
-once, however many websites it has. Installs with more than one website get
-a website selector on Settings, where a website can be given its own Smaily
-account, Contacts settings and automations.
+Stores > Configuration entry. On a store with more than one website, the
+initial setup first asks how the websites are run: as **one store in
+several versions**, set up once for all websites, where a website can be
+given its own Smaily account, Contacts settings and automations on
+Settings; or as **separate stores**, each website set up on its own with
+its own Smaily account. The
+[User Guide](https://smaily.com/connect-magento/#setup-website) has the
+details.
 
 ## Development
 
@@ -111,6 +115,12 @@ vendor/bin/phpunit -c phpunit.integration.xml.dist  # needs MySQL, see TESTING.m
 
 docker compose up -d      # Magento 2.4.8 sandbox on http://localhost:8080
 ```
+
+## Support
+
+Questions about Smaily Connect or your Smaily account: support@smaily.com.
+Bugs and feature requests:
+[GitHub issues](https://github.com/sendsmaily/smaily-magento-extension/issues).
 
 ## License
 

@@ -289,29 +289,22 @@ do not change it.
 
 ## Release cut (official repo)
 
-1. The version-cut PR sets the version in `composer.json`,
+1. The version-cut PR sets the version in `composer.json` (and the
+   lock's content hash: `composer update --lock`),
    `Model/ModuleInfo.php` and the ModuleVersion docblock, and names it in
-   CHANGELOG. It also updates every merchant command that quotes the
-   release-candidate version — the `composer require
-   smaily/smailyformagento:<version>` lines in README "Installation",
-   `docs/UPGRADING.md` "Steps" (both modes) and `docs/site/index.html`
-   `#install` and `#upgrading` (EN and ET twins); at 3.0.0 they become the
-   plain `composer require smaily/smailyformagento` (install) and `:^3.0`
-   (upgrade), and the "until 3.0.0 is released" notes beside them go
-   (`grep -rn '<previous version>' --exclude-dir=vendor .` finds them). It
+   CHANGELOG. Since 3.0.0 the merchant commands name no version: install
+   `composer require smaily/smailyformagento`, upgrade from 2.8.x `:^3.0`,
+   Hyvä `composer require smaily/module-connect-hyva` (README, UPGRADING,
+   `compat/hyva/README.md`, the site's `#install`, `#upgrading` and
+   `#st-hyva`); a cut checks with `grep -rn '<previous version>'
+   --exclude-dir=vendor .` that none quotes a version again. It
    collects the fragments: `bin/collect-changelog.sh` prints
    every `changelog.d/` bullet in the order it landed on `master` (oldest
    first; `-l` lists the files with their landing dates); paste them into
    the "Changes since <previous version>" list in that order, merge or
    reword a bullet a later change made untrue (wording may be edited by
-   hand), and `git rm` the fragments (`changelog.d/README.md` stays). It
-   sets the new version in the Hyvä companion's install command
-   `composer require smaily/smailyformagento:<version>
-   smaily/module-connect-hyva:<version>` (`compat/hyva/README.md`
-   "Installation" and `docs/site/index.html` `#st-hyva`, EN and ET;
-   PRO-4020); at 3.0.0 it becomes the plain `composer require
-   smaily/module-connect-hyva`, and the "until 3.0.0 is released" notes
-   beside it go. The same PR updates STATUS.md. Squash-merge it.
+   hand), and `git rm` the fragments (`changelog.d/README.md` stays). The
+   same PR updates STATUS.md. Squash-merge it.
 2. `gh release create 3.0.0-rc9 --repo sendsmaily/smaily-magento-extension
    --target master --title "…" --notes-file … --prerelease` (a release
    candidate; 3.0.0 itself without `--prerelease`). **Tag = the PLAIN
@@ -347,7 +340,8 @@ do not change it.
    `https://packagist.org/api/github?username=smaily`, set 2026-10-11). The
    mirror's tag is never moved, so its README — the Packagist page — keeps
    the text of the release that published it until the next release.
-   Release candidates are tagged publicly; 3.0.0 waits for a pilot store.
+   Release candidates were tagged publicly (rc1–rc21); 3.0.0, the first
+   stable release, was cut 2026-11-14 (Erkki's go 2026-11-12, CON-209).
    `dev-master` on Packagist has been v3 since the move PR merged.
 
 **Packagist vendor `smaily` (gotcha, 2026-10-11):** the vendor namespace is
@@ -503,6 +497,8 @@ is written in English.
   2026-11-03 session end: 4/5 (separate-stores setup and three of six
   Campaign Intelligence per-store steps on master, dark for one store;
   the first pilot store upgrades straight to rc21).
+  2026-11-14: 4/5 (installation report CON-234 and contract 1.32.0 on
+  master; 3.0.0 cut, its tag waits for Erkki).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Feature (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

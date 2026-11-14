@@ -64,12 +64,8 @@ command would install a second copy of Smaily Connect.
 
 ### With composer
 
-One command installs Smaily Connect and this module. Until 3.0.0 is
-released, give the release candidate's exact version for both packages, as
-the [releases page](https://github.com/sendsmaily/smaily-magento-extension/releases)
-names it — `3.0.0-rc21` below: a standard Magento project accepts stable
-versions only. From 3.0.0 on, `composer require smaily/module-connect-hyva`
-is enough; it installs Smaily Connect too.
+One command installs Smaily Connect and this module:
+`composer require smaily/module-connect-hyva` installs Smaily Connect too.
 
 Run the commands from the Magento root, as the user that owns the Magento
 files. `<Vendor>/<theme>` is the Hyvä theme your store uses. In production
@@ -77,7 +73,7 @@ mode (`bin/magento deploy:mode:show`):
 
 ```bash
 bin/magento maintenance:enable
-composer require smaily/smailyformagento:3.0.0-rc21 smaily/module-connect-hyva:3.0.0-rc21
+composer require smaily/module-connect-hyva
 bin/magento module:enable Smaily_Connect Hyva_SmailyConnect
 bin/magento setup:upgrade
 bin/magento setup:di:compile

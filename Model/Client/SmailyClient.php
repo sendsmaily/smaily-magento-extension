@@ -21,6 +21,7 @@ use Smaily\Connect\Model\Client\Exception\RequestRefusedException;
 use Smaily\Connect\Model\Client\Exception\TransportException;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\ModuleInfo;
+use Smaily\Connect\Model\Report\ConnectionHealth;
 use Smaily\Connect\Model\SmailyUrl;
 
 /**
@@ -67,6 +68,7 @@ class SmailyClient
         private readonly HttpClientFactory $httpClientFactory,
         private readonly Logger $logger,
         private readonly VerifiedCredentials $verifiedCredentials,
+        private readonly ConnectionHealth $health,
         private readonly string $subdomain,
         private readonly string $username,
         private readonly string $password
@@ -226,6 +228,7 @@ class SmailyClient
                 'endpoint' => $uri,
                 'status' => $status,
             ]);
+            $this->recordHealth($this->refusalCode($status, $decoded), false);
             if ($this->isPlanBlocked($decoded)) {
                 // Smaily answers this before it checks the credentials: they
                 // are not refused, the package is (PRO-3579).
@@ -272,6 +275,7 @@ class SmailyClient
             // contact lookup's email with it. Only the masked text goes on,
             // and the raw exception is not chained (PRO-3572).
             $error = TransportErrorMessage::of($exception);
+            $this->recordHealth(ConnectionHealth::UNREACHABLE, false);
             $this->logger->error('Smaily API transport error', [
                 'method' => $method,
                 'endpoint' => $uri,
@@ -284,6 +288,7 @@ class SmailyClient
         $this->lastExchange['response'] = ExchangeResponse::of($response->getStatusCode(), $body);
         $decoded = json_decode($body, true);
         if (!is_array($decoded)) {
+            $this->recordHealth(ConnectionHealth::UNREACHABLE, false);
             throw new TransportException(__('Smaily API returned a malformed response body'));
         }
 
@@ -294,7 +299,16 @@ class SmailyClient
             'rows' => array_is_list($decoded) ? count($decoded) : 1,
         ]);
 
-        if (isset($decoded['code']) && (int)$decoded['code'] !== ApiException::CODE_SUCCESS) {
+        $envelopeCode = isset($decoded['code']) ? (int)$decoded['code'] : null;
+        $refused = $envelopeCode !== null && $envelopeCode !== ApiException::CODE_SUCCESS;
+        // A 2xx answer to a write whose code refuses it is a failure; a
+        // read's code is an answer (206: no such contact), not a refusal.
+        $this->recordHealth(
+            $refused && $method === 'POST' ? $this->refusedWriteCode((int)$envelopeCode) : '',
+            $method === 'POST' && !$refused
+        );
+
+        if ($refused) {
             throw new ApiException(
                 __(
                     'Smaily API returned code %1: %2',
@@ -307,6 +321,50 @@ class SmailyClient
         }
 
         return $decoded;
+    }
+
+    /**
+     * Tell the installation report how this account's request went
+     * (CON-234): '' or an error code, and whether it wrote data. The
+     * subdomain and a code only, never a credential or a message.
+     */
+    private function recordHealth(string $errorCode, bool $wrote): void
+    {
+        $this->health->recordSmaily($this->subdomain, $errorCode, $wrote);
+    }
+
+    /**
+     * The installation report's code for an HTTP error answer: Smaily code
+     * 227 is the package, any other 4xx except 429 the credentials, the rest
+     * may pass later.
+     *
+     * @param mixed $decoded the decoded body
+     */
+    private function refusalCode(int $status, mixed $decoded): string
+    {
+        if ($this->isPlanBlocked($decoded)) {
+            return ConnectionHealth::PLAN_BLOCKED;
+        }
+
+        return $status !== 429 && $status < 500
+            ? ConnectionHealth::CREDENTIALS_REJECTED
+            : ConnectionHealth::UNREACHABLE;
+    }
+
+    /**
+     * The installation report's code for a 2xx answer that refused a write:
+     * code 227 is the package, the permanent refusal (203, invalid data) is
+     * named by its code as the queue names it, any other may pass later.
+     */
+    private function refusedWriteCode(int $envelopeCode): string
+    {
+        if ($envelopeCode === PlanBlockedException::SMAILY_CODE) {
+            return ConnectionHealth::PLAN_BLOCKED;
+        }
+
+        return $envelopeCode === ApiException::CODE_INVALID_DATA
+            ? 'permanent_envelope_' . $envelopeCode
+            : ConnectionHealth::UNREACHABLE;
     }
 
     /**

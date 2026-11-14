@@ -23,11 +23,13 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\RequestInterface;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\SleeperInterface;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Report\ConnectionHealth;
 use Smaily\Connect\Model\StorefrontScript;
 
 class ClientTest extends TestCase
@@ -40,10 +42,100 @@ class ClientTest extends TestCase
 
     private Settings&MockObject $settings;
 
+    private ConnectionHealth&MockObject $health;
+
+    /** @var array<int, array{string, string, bool}> what the installation report's health was told */
+    private array $healthCalls = [];
+
     protected function setUp(): void
     {
         $this->settings = $this->createMock(Settings::class);
         $this->settings->method('getApiKey')->willReturn('sk_test_key');
+        $this->settings->method('getTenantId')->willReturn('6d1f0c3e-2a7b-4c59-8e14-b9a0f3d5c217');
+        $this->health = $this->createMock(ConnectionHealth::class);
+        $this->health->method('recordEngine')->willReturnCallback(
+            function (string $tenantId, string $code, bool $wrote): void {
+                $this->healthCalls[] = [$tenantId, $code, $wrote];
+            }
+        );
+    }
+
+    /**
+     * CON-234: the final answer of each request tells the installation
+     * report's health how this engine store's last request went, by the
+     * engine's error code, and an accepted ingest request is a sync.
+     *
+     * @dataProvider healthAnswers
+     * @param array<int, Response|callable> $answers
+     */
+    public function testTheFinalAnswerIsRecordedForTheInstallationReport(
+        string $path,
+        array $answers,
+        string $code,
+        bool $wrote
+    ): void {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example' . $path);
+        $client = $this->createClient($answers);
+
+        try {
+            $path === '/api/v1/ingest/ping'
+                ? $client->ping()
+                : $client->ingest(Client::DOMAIN_ORDERS, [['external_order_id' => '100000001']]);
+        } catch (EngineException) {
+            // The failure itself is covered elsewhere.
+        }
+
+        self::assertSame([['6d1f0c3e-2a7b-4c59-8e14-b9a0f3d5c217', $code, $wrote]], $this->healthCalls);
+    }
+
+    /**
+     * @return array<string, array{string, array<int, Response|callable>, string, bool}>
+     */
+    public static function healthAnswers(): array
+    {
+        $ok = new Response(200, [], '{"ok":true}');
+
+        return [
+            'an accepted ingest request' => ['/api/v1/ingest/orders', [$ok], '', true],
+            'an accepted ping' => ['/api/v1/ingest/ping', [$ok], '', false],
+            'accepted after a retry' => [
+                '/api/v1/ingest/orders',
+                [new Response(503, [], '{"error":"unavailable"}'), $ok],
+                '',
+                true,
+            ],
+            'a revoked key' => [
+                '/api/v1/ingest/orders',
+                [new Response(401, [], '{"error":"api_key_revoked"}')],
+                'api_key_revoked',
+                false,
+            ],
+            'an error without a code' => ['/api/v1/ingest/orders', [new Response(400, [], 'nope')], 'http_400', false],
+            'unavailable after every retry' => [
+                '/api/v1/ingest/orders',
+                array_fill(0, 6, new Response(503, [], '{"error":"unavailable"}')),
+                'unavailable',
+                false,
+            ],
+            'no answer' => [
+                '/api/v1/ingest/orders',
+                array_fill(0, 6, static fn (RequestInterface $request) => new ConnectException('down', $request)),
+                'network_error',
+                false,
+            ],
+        ];
+    }
+
+    public function testTheSetupExchangeNamesNoEngineStore(): void
+    {
+        $client = $this->createClient([new Response(400, [], '{"error":"invalid_token"}')]);
+
+        try {
+            $client->setupExchange('tok_abc123');
+        } catch (EngineException) {
+        }
+
+        self::assertSame([], $this->healthCalls);
     }
 
     public function testIngestSendsWrapperAndBearerAuth(): void
@@ -813,7 +905,8 @@ class ClientTest extends TestCase
             $storeManager,
             $this->createMock(Logger::class),
             $sleeper,
-            new StorefrontScript($storeManager, $request ?? $this->createMock(Http::class))
+            new StorefrontScript($storeManager, $request ?? $this->createMock(Http::class)),
+            $this->health
         );
     }
 

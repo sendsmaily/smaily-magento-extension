@@ -23,6 +23,7 @@ use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Report\InstallationReport;
 use Smaily\Connect\ViewModel\Adminhtml\AutomationsForm;
 
 /**
@@ -44,7 +45,8 @@ class Save extends Action implements HttpPostActionInterface
         private readonly Client $client,
         private readonly SmailyClientProvider $smailyClientProvider,
         private readonly ConfigRowNormalizer $normalizer,
-        private readonly Settings $settings
+        private readonly Settings $settings,
+        private readonly InstallationReport $installationReport
     ) {
         parent::__construct($context);
     }
@@ -60,6 +62,10 @@ class Save extends Action implements HttpPostActionInterface
         $savedKeys = [];
         $fieldErrors = [];
         $saved = $this->save($errors, $savedKeys, $fieldErrors);
+        if ($saved) {
+            // A save of the setup schedules an installation report (CON-234).
+            $this->installationReport->setupSaved();
+        }
 
         // Embedded config-page block saves via AJAX; plain form posts get a
         // redirect back with flash messages.

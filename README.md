@@ -30,6 +30,15 @@ with the Smaily Connect plugins for WooCommerce and Shopify.
   chunked historical imports that never block live traffic.
 - **Privacy-first** — encrypted credentials, GDPR export/erase tooling and
   a shopper personalization opt-out page.
+- **Installation report** — when a Smaily account is connected, the
+  extension sends Smaily an installation report when you save the settings,
+  once a day, and when you remove a connection or remove the module,
+  authenticated with the connected Smaily account's API credentials, which
+  Smaily only checks and never stores: the store addresses, the Magento,
+  PHP and extension versions, the connected Smaily accounts, the
+  switched-on features, whether each connection works (error codes only)
+  and the time of the last successful sync — never customer, subscriber or
+  order data.
 - **Translated** — ships with English and Estonian (`et_EE`) translation
   packs for the admin and the storefront, and storefront texts in Russian,
   Finnish, Latvian and Lithuanian (machine translations awaiting a native

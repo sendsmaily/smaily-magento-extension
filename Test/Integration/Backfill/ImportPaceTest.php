@@ -40,6 +40,7 @@ use Smaily\Connect\Model\Engine\SleeperInterface;
 use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\OptOutReplay;
+use Smaily\Connect\Model\Report\ConnectionHealth;
 use Smaily\Connect\Model\ResourceModel\Backfill\Job as JobResource;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Model\StorefrontScript;
@@ -370,7 +371,8 @@ class ImportPaceTest extends IntegrationTestCase
             $storeManager,
             $this->createMock(Logger::class),
             $this->createMock(SleeperInterface::class),
-            new StorefrontScript($storeManager, $this->createMock(Http::class))
+            new StorefrontScript($storeManager, $this->createMock(Http::class)),
+            $this->createMock(ConnectionHealth::class)
         );
     }
 

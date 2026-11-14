@@ -58,6 +58,7 @@ use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
 use Smaily\Connect\Model\Queue\HandlerPool;
+use Smaily\Connect\Model\Report\ConnectionHealth;
 use Smaily\Connect\Model\ResourceModel\Log\Collection;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
@@ -581,6 +582,7 @@ class AbandonedCartTest extends IntegrationTestCase
             $httpClientFactory,
             $logger,
             $this->createMock(VerifiedCredentials::class),
+            $this->createMock(ConnectionHealth::class),
             'demo',
             'user',
             'secret'

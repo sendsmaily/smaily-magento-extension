@@ -32,5 +32,8 @@
         <job name="smaily_catalog_manifest" instance="Smaily\Connect\Cron\SendCatalogManifest" method="execute">
             <schedule>30 3 * * *</schedule>
         </job>
+        <job name="smaily_installation_report" instance="Smaily\Connect\Cron\SendInstallationReport" method="execute">
+            <schedule>* * * * *</schedule>
+        </job>
     </group>
 </config>

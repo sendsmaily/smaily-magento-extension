@@ -59,6 +59,7 @@ class RemoveSettingsOnUninstall implements DataPatchInterface, PatchRevertableIn
      */
     public function revert(): void
     {
+        $this->uninstall->reportRemoval();
         $this->uninstall->endEngineConnection(
             $this->moduleDataSetup->getConnection(),
             $this->moduleDataSetup->getTable('core_config_data')

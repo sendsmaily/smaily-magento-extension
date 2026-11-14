@@ -22,6 +22,7 @@ use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\ModuleInfo;
+use Smaily\Connect\Model\Report\ConnectionHealth;
 use Smaily\Connect\Model\StorefrontScript;
 
 /**
@@ -139,7 +140,8 @@ class Client
         private readonly StoreManagerInterface $storeManager,
         private readonly Logger $logger,
         private readonly SleeperInterface $sleeper,
-        private readonly StorefrontScript $storefrontScript
+        private readonly StorefrontScript $storefrontScript,
+        private readonly ConnectionHealth $health
     ) {
     }
 
@@ -628,6 +630,7 @@ class Client
                     // passes through, so no caller can forget either half.
                     $this->settings->clearRefusal();
                 }
+                $this->recordHealth($authenticated, '', $method === 'POST' && $this->isIngestUrl($url));
 
                 return $this->decode((string)$response->getBody());
             } catch (BadResponseException $exception) {
@@ -647,6 +650,7 @@ class Client
                 }
 
                 if ($status !== 429 && $status < 500) {
+                    $this->recordHealth($authenticated, $this->errorCode($status, $errorBody), false);
                     throw new EngineRequestException(
                         (string)__(
                             'Engine request failed with HTTP %1: %2',
@@ -659,6 +663,7 @@ class Client
                 }
 
                 if ($attempt >= count($retryDelays)) {
+                    $this->recordHealth($authenticated, $this->errorCode($status, $errorBody), false);
                     throw new EngineTransportException(
                         (string)__('Engine request failed with HTTP %1 after retries', $status),
                         $status,
@@ -677,6 +682,7 @@ class Client
                 $attempt++;
             } catch (GuzzleException $exception) {
                 if ($attempt >= count($retryDelays)) {
+                    $this->recordHealth($authenticated, ConnectionHealth::NETWORK_ERROR, false);
                     // The customer endpoints carry the address in the URL that
                     // ends Guzzle's message: only the masked text goes on, and
                     // the raw exception is not chained (PRO-3572).
@@ -688,6 +694,39 @@ class Client
                 $attempt++;
             }
         }
+    }
+
+    /**
+     * Tell the installation report how this engine store's request went
+     * (CON-234): '' or the engine's error code, and whether an ingest
+     * request was accepted. Only an authenticated request names a store.
+     */
+    private function recordHealth(bool $authenticated, string $errorCode, bool $wrote): void
+    {
+        if ($authenticated) {
+            $this->health->recordEngine($this->settings->getTenantId(), $errorCode, $wrote);
+        }
+    }
+
+    /**
+     * The engine's error code as its error body names it, else one for the
+     * HTTP status.
+     *
+     * @param array<string, mixed> $errorBody
+     */
+    private function errorCode(int $status, array $errorBody): string
+    {
+        $error = $errorBody['error'] ?? null;
+
+        return is_string($error) && preg_match(ConnectionHealth::CODE_PATTERN, $error) === 1
+            ? $error
+            : 'http_' . $status;
+    }
+
+    /** Whether a URL is one of the engine's ingest endpoints (contract §2–§6, §25). */
+    private function isIngestUrl(string $url): bool
+    {
+        return str_contains((string)parse_url($url, PHP_URL_PATH), '/ingest/');
     }
 
     /**

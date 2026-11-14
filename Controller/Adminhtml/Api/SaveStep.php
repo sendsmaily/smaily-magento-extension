@@ -16,6 +16,7 @@ use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
+use Smaily\Connect\Model\Report\SetupChange;
 use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
@@ -58,7 +59,8 @@ class SaveStep extends AbstractJsonAction implements HttpPostActionInterface
         private readonly WizardStepSaver $stepSaver,
         private readonly VerifiedCredentials $verifiedCredentials,
         private readonly WebsiteContext $websiteContext,
-        private readonly SubdomainNormalizer $normalizer
+        private readonly SubdomainNormalizer $normalizer,
+        private readonly SetupChange $setupChange
     ) {
         parent::__construct($context, $jsonFactory, $serializer);
     }
@@ -72,7 +74,12 @@ class SaveStep extends AbstractJsonAction implements HttpPostActionInterface
         $step = (string)($body['step'] ?? '');
         $data = is_array($body['data'] ?? null) ? $body['data'] : [];
 
+        // The installation report (CON-234): a save that removes a Smaily
+        // account reports it at once; a save that went through schedules a
+        // snapshot.
+        $before = $this->setupChange->before();
         $errors = $this->stepSaver->save($step, $data);
+        $this->setupChange->after($before, $errors === []);
 
         $response = [
             'saved' => $errors === [],

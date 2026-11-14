@@ -10,6 +10,7 @@ namespace Smaily\Connect\Model\Engine;
 
 use Smaily\Connect\Model\Backfill\ImportsOnConnect;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
+use Smaily\Connect\Model\Report\InstallationReport;
 
 /**
  * Connecting Campaign Intelligence, in one place for both connect paths —
@@ -27,7 +28,8 @@ class Connector
         private readonly Settings $settings,
         private readonly ImportsOnConnect $importsOnConnect,
         private readonly Websites $websites,
-        private readonly Connections $connections
+        private readonly Connections $connections,
+        private readonly InstallationReport $installationReport
     ) {
     }
 
@@ -47,6 +49,9 @@ class Connector
         // answer names it (contract v1.25.0 §1), else the store's.
         $this->settings->storeExchange($exchange, $this->connections->installationAccount());
         $this->connections->reset();
+        // A new connection is a change of the setup: the installation report
+        // says so (CON-234).
+        $this->installationReport->setupSaved();
 
         return [
             'exchange' => $exchange,

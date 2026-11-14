@@ -1,1 +1,0 @@
-- The extension and its Hyvä module install on PHP 8.5, which Magento 2.4.9 supports; PHP 8.1 to 8.5 are supported.

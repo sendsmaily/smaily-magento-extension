@@ -7,8 +7,27 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-11-14 — **3.0.0 is cut (release/3.0.0), the first
-stable release; its tag waits for Erkki.** 3.0.0-rc21 is the last
+_Last updated: 2026-11-14 later — **3.0.1 is cut (release/3.0.1): PHP
+8.5 allowed; its tag waits for Erkki.** 3.0.0 was released on
+2026-11-14 (tag 3.0.0 on ff15243; Packagist shows it for both packages).
+3.0.1 exists for the Adobe Commerce Marketplace: the portal refused the
+3.0.0 package at submit because its PHP range left out PHP 8.5, which
+Magento 2.4.9 (part of "Magento Open Source 2.4") supports. #259 allows
+`~8.5.0`, runs the unit suite and the 2.4.9 compile on PHP 8.5, and pins
+`magento/magento-coding-standard` to `^41.0`.
+
+**Marketplace (CON-152):** the 3.0.0 draft `l35yn03phn` holds the
+technical part and the new marketing part (title "Smaily Connect", new
+description, 4 screenshots, 240 px Smaily icon); it cannot pass and is
+cancelled for a 3.0.1 version. The kit, the portal's steps and its
+checks: `docs/internal/marketplace/MARKETPLACE.md` (#258).
+
+**After the 3.0.1 tag:** submit 3.0.1 in the portal (technical +
+marketing), then upload `docs/site/index.html` (PHP 8.1–8.5).
+
+_Earlier (2026-11-14, the 3.0.0 cut): **3.0.0 was cut (#256) and
+released the same day, the first stable release; #257 (README website
+layouts, Support section) followed.** 3.0.0-rc21 is the last
 release candidate (2026-11-03). Erkki's go: 2026-11-12 product meeting
 (CON-209), the first pilot store runs v3 connected to Campaign
 Intelligence.

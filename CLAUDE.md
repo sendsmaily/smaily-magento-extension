@@ -499,6 +499,8 @@ is written in English.
   the first pilot store upgrades straight to rc21).
   2026-11-14: 4/5 (installation report CON-234 and contract 1.32.0 on
   master; 3.0.0 cut, its tag waits for Erkki).
+  2026-11-14 session end: 4/5 (3.0.0 and 3.0.1 released; 3.0.1 submitted
+  to the Adobe Commerce Marketplace; CON-209 Done).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Feature (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

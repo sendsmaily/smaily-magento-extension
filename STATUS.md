@@ -7,23 +7,56 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-11-14 later — **3.0.1 is cut (release/3.0.1): PHP
-8.5 allowed; its tag waits for Erkki.** 3.0.0 was released on
-2026-11-14 (tag 3.0.0 on ff15243; Packagist shows it for both packages).
-3.0.1 exists for the Adobe Commerce Marketplace: the portal refused the
-3.0.0 package at submit because its PHP range left out PHP 8.5, which
-Magento 2.4.9 (part of "Magento Open Source 2.4") supports. #259 allows
-`~8.5.0`, runs the unit suite and the 2.4.9 compile on PHP 8.5, and pins
-`magento/magento-coding-standard` to `^41.0`.
+_Last updated: 2026-11-14 session end — **3.0.0 and 3.0.1 are
+released; 3.0.1 is submitted to the Adobe Commerce Marketplace.**
 
-**Marketplace (CON-152):** the 3.0.0 draft `l35yn03phn` holds the
-technical part and the new marketing part (title "Smaily Connect", new
-description, 4 screenshots, 240 px Smaily icon); it cannot pass and is
-cancelled for a 3.0.1 version. The kit, the portal's steps and its
-checks: `docs/internal/marketplace/MARKETPLACE.md` (#258).
+**Released today:**
+- **3.0.0** (#256, tag on ff15243): the first stable release. Install
+  `composer require smaily/smailyformagento`, upgrade from 2.8.x
+  `:^3.0`, Hyvä `composer require smaily/module-connect-hyva`.
+- **3.0.1** (#260, tag on 63a80e8): PHP 8.5 allowed (#259); CI runs the
+  unit suite and the Magento 2.4.9 compile on PHP 8.5; `require-dev`
+  pins `magento/magento-coding-standard` `^41.0`. Packagist lists both
+  versions for both packages; the guide site is live with PHP 8.1–8.5.
 
-**After the 3.0.1 tag:** submit 3.0.1 in the portal (technical +
-marketing), then upload `docs/site/index.html` (PHP 8.1–8.5).
+**Also merged today:** #254 CON-234 (the installation report to
+subscription.smaily.com; every shape got 200 from the receiver run
+locally), #255 (engine contract 1.32.0), #257 (README: website layouts,
+Support), #258 (the Marketplace kit, `docs/internal/marketplace/`).
+
+**Marketplace (CON-152):** version 3.0.1, submission `2q6w4ofnme`,
+launches on approval. Technical: automated testing in progress;
+marketing: awaiting review (title "Smaily Connect", new description,
+240 px Smaily icon, 4 screenshots, Magento Open Source 2.4, free). The
+3.0.0 submission was cancelled: the portal refused its PHP range.
+Marketplace's own counts: 45 free downloads 2019–2025.
+
+**Decisions for Erkki** (CON-234 comments): no `transactional_emails`
+until sending lands; `disconnected` right after a save; mode-A
+languages without a two-letter code left out.
+
+**Gotchas:** the rc18–rc21 gotchas hold. The Marketplace portal validates
+`composer.json` at submit (PHP range per the claimed edition's newest
+line), claims compatibility per minor line only (2.4), fixes the version
+number per draft, and cancelling a draft is permanent. Its file inputs
+take files set from a page script (`DataTransfer`), and its gallery takes
+a `drop` event; a file reaches the page only through a CORS-open URL
+(`raw.githubusercontent.com` of a pushed commit). The subscription
+receiver runs locally only with `DATABASE_URL` and
+`CREDENTIAL_CACHE_SECRET` on the command line. The in-app browser
+suppresses `confirm()`.
+
+**Open:** CON-152 (Marketplace review results), CON-283 (High: most
+catalog rows of the multi-website pilot store lack `websites`; cause
+unknown), CON-237 steps 4–6, CON-281, CON-230 (waits for INT-180),
+CON-252, CON-163, CON-146, CON-168, CON-157; the Estonian proofread of
+today's site text; the update notice to Magento clients; CON-147's
+human acceptance.
+
+**Next session opens with:**
+1. The Marketplace review results for 3.0.1 (`2q6w4ofnme`).
+2. CON-283.
+3. CON-237 step 4 (brief: `docs/internal/ENGINE_CONNECTIONS_PLAN.md`)._
 
 _Earlier (2026-11-14, the 3.0.0 cut): **3.0.0 was cut (#256) and
 released the same day, the first stable release; #257 (README website

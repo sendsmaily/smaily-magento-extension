@@ -1,9 +1,10 @@
-# Adobe Commerce Marketplace submission — Smaily Connect 3.0.0
+# Adobe Commerce Marketplace submission — Smaily Connect 3
 
-The kit for submitting version 3.0.0 to the existing Marketplace listing of
+The kit for submitting version 3 to the existing Marketplace listing of
 `smaily/smailyformagento`, which shows version 2.8.0. The listing's
-composer package name stays the same, so 3.0.0 is a **new version of that
-listing**, not a new product. Submission happens in the Commerce Developer
+composer package name stays the same, so version 3 is a **new version of
+that listing**, not a new product. The version submitted is **3.0.1**
+(3.0.0 fails the portal's PHP check). Submission happens in the Commerce Developer
 Portal, from the Smaily vendor account (CON-152).
 
 Files here:
@@ -17,7 +18,7 @@ Files here:
 | `screenshots/2-initial-setup.png` | Gallery image: the initial setup, step 2, the contact sync mode |
 | `screenshots/3-automations.png` | Gallery image: Settings › Automations |
 | `screenshots/4-intelligence.png` | Gallery image: Settings › Intelligence |
-| the release asset `smaily-connect-magento2.zip` of [3.0.0](https://github.com/sendsmaily/smaily-magento-extension/releases/tag/3.0.0) | The package upload |
+| the release asset `smaily-connect-magento2.zip` of 3.0.1 | The package upload |
 
 The screenshots come from the docker sandbox (Magento 2.4.8-p4, sample
 data), cropped to the module's page: no admin menu, no Magento logo, no
@@ -43,36 +44,37 @@ Against Adobe's [technical review guidelines](https://developer.adobe.com/commer
 | `name`, `type`, `version` | ✅ `smaily/smailyformagento`, `magento2-module`, `3.0.0` |
 | No `extra.map` / `extra.magento-root-dir`, no forbidden dependency, no inline alias | ✅ |
 | `etc/module.xml`, `registration.php` in `autoload.files`, a PSR-4 namespace | ✅ |
-| No `*` constraint on a Magento-vendor package | ⚠️ `require` is clean; `require-dev` has `magento/magento-coding-standard: *` — the guideline does not say whether `require-dev` counts |
+| No `*` constraint on a Magento-vendor package | ✅ from 3.0.1: `require-dev` pins `magento/magento-coding-standard` to `^41.0` (3.0.0 had `*`) |
 | No TODO / FIXME comments | ✅ none in PHP, PHTML, JS or XML |
 | Coding standard | ✅ 0 errors, 2,092 warnings with `magento/magento-coding-standard` 41 (the newest), `--standard=Magento2` on the package |
-| PHP versions not narrower than the claimed Commerce versions | ⚠️ see "Compatibility" |
+| PHP versions not narrower than the claimed Commerce versions | ❌ on 3.0.0, refused at submit; ✅ from 3.0.1 (PHP 8.1–8.5) — see "Compatibility" |
 | Installation with Varnish, production mode | ✅ by design: `setup:di:compile` runs in CI on 2.4.4-p13 and 2.4.9; only the module's own pages (personalization opt-out, the recommendations endpoint) are not cacheable |
 | `repositories` key in `composer.json` | ⚠️ the Mage-OS mirror (development only) is declared; the guideline does not mention the key |
 
-If the automated review refuses either ⚠️ item, the fix is a 3.0.1 that
-pins `magento/magento-coding-standard` in `require-dev` and drops
-`repositories` from the published `composer.json` (the development
-mirror can move into a local `auth`/config file).
+If the review refuses the `repositories` key, drop it from the published
+`composer.json` (the development mirror can move into a local config).
 
 ## Compatibility to claim
 
-The package requires PHP `~8.1 || ~8.2 || ~8.3 || ~8.4`. Marketplace
-refuses a package whose PHP range is narrower than a claimed Commerce
-version's:
+The portal asks per minor line only: Adobe Commerce (cloud) 2.4, Adobe
+Commerce (on-premises) 2.4, Magento Open Source 2.3 / 2.4. Claim
+**Magento Open Source 2.4**, as the 2.8.x listing did; Adobe Commerce is
+not tested.
 
-| Commerce | Its PHP (`magento/framework`) | Claim? |
-|---|---|---|
-| 2.4.4, 2.4.5 | 7.4, 8.1 | no — 7.4 is outside the package's range |
-| 2.4.6 | 8.1, 8.2 | yes |
-| 2.4.7 | 8.1, 8.2, 8.3 | yes |
-| 2.4.8 | 8.2, 8.3, 8.4 | yes |
-| 2.4.9 | 8.3, 8.4, 8.5 | no — 8.5 is outside the package's range (follow-up: test on PHP 8.5, widen the range in 3.0.1, then claim 2.4.9) |
+**The portal validates the PHP range at submit** (2026-11-14, on 3.0.0):
+"Failed to validate composer.json - Your extension should require an
+active PHP version such as 8.5.0 … which is supported by the selected
+Magento edition". Magento Open Source 2.4 includes 2.4.9, whose
+`magento/framework` (103.0.9) allows PHP 8.3–8.5, so the package must
+allow `~8.5.0`. 3.0.1 does (PR #259); 3.0.0 cannot be submitted.
 
-Claim **Magento Open Source and Adobe Commerce (on-premises and cloud)
-2.4.6, 2.4.7 and 2.4.8**. The module itself still installs on 2.4.4 and
-2.4.5 with PHP 8.1 (README, Packagist); only the Marketplace claim is
-narrower.
+| Commerce | Its PHP (`magento/framework`) |
+|---|---|
+| 2.4.4, 2.4.5 | 7.4, 8.1 |
+| 2.4.6 | 8.1, 8.2 |
+| 2.4.7 | 8.1, 8.2, 8.3 |
+| 2.4.8 | 8.2, 8.3, 8.4 |
+| 2.4.9 | 8.3, 8.4, 8.5 |
 
 ## Listing
 
@@ -85,11 +87,11 @@ description's opening paragraph; no logos of Adobe or Magento.
 Integration" today; Smaily is the integrated service, so its name is
 allowed).
 
-**Category:** the email-marketing category the portal offers (Marketing › Email Marketing or its current name).
+**Category:** Marketing › Email Marketing and Marketing › Marketing Automation (as the listing has).
 
 **Price:** Free.
 
-**Short description:**
+**Short description** (the portal shows no field for it today; keep for later):
 
 > Sync subscribers and customers to Smaily, run welcome, first-order and
 > abandoned-cart automations, and add Smaily Campaign Intelligence
@@ -138,7 +140,7 @@ allowed).
 > Russian, Finnish, Latvian and Lithuanian. Full user guide:
 > https://smaily.com/connect-magento/
 
-**Release notes (3.0.0):**
+**Release notes** (the portal's text, as entered for the version; for 3.0.1 add "Supports PHP 8.5 (Magento 2.4.9)."):
 
 > Smaily Connect 3.0.0 is a rewrite of Smaily for Magento 2.8 under the
 > name Smaily Connect. New: a guided initial setup, a Dashboard, a Log of
@@ -158,15 +160,27 @@ https://smaily.com/connect-magento/
 
 ## Submission steps (portal)
 
-1. Sign in to the Commerce Developer Portal with the Smaily vendor
-   account; open the existing extension `smaily/smailyformagento`.
-2. Add a new version: upload `smaily-connect-magento2.zip` (3.0.0), set
-   the compatibility above, the release notes, and the documentation PDF.
-3. Marketing: title, category, short and long description, gallery
-   images, support details as above.
-4. Submit both reviews (they run in parallel). Technical review results
-   appear on the product's status page; answer refusals with a fixed
-   package (3.0.1) and resubmit.
+What the portal holds, as met on 2026-11-14:
+
+1. Extensions › Smaily Ecommerce Integration (M2) › **Submit a New
+   Version** opens a draft with the version number fixed (it must match
+   the package's `composer.json`). The draft copies the last version's
+   marketing part, which counts as passed.
+2. **Technical Submission**: attach the package (malware-checked on
+   upload), tick the compatibility, the license (GPL-3.0), the user
+   guide PDF (replace the old `userguide.pdf`), and the release notes (a
+   list of changes; they cannot be edited later). **Submit** validates
+   `composer.json` before anything is queued.
+3. **Marketing Submission**: **Withdraw and Edit** reopens the passed
+   marketing part (its review then runs again). Extension Description
+   (title, long description in a rich-text editor, category), Images and
+   Videos (icon 240 × 240; 2–15 gallery images), Compatibility (the same
+   2.4 tick), Pricing (free), Extension Support (only for selling
+   support), Additional Details. **Preview** shows the listing.
+4. Submit both; the version is scheduled to launch on approval of both.
+
+A draft that cannot pass (3.0.0, refused on PHP) is cancelled with
+**Cancel Version Submission**, and the next version starts a new draft.
 
 Not on Marketplace: the Hyvä companion `smaily/module-connect-hyva`. It
 requires `hyva-themes/magento2-theme-module`, which Marketplace does not

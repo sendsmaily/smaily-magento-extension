@@ -53,15 +53,12 @@ with the Smaily Connect plugins for WooCommerce and Shopify.
 ## Installation
 
 ```bash
-composer require smaily/smailyformagento:3.0.0-rc21
+composer require smaily/smailyformagento
 bin/magento module:enable Smaily_Connect
 bin/magento setup:upgrade
 ```
 
-Until 3.0.0 is released, require the release candidate's exact version, as
-the [releases page](https://github.com/sendsmaily/smaily-magento-extension/releases)
-names it: without a version, composer installs the old 2.8.1. A store in
-production mode also needs maintenance mode, `setup:di:compile` and
+A store in production mode also needs maintenance mode, `setup:di:compile` and
 `setup:static-content:deploy` — the full sequence is in the
 [User Guide](https://smaily.com/connect-magento/#install).
 

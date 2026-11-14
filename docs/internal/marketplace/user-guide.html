@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Smaily Connect — User Guide</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  body { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: #1d2433; font-size: 10.5pt; line-height: 1.5; }
+  h1 { font-size: 22pt; margin: 0 0 2mm; color: #0b1f3a; }
+  .sub { color: #4a5568; margin: 0 0 6mm; font-size: 11pt; }
+  h2 { font-size: 13.5pt; color: #0b1f3a; border-bottom: 1px solid #d5dbe5; padding-bottom: 1mm; margin: 7mm 0 2.5mm; page-break-after: avoid; }
+  h3 { font-size: 11pt; margin: 4mm 0 1.5mm; page-break-after: avoid; }
+  p, li { margin: 0 0 1.6mm; }
+  ul, ol { padding-left: 6mm; margin: 0 0 2mm; }
+  code, pre { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9pt; }
+  pre { background: #f3f5f8; border: 1px solid #e1e6ee; border-radius: 3px; padding: 2.5mm 3mm; white-space: pre-wrap; page-break-inside: avoid; }
+  .note { background: #f6f8fb; border-left: 3px solid #2f6fdd; padding: 2mm 3mm; margin: 2mm 0 3mm; }
+  table { border-collapse: collapse; width: 100%; margin: 1mm 0 3mm; font-size: 9.5pt; }
+  th, td { border: 1px solid #d5dbe5; padding: 1.5mm 2mm; text-align: left; vertical-align: top; }
+  th { background: #f3f5f8; }
+  a { color: #2f6fdd; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Smaily Connect — User Guide</h1>
+<p class="sub">For Adobe Commerce and Magento Open Source · version 3.0.1 · package <code>smaily/smailyformagento</code></p>
+
+<div class="note">
+  <p><strong>The complete, always up-to-date guide</strong> — every setting, the imports, the Log and its messages, the FAQ, privacy and the command-line reference, in English and Estonian — is online at <a href="https://smaily.com/connect-magento/">https://smaily.com/connect-magento/</a>. This document covers setup and every feature in short.</p>
+</div>
+
+<h2>1. What Smaily Connect does</h2>
+<p>Smaily Connect connects your store to <a href="https://smaily.com">Smaily</a> email marketing:</p>
+<ul>
+  <li><strong>Contact synchronization</strong> — new subscribers and customers reach Smaily as they happen; an unsubscribe in Smaily comes back to the store. You choose the lawful basis: subscribers only (consent), all customers (legitimate interest) or checkout opt-in only.</li>
+  <li><strong>Automations</strong> — the Welcome, First order and Abandoned cart events start the Smaily workflows you pick, optionally with a single-use discount code from a cart price rule. Multilingual stores route each language to its own workflow or Smaily account.</li>
+  <li><strong>Abandoned cart</strong> — a cart left idle for the time you set triggers a reminder with its products and a secure link that restores the exact cart.</li>
+  <li><strong>Checkout opt-in</strong> — an optional newsletter checkbox at checkout, for guests and customers.</li>
+  <li><strong>Product RSS feed</strong> — for Smaily's template editor, with category, limit and sort parameters.</li>
+  <li><strong>Campaign Intelligence</strong> (optional, a separate paid Smaily service) — catalog, customer, order and browsing data power personalized product recommendations in emails and on the store's pages, recommendation attribution and automated campaigns such as replenishment and win-back.</li>
+  <li><strong>Operations</strong> — a Dashboard, a Log of every delivery with retry, health notices, and imports of existing data that never block live traffic.</li>
+  <li><strong>Privacy</strong> — encrypted credentials, GDPR export and erasure from the command line, and a shopper page to opt out of personalization.</li>
+</ul>
+
+<h2>2. Requirements</h2>
+<ul>
+  <li>Magento Open Source or Adobe Commerce 2.4.4 or newer, with PHP 8.1–8.5 as your Commerce version supports.</li>
+  <li>Magento cron running every minute.</li>
+  <li>A <strong>Smaily account with a package that includes API access</strong>, and an API user (in Smaily under Preferences &gt; API).</li>
+  <li>Campaign Intelligence only: a setup link from Smaily.</li>
+</ul>
+
+<h2>3. Installation</h2>
+<p>Run the commands from the Commerce root, as the user that owns the files. In production mode:</p>
+<pre>bin/magento maintenance:enable
+composer require smaily/smailyformagento
+bin/magento module:enable Smaily_Connect
+bin/magento setup:upgrade
+bin/magento setup:di:compile
+bin/magento setup:static-content:deploy en_US   # every locale your store uses
+bin/magento maintenance:disable
+bin/magento cache:flush</pre>
+<p>In developer or default mode, <code>composer require</code>, <code>module:enable</code>, <code>setup:upgrade</code> and <code>cache:flush</code> are enough. After the install, the admin notifications show <em>Smaily Connect is ready to set up</em>.</p>
+<p><strong>Upgrading from Smaily for Magento 2.8.x:</strong> require version 3 with <code>composer require smaily/smailyformagento:^3.0</code> and run the same commands (without <code>module:enable</code>). The settings migrate automatically during <code>setup:upgrade</code>; the online guide's <em>Upgrading from 2.8.x</em> section lists what changes.</p>
+
+<h2>4. Initial setup</h2>
+<p>Open <strong>Marketing &gt; Smaily Connect &gt; Initial setup</strong>. On a store with more than one website, the setup first asks <strong>How are your websites run?</strong>: <em>One store in several versions</em> (set up once, a website differs only where you choose) or <em>Separate stores</em> (each website set up on its own, with its own Smaily account).</p>
+<ol>
+  <li><strong>Connect</strong> — enter your Smaily <em>Subdomain</em> (for https://demo.sendsmaily.net it is <code>demo</code>), <em>API username</em> and <em>API password</em>, and press <em>Test connection</em>. Optionally connect a separate transactional Smaily account here. Press <em>Continue</em>.</li>
+  <li><strong>Contacts</strong> — pick the contact sync mode, the extra fields and the checkout options. Contact sync starts when this step is saved. Existing contacts are sent only when you start the contact import.</li>
+  <li><strong>Automations</strong> — for Welcome, First order and Abandoned cart, tick <em>Enabled</em> and pick a Smaily workflow. The lists show the enabled workflows of your account whose trigger is <em>form submitted</em>.</li>
+  <li><strong>Campaign Intelligence</strong> (optional) — paste the setup link from Smaily and press <em>Connect</em>, or press <em>Finish</em> and connect later.</li>
+  <li><strong>Overview</strong> — where everything lives and the address of your product RSS feed.</li>
+</ol>
+<p>Then check that cron runs every minute and that the Dashboard says <em>All systems normal</em> after the first deliveries.</p>
+
+<h2>5. Everyday use</h2>
+<table>
+  <tr><th>Page</th><th>What it is for</th></tr>
+  <tr><td>Marketing &gt; Smaily Connect &gt; <strong>Dashboard</strong></td><td>Health of the Smaily and Campaign Intelligence connections, deliveries of the last 30 days, recent activity.</td></tr>
+  <tr><td><strong>Settings</strong></td><td>Tabs <em>Connection</em>, <em>Contacts</em>, <em>Automations</em>, <em>Intelligence</em> and <em>RSS</em> — every option of the setup, the imports of existing data and, with Campaign Intelligence, its automations and email designs. A website selector picks the website on a store with several.</td></tr>
+  <tr><td><strong>Log</strong></td><td>Every delivery to Smaily and Campaign Intelligence with its status and reason; <em>Retry</em> for failed rows.</td></tr>
+</table>
+<p><strong>Recommendations on your pages:</strong> with Campaign Intelligence connected, add the <em>Smaily recommendations</em> widget under Content &gt; Widgets, or insert it into a CMS page or block. <strong>Browse tracking</strong> starts only after the visitor's marketing consent in your cookie notice; the online guide explains how to connect your consent tool.</p>
+<p><strong>Command line:</strong> <code>smaily:backfill:start</code> and <code>smaily:backfill:status</code> (imports), <code>smaily:engine:ping</code> and <code>smaily:engine:disconnect</code> (Campaign Intelligence), <code>smaily:gdpr</code> (export or erase one shopper's data).</p>
+
+<h2>6. Data and privacy</h2>
+<ul>
+  <li><strong>To Smaily:</strong> email, subscription status, store name, language and the extra fields you tick, for the contacts your sync mode covers; the fields of the automations you switch on.</li>
+  <li><strong>To Campaign Intelligence</strong> (only when connected): products, customers in scope, orders, and — only with browse tracking on and the visitor's marketing consent — browsing events under a pseudonymous id.</li>
+  <li><strong>Installation report:</strong> when a Smaily account is connected, the extension sends Smaily an installation report when you save the settings, once a day, and when you remove a connection or remove the module, authenticated with the connected Smaily account's API credentials, which Smaily only checks and never stores: the store addresses, the Magento, PHP and extension versions, the connected Smaily accounts, the switched-on features, whether each connection works (error codes only) and the time of the last successful sync — never customer, subscriber or order data.</li>
+  <li>The online guide's <em>Data &amp; privacy</em> section lists the cookies, the personalization opt-out page and the GDPR tools.</li>
+</ul>
+
+<h2>7. Removing the extension</h2>
+<p>Disabling (<code>bin/magento module:disable Smaily_Connect</code>, then <code>setup:upgrade</code>) stops everything and drops the module's tables; the settings stay. To remove it completely, disable it first, then run <code>bin/magento module:uninstall --remove-data Smaily_Connect</code>, which also removes its settings (and <code>setup:di:compile</code> in production mode). Before the settings go, the module tells Campaign Intelligence that the connection ends. Nothing is deleted in Smaily or Campaign Intelligence.</p>
+
+<h2>8. Support</h2>
+<p>Questions about Smaily Connect or your Smaily account: <a href="mailto:support@smaily.com">support@smaily.com</a>. The full guide: <a href="https://smaily.com/connect-magento/">https://smaily.com/connect-magento/</a>.</p>
+
+</body>
+</html>

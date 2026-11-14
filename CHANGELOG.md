@@ -1,5 +1,9 @@
 # Changelog
 
+### 3.0.1
+
+- The extension and its Hyvä module install on PHP 8.5, which Magento 2.4.9 supports; PHP 8.1 to 8.5 are supported.
+
 ### 3.0.0
 
 The first stable release of version 3, the rewrite of Smaily for Magento 2.8.x under the name Smaily Connect: everything below, from the first release candidate to 3.0.0-rc21 and the changes since. `composer require smaily/smailyformagento` installs it. A store on 2.8.x moves to it with `composer require smaily/smailyformagento:^3.0` — its `^2.8` constraint keeps it on 2.8.x otherwise — and its settings migrate on `setup:upgrade` ([docs/UPGRADING.md](docs/UPGRADING.md)). The release candidates 3.0.0-rc1 to 3.0.0-rc21 were GitHub pre-releases for pilot stores.

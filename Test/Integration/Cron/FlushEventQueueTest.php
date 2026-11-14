@@ -45,6 +45,7 @@ use Smaily\Connect\Model\Queue\Handler\ContactSyncHandler;
 use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
 use Smaily\Connect\Model\Queue\HandlerPool;
 use Smaily\Connect\Model\Queue\Pending;
+use Smaily\Connect\Model\Report\ConnectionHealth;
 use Smaily\Connect\Model\ResourceModel\Log\Collection;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
@@ -899,6 +900,7 @@ class FlushEventQueueTest extends IntegrationTestCase
                 $httpClientFactory,
                 $logger,
                 $this->createMock(VerifiedCredentials::class),
+                $this->createMock(ConnectionHealth::class),
                 'demo',
                 'user',
                 'secret'

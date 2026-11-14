@@ -1418,6 +1418,7 @@ invoke `bin/magento cron:run` every minute.
 | `smaily_health_check` | every 15 min | Engine-down / failure-volume / missing-consent-source notices |
 | `smaily_queue_janitor` | daily 02:20 | Retention pruning (both queues + the abandoned-cart tracker) |
 | `smaily_catalog_manifest` | daily 03:30 | The store's complete product list to the engine (contract §3c), when nothing holds it back |
+| `smaily_installation_report` | every minute | The installation report snapshot that is due (`Report\InstallationReport`): one a run at most, usually none |
 
 ## Key flows
 
@@ -2802,6 +2803,72 @@ implemented here:
   `Automations\Save` reads §12 after a successful PUT and answers each
   trigger's stored `enabled` / `test_mode`; the Automations tab redraws
   its cards from that, never from the request.
+
+### Installation report (CON-234)
+
+The extension tells Smaily's subscription service which installation runs
+where — contract installation-report-v1 (v1.0.1, `erkkimarkus/subscription`,
+`docs/contracts/installation-report-v1.md`), product `connect_magento`, as
+the WooCommerce plugin's CON-290. `Model\Report\ReportSender::ENDPOINT`
+(`POST https://subscription.smaily.com/v1/reports`) is the one place the
+address is written.
+
+- **Body** (`Report\ReportBuilder`): the default store view's web base URL
+  (secure when its storefront is) as `installation_url`; one `marketing`
+  connection per website with a connected Smaily account (subdomain, user
+  and password set, subdomain
+  inside the contract's rule) — one per language account in mode A, with
+  `language` (a two-letter code only) — and one `transactional` connection
+  per website with a Transactional account. Each carries the website code,
+  the website's default store view's web base URL, its features
+  (`subscriber_sync` = `isContactSyncActive()`; an automation when switched
+  on **and** `Automation\Router` resolves a workflow this account sends;
+  `campaign_intelligence` / `browse_tracking` while the engine store serving
+  the website is connected) and `intelligence` for that engine store
+  (`connected` = `isSendingAllowed()`; never the key). A transactional
+  connection names no feature: nothing sends order or shipping emails
+  through Smaily yet. The engine store of a website follows
+  `Engine\Connections::forWebsite()`'s rules, rebuilt in `engineFor()`
+  because the removal builds the report without the module's di.xml.
+- **Main account**: the default scope's account when a marketing
+  connection names it, else the first marketing connection's. It alone
+  authenticates (Basic, header only); a Transactional account never does.
+  With no marketing account nothing is built, scheduled or sent.
+- **Health** (`Report\ConnectionHealth`, flag
+  `smaily_connect_connection_health`): `Client\SmailyClient::request()` and
+  `Engine\Client::request()` record every final answer by subdomain /
+  tenant id — `plan_blocked`, `credentials_rejected`, `unreachable`,
+  `permanent_envelope_203` on the Smaily side; the engine's `error` code,
+  `http_<status>` or `network_error` on the engine side — and a sync: a
+  Smaily POST answered with code 101, an accepted engine POST to an
+  `/ingest/` path. Codes only; a success that changes only the time is
+  written at most every 5 minutes; recording never throws.
+- **Snapshots** (`Report\InstallationReport`, flag
+  `smaily_connect_installation_report`, cron `smaily_installation_report`):
+  a save schedules `setup_saved` 5 minutes on unless one waits —
+  `Api\SaveStep` (setup and Settings), `Automations\Save`,
+  `Engine\Connector::connect()` and a save of the module's Stores >
+  Configuration section (`Plugin\Adminhtml\ReportConfigSave`); `daily` is
+  due 24 hours after the last attempt, the first at a random moment within
+  24 hours. One report a run: `setup_saved`, then a retry, then `daily`. A
+  429, a 5xx or no answer is tried again after 60/120/240 s + 0–30 s or a
+  longer `Retry-After`; over an hour, or any other answer, ends it with one
+  log line (`error`). 5 s total / 3 s connect, TLS 1.2+, certificate
+  verified, never a redirect; nothing shown to the merchant.
+- **Events** (`Report\EventReport`, inline, once, never thrown):
+  `disconnected` from `smaily:engine:disconnect` (before the engine is told
+  and the key deleted; the engine store left out) and from a save that
+  removes an account (`Report\SetupChange` compares `role|subdomain` before
+  and after; the remaining connections, authenticated with the main account
+  after the save, or the one captured before it when no marketing account
+  remains — then with no connection); `deactivated` first in
+  `Setup\Uninstall::uninstall()` and `RemoveSettingsOnUninstall::revert()`,
+  once per removal (`reportRemoval()`); the engine's own §16 disconnect that
+  follows sends no second event. `bin/magento module:disable` runs no
+  module code, so it sends nothing.
+- **Never from a test or the sandbox**: tests answer through
+  `HttpClientFactory`; `docker-compose.yaml` resolves
+  `subscription.smaily.com` to 127.0.0.1 in the sandbox.
 
 ## Extension points
 

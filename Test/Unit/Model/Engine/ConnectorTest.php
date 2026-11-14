@@ -19,6 +19,7 @@ use Smaily\Connect\Model\Engine\Connector;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\Websites;
+use Smaily\Connect\Model\Report\InstallationReport;
 
 /**
  * CON-156: the one connect step the admin Connect and the configuration
@@ -36,6 +37,8 @@ class ConnectorTest extends TestCase
 
     private JobManager&MockObject $jobManager;
 
+    private InstallationReport&MockObject $installationReport;
+
     /** @var array<int, string> */
     private array $steps = [];
 
@@ -44,6 +47,10 @@ class ConnectorTest extends TestCase
         $this->client = $this->createMock(Client::class);
         $this->settings = $this->createMock(Settings::class);
         $this->jobManager = $this->createMock(JobManager::class);
+        $this->installationReport = $this->createMock(InstallationReport::class);
+        $this->installationReport->method('setupSaved')->willReturnCallback(function (): void {
+            $this->steps[] = 'report';
+        });
     }
 
     public function testConnectingExchangesStoresThenStartsTheCatalogCustomersAndOrdersImports(): void
@@ -70,9 +77,12 @@ class ConnectorTest extends TestCase
 
         $result = $this->connector()->connect('tok_abc123');
 
+        // A connection is a change of the setup: the installation report
+        // is scheduled once it is stored (CON-234).
         self::assertSame([
             'exchange',
             'store',
+            'report',
             sprintf('start %s %s %d', Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID),
             sprintf('start %s %s %d', Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID),
             sprintf('start %s %s %d', Job::TYPE_ORDERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID),
@@ -90,6 +100,7 @@ class ConnectorTest extends TestCase
             ->willThrowException(new EngineRequestException('setup_token_not_found', 404));
         $this->settings->expects(self::never())->method('storeExchange');
         $this->jobManager->expects(self::never())->method('startIfIdle');
+        $this->installationReport->expects(self::never())->method('setupSaved');
 
         $this->expectException(EngineRequestException::class);
         $this->connector()->connect('tok_abc123');
@@ -108,7 +119,8 @@ class ConnectorTest extends TestCase
             $this->settings,
             new ImportsOnConnect($this->jobManager),
             $websites,
-            $connections
+            $connections,
+            $this->installationReport
         );
     }
 }

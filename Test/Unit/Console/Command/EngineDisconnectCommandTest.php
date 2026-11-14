@@ -18,6 +18,9 @@ use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Console\Command\EngineDisconnectCommand;
 use Smaily\Connect\Model\Engine\Disconnector;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Report\EventReport;
+use Smaily\Connect\Model\Report\ReportBuilder;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -38,6 +41,34 @@ class EngineDisconnectCommandTest extends TestCase
 
     /** @var array<int, array{args: array<int, mixed>, stored: array<string, string>}> */
     private array $calls = [];
+
+    /** @var array<int, array{args: array<int, mixed>, stored: array<string, string>}> installation report events */
+    private array $events = [];
+
+    /**
+     * CON-234: the installation report's `disconnected` event names the
+     * engine store that goes, sent once while its connection is still
+     * stored, before the engine is told.
+     */
+    public function testTheInstallationReportIsToldFirstWhileTheConnectionIsStored(): void
+    {
+        $this->runCommand(Disconnector::PAUSED, ['--force' => true]);
+
+        self::assertCount(1, $this->events);
+        self::assertSame(
+            [ReportBuilder::EVENT_DISCONNECTED, ['6d1f0c3e-2a7b-4c59-8e14-b9a0f3d5c217']],
+            array_slice($this->events[0]['args'], 0, 2)
+        );
+        self::assertArrayHasKey(Settings::XML_PATH_API_KEY, $this->events[0]['stored']);
+        self::assertSame([], $this->values);
+    }
+
+    public function testWithoutForceNoEventIsSent(): void
+    {
+        $this->runCommand(Disconnector::PAUSED, []);
+
+        self::assertSame([], $this->events);
+    }
 
     /**
      * @dataProvider outcomes
@@ -126,11 +157,13 @@ class EngineDisconnectCommandTest extends TestCase
             Settings::XML_PATH_API_KEY => 'encrypted',
             Settings::XML_PATH_BASE_URL => 'https://intelligence.smaily.com',
             Settings::XML_PATH_ENDPOINTS => self::ENDPOINTS,
+            Settings::XML_PATH_TENANT_ID => '6d1f0c3e-2a7b-4c59-8e14-b9a0f3d5c217',
         ];
         if ($refused) {
             $this->values[Settings::XML_PATH_REFUSED_AT] = '2026-10-23 10:00:00';
         }
         $this->calls = [];
+        $this->events = [];
 
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $scopeConfig->method('isSetFlag')->willReturnCallback(
@@ -163,7 +196,20 @@ class EngineDisconnectCommandTest extends TestCase
             }
         );
 
-        $tester = new CommandTester(new EngineDisconnectCommand($settings, $disconnector));
+        $eventReport = $this->createMock(EventReport::class);
+        $eventReport->method('send')->willReturnCallback(function (mixed ...$args): string {
+            self::assertSame([], $this->calls, 'The report goes before the engine is told.');
+            $this->events[] = ['args' => $args, 'stored' => $this->values];
+
+            return 'http=200 error=-';
+        });
+
+        $tester = new CommandTester(new EngineDisconnectCommand(
+            $settings,
+            $disconnector,
+            $eventReport,
+            $this->createMock(Logger::class)
+        ));
         $tester->execute($input);
 
         return $tester;

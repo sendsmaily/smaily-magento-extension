@@ -23,6 +23,7 @@ use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Report\InstallationReport;
 
 /**
  * PRO-3734: after a save, the Automations tab shows each trigger's state as
@@ -34,6 +35,9 @@ class SaveTest extends TestCase
 {
     /** @var array<string, mixed> */
     private array $response = [];
+
+    /** How many times the installation report was told the setup was saved (CON-234). */
+    private int $reportsScheduled = 0;
 
     public function testASaveAskingForRealSendsAnswersTheTestModeTheEngineStored(): void
     {
@@ -66,6 +70,7 @@ class SaveTest extends TestCase
             ],
             $this->response
         );
+        self::assertSame(1, $this->reportsScheduled, 'A save of the setup schedules an installation report.');
     }
 
     public function testAFailedReadAfterTheSaveAnswersNoStates(): void
@@ -87,6 +92,7 @@ class SaveTest extends TestCase
         $this->controller($client, ['replenish_due' => ['workflow_id' => '']])->execute();
 
         self::assertSame(['saved' => false, 'errors' => ['Saving failed: down']], $this->response);
+        self::assertSame(0, $this->reportsScheduled, 'A refused save schedules no installation report.');
     }
 
     /**
@@ -181,6 +187,18 @@ class SaveTest extends TestCase
         $settings = $this->createMock(Settings::class);
         $settings->method('isRefused')->willReturn($refused);
 
-        return new Save($context, $client, $smailyClientProvider, new ConfigRowNormalizer(), $settings);
+        $installationReport = $this->createMock(InstallationReport::class);
+        $installationReport->method('setupSaved')->willReturnCallback(function (): void {
+            $this->reportsScheduled++;
+        });
+
+        return new Save(
+            $context,
+            $client,
+            $smailyClientProvider,
+            new ConfigRowNormalizer(),
+            $settings,
+            $installationReport
+        );
     }
 }

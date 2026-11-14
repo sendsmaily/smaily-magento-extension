@@ -227,6 +227,19 @@ start one.
   `SleeperInterface`, `Logger`) breaks the uninstall before anything is
   removed — that is why the §16 call there goes through
   `Engine\Disconnector`. `Test/Unit/Setup/UninstallTest` pins it.
+- **The installation report never reaches subscription.smaily.com from a
+  test or the sandbox** (CON-234): a report there creates a real
+  installation record. `Model/Report/ReportSender::ENDPOINT` is the one
+  place the address is written; tests answer through a mocked
+  `HttpClientFactory`, and `docker-compose.yaml` maps
+  `subscription.smaily.com` to 127.0.0.1 in the sandbox (a running sandbox
+  started before that line needs `docker compose up -d` to take it). Shapes
+  are checked against the subscription repo's receiver running locally
+  with its fake Smaily API, never the live one. The removal's `deactivated`
+  event is built without the module's di.xml too (`EventReport`,
+  `ReportBuilder`: no Logger, no `Engine\Client`); a place that deletes a
+  Smaily account's credentials outside `Api\SaveStep` and the Stores >
+  Configuration save sends `disconnected` first (`Report\SetupChange`).
 - Release ZIP is built by `.github/workflows/release.yaml` on a published
   GitHub release (see "Release cut" below).
 

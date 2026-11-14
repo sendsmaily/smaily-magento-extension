@@ -10,6 +10,9 @@ namespace Smaily\Connect\Console\Command;
 
 use Smaily\Connect\Model\Engine\Disconnector;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Report\EventReport;
+use Smaily\Connect\Model\Report\ReportBuilder;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -40,7 +43,9 @@ class EngineDisconnectCommand extends Command
 
     public function __construct(
         private readonly Settings $settings,
-        private readonly Disconnector $disconnector
+        private readonly Disconnector $disconnector,
+        private readonly EventReport $eventReport,
+        private readonly Logger $logger
     ) {
         parent::__construct();
     }
@@ -72,6 +77,11 @@ class EngineDisconnectCommand extends Command
             return Command::FAILURE;
         }
 
+        // The installation report says the engine store goes (CON-234),
+        // while the connection is still stored.
+        $this->logger->info('Installation report: Campaign Intelligence disconnected', [
+            'outcome' => $this->eventReport->send(ReportBuilder::EVENT_DISCONNECTED, [$this->settings->getTenantId()]),
+        ]);
         // The engine is told with the stored key, so before the key is deleted.
         $outcome = $this->disconnector->endConnection(
             $this->settings->getApiKey(),

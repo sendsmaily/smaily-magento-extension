@@ -28,6 +28,10 @@ services:
     # The image carries a copy of this script, so mount the working tree's own
     # over it — otherwise a bootstrap change needs an image rebuild to take.
     - ./.sandbox/entrypoint.sh:/entrypoint.sh:ro
+    # The installation report (CON-234) never leaves the sandbox: a report to
+    # the live receiver would create a real installation record.
+    extra_hosts:
+    - "subscription.smaily.com:127.0.0.1"
     depends_on:
       db:
         condition: service_healthy

@@ -38,6 +38,7 @@ use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Connector;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Engine\Websites;
+use Smaily\Connect\Model\Report\InstallationReport;
 use Smaily\Connect\Model\ResourceModel\Backfill\Job\Collection;
 use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
@@ -185,7 +186,8 @@ class SharedConnectAndImportStartTest extends IntegrationTestCase
             ]),
             new ImportsOnConnect($jobManager),
             $this->createMock(Websites::class),
-            $this->createMock(Connections::class)
+            $this->createMock(Connections::class),
+            $this->createMock(InstallationReport::class)
         ));
 
         $config = [];

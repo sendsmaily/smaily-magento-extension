@@ -20,6 +20,8 @@ use Smaily\Connect\Model\Engine\Disconnector;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\OrderOrigin;
 use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
+use Smaily\Connect\Model\Report\EventReport;
+use Smaily\Connect\Model\Report\ReportBuilder;
 use Smaily\Connect\Setup\Patch\Data\RemoveSettingsOnUninstall;
 use Smaily\Connect\Setup\Uninstall;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
@@ -37,9 +39,15 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  * CON-220: both paths first tell Campaign Intelligence that the connection
  * ends (contract §16), with the stored key; whatever the engine answers,
  * the settings still go.
+ * CON-234: before anything goes, both paths send the installation report's
+ * `deactivated` event, once per removal, while the Smaily credentials are
+ * still stored; it never stops the removal.
  */
 class UninstallTest extends IntegrationTestCase
 {
+    /** @var array<int, array{event: string, paths: string[]}> the installation report events sent */
+    private array $events = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -60,6 +68,54 @@ class UninstallTest extends IntegrationTestCase
     public function testUninstallClassRemovesEverySmailySettingAndFlag(): void
     {
         $this->uninstall($this->notCalledDisconnector())
+            ->uninstall($this->schemaSetup(), $this->createMock(ModuleContextInterface::class));
+
+        $this->assertOnlyForeignRowsRemain();
+    }
+
+    /**
+     * @dataProvider removalPaths
+     */
+    public function testBothPathsReportTheRemovalOnceBeforeTheCredentialsGo(string $path): void
+    {
+        $this->connectEngine();
+        $disconnector = $this->createMock(Disconnector::class);
+        $disconnector->method('endConnection')->willReturnCallback(function (): string {
+            self::assertCount(1, $this->events, 'The installation report goes before the engine is told.');
+
+            return Disconnector::PAUSED;
+        });
+        $uninstall = $this->uninstall($disconnector);
+
+        if ($path === 'uninstall') {
+            $uninstall->uninstall($this->schemaSetup(), $this->createMock(ModuleContextInterface::class));
+        } elseif ($path === 'patch revert') {
+            $this->patch($uninstall)->revert();
+        } else {
+            $uninstall->uninstall($this->schemaSetup(), $this->createMock(ModuleContextInterface::class));
+            $this->patch($uninstall)->revert();
+        }
+
+        self::assertCount(1, $this->events, 'One event per removal.');
+        self::assertSame(ReportBuilder::EVENT_DEACTIVATED, $this->events[0]['event']);
+        self::assertContains(Config::XML_PATH_PASSWORD, $this->events[0]['paths'], 'Sent while the password is stored.');
+        $this->assertOnlyForeignRowsRemain();
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function removalPaths(): array
+    {
+        return ['uninstall' => ['uninstall'], 'patch revert' => ['patch revert'], 'both' => ['both']];
+    }
+
+    public function testAFailedReportDoesNotStopTheRemoval(): void
+    {
+        $eventReport = $this->createMock(EventReport::class);
+        $eventReport->method('send')->willReturn(EventReport::NOT_SENT);
+
+        $this->uninstall($this->notCalledDisconnector(), $eventReport)
             ->uninstall($this->schemaSetup(), $this->createMock(ModuleContextInterface::class));
 
         $this->assertOnlyForeignRowsRemain();
@@ -165,25 +221,43 @@ class UninstallTest extends IntegrationTestCase
     }
 
     /**
-     * Without an Uninstall, the object manager builds one as Magento does,
-     * with the real Disconnector; the seeded store is not connected, so it
-     * sends nothing.
+     * Without an Uninstall, one with the real Disconnector; the seeded store
+     * is not connected to the engine, so it sends nothing there. (The
+     * harness's object manager cannot build the installation report: it has
+     * no store manager.)
      */
     private function patch(?Uninstall $uninstall = null): RemoveSettingsOnUninstall
     {
         /** @var ResourceConnection $resourceConnection */
         $resourceConnection = $this->objectManager->get(ResourceConnection::class);
-        $arguments = ['moduleDataSetup' => new DataSetup($resourceConnection)];
-        if ($uninstall !== null) {
-            $arguments['uninstall'] = $uninstall;
-        }
 
-        return $this->objectManager->create(RemoveSettingsOnUninstall::class, $arguments);
+        return $this->objectManager->create(RemoveSettingsOnUninstall::class, [
+            'moduleDataSetup' => new DataSetup($resourceConnection),
+            'uninstall' => $uninstall ?? $this->uninstall($this->objectManager->get(Disconnector::class)),
+        ]);
     }
 
-    private function uninstall(Disconnector $disconnector): Uninstall
+    /**
+     * Without an EventReport, one that records each event with the setting
+     * paths stored when it was sent.
+     */
+    private function uninstall(Disconnector $disconnector, ?EventReport $eventReport = null): Uninstall
     {
-        return new Uninstall($disconnector, $this->objectManager->get(EncryptorInterface::class), new NullLogger());
+        if ($eventReport === null) {
+            $eventReport = $this->createMock(EventReport::class);
+            $eventReport->method('send')->willReturnCallback(function (string $event): string {
+                $this->events[] = ['event' => $event, 'paths' => $this->configPaths()];
+
+                return 'http=200 error=-';
+            });
+        }
+
+        return new Uninstall(
+            $disconnector,
+            $this->objectManager->get(EncryptorInterface::class),
+            new NullLogger(),
+            $eventReport
+        );
     }
 
     private function notCalledDisconnector(): Disconnector

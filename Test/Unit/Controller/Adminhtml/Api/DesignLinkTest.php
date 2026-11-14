@@ -38,6 +38,7 @@ use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\SleeperInterface;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Report\ConnectionHealth;
 use Smaily\Connect\Model\StorefrontScript;
 
 /**
@@ -266,7 +267,8 @@ class DesignLinkTest extends TestCase
             $storeManager,
             $logger,
             $this->createMock(SleeperInterface::class),
-            new StorefrontScript($storeManager, $this->createMock(HttpRequest::class))
+            new StorefrontScript($storeManager, $this->createMock(HttpRequest::class)),
+            $this->createMock(ConnectionHealth::class)
         );
 
         $this->designLink(new EmailDesigns($settings, $client, $this->createMock(EmailDesignWorkflows::class)), ['email_key' => 'plugin.welcome'])->execute();

@@ -18,6 +18,7 @@ use Smaily\Connect\Controller\Adminhtml\Api\SaveStep;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
+use Smaily\Connect\Model\Report\SetupChange;
 use Smaily\Connect\Model\SubdomainNormalizer;
 
 /**
@@ -29,6 +30,9 @@ class SaveStepTest extends TestCase
 {
     /** @var array<int|string, mixed> */
     private array $response = [];
+
+    /** @var array<int, string> the save and the installation report's steps, in order */
+    private array $steps = [];
 
     /**
      * @dataProvider verifiedProvider
@@ -163,6 +167,35 @@ class SaveStepTest extends TestCase
     }
 
     /**
+     * CON-234: the installation report reads the accounts before the save
+     * and is told after it whether the save went through.
+     *
+     * @dataProvider saveOutcomes
+     * @param array<int, array{field: string, message: string}> $errors
+     */
+    public function testTheInstallationReportSeesTheAccountsAroundEverySave(array $errors, string $after): void
+    {
+        $this->controller(
+            ['step' => 'connect', 'data' => ['subdomain' => 'demo']],
+            $this->createMock(VerifiedCredentials::class),
+            $errors
+        )->execute();
+
+        self::assertSame(['before', 'save', $after], $this->steps);
+    }
+
+    /**
+     * @return array<string, array{array<int, array{field: string, message: string}>, string}>
+     */
+    public static function saveOutcomes(): array
+    {
+        return [
+            'saved' => [[], 'after saved'],
+            'refused' => [[['field' => 'subdomain', 'message' => 'Wrong']], 'after not saved'],
+        ];
+    }
+
+    /**
      * @param array<string, mixed> $body
      * @param array<int, array{field: string, message: string}> $errors
      */
@@ -190,7 +223,21 @@ class SaveStepTest extends TestCase
         $jsonFactory->method('create')->willReturn($result);
 
         $stepSaver = $this->createMock(WizardStepSaver::class);
-        $stepSaver->method('save')->willReturn($errors);
+        $stepSaver->method('save')->willReturnCallback(function () use ($errors): array {
+            $this->steps[] = 'save';
+
+            return $errors;
+        });
+        $setupChange = $this->createMock(SetupChange::class);
+        $setupChange->method('before')->willReturnCallback(function (): array {
+            $this->steps[] = 'before';
+
+            return ['accounts' => ['marketing|demo'], 'main' => null];
+        });
+        $setupChange->method('after')->willReturnCallback(function (array $before, bool $saved): void {
+            self::assertSame(['accounts' => ['marketing|demo'], 'main' => null], $before);
+            $this->steps[] = $saved ? 'after saved' : 'after not saved';
+        });
         $stepSaver->method('isConnectionAccepted')->willReturn($connectionAccepted);
         $stepSaver->method('isStorefrontUrlChanged')->willReturn($storefrontUrlChanged);
         $stepSaver->method('isTransactionalAccepted')->willReturn($transactionalAccepted);
@@ -205,7 +252,8 @@ class SaveStepTest extends TestCase
             $stepSaver,
             $verifiedCredentials,
             $websiteContext,
-            new SubdomainNormalizer()
+            new SubdomainNormalizer(),
+            $setupChange
         );
     }
 }

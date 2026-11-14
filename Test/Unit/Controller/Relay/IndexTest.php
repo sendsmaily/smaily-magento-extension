@@ -38,6 +38,7 @@ use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\OrderPlacer;
 use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
 use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
+use Smaily\Connect\Model\Report\ConnectionHealth;
 use Smaily\Connect\Model\StorefrontScript;
 
 /**
@@ -212,7 +213,8 @@ class IndexTest extends TestCase
             $this->createMock(StoreManagerInterface::class),
             $this->createMock(Logger::class),
             $sleeper,
-            $this->createMock(StorefrontScript::class)
+            $this->createMock(StorefrontScript::class),
+            $this->createMock(ConnectionHealth::class)
         );
 
         // A client may put any value in the forwarding headers: each request

@@ -17,6 +17,8 @@ use Psr\Log\LoggerInterface;
 use Smaily\Connect\Model\Adminhtml\SetupNotice;
 use Smaily\Connect\Model\Engine\Disconnector;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Report\EventReport;
+use Smaily\Connect\Model\Report\ReportBuilder;
 
 /**
  * Removes the module's settings and flag rows when the module is
@@ -26,7 +28,9 @@ use Smaily\Connect\Model\Engine\Settings;
  * present (the upgrade deletes them once migrated), and every
  * `smaily_connect_*` flag row (the profiling opt-out record, the verified
  * credentials, the health and reconcile cursors, the order-origin stamps), and the install's "ready
- * to set up" admin notice. Before that, endEngineConnection() tells
+ * to set up" admin notice. First reportRemoval() sends Smaily's
+ * subscription service the installation report's `deactivated` event
+ * (CON-234, EventReport). Before the removal, endEngineConnection() tells
  * Campaign Intelligence that this store's connection ends (contract §16,
  * Disconnector): the engine pauses the store and keeps its data. A refused
  * key or an engine that does not answer never stops the removal.
@@ -44,10 +48,14 @@ use Smaily\Connect\Model\Engine\Settings;
  */
 class Uninstall implements UninstallInterface
 {
+    /** Whether this removal sent its `deactivated` report (both removal paths may run). */
+    private bool $removalReported = false;
+
     public function __construct(
         private readonly Disconnector $disconnector,
         private readonly EncryptorInterface $encryptor,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly EventReport $eventReport
     ) {
     }
 
@@ -56,6 +64,7 @@ class Uninstall implements UninstallInterface
      */
     public function uninstall(SchemaSetupInterface $setup, ModuleContextInterface $context)
     {
+        $this->reportRemoval();
         $this->endEngineConnection($setup->getConnection(), $setup->getTable('core_config_data'));
         $this->removeSettings(
             $setup->getConnection(),
@@ -63,6 +72,25 @@ class Uninstall implements UninstallInterface
             $setup->getTable('flag')
         );
         $this->removeSetupNotice($setup->getConnection(), $setup->getTable(SetupNotice::TABLE));
+    }
+
+    /**
+     * Tell Smaily's subscription service that the module is removed (the
+     * installation report's `deactivated` event, CON-234), with the main
+     * Smaily account's credentials, before removeSettings() deletes them.
+     * Sent once per removal, also when both removal paths run; nothing is
+     * sent without a connected Smaily account, and nothing here stops the
+     * removal. The engine's own disconnect that follows sends no second
+     * event.
+     */
+    public function reportRemoval(): void
+    {
+        if ($this->removalReported) {
+            return;
+        }
+        $this->removalReported = true;
+        $outcome = $this->eventReport->send(ReportBuilder::EVENT_DEACTIVATED);
+        $this->logger->info('Smaily Connect removal: installation report', ['outcome' => $outcome]);
     }
 
     /**

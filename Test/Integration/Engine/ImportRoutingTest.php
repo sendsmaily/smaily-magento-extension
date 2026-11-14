@@ -50,6 +50,7 @@ use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\SleeperInterface;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\OptOutReplay;
+use Smaily\Connect\Model\Report\ConnectionHealth;
 use Smaily\Connect\Model\StorefrontScript;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\FrozenImportClock;
@@ -334,7 +335,8 @@ class ImportRoutingTest extends IntegrationTestCase
             $storeManager,
             $this->createMock(Logger::class),
             $this->createMock(SleeperInterface::class),
-            new StorefrontScript($storeManager, $this->createMock(Http::class))
+            new StorefrontScript($storeManager, $this->createMock(Http::class)),
+            $this->createMock(ConnectionHealth::class)
         );
     }
 

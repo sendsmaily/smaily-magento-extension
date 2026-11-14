@@ -27,6 +27,7 @@ use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Report\ConnectionHealth;
 use Smaily\Connect\Test\Unit\Support\StoreLocale;
 
 class SmailyClientTest extends TestCase
@@ -39,6 +40,70 @@ class SmailyClientTest extends TestCase
 
     /** @var array<int, array{level: string, message: string, context: array<string, mixed>}> */
     private array $logged = [];
+
+    /** @var ConnectionHealth&\PHPUnit\Framework\MockObject\MockObject */
+    private $health;
+
+    /** @var array<int, array{string, string, bool}> what the installation report's health was told */
+    private array $healthCalls = [];
+
+    /**
+     * CON-234: every answer tells the installation report's health how this
+     * account's last request went — a code only — and a write that Smaily
+     * took counts as a sync.
+     *
+     * @dataProvider healthAnswers
+     */
+    public function testEachAnswerIsRecordedForTheInstallationReport(
+        string $method,
+        Response|callable $answer,
+        string $code,
+        bool $wrote
+    ): void {
+        $client = $this->createClient([$answer], 'Demo');
+
+        try {
+            $method === 'POST'
+                ? $client->post(SmailyClient::ENDPOINT_CONTACT, ['email' => 'shopper@example.com'])
+                : $client->get(SmailyClient::ENDPOINT_CONTACT, ['email' => 'shopper@example.com']);
+        } catch (SmailyClientException) {
+            // The failure itself is covered elsewhere.
+        }
+
+        self::assertSame([['Demo', $code, $wrote]], $this->healthCalls);
+    }
+
+    /**
+     * @return array<string, array{string, Response|callable, string, bool}>
+     */
+    public static function healthAnswers(): array
+    {
+        return [
+            'a write Smaily took' => ['POST', new Response(200, [], '{"code":101}'), '', true],
+            'a read' => ['GET', new Response(200, [], '{"code":101}'), '', false],
+            'a read of no such contact' => ['GET', new Response(200, [], '{"code":206}'), '', false],
+            'a write refused as invalid data' => [
+                'POST',
+                new Response(200, [], '{"code":203,"message":"x"}'),
+                'permanent_envelope_203',
+                false,
+            ],
+            'a write refused for the package' => ['POST', new Response(200, [], '{"code":227}'), 'plan_blocked', false],
+            'a write refused for another reason' => ['POST', new Response(200, [], '{"code":225}'), 'unreachable', false],
+            'credentials refused' => ['POST', new Response(401, [], '{}'), 'credentials_rejected', false],
+            'a wrong subdomain' => ['GET', new Response(404, [], 'Not found'), 'credentials_rejected', false],
+            'the package (HTTP 403, code 227)' => [
+                'GET',
+                new Response(403, [], '{"code":227,"message":"A paid package is required"}'),
+                'plan_blocked',
+                false,
+            ],
+            'too many requests' => ['POST', new Response(429, [], '{}'), 'unreachable', false],
+            'a server error' => ['POST', new Response(503, [], ''), 'unreachable', false],
+            'no answer' => ['POST', self::networkFailure(), 'unreachable', false],
+            'a malformed answer' => ['POST', new Response(200, [], 'oops'), 'unreachable', false],
+        ];
+    }
 
     public function testGetReturnsDecodedBody(): void
     {
@@ -538,6 +603,14 @@ class SmailyClientTest extends TestCase
 
         $this->verifiedCredentials = $this->createMock(VerifiedCredentials::class);
 
+        $this->healthCalls = [];
+        $this->health = $this->createMock(ConnectionHealth::class);
+        $this->health->method('recordSmaily')->willReturnCallback(
+            function (string $subdomain, string $code, bool $wrote): void {
+                $this->healthCalls[] = [$subdomain, $code, $wrote];
+            }
+        );
+
         $this->logged = [];
         $logger = $this->createMock(Logger::class);
         foreach (['error', 'info', 'debug'] as $level) {
@@ -552,6 +625,7 @@ class SmailyClientTest extends TestCase
             $factory,
             $logger,
             $this->verifiedCredentials,
+            $this->health,
             $subdomain,
             'user',
             'secret'

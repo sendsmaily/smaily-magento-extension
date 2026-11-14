@@ -13,7 +13,7 @@ extension. Module `Smaily_Connect`, namespace `Smaily\Connect`, composer package
 via a plain `composer update`). Target: feature parity with the UNION of the Woo
 (`../connect-woo/`) and Shopify (`../connect-shopify/`) Smaily plugins, plus full
 Campaign Intelligence support. Aim: become Smaily's official upstream extension.
-Magento 2.4.4+ / PHP 8.1–8.4. GPL-3.0. Public product name "Smaily Connect".
+Magento 2.4.4+ / PHP 8.1–8.5. GPL-3.0. Public product name "Smaily Connect".
 
 Repository: the code lives in the official `sendsmaily/smaily-magento-extension`,
 branch `master` (owner decision 2026-10-07, PRO-1198; moved by PR #126,
@@ -208,7 +208,7 @@ start one.
   `Test/Unit/GeneratedCodeCompatibilityTest.php` (unit suite) fails on it,
   and so does CI's `Magento compile` job (CON-210), which runs
   `setup:di:compile` with the extension on Magento 2.4.4-p13 / PHP 8.1 and
-  2.4.9 / PHP 8.4 on every PR (no database needed; TESTING.md "Magento
+  2.4.9 / PHP 8.5 on every PR (no database needed; TESTING.md "Magento
   compile"). Plain 2.4.4 no longer installs from today's packages; the
   2.4.4 patch releases do.
 - Sandbox: `docker compose up -d` — real Magento 2 at

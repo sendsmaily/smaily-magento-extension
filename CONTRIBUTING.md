@@ -4,7 +4,7 @@ Thanks for taking the time to contribute!
 
 ## Getting started
 
-Requirements: PHP 8.1–8.4, Composer, Docker (for the sandbox).
+Requirements: PHP 8.1–8.5, Composer, Docker (for the sandbox).
 
 ```bash
 git clone https://github.com/sendsmaily/smaily-magento-extension.git
@@ -13,7 +13,7 @@ composer install    # Magento packages resolve via the Mage-OS mirror
 ```
 
 Dependencies install from the committed `composer.lock`. If your local PHP is
-newer than 8.4, or you are missing one of the Magento PHP extensions, add
+newer than 8.5, or you are missing one of the Magento PHP extensions, add
 `--ignore-platform-reqs`.
 
 `composer` reports `magento/module-catalog-inventory` as abandoned in favor of

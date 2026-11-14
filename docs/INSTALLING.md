@@ -16,7 +16,7 @@ Check the Magento and PHP versions first:
    Smaily Connect: they run only on PHP 7.x.
 2. **PHP version.** On the server, run `php -v` with the same PHP binary
    that runs `bin/magento` (on a server with several PHP versions, the one
-   the cron line and the web server use too). It must be **8.1 – 8.4**.
+   the cron line and the web server use too). It must be **8.1 – 8.5**.
 
 If either is below the minimum, stop and upgrade the store first (Magento
 2.4.7 or 2.4.8 on PHP 8.2 or 8.3 is a good target). A composer install
@@ -28,7 +28,7 @@ that happened.
 Then check the rest:
 
 - Magento Open Source / Adobe Commerce **2.4.4+** or Mage-OS.
-- PHP **8.1 – 8.4**.
+- PHP **8.1 – 8.5**.
 - These Magento modules enabled (they are on a standard install):
   `Magento_Store`, `Magento_Customer`, `Magento_Newsletter`,
   `Magento_Catalog`, `Magento_CatalogInventory`, `Magento_Quote`,

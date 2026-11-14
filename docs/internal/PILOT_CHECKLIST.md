@@ -64,7 +64,7 @@ initial setup has the **Storefront URL** field on its **Connect** step
 ## 0. Pre-flight
 
 **Versions first, before anything is installed.** Smaily Connect needs
-Magento **2.4.4 or newer** and PHP **8.1 – 8.4**. Magento 2.4.3 and older run
+Magento **2.4.4 or newer** and PHP **8.1 – 8.5**. Magento 2.4.3 and older run
 only on PHP 7.x, so they cannot run it. If either is below the minimum, stop:
 the store upgrades first (Magento 2.4.7 or 2.4.8 on PHP 8.2 or 8.3), and the
 pilot day moves. Installing the ZIP on an unsupported store makes
@@ -73,7 +73,7 @@ pilot day moves. Installing the ZIP on an unsupported store makes
 | What to do | Where to look / what good looks like |
 |---|---|
 | Confirm the Magento version. | The admin footer on any admin page: "Magento ver. 2.4.4" or newer (or `bin/magento --version` on the server). 2.4.3 or older: stop, see above. |
-| Confirm the PHP version. | The developer runs `php -v` with the same PHP binary that runs `bin/magento` (and the cron line): 8.1, 8.2, 8.3 or 8.4. 7.x or 8.0: stop, see above. |
+| Confirm the PHP version. | The developer runs `php -v` with the same PHP binary that runs `bin/magento` (and the cron line): 8.1, 8.2, 8.3, 8.4 or 8.5. 7.x or 8.0: stop, see above. |
 | Confirm how many websites the store has. | Stores > All Stores lists the websites. More than one: the initial setup first asks **How are your websites run?** (CON-279) — pick **One store in several versions** with the merchant unless each website is a business of its own (**Separate stores**: each website is set up on its own, with the website selector at the top). As one store, the initial setup runs once for the whole store, and its Connect, Contacts and Automations steps list each website that holds its own values (carried over from 2.8.x) under **Websites with their own values** — decide with the merchant, per website, **Keep its own values** or **Use this step's values**, and note it in PRO-2474. Settings shows a **Website** selector. |
 | Confirm whether the storefront theme is Luma-based or Hyvä. | Content > Design > Configuration. A Hyvä theme also needs the Hyvä companion, the same version as Smaily Connect and installed the same way: `composer require smaily/smailyformagento:<version> smaily/module-connect-hyva:<version>`, or the release's `smaily-connect-magento2-hyva.zip` next to the main ZIP — steps in the guide site's [Hyvä](https://smaily.com/connect-magento/#st-hyva) section. |
 | Confirm shoppers buy on Magento's own theme, not on a separate (headless) storefront application. | Open a product page on the public shop: Magento's own theme loads `requirejs` (Luma) or Alpine.js (Hyvä). A headless storefront (PRO-3614): walk `docs/HEADLESS_STOREFRONTS.md` "Before switching anything on" first — keep the automations off until its product-link check passes, and set the Storefront URL on the initial setup's **Connect** step, before contact sync and Campaign Intelligence (§1); §5's `{{abandoned_cart_url}}`, the checkout checkbox and §6 do not apply until the storefront team's hand-off items are in place. |

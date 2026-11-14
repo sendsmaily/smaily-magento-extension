@@ -50,7 +50,7 @@ scope for this module.
 
 ## Installation
 
-Prerequisites: Magento 2.4.4+, PHP 8.1–8.4, Hyvä theme 1.3+ (1.4+
+Prerequisites: Magento 2.4.4+, PHP 8.1–8.5, Hyvä theme 1.3+ (1.4+
 recommended, Tailwind v4) — via the free license key from the
 [Hyvä portal](https://www.hyva.io/) (private Packagist repo) or from source
 at [github.com/hyva-themes](https://github.com/hyva-themes), and Node.js 20+

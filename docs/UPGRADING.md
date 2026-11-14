@@ -54,7 +54,7 @@ keeps it that way, so there is nothing to do before you upgrade:
 ## Steps
 
 Check the Magento and PHP versions first: version 3 needs Magento
-**2.4.4 or newer** and PHP **8.1 – 8.4** (see
+**2.4.4 or newer** and PHP **8.1 – 8.5** (see
 [INSTALLING.md](INSTALLING.md#before-you-start)). Run every command below
 from the Magento root, as the user that owns the Magento files.
 

@@ -292,7 +292,7 @@ step with the extension on two versions, on every push and pull request:
 | Magento | PHP | |
 |---|---|---|
 | 2.4.4-p13 | 8.1 | the oldest supported line, on its oldest PHP |
-| 2.4.9 | 8.4 | the newest line composer.json allows, on the newest PHP both support |
+| 2.4.9 | 8.5 | the newest line composer.json allows, on the newest PHP both support |
 
 Each run creates the Magento project from `mirror.mage-os.org`, installs the
 extension through composer from the release ZIP (`bin/build-release-zip.sh`,

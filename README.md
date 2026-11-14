@@ -47,7 +47,7 @@ with the Smaily Connect plugins for WooCommerce and Shopify.
 ## Requirements
 
 - Magento Open Source / Adobe Commerce **2.4.4+** or Mage-OS
-- PHP **8.1 – 8.4**
+- PHP **8.1 – 8.5**
 - A working Magento cron (ideally every minute)
 
 ## Installation

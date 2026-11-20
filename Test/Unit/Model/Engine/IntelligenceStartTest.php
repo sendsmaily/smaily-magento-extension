@@ -91,6 +91,7 @@ class IntelligenceStartTest extends TestCase
             'connected' => $this->connected = true,
             'separate stores' => $this->separateStores = true,
             'several accounts or per-language accounts' => $this->oneAccount = false,
+            default => throw new \LogicException('Unknown case ' . $case),
         };
         $start = $this->start();
 

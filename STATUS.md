@@ -7,12 +7,18 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-11-20 — **3.0.2 is cut (release/3.0.2); its tag
-waits for Erkki.** 3.0.0 and 3.0.1 were released on 2026-11-14. The cut
-collects 13 changelog fragments into 12 bullets: CON-356's price bullet
-is merged into CON-363's banner bullet (the banner replaced the
-introduction that held the price link), and CON-364's bullet names the
-Stores > Configuration wording of #273.
+_Last updated: 2026-11-20 session end — **3.0.2 is released.** The
+GitHub release
+[3.0.2](https://github.com/sendsmaily/smaily-magento-extension/releases/tag/3.0.2)
+("3.0.2 — Try Intelligence free, shared stores, new look") was published
+on Erkki's go; the release workflow attached both ZIPs and their
+`.sha256`, the Hyvä mirror carries tag 3.0.2, and Packagist lists 3.0.2
+for both `smaily/smailyformagento` and `smaily/module-connect-hyva`.
+3.0.0 and 3.0.1 were released on 2026-11-14. The cut (#282) collects
+13 changelog fragments into 12 bullets: CON-356's price bullet is merged
+into CON-363's banner bullet (the banner replaced the introduction that
+held the price link), and CON-364's bullet names the Stores >
+Configuration wording of #273.
 
 **Merged since 3.0.1:**
 - #262 (guide), #264 (admin) CON-356: no Campaign Intelligence price.
@@ -62,7 +68,7 @@ multi-website pilot store (one store, 3.0.x) presses **Run again** on
 start (the engine keeps starts closed in production) and the Estonian
 proofread; CON-366 — Safari on an https admin, and an admin on its own
 subdomain; CON-230 — a real console sign-in once the engine switches §24
-on; CON-356 ships in 3.0.2. The Estonian proofread list for the 3.0.2
+on; CON-356 shipped in 3.0.2. The Estonian proofread list for the 3.0.2
 texts went to Erkki on 2026-11-20; his corrections land in one
 follow-up PR.
 
@@ -77,11 +83,16 @@ Magento's first-time system-messages popup is never drawn on
 message shows only in the **System Messages** list. A `release/*` branch
 takes one push (CLAUDE.md).
 
-**Next:**
-1. The 3.0.2 tag on Erkki's word.
-2. CON-369 payment reminder and CON-361 stock alerts (contract 1.35.0
-   §6c) — design first.
-3. CON-237 steps 4–6; CON-168's remaining automated-email items._
+**Next session opens with:**
+1. Erkki's Estonian proofread corrections for the 3.0.2 texts (one PR).
+2. The Marketplace review results for 3.0.1 (`2q6w4ofnme`; support
+   request SALES0907379 about the title); afterwards submit 3.0.2 as a
+   new version with a regenerated user-guide PDF (gear icon ›
+   Integrations, version 3.0.2).
+3. Designs for Erkki: CON-369 payment reminder and CON-361 stock alerts
+   (contract 1.35.0 §6c).
+4. CON-283: the multi-website pilot store presses **Run again** on
+   **Catalog**; then check the engine._
 
 _Earlier (2026-11-14 session end): **3.0.0 (#256, tag on ff15243) and
 3.0.1 (#260, tag on 63a80e8; PHP 8.5, #259) were released; 3.0.1 was

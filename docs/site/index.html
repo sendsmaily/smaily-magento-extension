@@ -1103,7 +1103,7 @@ bin/magento cache:flush</code></pre>
         <p>Without one the tracker sends nothing. The note under the switch says which source the store has; connect one as described in <a href="#connecting-your-cookie-consent-tool">Connecting your cookie consent tool</a>.</p>
       </div>
       <h3>Recommendations in your store</h3>
-      <p>Once Campaign Intelligence is connected, the tab shows <strong>Show recommendations in your store</strong>: the <strong>Smaily recommendations</strong> widget shows each shopper their recommendations on your store's pages, and only shoppers who accept marketing cookies see them. <strong>How to add it →</strong> opens <a href="#set-storefront-recs">Recommendations on your store's pages</a>.</p>
+      <p>Once Campaign Intelligence is connected, the tab shows <strong>Show recommendations in your store</strong>: the <strong>Smaily recommendations</strong> widget shows each shopper their recommendations on your store's pages, and only shoppers who accept marketing cookies see them. The card names both ways to place it: a widget instance under <span class="path">Content &gt; Elements &gt; Widgets</span> for product pages, the cart or the order success page, and the widget in a page or a block. <strong>How to add it →</strong> opens <a href="#set-storefront-recs">Recommendations on your store's pages</a>.</p>
     </div>
     <div data-lang="et">
       <p>Vahekaart <strong>Intelligence</strong> ühendab Campaign Intelligence'i, lülitab sisse sirvimise jälgimise ja käivitab ajaloolised impordid.</p>
@@ -1128,7 +1128,7 @@ bin/magento cache:flush</code></pre>
         <p>Ilma selleta ei saada jälgija midagi. Lüliti all olev märkus ütleb, milline allikas poel on; ühenda see nii, nagu kirjeldab jaotis <a href="#connecting-your-cookie-consent-tool">Küpsiste nõusoleku tööriista ühendamine</a>.</p>
       </div>
       <h3>Soovitused sinu poes</h3>
-      <p>Kui Campaign Intelligence on ühendatud, näitab vahekaart kaarti <strong>Näita soovitusi oma poes</strong>: vidin <strong>Smaily soovitused</strong> näitab igale ostjale tema soovitusi sinu poe lehtedel ja neid näevad ainult turundusküpsistega nõustunud ostjad. <strong>Kuidas lisada →</strong> avab jaotise <a href="#set-storefront-recs">Soovitused poe lehtedel</a>.</p>
+      <p>Kui Campaign Intelligence on ühendatud, näitab vahekaart kaarti <strong>Näita soovitusi oma poes</strong>: vidin <strong>Smaily soovitused</strong> näitab igale ostjale tema soovitusi sinu poe lehtedel ja neid näevad ainult turundusküpsistega nõustunud ostjad. Kaart nimetab mõlemat paigutamise viisi: vidina eksemplar menüüs <span class="path">Content &gt; Elements &gt; Widgets</span> tootelehtede, ostukorvi või tellimuse kinnituslehe jaoks ning vidin lehel või plokis. <strong>Kuidas lisada →</strong> avab jaotise <a href="#set-storefront-recs">Soovitused poe lehtedel</a>.</p>
     </div>
   </div>
 
@@ -1229,10 +1229,20 @@ window.smailyConnect.consentOverride = function () {
   <div class="sub" id="set-storefront-recs">
     <h2><span data-lang="en">Recommendations on your store's pages</span><span data-lang="et">Soovitused poe lehtedel</span></h2>
     <div data-lang="en">
-      <p>The <strong>Smaily recommendations</strong> widget shows a shopper their own recommendations from Campaign Intelligence — the same products as in their Smaily emails — on your store's pages, under the heading <strong>Recommended for you</strong>, as your theme's own product cards. Nothing appears until you place the widget, and it has no settings.</p>
+      <p>The <strong>Smaily recommendations</strong> widget shows a shopper their own recommendations from Campaign Intelligence — the same products as in their Smaily emails — on your store's pages, under the heading <strong>Recommended for you</strong>, as your theme's own product cards. Nothing appears until you place the widget, and it has no settings. Place it in one of two ways: as a widget instance, on every product page, the shopping cart or the order success page; or in a page or a block.</p>
+      <p><strong>On every product page and the shopping cart</strong> (a widget instance):</p>
+      <ol>
+        <li>Open <span class="path">Content &gt; Elements &gt; Widgets</span> and press <strong>Add Widget</strong>.</li>
+        <li>Pick <strong>Smaily recommendations</strong> as the <strong>Type</strong> and your store's theme (for example <strong>Magento Luma</strong>) as the <strong>Design Theme</strong>, and press <strong>Continue</strong>.</li>
+        <li>Enter a <strong>Widget Title</strong> (only the admin shows it) and pick <strong>All Store Views</strong> under <strong>Assign to Store Views</strong>.</li>
+        <li>Under <strong>Layout Updates</strong> press <strong>Add Layout Update</strong>, pick <strong>All Product Types</strong> under <strong>Display on</strong> and <strong>Main Content Bottom</strong> as the <strong>Container</strong>.</li>
+        <li>Press <strong>Add Layout Update</strong> again, pick <strong>Specified Page</strong> under <strong>Display on</strong>, <strong>Shopping Cart</strong> as the <strong>Page</strong> and <strong>Main Content Bottom</strong> as the <strong>Container</strong>. For the order success page add one more with <strong>One Page Checkout Success</strong> as the <strong>Page</strong>.</li>
+        <li>Press <strong>Save</strong>, then refresh the cache types Magento marks as invalidated under <span class="path">System &gt; Tools &gt; Cache Management</span>.</li>
+      </ol>
+      <p><strong>In a page or a block:</strong></p>
       <ol>
         <li>Open a page under <span class="path">Content &gt; Pages</span> or a block under <span class="path">Content &gt; Blocks</span>.</li>
-        <li>In the content editor press <strong>Insert Widget...</strong>, pick <strong>Smaily recommendations</strong> as the <strong>Widget Type</strong> and press <strong>Insert Widget</strong>. In Page Builder do the same in a <strong>Text</strong> element, or put <code>{{widget type="Smaily\Connect\Block\Widget\Recommendations"}}</code> in an <strong>HTML Code</strong> element.</li>
+        <li>In the content editor press <strong>Insert Widget...</strong>, pick <strong>Smaily recommendations</strong> as the <strong>Widget Type</strong> and press <strong>Insert Widget</strong>. In Page Builder, press <strong>Insert Widget</strong> in a <strong>Text</strong> element's toolbar, or <strong>Insert Widget...</strong> in an <strong>HTML Code</strong> element, which puts <code>{{widget type="Smaily\Connect\Block\Widget\Recommendations"}}</code> in its code.</li>
         <li>Save the page or block.</li>
       </ol>
       <ul>
@@ -1245,10 +1255,20 @@ window.smailyConnect.consentOverride = function () {
       </ul>
     </div>
     <div data-lang="et">
-      <p>Vidin <strong>Smaily soovitused</strong> näitab ostjale poe lehtedel tema enda soovitusi Campaign Intelligence'ist — samu tooteid, mis on tema Smaily e-kirjades — pealkirja <strong>Sulle soovitatud</strong> all, sinu teema enda tootekaartidena. Midagi ei ilmu enne, kui vidina lehele paigutad, ja sellel pole seadeid.</p>
+      <p>Vidin <strong>Smaily soovitused</strong> näitab ostjale poe lehtedel tema enda soovitusi Campaign Intelligence'ist — samu tooteid, mis on tema Smaily e-kirjades — pealkirja <strong>Sulle soovitatud</strong> all, sinu teema enda tootekaartidena. Midagi ei ilmu enne, kui vidina lehele paigutad, ja sellel pole seadeid. Paiguta see ühel kahest viisist: vidina eksemplarina igale tootelehele, ostukorvi või tellimuse kinnituslehele; või lehe või ploki sisse.</p>
+      <p><strong>Igal tootelehel ja ostukorvis</strong> (vidina eksemplar):</p>
+      <ol>
+        <li>Ava <span class="path">Content &gt; Elements &gt; Widgets</span> ja vajuta <strong>Add Widget</strong>.</li>
+        <li>Vali <strong>Type</strong> väärtuseks <strong>Smaily soovitused</strong> ja <strong>Design Theme</strong> väärtuseks oma poe teema (näiteks <strong>Magento Luma</strong>) ning vajuta <strong>Continue</strong>.</li>
+        <li>Sisesta <strong>Widget Title</strong> (seda näeb ainult admin) ja vali <strong>Assign to Store Views</strong> all <strong>All Store Views</strong>.</li>
+        <li>Vajuta jaotises <strong>Layout Updates</strong> nuppu <strong>Add Layout Update</strong>, vali <strong>Display on</strong> all <strong>All Product Types</strong> ja <strong>Container</strong> väärtuseks <strong>Main Content Bottom</strong>.</li>
+        <li>Vajuta uuesti <strong>Add Layout Update</strong>, vali <strong>Display on</strong> all <strong>Specified Page</strong>, <strong>Page</strong> väärtuseks <strong>Shopping Cart</strong> ja <strong>Container</strong> väärtuseks <strong>Main Content Bottom</strong>. Tellimuse kinnituslehe jaoks lisa veel üks, mille <strong>Page</strong> on <strong>One Page Checkout Success</strong>.</li>
+        <li>Vajuta <strong>Save</strong> ja värskenda seejärel menüüs <span class="path">System &gt; Tools &gt; Cache Management</span> vahemälutüübid, mille Magento märgib kehtetuks.</li>
+      </ol>
+      <p><strong>Lehel või plokis:</strong></p>
       <ol>
         <li>Ava leht menüüs <span class="path">Content &gt; Pages</span> või plokk menüüs <span class="path">Content &gt; Blocks</span>.</li>
-        <li>Vajuta sisuredaktoris <strong>Insert Widget...</strong>, vali <strong>Widget Type</strong> väärtuseks <strong>Smaily soovitused</strong> ja vajuta <strong>Insert Widget</strong>. Page Builderis tee sama elemendis <strong>Text</strong> või pane <code>{{widget type="Smaily\Connect\Block\Widget\Recommendations"}}</code> elementi <strong>HTML Code</strong>.</li>
+        <li>Vajuta sisuredaktoris <strong>Insert Widget...</strong>, vali <strong>Widget Type</strong> väärtuseks <strong>Smaily soovitused</strong> ja vajuta <strong>Insert Widget</strong>. Page Builderis vajuta elemendi <strong>Text</strong> tööriistaribal <strong>Insert Widget</strong> või elemendis <strong>HTML Code</strong> nuppu <strong>Insert Widget...</strong>, mis paneb selle koodi <code>{{widget type="Smaily\Connect\Block\Widget\Recommendations"}}</code>.</li>
         <li>Salvesta leht või plokk.</li>
       </ol>
       <ul>

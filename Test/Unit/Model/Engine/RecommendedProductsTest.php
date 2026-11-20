@@ -82,6 +82,21 @@ class RecommendedProductsTest extends TestCase
         self::assertSame([['attribute' => 'sku', 'in' => ['MJ30']]], $this->filters[3][0]);
     }
 
+    /**
+     * CON-359: a slot under the connection prefix (`c2-MJ07`) is this
+     * store's product by its `external_id`; the prefixed sku is never
+     * looked up as a Magento SKU.
+     */
+    public function testAPrefixedSlotIsTheProductOfItsExternalId(): void
+    {
+        $items = $this->products([
+            $this->product(7, 'MJ07', 'https://shop.example/jacket.html'),
+        ])->forSlots([$this->slot(self::REC_1, '7', 'c2-MJ07')]);
+
+        self::assertSame([7], array_map(static fn (array $item): int => (int)$item['product']->getId(), $items));
+        self::assertSame([['attribute' => 'entity_id', 'in' => ['7']]], $this->filters[1][0]);
+    }
+
     public function testOnlyEnabledProductsVisibleInTheCatalogOfThisStoreAreAskedFor(): void
     {
         $this->products([])->forSlots([$this->slot(self::REC_1, '7', 'MJ07')]);

@@ -80,8 +80,10 @@ allow `~8.5.0`. 3.0.1 does (PR #259); 3.0.0 cannot be submitted.
 
 Rules: Adobe's [marketing review guidelines](https://developer.adobe.com/commerce/marketplace/guides/sellers/marketing-review-guidelines)
 — a title of at most five words, no "Magento", "Adobe", "M2",
-"Extension", "Module" or "Plugin"; every fee in **bold** in the long
-description's opening paragraph; no logos of Adobe or Magento. The long
+"Extension", "Module" or "Plugin"; every fee in **bold** (in this
+integration listing, in the bold "Account & Pricing" section of the
+20 Nov 2026 format below, not in the opening paragraph); no logos of
+Adobe or Magento. The long
 description lists the features vertically, as bullets made with the
 editor's own bullet button, under a "Features" heading formatted as
 Header 2 or Header 3 (marketing review, 18 Nov 2026). An integration's

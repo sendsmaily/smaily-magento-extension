@@ -866,6 +866,16 @@ html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hi
 .smaily-ci-banner__icon--clock { background: #fde4ef; color: #e91e63; }
 .smaily-ci-banner__icon--undo { background: #fef3c7; color: #d97706; }
 .smaily-ci-banner__row-text { flex: 1 1 auto; }
+/* The Smaily invitation (CON-364, the WooCommerce plugin's CON-351) in the
+ * same card: the Smaily mark without a tile, a secondary text link beside
+ * the call to action, a Dismiss link, and its panel's icons. */
+.smaily-ci-banner .smaily-ci-banner__logo--smaily { background: none; }
+.smaily-ci-banner a.smaily-ci-banner__link, .smaily-ci-banner a.smaily-ci-banner__link:visited { color: #6b3f8c; font-size: 14px; font-weight: 500; text-decoration: underline; }
+.smaily-ci-banner a.smaily-ci-banner__link:hover { color: #2a1028; }
+.smaily-ci-banner a.smaily-ci-banner__dismiss, .smaily-ci-banner a.smaily-ci-banner__dismiss:visited { color: #6b6577; }
+.smaily-ci-banner a.smaily-ci-banner__dismiss:hover { color: #2a1028; }
+.smaily-ci-banner__icon--mail { background: #fde4ef; color: #e91e63; }
+.smaily-ci-banner__icon--cart { background: #fef3c7; color: #d97706; }
 .smaily-ci-banner__chip { flex: none; padding: 4px 10px; border-radius: 6px; background: #f1eef5; color: #8a8494; font-size: 12px; }
 @media (max-width: 960px) {
     .smaily-ci-banner__panel { display: none; }

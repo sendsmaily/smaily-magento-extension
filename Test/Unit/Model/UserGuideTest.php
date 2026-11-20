@@ -44,6 +44,13 @@ class UserGuideTest extends TestCase
         self::assertStringContainsString('id="' . UserGuide::SECTION_CONSENT_TOOL . '"', $site);
     }
 
+    public function testTheApiCredentialsStepIsInTheGuideSite(): void
+    {
+        $site = (string)file_get_contents(self::ROOT . '/docs/site/index.html');
+
+        self::assertStringContainsString('id="' . UserGuide::SECTION_SETUP_CONNECT . '"', $site);
+    }
+
     public function testTheRecommendationsWidgetSectionIsInTheGuideSite(): void
     {
         $site = (string)file_get_contents(self::ROOT . '/docs/site/index.html');

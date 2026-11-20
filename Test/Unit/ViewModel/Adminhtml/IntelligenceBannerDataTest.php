@@ -25,9 +25,9 @@ use Smaily\Connect\ViewModel\Adminhtml\IntelligenceBannerData;
 /**
  * CON-363: which Campaign Intelligence banner the admin sees (as the
  * WooCommerce plugin's CON-350) — none once Campaign Intelligence is
- * connected, the upsell after Smaily's code 227, the invitation for an
- * account Smaily accepted, none otherwise — and the 30-day Dismiss. No
- * page load asks the engine.
+ * connected or without a Smaily marketing account (CON-364), the upsell
+ * after Smaily's code 227, the invitation for an account Smaily accepted,
+ * none otherwise — and the 30-day Dismiss. No page load asks the engine.
  */
 class IntelligenceBannerDataTest extends TestCase
 {
@@ -79,6 +79,15 @@ class IntelligenceBannerDataTest extends TestCase
         $this->verified = true;
         $this->allowed = false;
         self::assertSame('', $this->banner()->getVariant());
+    }
+
+    public function testNoBannerWithoutASmailyMarketingAccount(): void
+    {
+        // CON-364: the Smaily invitation shows instead.
+        $this->main = null;
+
+        self::assertSame('', $this->banner()->getVariant());
+        self::assertFalse($this->banner()->offersStart());
     }
 
     public function testTheStartIsNotOfferedWhereTheShopCannotStartItself(): void

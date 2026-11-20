@@ -15,9 +15,14 @@
 
 /* ========================================================================= *
  * Design tokens — single source of truth for the Smaily admin visual system.
- * Accent is Smaily #e91e63 (selection / focus / progress / brand marks);
- * primary buttons stay Magento action-orange; everything else sits on
- * standard adminhtml neutrals. Light adminhtml only — no dark mode.
+ * Brand is the Campaign Intelligence palette every Smaily product uses
+ * (CON-376): primary for our own buttons, active controls, selection and
+ * focus; brand text for links and small brand text; the selected tint; plum
+ * for dark brand surfaces and banner headings; Smaily magenta only as a small
+ * accent, never a button or text. Only our own selectors read these, so
+ * Magento's native UI keeps its look; status colours keep their roles below;
+ * everything else sits on standard adminhtml neutrals. Light adminhtml only —
+ * no dark mode.
  * ========================================================================= */
 :root {
   /* Surfaces & borders */
@@ -26,11 +31,12 @@
 
   /* Text */
   --s-text:#303030;    --s-text-2:#5a5a5a;    --s-text-3:#8a8a8a;
-  --s-link:#1979c3;    --s-link-hover:#006bb4;
+  --s-link:var(--s-brand-text); --s-link-hover:var(--s-plum);
 
-  /* Brand accent (Smaily) + Action (Magento primary) */
-  --s-accent:#e91e63;  --s-accent-hover:#c2185b; --s-accent-soft:#fce4ec; --s-accent-border:#f4a6c0;
-  --s-action:#eb5202;  --s-action-hover:#ba4000;
+  /* Brand: the Campaign Intelligence palette (CON-376) */
+  --s-primary:#5e3b72; --s-primary-hover:#4a2d5c; --s-on-primary:#ffffff;
+  --s-brand-text:#4a2d5c; --s-plum:#2a1028;   --s-magenta:#e91e63;
+  --s-selected:#efe5fb; --s-selected-border:#e2d3f6;
 
   /* Status roles: fg / soft bg / border */
   --s-success:#1f7a34; --s-success-soft:#e5efe5; --s-success-border:#93c47d;
@@ -105,16 +111,16 @@
 .smaily-ui .smaily-ml-none { color: #666; }
 .smaily-ui .smaily-ml-unmapped-list { margin: 0.25rem 0 0; padding-left: 1.25rem; }
 /* Per-language Smaily accounts (PRO-3566, pack "Setup Wizard" frame 4): a
- * dashed accent-tinted region (the pack's #d6c3cb, no token) that appears with
+ * dashed region in the selected tint's border (CON-376) that appears with
  * the mode; the account blocks in a two-column grid that stacks when narrow;
  * each block with a language chip, compact fields and its own status. */
 .smaily-ui .smaily-ml-region {
     max-width: 680px; margin-bottom: 2rem; padding: 16px 18px;
-    background: var(--s-surface-2); border: 1px dashed #d6c3cb; border-radius: 6px;
+    background: var(--s-surface-2); border: 1px dashed var(--s-selected-border); border-radius: 6px;
 }
 .smaily-ui .smaily-ml-region__kicker {
     margin-bottom: var(--sp-3); font: 700 var(--fs-11)/1 var(--font); letter-spacing: .5px;
-    text-transform: uppercase; color: var(--s-accent);
+    text-transform: uppercase; color: var(--s-brand-text);
 }
 /* Settings: the mode cards and the fallback card share the region's measure
  * (the initial setup already caps its cards at it). */
@@ -141,7 +147,7 @@
 /* --- Wizard stepper ------------------------------------------------------- */
 .smaily-wizard .smaily-steps { display: flex; gap: 0; margin: 0 0 3rem; padding: 0; list-style: none; }
 .smaily-wizard .smaily-steps li { flex: 1; text-align: center; padding: 1rem 0.5rem; border-bottom: 3px solid #d0d0d0; color: #666; cursor: default; }
-.smaily-wizard .smaily-steps li.active { border-color: #eb5202; color: #333; font-weight: 600; }
+.smaily-wizard .smaily-steps li.active { border-color: var(--s-primary); color: #333; font-weight: 600; }
 .smaily-wizard .smaily-steps li.done { border-color: #79a22e; color: #333; cursor: pointer; }
 .smaily-wizard .smaily-step-panel { display: none; }
 .smaily-wizard .smaily-step-panel.active { display: block; }
@@ -154,7 +160,7 @@
 .smaily-settings .smaily-tabs { display: flex; gap: var(--sp-1); margin: 0; padding: 0 var(--sp-6); list-style: none; background: var(--s-surface); border-bottom: 1px solid var(--s-border); }
 .smaily-settings .smaily-tabs li { padding: 13px 16px 11px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: #666; cursor: pointer; font-size: var(--fs-13); font-weight: 600; line-height: 1; white-space: nowrap; }
 .smaily-settings .smaily-tabs li:hover { color: #333; }
-.smaily-settings .smaily-tabs li.active { border-color: #eb5202; color: #333; font-weight: 700; }
+.smaily-settings .smaily-tabs li.active { border-color: var(--s-primary); color: #333; font-weight: 700; }
 .smaily-settings .smaily-tab-panel { display: none; }
 .smaily-settings .smaily-tab-panel.active { display: block; }
 .smaily-settings .smaily-footer .note { margin: 0; }
@@ -203,7 +209,7 @@
 .smaily-log-details-modal .action-close:before { font-size: 1.4rem; line-height: 1; }
 .smaily-log-details-modal .action-close:hover { border-color: var(--s-border-strong); color: var(--s-text); }
 .smaily-log-details-modal .modal-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 18px var(--sp-5); }
-.smaily-log-details-modal :is(.action-close, .smaily-log-details__resend, .smaily-log-details__copy):focus-visible { outline: 2px solid var(--s-link); outline-offset: 2px; box-shadow: none; }
+.smaily-log-details-modal :is(.action-close, .smaily-log-details__resend, .smaily-log-details__copy):focus-visible { outline: 2px solid var(--s-primary); outline-offset: 2px; box-shadow: none; }
 .smaily-log-details__head { display: block; }
 .smaily-log-details__id { display: block; margin-bottom: 5px; font: 400 var(--fs-12)/1 var(--mono); color: var(--s-text-3); }
 .smaily-log-details__title { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
@@ -229,7 +235,7 @@
 .smaily-log-timeline__item:last-child { padding-bottom: 0; }
 .smaily-log-timeline__item.is-failed { --dot: var(--s-bar-error); --ring: rgba(215, 44, 13, .13); --badge-fg: var(--s-danger); --badge-bg: var(--s-danger-soft); --badge-bd: var(--s-danger-border); }
 .smaily-log-timeline__item.is-delivered { --dot: var(--s-bar-success); --ring: rgba(76, 175, 80, .13); --badge-fg: var(--s-success); --badge-bg: var(--s-success-soft); --badge-bd: var(--s-success-border); }
-.smaily-log-timeline__item:is(.is-scheduled, .is-waiting, .is-in_progress) { --dot: var(--s-link); --ring: rgba(25, 121, 195, .13); --badge-fg: var(--s-info); --badge-bg: var(--s-info-soft); --badge-bd: var(--s-info-border); }
+.smaily-log-timeline__item:is(.is-scheduled, .is-waiting, .is-in_progress) { --dot: var(--s-bar-info); --ring: rgba(25, 121, 195, .13); --badge-fg: var(--s-info); --badge-bg: var(--s-info-soft); --badge-bd: var(--s-info-border); }
 .smaily-log-timeline__dot { flex: 0 0 auto; width: 11px; height: 11px; margin-top: 3px; border-radius: 50%; background: var(--dot); box-shadow: 0 0 0 3px var(--ring); }
 .smaily-log-timeline__body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .smaily-log-timeline__title { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); font-weight: 700; color: var(--s-text); }
@@ -279,9 +285,9 @@
 }
 .smaily-choice:hover { border-color: var(--s-border-strong); }
 .smaily-choice.is-selected {
-    background: var(--s-accent-soft);
-    border-color: var(--s-accent);
-    box-shadow: 0 0 0 1px var(--s-accent);
+    background: var(--s-selected);
+    border-color: var(--s-primary);
+    box-shadow: 0 0 0 1px var(--s-primary);
 }
 .smaily-choice.is-disabled { opacity: .55; cursor: not-allowed; }
 .smaily-choice__radio {
@@ -295,13 +301,13 @@
     align-items: center;
     justify-content: center;
 }
-.smaily-choice.is-selected .smaily-choice__radio { border-color: var(--s-accent); }
+.smaily-choice.is-selected .smaily-choice__radio { border-color: var(--s-primary); }
 .smaily-choice.is-selected .smaily-choice__radio::after {
     content: "";
     width: 9px;
     height: 9px;
     border-radius: 50%;
-    background: var(--s-accent);
+    background: var(--s-primary);
 }
 .smaily-choice__body { flex: 1; min-width: 0; }
 .smaily-choice__title-row {
@@ -505,12 +511,12 @@
 .smaily-progress__fill {
     width: 0;
     height: 100%;
-    background: var(--s-accent);
+    background: var(--s-primary);
     border-radius: 6px;
     transition: width .3s ease;
 }
 .smaily-progress.is-running .smaily-progress__fill {
-    background: repeating-linear-gradient(45deg, var(--s-accent), var(--s-accent) 7px, var(--s-accent-hover) 7px, var(--s-accent-hover) 14px);
+    background: repeating-linear-gradient(45deg, var(--s-primary), var(--s-primary) 7px, var(--s-primary-hover) 7px, var(--s-primary-hover) 14px);
     background-size: 28px 28px;
     animation: smaily-stripe .8s linear infinite;
 }
@@ -578,9 +584,9 @@
  *
  * Screen-application CSS only: consumes the Stage A tokens + component classes
  * above (never redefines them) to wire Dashboard / Wizard / Settings / Engine
- * Automations / Log / Backfill onto the design system. Primary buttons stay
- * Magento action-orange (untouched); accent (#e91e63) drives selection, the
- * stepper/tab indicators and progress, per the token sheet.
+ * Automations / Log / Backfill onto the design system. The brand primary
+ * (CON-376) drives our primary buttons, selection, the stepper/tab
+ * indicators and progress, per the token sheet.
  * ========================================================================= */
 
 /* --- Choice card glue: the real radio is visually hidden; the .smaily-choice
@@ -589,7 +595,7 @@
  * stays inside its parent whatever the host page's box model (PRO-3641). */
 .smaily-choice { width: 100%; box-sizing: border-box; margin-bottom: var(--sp-2); }
 .smaily-choice__input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; }
-.smaily-choice__input:focus-visible ~ .smaily-choice__radio { box-shadow: 0 0 0 3px var(--s-accent-soft); }
+.smaily-choice__input:focus-visible ~ .smaily-choice__radio { box-shadow: 0 0 0 2px var(--s-primary); }
 .smaily-choice__desc .note { margin: 0; }
 
 /* --- InlineStatus wired into the shared AJAX result span. The result() helper
@@ -602,10 +608,10 @@
 .smaily-inline-status:empty { display: none; }
 .smaily-inline-status a { color: inherit; text-decoration: underline; font-weight: 600; }
 
-/* --- Wizard stepper: accent for active, success for completed (token-driven,
+/* --- Wizard stepper: primary for active, success for completed (token-driven,
  * overrides the legacy literals above). --------------------------------------*/
 .smaily-wizard .smaily-steps li { border-bottom-color: var(--s-border-2); color: var(--s-text-2); }
-.smaily-wizard .smaily-steps li.active { border-bottom-color: var(--s-accent); color: var(--s-text); }
+.smaily-wizard .smaily-steps li.active { border-bottom-color: var(--s-primary); color: var(--s-text); }
 .smaily-wizard .smaily-steps li.done { border-bottom-color: var(--s-success); color: var(--s-text); }
 .smaily-wizard .smaily-steps li .smaily-step-index {
     display: inline-flex; align-items: center; justify-content: center;
@@ -613,8 +619,8 @@
     background: var(--s-surface-3); color: var(--s-text-3);
     border: 1px solid var(--s-border-2); font: 700 var(--fs-12)/1 var(--font); vertical-align: middle;
 }
-.smaily-wizard .smaily-steps li.active .smaily-step-index { background: var(--s-surface); color: var(--s-accent); border-color: var(--s-accent); }
-.smaily-wizard .smaily-steps li.done .smaily-step-index { background: var(--s-accent); color: #fff; border-color: var(--s-accent); }
+.smaily-wizard .smaily-steps li.active .smaily-step-index { background: var(--s-surface); color: var(--s-primary); border-color: var(--s-primary); }
+.smaily-wizard .smaily-steps li.done .smaily-step-index { background: var(--s-primary); color: var(--s-on-primary); border-color: var(--s-primary); }
 .smaily-wizard .smaily-steps li.done .smaily-step-index::before { content: "\2713"; }
 .smaily-wizard .smaily-steps li.done .smaily-step-index .smaily-step-num { display: none; }
 
@@ -655,7 +661,7 @@
         font-size: var(--fs-13); font-weight: 700; line-height: 1.3; color: var(--s-text);
     }
     .smaily-wizard .smaily-steps li:not(.active):not(.done) { font-weight: 500; color: var(--s-text-3); }
-    .smaily-wizard .smaily-steps li.active { background: var(--s-surface); border-left-color: var(--s-accent); }
+    .smaily-wizard .smaily-steps li.active { background: var(--s-surface); border-left-color: var(--s-primary); }
     .smaily-wizard .smaily-steps li .smaily-step-index { flex: 0 0 auto; width: 26px; height: 26px; margin-right: 0; }
     .smaily-wizard .smaily-steps li.active .smaily-step-index { border-width: 2px; }
 }
@@ -682,9 +688,9 @@
 .smaily-wizard .smaily-setup-summary__value { font-weight: 600; color: var(--s-text); word-break: break-all; }
 .smaily-wizard code.smaily-setup-summary__value { font: 400 var(--fs-13)/1 var(--mono); background: none; padding: 0; }
 
-/* --- Settings tabs: accent underline for the active tab. -------------------- */
+/* --- Settings tabs: primary underline for the active tab. ------------------- */
 .smaily-settings .smaily-tabs li { color: var(--s-text-2); }
-.smaily-settings .smaily-tabs li.active { border-bottom-color: var(--s-accent); color: var(--s-text); }
+.smaily-settings .smaily-tabs li.active { border-bottom-color: var(--s-primary); color: var(--s-text); }
 
 /* --- Dashboard ------------------------------------------------------------- */
 /* PRO-3568 (pack Dashboard): the verdict at 6 px radius and 18/20 padding,
@@ -711,7 +717,7 @@
 .smaily-dashboard .smaily-verdict-action { align-self: center; }
 .smaily-ui .action-primary.smaily-verdict-action--danger,
 .smaily-ui .action-primary.smaily-verdict-action--danger:focus { background: var(--s-bar-error); border-color: var(--s-danger); color: #fff; }
-.smaily-ui .action-primary.smaily-verdict-action--danger:hover { background: var(--s-danger); border-color: var(--s-danger); color: #fff; }
+.smaily-ui .action-primary.smaily-verdict-action--danger:is(:hover, :active) { background: var(--s-danger); border-color: var(--s-danger); color: #fff; }
 
 .smaily-dashboard .smaily-connections { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 /* Connection cards (PRO-3568, pack Dashboard): flat, 13/15 padding, 5 px
@@ -816,7 +822,7 @@ html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hi
 .smaily-design-modal__actions { flex: 0 0 auto; display: flex; align-items: center; gap: var(--sp-2); }
 .smaily-design-modal__close { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 1px solid #d6d6d6; border-radius: var(--r-2); background: var(--s-surface); color: var(--s-text-2); font: 400 24px/1 var(--font); cursor: pointer; }
 .smaily-design-modal__close:hover { border-color: var(--s-border-strong); color: var(--s-text); }
-.smaily-design-modal :is(button, iframe):focus-visible { outline: 2px solid var(--s-link); outline-offset: 2px; box-shadow: none; }
+.smaily-design-modal :is(button, iframe):focus-visible { outline: 2px solid var(--s-primary); outline-offset: 2px; box-shadow: none; }
 .smaily-design-modal__body { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: var(--s-surface-2); }
 .smaily-design-modal__loading { position: absolute; inset: 0; z-index: 2; background: var(--s-surface-2); display: flex; align-items: center; justify-content: center; gap: var(--sp-2); font-size: var(--fs-13); color: var(--s-text-2); }
 .smaily-design-modal__loading[hidden], .smaily-design-modal .smaily-banner[hidden] { display: none; }
@@ -854,45 +860,45 @@ html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hi
 
 /* --- Campaign Intelligence banner (CON-363) --------------------------------
  * Marketing's design (the WooCommerce plugin's PromoBanner, CON-350): a
- * lilac card with a logo, a title, a short pitch, a dark call to
- * action and, on wide screens, a decorative panel on the right that fades
- * out. No remote fonts or images. */
-.smaily-ci-banner { position: relative; display: flex; gap: 32px; margin: 0 0 var(--sp-5); padding: 28px; overflow: hidden; border: 1px solid #ebe3f3; border-radius: 16px; background: linear-gradient(100deg, #fcfaff 0%, #f7f1fd 55%, #efe5fb 100%); color: #2a1028; font-family: var(--font); }
+ * card in the Campaign Intelligence palette (CON-376) with a logo, a title,
+ * a short pitch, a dark call to action and, on wide screens, a decorative
+ * panel on the right that fades out. No remote fonts or images. */
+.smaily-ci-banner { position: relative; display: flex; gap: 32px; margin: 0 0 var(--sp-5); padding: 28px; overflow: hidden; border: 1px solid var(--s-selected-border); border-radius: 16px; background: linear-gradient(100deg, var(--s-surface) 0%, var(--s-selected) 100%); color: var(--s-plum); font-family: var(--font); }
 .smaily-ci-banner [hidden], .smaily-ci-banner .smaily-ci-banner__cta[hidden], .smaily-ci-banner--aside { display: none; }
 .smaily-ci-banner__main { flex: 1 1 0; min-width: 0; max-width: 440px; }
 .smaily-ci-banner__head { display: flex; align-items: center; gap: 14px; }
 .smaily-ci-banner__logo { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px; }
-.smaily-ci-banner .smaily-ci-banner__title { margin: 0; padding: 0; font-size: 22px; font-weight: 600; line-height: 1.2; color: #2a1028; }
-.smaily-ci-banner__accent { color: #8a5cb8; }
+.smaily-ci-banner .smaily-ci-banner__title { margin: 0; padding: 0; font-size: 22px; font-weight: 600; line-height: 1.2; color: var(--s-plum); }
+.smaily-ci-banner__accent { color: var(--s-primary); }
 .smaily-ci-banner .smaily-ci-banner__body { margin: 16px 0 0; font-size: 15px; line-height: 1.45; }
 .smaily-ci-banner__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 20px; }
-.smaily-ci-banner .smaily-ci-banner__cta, .smaily-ci-banner .smaily-ci-banner__cta:visited { display: inline-flex; align-items: center; padding: 10px 18px; border: 0; border-radius: 8px; background: linear-gradient(90deg, #2a1028 0%, #5e3b72 100%); color: #fff; font: 600 14px/1.3 var(--font); text-decoration: none; cursor: pointer; }
-.smaily-ci-banner .smaily-ci-banner__cta:hover, .smaily-ci-banner .smaily-ci-banner__cta:focus { color: #fff; background: linear-gradient(90deg, #3a1738 0%, #6e4885 100%); text-decoration: none; }
-.smaily-ci-banner .smaily-ci-banner__cta:focus-visible, .smaily-ci-banner__dismiss:focus-visible { outline: 2px solid #5e3b72; outline-offset: 2px; box-shadow: none; }
+.smaily-ci-banner .smaily-ci-banner__cta, .smaily-ci-banner .smaily-ci-banner__cta:visited { display: inline-flex; align-items: center; padding: 10px 18px; border: 0; border-radius: 8px; background: linear-gradient(90deg, var(--s-plum) 0%, var(--s-primary) 100%); color: var(--s-on-primary); font: 600 14px/1.3 var(--font); text-decoration: none; cursor: pointer; }
+.smaily-ci-banner .smaily-ci-banner__cta:hover, .smaily-ci-banner .smaily-ci-banner__cta:focus { color: var(--s-on-primary); background: linear-gradient(90deg, var(--s-primary-hover) 0%, var(--s-primary) 100%); text-decoration: none; }
+.smaily-ci-banner .smaily-ci-banner__cta:focus-visible, .smaily-ci-banner__dismiss:focus-visible { outline: 2px solid var(--s-primary); outline-offset: 2px; box-shadow: none; }
 .smaily-ci-banner .smaily-ci-banner__cta:disabled { opacity: .6; cursor: progress; }
 .smaily-ci-banner .smaily-ci-banner__note { margin: 12px 0 0; font-size: 13px; line-height: 1.4; color: #6b6577; }
-.smaily-ci-banner__note a { color: #6b3f8c; font-weight: 500; }
+.smaily-ci-banner__note a { color: var(--s-brand-text); font-weight: 500; }
 .smaily-ci-banner__corner { position: absolute; top: 12px; right: 16px; z-index: 1; display: flex; align-items: center; gap: 12px; }
-.smaily-ci-banner__pill { padding: 6px 16px; border-radius: 999px; background: #2a1028; color: #fff; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.smaily-ci-banner__pill { padding: 6px 16px; border-radius: 999px; background: var(--s-plum); color: var(--s-on-primary); font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 .smaily-ci-banner__dismiss { padding: 0; border: 0; background: none; color: #6b6577; font: 400 13px/1.3 var(--font); text-decoration: underline; cursor: pointer; }
-.smaily-ci-banner__dismiss:hover { color: #2a1028; }
-.smaily-ci-banner__panel { flex: 1 1 0; min-width: 0; margin: 8px -28px -28px 0; padding: 20px 0 20px 20px; border: 1px solid #ebe3f3; border-right: 0; border-bottom: 0; border-radius: 16px 0 0 0; background: rgba(255, 255, 255, .6); -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent 100%); mask-image: linear-gradient(to bottom, #000 45%, transparent 100%); }
+.smaily-ci-banner__dismiss:hover { color: var(--s-plum); }
+.smaily-ci-banner__panel { flex: 1 1 0; min-width: 0; margin: 8px -28px -28px 0; padding: 20px 0 20px 20px; border: 1px solid var(--s-selected-border); border-right: 0; border-bottom: 0; border-radius: 16px 0 0 0; background: rgba(255, 255, 255, .6); -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent 100%); mask-image: linear-gradient(to bottom, #000 45%, transparent 100%); }
 .smaily-ci-banner__panel-label { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border: 1px solid #e7e1ee; border-radius: 8px; background: #fff; font-size: 13px; font-weight: 500; }
 .smaily-ci-banner .smaily-ci-banner__panel-heading { margin: 20px 0 0; font-size: 14px; color: #8a8494; }
 .smaily-ci-banner__row { display: flex; width: max-content; min-width: 100%; box-sizing: border-box; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 14px; border: 1px solid #ece8f1; border-right: 0; border-radius: 10px 0 0 10px; background: #fff; font-size: 14px; font-weight: 500; white-space: nowrap; }
 .smaily-ci-banner__row--1 { opacity: .6; }
 .smaily-ci-banner__icon { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; }
-.smaily-ci-banner__icon--clock { background: #fde4ef; color: #e91e63; }
+.smaily-ci-banner__icon--clock { background: #fde4ef; color: var(--s-magenta); }
 .smaily-ci-banner__icon--undo { background: #fef3c7; color: #d97706; }
 .smaily-ci-banner__row-text { flex: 1 1 auto; }
 /* The Smaily invitation (CON-364, the WooCommerce plugin's CON-351) in the
  * same card: a secondary text link beside the call to action, a Dismiss
  * link, and its panel's icons. */
-.smaily-ci-banner a.smaily-ci-banner__link, .smaily-ci-banner a.smaily-ci-banner__link:visited { color: #6b3f8c; font-size: 14px; font-weight: 500; text-decoration: underline; }
-.smaily-ci-banner a.smaily-ci-banner__link:hover { color: #2a1028; }
+.smaily-ci-banner a.smaily-ci-banner__link, .smaily-ci-banner a.smaily-ci-banner__link:visited { color: var(--s-brand-text); font-size: 14px; font-weight: 500; text-decoration: underline; }
+.smaily-ci-banner a.smaily-ci-banner__link:hover { color: var(--s-plum); }
 .smaily-ci-banner a.smaily-ci-banner__dismiss, .smaily-ci-banner a.smaily-ci-banner__dismiss:visited { color: #6b6577; }
-.smaily-ci-banner a.smaily-ci-banner__dismiss:hover { color: #2a1028; }
-.smaily-ci-banner__icon--mail { background: #fde4ef; color: #e91e63; }
+.smaily-ci-banner a.smaily-ci-banner__dismiss:hover { color: var(--s-plum); }
+.smaily-ci-banner__icon--mail { background: #fde4ef; color: var(--s-magenta); }
 .smaily-ci-banner__icon--cart { background: #fef3c7; color: #d97706; }
 .smaily-ci-banner__chip { flex: none; padding: 4px 10px; border-radius: 6px; background: #f1eef5; color: #8a8494; font-size: 12px; }
 @media (max-width: 960px) {
@@ -978,10 +984,17 @@ html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hi
     font-size: var(--fs-14); color: var(--s-text); background: var(--s-surface); box-sizing: border-box;
 }
 .smaily-ui select { padding: 7px 10px; cursor: pointer; }
+/* Our primary buttons in the brand primary (CON-376), hover, press and focus
+ * included (Magento's own are orange with a blue focus ring); a native
+ * .action-primary outside .smaily-ui keeps Magento's look. */
 .smaily-ui .action-primary {
-    padding: 9px 18px; border-radius: var(--r-2); border-color: #d44f00; font-weight: 700; font-size: var(--fs-13);
-    line-height: 1; text-shadow: none;
+    padding: 9px 18px; border-radius: var(--r-2); border-color: var(--s-primary); font-weight: 700; font-size: var(--fs-13);
+    line-height: 1; text-shadow: none; background: var(--s-primary); color: var(--s-on-primary);
 }
+.smaily-ui .action-primary:is(:hover, :active, :focus) {
+    background: var(--s-primary-hover); border-color: var(--s-primary-hover); color: var(--s-on-primary); box-shadow: none;
+}
+.smaily-ui .action-primary:focus-visible { outline: 2px solid var(--s-primary); outline-offset: 2px; }
 .smaily-ui .action-secondary {
     padding: 9px 16px; background: var(--s-surface); border: 1px solid var(--s-border-strong);
     border-radius: var(--r-2); color: var(--s-text); font-weight: 700; font-size: var(--fs-13);
@@ -1012,8 +1025,8 @@ html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hi
  * and the toggle rows/checkbox grid use the 4px spacing tokens). PRO-2456:
  * the wizard's Contacts step renders the same partial, so every rule below
  * also covers it ([data-step="2"]). */
-.smaily-ui input[type=checkbox] { accent-color: var(--s-accent); width: 15px; height: 15px; cursor: pointer; }
-.smaily-ui input[type=radio] { accent-color: var(--s-accent); }
+.smaily-ui input[type=checkbox] { accent-color: var(--s-primary); width: 15px; height: 15px; cursor: pointer; }
+.smaily-ui input[type=radio] { accent-color: var(--s-primary); }
 .smaily-settings [data-tab="subscribers"] .smaily-card,
 .smaily-wizard [data-step="2"] .smaily-card { max-width: 680px; padding: 20px 22px; border-radius: 6px; color: var(--s-text); }
 .smaily-settings [data-tab="subscribers"] .smaily-card .smaily-card,
@@ -1228,7 +1241,7 @@ html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hi
 }
 .smaily-website-picker__item:hover { border-color: var(--s-border-strong); text-decoration: none; color: var(--s-text); }
 .smaily-website-picker__item.is-active {
-    border-color: var(--s-accent); box-shadow: inset 0 -3px 0 var(--s-accent); background: var(--s-surface);
+    border-color: var(--s-primary); box-shadow: inset 0 -3px 0 var(--s-primary); background: var(--s-surface);
 }
 .smaily-website-picker__name { font-size: var(--fs-14); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .smaily-website-picker__account { font-size: var(--fs-12); color: var(--s-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

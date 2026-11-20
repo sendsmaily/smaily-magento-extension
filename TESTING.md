@@ -220,6 +220,16 @@ layouts) and still elsewhere, still under the stylesheet's
 prefers-reduced-motion rules, and animated by no other rule; and the boxed
 Campaign Intelligence icon, still, in the banner, on the Dashboard's
 Campaign Intelligence card and beside the Settings and setup titles.
+`Test/Js/brand-palette.html` checks the Campaign Intelligence palette with
+the same stylesheet text, after a stand-in for Magento's own orange button
+styles: the token sheet holds the palette and no other rule writes a
+palette colour; the status colours keep their values; our primary button
+reads the primary token, plain and focused, while a native
+`.action-primary` outside `.smaily-ui` keeps Magento's orange, and every
+rule naming `.action-primary` is scoped to one of our containers; the
+Campaign Intelligence banner and the Smaily invitation use plum, primary,
+brand text and the selected tint; every text colour set from the palette
+meets WCAG AA on its background.
 To check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.

@@ -2670,6 +2670,63 @@ Initial setup, Settings, Log. Design rules:
     WooCommerce plugin does not read it either, so an item with
     `created_by: "other"` keeps "Edit design" as any other item (§23's
     "link to Smaily instead" is not built in either plugin).
+- **The Campaign Intelligence banner and "Try Intelligence free" (CON-363,
+  contract §21, as the WooCommerce plugin's CON-350 / CON-175 / CON-347).**
+  `panel/intelligence-banner.phtml` (view model
+  `ViewModel\Adminhtml\IntelligenceBannerData`) draws marketing's banner in
+  HTML: none while Campaign Intelligence is connected; the upsell
+  (**Requires a paid Smaily plan**, **Log in to Smaily** to the main
+  account's own address) when the main account's last Smaily answer was code
+  227 (`ConnectionHealth::PLAN_BLOCKED`); the invitation (**Contact Smaily**,
+  `https://smaily.com/consultation/`) when Smaily accepted the account saved
+  for the page's website; else none. It replaces the introduction on setup
+  step 4 and Settings > Intelligence, above the setup-link field, which
+  stays; the same block, with `dismissible`, sits on top of the Settings tabs
+  (hidden on the Intelligence tab) and on the Dashboard, where **Dismiss**
+  (`Api\DismissBanner`) keeps the time at the default scope
+  (`smaily_connect/internal/ci_banner_dismissed_at`) and hides it 30 days.
+  `panel/intelligence-start.phtml`, once per page, runs the banners:
+  - `Model\Engine\IntelligenceStart` offers the start only with no engine
+    connection, not separate stores, and exactly one Smaily marketing
+    account with no per-language accounts
+    (`ReportBuilder::hasOneSmailyAccount()`, §21 rule 3). A page load never
+    calls the engine: the page asks `Api\OnboardingStatus` afterwards, one
+    request for every banner; the engine's "Is the start open?" answer is
+    kept 300 s in the application cache (`'1'`/`'0'`, any failure `'0'`).
+    While it is open the button reads **Try Intelligence free**.
+  - A press posts `Api\OnboardingStart` (form key, Settings ACL), which
+    sends §21 with the shop address (`Client::siteUrl()`), `platform:
+    magento`, the MAIN account's login (`ReportBuilder::mainCredentials()`),
+    `language` (`et` for an Estonian admin, else `en`), the admin user's
+    `admin_email`, and on an https admin `display: frame` plus
+    `frame_origin` when the admin's origin is not the shop's. At most 10
+    starts a minute leave the installation (`FixedWindowCounter`). The
+    answer is `{start_url, display, engine_origin}` with
+    `Cache-Control: no-store, private` — only a link on the engine's host —
+    or `{error}` by the engine's code only, never its message; a 404 writes
+    the cached status `'0'`; a 409 passes `console_url` only on the engine
+    host.
+  - The start window opens in the design window's modal
+    (`panel/modal-js.phtml`, shared with `panel/email-designs.phtml`) in an
+    iframe with `referrerpolicy="no-referrer"`, and must post `ready` from
+    the engine's origin within 10 s. No frame — an http admin, an answer
+    without `display: frame`, `400 frame_origin_not_allowed`, no `ready` —
+    offers **Open in a new window**: a fresh press opens a blank window
+    (opener kept: §21 posts the token to it) and sends it to a fresh link.
+    A `smaily_intelligence_setup` message from the engine's origin
+    (`setup_url` under `<origin>/setup/`, or `setup_token`) goes to the
+    existing `Api\EngineExchange` → `Engine\Connector`, so the allow-list,
+    the account check and the imports on connect apply unchanged; in a
+    frame its result is applied when the frame closes (`closed`, Escape,
+    the close button, the backdrop), so the engine's welcome step stays.
+    The panels take it through the `smaily:intelligence-connected` event
+    (panels-js shows the connection and its imports; Settings opens the
+    Intelligence tab); the Dashboard, without panels, opens Settings >
+    Intelligence. Refusals show §21's texts in the banner (403 turns it
+    into the upsell, 404 brings **Contact Smaily** back).
+  - Connected, Settings > Intelligence shows **Show recommendations in your
+    store**: the **Smaily recommendations** widget, who sees it, and a
+    link to the guide's `UserGuide::SECTION_STOREFRONT_RECOMMENDATIONS`.
 - **Dashboard is operational truth.** Every number on
   `dashboard/index.phtml` is a real local queue query
   (`Model\Adminhtml\DashboardStats`); the health verdict reuses the
@@ -2794,6 +2851,12 @@ implemented here:
   body, up to 60 s) and 5xx; other 4xx never retry; every call has a 10 s
   connect and 30 s total timeout (`Engine\Client`). The storefront browse
   relay makes one 3 s attempt and never retries or waits.
+- The two §21 onboarding calls (`Engine\Onboarding`, CON-363) have no
+  endpoints map key and no API key: `GET /api/v1/onboarding/status` (one
+  3 s attempt) and `POST /api/v1/onboarding/start` (one 10 s attempt; its
+  body carries the main Smaily account's API password) go to
+  `Client::DEFAULT_SETUP_BASE_URL` with no redirect followed and nothing
+  logged.
 - Smaily marketing API: HTTP Basic; success envelope `{code:101}`, 203 =
   invalid data, 206 = email not found (`Model\Client\SmailyClient`).
 - Engine automations config (§13): every row carries all eight keys;

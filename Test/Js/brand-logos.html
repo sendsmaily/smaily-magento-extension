@@ -1,0 +1,313 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the Smaily Connect and Campaign Intelligence logos
+  (CON-372): the real templates, rendered by Test/Js/render-admin.php into
+  Test/Js/build/, each in a fresh frame with the admin stylesheet (its text,
+  from build/smaily-admin-css.js, so the page can read its rules) on the
+  admin's light background.
+
+  Checked: the Connect lockup (brand.phtml) is drawn 28 px high at the
+  logo's proportions and hidden from assistive technology. With the
+  entrance (the Dashboard) the S fades in over 420 ms and the lettering
+  100 ms later over 520 ms, each once, and both rest at full opacity; still
+  (every other page) nothing plays. The stylesheet's prefers-reduced-motion
+  rules, applied as a browser that asks for reduced motion applies them,
+  stop the entrance and show the whole logo at once. Only the entrance
+  class starts an animation of the logo, and the two renders differ in
+  that class alone, so no state can start it. The boxed Campaign
+  Intelligence icon loads and shows, without animation, in the banner
+  (44 px, and 16 px in its panel), on the Dashboard's Campaign Intelligence
+  card (18 px, connected), and beside the Settings > Intelligence and setup
+  step 4 titles (24 px). Which page plays the entrance is the layouts'
+  business: Test/Unit/AdminBrandTest.php checks them.
+
+  The logos carry no text, so en_US alone is checked. Run it with
+  bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>brand logos harness</title>
+    <script src="build/smaily-admin-css.js"></script>
+    <script src="build/brand-entrance.en_US.js"></script>
+    <script src="build/brand-still.en_US.js"></script>
+    <script src="build/ci-banner-dashboard.en_US.js"></script>
+    <script src="build/dashboard.en_US.js"></script>
+    <script src="build/settings-website.en_US.js"></script>
+    <script src="build/setup-websites.en_US.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var ICON = '../../view/adminhtml/web/images/campaign-intelligence-icon.svg';
+    var REDUCED = 'prefers-reduced-motion: reduce';
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    function rendered(page) {
+        var found = (window.smailyAdminPages || {})[page];
+
+        if (!found) {
+            throw new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it');
+        }
+
+        return found.html;
+    }
+
+    // The page in a frame with the admin stylesheet, its scripts left out
+    // (only the markup and the styles are checked). extraCss, if given, is
+    // added after the stylesheet.
+    function open(page, extraCss) {
+        return new Promise(function (resolve) {
+            var frame = document.createElement('iframe');
+
+            frame.style.width = '1200px';
+            frame.style.height = '900px';
+            frame.onload = function () {
+                resolve(frame.contentDocument);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">'
+                + '<style id="admin-css">' + window.smailyAdminCss + '</style>'
+                + (extraCss ? '<style>' + extraCss + '</style>' : '')
+                + '</head><body style="margin:20px;background:#fff">'
+                + rendered(page).replace(/<script[\s\S]*?<\/script>/g, '')
+                + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function style(element) {
+        return element.ownerDocument.defaultView.getComputedStyle(element);
+    }
+
+    // Every style rule of the admin stylesheet, those inside @media too,
+    // as [rule, the media text or ''].
+    function styleRules(doc) {
+        var out = [];
+
+        Array.prototype.forEach.call(doc.getElementById('admin-css').sheet.cssRules, function (rule) {
+            if (rule.cssRules && rule.media) {
+                Array.prototype.forEach.call(rule.cssRules, function (inner) {
+                    out.push([inner, rule.media.mediaText]);
+                });
+            } else if (rule.selectorText) {
+                out.push([rule, '']);
+            }
+        });
+
+        return out;
+    }
+
+    function near(value, expected) {
+        return Math.abs(value - expected) < 0.75;
+    }
+
+    // An image of the Campaign Intelligence icon, loaded, at size x size,
+    // still.
+    function iconShown(img, size) {
+        var box = img && img.getBoundingClientRect();
+
+        return !!img
+            && img.getAttribute('src') === ICON
+            && img.getAttribute('alt') === ''
+            && img.complete && img.naturalWidth > 0
+            && near(box.width, size) && near(box.height, size)
+            && style(img).animationName === 'none';
+    }
+
+    function run() {
+        var entranceHtml = rendered('brand-entrance.en_US'),
+            stillHtml = rendered('brand-still.en_US');
+
+        // The two renders differ only in the entrance class: nothing else
+        // (no view model, no state) reaches the template.
+        check('the logo is the same markup with and without the entrance, but for the entrance class',
+            entranceHtml.indexOf('smaily-brand smaily-brand--entrance') !== -1
+            && entranceHtml.replace(' smaily-brand--entrance', '') === stillHtml);
+
+        return open('brand-entrance.en_US').then(function (doc) {
+            var brand = doc.querySelector('.smaily-brand'),
+                svg = brand && brand.querySelector('svg'),
+                symbol = brand && brand.querySelector('.smaily-brand__symbol'),
+                wordmark = brand && brand.querySelector('.smaily-brand__wordmark'),
+                box = svg && svg.getBoundingClientRect(),
+                rules = styleRules(doc),
+                animated;
+
+            check('entrance: the Connect lockup is drawn 28 px high at its proportions (194 x 31.6)',
+                !!box && near(box.height, 28) && near(box.width, 28 * 194.001709 / 31.622009));
+            check('entrance: the logo is hidden from assistive technology (the page title names the extension)',
+                brand.getAttribute('aria-hidden') === 'true');
+            check('entrance: the S in Smaily pink, the lettering in Smaily plum, from the pack',
+                symbol.getAttribute('fill') === '#e91e62' && wordmark.getAttribute('fill') === '#2c0b22');
+            check('entrance: the S fades in over 420 ms, once',
+                style(symbol).animationName === 'smaily-brand-in'
+                && style(symbol).animationDuration === '0.42s'
+                && style(symbol).animationDelay === '0s'
+                && style(symbol).animationIterationCount === '1');
+            check('entrance: the lettering follows 100 ms later over 520 ms, once (620 ms in all)',
+                style(wordmark).animationName === 'smaily-brand-in'
+                && style(wordmark).animationDuration === '0.52s'
+                && style(wordmark).animationDelay === '0.1s'
+                && style(wordmark).animationIterationCount === '1');
+
+            // Only the entrance class starts an animation of the logo: no
+            // state class (connected, synced, sending) appears in a rule
+            // that animates it.
+            animated = rules.filter(function (pair) {
+                return pair[0].selectorText.indexOf('smaily-brand') !== -1
+                    && pair[0].style.animationName !== '' && pair[0].style.animationName !== 'none';
+            });
+            check('the stylesheet animates the logo only under .smaily-brand--entrance',
+                animated.length === 2 && animated.every(function (pair) {
+                    return pair[1] === '' && /^\.smaily-brand--entrance \.smaily-brand__(symbol|wordmark)$/.test(pair[0].selectorText);
+                }));
+
+            // A frame's animations do not advance under the harness's virtual
+            // time, so each one is run to its end.
+            animated = symbol.getAnimations().concat(wordmark.getAnimations());
+            check('entrance: as the page loads the logo starts unseen',
+                style(symbol).opacity === '0' && style(wordmark).opacity === '0');
+            animated.forEach(function (animation) {
+                animation.finish();
+            });
+            check('entrance: at its end the logo rests whole, as the static logo',
+                animated.length === 2
+                && style(symbol).opacity === '1' && style(wordmark).opacity === '1');
+        }).then(function () {
+            return open('brand-still.en_US');
+        }).then(function (doc) {
+            var brand = doc.querySelector('.smaily-brand'),
+                box = brand.querySelector('svg').getBoundingClientRect();
+
+            check('still: no entrance class', !brand.classList.contains('smaily-brand--entrance'));
+            check('still: the same 28 px lockup', near(box.height, 28) && near(box.width, 28 * 194.001709 / 31.622009));
+            check('still: nothing plays and the whole logo shows at once',
+                ['.smaily-brand__symbol', '.smaily-brand__wordmark'].every(function (selector) {
+                    var path = brand.querySelector(selector);
+
+                    return style(path).animationName === 'none' && style(path).opacity === '1';
+                }));
+        }).then(function () {
+            // A browser that asks for reduced motion applies the stylesheet's
+            // prefers-reduced-motion rules: applied here unconditionally.
+            return open('brand-entrance.en_US').then(function (doc) {
+                return styleRules(doc).filter(function (pair) {
+                    return pair[1].indexOf(REDUCED) !== -1 && pair[0].selectorText.indexOf('smaily-brand') !== -1;
+                }).map(function (pair) {
+                    return pair[0].cssText;
+                }).join('\n');
+            });
+        }).then(function (reducedCss) {
+            check('the stylesheet has prefers-reduced-motion rules for the logo', reducedCss !== '');
+
+            return open('brand-entrance.en_US', reducedCss);
+        }).then(function (doc) {
+            var brand = doc.querySelector('.smaily-brand');
+
+            check('reduced motion: the entrance does not play and the whole logo shows at once',
+                brand.classList.contains('smaily-brand--entrance')
+                && ['.smaily-brand__symbol', '.smaily-brand__wordmark'].every(function (selector) {
+                    var path = brand.querySelector(selector);
+
+                    return style(path).animationName === 'none' && style(path).opacity === '1';
+                }));
+        }).then(function () {
+            return open('ci-banner-dashboard.en_US');
+        }).then(function (doc) {
+            return wait(100).then(function () {
+                check('banner: the boxed Campaign Intelligence icon beside its title, 44 px, still',
+                    iconShown(doc.querySelector('.smaily-ci-banner__head > img.smaily-ci-banner__logo'), 44));
+                check('banner: the same icon, 16 px, in the panel\'s label',
+                    iconShown(doc.querySelector('.smaily-ci-banner__panel-label > img'), 16));
+                check('banner: no other mark is drawn beside the title',
+                    doc.querySelectorAll('.smaily-ci-banner__head svg').length === 0);
+            });
+        }).then(function () {
+            return open('dashboard.en_US');
+        }).then(function (doc) {
+            return wait(100).then(function () {
+                var icons = doc.querySelectorAll('.smaily-connection-label img'),
+                    card = icons.length === 1 ? icons[0].closest('.smaily-connection') : null;
+
+                check('dashboard: only the Campaign Intelligence card carries the icon, 18 px, still',
+                    !!card && card.querySelector('.smaily-connection-label').textContent === 'Campaign Intelligence'
+                    && iconShown(icons[0], 18));
+                check('dashboard: the connected card keeps its state as before (dot, pill)',
+                    !!card && card.classList.contains('is-on') && !!card.querySelector('.smaily-pill'));
+            });
+        }).then(function () {
+            return open('settings-website.en_US');
+        }).then(function (doc) {
+            return wait(100).then(function () {
+                var heading = doc.querySelector('.smaily-tab-panel[data-tab="intelligence"] > h3');
+
+                // The tab panels are hidden until the page script picks one.
+                doc.querySelector('.smaily-tab-panel[data-tab="intelligence"]').style.display = 'block';
+                check('settings: the Intelligence tab title carries the icon, 24 px, still',
+                    !!heading && heading.textContent === 'Campaign Intelligence'
+                    && iconShown(heading.querySelector('img.smaily-ci-icon'), 24));
+            });
+        }).then(function () {
+            return open('setup-websites.en_US');
+        }).then(function (doc) {
+            return wait(100).then(function () {
+                var titles = doc.querySelectorAll('.smaily-step-title img.smaily-ci-icon'),
+                    panel = doc.querySelector('.smaily-step-panel[data-step="4"]'),
+                    heading = panel && panel.querySelector('.smaily-step-title');
+
+                panel.style.display = 'block';
+                check('setup: only step 4, Campaign Intelligence, carries the icon, 24 px, still',
+                    titles.length === 1 && !!heading && heading.textContent === 'Campaign Intelligence (optional)'
+                    && iconShown(heading.querySelector('img.smaily-ci-icon'), 24));
+            });
+        });
+    }
+
+    run().then(function () {
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    }, function (error) {
+        document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }).then(function () {
+        clearInterval(keepAlive);
+    });
+</script>
+</body>
+</html>

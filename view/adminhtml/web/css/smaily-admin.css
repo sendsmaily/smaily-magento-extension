@@ -834,16 +834,34 @@ html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hi
 .smaily-start-modal .smaily-design-modal__body { overflow: auto; }
 .smaily-start-modal__frame { min-width: 560px; min-height: 640px; }
 
+/* --- Smaily Connect and Campaign Intelligence logos (CON-372) --------------
+ * The Connect lockup above the page title (brand.phtml), 28 px high on the
+ * admin's light background. On the Dashboard (--entrance) the logo pack's
+ * entrance plays once as the page loads: the S fades in over 420 ms, the
+ * lettering 100 ms later over 520 ms, ending on the static logo. Under
+ * prefers-reduced-motion it does not play. No state class starts it. */
+.smaily-brand { margin: 0 0 var(--sp-3); line-height: 0; }
+.smaily-brand svg { display: block; width: auto; height: 28px; }
+.smaily-brand--entrance .smaily-brand__symbol { animation: smaily-brand-in 420ms cubic-bezier(.22, .61, .36, 1) both; }
+.smaily-brand--entrance .smaily-brand__wordmark { animation: smaily-brand-in 520ms 100ms ease-out both; }
+@keyframes smaily-brand-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+    .smaily-brand--entrance .smaily-brand__symbol,
+    .smaily-brand--entrance .smaily-brand__wordmark { animation: none; opacity: 1; }
+}
+/* The boxed Campaign Intelligence icon, static, beside a name of the product. */
+.smaily-ci-icon { flex: none; margin-right: var(--sp-2); vertical-align: middle; }
+
 /* --- Campaign Intelligence banner (CON-363) --------------------------------
  * Marketing's design (the WooCommerce plugin's PromoBanner, CON-350): a
- * lilac card with a logo tile, a title, a short pitch, a dark call to
+ * lilac card with a logo, a title, a short pitch, a dark call to
  * action and, on wide screens, a decorative panel on the right that fades
  * out. No remote fonts or images. */
 .smaily-ci-banner { position: relative; display: flex; gap: 32px; margin: 0 0 var(--sp-5); padding: 28px; overflow: hidden; border: 1px solid #ebe3f3; border-radius: 16px; background: linear-gradient(100deg, #fcfaff 0%, #f7f1fd 55%, #efe5fb 100%); color: #2a1028; font-family: var(--font); }
 .smaily-ci-banner [hidden], .smaily-ci-banner .smaily-ci-banner__cta[hidden], .smaily-ci-banner--aside { display: none; }
 .smaily-ci-banner__main { flex: 1 1 0; min-width: 0; max-width: 440px; }
 .smaily-ci-banner__head { display: flex; align-items: center; gap: 14px; }
-.smaily-ci-banner__logo { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 10px; background: #2a1028; }
+.smaily-ci-banner__logo { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px; }
 .smaily-ci-banner .smaily-ci-banner__title { margin: 0; padding: 0; font-size: 22px; font-weight: 600; line-height: 1.2; color: #2a1028; }
 .smaily-ci-banner__accent { color: #8a5cb8; }
 .smaily-ci-banner .smaily-ci-banner__body { margin: 16px 0 0; font-size: 15px; line-height: 1.45; }
@@ -868,9 +886,8 @@ html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hi
 .smaily-ci-banner__icon--undo { background: #fef3c7; color: #d97706; }
 .smaily-ci-banner__row-text { flex: 1 1 auto; }
 /* The Smaily invitation (CON-364, the WooCommerce plugin's CON-351) in the
- * same card: the Smaily mark without a tile, a secondary text link beside
- * the call to action, a Dismiss link, and its panel's icons. */
-.smaily-ci-banner .smaily-ci-banner__logo--smaily { background: none; }
+ * same card: a secondary text link beside the call to action, a Dismiss
+ * link, and its panel's icons. */
 .smaily-ci-banner a.smaily-ci-banner__link, .smaily-ci-banner a.smaily-ci-banner__link:visited { color: #6b3f8c; font-size: 14px; font-weight: 500; text-decoration: underline; }
 .smaily-ci-banner a.smaily-ci-banner__link:hover { color: #2a1028; }
 .smaily-ci-banner a.smaily-ci-banner__dismiss, .smaily-ci-banner a.smaily-ci-banner__dismiss:visited { color: #6b6577; }

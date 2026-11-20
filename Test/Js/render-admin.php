@@ -162,6 +162,18 @@ $block = static fn (object $viewModel, array $data = []): object => new class ($
     {
         return 'https://store.example/';
     }
+
+    /**
+     * The module's static file in the repository, as a harness page under
+     * Test/Js reaches it (CON-372).
+     *
+     * @param string $fileId Smaily_Connect::<path under view/adminhtml/web>
+     * @return string
+     */
+    public function getViewFileUrl(string $fileId): string
+    {
+        return '../../view/adminhtml/web/' . explode('::', $fileId, 2)[1];
+    }
 };
 
 /*
@@ -2434,6 +2446,20 @@ foreach (['invite-settings' => true, 'invite-settings-connected' => false] as $p
     ] + $pages['settings-website'];
 }
 
+/*
+ * The Smaily Connect logo above the page title (CON-372, brand.phtml): with
+ * the entrance (the Dashboard) and still (every other page).
+ */
+foreach (['brand-entrance' => ['entrance' => true], 'brand-still' => []] as $page => $data) {
+    $pages[$page] = [
+        'template' => $root . '/view/adminhtml/templates/brand.phtml',
+        // The template reads no view model.
+        'viewModel' => new stdClass(),
+        'data' => $data,
+        'strings' => [],
+    ];
+}
+
 $render = static function (string $template, object $block, Escaper $escaper): string {
     ob_start();
     include $template;
@@ -2477,6 +2503,18 @@ foreach ($pages as $name => $page) {
     }
 }
 StoreLocale::reset();
+
+// The admin stylesheet as a string, for Test/Js/brand-logos.html (CON-372):
+// a page opened from file:// cannot read the rules of a stylesheet it links,
+// and that harness reads the prefers-reduced-motion rules to apply them.
+$css = file_get_contents($root . '/view/adminhtml/web/css/smaily-admin.css'); // phpcs:ignore Magento2.Functions.DiscouragedFunction
+$file = $build . '/smaily-admin-css.js';
+if ($css === false || file_put_contents( // phpcs:ignore Magento2.Functions.DiscouragedFunction
+    $file,
+    'window.smailyAdminCss = ' . json_encode($css, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ";\n"
+) === false) {
+    throw new RuntimeException('Cannot write ' . $file . '.');
+}
 
 // The merchant user guide (docs/site/index.html) as a string, for
 // Test/Js/user-guide-site.html: a page opened from file:// cannot read

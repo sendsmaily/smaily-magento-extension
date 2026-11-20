@@ -11,6 +11,18 @@
         <css src="Smaily_Connect::css/smaily-admin.css"/>
     </head>
     <body>
+        <!-- The Smaily Connect logo above the page title (CON-372); the
+             Dashboard, the extension's landing page, plays its entrance. -->
+        <referenceContainer name="main.top">
+            <block class="Magento\Backend\Block\Template"
+                   name="smaily.brand"
+                   template="Smaily_Connect::brand.phtml"
+                   before="page.title">
+                <arguments>
+                    <argument name="entrance" xsi:type="boolean">true</argument>
+                </arguments>
+            </block>
+        </referenceContainer>
         <referenceContainer name="content">
             <block class="Magento\Backend\Block\Template"
                    name="smaily.dashboard"

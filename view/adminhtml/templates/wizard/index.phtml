@@ -123,12 +123,18 @@ $panelClass = static function (int $stepNo) use ($startStep): string {
 };
 $completedPill = '<span class="smaily-pill smaily-pill--active" id="smaily-w-completed-pill">'
     . '<span class="smaily-pill__dot"></span>' . $escaper->escapeHtml(__('Completed')) . '</span>';
-$stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $stepTitles): string {
+// Step 4's title carries the Campaign Intelligence icon from the logo pack
+// (CON-372), static.
+$ciIcon = '<img class="smaily-ci-icon" src="'
+    . $escaper->escapeUrl($block->getViewFileUrl('Smaily_Connect::images/campaign-intelligence-icon.svg'))
+    . '" width="24" height="24" alt="">';
+$stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $stepTitles, $ciIcon): string {
     return '<div class="smaily-step-head">'
         . '<div class="smaily-step-kicker-row"><span class="smaily-step-kicker">'
         . $escaper->escapeHtml(__('Step %1 of %2', $stepNo, count($stepTitles)))
         . '</span>' . $marker . '</div>'
-        . '<h3 class="smaily-step-title">' . $escaper->escapeHtml($stepTitles[$stepNo]) . '</h3>'
+        . '<h3 class="smaily-step-title">' . ($stepNo === 4 ? $ciIcon : '')
+        . $escaper->escapeHtml($stepTitles[$stepNo]) . '</h3>'
         . '</div>';
 };
 ?>

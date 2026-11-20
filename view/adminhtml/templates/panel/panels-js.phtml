@@ -38,6 +38,7 @@ $urls = [
     'engineExchange' => $block->getUrl('smaily_connect/api/engineexchange'),
     'enginePing' => $block->getUrl('smaily_connect/api/engineping'),
     'backfill' => $block->getUrl('smaily_connect/api/backfillstate'),
+    'consoleEntry' => $block->getUrl('smaily_connect/api/consoleentry'),
     'logFailed' => $block->getUrl('smaily_connect/log', ['_query' => ['filters' => ['status' => 'failed']]]),
 ];
 ?>
@@ -1263,6 +1264,56 @@ window.smailyPanelsInit = function ($) {
                         data.message || '<?= $escaper->escapeJs(__('Could not reach Campaign Intelligence.')) ?>',
                         false);
                 }
+            });
+        });
+
+        // "Open Campaign Intelligence" (contract §24, CON-230): a pop-up
+        // blocker allows a new tab only in the press itself, and the link
+        // comes later, so the press opens a blank tab at once, cut off from
+        // this page, and sends it to the one-time link when it arrives; on a
+        // failure the tab closes and the line beside the button says why.
+        // The link is never kept. While Campaign Intelligence does not offer
+        // console entry (404), the button goes and the console's sign-in
+        // address shows instead.
+        $('#smaily-w-console-open').on('click', function () {
+            var $button = $(this),
+                tab = window.open('', '_blank'),
+                failed = '<?= $escaper->escapeJs(__('Campaign Intelligence could not be opened. Try again in a minute.')) ?>';
+            result('#smaily-w-console-result', '', true);
+            if (!tab) {
+                result('#smaily-w-console-result',
+                    '<?= $escaper->escapeJs(__('Your browser blocked the new tab. Allow pop-ups for this page and try again.')) ?>',
+                    false);
+                return;
+            }
+            try {
+                tab.opener = null;
+            } catch (ignore) {
+                // A browser that keeps the opener read-only still opens the page.
+            }
+            $button.prop('disabled', true);
+            post(urls.consoleEntry, {}).then(function (data) {
+                var $unavailable;
+                if (typeof data.url === 'string' && data.url.indexOf('https://') === 0) {
+                    tab.location.href = data.url;
+                    return;
+                }
+                tab.close();
+                if (data.error === 'not_available' && typeof data.console_url === 'string'
+                    && data.console_url.indexOf('https://') === 0) {
+                    $button.hide();
+                    $unavailable = $('#smaily-w-console-unavailable');
+                    $unavailable.find('span').text(data.message || '');
+                    $unavailable.find('a').attr('href', data.console_url).text(data.console_url);
+                    $unavailable.show();
+                    return;
+                }
+                result('#smaily-w-console-result', data.message || failed, false);
+            }, function () {
+                tab.close();
+                result('#smaily-w-console-result', failed, false);
+            }).then(function () {
+                $button.prop('disabled', false);
             });
         });
 

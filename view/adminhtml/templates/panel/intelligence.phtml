@@ -90,6 +90,20 @@ $isRefused = $viewModel->isEngineRefused();
                 <div class="smaily-banner__message" id="smaily-w-engine-status"></div>
             </div>
         </div>
+        <?php if ($isSettings): ?>
+        <?php // "Open Campaign Intelligence" (contract §24, CON-230): the
+        // store's console in a new tab, signed in with a one-time link the
+        // server asks for (Api\ConsoleEntry); panels-js opens the tab.
+        // Settings only, while connected and the account is active; the
+        // page and the endpoint both need the Settings ACL resource. ?>
+        <div class="smaily-field" id="smaily-w-console-entry">
+            <button type="button" class="action-secondary" id="smaily-w-console-open">
+                <span><?= $escaper->escapeHtml(__('Open Campaign Intelligence')) ?></span>
+            </button>
+            <span class="smaily-result" id="smaily-w-console-result"></span>
+            <p class="note" id="smaily-w-console-unavailable" style="display:none;"><span></span> <a href="" target="_blank" rel="noopener noreferrer"></a></p>
+        </div>
+        <?php endif; ?>
         <?php endif; ?>
         <?php // A Connect starts the catalog import (PRO-3741); panels-js shows
         // this banner when it did, and Hold back cancels that import. ?>

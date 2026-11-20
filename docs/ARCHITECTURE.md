@@ -2761,6 +2761,29 @@ Initial setup, Settings, Log. Design rules:
     this card (`smaily-ci-banner--smaily`, no `data-variant`), so the
     scripts that drive or hide these banners select
     `.smaily-ci-banner[data-variant]`.
+- **"Open Campaign Intelligence" (CON-230, contract §24; as the
+  WooCommerce plugin's CON-228).** Settings > Intelligence shows the button
+  (`panel/intelligence.phtml`, `#smaily-w-console-open`) while Campaign
+  Intelligence is connected and the account is not refused; the page and
+  the endpoint both need `Smaily_Connect::config`. The press opens a blank
+  tab at once (pop-up blockers allow nothing later), cuts its `opener`,
+  and posts to `Api\ConsoleEntry` (`panel/panels-js.phtml`). The endpoint
+  checks the form key, takes the connection the tab shows (the primary:
+  separate stores share it until CON-237 gives them their own) and its
+  client, and calls `Engine\Client::consoleEntry()` — map key
+  `console_entry`, fallback `PATH_CONSOLE_ENTRY`, body `{email}` with the
+  signed-in admin user's own address — one attempt, no retry and no wait,
+  so one press is one engine call. Only an https link is passed on, as
+  `{url}` with `Cache-Control: no-store, private`, and the tab goes to it;
+  nothing stores, logs or caches the link or the email
+  (`ConsoleEntryTest`). Refusals are answered by the engine's status only,
+  never its message (CON-357): 404 (console entry switched off, or a
+  legacy key) `not_available` with `console_url` (the engine origin's
+  `/login`): the button goes and the address shows; 401 `api_key_rejected`
+  (connect again); 403 `tenant_inactive`; 429 `rate_limit_exceeded`; the
+  rest `engine_unavailable`. A failure closes the tab and the line beside
+  the button gives the message (`Test/Js/console-entry.html`). The console
+  is never framed: §24 forbids it.
 - **The Smaily invitation (CON-364, as the WooCommerce plugin's CON-321 /
   CON-351).** `ViewModel\Adminhtml\SmailyInvitationData` decides it: due
   while `ReportBuilder::mainCredentials()` is null (no Smaily marketing

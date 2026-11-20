@@ -672,6 +672,20 @@ $pages['intelligence-settings'] = [
     'data' => ['context' => 'settings'],
     'strings' => $intelligenceStrings,
 ];
+/*
+ * Settings > Intelligence with Campaign Intelligence connected, for
+ * "Open Campaign Intelligence" (CON-230, Test/Js/console-entry.html).
+ */
+$pages['intelligence-settings-connected'] = [
+    'template' => $intelligenceTemplates,
+    'viewModel' => $intelligenceViewModel('', true),
+    'data' => ['context' => 'settings'],
+    'strings' => [
+        'Open Campaign Intelligence',
+        'Your browser blocked the new tab. Allow pop-ups for this page and try again.',
+        'Campaign Intelligence could not be opened. Try again in a minute.',
+    ],
+];
 $pages['connection-setup'] = [
     'template' => [
         $root . '/view/adminhtml/templates/panel/connection.phtml',

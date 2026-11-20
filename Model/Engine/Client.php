@@ -118,8 +118,8 @@ class Client
     private const HISTORY_PROGRESS_TIMEOUT_SECONDS = 10;
 
     /**
-     * The email design calls (§22, §23) answer an admin's click or page
-     * load: one attempt, no retry and no wait, so the admin is never kept
+     * The email design calls (§22, §23) and the console entry (§24) answer
+     * an admin's click or page load: one attempt, no retry and no wait, so the admin is never kept
      * waiting behind a backoff (as the WooCommerce plugin, CON-173).
      */
     private const EMAIL_DESIGNS_TIMEOUT_SECONDS = 15;
@@ -132,6 +132,12 @@ class Client
      */
     public const PATH_EMAILS_DESIGN_LINK = '/api/v1/emails/{email_key}/design-link';
     public const PATH_EMAILS_DESIGNS = '/api/v1/emails/designs';
+
+    /**
+     * Fallback path of the console entry (§24, map key `console_entry`,
+     * which the engine returns only while console entry is switched on).
+     */
+    public const PATH_CONSOLE_ENTRY = '/api/v1/console/entry';
 
     /**
      * @var array{request: array<int|string, mixed>, response: array{http_status: int, body: mixed}|null}|null
@@ -569,6 +575,27 @@ class Client
             'POST',
             $url,
             $body,
+            singleAttempt: true,
+            timeoutSeconds: self::EMAIL_DESIGNS_TIMEOUT_SECONDS
+        );
+    }
+
+    /**
+     * A one-time link that opens the store's Campaign Intelligence console
+     * for the admin who pressed "Open Campaign Intelligence" (§24, CON-230):
+     * `{url, expires_at}`. `$email` is that admin's own email, never a
+     * customer's. The admin waits on it and each press is one engine call,
+     * so it is one attempt, no retry and no wait, as the email design
+     * calls. The caller opens the link at once and never stores or logs it.
+     *
+     * @return array<string, mixed>
+     */
+    public function consoleEntry(string $email): array
+    {
+        return $this->request(
+            'POST',
+            $this->endpoint('console_entry', self::PATH_CONSOLE_ENTRY),
+            ['email' => $email],
             singleAttempt: true,
             timeoutSeconds: self::EMAIL_DESIGNS_TIMEOUT_SECONDS
         );

@@ -2779,7 +2779,8 @@ Initial setup, Settings, Log. Design rules:
   account; a Transactional account alone does not count) and only for an
   admin with `Smaily_Connect::config`. `panel/smaily-invitation-banner.phtml`
   draws marketing's banner (body, **Connect your Smaily account**, **Create
-  a Smaily account** to `https://www.sendsmaily.net`, the API-user note, a
+  a Smaily account** to Smaily's sign-up page,
+  `https://www.sendsmaily.net/account/register/`, the API-user note, a
   decorative panel with the two automations Magento has — the WooCommerce
   plugin's third row, Payment reminder, is not one) on top of setup step 1
   and of the Settings > Connection tab (the WooCommerce plugin's

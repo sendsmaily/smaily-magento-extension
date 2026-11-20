@@ -2364,7 +2364,7 @@ $invitationViewModel = static fn (bool $due = true, bool $dismissed = false): ob
      */
     public function getSignupUrl(): string
     {
-        return 'https://www.sendsmaily.net';
+        return 'https://www.sendsmaily.net/account/register/';
     }
 
     /**

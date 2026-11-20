@@ -7,56 +7,93 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-11-14 session end — **3.0.0 and 3.0.1 are
-released; 3.0.1 is submitted to the Adobe Commerce Marketplace.**
+_Last updated: 2026-11-20 — **3.0.2 is cut (release/3.0.2); its tag
+waits for Erkki.** 3.0.0 and 3.0.1 were released on 2026-11-14. The cut
+collects 13 changelog fragments into 12 bullets: CON-356's price bullet
+is merged into CON-363's banner bullet (the banner replaced the
+introduction that held the price link), and CON-364's bullet names the
+Stores > Configuration wording of #273.
 
-**Released today:**
-- **3.0.0** (#256, tag on ff15243): the first stable release. Install
-  `composer require smaily/smailyformagento`, upgrade from 2.8.x
-  `:^3.0`, Hyvä `composer require smaily/module-connect-hyva`.
-- **3.0.1** (#260, tag on 63a80e8): PHP 8.5 allowed (#259); CI runs the
-  unit suite and the Magento 2.4.9 compile on PHP 8.5; `require-dev`
-  pins `magento/magento-coding-standard` `^41.0`. Packagist lists both
-  versions for both packages; the guide site is live with PHP 8.1–8.5.
+**Merged since 3.0.1:**
+- #262 (guide), #264 (admin) CON-356: no Campaign Intelligence price.
+- #263, #278: engine contract 1.34.0, 1.35.0.
+- #265 + #266 CON-359: the connection prefix in front of every product
+  code and order number sent to the engine.
+- #267 + #271 CON-363: the Campaign Intelligence banner and **Try
+  Intelligence free** (onboarding start; the engine keeps starts closed
+  in production).
+- #268 CON-357: stored and logged errors keep only the code and its
+  place, never the remote text.
+- #269 + #272 + #273 CON-364: the Smaily-account invitation (setup
+  step 1, Settings › Connection, Dashboard, system message; hidden after
+  a successful **Test connection**) and gear icon › Integrations
+  wording.
+- #270: the Marketplace kit's description in the integration format.
+- #274 CON-366: **Edit design** frame mode (third-party cookies blocked,
+  an admin on its own subdomain).
+- #275 CON-368: abandoned-cart wait at most 1435 minutes; **Create a
+  Smaily account** opens the sign-up page.
+- #276 CON-230 (**Open Campaign Intelligence**, a one-time console link)
+  and CON-367 (§25 `stop_reason` for a stopped history import; Hold back
+  / Cancel import also cancel the queued imports, as in Woo).
+- #277 CON-372: the logos.
+- #279 + #281 CON-376 palette, CON-365 recommendations placement, and
+  contrast fixes.
+- #280 CON-358: Page Builder markup out of descriptions (the bullet
+  tells merchants to press **Run again** on **Catalog**).
 
-**Also merged today:** #254 CON-234 (the installation report to
-subscription.smaily.com; every shape got 200 from the receiver run
-locally), #255 (engine contract 1.32.0), #257 (README: website layouts,
-Support), #258 (the Marketplace kit, `docs/internal/marketplace/`).
+**Marketplace (CON-152):** 3.0.1, submission `2q6w4ofnme`. Technical
+part "Awaiting Manual QA" (MFTF 6/20 failed, on Magento's own admin grid
+filter buttons — not the extension's code). Marketing part refused
+twice (the title as a "developer name", then the integration
+description format); resubmitted 2026-11-20 in the integration format.
+Support request SALES0907379 asks Adobe to accept the title as the
+integrated service's name. The Marketplace user-guide PDF still says
+"Preferences > API" (and version 3.0.1): regenerate it from
+`docs/internal/marketplace/user-guide.html` before the next Marketplace
+submission.
 
-**Marketplace (CON-152):** version 3.0.1, submission `2q6w4ofnme`,
-launches on approval. Technical: automated testing in progress;
-marketing: awaiting review (title "Smaily Connect", new description,
-240 px Smaily icon, 4 screenshots, Magento Open Source 2.4, free). The
-3.0.0 submission was cancelled: the portal refused its PHP range.
-Marketplace's own counts: 45 free downloads 2019–2025.
+**Pilot:** CON-147 closed (5/5): the first pilot store runs v3
+connected to Campaign Intelligence. CON-283 found no code defect: the
+multi-website pilot store (one store, 3.0.x) presses **Run again** on
+**Catalog**.
 
-**Decisions for Erkki** (CON-234 comments): no `transactional_emails`
-until sending lands; `disconnected` right after a save; mode-A
-languages without a two-letter code left out.
+**Human acceptance pending:** CON-363 — a live **Try Intelligence free**
+start (the engine keeps starts closed in production) and the Estonian
+proofread; CON-366 — Safari on an https admin, and an admin on its own
+subdomain; CON-230 — a real console sign-in once the engine switches §24
+on; CON-356 ships in 3.0.2. The Estonian proofread list for the 3.0.2
+texts went to Erkki on 2026-11-20; his corrections land in one
+follow-up PR.
 
-**Gotchas:** the rc18–rc21 gotchas hold. The Marketplace portal validates
-`composer.json` at submit (PHP range per the claimed edition's newest
-line), claims compatibility per minor line only (2.4), fixes the version
-number per draft, and cancelling a draft is permanent. Its file inputs
-take files set from a page script (`DataTransfer`), and its gallery takes
-a `drop` event; a file reaches the page only through a CORS-open URL
-(`raw.githubusercontent.com` of a pushed commit). The subscription
-receiver runs locally only with `DATABASE_URL` and
-`CREDENTIAL_CACHE_SECRET` on the command line. The in-app browser
-suppresses `confirm()`.
+**Gotchas:** an unreachable engine makes one ingest flush take about
+90 s for 2 rows (10 s connect timeout × retries) — check that cron runs
+do not overlap. A network-error Log row keeps cURL's local English text
+(no remote text, by design). The onboarding-status and banner-dismiss
+calls also carry `form_key` in the query string (minor). Worktrees under
+`.claude/worktrees` leak into the sandbox compile: remove them first.
+Magento's first-time system-messages popup is never drawn on
+2.4.4–2.4.9 (its collection is never loaded), so a link in a system
+message shows only in the **System Messages** list. A `release/*` branch
+takes one push (CLAUDE.md).
 
-**Open:** CON-152 (Marketplace review results), CON-283 (High: most
-catalog rows of the multi-website pilot store lack `websites`; cause
-unknown), CON-237 steps 4–6, CON-281, CON-230 (waits for INT-180),
-CON-252, CON-163, CON-146, CON-168, CON-157; the Estonian proofread of
-today's site text; the update notice to Magento clients; CON-147's
-human acceptance.
+**Next:**
+1. The 3.0.2 tag on Erkki's word.
+2. CON-369 payment reminder and CON-361 stock alerts (contract 1.35.0
+   §6c) — design first.
+3. CON-237 steps 4–6; CON-168's remaining automated-email items._
 
-**Next session opens with:**
-1. The Marketplace review results for 3.0.1 (`2q6w4ofnme`).
-2. CON-283.
-3. CON-237 step 4 (brief: `docs/internal/ENGINE_CONNECTIONS_PLAN.md`)._
+_Earlier (2026-11-14 session end): **3.0.0 (#256, tag on ff15243) and
+3.0.1 (#260, tag on 63a80e8; PHP 8.5, #259) were released; 3.0.1 was
+submitted to the Adobe Commerce Marketplace** (`2q6w4ofnme`; the 3.0.0
+submission was cancelled, the portal refused its PHP range). Also merged
+that day: #254 CON-234 (installation report), #255 contract 1.32.0, #257
+README, #258 the Marketplace kit. The portal validates `composer.json`
+at submit, claims compatibility per minor line only, fixes the version
+per draft, and cancelling a draft is permanent. Decisions for Erkki in
+CON-234: no `transactional_emails` until sending lands; `disconnected`
+right after a save; mode-A languages without a two-letter code left
+out._
 
 _Earlier (2026-11-14, the 3.0.0 cut): **3.0.0 was cut (#256) and
 released the same day, the first stable release; #257 (README website

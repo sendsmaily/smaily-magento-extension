@@ -1,0 +1,96 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * The behaviour of an engine page in a modal over the darkened admin, in
+ * one place for both such modals: the email design page
+ * (panel/email-designs.phtml, CON-257) and the Campaign Intelligence start
+ * window (panel/intelligence-start.phtml, CON-363). Each template includes
+ * this file; the function is defined once.
+ *
+ *   var modal = window.smailyModal($, $modal, requestClose);
+ *   modal.show($trigger);   // focus goes to the close button
+ *   modal.hide();           // focus returns to $trigger
+ *
+ * $modal is the .smaily-design-modal markup (backdrop, dialog, close
+ * button). The close button, a backdrop click and Escape call
+ * requestClose(); the caller decides what closing means and calls hide().
+ * While the modal is open, Tab keeps focus inside it.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ */
+?>
+<script>
+window.smailyModal = window.smailyModal || function ($, $modal, requestClose) {
+    'use strict';
+
+    var $dialog = $modal.find('.smaily-design-modal__dialog');
+    var open = false;
+    var $trigger = null;
+
+    function focusables() {
+        return $dialog.find('button, iframe, a[href]').filter(function () {
+            return !$(this).closest('[hidden]').length;
+        });
+    }
+
+    $modal.find('.smaily-design-modal__close, .smaily-design-modal__backdrop').on('click', function () {
+        requestClose();
+    });
+
+    $(document).on('keydown', function (event) {
+        var $items, first, last;
+        if (!open) {
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            requestClose();
+            return;
+        }
+        if (event.key !== 'Tab') {
+            return;
+        }
+        // Focus stays inside the modal while it is open.
+        $items = focusables();
+        first = $items.get(0);
+        last = $items.get($items.length - 1);
+        if (event.shiftKey && (document.activeElement === first || !$dialog[0].contains(document.activeElement))) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || !$dialog[0].contains(document.activeElement))) {
+            event.preventDefault();
+            first.focus();
+        }
+    });
+    document.addEventListener('focusin', function (event) {
+        if (open && !$dialog[0].contains(event.target)) {
+            focusables().first().trigger('focus');
+        }
+    });
+
+    return {
+        show: function ($from) {
+            $trigger = $from || null;
+            open = true;
+            $modal.prop('hidden', false);
+            $('html').addClass('smaily-design-modal-open');
+            $modal.find('.smaily-design-modal__close').trigger('focus');
+        },
+        hide: function () {
+            var $from = $trigger;
+            $trigger = null;
+            open = false;
+            $modal.prop('hidden', true);
+            $('html').removeClass('smaily-design-modal-open');
+            if ($from && $from.length && document.contains($from[0])) {
+                $from.trigger('focus');
+            }
+        },
+        isOpen: function () {
+            return open;
+        }
+    };
+};
+</script>

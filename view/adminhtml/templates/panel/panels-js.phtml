@@ -905,8 +905,8 @@ window.smailyPanelsInit = function ($) {
     function engineConnected(tenantName, engineVersion) {
         intelligenceConnected = true;
         $('#smaily-w-engine-disconnected').hide();
-        // Settings only: the setup step renders the introduction without this id.
-        $('#smaily-w-engine-intro').hide();
+        // A connected store sees no Campaign Intelligence banner (CON-363).
+        $('.smaily-ci-banner').hide();
         $('#smaily-w-engine-connected').show();
         // Settings only: browse tracking is the tab's one thing to save (PRO-3567).
         $('#smaily-w-intelligence-footer').show();
@@ -1281,24 +1281,32 @@ window.smailyPanelsInit = function ($) {
             });
         });
 
-        // Engine connect.
+        // Engine connect: the setup-link field, or "Try Intelligence free",
+        // whose setup exchange panel/intelligence-start.phtml runs (CON-363).
+        function exchanged(data) {
+            engineConnected(data.tenantName, data.engineVersion);
+            if (data.catalogImportStarted) {
+                $('#smaily-w-engine-catalog-import').show();
+                refreshImportCard('catalog');
+            }
+            if (data.customersImportStarted) {
+                $('#smaily-w-engine-customers-import').show();
+                refreshImportCard('customers');
+            }
+            if (data.ordersImportStarted) {
+                $('#smaily-w-engine-orders-import').show();
+                refreshImportCard('orders');
+            }
+        }
+        $(document).on('smaily:intelligence-connected', function (event, data) {
+            event.preventDefault();
+            exchanged(data);
+        });
         $('#smaily-w-engine-connect').on('click', function () {
             result('#smaily-w-engine-result', '<?= $escaper->escapeJs(__('Connecting…')) ?>', true);
             post(urls.engineExchange, {setup_url: $('#smaily-w-setup-url').val()}).then(function (data) {
                 if (data.connected) {
-                    engineConnected(data.tenantName, data.engineVersion);
-                    if (data.catalogImportStarted) {
-                        $('#smaily-w-engine-catalog-import').show();
-                        refreshImportCard('catalog');
-                    }
-                    if (data.customersImportStarted) {
-                        $('#smaily-w-engine-customers-import').show();
-                        refreshImportCard('customers');
-                    }
-                    if (data.ordersImportStarted) {
-                        $('#smaily-w-engine-orders-import').show();
-                        refreshImportCard('orders');
-                    }
+                    exchanged(data);
                 } else {
                     result('#smaily-w-engine-result',
                         data.message || '<?= $escaper->escapeJs(__('Connection failed.')) ?>', false);

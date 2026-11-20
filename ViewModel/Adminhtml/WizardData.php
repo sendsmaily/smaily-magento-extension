@@ -720,20 +720,6 @@ class WizardData implements ArgumentInterface
     }
 
     /**
-     * The Campaign Intelligence product page, which names its price, in the
-     * admin's language: the Estonian page for an Estonian admin, the English
-     * one otherwise (CON-356).
-     */
-    public function getIntelligencePageUrl(): string
-    {
-        $language = strtolower((string)strtok((string)$this->localeResolver->getLocale(), '_'));
-
-        return $language === 'et'
-            ? 'https://smaily.com/et/campaign-intelligence/'
-            : 'https://smaily.com/campaign-intelligence/';
-    }
-
-    /**
      * The merchant's own Smaily account page — where a deactivated Campaign
      * Intelligence account is sorted out. Falls back to the public site when
      * no subdomain is configured yet.

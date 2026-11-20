@@ -755,22 +755,4 @@ class WizardDataTest extends TestCase
 
         self::assertSame('ZZ', $this->viewModel->getMultilingualAccounts()[0]['languageName']);
     }
-
-    /**
-     * CON-356: the panel names no Campaign Intelligence price; it links the
-     * product page in the admin's language.
-     */
-    public function testTheIntelligencePageIsTheEstonianOneForAnEstonianAdmin(): void
-    {
-        $this->localeResolver->method('getLocale')->willReturn('et_EE');
-
-        self::assertSame('https://smaily.com/et/campaign-intelligence/', $this->viewModel->getIntelligencePageUrl());
-    }
-
-    public function testTheIntelligencePageIsTheEnglishOneForAnyOtherAdmin(): void
-    {
-        $this->localeResolver->method('getLocale')->willReturn('fi_FI');
-
-        self::assertSame('https://smaily.com/campaign-intelligence/', $this->viewModel->getIntelligencePageUrl());
-    }
 }

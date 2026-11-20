@@ -514,6 +514,14 @@ $intelligenceViewModel = static fn (
     }
 
     /**
+     * @return string
+     */
+    public function getIntelligencePageUrl(): string
+    {
+        return 'https://smaily.com/campaign-intelligence/';
+    }
+
+    /**
      * @return array<string, string>
      */
     public function getWebsiteQuery(): array
@@ -1273,6 +1281,14 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
     public function getConsentGuideUrl(): string
     {
         return 'https://example.com/consent-guide';
+    }
+
+    /**
+     * @return string
+     */
+    public function getIntelligencePageUrl(): string
+    {
+        return 'https://smaily.com/campaign-intelligence/';
     }
 
     /**

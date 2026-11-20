@@ -33,7 +33,15 @@ $isRefused = $viewModel->isEngineRefused();
     // the Settings copy, also right after a Connect (PRO-3583). ?>
     <div<?= $isSettings ? ' id="smaily-w-engine-intro"' : '' ?>>
         <p><?= $escaper->escapeHtml(__('Campaign Intelligence uses your store’s product, customer and order data to create personalized product recommendations for Smaily campaigns and automations. This helps you send more relevant emails with less manual work.')) ?></p>
-        <p><?= $escaper->escapeHtml(__('Campaign Intelligence is an optional paid add-on (€250/month), added to your regular Smaily monthly payment. Contact Smaily to activate it, or set it up later.')) ?></p>
+        <?php // No price here: it depends on the number of contacts, so the
+        // product page in the admin's language names it (CON-356). ?>
+        <p><?= /* @noEscape */ strtr(
+            $escaper->escapeHtml(__('Campaign Intelligence is an optional paid add-on on top of your Smaily monthly payment. Its price depends on the number of your contacts — see the %1Campaign Intelligence page%2. Contact Smaily to activate it, or set it up later.')),
+            [
+                '%1' => '<a href="' . $escaper->escapeUrl($viewModel->getIntelligencePageUrl()) . '" target="_blank">',
+                '%2' => '</a>',
+            ]
+        ) ?></p>
     </div>
     <?php // Separate stores (CON-279): Campaign Intelligence stays one
     // connection for the installation in this release, reached from every

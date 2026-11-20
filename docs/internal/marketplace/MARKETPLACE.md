@@ -81,11 +81,21 @@ allow `~8.5.0`. 3.0.1 does (PR #259); 3.0.0 cannot be submitted.
 Rules: Adobe's [marketing review guidelines](https://developer.adobe.com/commerce/marketplace/guides/sellers/marketing-review-guidelines)
 — a title of at most five words, no "Magento", "Adobe", "M2",
 "Extension", "Module" or "Plugin"; every fee in **bold** in the long
-description's opening paragraph; no logos of Adobe or Magento.
+description's opening paragraph; no logos of Adobe or Magento. The long
+description lists the features vertically, as bullets made with the
+editor's own bullet button, under a "Features" heading formatted as
+Header 2 or Header 3 (marketing review, 18 Nov 2026).
 
-**Title:** `Smaily Connect` (the listing shows "Smaily Ecommerce
-Integration" today; Smaily is the integrated service, so its name is
-allowed).
+**Title:** `Smaily Connect`
+
+The owner's position (2026-11-20): "Smaily" in "Smaily Connect" is not
+the developer's name. Smaily is the email marketing platform the
+extension connects a store to, and the title names that platform, as an
+integration's title names the service it integrates. The extension does
+nothing without a Smaily account, so the name cannot be removed. The
+marketing review of 18 Nov 2026 asked to remove "the developer/company
+name" from the title. The portal has no field for a note to the
+reviewer, so the long description's first sentence says what Smaily is.
 
 **Category:** Marketing › Email Marketing and Marketing › Marketing Automation (as the listing has).
 
@@ -97,48 +107,50 @@ allowed).
 > abandoned-cart automations, and add Smaily Campaign Intelligence
 > product recommendations to your emails and store.
 
-**Long description:**
+**Long description** (as resubmitted on 2026-11-20):
 
-> Smaily Connect connects your store to Smaily email marketing.
-> **The extension is free; it needs a Smaily account with a package that
-> includes API access. Campaign Intelligence is an optional paid Smaily
-> add-on (€250 per month on top of the Smaily subscription).**
+> Smaily Connect connects your Magento store to Smaily, an email
+> marketing platform. **The extension is free. It needs a Smaily account
+> with a package that includes API access. Campaign Intelligence is an
+> optional paid Smaily add-on; its price depends on the number of
+> contacts (smaily.com/campaign-intelligence).**
 >
-> **Contacts.** New subscribers and customers reach Smaily as they happen,
-> and an unsubscribe in Smaily comes back to the store. Pick the lawful
-> basis that matches how you asked for permission: subscribers only
-> (consent), all customers (legitimate interest) or checkout opt-in only.
-> An optional newsletter checkbox at checkout serves guests and customers.
+> ## Features
 >
-> **Automations.** Welcome, First order and Abandoned cart start the Smaily
-> workflows you pick, optionally with a single-use discount code from a
-> cart price rule. An abandoned-cart reminder carries the cart's products
-> and a secure link that restores the exact cart. Multilingual stores
-> route each language to its own workflow or Smaily account.
+> - Contact sync: new subscribers and customers reach Smaily as they
+>   happen, and an unsubscribe in Smaily comes back to the store.
+> - Three lawful bases to choose from: subscribers only (consent), all
+>   customers (legitimate interest) or checkout opt-in only.
+> - An optional newsletter checkbox at checkout for guests and customers.
+> - Welcome, First order and Abandoned cart automations start the Smaily
+>   workflows you pick, optionally with a single-use discount code from a
+>   cart price rule.
+> - Abandoned-cart reminders carry the cart's products and a secure link
+>   that restores the exact cart.
+> - Multilingual stores route each language to its own workflow or Smaily
+>   account.
+> - Optional Campaign Intelligence: personalized product recommendations
+>   in Smaily emails and on your store's pages, attribution of the orders
+>   they bring, and automated campaigns such as replenishment and
+>   win-back.
+> - A guided initial setup, one Settings page, a Dashboard and a Log of
+>   every delivery with retry.
+> - Durable queues with retries; imports of existing data run in the
+>   background without slowing the store.
+> - Several websites can be set up as one store or as separate stores
+>   with their own Smaily accounts.
+> - Privacy: credentials stored encrypted, browse tracking only after the
+>   visitor's marketing consent, a personalization opt-out for shoppers,
+>   and GDPR export and erasure from the command line.
+> - Admin and storefront in English and Estonian; storefront texts also
+>   in Russian, Finnish, Latvian and Lithuanian.
 >
-> **Campaign Intelligence (optional).** Catalog, customer, order and
-> consented browsing data power personalized product recommendations in
-> Smaily emails and on your store's pages (a widget), with attribution of
-> the orders they bring, and automated campaigns such as replenishment and
-> win-back.
->
-> **Built for production.** A guided initial setup, one Settings page, a
-> Dashboard and a Log of every delivery with retry. Deliveries go through
-> durable queues with retries; imports of existing data run in the
-> background without slowing the store. Websites can be set up as one
-> store or as separate stores with their own Smaily accounts.
->
-> **Privacy.** Credentials are stored encrypted. Browse tracking waits for
-> the visitor's marketing consent. Shoppers can opt out of
-> personalization, and GDPR export and erasure run from the command line.
 > When a Smaily account is connected, the extension sends Smaily an
-> installation report — store addresses, versions, connected accounts,
+> installation report: store addresses, versions, connected accounts,
 > switched-on features and connection health, never customer, subscriber
 > or order data.
 >
-> English and Estonian admin and storefront; storefront texts also in
-> Russian, Finnish, Latvian and Lithuanian. Full user guide:
-> https://smaily.com/connect-magento/
+> Full user guide: https://smaily.com/connect-magento/
 
 **Release notes** (the portal's text, as entered for the version; for 3.0.1 add "Supports PHP 8.5 (Magento 2.4.9)."):
 
@@ -178,6 +190,10 @@ What the portal holds, as met on 2026-11-14:
    2.4 tick), Pricing (free), Extension Support (only for selling
    support), Additional Details. **Preview** shows the listing.
 4. Submit both; the version is scheduled to launch on approval of both.
+
+A refused marketing part is edited in place on the version's page and
+sent again with **Submit** → **Confirm**; there is no field for a note to
+the reviewer.
 
 A draft that cannot pass (3.0.0, refused on PHP) is cancelled with
 **Cancel Version Submission**, and the next version starts a new draft.

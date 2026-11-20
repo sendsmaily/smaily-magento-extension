@@ -406,6 +406,9 @@
 .smaily-inline-status.is-working { color: var(--s-text-2); }
 .smaily-inline-status.is-saved { color: var(--s-success); }
 .smaily-inline-status.is-error { color: var(--s-danger); }
+/* An error can be long (Smaily's or Campaign Intelligence's own message):
+ * it wraps within its column instead of widening the page. */
+.smaily-inline-status.is-error { white-space: normal; line-height: 1.4; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .smaily-inline-status__spinner {
     flex: 0 0 auto;
     width: 13px;

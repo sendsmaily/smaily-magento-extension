@@ -189,7 +189,8 @@
                     return rule.selectorText === '.smaily-ui .action-primary';
                 })[0],
                 unscoped,
-                muted;
+                muted,
+                errorStatus;
 
             check('the token sheet holds the palette', Object.keys(PALETTE).every(function (name) {
                 return root.getPropertyValue(name).trim() === PALETTE[name];
@@ -233,6 +234,21 @@
             check('focused, the native button keeps Magento\'s darker orange and blue ring',
                 doc.activeElement === native && style(native).backgroundColor === 'rgb(186, 64, 0)'
                 && style(native).boxShadow.indexOf('rgb(0, 123, 219)') !== -1);
+
+            // CON-365: a long error after Save Automations wraps within the
+            // tab footer instead of widening the page.
+            doc.querySelector('.smaily-tab-panel[data-tab="connection"]').style.display = 'none';
+            doc.querySelector('.smaily-tab-panel[data-tab="automations"]').style.display = 'block';
+            errorStatus = doc.getElementById('smaily-w-automations-result');
+            errorStatus.className = 'smaily-result smaily-inline-status err is-error';
+            errorStatus.innerHTML = '<span class="smaily-inline-status__error">!</span><span>Could not load the workflow'
+                + ' list: Smaily API request failed: cURL error 7: Failed to connect to example.sendsmaily.net port 443'
+                + ' after 0 ms: Could not connect to server (see https://curl.se/libcurl/c/libcurl-errors.html)'
+                + ' for https://example.sendsmaily.net/api/autoresponder.php?page=1&limit=100</span>';
+            check('a long error wraps within the tab footer',
+                errorStatus.getBoundingClientRect().right <= errorStatus.parentNode.getBoundingClientRect().right + 0.5
+                && errorStatus.getBoundingClientRect().height > 30
+                && doc.documentElement.scrollWidth <= doc.defaultView.innerWidth);
 
             aa('white on the primary button', WHITE, PRIMARY);
             aa('white on the focused primary button', WHITE, PRIMARY_HOVER);

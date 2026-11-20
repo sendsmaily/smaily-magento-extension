@@ -231,7 +231,8 @@ Campaign Intelligence banner and the Smaily invitation use plum, primary,
 brand text and the selected tint; every text colour set from the palette
 meets WCAG AA on its background, and so do the lightest text colour (on
 white, the grey canvas and the selected tint) and the banner illustration's
-heading and chips.
+heading and chips; and that a long error after **Save Automations** wraps
+within the tab footer instead of widening the page.
 To check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.

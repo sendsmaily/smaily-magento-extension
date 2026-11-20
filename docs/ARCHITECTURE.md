@@ -1133,7 +1133,7 @@ below.
   page (up to 500 per store view, `Backfill\ContactsProcessor`) is
   answered with 203 (`ApiException::isInvalidData()`), each of its
   contacts is posted again alone in the same run, through the same client: the valid ones sync, and only the
-  refused one fails (`permanent_envelope_203`, Smaily's answer as its last
+  refused one fails (`permanent_envelope_203`, Smaily's code as its last
   response; the import counts it as failed). WooCommerce posts one contact
   per request, so the outcome is the same. A single contact's 203 is not
   sent again, and any other failure of the group stays the group's.
@@ -1159,8 +1159,9 @@ below.
   UUID to make an enqueue idempotent.
 - **Exchange evidence (PRO-1965, Woo F3-44 parity):** both clients keep
   the last request body and the reply to it (`lastExchange()`: HTTP status
-  plus the decoded body, or the start of a non-JSON body via
-  `Model\Client\ExchangeResponse`; no reply on a network failure; never a
+  plus the decoded body without any `message` key at any depth, and no body
+  when it is not JSON, via `Model\Client\ExchangeResponse` — the remote's
+  text can name a customer, CON-357; no reply on a network failure; never a
   credential). The handlers and `Cron\FlushIngestQueue` hand it to
   `recordExchange()` on the queue, which sets `sent_payload` and
   `last_response` on the row model; `markSent()` / `markFailed()` store
@@ -1208,21 +1209,25 @@ below.
   and by `Model\Log\QueueRowLoader` for the single row the drawer and the
   resend route read, so the label, the status filter and the drawer all read
   one value, and the flusher still sees the terminal `sent` row it wrote.
-  The grid's error column and the Details drawer both show the server's own
+  The grid's error column and the Details drawer both show the stored
   message through `Model\Log\FailureMessage` (`Queue\Failure`'s
   `permanent_http_<code>:` prefix stripped — its shape is
   `Failure::CLASS_REGEX`, which the SQL filter below reads too —
   `PayloadRedactor` applied); the
-  classification stays in the drawer. Deliberate exception (PRO-2508): a
-  Smaily 401/403 stores the client's own sentence ("Smaily API credentials
-  were rejected") instead of Smaily's body, because it names what to fix;
-  the body stays in `last_response`. The package refusal is a client
-  sentence too. Any other Smaily HTTP error quotes Smaily's answer after
-  the status, as the engine client does (PRO-3749): "Smaily API request
-  failed with HTTP <code>: <answer>", the answer being the JSON envelope's
-  `message`, else the body's text without markup, cut to 500 characters;
-  a JSON answer without a `message`, or an empty one, leaves the status
-  alone. The grid's
+  classification stays in the drawer. **No remote or database text
+  (CON-357, as Woo CON-301):** the stored message is the extension's own,
+  with codes only. The Smaily client says "Smaily API request failed with
+  HTTP <status>" or "Smaily API returned code <code>", and a 401/403 or the
+  package refusal its own sentence (PRO-2508); the engine client says
+  "Engine request failed with HTTP <status>: <engine error code>"
+  (`http_<status>` when the body names none); a D6 or §3b `errors[]` entry is stored as
+  `<field>: <error code>` or `<field>: rejected by engine`
+  (`Engine\Queue\ItemError`); any other error by its type, code and
+  `file:line` (`Model\Client\FailureText`, which `Queue\Failure` and the
+  log lines that catch any `\Throwable` use). A network failure keeps
+  Guzzle's text with its URL masked (`TransportErrorMessage`, PRO-3572).
+  Rows stored before CON-357 keep their text until the retention sweep
+  below removes them; nothing rewrites them, as in Woo. The grid's
   text filter on that column matches the shown text, not the stored value
   (PRO-2509): `Log\Collection::addFieldToFilter()` strips the same prefix
   in SQL, adds a LIKE per client message whose translation in the admin's

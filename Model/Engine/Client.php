@@ -81,6 +81,13 @@ class Client
     public const ENGINE_HOSTS = ['intelligence.smaily.com'];
     public const COMPATIBLE_ENGINE_MAJOR = 1;
 
+    /**
+     * The §1 `capabilities` value of a connector that puts the connection's
+     * prefix in front of every key it sends (contract v1.33.0, CON-359:
+     * Payload\ConnectionPrefix).
+     */
+    public const CAPABILITY_CONNECTION_PREFIX = 'connection_prefix';
+
     private const RETRY_DELAYS_SECONDS = [1, 2, 4, 8, 16];
     private const TIMEOUT_SECONDS = 30;
     private const CONNECT_TIMEOUT_SECONDS = 10;
@@ -151,7 +158,12 @@ class Client
      *
      * Only an https address on ENGINE_HOSTS is called, and a reply is
      * returned only when its engine base URL and every endpoint are https
-     * addresses on ENGINE_HOSTS too.
+     * addresses on ENGINE_HOSTS too, and its connection prefix has the
+     * contract's shape (every key sent under another would be refused).
+     *
+     * The request declares that the extension applies the connection
+     * prefix and, on a reconnect, reports the prefix the connection held,
+     * so the engine gives it back (contract v1.33.0 §1, CON-359).
      *
      * @param array<string, string> $storeConfig the store's `store_config` (contract v1.21.0 §1), sent when not empty
      * @return array<string, mixed>
@@ -176,6 +188,11 @@ class Client
         if ($storeConfig) {
             $body['store_config'] = $storeConfig;
         }
+        $body['capabilities'] = [self::CAPABILITY_CONNECTION_PREFIX];
+        $previousPrefix = $this->settings->getPreviousPrefix();
+        if ($previousPrefix !== null) {
+            $body['connection'] = ['previous_prefix' => $previousPrefix];
+        }
         $response = $this->request('POST', $baseUrl . '/api/setup/exchange', $body, false);
 
         $endpoints = $response['endpoints'] ?? [];
@@ -195,18 +212,42 @@ class Client
                 );
             }
         }
+        if (is_array($response['config'] ?? null) && Settings::configPrefix($response['config']) === null) {
+            throw new EngineRequestException(
+                (string)__(
+                    'The engine answered with a connection code this extension cannot use,'
+                    . ' so the connection was not saved.'
+                ),
+                400
+            );
+        }
 
         return $response;
     }
 
     /**
-     * Health/tenant check.
+     * Health/tenant check. The connection prefix the ping answers wins over
+     * the stored one (contract v1.33.0 §2, CON-359); one of the wrong shape
+     * is logged and the stored one kept.
      *
      * @return array<string, mixed>
      */
     public function ping(): array
     {
-        return $this->request('GET', $this->endpoint('ingest_ping'), null);
+        $answer = $this->request('GET', $this->endpoint('ingest_ping'), null);
+        $config = $answer['config'] ?? null;
+        if (is_array($config) && array_key_exists('connection', $config)) {
+            $prefix = Settings::configPrefix($config);
+            if ($prefix === null) {
+                $this->logger->error(
+                    'The engine ping answered a connection prefix of the wrong shape; the stored one is kept'
+                );
+            } else {
+                $this->settings->recordConnectionPrefix($prefix);
+            }
+        }
+
+        return $answer;
     }
 
     /**
@@ -284,13 +325,15 @@ class Client
      * platform HARD delete, where the product's SKUs may no longer be
      * enumerable.
      *
-     * `$productIds` carry the RAW platform parent product ids — exactly the
+     * `$productIds` carry the platform parent product ids — exactly the
      * `tags.product_id` strings the catalog sync emits
-     * (ParentProductResolver::productIdOf()), never the `sku`.
+     * (ParentProductResolver::productIdOf(), under the connection prefix:
+     * Payload\ConnectionPrefix), never the `sku`.
      *
      * Idempotent: a re-removed or never-ingested id lands in the response's
      * `not_found` — a contract-defined success, not an error. Response:
-     * {ok, removed_products, rows_tombstoned, not_found}. NOT a D6 shape.
+     * {ok, removed_products, rows_tombstoned, not_found, errors?} (`errors`,
+     * v1.33.0: an id outside the calling connection). NOT a D6 shape.
      *
      * The endpoints map carries `ingest_catalog_remove` since contract
      * v1.4.0; tenants exchanged earlier fall back to the hardcoded path

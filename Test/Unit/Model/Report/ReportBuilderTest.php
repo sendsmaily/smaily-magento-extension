@@ -392,6 +392,29 @@ class ReportBuilderTest extends TestCase
         );
     }
 
+    /**
+     * CON-363: only a shop with one Smaily account starts Campaign
+     * Intelligence itself (contract §21 rule 3).
+     */
+    public function testOneSmailyAccountIsOneMarketingAccountWithoutLanguageAccounts(): void
+    {
+        $this->websites[2] = ['code' => 'second', 'url' => 'https://second.test/', 'stores' => [2 => 'en']];
+        $this->transactional = [0 => ['example-transactional', 'tx-user', 'tx-secret']];
+        self::assertTrue($this->builder()->hasOneSmailyAccount(), 'Two websites on one account, and a transactional one.');
+
+        $this->accounts[2] = ['example-second', 'second-user', 'second-secret'];
+        self::assertFalse($this->builder()->hasOneSmailyAccount(), 'Two accounts.');
+
+        unset($this->accounts[2], $this->websites[2]);
+        $this->modes[1] = 'a';
+        $this->storeAccounts = [1 => ['example', 'api-user', 'not-a-real-password']];
+        self::assertFalse($this->builder()->hasOneSmailyAccount(), 'Per-language accounts.');
+
+        $this->modes = [];
+        $this->accounts = [];
+        self::assertFalse($this->builder()->hasOneSmailyAccount(), 'No account.');
+    }
+
     protected function builder(): ReportBuilder
     {
         return new ReportBuilder(

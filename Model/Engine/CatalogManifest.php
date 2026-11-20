@@ -305,6 +305,9 @@ class CatalogManifest
      */
     private function products(Connection $connection): array
     {
+        // Each sku under the connection's prefix (contract v1.33.0 §3c,
+        // CON-359): the list covers the connection's own products.
+        $prefix = $connection->settings()->getConnectionPrefix();
         $products = [];
         $cursor = 0;
         do {
@@ -315,6 +318,7 @@ class CatalogManifest
                 if ($item === null) {
                     continue;
                 }
+                $item['sku'] = $prefix . $item['sku'];
                 $products[] = $item;
                 if (count($products) > self::MAX_PRODUCTS) {
                     return $products;

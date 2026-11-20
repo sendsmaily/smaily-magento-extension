@@ -300,6 +300,37 @@ class StorefrontRecommendationsTest extends TestCase
         ], $slots);
     }
 
+    /**
+     * CON-359 (contract v1.33.0 §15): on a connection with a code prefix a
+     * slot's sku is opaque. A slot under the prefix is this store's product,
+     * named by its `external_id`; a slot under another prefix is another
+     * shop's of the same engine store, and one without an `external_id`
+     * cannot be named without taking the sku apart: both are left out.
+     */
+    public function testOnAPrefixedConnectionOnlyThisShopsSlotsAreKept(): void
+    {
+        $this->settings->method('getConnectionPrefix')->willReturn('c2-');
+        $this->guest('vt_8f3k2a');
+        $this->engineAnswer = (array)json_decode(
+            '{"slots":['
+            . '{"position":1,"rec_id":"' . self::REC_ID . '","sku":"c2-MJ07","external_id":"7",'
+            . '"name":"Jacket","price":29.99,"in_stock":true},'
+            . '{"position":2,"rec_id":"9b2f6c3a-1d4e-4f5a-8b6c-7d8e9f0a1b2c","sku":"c3-woo-7","external_id":"7",'
+            . '"name":"Scarf","price":9.5,"in_stock":true},'
+            . '{"position":3,"rec_id":"ab2f6c3a-1d4e-4f5a-8b6c-7d8e9f0a1b2c","sku":"c2-MJ09","external_id":null,'
+            . '"name":"Hat","price":12,"in_stock":true},'
+            . '{"position":4,"rec_id":"bb2f6c3a-1d4e-4f5a-8b6c-7d8e9f0a1b2c","sku":"MJ11","external_id":"11",'
+            . '"name":"Belt","price":15,"in_stock":true}'
+            . ']}',
+            true
+        );
+
+        self::assertSame(
+            [['rec_id' => self::REC_ID, 'external_id' => '7', 'sku' => 'c2-MJ07']],
+            $this->service()->slots()
+        );
+    }
+
     private function loggedIn(int $customerId, string $email, bool $profilingAllowed): void
     {
         $customer = $this->createMock(CustomerInterface::class);

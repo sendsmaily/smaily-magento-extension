@@ -340,6 +340,141 @@ class FlushIngestQueueTest extends TestCase
         self::assertSame(3, $sent[21]['rows_tombstoned']);
     }
 
+    /**
+     * CON-359 (contract v1.33.0 §3b): the ids go under the connection's
+     * prefix; `not_found` names them so, and an id `errors[]` names
+     * (outside the calling connection) fails its row, terminally.
+     */
+    public function testCatalogRemoveSendsTheIdsUnderTheConnectionPrefix(): void
+    {
+        $this->settings->method('getConnectionPrefix')->willReturn('c2-');
+        $removed = $this->createEvent(21, Client::DOMAIN_CATALOG_REMOVE);
+        $gone = $this->createEvent(22, Client::DOMAIN_CATALOG_REMOVE);
+        $refused = $this->createEvent(23, Client::DOMAIN_CATALOG_REMOVE);
+        $this->payloads = [
+            21 => ['product_id' => '7'],
+            22 => ['product_id' => '9'],
+            23 => ['product_id' => '11'],
+        ];
+        $this->stubClaims([Client::DOMAIN_CATALOG_REMOVE => [$removed, $gone, $refused]]);
+        $this->client->expects(self::once())->method('catalogRemove')
+            ->with(['c2-7', 'c2-9', 'c2-11'])
+            ->willReturn([
+                'ok' => true,
+                'removed_products' => 1,
+                'rows_tombstoned' => 1,
+                'not_found' => ['c2-9'],
+                'errors' => [[
+                    'product_id' => 'c2-11',
+                    'field' => 'product_ids',
+                    'error' => 'connection_prefix_mismatch',
+                    'message' => 'Product id is outside this connection.',
+                ]],
+            ]);
+        $this->client->method('lastExchange')->willReturn(['request' => [], 'response' => null]);
+        $recorded = [];
+        $this->queue->method('recordExchange')->willReturnCallback(
+            static function (IngestEvent $event, array $sent) use (&$recorded): void {
+                $recorded[(int)$event->getId()] = $sent;
+            }
+        );
+        $sent = [];
+        $this->queue->method('markSent')->willReturnCallback(
+            static function (IngestEvent $event, ?string $response = null) use (&$sent): void {
+                $sent[(int)$event->getId()] = json_decode((string)$response, true)['outcome'];
+            }
+        );
+        $this->queue->expects(self::once())->method('markFailedMany')
+            ->with([$refused], 'product_ids: Product id is outside this connection.', true);
+
+        $this->createCron()->execute();
+
+        self::assertSame([21 => 'removed', 22 => 'not_found'], $sent);
+        self::assertSame(['product_ids' => ['c2-7']], $recorded[21], 'The row keeps the id as it was sent');
+    }
+
+    /**
+     * CON-359: the catalog rows and orders go under the connection's
+     * prefix — the rows' own items, as queued, otherwise unchanged — and
+     * each row keeps its item as it was sent. Customers carry no prefix.
+     */
+    public function testTheItemsGoUnderTheConnectionPrefix(): void
+    {
+        $this->settings->method('getConnectionPrefix')->willReturn('c2-');
+        $this->payloads = [
+            11 => ['sku' => 'MJ01', 'external_id' => '5', 'tags' => ['product_id' => '4']],
+            12 => ['email' => 'u1@example.invalid', 'external_id' => '42'],
+            13 => ['external_order_id' => '000000123', 'items' => [['sku' => 'MJ01', 'qty' => 1]]],
+        ];
+        $catalog = $this->createEvent(11);
+        $this->stubClaims([
+            Client::DOMAIN_CATALOG => [$catalog],
+            Client::DOMAIN_CUSTOMERS => [$this->createEvent(12, Client::DOMAIN_CUSTOMERS)],
+            Client::DOMAIN_ORDERS => [$this->createEvent(13, Client::DOMAIN_ORDERS)],
+        ]);
+        $ingested = [];
+        $this->client->method('ingest')->willReturnCallback(
+            static function (string $domain, array $items) use (&$ingested): array {
+                $ingested[$domain] = $items;
+
+                return ['ok' => true, 'processed' => count($items), 'deduplicated' => 0, 'errors' => []];
+            }
+        );
+        $this->client->method('lastExchange')->willReturn(['request' => [], 'response' => null]);
+        $recorded = [];
+        $this->queue->method('recordExchange')->willReturnCallback(
+            static function (IngestEvent $event, array $sent) use (&$recorded): void {
+                $recorded[(int)$event->getId()] = $sent;
+            }
+        );
+
+        $this->createCron()->execute();
+
+        self::assertSame([
+            Client::DOMAIN_CATALOG => [['sku' => 'c2-MJ01', 'external_id' => '5', 'tags' => ['product_id' => 'c2-4']]],
+            Client::DOMAIN_CUSTOMERS => [['email' => 'u1@example.invalid', 'external_id' => '42']],
+            Client::DOMAIN_ORDERS => [
+                ['external_order_id' => 'c2-000000123', 'items' => [['sku' => 'c2-MJ01', 'qty' => 1]]],
+            ],
+        ], $ingested);
+        self::assertSame(['products' => $ingested[Client::DOMAIN_CATALOG]], $recorded[11]);
+    }
+
+    /**
+     * CON-359, CON-237: each connection sends under its own prefix.
+     */
+    public function testEachConnectionSendsUnderItsOwnPrefix(): void
+    {
+        $this->settings->method('getConnectionPrefix')->willReturn('c1-');
+        $other = $this->createMock(Client::class);
+        $website = $this->createMock(Settings::class);
+        $website->method('isSendingAllowed')->willReturn(true);
+        $website->method('getConnectionPrefix')->willReturn('c4-');
+        $connections = $this->engineConnections([
+            [$this->engineConnection(0, $this->settings, [1], [1], 1), $this->client],
+            [$this->engineConnection(2, $website, [2], [2, 3], 2), $other],
+        ]);
+        $this->payloads = [11 => ['sku' => 'MJ01'], 12 => ['sku' => 'MJ01']];
+        $this->stubBatches([
+            Client::DOMAIN_CATALOG => [[$this->createEvent(11)]],
+            '2:' . Client::DOMAIN_CATALOG => [[$this->createEvent(12)]],
+        ]);
+        $sent = [];
+        foreach (['c1' => $this->client, 'c4' => $other] as $name => $client) {
+            $client->method('ingest')->willReturnCallback(
+                static function (string $domain, array $items) use (&$sent, $name): array {
+                    $sent[$name] = array_column($items, 'sku');
+
+                    return ['ok' => true, 'processed' => count($items), 'deduplicated' => 0, 'errors' => []];
+                }
+            );
+        }
+
+        $this->createCron(null, $connections)->execute();
+
+        self::assertSame(['c1' => ['c1-MJ01'], 'c4' => ['c4-MJ01']], $sent);
+    }
+
     public function testCatalogRemoveRowWithoutKeyIsTerminalObservableSkip(): void
     {
         $keyless = $this->createEvent(31, Client::DOMAIN_CATALOG_REMOVE);

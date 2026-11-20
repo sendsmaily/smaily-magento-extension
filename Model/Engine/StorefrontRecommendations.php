@@ -169,12 +169,19 @@ class StorefrontRecommendations
      * The slots with a well-formed recommendation id and a product key
      * (`external_id`, else `sku`), in the engine's order.
      *
+     * On a connection with a code prefix (contract v1.33.0 §15, CON-359)
+     * the `sku` is opaque: a slot names this store's product only when its
+     * `sku` is under the prefix — another is another shop's of the same
+     * engine store, and its `external_id` that shop's id — and then by its
+     * `external_id` only.
+     *
      * @param array<string, mixed> $answer the §15 response body
      * @return array<int, array{rec_id: string, external_id: string, sku: string}>
      */
     private function usableSlots(array $answer): array
     {
         $slots = is_array($answer['slots'] ?? null) ? $answer['slots'] : [];
+        $prefix = $this->settings->getConnectionPrefix();
         $usable = [];
         foreach ($slots as $slot) {
             if (!is_array($slot)) {
@@ -184,6 +191,9 @@ class StorefrontRecommendations
             $externalId = is_scalar($slot['external_id'] ?? null) ? trim((string)$slot['external_id']) : '';
             $sku = is_string($slot['sku'] ?? null) ? trim($slot['sku']) : '';
             if (!RecId::isValid($recId) || ($externalId === '' && $sku === '')) {
+                continue;
+            }
+            if ($prefix !== '' && (!str_starts_with($sku, $prefix) || !ctype_digit($externalId))) {
                 continue;
             }
             $usable[] = ['rec_id' => $recId, 'external_id' => $externalId, 'sku' => $sku];

@@ -55,6 +55,12 @@ class QueueRoutingTest extends IntegrationTestCase
     /** @var list<array{key: string, path: string, ids: string[]}> the requests the engine got, in order */
     private array $requests = [];
 
+    /** @var array<string, string> the connection prefix the engine gave each API key (contract v1.33.0) */
+    private array $prefixOf = [];
+
+    /** @var array<string, list<string>> the product codes and order ids each API key sent */
+    private array $keysSent = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -197,6 +203,60 @@ class QueueRoutingTest extends IntegrationTestCase
     }
 
     /**
+     * CON-359 (contract v1.33.0): two shops in one engine store number
+     * their products and orders from 1. Each connection sends its rows —
+     * the same product, parent product, order and removal ids — under its
+     * own prefix, as the engine checks it per key, so neither overwrites
+     * the other; each row keeps its item as it was sent.
+     */
+    public function testTwoConnectionsSendTheSameIdsUnderTheirOwnPrefixes(): void
+    {
+        [$primary, $latvia] = [
+            $this->engineConnection(0, $this->settings('sk_ee', 'c1-'), [1], [1, 4], 1),
+            $this->engineConnection(2, $this->settings('sk_lv', 'c4-'), [2], [2, 3], 2),
+        ];
+        $this->prefixOf = ['sk_ee' => 'c1-', 'sk_lv' => 'c4-'];
+        foreach ([1 => 'ee', 2 => 'lv'] as $store => $shop) {
+            $this->queue->enqueue('catalog', [
+                'event_id' => 'b3f1a2c4-6d1e-4f7a-9b2c-3e5d7f9a1b2' . $store,
+                'sku' => 'MJ01',
+                'external_id' => '5',
+                'in_stock' => true,
+                'tags' => ['product_id' => '1'],
+            ], '5', $store, 'cat-' . $shop);
+            $this->queue->enqueue('orders', [
+                'external_order_id' => '000000001',
+                'customer_email' => 'shopper@example.invalid',
+                'status' => 'completed',
+                'items' => [['sku' => 'MJ01', 'qty' => 1]],
+            ], '1', $store, 'ord-' . $shop);
+            $this->queue->enqueue(Client::DOMAIN_CATALOG_REMOVE, ['product_id' => '1'], '1', $store, 'rem-' . $shop);
+        }
+
+        $this->flush($this->engineConnections([
+            [$primary, $this->client($primary->settings())],
+            [$latvia, $this->client($latvia->settings())],
+        ]));
+
+        self::assertSame([
+            'sk_ee' => ['c1-MJ01', 'c1-1', 'c1-MJ01', 'c1-000000001', 'c1-1'],
+            'sk_lv' => ['c4-MJ01', 'c4-1', 'c4-MJ01', 'c4-000000001', 'c4-1'],
+        ], $this->keysSent);
+        $rows = $this->fetchAll(IngestEventResource::TABLE_NAME);
+        self::assertSame(
+            [IngestEvent::STATUS_SENT],
+            array_values(array_unique(array_column($rows, 'status'))),
+            'The engine refused no key as another connection\'s'
+        );
+        $sent = array_column($rows, 'sent_payload', 'event_uuid');
+        self::assertStringContainsString('"sku":"c4-MJ01"', (string)$sent['cat-lv']);
+        self::assertStringContainsString('"external_order_id":"c1-000000001"', (string)$sent['ord-ee']);
+        self::assertSame('{"product_ids":["c4-1"]}', $sent['rem-lv']);
+        $stored = array_column($rows, 'payload', 'event_uuid');
+        self::assertStringContainsString('"sku":"MJ01"', (string)$stored['cat-lv'], 'The row holds it without one');
+    }
+
+    /**
      * Catalog rows of store views NULL, 1, 2, 3, 4 and 9, oldest first.
      */
     private function seedRows(): void
@@ -217,9 +277,10 @@ class QueueRoutingTest extends IntegrationTestCase
         ];
     }
 
-    private function settings(string $apiKey): Settings
+    private function settings(string $apiKey, string $prefix = ''): Settings
     {
         $settings = $this->createMock(Settings::class);
+        $settings->method('getConnectionPrefix')->willReturn($prefix);
         $settings->method('isSendingAllowed')->willReturn(true);
         $settings->method('isRefused')->willReturn(false);
         $settings->method('getApiKey')->willReturn($apiKey);
@@ -262,19 +323,39 @@ class QueueRoutingTest extends IntegrationTestCase
         return function (RequestInterface $request) {
             $body = json_decode((string)$request->getBody(), true);
             $path = $request->getUri()->getPath();
+            $key = substr($request->getHeaderLine('Authorization'), strlen('Bearer '));
             if (isset($body['product_ids'])) {
                 $ids = array_map('strval', $body['product_ids']);
                 $reply = ['ok' => true, 'removed_products' => count($ids), 'rows_tombstoned' => 0, 'not_found' => []];
+                foreach ($ids as $id) {
+                    if (!$this->underPrefix($key, $id)) {
+                        $reply['errors'][] = [
+                            'product_id' => $id,
+                            'field' => 'product_ids',
+                            'error' => 'connection_prefix_mismatch',
+                            'message' => 'outside this connection',
+                        ];
+                    }
+                }
             } else {
                 $items = (array)reset($body);
-                $ids = array_map(static fn (array $item): string => (string)$item['event_id'], $items);
-                $reply = ['ok' => true, 'processed' => count($items), 'deduplicated' => 0, 'errors' => []];
+                $ids = array_map(static fn (array $item): string => (string)($item['event_id'] ?? ''), $items);
+                $reply = ['ok' => true, 'processed' => 0, 'deduplicated' => 0, 'errors' => []];
+                foreach ($items as $index => $item) {
+                    $field = $this->mismatchedField($key, $item);
+                    if ($field === null) {
+                        $reply['processed']++;
+                        continue;
+                    }
+                    $reply['errors'][] = [
+                        'index' => $index,
+                        'field' => $field,
+                        'error' => 'connection_prefix_mismatch',
+                        'message' => 'outside this connection',
+                    ];
+                }
             }
-            $this->requests[] = [
-                'key' => substr($request->getHeaderLine('Authorization'), strlen('Bearer ')),
-                'path' => $path,
-                'ids' => $ids,
-            ];
+            $this->requests[] = ['key' => $key, 'path' => $path, 'ids' => $ids];
 
             return Create::promiseFor(new Response(
                 200,
@@ -282,6 +363,45 @@ class QueueRoutingTest extends IntegrationTestCase
                 (string)json_encode($reply)
             ));
         };
+    }
+
+    /**
+     * The engine's per-key check (contract v1.33.0): a key with a prefix
+     * writes only keys under it. Records the keys a prefixed API key sent.
+     */
+    private function underPrefix(string $apiKey, string $value): bool
+    {
+        if (!isset($this->prefixOf[$apiKey])) {
+            return true;
+        }
+        $this->keysSent[$apiKey][] = $value;
+
+        return str_starts_with($value, $this->prefixOf[$apiKey]);
+    }
+
+    /**
+     * The field of a catalog row or an order the engine refuses as another
+     * connection's, or null. Order lines are not checked.
+     *
+     * @param array<string, mixed> $item
+     */
+    private function mismatchedField(string $apiKey, array $item): ?string
+    {
+        if (isset($item['external_order_id'])) {
+            foreach ((array)($item['items'] ?? []) as $line) {
+                $this->underPrefix($apiKey, (string)$line['sku']);
+            }
+
+            return $this->underPrefix($apiKey, (string)$item['external_order_id']) ? null : 'external_order_id';
+        }
+        if (isset($item['sku']) && !$this->underPrefix($apiKey, (string)$item['sku'])) {
+            return 'sku';
+        }
+        if (isset($item['tags']['product_id']) && !$this->underPrefix($apiKey, (string)$item['tags']['product_id'])) {
+            return 'tags.product_id';
+        }
+
+        return null;
     }
 
     private function flush(Connections $connections): void

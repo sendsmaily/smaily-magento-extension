@@ -582,6 +582,89 @@ class ClientTest extends TestCase
     }
 
     /**
+     * CON-359 (contract v1.33.0 §1): the exchange declares that the
+     * extension applies the connection prefix; a first connection reports
+     * no previous prefix.
+     */
+    public function testTheSetupExchangeDeclaresTheConnectionPrefixCapability(): void
+    {
+        $client = $this->createClient([
+            new Response(200, [], '{"tenant_id":"t1","api_key":"sk_x","endpoints":{}}'),
+        ]);
+
+        $client->setupExchange('tok_abc123');
+
+        $body = json_decode((string)$this->history[0]['request']->getBody(), true);
+        self::assertSame(['connection_prefix'], $body['capabilities']);
+        self::assertArrayNotHasKey('connection', $body);
+    }
+
+    /**
+     * CON-359: a reconnect reports the prefix the connection held — also
+     * '' for an unprefixed one — so the engine gives it back.
+     *
+     * @dataProvider previousPrefixes
+     */
+    public function testAReconnectReportsThePreviousPrefix(string $previous): void
+    {
+        $this->settings->method('getPreviousPrefix')->willReturn($previous);
+        $client = $this->createClient([
+            new Response(200, [], '{"tenant_id":"t1","api_key":"sk_x","endpoints":{}}'),
+        ]);
+
+        $client->setupExchange('tok_abc123');
+
+        $body = json_decode((string)$this->history[0]['request']->getBody(), true);
+        self::assertSame(['previous_prefix' => $previous], $body['connection']);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function previousPrefixes(): array
+    {
+        return ['a prefixed connection' => ['c2-'], 'an unprefixed connection' => ['']];
+    }
+
+    /**
+     * CON-359: a reply whose connection prefix has the wrong shape is
+     * never stored — every key sent under it would be refused.
+     */
+    public function testAReplyWithAMalformedConnectionPrefixIsRefused(): void
+    {
+        $client = $this->createClient([
+            new Response(200, [], '{"tenant_id":"t1","api_key":"sk_x","endpoints":{},'
+                . '"config":{"connection":{"prefix":"shop-"}}}'),
+        ]);
+
+        $this->expectException(EngineRequestException::class);
+        $this->expectExceptionMessage(
+            'The engine answered with a connection code this extension cannot use, so the connection was not saved.'
+        );
+        $client->setupExchange('tok_abc123');
+    }
+
+    /**
+     * CON-359 (contract v1.33.0 §2): the ping's connection prefix is
+     * stored over the connection's; a ping without the block (an engine
+     * before v1.33.0) and one of the wrong shape change nothing.
+     */
+    public function testThePingsConnectionPrefixIsStored(): void
+    {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/ingest/ping');
+        $this->settings->expects(self::once())->method('recordConnectionPrefix')->with('c5-');
+        $client = $this->createClient([
+            new Response(200, [], '{"ok":true,"config":{"connection":{"prefix":"c5-"}}}'),
+            new Response(200, [], '{"ok":true,"config":{"history":{"start_months":18}}}'),
+            new Response(200, [], '{"ok":true,"config":{"connection":{"prefix":"C5"}}}'),
+        ]);
+
+        $client->ping();
+        $client->ping();
+        $client->ping();
+    }
+
+    /**
      * CON-253 (contract v1.21.0 §3): a product no website sells goes as
      * `websites: {}`, never `[]`, also after the queue's JSON round trip
      * made it an empty array; a product some website sells goes with its

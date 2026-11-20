@@ -70,6 +70,8 @@ class IndexTest extends TestCase
 
     private bool $marketingConsent = false;
 
+    private string $connectionPrefix = '';
+
     /** @var array{code: int, data: array<string, mixed>} */
     private array $answer = ['code' => 200, 'data' => []];
 
@@ -123,6 +125,30 @@ class IndexTest extends TestCase
 
         self::assertSame(200, $this->answer['code']);
         self::assertSame([], $this->sleeps);
+    }
+
+    /**
+     * CON-359 (contract v1.33.0 §6): the page's sku — held without a
+     * prefix, also by a page cached before a connect — goes under the
+     * connection's prefix; without one it goes as the page sent it.
+     *
+     * @dataProvider prefixedSkus
+     */
+    public function testTheSkuGoesUnderTheConnectionPrefix(string $prefix, string $expected): void
+    {
+        $this->connectionPrefix = $prefix;
+
+        $this->createRelay([new Response(200, [], '{"ok":true}')])->execute();
+
+        self::assertSame($expected, $this->forwardedEvent()['sku']);
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function prefixedSkus(): array
+    {
+        return ['a prefixed connection' => ['c2-', 'c2-ABC-1'], 'an unprefixed connection' => ['', 'ABC-1']];
     }
 
     public function testATokenNamedInTheBodyIsNotForwarded(): void
@@ -205,6 +231,7 @@ class IndexTest extends TestCase
         $settings->method('isSendingAllowed')->willReturn(true);
         $settings->method('getApiKey')->willReturn('sk_test_key');
         $settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/ingest/browse');
+        $settings->method('getConnectionPrefix')->willReturnCallback(fn (): string => $this->connectionPrefix);
 
         $client = new Client(
             $settings,

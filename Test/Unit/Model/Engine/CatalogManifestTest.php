@@ -190,6 +190,24 @@ class CatalogManifestTest extends TestCase
         self::assertSame([0, 2, 3], $this->cursors);
     }
 
+    /**
+     * CON-359 (contract v1.33.0 §3c): every sku of the list goes under the
+     * connection's prefix — the list covers the connection's own products
+     * — and the Log row keeps the list as it was sent.
+     */
+    public function testTheListsSkusGoUnderTheConnectionPrefix(): void
+    {
+        $this->settings->method('getConnectionPrefix')->willReturn('c2-');
+        $this->catalog([[$this->product(1), $this->product(2)]]);
+        $sent = [['sku' => 'c2-SKU-1', 'in_stock' => true], ['sku' => 'c2-SKU-2', 'in_stock' => false]];
+        $this->client->expects(self::once())->method('catalogManifest')->with($sent)->willReturn(['ok' => true]);
+        $this->queue->method('newEvent')->willReturn($this->event);
+        $this->queue->expects(self::once())->method('recordExchange')
+            ->with($this->event, ['products' => $sent], self::anything());
+
+        $this->manifest()->send($this->primary());
+    }
+
     public function testTheLogRowKeepsASampleOfTheListAndCountsTheRest(): void
     {
         $products = [];

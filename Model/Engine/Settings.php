@@ -77,6 +77,19 @@ class Settings
      */
     public const XML_PATH_WEBSITE_CONNECTION = 'smaily_connect/intelligence/website_connection';
 
+    /**
+     * The code prefix the engine gave this connection (contract v1.33.0 §1
+     * `config.connection.prefix`, CON-359): `c<N>-`, or '' for a connection
+     * without one. Every product and order key the extension sends starts
+     * with it (Payload\ConnectionPrefix). The primary's disconnect keeps it:
+     * the next setup exchange reports it as `connection.previous_prefix`, so
+     * a reconnect gets the same prefix back.
+     */
+    public const XML_PATH_CONNECTION_PREFIX = 'smaily_connect/intelligence/connection_prefix';
+
+    /** The prefix shape the engine assigns (contract v1.33.0 "Connection prefix"). */
+    public const CONNECTION_PREFIX_PATTERN = '/^c[1-9][0-9]{0,3}-$/D';
+
     /** Every path a website-scope connection holds; its clear() removes them all. */
     public const WEBSITE_PATHS = [
         self::XML_PATH_CONNECTED,
@@ -93,6 +106,7 @@ class Settings
         self::XML_PATH_EMAIL_WORKFLOWS,
         self::XML_PATH_SMAILY_SUBDOMAIN,
         self::XML_PATH_WEBSITE_CONNECTION,
+        self::XML_PATH_CONNECTION_PREFIX,
     ];
 
     /** In-request memo: a refusal recorded mid-run must stop the rest of it. */
@@ -305,6 +319,79 @@ class Settings
     }
 
     /**
+     * The code prefix to put in front of every key this connection sends
+     * (CON-359): '' when not connected and for a connection without one.
+     */
+    public function getConnectionPrefix(): string
+    {
+        if (!$this->isConnected()) {
+            return '';
+        }
+        $prefix = $this->value(self::XML_PATH_CONNECTION_PREFIX);
+
+        return self::isConnectionPrefix($prefix) ? (string)$prefix : '';
+    }
+
+    /**
+     * The prefix this connector held before, for the setup exchange's
+     * `connection.previous_prefix` (contract v1.33.0 §1): the stored one —
+     * the primary keeps it through a disconnect — else '' while a
+     * connection made before the prefix was stored is connected; null when
+     * there is none to report. A website-scope copy reports only its own
+     * connection's: its scope would read the primary's after a disconnect.
+     */
+    public function getPreviousPrefix(): ?string
+    {
+        if ($this->websiteId !== null && !$this->isWebsiteConnection()) {
+            return null;
+        }
+        $prefix = $this->value(self::XML_PATH_CONNECTION_PREFIX);
+        if (self::isConnectionPrefix($prefix)) {
+            return (string)$prefix;
+        }
+
+        return $this->isConnected() ? '' : null;
+    }
+
+    /**
+     * Store the prefix the ping answers (contract v1.33.0 §2) when it
+     * differs from the stored one: the engine's prefix wins.
+     */
+    public function recordConnectionPrefix(string $prefix): void
+    {
+        if (!$this->isConnected() || !self::isConnectionPrefix($prefix)
+            || (string)$this->value(self::XML_PATH_CONNECTION_PREFIX) === $prefix
+        ) {
+            return;
+        }
+
+        $this->write(self::XML_PATH_CONNECTION_PREFIX, $prefix);
+        $this->cleanConfigCache();
+    }
+
+    /**
+     * The `connection.prefix` of a setup exchange's or ping's `config`
+     * block: '' when the block has no `connection` (an engine before
+     * v1.33.0), the prefix when it is '' or `c<N>-`, null for anything else.
+     *
+     * @param array<string, mixed> $config
+     */
+    public static function configPrefix(array $config): ?string
+    {
+        if (!array_key_exists('connection', $config)) {
+            return '';
+        }
+        $prefix = is_array($config['connection']) ? ($config['connection']['prefix'] ?? null) : null;
+
+        return self::isConnectionPrefix($prefix) ? (string)$prefix : null;
+    }
+
+    private static function isConnectionPrefix(mixed $prefix): bool
+    {
+        return is_string($prefix) && ($prefix === '' || preg_match(self::CONNECTION_PREFIX_PATTERN, $prefix) === 1);
+    }
+
+    /**
      * Record the Smaily account of a connection made before storeExchange()
      * recorded it (the data patch RecordEngineConnectionAccount).
      */
@@ -347,6 +434,13 @@ class Settings
             $this->serializer->serialize($response['config'] ?? [])
         );
         $this->write(self::XML_PATH_ISSUED_AT, (string)($response['issued_at'] ?? ''));
+        // Over the last connection's prefix (Client::setupExchange() refused
+        // a reply whose prefix has the wrong shape).
+        $config = $response['config'] ?? null;
+        $this->write(
+            self::XML_PATH_CONNECTION_PREFIX,
+            is_array($config) ? (self::configPrefix($config) ?? '') : ''
+        );
         $this->write(self::XML_PATH_CONNECTED, '1');
         // The pushed workflows of an earlier connection — maybe another
         // store's — are not this one's: the next §23 read brings its own.
@@ -373,7 +467,8 @@ class Settings
     /**
      * Remove the tenant connection (disconnect). A website-scope copy
      * removes every row of its scope (WEBSITE_PATHS); the primary keeps its
-     * browse tracking choice for the next connect, as it always has.
+     * browse tracking choice for the next connect, as it always has, and
+     * its connection prefix for the next setup exchange to report.
      */
     public function clear(): void
     {

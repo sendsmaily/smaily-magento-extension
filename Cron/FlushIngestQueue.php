@@ -17,6 +17,7 @@ use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\IngestPace;
+use Smaily\Connect\Model\Engine\Payload\ConnectionPrefix;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Logger\Logger;
@@ -60,7 +61,12 @@ use Smaily\Connect\Model\Privacy\OptOutReplay;
  * The catalog_remove domain (§3b product-level removal, PRO-1231) is NOT
  * D6 and gets its own flush path: on a 2xx every batched id was applied —
  * an id in `not_found` is a contract-defined success ("already removed, or
- * never sent"), recorded as the row's outcome, never retried.
+ * never sent"), recorded as the row's outcome, never retried; only an id
+ * its `errors[]` names (outside the calling connection, v1.33.0) fails.
+ *
+ * Every key goes out under the connection's code prefix (contract v1.33.0,
+ * CON-359: Payload\ConnectionPrefix): the rows hold them without it, and
+ * each row keeps the item as it was sent.
  */
 class FlushIngestQueue
 {
@@ -180,9 +186,12 @@ class FlushIngestQueue
         }
         $client = $this->connections->client($connection);
 
+        // The keys go out under the connection's prefix (CON-359); the rows
+        // hold them without it.
+        $prefix = $connection->settings()->getConnectionPrefix();
         $items = [];
         foreach ($events as $index => $event) {
-            $items[$index] = $this->queue->decodePayload($event);
+            $items[$index] = ConnectionPrefix::item($domain, $this->queue->decodePayload($event), $prefix);
         }
 
         $this->pace->awaitTurn();
@@ -251,8 +260,9 @@ class FlushIngestQueue
 
     /**
      * Send one §3b catalog/remove batch of the connection's rows: one
-     * wrapper of unique product ids. §3b has no per-item errors[] — a 2xx
-     * applies to every id. True when a batch was claimed.
+     * wrapper of unique product ids. §3b has no index-aligned errors[] — a
+     * 2xx applies to every id but one its `errors[]` names (v1.33.0). True
+     * when a batch was claimed.
      */
     private function flushCatalogRemove(Connection $connection): bool
     {
@@ -270,6 +280,7 @@ class FlushIngestQueue
         }
         $client = $this->connections->client($connection);
 
+        $prefix = $connection->settings()->getConnectionPrefix();
         $keyed = [];
         $keyless = [];
         foreach ($events as $event) {
@@ -279,7 +290,8 @@ class FlushIngestQueue
                 $keyless[] = $event;
                 continue;
             }
-            $keyed[] = [$event, $productId];
+            // The id as sent: under the connection's prefix (CON-359).
+            $keyed[] = [$event, $prefix . $productId];
         }
         if ($keyless) {
             // No removal key — terminal, observable skip (never silent).
@@ -325,7 +337,24 @@ class FlushIngestQueue
         $this->stopIfThrottled($connection, $client);
         $this->recordRemoveExchange($client, $keyed);
         $notFound = array_map('strval', (array)($response['not_found'] ?? []));
+        // An id outside the calling connection (contract v1.33.0 §3b
+        // `connection_prefix_mismatch`) was not removed: its row fails, as a
+        // D6 item the engine refused.
+        $refused = [];
+        foreach ((array)($response['errors'] ?? []) as $error) {
+            if (is_array($error) && is_scalar($error['product_id'] ?? null)) {
+                $refused[(string)$error['product_id']] = sprintf(
+                    '%s: %s',
+                    (string)($error['field'] ?? 'product_ids'),
+                    (string)($error['message'] ?? 'rejected by engine')
+                );
+            }
+        }
         foreach ($keyed as [$event, $productId]) {
+            if (isset($refused[$productId])) {
+                $this->queue->markFailedMany([$event], $refused[$productId], true);
+                continue;
+            }
             $this->queue->markSent($event, $this->serializer->serialize([
                 'outcome' => in_array($productId, $notFound, true) ? 'not_found' : 'removed',
                 'removed_products' => (int)($response['removed_products'] ?? 0),

@@ -131,6 +131,7 @@ class SettingsTest extends TestCase
             $default('save', Settings::XML_PATH_ENDPOINTS, '{"catalog":"https:\/\/intelligence.smaily.com\/api\/v1\/catalog"}'),
             $default('save', Settings::XML_PATH_CONFIG, '{"batch_size_max":100}'),
             $default('save', Settings::XML_PATH_ISSUED_AT, '2026-11-03T10:00:00Z'),
+            $default('save', Settings::XML_PATH_CONNECTION_PREFIX, ''),
             $default('save', Settings::XML_PATH_CONNECTED, '1'),
             $default('delete', Settings::XML_PATH_EMAIL_WORKFLOWS),
             $default('save', Settings::XML_PATH_SMAILY_SUBDOMAIN, 'shop'),
@@ -149,9 +150,9 @@ class SettingsTest extends TestCase
             $default('delete', Settings::XML_PATH_SMAILY_SUBDOMAIN),
         ], $this->calls);
         self::assertSame(
-            [Settings::XML_PATH_BROWSE_TRACKING => '1'],
+            [Settings::XML_PATH_BROWSE_TRACKING => '1', Settings::XML_PATH_CONNECTION_PREFIX => ''],
             $this->rows['default'][0],
-            'A disconnect keeps the browse tracking choice'
+            'A disconnect keeps the browse tracking choice and the connection prefix'
         );
         self::assertNull($settings->getWebsiteId());
         self::assertFalse($settings->isWebsiteConnection());
@@ -298,6 +299,126 @@ class SettingsTest extends TestCase
         self::assertFalse($primary->isConnected());
         self::assertTrue($finland->isConnected());
         self::assertSame('t_3', $finland->getTenantId());
+    }
+
+    /**
+     * CON-359 (contract v1.33.0 §1): the connection's code prefix comes
+     * from the setup exchange's `config.connection.prefix`; an engine
+     * before v1.33.0 answers none, which is the prefix ''. It applies only
+     * while connected.
+     */
+    public function testTheConnectionPrefixIsTheOneTheSetupExchangeAnswered(): void
+    {
+        $settings = $this->createScopedSettings();
+        self::assertSame('', $settings->getConnectionPrefix());
+
+        $settings->storeExchange(['api_key' => 'k', 'config' => ['connection' => ['prefix' => 'c2-']]], 'shop');
+        self::assertSame('c2-', $settings->getConnectionPrefix());
+
+        $settings->storeExchange(['api_key' => 'k', 'config' => ['batch_size_max' => 100]], 'shop');
+        self::assertSame('', $settings->getConnectionPrefix(), 'An engine before v1.33.0');
+
+        $this->rows['default'][0][Settings::XML_PATH_CONNECTION_PREFIX] = 'c2-';
+        $settings->clear();
+        self::assertSame('', $settings->getConnectionPrefix(), 'Not connected');
+    }
+
+    /**
+     * CON-359: a reconnect reports the prefix the connection had, so the
+     * engine gives it back — the primary keeps it through a disconnect; a
+     * connection made before the prefix was stored held ''; a store that
+     * never connected reports none.
+     */
+    public function testAReconnectReportsThePrefixTheConnectionHad(): void
+    {
+        $settings = $this->createScopedSettings();
+        self::assertNull($settings->getPreviousPrefix(), 'Never connected');
+
+        $this->rows['default'][0] += [Settings::XML_PATH_CONNECTED => '1', Settings::XML_PATH_API_KEY => 'encrypted'];
+        self::assertSame('', $settings->getPreviousPrefix(), 'Connected before the prefix was stored');
+
+        $settings->storeExchange(['api_key' => 'k', 'config' => ['connection' => ['prefix' => 'c7-']]], 'shop');
+        self::assertSame('c7-', $settings->getPreviousPrefix());
+
+        $settings->clear();
+        self::assertSame('c7-', $settings->getPreviousPrefix(), 'Kept through the disconnect');
+    }
+
+    /**
+     * CON-359 (contract v1.33.0 §2): the ping's prefix wins over the stored
+     * one; the same one writes nothing, and nothing is stored while not
+     * connected or for a prefix of the wrong shape.
+     */
+    public function testThePingsPrefixWinsOverTheStoredOne(): void
+    {
+        $settings = $this->createScopedSettings();
+        $settings->recordConnectionPrefix('c3-');
+        self::assertArrayNotHasKey(Settings::XML_PATH_CONNECTION_PREFIX, $this->rows['default'][0]);
+
+        $settings->storeExchange(['api_key' => 'k', 'config' => ['connection' => ['prefix' => 'c2-']]], 'shop');
+        $this->calls = [];
+        $settings->recordConnectionPrefix('c2-');
+        self::assertSame([], $this->calls, 'The same prefix writes nothing');
+
+        $settings->recordConnectionPrefix('c3-');
+        self::assertSame('c3-', $settings->getConnectionPrefix());
+
+        $settings->recordConnectionPrefix('../');
+        self::assertSame('c3-', $settings->getConnectionPrefix());
+    }
+
+    /**
+     * @dataProvider configPrefixes
+     * @param array<string, mixed> $config
+     */
+    public function testTheConfigBlocksPrefixIsReadByTheContractsShape(array $config, ?string $expected): void
+    {
+        self::assertSame($expected, Settings::configPrefix($config));
+    }
+
+    /**
+     * @return array<string, array{0: array<string, mixed>, 1: string|null}>
+     */
+    public static function configPrefixes(): array
+    {
+        return [
+            'an engine before v1.33.0' => [['history' => []], ''],
+            'a connection without a prefix' => [['connection' => ['prefix' => '']], ''],
+            'a prefix' => [['connection' => ['prefix' => 'c2-']], 'c2-'],
+            'the longest prefix' => [['connection' => ['prefix' => 'c9999-']], 'c9999-'],
+            'no prefix in the block' => [['connection' => []], null],
+            'a prefix from zero' => [['connection' => ['prefix' => 'c0-']], null],
+            'upper case' => [['connection' => ['prefix' => 'C2-']], null],
+            'too long' => [['connection' => ['prefix' => 'c10000-']], null],
+            'a trailing newline' => [['connection' => ['prefix' => "c2-\n"]], null],
+            'not a string' => [['connection' => ['prefix' => 2]], null],
+        ];
+    }
+
+    /**
+     * CON-359, CON-237: each connection holds its own prefix; a website
+     * reports a previous prefix only while it holds a connection of its
+     * own, never the primary's its scope would read after a disconnect.
+     */
+    public function testEachConnectionHoldsItsOwnPrefix(): void
+    {
+        $primary = $this->createScopedSettings();
+        $primary->storeExchange(['api_key' => 'k', 'config' => ['connection' => ['prefix' => 'c1-']]], 'shop');
+        $latvia = $primary->withWebsite(2);
+        self::assertNull($latvia->getPreviousPrefix());
+
+        $latvia->storeExchange(['api_key' => 'k', 'config' => ['connection' => ['prefix' => 'c4-']]], 'shop-lv');
+        $finland = $primary->withWebsite(3);
+        $finland->storeExchange(['api_key' => 'k', 'config' => []], 'shop-fi');
+
+        self::assertSame('c1-', $primary->getConnectionPrefix());
+        self::assertSame('c4-', $latvia->getConnectionPrefix());
+        self::assertSame('', $finland->getConnectionPrefix(), 'Its own empty value, not the primary\'s');
+        self::assertSame('c4-', $latvia->getPreviousPrefix());
+
+        $latvia->clear();
+        self::assertNull($latvia->getPreviousPrefix());
+        self::assertSame('c1-', $primary->getConnectionPrefix());
     }
 
     /**

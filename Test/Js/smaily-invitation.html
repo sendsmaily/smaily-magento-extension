@@ -1,0 +1,260 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the invitation to connect a Smaily account (CON-364,
+  as the WooCommerce plugin's CON-351 banner): the real templates —
+  panel/smaily-invitation-banner.phtml on top of setup step 1 of
+  wizard/index.phtml (with panel/connection.phtml and panel/panels-js.phtml)
+  and on its own as the Dashboard draws it — rendered in en_US and et_EE by
+  Test/Js/render-admin.php into Test/Js/build/, with the admin stylesheet
+  and jQuery from vendor/, one fresh frame per scenario. Stubbed:
+  RequireJS's require() and the requests (fetch).
+
+  Checked: on setup step 1 the banner shows the invitation's text,
+  "Connect your Smaily account", "Create a Smaily account" (Smaily's sign-up
+  page, a new tab), the API-user note and the decorative panel (hidden from
+  assistive technology, Welcome email and Abandoned cart reminder, each
+  "Automated"), with no Dismiss; "Connect your Smaily account" goes to the
+  Subdomain field, opening a finished setup's form first; the panels'
+  boot with Campaign Intelligence connected leaves it alone. On the
+  Dashboard it carries "Connect your Smaily account" to Settings >
+  Connection and Dismiss to the dismiss link with the form key. No banner
+  once a Smaily account is connected, nor on the Dashboard once dismissed.
+
+  Run it with bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>smaily invitation harness</title>
+    <script src="build/invite-setup.en_US.js"></script>
+    <script src="build/invite-setup.et_EE.js"></script>
+    <script src="build/invite-setup-completed.en_US.js"></script>
+    <script src="build/invite-setup-completed.et_EE.js"></script>
+    <script src="build/invite-setup-connected.en_US.js"></script>
+    <script src="build/invite-setup-connected.et_EE.js"></script>
+    <script src="build/invite-dashboard.en_US.js"></script>
+    <script src="build/invite-dashboard.et_EE.js"></script>
+    <script src="build/invite-dashboard-dismissed.en_US.js"></script>
+    <script src="build/invite-dashboard-dismissed.et_EE.js"></script>
+    <script src="build/invite-dashboard-connected.en_US.js"></script>
+    <script src="build/invite-dashboard-connected.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var CSS = '../../view/adminhtml/web/css/smaily-admin.css';
+    var BODY = 'Connect your store to Smaily to sync contacts and set up automated emails.';
+    var NOTE = 'Log in to Smaily: gear icon → Integrations → Create a new user (API username and password).';
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    // Runs in the frame before the page: the admin's form key, RequireJS's
+    // require() for a page script that asks for jQuery, and every request
+    // answered with an empty success.
+    function stubs() {
+        return [
+            '<link rel="stylesheet" href="' + CSS + '">',
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.require = function (deps, callback) { callback(window.jQuery); };',
+            'window.fetch = function () {',
+            '  return Promise.resolve(new Response("{}", {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>'
+        ].join('\n');
+    }
+
+    function open(page) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.style.width = '1200px';
+            frame.style.height = '900px';
+            frame.onload = function () {
+                wait(100).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs()
+                + '</head><body>' + rendered.html + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function shown(element) {
+        return !!element && element.offsetParent !== null;
+    }
+
+    function text(element) {
+        return element ? element.textContent.trim() : '';
+    }
+
+    function banner(doc) {
+        return doc.querySelector('.smaily-ci-banner--smaily');
+    }
+
+    function action(element, name) {
+        return element.querySelector('[data-action="' + name + '"]');
+    }
+
+    // What both placements share: the words, the sign-up link and the panel.
+    function common(locale, where, element, strings) {
+        var rows = element.querySelectorAll('.smaily-ci-banner__row'),
+            signup = action(element, 'signup'),
+            panel = element.querySelector('.smaily-ci-banner__panel');
+
+        check(locale + ', ' + where + ': the invitation\'s text and note',
+            text(element.querySelector('.smaily-ci-banner__title')) === 'Smaily'
+            && text(element.querySelector('.smaily-ci-banner__body')) === strings[BODY]
+            && text(element.querySelector('.smaily-ci-banner__note')) === strings[NOTE]
+            && element.getAttribute('aria-label') === 'Smaily');
+        check(locale + ', ' + where + ': "Create a Smaily account" opens Smaily\'s sign-up page in a new tab',
+            text(signup) === strings['Create a Smaily account'] && shown(signup)
+            && signup.getAttribute('href') === 'https://www.sendsmaily.net'
+            && signup.getAttribute('target') === '_blank'
+            && signup.getAttribute('rel') === 'noopener noreferrer');
+        check(locale + ', ' + where + ': the panel shows the automations Magento has, each automated, for the eye only',
+            panel.getAttribute('aria-hidden') === 'true'
+            && text(panel.querySelector('.smaily-ci-banner__panel-label')) === strings['Smaily in action']
+            && rows.length === 2
+            && text(rows[0].querySelector('.smaily-ci-banner__row-text')) === strings['Welcome email']
+            && text(rows[1].querySelector('.smaily-ci-banner__row-text')) === strings['Abandoned cart reminder']
+            && Array.prototype.every.call(rows, function (row) {
+                return text(row.querySelector('.smaily-ci-banner__chip')) === strings.Automated;
+            }));
+    }
+
+    async function setup(locale) {
+        var page = 'invite-setup.' + locale,
+            strings = window.smailyAdminPages[page].strings,
+            frame = await open(page),
+            doc = frame.contentDocument,
+            element = banner(doc),
+            connect = element && action(element, 'connect'),
+            field = doc.getElementById('smaily-w-subdomain');
+
+        if (locale !== 'en_US') {
+            check(locale + ': the invitation is translated', strings[BODY] !== BODY && strings[NOTE] !== NOTE
+                && strings['Create a Smaily account'] !== 'Create a Smaily account');
+        }
+        check(locale + ', setup: the banner sits on top of step 1, above its heading',
+            shown(element) && element.closest('.smaily-step-panel').getAttribute('data-step') === '1'
+            && !!(element.compareDocumentPosition(doc.querySelector('[data-step="1"] .smaily-step-head'))
+                & Node.DOCUMENT_POSITION_FOLLOWING));
+        common(locale, 'setup', element, strings);
+        check(locale + ', setup: no Dismiss', !element.querySelector('.smaily-ci-banner__dismiss'));
+        check(locale + ', setup: "Connect your Smaily account" is a button',
+            connect.tagName === 'BUTTON' && text(connect) === strings['Connect your Smaily account']);
+        connect.click();
+        check(locale + ', setup: "Connect your Smaily account" goes to the Subdomain field',
+            doc.activeElement === field);
+        frame.remove();
+
+        frame = await open('invite-setup-completed.' + locale);
+        doc = frame.contentDocument;
+        element = banner(doc);
+        check(locale + ', finished setup: the banner shows with the summary, the form closed,'
+            + ' Campaign Intelligence connected',
+            shown(element) && shown(doc.getElementById('smaily-w-summary'))
+            && !shown(doc.getElementById('smaily-w-subdomain')));
+        action(element, 'connect').click();
+        check(locale + ', finished setup: "Connect your Smaily account" opens the form at the Subdomain field',
+            shown(doc.getElementById('smaily-w-subdomain'))
+            && doc.activeElement === doc.getElementById('smaily-w-subdomain'));
+        frame.remove();
+
+        frame = await open('invite-setup-connected.' + locale);
+        check(locale + ', setup: no banner once a Smaily account is connected',
+            !banner(frame.contentDocument) && shown(frame.contentDocument.getElementById('smaily-w-summary')));
+        frame.remove();
+    }
+
+    async function dashboard(locale) {
+        var page = 'invite-dashboard.' + locale,
+            strings = window.smailyAdminPages[page].strings,
+            frame = await open(page),
+            element = banner(frame.contentDocument),
+            connect = action(element, 'connect'),
+            dismiss = element.querySelector('.smaily-ci-banner__dismiss');
+
+        common(locale, 'Dashboard', element, strings);
+        check(locale + ', Dashboard: "Connect your Smaily account" opens Settings > Connection',
+            connect.tagName === 'A' && text(connect) === strings['Connect your Smaily account']
+            && connect.getAttribute('href') === 'https://store.example/admin/smaily_connect/settings/?tab=connection'
+            && !connect.hasAttribute('target'));
+        check(locale + ', Dashboard: Dismiss is the dismiss link with the form key',
+            shown(dismiss) && text(dismiss) === strings.Dismiss
+            && dismiss.getAttribute('href')
+                === 'https://store.example/admin/smaily_connect/invitation/dismiss/?form_key=form-key');
+        frame.remove();
+
+        frame = await open('invite-dashboard-dismissed.' + locale);
+        check(locale + ', Dashboard: no banner once dismissed', !banner(frame.contentDocument));
+        frame.remove();
+
+        frame = await open('invite-dashboard-connected.' + locale);
+        check(locale + ', Dashboard: no banner once a Smaily account is connected', !banner(frame.contentDocument));
+        frame.remove();
+    }
+
+    (async function () {
+        try {
+            for (var locale of ['en_US', 'et_EE']) {
+                log('# ' + locale);
+                await setup(locale);
+                await dashboard(locale);
+            }
+        } catch (error) {
+            failures++;
+            log('FAIL ' + (error && error.stack ? error.stack : error));
+        }
+        clearInterval(keepAlive);
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    })();
+</script>
+</body>
+</html>

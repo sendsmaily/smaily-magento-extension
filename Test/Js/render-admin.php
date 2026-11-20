@@ -2270,6 +2270,106 @@ $pages['ci-banner-dashboard'] = [
     'strings' => $bannerStrings,
 ];
 
+/*
+ * The invitation to connect a Smaily account (CON-364):
+ * panel/smaily-invitation-banner.phtml on top of setup step 1 (no Dismiss)
+ * and on the Dashboard (dismissible). invite-setup: the setup not finished,
+ * the form shown; invite-setup-completed: a finished setup's summary, the
+ * form behind Edit credentials, Campaign Intelligence connected (the panels
+ * hide its banners at boot, not this one); invite-setup-connected: a Smaily
+ * account connected; invite-dashboard(-dismissed, -connected): the
+ * Dashboard's banner, dismissed in the last 90 days, a Smaily account
+ * connected.
+ */
+$invitationViewModel = static fn (bool $due = true, bool $dismissed = false): object => new class ($due, $dismissed) {
+    /**
+     * @param bool $due
+     * @param bool $dismissed
+     */
+    public function __construct(private readonly bool $due, private readonly bool $dismissed)
+    {
+    }
+
+    /**
+     * @return bool
+     */
+    public function isDue(): bool
+    {
+        return $this->due;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isDismissed(): bool
+    {
+        return $this->dismissed;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSignupUrl(): string
+    {
+        return 'https://www.sendsmaily.net';
+    }
+
+    /**
+     * @return string
+     */
+    public function getConnectUrl(): string
+    {
+        return 'https://store.example/admin/smaily_connect/settings/?tab=connection';
+    }
+
+    /**
+     * @return string
+     */
+    public function getDismissUrl(): string
+    {
+        return 'https://store.example/admin/smaily_connect/invitation/dismiss/?form_key=form-key';
+    }
+};
+$invitationStrings = [
+    'Connect your store to Smaily to sync contacts and set up automated emails.',
+    'Connect your Smaily account',
+    'Create a Smaily account',
+    'Log in to Smaily: gear icon → Integrations → Create a new user (API username and password).',
+    'Smaily in action',
+    'Welcome email',
+    'Abandoned cart reminder',
+    'Automated',
+    'Dismiss',
+];
+$invitationTemplate = $root . '/view/adminhtml/templates/panel/smaily-invitation-banner.phtml';
+$pages['invite-setup'] = [
+    'template' => $pages['setup-websites']['template'],
+    'viewModel' => $pages['setup-websites']['viewModel'],
+    'data' => ['children' => $pages['setup-websites']['data']['children']
+        + ['invitation.banner' => [$invitationTemplate, $invitationViewModel(), []]]],
+    'strings' => $invitationStrings,
+];
+foreach (['invite-setup-completed' => true, 'invite-setup-connected' => false] as $page => $due) {
+    $pages[$page] = [
+        'template' => $setupCompleted['template'],
+        'viewModel' => $intelligenceViewModel('', true),
+        'data' => ['children' => $setupCompleted['data']['children']
+            + ['invitation.banner' => [$invitationTemplate, $invitationViewModel($due), []]]],
+        'strings' => $invitationStrings,
+    ];
+}
+foreach ([
+    'invite-dashboard' => $invitationViewModel(),
+    'invite-dashboard-dismissed' => $invitationViewModel(true, true),
+    'invite-dashboard-connected' => $invitationViewModel(false),
+] as $page => $invitation) {
+    $pages[$page] = [
+        'template' => [[$invitationTemplate, $invitation, ['dismissible' => true]]],
+        'viewModel' => null,
+        'strings' => $invitationStrings,
+    ];
+}
+
 $render = static function (string $template, object $block, Escaper $escaper): string {
     ob_start();
     include $template;

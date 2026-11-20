@@ -2756,6 +2756,32 @@ Initial setup, Settings, Log. Design rules:
   - Connected, Settings > Intelligence shows **Show recommendations in your
     store**: the **Smaily recommendations** widget, who sees it, and a
     link to the guide's `UserGuide::SECTION_STOREFRONT_RECOMMENDATIONS`.
+  - No Smaily marketing account connected, no Campaign Intelligence
+    banner: the Smaily invitation below shows instead. Its banner shares
+    this card (`smaily-ci-banner--smaily`, no `data-variant`), so the
+    scripts that drive or hide these banners select
+    `.smaily-ci-banner[data-variant]`.
+- **The Smaily invitation (CON-364, as the WooCommerce plugin's CON-321 /
+  CON-351).** `ViewModel\Adminhtml\SmailyInvitationData` decides it: due
+  while `ReportBuilder::mainCredentials()` is null (no Smaily marketing
+  account; a Transactional account alone does not count) and only for an
+  admin with `Smaily_Connect::config`. `panel/smaily-invitation-banner.phtml`
+  draws marketing's banner (body, **Connect your Smaily account**, **Create
+  a Smaily account** to `https://www.sendsmaily.net`, the API-user note, a
+  decorative panel with the two automations Magento has — the WooCommerce
+  plugin's third row, Payment reminder, is not one) on top of setup step 1,
+  where it cannot be closed and the button goes to the first Subdomain
+  field, and on the Dashboard (`dismissible`), where the button opens
+  Settings > Connection. Magento has no WordPress admin notices, so the
+  one-line notice is an admin system message,
+  `Model\Adminhtml\SmailyInvitationNotice` (major, so Magento's message
+  bar counts it), with the same links plus the guide's
+  `UserGuide::SECTION_SETUP_CONNECT`. Dismiss on either is a GET link, as
+  Magento's own "Mark as Read" (`Controller\Adminhtml\Invitation\Dismiss`:
+  the admin URL's secret key, and the form key in the query, checked
+  there); it keeps the time at the default scope
+  (`smaily_connect/internal/invitation_dismissed_at`) and hides both for
+  90 days, then returns to the page.
 - **Dashboard is operational truth.** Every number on
   `dashboard/index.phtml` is a real local queue query
   (`Model\Adminhtml\DashboardStats`); the health verdict reuses the

@@ -103,6 +103,7 @@ $strings = [
         </div>
     </div>
 </div>
+<?= /* @noEscape */ $block->fetchView($block->getTemplateFile('Smaily_Connect::panel/modal-js.phtml')) ?>
 <script>
 require(['jquery'], function ($) {
     'use strict';
@@ -119,7 +120,10 @@ require(['jquery'], function ($) {
     var opening = 0;
     var hintTimer = null;
     var $modal = $('#smaily-design-modal').appendTo(document.body);
-    var $dialog = $modal.find('.smaily-design-modal__dialog');
+    // Showing, hiding, focus and Escape: panel/modal-js.phtml.
+    var modal = window.smailyModal($, $modal, function () {
+        closeModal();
+    });
     var $body = $modal.find('.smaily-design-modal__body');
     var $loading = $modal.find('.smaily-design-modal__loading');
     var $hint = $modal.find('.smaily-design-modal__hint');
@@ -246,16 +250,10 @@ require(['jquery'], function ($) {
     document.addEventListener('visibilitychange', onReturn);
 
     // --- The modal --------------------------------------------------------
-    function focusables() {
-        return $dialog.find('button, iframe, a[href]').filter(function () {
-            return !$(this).closest('[hidden]').length;
-        });
-    }
-
     function openModal(key, $slot, $trigger) {
         var ticket = ++opening,
             name;
-        current = {key: key, slot: $slot, trigger: $trigger};
+        current = {key: key, slot: $slot};
         name = $slot.closest('.smaily-engine-trigger').find('.smaily-engine-trigger__name').first().text();
         $modal.find('.smaily-design-modal__title').text(strings.title.replace('%1', function () {
             return name;
@@ -264,9 +262,7 @@ require(['jquery'], function ($) {
         $loading.prop('hidden', false);
         $hint.prop('hidden', true);
         $error.prop('hidden', true);
-        $modal.prop('hidden', false);
-        $('html').addClass('smaily-design-modal-open');
-        $modal.find('.smaily-design-modal__close').trigger('focus');
+        modal.show($trigger);
 
         requestLink(key).then(function (url) {
             var $frame;
@@ -298,31 +294,19 @@ require(['jquery'], function ($) {
     // Closing ends the frame and reads the list again, unless the design
     // page moved to a tab, whose return reads it.
     function closeModal(reread) {
-        var $trigger;
         if (!current) {
             return;
         }
-        $trigger = current.trigger;
         current = null;
         opening++;
         clearTimeout(hintTimer);
         $body.find('iframe').remove();
-        $modal.prop('hidden', true);
-        $('html').removeClass('smaily-design-modal-open');
-        if ($trigger && $trigger.length && document.contains($trigger[0])) {
-            $trigger.trigger('focus');
-        }
+        modal.hide();
         if (reread !== false) {
             readDesigns();
         }
     }
 
-    $modal.find('.smaily-design-modal__close').on('click', function () {
-        closeModal();
-    });
-    $modal.find('.smaily-design-modal__backdrop').on('click', function () {
-        closeModal();
-    });
     // A fresh link in a new tab: the frame's link is used up once opened.
     $modal.find('.smaily-design-modal__newtab').on('click', function () {
         var key, $slot;
@@ -333,37 +317,6 @@ require(['jquery'], function ($) {
         $slot = current.slot;
         closeModal(false);
         openInTab(key, $slot);
-    });
-
-    $(document).on('keydown', function (event) {
-        var $items, first, last;
-        if (!current) {
-            return;
-        }
-        if (event.key === 'Escape') {
-            event.preventDefault();
-            closeModal();
-            return;
-        }
-        if (event.key !== 'Tab') {
-            return;
-        }
-        // Focus stays inside the modal while it is open.
-        $items = focusables();
-        first = $items.get(0);
-        last = $items.get($items.length - 1);
-        if (event.shiftKey && (document.activeElement === first || !$dialog[0].contains(document.activeElement))) {
-            event.preventDefault();
-            last.focus();
-        } else if (!event.shiftKey && (document.activeElement === last || !$dialog[0].contains(document.activeElement))) {
-            event.preventDefault();
-            first.focus();
-        }
-    });
-    document.addEventListener('focusin', function (event) {
-        if (current && !$dialog[0].contains(event.target)) {
-            focusables().first().trigger('focus');
-        }
     });
 
     // The design page's messages (§22 Embedding rule 4): a hint to read

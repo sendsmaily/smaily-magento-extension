@@ -317,10 +317,11 @@ class HistoryProgressTest extends TestCase
     }
 
     /**
-     * As the WooCommerce plugin's sequence ends: while the orders import is
-     * still queued, a catalog or customers import cancelled after the
-     * import began stops it, `started` with `cancelled`. One cancelled
-     * before the import began is not this import's.
+     * As the WooCommerce plugin's sequence ends: before the orders import
+     * began, a catalog or customers import cancelled after the import
+     * began stops it (that cancel cancels the queued orders import too),
+     * `started` with `cancelled`, once that import's rows are delivered.
+     * One cancelled before the import began is not this import's.
      *
      * @dataProvider partsBeforeTheOrdersProvider
      */
@@ -333,6 +334,7 @@ class HistoryProgressTest extends TestCase
         $this->progress()->report();
         self::assertCount(0, $this->calls, 'Cancelled before this import began');
 
+        $this->jobs[9] = $this->job(9, Job::TYPE_ORDERS, Job::STATUS_CANCELLED, 1000, 0, '2027-01-15 08:20:00');
         $this->jobs[$id] = $this->job($id, $jobType, Job::STATUS_CANCELLED, 500, 120, '2027-01-15 08:20:00');
         $this->undelivered[(string)$id] = 1;
         $this->progress()->report();
@@ -560,6 +562,10 @@ class HistoryProgressTest extends TestCase
                 'total_count' => $total,
                 'completed_at' => $completedAt,
                 'error_message' => $errorMessage,
+                // A queued or cancelled job here never started.
+                'started_at' => in_array($status, [Job::STATUS_PENDING, Job::STATUS_CANCELLED], true)
+                    ? null
+                    : '2027-01-15 08:00:30',
                 default => null,
             }
         );

@@ -427,6 +427,47 @@ class JobManager
     }
 
     /**
+     * The merchant's cancel of a Campaign Intelligence import (its card's
+     * Cancel import, the Hold back the import of a connect), as the
+     * WooCommerce plugin's cancel ends its import sequence (CON-247,
+     * CON-367): the import's active jobs are cancelled (requestCancel()),
+     * and so are the imports queued behind it — each connection's engine
+     * jobs still pending (never started) with a higher id than its latest
+     * job of this type, which the tick would run after it. A job that
+     * already runs is left alone.
+     *
+     * @return int number of jobs of this type cancelled
+     */
+    public function cancelEngineSequence(string $jobType, ?int $websiteId = null): int
+    {
+        $select = $this->connection()->select()
+            ->from($this->table(), ['website_id', 'last' => 'MAX(id)'])
+            ->where('job_type = ?', $jobType)
+            ->where('target = ?', Job::TARGET_ENGINE)
+            ->group('website_id');
+        if ($websiteId !== null) {
+            $select->where('website_id = ?', $websiteId);
+        }
+        $latest = $this->connection()->fetchPairs($select);
+
+        $cancelled = $this->requestCancel($jobType, Job::TARGET_ENGINE, $websiteId);
+        foreach ($latest as $connectionKey => $lastId) {
+            $this->connection()->update(
+                $this->table(),
+                ['status' => Job::STATUS_CANCELLED, 'completed_at' => $this->dateTime->gmtDate()],
+                [
+                    'target = ?' => Job::TARGET_ENGINE,
+                    'website_id = ?' => (int)$connectionKey,
+                    'status = ?' => Job::STATUS_PENDING,
+                    'id > ?' => (int)$lastId,
+                ]
+            );
+        }
+
+        return $cancelled;
+    }
+
+    /**
      * Fresh read of the persisted status — the page-boundary cancel check
      * for workers holding a possibly stale in-memory job.
      */

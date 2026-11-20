@@ -44,12 +44,14 @@ use Smaily\Connect\Model\Logger\Logger;
  *     JobManager::STALLED_SECONDS — the WooCommerce plugin's test needs
  *     Action Scheduler, and the wait keeps a cron outage that ends from
  *     counting as one);
- *   - before its orders import began (still queued), its catalog or
- *     customers import was cancelled after the import began
- *     (`cancelled`, phase `started`) — where the WooCommerce plugin's
- *     sequence ends. Once the orders import runs, only it counts; a failed
- *     or stalled catalog or customers import never stops the import (the
- *     plugin's sequence moves on).
+ *   - before its orders import began, its catalog or customers import was
+ *     cancelled after the import began (`cancelled`, phase `started`; the
+ *     report waits for that import's rows) — the cancel ends the sequence
+ *     as in the WooCommerce plugin: the orders import queued behind it is
+ *     cancelled too (JobManager::cancelEngineSequence()). Once the orders
+ *     import runs, only it counts; a failed or stalled catalog or
+ *     customers import never stops the import (the plugin's sequence moves
+ *     on).
  * A part stopped because the account was refused or the connection is gone
  * (Job::REASON_ENGINE_NOT_ACTIVE) ends the import with no report: the
  * WooCommerce plugin pauses such an import and reports no stop, but
@@ -239,36 +241,33 @@ class HistoryProgress
 
     /**
      * Why the history import stopped before `complete`, with the job of the
-     * part that stopped; null while it goes on. Its orders import, then —
-     * while that one is still queued — the latest catalog or customers
-     * import, when it was cancelled after the import began (an earlier one
-     * is not this import's).
+     * part that stopped; null while it goes on. While the orders import has
+     * not begun, the latest catalog or customers import cancelled after the
+     * import began (an earlier one is not this import's; that cancel also
+     * cancelled the orders import queued behind it,
+     * JobManager::cancelEngineSequence()); then the orders import.
      *
      * @param array<string, mixed> $state HistoryImport::state()
      * @return array{reason: string, job: Job}|null
      */
     private function stopped(array $state, Job $ordersJob, Connection $connection): ?array
     {
-        $reason = $this->stopReason($ordersJob, $connection);
-        if ($reason !== null) {
-            return ['reason' => $reason, 'job' => $ordersJob];
-        }
-        if ($ordersJob->getStatus() !== Job::STATUS_PENDING) {
-            return null;
-        }
-        foreach ([Job::TYPE_CATALOG, Job::TYPE_CUSTOMERS] as $jobType) {
-            $job = $this->jobManager->latest($jobType, Job::TARGET_ENGINE, $connection->key());
-            if ($job !== null && $job->getStatus() === Job::STATUS_CANCELLED
-                && (string)$job->getData('completed_at') >= (string)$state['until']
-            ) {
-                return [
-                    'reason' => $this->notActive($job) ? self::STOP_NOT_ACTIVE : self::STOP_CANCELLED,
-                    'job' => $job,
-                ];
+        if ((string)$ordersJob->getData('started_at') === '') {
+            foreach ([Job::TYPE_CATALOG, Job::TYPE_CUSTOMERS] as $jobType) {
+                $job = $this->jobManager->latest($jobType, Job::TARGET_ENGINE, $connection->key());
+                if ($job !== null && $job->getStatus() === Job::STATUS_CANCELLED
+                    && (string)$job->getData('completed_at') >= (string)$state['until']
+                ) {
+                    return [
+                        'reason' => $this->notActive($job) ? self::STOP_NOT_ACTIVE : self::STOP_CANCELLED,
+                        'job' => $job,
+                    ];
+                }
             }
         }
+        $reason = $this->stopReason($ordersJob, $connection);
 
-        return null;
+        return $reason === null ? null : ['reason' => $reason, 'job' => $ordersJob];
     }
 
     /**

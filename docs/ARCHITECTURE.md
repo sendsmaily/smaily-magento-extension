@@ -360,11 +360,15 @@ below.
   so a cron outage that ends is not one; the plugin's own test needs
   Action Scheduler); or, while the orders job is still queued, the latest
   catalog or customers job was cancelled after the import began
-  (`completed_at` ≥ `until`; `cancelled`, phase `started`) — where the
-  plugin's sequence ends (there the orders import then never starts; here
-  the queued orders job still runs, its rows still reach the engine, and
-  the import stays reported as stopped). A failed or stalled catalog or
-  customers job is
+  (`completed_at` ≥ `until`; `cancelled`, phase `started`, after that
+  job's rows are delivered) — where the plugin's sequence ends: the
+  merchant's cancel of an engine import (`BackfillState` `cancel`,
+  `JobManager::cancelEngineSequence()`; Erkki, 2026-11-20) also cancels
+  each connection's engine jobs still pending with a higher id than that
+  import's latest job — the imports the tick would run after it — and
+  leaves a running one alone, so Hold back the import stops the customers
+  and orders imports queued with the catalog. A failed or stalled catalog
+  or customers job is
   no stop (the plugin's sequence moves on), and once the orders job runs
   only it counts. The plugin pauses an import while the account is
   refused and reports no stop for it; `Cron/BackfillTick` (and
@@ -582,7 +586,10 @@ below.
   `ordersImportStarted`, and
   `panels-js.phtml` then shows an info banner for each import started —
   the catalog one with **Hold back the
-  import**, which posts the BackfillState `cancel` (`requestCancel()`);
+  import**, which posts the BackfillState `cancel`
+  (`cancelEngineSequence()`: the customers and orders jobs queued behind
+  it are cancelled too, as the WooCommerce plugin's Hold back ends its
+  sequence, CON-367);
   the customers and orders ones point to their card's **Cancel import** — and asks
   the Settings tab's Catalog, Customers and Orders cards for their state; the
   Catalog card renders the Hold back's cancel answer, which

@@ -136,8 +136,9 @@ Historical imports > Catalog**) so Campaign Intelligence gets the new links.
 Connecting Campaign Intelligence starts the catalog import, so set the
 Storefront URL before connecting Campaign Intelligence — on a new install,
 on the initial setup's Connect step, which saves it before the setup's
-Intelligence step — or press **Hold back the import** right after connecting and
-run the import once the Storefront URL is set. While no Storefront URL is
+Intelligence step — or press **Hold back the import** right after connecting
+(the customers and orders imports queued behind it do not start either) and
+run the imports once the Storefront URL is set. While no Storefront URL is
 saved, the initial setup's Intelligence step and **Settings > Intelligence**
 say the same under their setup URL field, until Campaign Intelligence is
 connected.

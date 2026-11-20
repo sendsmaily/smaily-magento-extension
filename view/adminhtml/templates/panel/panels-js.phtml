@@ -1325,12 +1325,12 @@ window.smailyPanelsInit = function ($) {
             var $button = $(this).prop('disabled', true);
             result('#smaily-w-engine-catalog-holdback-result', '<?= $escaper->escapeJs(__('Canceling…')) ?>', true);
             post(urls.backfill, {job_type: 'catalog', action: 'cancel'}).then(function (data) {
-                var text = '<?= $escaper->escapeJs(__('The catalog import had already finished, so there was nothing left to hold back.')) ?>';
+                var text = '<?= $escaper->escapeJs(__('The catalog import had already finished, so there was nothing left to hold back of it; the customers and orders imports waiting behind it do not start.')) ?>';
                 if (data.status === 'cancelled') {
                     text = data.processed > 0
-                        ? '<?= $escaper->escapeJs(__('Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?>'
+                        ? '<?= $escaper->escapeJs(__('Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent, and the customers and orders imports waiting behind it do not start. Start each import again any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?>'
                             .replace('%1', data.processed)
-                        : '<?= $escaper->escapeJs(__('Held back: the catalog import is canceled. Start it any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?>';
+                        : '<?= $escaper->escapeJs(__('Held back: the catalog import is canceled, and the customers and orders imports waiting behind it do not start. Start each any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?>';
                 }
                 $button.hide();
                 result('#smaily-w-engine-catalog-holdback-result', text, true);

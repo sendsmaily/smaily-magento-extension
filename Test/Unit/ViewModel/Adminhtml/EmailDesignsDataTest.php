@@ -10,43 +10,36 @@ namespace Smaily\Connect\Test\Unit\ViewModel\Adminhtml;
 
 use Magento\Framework\App\Request\Http as HttpRequest;
 use PHPUnit\Framework\TestCase;
-use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\EmailDesigns;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\ViewModel\Adminhtml\EmailDesignsData;
 
 /**
- * CON-257: the engine lets only the origin of `plugin_info.site_url`, on
- * https, frame its design page (contract §22 Embedding rule 1); any other
- * admin opens the page in a new tab.
+ * CON-257, CON-366: an https admin opens the design page in a frame — on
+ * the origin of `plugin_info.site_url` (contract §22 Embedding rule 1 (a))
+ * or on an origin of its own, which the link names as `frame_origin` (rule
+ * 1 (d)); an http admin opens it in a new tab.
  */
 class EmailDesignsDataTest extends TestCase
 {
     /**
      * @dataProvider originProvider
      */
-    public function testTheDesignPageIsFramedOnlyOnTheSiteOrigin(
-        string $siteUrl,
-        string $scheme,
-        string $host,
-        bool $frameable
-    ): void {
-        self::assertSame($frameable, $this->viewModel($siteUrl, $scheme, $host)->isFrameable());
+    public function testTheDesignPageIsFramedOnAnHttpsAdmin(string $scheme, string $host, bool $frameable): void
+    {
+        self::assertSame($frameable, $this->viewModel($scheme, $host)->isFrameable());
     }
 
     /**
-     * @return array<string, array{string, string, string, bool}>
+     * @return array<string, array{string, string, bool}>
      */
     public static function originProvider(): array
     {
         return [
-            'the storefront host' => ['https://shop.example/', 'https', 'shop.example', true],
-            'a store view path' => ['https://shop.example/et/', 'https', 'shop.example', true],
-            'the default port written out' => ['https://shop.example:443/', 'https', 'shop.example', true],
-            'an admin host of its own' => ['https://shop.example/', 'https', 'admin.shop.example', false],
-            'another port' => ['https://shop.example/', 'https', 'shop.example:8443', false],
-            'plain http' => ['http://shop.example/', 'http', 'shop.example', false],
-            'no site URL' => ['', 'https', 'shop.example', false],
+            'the storefront host' => ['https', 'shop.example', true],
+            'an admin host of its own' => ['https', 'admin.shop.example', true],
+            'another port' => ['https', 'shop.example:8443', true],
+            'plain http' => ['http', 'shop.example', false],
         ];
     }
 
@@ -58,17 +51,14 @@ class EmailDesignsDataTest extends TestCase
         $viewModel = new EmailDesignsData(
             $this->createMock(EmailDesigns::class),
             $settings,
-            $this->createMock(Client::class),
             $this->createMock(HttpRequest::class)
         );
 
         self::assertSame('https://intelligence.smaily.com', $viewModel->getEngineOrigin());
     }
 
-    private function viewModel(string $siteUrl, string $scheme, string $host): EmailDesignsData
+    private function viewModel(string $scheme, string $host): EmailDesignsData
     {
-        $client = $this->createMock(Client::class);
-        $client->method('siteUrl')->willReturn($siteUrl);
         $request = $this->createMock(HttpRequest::class);
         $request->method('getScheme')->willReturn($scheme);
         $request->method('getHttpHost')->with(false)->willReturn($host);
@@ -76,7 +66,6 @@ class EmailDesignsDataTest extends TestCase
         return new EmailDesignsData(
             $this->createMock(EmailDesigns::class),
             $this->createMock(Settings::class),
-            $client,
             $request
         );
     }

@@ -68,6 +68,12 @@ abstract class AbstractEmailDesignAction extends AbstractJsonAction
             ? (string)($exception->getErrorBody()['error'] ?? '')
             : '';
 
+        if ($exception instanceof EngineRequestException
+            && EmailDesigns::refusesFrameOrigin($status, $exception->getErrorBody())) {
+            // The admin's origin may not frame the design page (§22
+            // Embedding rule 1): the modal offers "Open in a new tab".
+            return $this->failure(400, 'frame_origin_not_allowed', (string)__('The design page did not open.'));
+        }
         if ($status === 404 && $error === 'unknown_email') {
             return $this->failure(
                 404,

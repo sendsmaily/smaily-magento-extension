@@ -202,8 +202,8 @@ class SmailyClientTest extends TestCase
         return [
             'HTTP refusal' => [
                 new Response(404, [], 'Not found'),
-                'Smaily API request failed with HTTP 404: Not found',
-                'Smaily API päring ebaõnnestus (HTTP 404): Not found',
+                'Smaily API request failed with HTTP 404',
+                'Smaily API päring ebaõnnestus (HTTP 404)',
             ],
             'HTTP refusal without an answer' => [
                 new Response(400, [], ''),
@@ -217,8 +217,8 @@ class SmailyClientTest extends TestCase
             ],
             'error envelope' => [
                 new Response(200, [], '{"code": 203, "message": "Invalid data"}'),
-                'Smaily API returned code 203: Invalid data',
-                'Smaily API tagastas koodi 203: Invalid data',
+                'Smaily API returned code 203',
+                'Smaily API tagastas koodi 203',
             ],
             'malformed body' => [
                 new Response(200, [], 'not json'),
@@ -268,49 +268,62 @@ class SmailyClientTest extends TestCase
     }
 
     /**
-     * PRO-3749: an HTTP error that is not a credential or package refusal
-     * names Smaily's answer after the status, as the engine client does:
-     * the envelope's message when the answer is JSON, else its text without
-     * markup, both cut to a length the Log's error column can show.
+     * CON-357: an answer's text can name the contact, so an error names the
+     * HTTP status or Smaily's code and never the text, and the recorded reply
+     * keeps a JSON answer's code without its message and no other answer.
      *
-     * @return array<string, array{0: Response, 1: string}>
+     * @return array<string, array{0: Response, 1: string, 2: mixed}>
      */
-    public static function httpErrorAnswers(): array
+    public static function answersNamingAContact(): array
     {
         return [
             'JSON envelope' => [
-                new Response(400, [], '{"code": 205, "message": "Unknown field: birthday"}'),
-                'Smaily API request failed with HTTP 400: Unknown field: birthday',
+                new Response(400, [], '{"code": 205, "message": "Unknown field for Mari Maasikas, mari@example.com"}'),
+                'Smaily API request failed with HTTP 400',
+                ['code' => 205],
             ],
             'HTML error page' => [
-                new Response(404, [], "<html><head><title>404 Not Found</title></head>\n<body>  nginx </body></html>"),
-                'Smaily API request failed with HTTP 404: 404 Not Found nginx',
+                new Response(404, [], '<html><title>No contact Mari Maasikas, mari@example.com</title></html>'),
+                'Smaily API request failed with HTTP 404',
+                null,
             ],
-            'JSON without a message' => [
-                new Response(400, [], '{"code": 205, "api_key": "s3cr3t"}'),
-                'Smaily API request failed with HTTP 400',
+            'server error' => [
+                new Response(503, [], 'Mari Maasikas, mari@example.com could not be saved'),
+                'Smaily API request failed with HTTP 503',
+                null,
             ],
-            'long answer' => [
-                new Response(400, [], str_repeat('a', 600)),
-                'Smaily API request failed with HTTP 400: ' . str_repeat('a', 500) . '…',
+            'error envelope' => [
+                new Response(200, [], '{"code": 203, "message": "Invalid data: Mari Maasikas, mari@example.com"}'),
+                'Smaily API returned code 203',
+                ['code' => 203],
             ],
         ];
     }
 
     /**
-     * @dataProvider httpErrorAnswers
+     * @dataProvider answersNamingAContact
      */
-    public function testAnHttpErrorNamesSmailysAnswer(Response $response, string $expected): void
-    {
+    public function testAnErrorNamesTheStatusOrCodeNeverTheAnswer(
+        Response $response,
+        string $expected,
+        mixed $recordedBody
+    ): void {
         $client = $this->createClient([$response]);
 
         try {
             $client->post(SmailyClient::ENDPOINT_CONTACT, []);
-            self::fail('Expected a RequestRefusedException');
-        } catch (RequestRefusedException $exception) {
+            self::fail('Expected a SmailyClientException');
+        } catch (SmailyClientException $exception) {
             self::assertSame($expected, $exception->getSourceMessage());
-            self::assertSame($response->getStatusCode(), $exception->getHttpStatus());
+            self::assertSame($expected, $exception->getMessage());
         }
+        self::assertSame(
+            ['http_status' => $response->getStatusCode(), 'body' => $recordedBody],
+            $client->lastExchange()['response'] ?? null
+        );
+        $kept = json_encode([$client->lastExchange(), $this->logged], JSON_UNESCAPED_SLASHES);
+        self::assertStringNotContainsString('mari@example.com', (string)$kept);
+        self::assertStringNotContainsString('Maasikas', (string)$kept);
     }
 
     /**
@@ -513,7 +526,7 @@ class SmailyClientTest extends TestCase
 
         self::assertSame([
             'request' => [['email' => 'test@example.com']],
-            'response' => ['http_status' => 200, 'body' => ['code' => 101, 'message' => 'OK']],
+            'response' => ['http_status' => 200, 'body' => ['code' => 101]],
         ], $client->lastExchange());
     }
 
@@ -529,7 +542,7 @@ class SmailyClientTest extends TestCase
         } catch (ApiException) {
         }
         self::assertSame(
-            ['http_status' => 200, 'body' => ['code' => 203, 'message' => 'Invalid data']],
+            ['http_status' => 200, 'body' => ['code' => 203]],
             $client->lastExchange()['response'] ?? null
         );
 
@@ -539,7 +552,7 @@ class SmailyClientTest extends TestCase
         }
         self::assertSame([
             'request' => ['autoresponder' => 7],
-            'response' => ['http_status' => 502, 'body' => '<html>Bad gateway</html>'],
+            'response' => ['http_status' => 502, 'body' => null],
         ], $client->lastExchange());
     }
 

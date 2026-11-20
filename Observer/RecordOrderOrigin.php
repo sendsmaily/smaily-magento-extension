@@ -10,6 +10,7 @@ namespace Smaily\Connect\Observer;
 
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
+use Smaily\Connect\Model\Client\FailureText;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\OrderOrigin;
 
@@ -34,7 +35,7 @@ class RecordOrderOrigin implements ObserverInterface
         try {
             $this->orderOrigin->record();
         } catch (\Exception $e) {
-            $this->logger->error('Could not record where the order came from', ['error' => $e->getMessage()]);
+            $this->logger->error('Could not record where the order came from', ['error' => FailureText::of($e)]);
         }
     }
 }

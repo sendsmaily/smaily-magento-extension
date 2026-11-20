@@ -704,13 +704,12 @@ class Client
                 }
 
                 if ($status !== 429 && $status < 500) {
-                    $this->recordHealth($authenticated, $this->errorCode($status, $errorBody), false);
+                    $errorCode = $this->errorCode($status, $errorBody);
+                    $this->recordHealth($authenticated, $errorCode, false);
+                    // The engine's error code, never its message, which can
+                    // name the customer (CON-357).
                     throw new EngineRequestException(
-                        (string)__(
-                            'Engine request failed with HTTP %1: %2',
-                            $status,
-                            (string)($errorBody['message'] ?? $errorBody['error'] ?? 'unknown error')
-                        ),
+                        (string)__('Engine request failed with HTTP %1: %2', $status, $errorCode),
                         $status,
                         $errorBody
                     );

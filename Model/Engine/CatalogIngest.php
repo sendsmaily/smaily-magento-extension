@@ -11,6 +11,7 @@ namespace Smaily\Connect\Model\Engine;
 use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\ResourceModel\Product as ProductResource;
 use Magento\Catalog\Model\ResourceModel\Product\Collection;
+use Smaily\Connect\Model\Client\FailureText;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
@@ -334,7 +335,7 @@ class CatalogIngest
         } catch (\Throwable $exception) {
             $this->logger->error('Catalog payload build failed', [
                 'product_id' => $product->getId(),
-                'error' => $exception->getMessage(),
+                'error' => FailureText::of($exception),
             ]);
 
             return null;

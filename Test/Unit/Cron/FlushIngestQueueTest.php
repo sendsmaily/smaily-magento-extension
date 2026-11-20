@@ -65,6 +65,10 @@ class FlushIngestQueueTest extends TestCase
         );
     }
 
+    /**
+     * CON-357: the row keeps the field and never the engine's message,
+     * which can name the customer.
+     */
     public function testD6ErrorsMapBackOntoBatchRowsByIndex(): void
     {
         $first = $this->createEvent(11);
@@ -77,7 +81,12 @@ class FlushIngestQueueTest extends TestCase
             'processed' => 2,
             'deduplicated' => 0,
             'errors' => [
-                ['index' => 1, 'field' => 'price', 'message' => 'must be a number', 'sku' => 'X'],
+                [
+                    'index' => 1,
+                    'field' => 'price',
+                    'message' => 'Mari Maasikas (mari.maasikas@example.com): must be a number',
+                    'sku' => 'X',
+                ],
             ],
         ]);
 
@@ -100,7 +109,7 @@ class FlushIngestQueueTest extends TestCase
 
         self::assertSame([11, 13], $sent);
         self::assertArrayHasKey(12, $failed);
-        self::assertSame('price: must be a number', $failed[12][0]);
+        self::assertSame('price: rejected by engine', $failed[12][0]);
         self::assertTrue($failed[12][1], 'Per-item validation errors are terminal');
     }
 
@@ -385,7 +394,7 @@ class FlushIngestQueueTest extends TestCase
             }
         );
         $this->queue->expects(self::once())->method('markFailedMany')
-            ->with([$refused], 'product_ids: Product id is outside this connection.', true);
+            ->with([$refused], 'product_ids: connection_prefix_mismatch', true);
 
         $this->createCron()->execute();
 

@@ -19,14 +19,16 @@ use Smaily\Connect\Model\Queue\Handler\ProfilingConsentHandler;
 /**
  * What a failed row says to the merchant (PRO-2454).
  *
- * A terminal refusal is stored as `permanent_http_<code>: <server message>`
+ * A terminal refusal is stored as `permanent_http_<code>: <message>`
  * (`permanent_envelope_<code>:` for a Smaily error envelope, PRO-1962)
- * (Model\Queue\Failure) — the classification is ours, the sentence after
- * it is Smaily's own, except where the client words a refusal itself
- * (rejected credentials, PRO-2508). The merchant is shown that sentence, redacted
- * exactly like the payload beside it; the classification stays for the
- * Details drawer, where the technical detail belongs. A retryable failure
- * carries no prefix and is shown as it is.
+ * (Model\Queue\Failure) — the classification and the message are ours: the
+ * client names the HTTP status and the error code, never the server's text,
+ * which can name a customer (CON-357), and words some refusals itself
+ * (rejected credentials, PRO-2508). The merchant is shown that sentence,
+ * redacted exactly like the payload beside it; the classification stays for
+ * the Details drawer, where the technical detail belongs. A retryable failure
+ * carries no prefix and is shown as it is. A row stored before CON-357 keeps
+ * the server's text it was stored with until the janitor prunes it.
  *
  * The client's own messages are stored as English source text, whatever the
  * store's language (PRO-3628), and are translated here, in the admin's
@@ -47,12 +49,15 @@ class FailureMessage
         'Smaily refused the request because this account\'s package does not include API access.'
             . ' Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all.',
         'Smaily API credentials were rejected',
-        // Before the one without the answer, whose pattern would match it too.
+        // Stored before CON-357, with Smaily's answer; before the one without
+        // it, whose pattern would match it too.
         'Smaily API request failed with HTTP %1: %2',
         'Smaily API request failed with HTTP %1',
         'Smaily API request failed: %1',
         'Smaily API returned a malformed response body',
+        // Stored before CON-357, with Smaily's message; before the one without it.
         'Smaily API returned code %1: %2',
+        'Smaily API returned code %1',
         'Smaily API credentials are not configured (store scope: %1)',
         'The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.',
         // Not errors: the reasons a row was closed without sending (PRO-3619, PRO-3634, PRO-3693, CON-195).
@@ -94,9 +99,8 @@ class FailureMessage
     }
 
     /**
-     * The merchant-facing wording of a stored `last_error`: the server's own
-     * message where there is one, in the admin's language where it is one of
-     * ours, with secrets hidden.
+     * The merchant-facing wording of a stored `last_error`: in the admin's
+     * language where it is one of ours, with secrets hidden.
      */
     public function forDisplay(?string $lastError): string
     {

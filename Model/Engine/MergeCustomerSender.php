@@ -13,6 +13,7 @@ use Magento\Framework\Exception\LocalizedException;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
+use Smaily\Connect\Model\Engine\Queue\ItemError;
 
 /**
  * Sends the customer of an identity merge to Campaign Intelligence (contract
@@ -85,7 +86,7 @@ class MergeCustomerSender
 
     /**
      * The engine's refusal of the one item, as the ingest flush words a
-     * per-item error (`field: message`); null when it took the item.
+     * per-item error (ItemError); null when it took the item.
      *
      * @param array<string, mixed> $response
      */
@@ -93,11 +94,7 @@ class MergeCustomerSender
     {
         foreach ((array)($response['errors'] ?? []) as $error) {
             if (is_array($error) && (int)($error['index'] ?? -1) === 0) {
-                return sprintf(
-                    '%s: %s',
-                    (string)($error['field'] ?? 'item'),
-                    (string)($error['message'] ?? 'rejected by engine')
-                );
+                return ItemError::reason($error, 'item');
             }
         }
 

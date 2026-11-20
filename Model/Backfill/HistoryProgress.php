@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Backfill;
 
 use Magento\Framework\Stdlib\DateTime\DateTime;
+use Smaily\Connect\Model\Client\FailureText;
 use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
@@ -68,7 +69,7 @@ class HistoryProgress
             $connections = $this->connections->all();
         } catch (\Throwable $exception) {
             $this->logger->error('Campaign Intelligence history progress could not be read', [
-                'error' => $exception->getMessage(),
+                'error' => FailureText::of($exception),
             ]);
 
             return;
@@ -78,7 +79,7 @@ class HistoryProgress
                 $this->reportDue($connection);
             } catch (\Throwable $exception) {
                 $this->logger->error('Campaign Intelligence history progress could not be read', [
-                    'error' => $exception->getMessage(),
+                    'error' => FailureText::of($exception),
                 ]);
             }
         }
@@ -156,7 +157,7 @@ class HistoryProgress
             $this->logger->info('Campaign Intelligence history progress report failed', [
                 'import_id' => $state['import_id'],
                 'phase' => $phase,
-                'error' => $exception->getMessage(),
+                'error' => FailureText::of($exception),
             ]);
 
             return;

@@ -15,6 +15,7 @@ use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Cron\AbandonedCart;
 use Smaily\Connect\Model\Adminhtml\SetupNotice;
 use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\Adminhtml\TransactionalSettingsSaver;
@@ -1208,6 +1209,55 @@ class WizardStepSaverTest extends TestCase
 
         self::assertSame(['first_order_coupon_rule'], array_column($errors, 'field'), 'only a switched-on automation');
         self::assertSame([], $this->saved);
+    }
+
+    /**
+     * CON-368: the longest cutoff a reminder can still go out with is saved.
+     */
+    public function testTheLongestCutoffThatCanSendIsSaved(): void
+    {
+        self::assertSame(1435, AbandonedCart::MAX_CUTOFF_MINUTES);
+
+        self::assertSame([], $this->saver->save('automations', [
+            'abandoned_enabled' => true,
+            'abandoned_cutoff' => 1435,
+        ]));
+        self::assertSame('1435', $this->savedValue(Config::XML_PATH_ABANDONED_CUTOFF));
+    }
+
+    /**
+     * CON-368: one minute more could miss the scan's last run, so with the
+     * reminder on nothing of the automations is saved, and the message says
+     * which cutoffs work.
+     */
+    public function testACutoffThatCannotSendSavesNothing(): void
+    {
+        $errors = $this->saver->save('automations', [
+            'welcome_enabled' => true,
+            'abandoned_enabled' => true,
+            'abandoned_cutoff' => 1436,
+        ]);
+
+        self::assertSame([[
+            'field' => 'abandoned_cutoff',
+            'message' => 'The abandoned-cart wait must be from 10 to 1435 minutes. A longer wait would send no reminder.',
+        ]], $errors);
+        self::assertSame([], $this->saved);
+    }
+
+    /**
+     * CON-368: with the reminder off its cutoff field is hidden, so a cutoff
+     * that cannot send blocks nothing; it is not written over the stored one.
+     */
+    public function testACutoffThatCannotSendWithTheReminderOffLeavesTheStoredOne(): void
+    {
+        self::assertSame([], $this->saver->save('automations', [
+            'welcome_enabled' => true,
+            'abandoned_enabled' => false,
+            'abandoned_cutoff' => 1440,
+        ]));
+        self::assertTrue($this->wasSaved(Config::XML_PATH_WELCOME_ENABLED));
+        self::assertFalse($this->wasSaved(Config::XML_PATH_ABANDONED_CUTOFF));
     }
 
     /**

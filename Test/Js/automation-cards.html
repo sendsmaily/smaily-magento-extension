@@ -24,6 +24,9 @@
   The per-language workflow tables follow their card's switch, and mode A
   still hides the card's own workflow while it is on. A Campaign
   Intelligence trigger with a field to fix stays open while it is off.
+  An abandoned-cart reminder that is on with a cutoff no reminder can be
+  sent with (CON-368) says so under "Wait (minutes)" when the page opens,
+  and the save's refusal of it shows there too.
 
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
@@ -34,6 +37,8 @@
     <title>automation cards harness</title>
     <script src="build/settings-discount.en_US.js"></script>
     <script src="build/settings-discount.et_EE.js"></script>
+    <script src="build/settings-long-wait.en_US.js"></script>
+    <script src="build/settings-long-wait.et_EE.js"></script>
     <script src="build/settings-modes.en_US.js"></script>
     <script src="build/settings-modes.et_EE.js"></script>
     <script src="build/transactional-connected.en_US.js"></script>
@@ -60,6 +65,9 @@
         errors: ['replenish_due / cooldown_days: Too big', 'Nothing was saved: validation_failed'],
         field_errors: [{trigger_key: 'replenish_due', field: 'cooldown_days', message: 'Too big'}]
     };
+    // The Settings save refuses a cutoff no reminder can be sent with
+    // (WizardStepSaver, CON-368).
+    var CUTOFF_REFUSED = {saved: false, errors: [{field: 'abandoned_cutoff', message: 'Too long a wait'}]};
     var failures = 0;
     var passes = 0;
 
@@ -100,6 +108,8 @@
             '  window.requests.push({url: url, body: body});',
             '  if (url.indexOf("/workflows/") !== -1) {',
             '    answer = ' + JSON.stringify(WORKFLOWS) + ';',
+            '  } else if (body.indexOf(\'"abandoned_cutoff":1440\') !== -1) {',
+            '    answer = ' + JSON.stringify(CUTOFF_REFUSED) + ';',
             '  } else if (url.indexOf("automations/save") !== -1) {',
             '    answer = ' + JSON.stringify(REFUSED) + ';',
             '  } else {',
@@ -225,6 +235,25 @@
             && byId('smaily-w-welcome-coupon-enabled').checked && shown(byId('smaily-w-welcome-coupon-rule'))
             && byId('smaily-w-welcome-coupon-rule').value === '14'
             && byId('smaily-w-welcome-coupon-days').value === '10');
+        frame.remove();
+    }
+
+    // A cutoff saved before it had a maximum (CON-368).
+    async function longWait(locale) {
+        var frame = await open('settings-long-wait.' + locale, false),
+            cutoff = frame.contentDocument.getElementById('smaily-w-cutoff'),
+            error = function () {
+                var next = cutoff.nextElementSibling;
+
+                return next && next.classList.contains('smaily-field-error') ? next.textContent : '';
+            };
+
+        check(locale + ', a wait no reminder can be sent with: the card says so under "Wait (minutes)"',
+            shown(cutoff) && cutoff.value === '1440' && cutoff.getAttribute('max') === '1435'
+            && cutoff.classList.contains('is-invalid') && / 10 .* 1435 /.test(error()));
+        await saveAutomations(frame);
+        check(locale + ', the save\'s refusal shows under "Wait (minutes)"',
+            cutoff.classList.contains('is-invalid') && error() === 'Too long a wait');
         frame.remove();
     }
 
@@ -357,6 +386,7 @@
             for (var locale of ['en_US', 'et_EE']) {
                 log('# ' + locale);
                 await storeCards(locale);
+                await longWait(locale);
                 await perLanguage(locale);
                 await transactionalCards(locale);
                 await engineCards(locale);

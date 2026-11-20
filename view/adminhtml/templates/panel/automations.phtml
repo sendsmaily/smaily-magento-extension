@@ -107,7 +107,7 @@ $storeTriggers = [
                     <?php if (!empty($trigger['abandoned'])): ?>
                     <label class="smaily-engine-trigger__ctrl">
                         <span><?= $escaper->escapeHtml(__('Wait (minutes)')) ?></span>
-                        <input type="number" id="smaily-w-cutoff" min="10" max="1440" value="30"/>
+                        <input type="number" id="smaily-w-cutoff" min="<?= (int)\Smaily\Connect\Model\Config::MIN_ABANDONED_CUTOFF_MINUTES ?>" max="<?= (int)\Smaily\Connect\Cron\AbandonedCart::MAX_CUTOFF_MINUTES ?>" value="30"/>
                     </label>
                     <?php endif; ?>
                 </div>
@@ -151,7 +151,7 @@ $storeTriggers = [
         <?php endforeach; ?>
     </div>
 
-    <p class="note"><?= $escaper->escapeHtml(__('How long a cart must be inactive before it counts as abandoned. Minimum 10 minutes. Carts older than 24 hours are never mailed.')) ?></p>
+    <p class="note"><?= $escaper->escapeHtml(__('How long a cart must be inactive before it counts as abandoned. From 10 to 1435 minutes. Carts older than 24 hours are never mailed.')) ?></p>
     <p class="note"><?= $escaper->escapeHtml(__('If another tool also sends abandoned-cart emails (for example an extension such as Mageplaza SMTP or Avada Email Marketing, or Adobe Commerce\'s own email reminder rules), switch those emails off there, so a shopper does not get two reminders for one cart.')) ?></p>
     <p class="note"><?= $escaper->escapeHtml(__('The automation receives the cart contents (up to 10 products) and a recovery link that restores the exact cart.')) ?>
     <?php if ($isMultilingual): ?>

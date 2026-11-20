@@ -1848,6 +1848,47 @@ foreach ($discountPages as $page => [$rules, $hasRules]) {
 }
 
 /*
+ * settings-long-wait: the settings-discount page of a website whose
+ * abandoned-cart reminder is on with a cutoff saved before the cutoff had a
+ * maximum, 1440 minutes, with which no reminder is sent (CON-368).
+ */
+$pages['settings-long-wait'] = [
+    'viewModel' => new class ($discountViewModel([], true)) {
+        /**
+         * @param object $inner
+         */
+        public function __construct(private readonly object $inner)
+        {
+        }
+
+        /**
+         * @param string $name
+         * @param array<int, mixed> $arguments
+         * @return mixed
+         */
+        public function __call(string $name, array $arguments): mixed
+        {
+            return $this->inner->$name(...$arguments);
+        }
+
+        /**
+         * @return string
+         */
+        public function getBootJson(): string
+        {
+            $boot = json_decode($this->inner->getBootJson(), true);
+            $boot['automations']['abandonedEnabled'] = true;
+            $boot['automations']['abandonedCutoff'] = 1440;
+
+            return (string)json_encode($boot);
+        }
+    },
+    'template' => $pages['settings-discount']['template'],
+    'data' => $pages['settings-discount']['data'],
+    'strings' => $discountStrings,
+];
+
+/*
  * The Dashboard (view/adminhtml/templates/dashboard/index.phtml): set up,
  * Smaily and Campaign Intelligence connected, browse tracking on, nothing
  * failed. The -storefront page has a Storefront URL saved (PRO-3918); the

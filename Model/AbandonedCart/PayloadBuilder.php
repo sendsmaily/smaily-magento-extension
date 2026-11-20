@@ -17,6 +17,7 @@ use Magento\Quote\Model\Quote\Item;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Client\FailureText;
+use Smaily\Connect\Model\DescriptionText;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\StorefrontScript;
 
@@ -256,9 +257,9 @@ class PayloadBuilder
         $regular = (float)$product->getPriceInfo()->getPrice('regular_price')->getAmount()->getValue();
 
         return [
-            'description' => trim(strip_tags(
+            'description' => DescriptionText::fromHtml(
                 (string)($product->getData('short_description') ?: $product->getData('description'))
-            )),
+            ),
             'image_url' => (string)$this->imageUrl($product),
             'base_price' => $regular > 0 ? number_format($regular, 2, '.', '') : '',
         ];

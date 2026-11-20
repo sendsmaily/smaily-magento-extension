@@ -46,7 +46,7 @@ class DescriptionTextTest extends TestCase
     public function testAPageBuilderDescriptionKeepsOnlyItsText(): void
     {
         self::assertSame(
-            "A roomy canvas bag for every trip.\n\nPattern:",
+            "A roomy canvas bag for every trip.\nPattern:",
             DescriptionText::fromHtml(self::PAGE_BUILDER_HTML)
         );
     }
@@ -67,5 +67,28 @@ class DescriptionTextTest extends TestCase
     public function testADescriptionOfOnlyMarkupIsEmpty(): void
     {
         self::assertSame('', DescriptionText::fromHtml('<style>.a{color:red}</style><p>{{widget type="X"}}</p>'));
+    }
+
+    public function testParagraphsWithoutLineBreaksDoNotRunTogether(): void
+    {
+        self::assertSame(
+            "Solid oak.\nTwo metres long.\nSeats six\nor eight.",
+            DescriptionText::fromHtml('<p>Solid oak.</p><p>Two metres long.</p><ul><li>Seats six<br>or eight.</li></ul>')
+        );
+    }
+
+    /**
+     * Page Builder's HTML Code element stores its HTML entity-escaped.
+     */
+    public function testEntityEscapedHtmlCodeContentKeepsOnlyItsText(): void
+    {
+        self::assertSame(
+            "Fish & chips\nSee the sale today.",
+            DescriptionText::fromHtml(
+                '<p>Fish &amp; chips</p><div data-content-type="html" data-appearance="default" data-element="main">'
+                . '&lt;style&gt;.sale{color:red}&lt;/style&gt;&lt;p&gt;See &lt;a href="{{store url=\'sale.html\'}}"&gt;'
+                . 'the sale&lt;/a&gt;&amp;nbsp;today.&lt;/p&gt;</div>'
+            )
+        );
     }
 }

@@ -98,7 +98,7 @@ class CatalogPayloadBuilderTest extends TestCase
             $this->oneStore()
         );
 
-        self::assertSame("A roomy canvas bag for every trip.\n\nPattern:", $item['description']);
+        self::assertSame("A roomy canvas bag for every trip.\nPattern:", $item['description']);
     }
 
     /**

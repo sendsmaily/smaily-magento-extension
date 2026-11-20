@@ -67,7 +67,7 @@ class FeedBuilderTest extends TestCase
     {
         $item = $this->firstItem($this->build('', DescriptionTextTest::PAGE_BUILDER_HTML));
 
-        self::assertSame("A roomy canvas bag for every trip.\n\nPattern:", (string)$item->description);
+        self::assertSame("A roomy canvas bag for every trip.\nPattern:", (string)$item->description);
     }
 
     private function firstItem(string $xml): \SimpleXMLElement

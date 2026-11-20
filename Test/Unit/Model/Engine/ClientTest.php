@@ -689,6 +689,40 @@ class ClientTest extends TestCase
     }
 
     /**
+     * CON-359 (contract v1.33.0 §6): the page's sku — held without a
+     * prefix, also by a page cached before a connect — goes under the
+     * connection's prefix; without one it goes as the page sent it.
+     *
+     * @dataProvider prefixedSkus
+     */
+    public function testTheRelayedSkuGoesUnderTheConnectionPrefix(string $prefix, string $expected): void
+    {
+        $this->settings->method('getEndpoint')->with('ingest_browse')
+            ->willReturn('https://engine.example/api/v1/ingest/browse');
+        $this->settings->method('getConnectionPrefix')->willReturn($prefix);
+        $client = $this->createClient([new Response(200, [], '{"ok":true}')]);
+
+        $client->relayBrowse([[
+            'event_id' => '9b2f6c3a-1d4e-4f5a-8b6c-7d8e9f0a1b2c',
+            'session_id' => 's1',
+            'event_type' => 'product_view',
+            'sku' => 'ABC-1',
+        ]]);
+
+        $body = json_decode((string)$this->history[0]['request']->getBody(), true);
+        self::assertIsArray($body);
+        self::assertSame($expected, $body['events'][0]['sku']);
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function prefixedSkus(): array
+    {
+        return ['a prefixed connection' => ['c2-', 'c2-ABC-1'], 'an unprefixed connection' => ['', 'ABC-1']];
+    }
+
+    /**
      * CON-253 (contract v1.21.0 §15): the storefront request names the
      * website the shopper is on.
      */

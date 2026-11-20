@@ -343,11 +343,7 @@ class FlushIngestQueue
         $refused = [];
         foreach ((array)($response['errors'] ?? []) as $error) {
             if (is_array($error) && is_scalar($error['product_id'] ?? null)) {
-                $refused[(string)$error['product_id']] = sprintf(
-                    '%s: %s',
-                    (string)($error['field'] ?? 'product_ids'),
-                    (string)($error['message'] ?? 'rejected by engine')
-                );
+                $refused[(string)$error['product_id']] = $this->engineErrorMessage($error, 'product_ids');
             }
         }
         foreach ($keyed as [$event, $productId]) {
@@ -411,6 +407,21 @@ class FlushIngestQueue
     }
 
     /**
+     * One entry of the engine's `errors[]` as a row's failure message:
+     * `<field>: <message>`.
+     *
+     * @param array<mixed> $error
+     */
+    private function engineErrorMessage(array $error, string $defaultField): string
+    {
+        return sprintf(
+            '%s: %s',
+            (string)($error['field'] ?? $defaultField),
+            (string)($error['message'] ?? 'rejected by engine')
+        );
+    }
+
+    /**
      * @param IngestEvent[] $events indexed 0..n-1 in send order
      * @param array<int, array<string, mixed>> $items the same indexes
      * @param array<string, mixed> $response
@@ -426,11 +437,7 @@ class FlushIngestQueue
         $errorsByIndex = [];
         foreach ((array)($response['errors'] ?? []) as $error) {
             if (is_array($error) && isset($error['index'])) {
-                $errorsByIndex[(int)$error['index']] = sprintf(
-                    '%s: %s',
-                    (string)($error['field'] ?? 'item'),
-                    (string)($error['message'] ?? 'rejected by engine')
-                );
+                $errorsByIndex[(int)$error['index']] = $this->engineErrorMessage($error, 'item');
             }
         }
 

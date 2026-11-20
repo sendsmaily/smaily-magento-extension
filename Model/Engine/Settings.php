@@ -15,6 +15,7 @@ use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Store\Model\ScopeInterface;
+use Smaily\Connect\Model\Engine\Payload\ConnectionPrefix;
 
 /**
  * Campaign Intelligence connection settings. The API key is encrypted at
@@ -86,9 +87,6 @@ class Settings
      * a reconnect gets the same prefix back.
      */
     public const XML_PATH_CONNECTION_PREFIX = 'smaily_connect/intelligence/connection_prefix';
-
-    /** The prefix shape the engine assigns (contract v1.33.0 "Connection prefix"). */
-    public const CONNECTION_PREFIX_PATTERN = '/^c[1-9][0-9]{0,3}-$/D';
 
     /** Every path a website-scope connection holds; its clear() removes them all. */
     public const WEBSITE_PATHS = [
@@ -329,7 +327,7 @@ class Settings
         }
         $prefix = $this->value(self::XML_PATH_CONNECTION_PREFIX);
 
-        return self::isConnectionPrefix($prefix) ? (string)$prefix : '';
+        return ConnectionPrefix::isConnectionPrefix($prefix) ? (string)$prefix : '';
     }
 
     /**
@@ -346,7 +344,7 @@ class Settings
             return null;
         }
         $prefix = $this->value(self::XML_PATH_CONNECTION_PREFIX);
-        if (self::isConnectionPrefix($prefix)) {
+        if (ConnectionPrefix::isConnectionPrefix($prefix)) {
             return (string)$prefix;
         }
 
@@ -359,7 +357,7 @@ class Settings
      */
     public function recordConnectionPrefix(string $prefix): void
     {
-        if (!$this->isConnected() || !self::isConnectionPrefix($prefix)
+        if (!$this->isConnected() || !ConnectionPrefix::isConnectionPrefix($prefix)
             || (string)$this->value(self::XML_PATH_CONNECTION_PREFIX) === $prefix
         ) {
             return;
@@ -367,28 +365,6 @@ class Settings
 
         $this->write(self::XML_PATH_CONNECTION_PREFIX, $prefix);
         $this->cleanConfigCache();
-    }
-
-    /**
-     * The `connection.prefix` of a setup exchange's or ping's `config`
-     * block: '' when the block has no `connection` (an engine before
-     * v1.33.0), the prefix when it is '' or `c<N>-`, null for anything else.
-     *
-     * @param array<string, mixed> $config
-     */
-    public static function configPrefix(array $config): ?string
-    {
-        if (!array_key_exists('connection', $config)) {
-            return '';
-        }
-        $prefix = is_array($config['connection']) ? ($config['connection']['prefix'] ?? null) : null;
-
-        return self::isConnectionPrefix($prefix) ? (string)$prefix : null;
-    }
-
-    private static function isConnectionPrefix(mixed $prefix): bool
-    {
-        return is_string($prefix) && ($prefix === '' || preg_match(self::CONNECTION_PREFIX_PATTERN, $prefix) === 1);
     }
 
     /**
@@ -439,7 +415,7 @@ class Settings
         $config = $response['config'] ?? null;
         $this->write(
             self::XML_PATH_CONNECTION_PREFIX,
-            is_array($config) ? (self::configPrefix($config) ?? '') : ''
+            is_array($config) ? (ConnectionPrefix::configPrefix($config) ?? '') : ''
         );
         $this->write(self::XML_PATH_CONNECTED, '1');
         // The pushed workflows of an earlier connection — maybe another

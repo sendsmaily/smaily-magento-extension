@@ -20,6 +20,7 @@ use Smaily\Connect\Model\Client\TransportErrorMessage;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
+use Smaily\Connect\Model\Engine\Payload\ConnectionPrefix;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\ModuleInfo;
 use Smaily\Connect\Model\Report\ConnectionHealth;
@@ -212,7 +213,7 @@ class Client
                 );
             }
         }
-        if (is_array($response['config'] ?? null) && Settings::configPrefix($response['config']) === null) {
+        if (is_array($response['config'] ?? null) && ConnectionPrefix::configPrefix($response['config']) === null) {
             throw new EngineRequestException(
                 (string)__(
                     'The engine answered with a connection code this extension cannot use,'
@@ -237,7 +238,7 @@ class Client
         $answer = $this->request('GET', $this->endpoint('ingest_ping'), null);
         $config = $answer['config'] ?? null;
         if (is_array($config) && array_key_exists('connection', $config)) {
-            $prefix = Settings::configPrefix($config);
+            $prefix = ConnectionPrefix::configPrefix($config);
             if ($prefix === null) {
                 $this->logger->error(
                     'The engine ping answered a connection prefix of the wrong shape; the stored one is kept'
@@ -303,15 +304,25 @@ class Client
      * slow, failing or asking the store to slow down costs the batch, never
      * a storefront worker.
      *
+     * Each sku goes under the connection's prefix (contract v1.33.0 §6,
+     * CON-359): the page holds it without one, also a page cached before
+     * a connect.
+     *
      * @param array<int, array<string, mixed>> $events
      * @return array<string, mixed>
      */
     public function relayBrowse(array $events): array
     {
+        $prefix = $this->settings->getConnectionPrefix();
+        $events = array_map(
+            static fn (array $event): array => ConnectionPrefix::item(self::DOMAIN_BROWSE, $event, $prefix),
+            array_values($events)
+        );
+
         return $this->request(
             'POST',
             $this->endpoint('ingest_' . self::DOMAIN_BROWSE),
-            [self::DOMAIN_WRAPPERS[self::DOMAIN_BROWSE] => array_values($events)],
+            [self::DOMAIN_WRAPPERS[self::DOMAIN_BROWSE] => $events],
             singleAttempt: true,
             timeoutSeconds: self::RELAY_TIMEOUT_SECONDS
         );

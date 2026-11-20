@@ -26,9 +26,13 @@
                         <argument name="dismissible" xsi:type="boolean">true</argument>
                     </arguments>
                 </block>
+                <!-- The Dashboard needs only Smaily_Connect::connect; the
+                     Campaign Intelligence banner and its start are for
+                     admins who may open the Settings. -->
                 <block class="Magento\Backend\Block\Template"
                        name="smaily.intelligence.banner.top" as="intelligence.banner.top"
-                       template="Smaily_Connect::panel/intelligence-banner.phtml">
+                       template="Smaily_Connect::panel/intelligence-banner.phtml"
+                       aclResource="Smaily_Connect::config">
                     <arguments>
                         <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\IntelligenceBannerData</argument>
                         <argument name="dismissible" xsi:type="boolean">true</argument>
@@ -36,9 +40,11 @@
                 </block>
                 <block class="Magento\Backend\Block\Template"
                        name="smaily.intelligence.start" as="intelligence.start"
-                       template="Smaily_Connect::panel/intelligence-start.phtml">
+                       template="Smaily_Connect::panel/intelligence-start.phtml"
+                       aclResource="Smaily_Connect::config">
                     <arguments>
                         <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\IntelligenceBannerData</argument>
+                        <argument name="dismissible" xsi:type="boolean">true</argument>
                     </arguments>
                 </block>
             </block>

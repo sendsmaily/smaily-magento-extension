@@ -13,7 +13,6 @@ use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\App\Request\Http as HttpRequest;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
-use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
 use Magento\Framework\DataObject;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
@@ -38,11 +37,10 @@ class OnboardingStart extends AbstractOnboardingAction implements HttpPostAction
         Context $context,
         JsonFactory $jsonFactory,
         JsonSerializer $serializer,
-        FormKeyValidator $formKeyValidator,
         private readonly IntelligenceStart $intelligenceStart,
         private readonly ResolverInterface $localeResolver
     ) {
-        parent::__construct($context, $jsonFactory, $serializer, $formKeyValidator);
+        parent::__construct($context, $jsonFactory, $serializer);
     }
 
     /**
@@ -55,17 +53,15 @@ class OnboardingStart extends AbstractOnboardingAction implements HttpPostAction
             return $refusal;
         }
 
+        /** @var HttpRequest $request An admin request is an HTTP request. */
         $request = $this->getRequest();
-        $adminOrigin = $request instanceof HttpRequest
-            ? EmailDesigns::origin($request->getScheme() . '://' . $request->getHttpHost(false))
-            : '';
         // The signed-in admin user (a DataObject holding `email`; Magento_User
         // is not a dependency of this module).
         $user = $this->_auth->getUser();
 
         ['status' => $status, 'body' => $body] = $this->intelligenceStart->start(
             ($this->requestBody()['display'] ?? '') === 'frame',
-            $adminOrigin,
+            EmailDesigns::requestOrigin($request),
             $user instanceof DataObject ? trim((string)$user->getData('email')) : '',
             IntelligenceStart::language((string)$this->localeResolver->getLocale())
         );

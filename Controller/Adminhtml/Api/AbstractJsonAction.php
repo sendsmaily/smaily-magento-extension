@@ -24,6 +24,9 @@ abstract class AbstractJsonAction extends Action
 {
     public const ADMIN_RESOURCE = 'Smaily_Connect::config';
 
+    /** The Cache-Control of an answer no cache may keep (noStore()). */
+    protected const NO_STORE = 'no-store';
+
     public function __construct(
         Context $context,
         private readonly JsonFactory $jsonFactory,
@@ -43,6 +46,34 @@ abstract class AbstractJsonAction extends Action
         }
 
         return $result->setData($data);
+    }
+
+    /** No cache may keep this answer: `Cache-Control` is static::NO_STORE. */
+    protected function noStore(Json $result): Json
+    {
+        $result->setHeader('Cache-Control', static::NO_STORE, true);
+
+        return $result;
+    }
+
+    /**
+     * The answer to a request without a valid form key — 403
+     * {error: invalid_form_key[, message]}, kept by no cache — or null when
+     * it may go on. Magento's backend request validator checks the form key
+     * of every POST too; it is checked here as well, so an endpoint that
+     * asks for it never rests on a framework setting alone.
+     */
+    protected function formKeyRefusal(?string $message = null): ?Json
+    {
+        if ($this->_formKeyValidator->validate($this->getRequest())) {
+            return null;
+        }
+        $answer = ['error' => 'invalid_form_key'];
+        if ($message !== null) {
+            $answer['message'] = $message;
+        }
+
+        return $this->noStore($this->jsonResponse($answer, 403));
     }
 
     /**

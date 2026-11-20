@@ -102,6 +102,7 @@ class OnboardingTest extends TestCase
         $this->startAction($start, ['display' => 'frame'], formKeyValid: false)->execute();
         self::assertSame(403, $this->status);
         self::assertSame(['error' => 'invalid_form_key'], $this->response);
+        self::assertSame('no-store, private', $this->headers['Cache-Control'] ?? null);
 
         $this->statusAction($start, formKeyValid: false)->execute();
         self::assertSame(403, $this->status);
@@ -128,10 +129,9 @@ class OnboardingTest extends TestCase
     private function statusAction(IntelligenceStart $start, bool $formKeyValid = true): OnboardingStatus
     {
         return new OnboardingStatus(
-            $this->context([]),
+            $this->context([], $formKeyValid),
             $this->jsonFactory(),
             new JsonSerializer(),
-            $this->formKeyValidator($formKeyValid),
             $start
         );
     }
@@ -145,10 +145,9 @@ class OnboardingTest extends TestCase
         $locale->method('getLocale')->willReturn('et_EE');
 
         return new OnboardingStart(
-            $this->context($body),
+            $this->context($body, $formKeyValid),
             $this->jsonFactory(),
             new JsonSerializer(),
-            $this->formKeyValidator($formKeyValid),
             $start,
             $locale
         );
@@ -163,10 +162,9 @@ class OnboardingTest extends TestCase
         $dateTime->method('gmtTimestamp')->willReturn(1_763_640_000);
 
         return new DismissBanner(
-            $this->context([]),
+            $this->context([], $formKeyValid),
             $this->jsonFactory(),
             new JsonSerializer(),
-            $this->formKeyValidator($formKeyValid),
             $writer,
             $cacheTypes ?? $this->createMock(TypeListInterface::class),
             $dateTime
@@ -176,7 +174,7 @@ class OnboardingTest extends TestCase
     /**
      * @param array<string, mixed> $body
      */
-    private function context(array $body): Context
+    private function context(array $body, bool $formKeyValid = true): Context
     {
         $request = $this->createMock(HttpRequest::class);
         $request->method('getContent')->willReturn((string)json_encode($body));
@@ -187,6 +185,7 @@ class OnboardingTest extends TestCase
         $context = $this->createMock(Context::class);
         $context->method('getRequest')->willReturn($request);
         $context->method('getAuth')->willReturn($auth);
+        $context->method('getFormKeyValidator')->willReturn($this->formKeyValidator($formKeyValid));
 
         return $context;
     }

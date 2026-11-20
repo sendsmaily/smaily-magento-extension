@@ -91,7 +91,11 @@ class DesignLinkTest extends TestCase
         $this->designLink($emailDesigns, ['email_key' => 'plugin.welcome'], formKeyValid: false)->execute();
 
         self::assertSame(403, $this->status);
-        self::assertSame('invalid_form_key', $this->response['error']);
+        self::assertSame([
+            'error' => 'invalid_form_key',
+            'message' => 'Your admin session has expired. Reload the page and try again.',
+        ], $this->response);
+        self::assertSame('no-store', $this->headers['Cache-Control'] ?? null);
     }
 
     public function testTheDesignListRefusesAnInvalidFormKeyToo(): void
@@ -291,11 +295,10 @@ class DesignLinkTest extends TestCase
         $locale->method('getLocale')->willReturn('et_EE');
 
         return new DesignLink(
-            $this->context($body, $allowed),
+            $this->context($body, $allowed, $formKeyValid),
             $this->jsonFactory(),
             new JsonSerializer(),
             $emailDesigns,
-            $this->formKeyValidator($formKeyValid),
             $locale
         );
     }
@@ -303,11 +306,10 @@ class DesignLinkTest extends TestCase
     private function designs(EmailDesigns $emailDesigns, bool $formKeyValid = true): Designs
     {
         return new Designs(
-            $this->context([], ['Smaily_Connect::config']),
+            $this->context([], ['Smaily_Connect::config'], $formKeyValid),
             $this->jsonFactory(),
             new JsonSerializer(),
-            $emailDesigns,
-            $this->formKeyValidator($formKeyValid)
+            $emailDesigns
         );
     }
 
@@ -315,7 +317,7 @@ class DesignLinkTest extends TestCase
      * @param array<string, mixed> $body
      * @param string[] $allowed
      */
-    private function context(array $body, array $allowed): Context&MockObject
+    private function context(array $body, array $allowed, bool $formKeyValid = true): Context&MockObject
     {
         $request = $this->createMock(HttpRequest::class);
         $request->method('getContent')->willReturn((string)json_encode($body));
@@ -326,6 +328,7 @@ class DesignLinkTest extends TestCase
         $context = $this->createMock(Context::class);
         $context->method('getRequest')->willReturn($request);
         $context->method('getAuthorization')->willReturn($authorization);
+        $context->method('getFormKeyValidator')->willReturn($this->formKeyValidator($formKeyValid));
 
         return $context;
     }

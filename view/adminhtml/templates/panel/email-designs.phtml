@@ -129,23 +129,14 @@ require(['jquery'], function ($) {
     var $hint = $modal.find('.smaily-design-modal__hint');
     var $error = $modal.find('.smaily-design-modal__error');
 
+    // The answer's body (panel/modal-js.phtml); any other status than 2xx
+    // fails with the server's message.
     function post(url, data) {
-        var separator = url.indexOf('?') === -1 ? '?' : '&';
-        return fetch(url + separator + 'form_key=' + encodeURIComponent(window.FORM_KEY), {
-            method: 'POST',
-            credentials: 'same-origin',
-            cache: 'no-store',
-            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-            body: JSON.stringify(data || {})
-        }).then(function (response) {
-            return response.json().catch(function () {
-                return {};
-            }).then(function (body) {
-                if (!response.ok) {
-                    throw new Error((body && body.message) || strings.failed);
-                }
-                return body || {};
-            });
+        return window.smailyPost(url, data).then(function (answer) {
+            if (answer.status < 200 || answer.status > 299) {
+                throw new Error(answer.body.message || strings.failed);
+            }
+            return answer.body;
         });
     }
 

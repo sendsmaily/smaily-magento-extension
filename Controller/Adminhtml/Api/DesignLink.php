@@ -12,7 +12,6 @@ use Magento\Backend\App\Action\Context;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
-use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use Smaily\Connect\Model\Engine\EmailDesigns;
@@ -43,10 +42,9 @@ class DesignLink extends AbstractEmailDesignAction implements HttpPostActionInte
         JsonFactory $jsonFactory,
         JsonSerializer $serializer,
         EmailDesigns $emailDesigns,
-        FormKeyValidator $formKeyValidator,
         private readonly ResolverInterface $localeResolver
     ) {
-        parent::__construct($context, $jsonFactory, $serializer, $emailDesigns, $formKeyValidator);
+        parent::__construct($context, $jsonFactory, $serializer, $emailDesigns);
     }
 
     /**

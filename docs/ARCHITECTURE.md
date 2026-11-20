@@ -228,6 +228,26 @@ below.
   (`Test/Integration/Engine/QueueRoutingTest` pins both). The column
   comment in `db_schema.xml` still reads "i18n context"; the column now
   also carries the connection's canonical store view — no schema change.
+- **The connection prefix (CON-359, contract v1.33.0).** The setup
+  exchange declares `capabilities: ["connection_prefix"]` and, on a
+  reconnect, `connection.previous_prefix` (`Settings::getPreviousPrefix()`:
+  the stored prefix, which the primary's disconnect keeps; `""` while a
+  connection made before the prefix was stored is connected; a website
+  connection reports only its own). The engine's `config.connection.prefix`
+  (`c<N>-` or `""`; a reply of any other shape is refused) is stored at the
+  connection's scope (`smaily_connect/intelligence/connection_prefix`, a
+  `core_config_data` row, no schema change) and the ping's wins over it.
+  Every product code and order id goes out under the connection's prefix,
+  applied when it is SENT, never stored: the queue rows, their dedupe and
+  the storefront pages keep the keys bare, and
+  `Payload\ConnectionPrefix::item()` puts the prefix in front of the
+  catalog `sku` and `tags.product_id`, the order's `external_order_id` and
+  its lines' `sku`, and the browse `sku` (`Cron/FlushIngestQueue`, the
+  relay); `FlushIngestQueue` does the §3b ids and `CatalogManifest` the
+  §3c skus. Customers carry none. A row keeps its item as it was sent; a
+  §3b id the engine names in `errors[]` (another connection's) fails its
+  row. A connection with the prefix `""` — every connection until the
+  engine assigns prefixes — sends exactly what it sent before.
 - **The send pace (CON-232)** lives in one place, `Model/Engine/IngestPace`:
   one request at a time, at most `REQUESTS_PER_SECOND` (5; the contract
   allows 100 a second per ingest route, and the engine contract is to name
@@ -2038,7 +2058,11 @@ in Magento's shape (PRO-3790). Nothing is placed automatically.
   at the current store view — enabled, visible in the catalog, in the
   store's website, with the listing attributes, prices and URL rewrites —
   matching each slot by `external_id` (the product id the catalog sync
-  sends), else by `sku` (`mag-<id>` names the id). A product the collection
+  sends), else by `sku` (`mag-<id>` names the id). On a connection with a
+  code prefix (CON-359) the `sku` is opaque: `StorefrontRecommendations`
+  keeps only a slot whose `sku` is under the prefix and that has an
+  `external_id` — another prefix is another shop's product of the same
+  engine store — so its card is found by `external_id`. A product the collection
   does not return or that is not salable is dropped, nothing takes its
   place. The store's own name, image and price render; each link is the
   product URL + `smaily_rec=<rec_id>&smaily_ctx=storefront` (parameter

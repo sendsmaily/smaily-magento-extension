@@ -2518,9 +2518,10 @@ foreach ($pages as $name => $page) {
 }
 StoreLocale::reset();
 
-// The admin stylesheet as a string, for Test/Js/brand-logos.html (CON-372):
-// a page opened from file:// cannot read the rules of a stylesheet it links,
-// and that harness reads the prefers-reduced-motion rules to apply them.
+// The admin stylesheet as a string, for Test/Js/brand-logos.html (CON-372)
+// and Test/Js/brand-palette.html (CON-376): a page opened from file://
+// cannot read the rules of a stylesheet it links, and those harnesses read
+// its rules.
 $css = file_get_contents($root . '/view/adminhtml/web/css/smaily-admin.css'); // phpcs:ignore Magento2.Functions.DiscouragedFunction
 $file = $build . '/smaily-admin-css.js';
 if ($css === false || file_put_contents( // phpcs:ignore Magento2.Functions.DiscouragedFunction

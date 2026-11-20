@@ -104,6 +104,8 @@ $tabs = [
     // this one steps aside there. ?>
     <?= $block->getChildHtml('intelligence.banner.top') ?>
     <div class="smaily-tab-panel" data-tab="connection">
+        <?php // The invitation to connect a Smaily account (CON-364): stays until one is connected. ?>
+        <?= $block->getChildHtml('invitation.banner') ?>
         <h3><?= $escaper->escapeHtml(__('Connection')) ?></h3>
         <p class="smaily-tab-desc"><?= $escaper->escapeHtml(__('Your Smaily API credentials for this store.')) ?></p>
         <?= /* @noEscape */ $ownSwitch('connection', (string)__('Use its own Smaily account on this website')) ?>

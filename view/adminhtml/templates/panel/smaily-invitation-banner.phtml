@@ -13,11 +13,13 @@
  * Magento has: the WooCommerce plugin's third row, Payment reminder, is not
  * one of them.
  *
- * Drawn on top of setup step 1, where it cannot be closed and its "Connect
- * your Smaily account" goes to the first subdomain field, and on the
- * Dashboard (block data `dismissible`), where the same button opens
+ * Drawn on top of setup step 1 and of the Settings > Connection tab (the
+ * WooCommerce plugin's Step1Connect), where it cannot be closed and its
+ * "Connect your Smaily account" goes to the first subdomain field, and on
+ * the Dashboard (block data `dismissible`), where the same button opens
  * Settings > Connection and Dismiss hides it, and the system message, for
- * 90 days.
+ * 90 days. A Test connection or save that Smaily accepts hides it on the
+ * page (panel/panels-js.phtml, setConnectionStatus()).
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper

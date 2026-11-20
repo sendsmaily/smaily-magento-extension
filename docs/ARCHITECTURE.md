@@ -2769,11 +2769,14 @@ Initial setup, Settings, Log. Design rules:
   draws marketing's banner (body, **Connect your Smaily account**, **Create
   a Smaily account** to `https://www.sendsmaily.net`, the API-user note, a
   decorative panel with the two automations Magento has — the WooCommerce
-  plugin's third row, Payment reminder, is not one) on top of setup step 1,
-  where it cannot be closed and the button goes to the first Subdomain
-  field, and on the Dashboard (`dismissible`), where the button opens
-  Settings > Connection. Magento has no WordPress admin notices, so the
-  one-line notice is an admin system message,
+  plugin's third row, Payment reminder, is not one) on top of setup step 1
+  and of the Settings > Connection tab (the WooCommerce plugin's
+  `Step1Connect` draws it in both), where it cannot be closed and the
+  button goes to the first Subdomain field (a Test connection or
+  Connection save that Smaily accepts hides it on the page, as Woo's
+  `smailyConnection` success does), and on the Dashboard (`dismissible`),
+  where the button opens Settings > Connection. Magento has no WordPress
+  admin notices, so the one-line notice is an admin system message,
   `Model\Adminhtml\SmailyInvitationNotice` (major, so Magento's message
   bar counts it), with the same links plus the guide's
   `UserGuide::SECTION_SETUP_CONNECT`. Dismiss on either is a GET link, as

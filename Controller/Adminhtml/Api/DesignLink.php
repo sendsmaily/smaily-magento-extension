@@ -10,6 +10,7 @@ namespace Smaily\Connect\Controller\Adminhtml\Api;
 
 use Magento\Backend\App\Action\Context;
 use Magento\Framework\App\Action\HttpPostActionInterface;
+use Magento\Framework\App\Request\Http as HttpRequest;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Locale\ResolverInterface;
@@ -18,12 +19,14 @@ use Smaily\Connect\Model\Engine\EmailDesigns;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 
 /**
- * POST (form key) {email_key, return_url?} -> {url}
+ * POST (form key) {email_key, return_url?, display?} -> {url}
  *
  * A one-time link to one email's design page (contract §22, CON-257),
  * minted when the admin presses "Edit design" or "Open in a new tab": one
- * click, one call. The page shows it in a frame over the admin, or in a
- * new tab. The link is never stored, logged or cached: the answer carries
+ * click, one call. The page shows it in a frame over the admin
+ * (`display: 'frame'`, a §22 frame link naming the admin's origin when it
+ * is not the shop's, CON-366), or in a new tab (any other `display`). The
+ * link is never stored, logged or cached: the answer carries
  * Cache-Control: no-store, and nothing here writes it anywhere.
  *
  * An engine email (a §11 catalogue key) opens its setup page on the
@@ -76,9 +79,17 @@ class DesignLink extends AbstractEmailDesignAction implements HttpPostActionInte
         }
         $returnUrl = is_string($body['return_url'] ?? null) ? $body['return_url'] : '';
         $language = strtolower((string)strtok((string)$this->localeResolver->getLocale(), '_'));
+        /** @var HttpRequest $request An admin request is an HTTP request. */
+        $request = $this->getRequest();
 
         try {
-            $url = $this->emailDesigns->designLink($emailKey, $returnUrl, $language);
+            $url = $this->emailDesigns->designLink(
+                $emailKey,
+                $returnUrl,
+                $language,
+                ($body['display'] ?? '') === 'frame',
+                EmailDesigns::requestOrigin($request)
+            );
         } catch (EngineException $exception) {
             return $this->engineFailure($exception);
         }

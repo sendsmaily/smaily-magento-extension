@@ -25,7 +25,10 @@ use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
  *   read keeps what the last one stored.
  * - designLink() mints a §22 one-time link to one email's design page. The
  *   link goes to the admin's browser once and is never stored, logged or
- *   cached here.
+ *   cached here. A link for the modal is minted with `display: "frame"`
+ *   (contract 1.31.0, CON-366, as the WooCommerce plugin's CON-311): its
+ *   session lives in the page, not in a cookie a browser may refuse in a
+ *   frame. An admin on an origin of its own is named as `frame_origin`.
  *
  * Only an account the engine may be called for (connected, not refused —
  * Settings::isSendingAllowed()) is asked.
@@ -100,11 +103,21 @@ class EmailDesigns
      * goes along only when the engine would take it (allowedReturnUrl()),
      * else it is left out rather than refused by the engine.
      *
+     * @param bool $frame the link opens in the admin's modal (`display:
+     *     "frame"`), else in a new tab (`display: "tab"`)
+     * @param string $adminOrigin the origin of the admin page; with a frame
+     *     it goes as `frame_origin` when it is not the site URL's origin
+     *     (§22 Embedding rule 1 (d)), which the engine may refuse with 422
      * @return string the link: an https address, to open at once
      * @throws EngineException when the engine refuses or cannot answer
      */
-    public function designLink(string $emailKey, string $returnUrl, string $language): string
-    {
+    public function designLink(
+        string $emailKey,
+        string $returnUrl,
+        string $language,
+        bool $frame,
+        string $adminOrigin
+    ): string {
         if (!self::isEmailKey($emailKey)) {
             throw new EngineRequestException('unknown_email', 404, ['error' => 'unknown_email']);
         }
@@ -115,6 +128,10 @@ class EmailDesigns
         if (preg_match('/^[a-z]{2}$/', $language) === 1) {
             $body['language'] = $language;
         }
+        $body['display'] = $frame ? 'frame' : 'tab';
+        if ($frame && $adminOrigin !== self::origin($this->client->siteUrl())) {
+            $body['frame_origin'] = $adminOrigin;
+        }
 
         $link = $this->client->emailDesignLink($emailKey, $body);
         $url = is_string($link['url'] ?? null) ? $link['url'] : '';
@@ -123,6 +140,27 @@ class EmailDesigns
         }
 
         return $url;
+    }
+
+    /**
+     * Whether the engine refused the request's `frame_origin` (§22: 422 with
+     * `field: "frame_origin"` in its `errors`): the admin's origin may not
+     * frame the design page, so it opens in a new tab.
+     *
+     * @param array<string, mixed> $errorBody
+     */
+    public static function refusesFrameOrigin(int $status, array $errorBody): bool
+    {
+        if ($status !== 422 || !is_array($errorBody['errors'] ?? null)) {
+            return false;
+        }
+        foreach ($errorBody['errors'] as $error) {
+            if (is_array($error) && ($error['field'] ?? null) === 'frame_origin') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Whether `$key` has the form of a §22 email key. */

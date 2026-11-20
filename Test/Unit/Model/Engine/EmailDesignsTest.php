@@ -20,6 +20,9 @@ use Smaily\Connect\Model\Engine\Settings;
  */
 class EmailDesignsTest extends TestCase
 {
+    /** @var array<int, array<string, mixed>> the bodies the engine was sent */
+    private array $bodies = [];
+
     public function testTheListKeepsEveryKnownKindAndLeavesTheRestOut(): void
     {
         $client = $this->createMock(Client::class);
@@ -69,13 +72,90 @@ class EmailDesignsTest extends TestCase
         $client = $this->createMock(Client::class);
         $client->method('siteUrl')->willReturn('https://Shop.example/');
         $client->expects(self::once())->method('emailDesignLink')
-            ->with('plugin.welcome', ['return_url' => 'https://shop.example/admin/smaily/settings/', 'language' => 'et'])
+            ->with('plugin.welcome', [
+                'return_url' => 'https://shop.example/admin/smaily/settings/',
+                'language' => 'et',
+                'display' => 'tab',
+            ])
             ->willReturn(['url' => 'https://intelligence.smaily.com/design/email/dl_1', 'expires_at' => 'x']);
 
         self::assertSame(
             'https://intelligence.smaily.com/design/email/dl_1',
-            $this->emailDesigns($client)->designLink('plugin.welcome', 'https://shop.example/admin/smaily/settings/', 'et')
+            $this->emailDesigns($client)->designLink(
+                'plugin.welcome',
+                'https://shop.example/admin/smaily/settings/',
+                'et',
+                false,
+                'https://shop.example'
+            )
         );
+    }
+
+    /**
+     * CON-366, contract 1.31.0 §22: a link for the modal is a frame link,
+     * whose session lives in the page, not in a third-party cookie. An admin
+     * on the shop's own origin needs no `frame_origin` (Embedding rule 1 (a)).
+     */
+    public function testAFrameLinkFromTheShopsOwnOriginNamesNoFrameOrigin(): void
+    {
+        $client = $this->createMock(Client::class);
+        $client->method('siteUrl')->willReturn('https://shop.example/');
+        $client->expects(self::once())->method('emailDesignLink')
+            ->with('plugin.welcome', ['language' => 'en', 'display' => 'frame'])
+            ->willReturn(['url' => 'https://intelligence.smaily.com/design/email/dl_1']);
+
+        $this->emailDesigns($client)->designLink('plugin.welcome', '', 'en', true, 'https://shop.example');
+    }
+
+    /**
+     * An admin on a host or port of its own names its origin as
+     * `frame_origin` (Embedding rule 1 (d)); a tab link never carries it.
+     */
+    public function testAFrameLinkFromAnAdminOnItsOwnOriginNamesThatOrigin(): void
+    {
+        $client = $this->createMock(Client::class);
+        $client->method('siteUrl')->willReturn('https://www.shop.example/');
+        $client->expects(self::exactly(2))->method('emailDesignLink')
+            ->willReturnCallback(function (string $emailKey, array $body): array {
+                $this->bodies[] = $body;
+
+                return ['url' => 'https://intelligence.smaily.com/design/email/dl_1'];
+            });
+
+        $this->emailDesigns($client)->designLink('plugin.welcome', '', 'en', true, 'https://admin.shop.example');
+        $this->emailDesigns($client)->designLink('plugin.welcome', '', 'en', false, 'https://admin.shop.example');
+
+        self::assertSame([
+            ['language' => 'en', 'display' => 'frame', 'frame_origin' => 'https://admin.shop.example'],
+            ['language' => 'en', 'display' => 'tab'],
+        ], $this->bodies);
+    }
+
+    /**
+     * @dataProvider frameOriginRefusalProvider
+     * @param array<string, mixed> $errorBody
+     */
+    public function testARefusedFrameOriginIsA422NamingIt(int $status, array $errorBody, bool $refused): void
+    {
+        self::assertSame($refused, EmailDesigns::refusesFrameOrigin($status, $errorBody));
+    }
+
+    /**
+     * @return array<string, array{int, array<string, mixed>, bool}>
+     */
+    public static function frameOriginRefusalProvider(): array
+    {
+        $frameOrigin = ['error' => 'validation_failed', 'errors' => [
+            ['field' => 'return_url', 'message' => 'x'],
+            ['field' => 'frame_origin', 'message' => 'not in the registrable domain of the site'],
+        ]];
+
+        return [
+            'frame_origin refused' => [422, $frameOrigin, true],
+            'another field' => [422, ['error' => 'validation_failed', 'errors' => [['field' => 'language']]], false],
+            'no errors' => [422, ['error' => 'validation_failed'], false],
+            'another status' => [400, $frameOrigin, false],
+        ];
     }
 
     /**
@@ -85,10 +165,10 @@ class EmailDesignsTest extends TestCase
     {
         $client = $this->createMock(Client::class);
         $client->method('siteUrl')->willReturn('https://shop.example/');
-        $client->expects(self::once())->method('emailDesignLink')->with('plugin.welcome', [])
+        $client->expects(self::once())->method('emailDesignLink')->with('plugin.welcome', ['display' => 'tab'])
             ->willReturn(['url' => 'https://intelligence.smaily.com/design/email/dl_1']);
 
-        $this->emailDesigns($client)->designLink('plugin.welcome', $returnUrl, '');
+        $this->emailDesigns($client)->designLink('plugin.welcome', $returnUrl, '', false, '');
     }
 
     /**
@@ -110,7 +190,7 @@ class EmailDesignsTest extends TestCase
         $client->method('emailDesignLink')->willReturn(['url' => 'javascript:alert(1)']);
 
         $this->expectException(EngineRequestException::class);
-        $this->emailDesigns($client)->designLink('plugin.welcome', '', 'en');
+        $this->emailDesigns($client)->designLink('plugin.welcome', '', 'en', false, '');
     }
 
     public function testAKeyThatIsNoEmailKeyIsNeverSent(): void
@@ -119,7 +199,7 @@ class EmailDesignsTest extends TestCase
         $client->expects(self::never())->method('emailDesignLink');
 
         $this->expectException(EngineRequestException::class);
-        $this->emailDesigns($client)->designLink('plugin.Welcome/../x', '', 'en');
+        $this->emailDesigns($client)->designLink('plugin.Welcome/../x', '', 'en', false, '');
     }
 
     public function testOnlyAnAccountTheEngineMayBeAskedForIsAvailable(): void

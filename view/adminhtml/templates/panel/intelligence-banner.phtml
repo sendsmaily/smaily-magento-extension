@@ -1,0 +1,98 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * The Campaign Intelligence banner (CON-363, as the WooCommerce plugin's
+ * CON-350 banner; marketing's design, a lilac card): the invitation to a
+ * store with a working Smaily account, or the upsell when Smaily answered
+ * code 227. Which one, if any, comes from the view model
+ * (ViewModel\Adminhtml\IntelligenceBannerData); none once Campaign
+ * Intelligence is connected. Every visible word is a translated phrase; the
+ * panel on the right only illustrates, so assistive technology and narrow
+ * screens skip it.
+ *
+ * Drawn on setup step 4 and the Settings Intelligence tab above the setup
+ * link field, where it always stays, and on top of the other Settings tabs
+ * and the Dashboard (block data `dismissible`), where Dismiss hides it for
+ * 30 days. Its button reads "Contact Smaily" (Smaily's consultation page);
+ * panel/intelligence-start.phtml turns it into "Try Intelligence free"
+ * while the engine takes starts, and runs the start.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+use Smaily\Connect\ViewModel\Adminhtml\IntelligenceBannerData;
+
+/** @var IntelligenceBannerData $viewModel */
+$viewModel = $block->getData('view_model');
+$variant = $viewModel->getVariant();
+$dismissible = (bool)$block->getData('dismissible');
+if ($variant === '' || ($dismissible && $viewModel->isDismissed())) {
+    return;
+}
+$upsell = $variant === IntelligenceBannerData::VARIANT_UPSELL;
+$loginUrl = $viewModel->getLoginUrl();
+$gradientId = $dismissible ? 'smaily-ci-banner-mark-top' : 'smaily-ci-banner-mark';
+$hidden = ' hidden';
+?>
+<section class="smaily-ci-banner<?= $dismissible ? ' smaily-ci-banner--top' : '' ?>"
+         aria-label="<?= $escaper->escapeHtmlAttr(__('Campaign Intelligence')) ?>"
+         data-variant="<?= $escaper->escapeHtmlAttr($variant) ?>"
+         data-offers-start="<?= $viewModel->offersStart() ? '1' : '0' ?>"
+         data-login-url="<?= $escaper->escapeHtmlAttr($loginUrl) ?>">
+    <div class="smaily-ci-banner__main">
+        <div class="smaily-ci-banner__head">
+            <span class="smaily-ci-banner__logo" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="28" height="28" focusable="false">
+                    <defs>
+                        <linearGradient id="<?= /* @noEscape */ $gradientId ?>" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#ff5c9d"/>
+                            <stop offset="100%" stop-color="#7cc4ff"/>
+                        </linearGradient>
+                    </defs>
+                    <rect x="3" y="3" width="12" height="12" rx="4" fill="none" stroke="url(#<?= /* @noEscape */ $gradientId ?>)" stroke-width="2"/>
+                    <rect x="9" y="9" width="12" height="12" rx="4" fill="none" stroke="url(#<?= /* @noEscape */ $gradientId ?>)" stroke-width="2"/>
+                </svg>
+            </span>
+            <?php // The product name: not translated. ?>
+            <h2 class="smaily-ci-banner__title">Campaign <span class="smaily-ci-banner__accent">Intelligence</span></h2>
+        </div>
+        <p class="smaily-ci-banner__body"><?= $escaper->escapeHtml(__('Connect your store with Smaily, and add personalized product recommendations to your campaigns, tailored to each customer’s interests.')) ?></p>
+        <div class="smaily-ci-banner__actions">
+            <a class="smaily-ci-banner__cta" data-action="login" href="<?= $escaper->escapeUrl($loginUrl) ?>" target="_blank" rel="noopener noreferrer"<?= /* @noEscape */ $upsell && $loginUrl !== '' ? '' : $hidden ?>><?= $escaper->escapeHtml(__('Log in to Smaily')) ?></a>
+            <a class="smaily-ci-banner__cta" data-action="contact" href="<?= $escaper->escapeUrl($viewModel->getConsultationUrl()) ?>" target="_blank" rel="noopener noreferrer"<?= /* @noEscape */ $upsell ? $hidden : '' ?>><?= $escaper->escapeHtml(__('Contact Smaily')) ?></a>
+            <button type="button" class="smaily-ci-banner__cta" data-action="start" hidden><span><?= $escaper->escapeHtml(__('Try Intelligence free')) ?></span></button>
+        </div>
+        <p class="smaily-ci-banner__note" role="status"<?= /* @noEscape */ $upsell ? '' : $hidden ?>><?= $upsell ? $escaper->escapeHtml(__('Campaign Intelligence requires a paid Smaily plan. Log in to Smaily to review your plan options.')) : '' ?></p>
+    </div>
+    <div class="smaily-ci-banner__panel" aria-hidden="true">
+        <span class="smaily-ci-banner__panel-label">
+            <svg viewBox="0 0 24 24" width="16" height="16" focusable="false">
+                <rect x="3" y="3" width="12" height="12" rx="4" fill="none" stroke="#2a1028" stroke-width="2"/>
+                <rect x="9" y="9" width="12" height="12" rx="4" fill="none" stroke="#2a1028" stroke-width="2"/>
+            </svg>
+            <?= $escaper->escapeHtml(__('Engine in action')) ?>
+        </span>
+        <p class="smaily-ci-banner__panel-heading"><?= $escaper->escapeHtml(__('What the engine recommends you do next')) ?></p>
+        <?php foreach ([
+            ['clock', __('56 customers are due to reorder'), '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'],
+            ['undo', __('12 customers are slipping away'), '<path d="M9 6L5 10l4 4"/><path d="M5 10h9a5 5 0 0 1 0 10h-3"/>'],
+        ] as $index => [$icon, $text, $paths]): ?>
+        <div class="smaily-ci-banner__row smaily-ci-banner__row--<?= (int)$index ?>">
+            <span class="smaily-ci-banner__icon smaily-ci-banner__icon--<?= /* @noEscape */ $icon ?>">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><?= /* @noEscape */ $paths ?></svg>
+            </span>
+            <span class="smaily-ci-banner__row-text"><?= $escaper->escapeHtml($text) ?></span>
+            <span class="smaily-ci-banner__chip"><?= $escaper->escapeHtml(__('Create segment in Smaily')) ?></span>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <div class="smaily-ci-banner__corner">
+        <span class="smaily-ci-banner__pill"<?= /* @noEscape */ $upsell ? '' : $hidden ?>><?= $escaper->escapeHtml(__('Requires a paid Smaily plan')) ?></span>
+        <?php if ($dismissible): ?>
+        <button type="button" class="smaily-ci-banner__dismiss"><?= $escaper->escapeHtml(__('Dismiss')) ?></button>
+        <?php endif; ?>
+    </div>
+</section>

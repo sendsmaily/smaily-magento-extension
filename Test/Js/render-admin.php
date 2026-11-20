@@ -78,7 +78,8 @@ $escaper = new Escaper();
  * The template's $block: the view model, the block's other data, an admin URL,
  * the store's base URL and a child template rendered the way Magento's
  * Template block renders one (the block's 'children' data maps a child's name
- * to its template; a child not listed renders empty).
+ * to its template, or to [path, view model, data] for a child block with a
+ * view model of its own; a child not listed renders empty).
  */
 $block = static fn (object $viewModel, array $data = []): object => new class ($viewModel, $data, $escaper, $root) {
     /**
@@ -134,6 +135,12 @@ $block = static fn (object $viewModel, array $data = []): object => new class ($
     public function getChildHtml(string $name): string
     {
         $template = $this->data['children'][$name] ?? null;
+        if (is_array($template)) {
+            // A child block of its own: [path, view model, data] (CON-363).
+            [$file, $viewModel, $data] = $template;
+
+            return (new self($viewModel, $data, $this->escaper, $this->root))->fetchView($file);
+        }
 
         return $template === null ? '' : $this->fetchView($template);
     }
@@ -511,14 +518,6 @@ $intelligenceViewModel = static fn (
     public function getConsentGuideUrl(): string
     {
         return 'https://example.com/consent-guide';
-    }
-
-    /**
-     * @return string
-     */
-    public function getIntelligencePageUrl(): string
-    {
-        return 'https://smaily.com/campaign-intelligence/';
     }
 
     /**
@@ -1281,14 +1280,6 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
     public function getConsentGuideUrl(): string
     {
         return 'https://example.com/consent-guide';
-    }
-
-    /**
-     * @return string
-     */
-    public function getIntelligencePageUrl(): string
-    {
-        return 'https://smaily.com/campaign-intelligence/';
     }
 
     /**
@@ -2122,6 +2113,162 @@ foreach (['email-designs' => true, 'email-designs-tab' => false] as $page => $fr
         ],
     ];
 }
+
+/*
+ * The Campaign Intelligence banner and "Try Intelligence free" (CON-363):
+ * panel/intelligence-banner.phtml on top of the Settings tabs (dismissible)
+ * and as the Intelligence tab's child above the setup link field,
+ * panel/panels-js.phtml for the connection, and
+ * panel/intelligence-start.phtml once for the page. ci-start-frame: an https
+ * admin, so the start window opens in the modal; ci-start-window: the admin
+ * cannot frame it, so a new window. ci-banner-upsell: Smaily answered code
+ * 227; ci-banner-separate: separate stores, so the start is not offered;
+ * ci-banner-none: Campaign Intelligence connected; ci-banner-dashboard: the
+ * dismissible banner alone, as the Dashboard draws it, without the panels.
+ */
+$bannerViewModel = static fn (string $variant, bool $offersStart = true, bool $frameable = true): object => new class (
+    $variant,
+    $offersStart,
+    $frameable
+) {
+    /**
+     * @param string $variant
+     * @param bool $offersStart
+     * @param bool $frameable
+     */
+    public function __construct(
+        private readonly string $variant,
+        private readonly bool $offersStart,
+        private readonly bool $frameable
+    ) {
+    }
+
+    /**
+     * @return string
+     */
+    public function getVariant(): string
+    {
+        return $this->variant;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isDismissed(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public function offersStart(): bool
+    {
+        return $this->offersStart;
+    }
+
+    /**
+     * @return string
+     */
+    public function getLoginUrl(): string
+    {
+        return 'https://shop.sendsmaily.net/';
+    }
+
+    /**
+     * @return string
+     */
+    public function getConsultationUrl(): string
+    {
+        return 'https://smaily.com/consultation/';
+    }
+
+    /**
+     * @return bool
+     */
+    public function isFrameable(): bool
+    {
+        return $this->frameable;
+    }
+};
+$bannerStrings = [
+    'Connect your store with Smaily, and add personalized product recommendations to your campaigns, tailored to each'
+        . ' customer’s interests.',
+    'Contact Smaily',
+    'Try Intelligence free',
+    'Open in a new window',
+    'Log in to Smaily',
+    'Requires a paid Smaily plan',
+    'Campaign Intelligence requires a paid Smaily plan. Log in to Smaily to review your plan options.',
+    'Intelligence needs a paid Smaily package. Your Smaily account is on the free package. Trying Intelligence is free,'
+        . ' but it works only with a paid Smaily package. No store was created and nothing was sent.',
+    'Connecting your shop · Sending your shop address · Checking your Smaily account',
+    'Finish the setup in the window that opened. If the extension does not connect by itself, copy the setup link that'
+        . ' window shows into Setup URL or token from Smaily under Marketing > Smaily Connect > Settings > Intelligence.',
+    'The setup window did not open here.',
+    'Your browser blocked the new tab. Allow pop-ups for this page and try again.',
+    'Smaily refused the API login stored in this extension. Check it in the extension settings and try again.'
+        . ' No store was created.',
+    'Open the Smaily connection settings',
+    'This Smaily account already has a store in Intelligence.',
+    'Open console',
+    'To connect this extension, create a setup link in the console (Settings → Connections) and paste it into Setup URL'
+        . ' or token from Smaily.',
+    'Smaily did not answer. Try again shortly.',
+    'Campaign Intelligence could not be started. Try again later, or contact Smaily.',
+    'Connecting the extension…',
+    'Opening the setup window…',
+    'Dismiss',
+    'Engine in action',
+    'Campaign Intelligence',
+    'Show recommendations in your store',
+    'How to add it →',
+    'Connected: %1 (engine %2)',
+    'The catalog import has started',
+];
+$bannerTemplate = $root . '/view/adminhtml/templates/panel/intelligence-banner.phtml';
+$startTemplate = $root . '/view/adminhtml/templates/panel/intelligence-start.phtml';
+foreach (['ci-start-frame' => true, 'ci-start-window' => false] as $page => $frameable) {
+    $banner = $bannerViewModel('invite', true, $frameable);
+    $pages[$page] = [
+        'template' => [
+            [$bannerTemplate, $banner, ['dismissible' => true]],
+            [$root . '/view/adminhtml/templates/panel/intelligence.phtml', $intelligence, [
+                'context' => 'settings',
+                'children' => ['intelligence.banner' => [$bannerTemplate, $banner, []]],
+            ]],
+            [$root . '/view/adminhtml/templates/panel/panels-js.phtml', $intelligence, ['context' => 'settings']],
+            [$startTemplate, $banner, []],
+        ],
+        'viewModel' => null,
+        'strings' => $bannerStrings,
+    ];
+}
+foreach ([
+    'ci-banner-upsell' => $bannerViewModel('upsell', false),
+    'ci-banner-separate' => $bannerViewModel('invite', false),
+    'ci-banner-none' => $bannerViewModel(''),
+] as $page => $banner) {
+    $pages[$page] = [
+        'template' => [
+            [$root . '/view/adminhtml/templates/panel/intelligence.phtml', $intelligence, [
+                'context' => 'settings',
+                'children' => ['intelligence.banner' => [$bannerTemplate, $banner, []]],
+            ]],
+            [$startTemplate, $banner, []],
+        ],
+        'viewModel' => null,
+        'strings' => $bannerStrings,
+    ];
+}
+$pages['ci-banner-dashboard'] = [
+    'template' => [
+        [$bannerTemplate, $bannerViewModel('invite'), ['dismissible' => true]],
+        [$startTemplate, $bannerViewModel('invite'), []],
+    ],
+    'viewModel' => null,
+    'strings' => $bannerStrings,
+];
 
 $render = static function (string $template, object $block, Escaper $escaper): string {
     ob_start();

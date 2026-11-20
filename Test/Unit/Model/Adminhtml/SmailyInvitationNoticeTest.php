@@ -43,7 +43,7 @@ class SmailyInvitationNoticeTest extends TestCase
         self::assertSame(
             'Connect your store to Smaily to sync contacts and set up automated emails.'
             . ' <a href="https://admin.example/smaily_connect/settings/?tab=connection">Connect your Smaily account</a>'
-            . ' | <a href="https://www.sendsmaily.net" target="_blank" rel="noopener noreferrer">Create a Smaily account</a>'
+            . ' | <a href="https://www.sendsmaily.net/account/register/" target="_blank" rel="noopener noreferrer">Create a Smaily account</a>'
             . ' | <a href="https://smaily.com/connect-magento/#setup-connect" target="_blank" rel="noopener noreferrer">'
             . 'User guide to create API credentials</a>'
             . ' <a href="https://admin.example/smaily_connect/invitation/dismiss/?form_key=form-key">Dismiss</a>',

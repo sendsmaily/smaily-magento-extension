@@ -41,8 +41,8 @@ class SmailyInvitationData implements ArgumentInterface
     /** A dismissed invitation stays away this long (Woo CON-321). */
     public const DISMISS_SECONDS = 90 * 86400;
 
-    /** Smaily sign-up: where "Create a Smaily account" leads (Woo's SIGNUP_URL). */
-    public const SIGNUP_URL = 'https://www.sendsmaily.net';
+    /** Smaily's sign-up page: where "Create a Smaily account" leads. */
+    public const SIGNUP_URL = 'https://www.sendsmaily.net/account/register/';
 
     /** The admins who may connect an account: the Settings resource. */
     public const RESOURCE = 'Smaily_Connect::config';

@@ -1486,6 +1486,18 @@ name in `abandoned_cart_url` and `store_url` (`magento` under bin/magento),
 so `Model\StorefrontScript` puts the storefront's `index.php` in its place,
 as for catalog product links (PRO-3732).
 
+**The longest cutoff (CON-368, as the WooCommerce plugin's CON-326).** A
+cart leaves the scan 24 hours after its last change and the scan runs every
+5 minutes (`RUN_INTERVAL_SECONDS`, pinned to `etc/crontab.xml` by a unit
+test), so `AbandonedCart::MAX_CUTOFF_MINUTES` = 24 h minus one run = 1435
+minutes is the longest cutoff that leaves every cart one run inside the
+window. `WizardStepSaver` refuses a longer one while the reminder is on
+(nothing of the automations is saved) and leaves the stored one as it is
+while the reminder is off; Stores > Configuration and `config:set` refuse it
+through `Model\Config\Backend\AbandonedCutoff`. A longer cutoff stored before
+the limit is not rewritten: the switched-on card shows the refusal under
+**Wait (minutes)** when the page opens.
+
 **One build per store (PRO-1960).** Before the reminder rules below weigh
 the page, the cron builds every candidate's payload, grouped by store: one
 frontend emulation per store around the whole build (Magento allows one
@@ -2785,7 +2797,8 @@ Initial setup, Settings, Log. Design rules:
   account; a Transactional account alone does not count) and only for an
   admin with `Smaily_Connect::config`. `panel/smaily-invitation-banner.phtml`
   draws marketing's banner (body, **Connect your Smaily account**, **Create
-  a Smaily account** to `https://www.sendsmaily.net`, the API-user note, a
+  a Smaily account** to Smaily's sign-up page,
+  `https://www.sendsmaily.net/account/register/`, the API-user note, a
   decorative panel with the two automations Magento has — the WooCommerce
   plugin's third row, Payment reminder, is not one) on top of setup step 1
   and of the Settings > Connection tab (the WooCommerce plugin's

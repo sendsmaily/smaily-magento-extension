@@ -68,7 +68,7 @@ class SmailyInvitationDataTest extends TestCase
     {
         $invitation = $this->invitation();
 
-        self::assertSame('https://www.sendsmaily.net', $invitation->getSignupUrl());
+        self::assertSame('https://www.sendsmaily.net/account/register/', $invitation->getSignupUrl());
         self::assertSame('https://smaily.com/connect-magento/#setup-connect', $invitation->getGuideUrl());
         self::assertSame('admin/smaily_connect/settings', $invitation->getConnectUrl());
         self::assertSame('admin/smaily_connect/invitation/dismiss', $invitation->getDismissUrl());

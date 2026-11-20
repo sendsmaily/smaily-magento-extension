@@ -1023,7 +1023,7 @@ bin/magento cache:flush</code></pre>
   <div class="sub" id="set-abandoned">
     <h2><span data-lang="en">Abandoned cart</span><span data-lang="et">Hüljatud ostukorv</span></h2>
     <div data-lang="en">
-      <p>A cart counts as abandoned when it has products and an email address and has been idle longer than <strong>Wait (minutes)</strong> (default 30, minimum 10). The store checks for such carts every 5 minutes.</p>
+      <p>A cart counts as abandoned when it has products and an email address and has been idle longer than <strong>Wait (minutes)</strong> (default 30): from 10 to 1435 minutes. The store checks for such carts every 5 minutes and never mails a cart older than 24 hours, so a longer wait could miss the last check. While the automation is enabled, a longer wait is not saved, and a message under the field points out one saved earlier.</p>
       <ul>
         <li>A cart older than 24 hours is never mailed, so a cron that was down never sends stale reminders.</li>
         <li>Each cart is mailed <strong>once</strong>, and one email address gets at most <strong>one reminder in 24 hours</strong>, however many carts carry it. A further cart's row in the Log reads <strong>Skipped</strong>.</li>
@@ -1050,7 +1050,7 @@ bin/magento cache:flush</code></pre>
       </div>
     </div>
     <div data-lang="et">
-      <p>Ostukorv loetakse hüljatuks, kui selles on tooted ja e-posti aadress ning see on olnud puutumata kauem kui <strong>Ooteaeg (minutites)</strong> (vaikimisi 30, vähemalt 10). Pood otsib selliseid ostukorve iga 5 minuti järel.</p>
+      <p>Ostukorv loetakse hüljatuks, kui selles on tooted ja e-posti aadress ning see on olnud puutumata kauem kui <strong>Ooteaeg (minutites)</strong> (vaikimisi 30): 10 kuni 1435 minutit. Pood otsib selliseid ostukorve iga 5 minuti järel ega saada kirja üle 24 tunni vanusele ostukorvile, nii et pikem ooteaeg võiks viimasest kontrollist mööda minna. Kui automaatika on lubatud, pikemat ooteaega ei salvestata ja varem salvestatud pikema ooteaja kohta on välja all teade.</p>
       <ul>
         <li>Üle 24 tunni vanusele ostukorvile kirja ei saadeta, nii et seisnud cron ei saada kunagi aegunud meeldetuletusi.</li>
         <li>Iga ostukorvi kohta saadetakse kiri <strong>üks kord</strong> ning üks e-posti aadress saab <strong>24 tunni jooksul kõige rohkem ühe meeldetuletuse</strong>, ükskõik mitmel ostukorvil see on. Järgmise ostukorvi rida on logis <strong>Vahele jäetud</strong>.</li>

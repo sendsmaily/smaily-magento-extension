@@ -157,8 +157,9 @@
                 <field id="abandoned_cutoff" translate="label comment" type="text" sortOrder="70"
                        showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
                     <label>Abandoned Cart Cutoff (Minutes)</label>
-                    <comment>How long a cart must be inactive before it counts as abandoned. Minimum 10 minutes. Carts older than 24 hours are never mailed.</comment>
-                    <validate>validate-digits digits-range-10-1440</validate>
+                    <comment>How long a cart must be inactive before it counts as abandoned. From 10 to 1435 minutes. Carts older than 24 hours are never mailed.</comment>
+                    <validate>validate-digits digits-range-10-1435</validate>
+                    <backend_model>Smaily\Connect\Model\Config\Backend\AbandonedCutoff</backend_model>
                     <depends><field id="abandoned_enabled">1</field></depends>
                 </field>
                 <field id="welcome_coupon_enabled" translate="label" type="select" sortOrder="71"

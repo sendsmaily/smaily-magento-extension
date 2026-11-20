@@ -15,6 +15,7 @@ use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
+use Smaily\Connect\Cron\AbandonedCart;
 use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
 use Smaily\Connect\Model\Automation\Mapping;
 use Smaily\Connect\Model\Automation\MappingSaver;
@@ -25,6 +26,7 @@ use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\Config\Backend\AbandonedCutoff;
 use Smaily\Connect\Model\Config\Source\MultilingualMode;
 use Smaily\Connect\Model\Config\Source\SyncFields;
 use Smaily\Connect\Model\Config\Source\SyncMode;
@@ -961,9 +963,9 @@ class WizardStepSaver
      */
     private function saveAutomations(array $data, int $websiteId, ?int $target): array
     {
-        $couponErrors = $this->couponErrors($data);
-        if ($couponErrors !== []) {
-            return $couponErrors;
+        $errors = array_merge($this->cutoffErrors($data), $this->couponErrors($data));
+        if ($errors !== []) {
+            return $errors;
         }
         $this->saveFlag(Config::XML_PATH_WELCOME_ENABLED, $data, 'welcome_enabled', $target);
         $this->saveFlag(Config::XML_PATH_FIRST_ORDER_ENABLED, $data, 'first_order_enabled', $target);
@@ -1001,10 +1003,15 @@ class WizardStepSaver
             $this->write($path, $postedId === '' ? '0' : $postedId, $target);
         }
 
-        if (array_key_exists('abandoned_cutoff', $data)) {
+        // A cutoff no reminder could be sent with is refused above while the
+        // reminder is on (CON-368); with it off the field is hidden, so it
+        // blocks nothing and the stored cutoff is left as it is.
+        if (array_key_exists('abandoned_cutoff', $data)
+            && (int)$data['abandoned_cutoff'] <= AbandonedCart::MAX_CUTOFF_MINUTES
+        ) {
             $this->write(
                 Config::XML_PATH_ABANDONED_CUTOFF,
-                (string)max(Config::MIN_ABANDONED_CUTOFF_MINUTES, min(1440, (int)$data['abandoned_cutoff'])),
+                (string)max(Config::MIN_ABANDONED_CUTOFF_MINUTES, (int)$data['abandoned_cutoff']),
                 $target
             );
         }
@@ -1040,6 +1047,25 @@ class WizardStepSaver
         }
 
         return [];
+    }
+
+    /**
+     * A switched-on abandoned-cart reminder whose cutoff is longer than any
+     * a reminder could be sent with (CON-368, as the WooCommerce plugin's
+     * CON-326); nothing is saved with one.
+     *
+     * @param array<string, mixed> $data
+     * @return array<int, array{field: string, message: string}>
+     */
+    private function cutoffErrors(array $data): array
+    {
+        if (empty($data['abandoned_enabled'])
+            || (int)($data['abandoned_cutoff'] ?? 0) <= AbandonedCart::MAX_CUTOFF_MINUTES
+        ) {
+            return [];
+        }
+
+        return [['field' => 'abandoned_cutoff', 'message' => (string)AbandonedCutoff::refusal()]];
     }
 
     /**

@@ -55,6 +55,18 @@ class AbandonedCart
         . ' Nothing was sent.';
 
     private const MAX_AGE_SECONDS = 86400;
+
+    /** How often the scan runs: etc/crontab.xml, every 5 minutes. */
+    public const RUN_INTERVAL_SECONDS = 300;
+
+    /**
+     * The longest cutoff a reminder can still go out with (CON-368, as the
+     * WooCommerce plugin's CON-326): MAX_AGE minus one run interval, so at
+     * least one run falls between the cutoff and the end of the scan's
+     * window. A longer one is refused where it is set.
+     */
+    public const MAX_CUTOFF_MINUTES = (self::MAX_AGE_SECONDS - self::RUN_INTERVAL_SECONDS) / 60;
+
     private const REMINDER_INTERVAL_SECONDS = 86400;
     private const BATCH_SIZE = 100;
 

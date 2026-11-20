@@ -47,7 +47,9 @@
 
 /** @var \Smaily\Connect\ViewModel\Adminhtml\IntelligenceBannerData $viewModel */
 $viewModel = $block->getData('view_model');
-if ($viewModel->getVariant() === '') {
+// Block data `dismissible`: the page's only banner is the dismissible one
+// (the Dashboard), so nothing is needed while it is dismissed.
+if ($viewModel->getVariant() === '' || ($block->getData('dismissible') && $viewModel->isDismissed())) {
     return;
 }
 $config = [
@@ -123,25 +125,8 @@ require(['jquery'], function ($) {
     var connected = null;
     var readyTimer = null;
 
-    // Every answer as {status, body}; no answer is status 0.
-    function post(url, data) {
-        var separator = url.indexOf('?') === -1 ? '?' : '&';
-        return fetch(url + separator + 'form_key=' + encodeURIComponent(window.FORM_KEY), {
-            method: 'POST',
-            credentials: 'same-origin',
-            cache: 'no-store',
-            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-            body: JSON.stringify(data || {})
-        }).then(function (response) {
-            return response.json().catch(function () {
-                return {};
-            }).then(function (body) {
-                return {status: response.status, body: body && typeof body === 'object' ? body : {}};
-            });
-        }, function () {
-            return {status: 0, body: {}};
-        });
-    }
+    // Every answer as {status, body}; no answer is status 0 (panel/modal-js.phtml).
+    var post = window.smailyPost;
 
     function startOpen() {
         statusAnswer = statusAnswer || post(config.statusUrl).then(function (answer) {
@@ -440,7 +425,7 @@ require(['jquery'], function ($) {
             post(config.dismissUrl);
         });
 
-        if (banner.variant === 'invite' && banner.$el.attr('data-offers-start') === '1') {
+        if (banner.$el.attr('data-offers-start') === '1') {
             startOpen().then(function (open) {
                 banner.startOpen = open;
                 render(banner);

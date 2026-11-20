@@ -11,7 +11,6 @@ namespace Smaily\Connect\Controller\Adminhtml\Api;
 use Magento\Backend\App\Action\Context;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
-use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use Smaily\Connect\Model\Engine\EmailDesigns;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
@@ -33,27 +32,23 @@ abstract class AbstractEmailDesignAction extends AbstractJsonAction
         Context $context,
         JsonFactory $jsonFactory,
         JsonSerializer $serializer,
-        protected readonly EmailDesigns $emailDesigns,
-        private readonly FormKeyValidator $formKeyValidator
+        protected readonly EmailDesigns $emailDesigns
     ) {
         parent::__construct($context, $jsonFactory, $serializer);
     }
 
     /**
-     * The form key and the connection, checked before the engine is asked:
-     * the refusal to answer with, or null when the request may go on.
+     * The form key (AbstractJsonAction::formKeyRefusal()) and the
+     * connection, checked before the engine is asked: the refusal to answer
+     * with, or null when the request may go on.
      */
     protected function refusal(): ?Json
     {
-        // Magento's backend request validator checks the form key of every
-        // POST too; it is checked here as well, so these endpoints never rest
-        // on a framework setting alone.
-        if (!$this->formKeyValidator->validate($this->getRequest())) {
-            return $this->failure(
-                403,
-                'invalid_form_key',
-                (string)__('Your admin session has expired. Reload the page and try again.')
-            );
+        $refusal = $this->formKeyRefusal(
+            (string)__('Your admin session has expired. Reload the page and try again.')
+        );
+        if ($refusal !== null) {
+            return $refusal;
         }
         if (!$this->emailDesigns->isAvailable()) {
             return $this->failure(503, 'not_available', (string)__('Campaign Intelligence is not connected.'));
@@ -119,13 +114,5 @@ abstract class AbstractEmailDesignAction extends AbstractJsonAction
     protected function failure(int $status, string $error, string $message): Json
     {
         return $this->noStore($this->jsonResponse(['error' => $error, 'message' => $message], $status));
-    }
-
-    /** No cache may keep an answer of these endpoints. */
-    protected function noStore(Json $result): Json
-    {
-        $result->setHeader('Cache-Control', 'no-store', true);
-
-        return $result;
     }
 }

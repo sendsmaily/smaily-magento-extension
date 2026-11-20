@@ -55,8 +55,8 @@ class EmailDesignsData implements ArgumentInterface
     public function isFrameable(): bool
     {
         $siteOrigin = EmailDesigns::origin($this->client->siteUrl());
-        $adminOrigin = EmailDesigns::origin($this->request->getScheme() . '://' . $this->request->getHttpHost(false));
 
-        return str_starts_with($siteOrigin, 'https://') && $siteOrigin === $adminOrigin;
+        return str_starts_with($siteOrigin, 'https://')
+            && $siteOrigin === EmailDesigns::requestOrigin($this->request);
     }
 }

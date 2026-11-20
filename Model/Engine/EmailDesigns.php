@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Engine;
 
+use Magento\Framework\App\Request\Http as HttpRequest;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 
@@ -177,5 +178,15 @@ class EmailDesigns
         }
 
         return $origin . ':' . $port;
+    }
+
+    /**
+     * The origin of the admin page a request came from, as the admin's
+     * browser sent it, so a TLS proxy counts as Magento counts it
+     * (Http::isSecure()).
+     */
+    public static function requestOrigin(HttpRequest $request): string
+    {
+        return self::origin($request->getScheme() . '://' . $request->getHttpHost(false));
     }
 }

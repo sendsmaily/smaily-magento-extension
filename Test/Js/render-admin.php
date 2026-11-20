@@ -2124,22 +2124,31 @@ foreach (['email-designs' => true, 'email-designs-tab' => false] as $page => $fr
  * cannot frame it, so a new window. ci-banner-upsell: Smaily answered code
  * 227; ci-banner-separate: separate stores, so the start is not offered;
  * ci-banner-none: Campaign Intelligence connected; ci-banner-dashboard: the
- * dismissible banner alone, as the Dashboard draws it, without the panels.
+ * dismissible banner alone, as the Dashboard draws it, without the panels;
+ * ci-banner-dashboard-dismissed: the same, dismissed in the last 30 days.
  */
-$bannerViewModel = static fn (string $variant, bool $offersStart = true, bool $frameable = true): object => new class (
+$bannerViewModel = static fn (
+    string $variant,
+    bool $offersStart = true,
+    bool $frameable = true,
+    bool $dismissed = false
+): object => new class (
     $variant,
     $offersStart,
-    $frameable
+    $frameable,
+    $dismissed
 ) {
     /**
      * @param string $variant
      * @param bool $offersStart
      * @param bool $frameable
+     * @param bool $dismissed
      */
     public function __construct(
         private readonly string $variant,
         private readonly bool $offersStart,
-        private readonly bool $frameable
+        private readonly bool $frameable,
+        private readonly bool $dismissed
     ) {
     }
 
@@ -2156,7 +2165,7 @@ $bannerViewModel = static fn (string $variant, bool $offersStart = true, bool $f
      */
     public function isDismissed(): bool
     {
-        return false;
+        return $this->dismissed;
     }
 
     /**
@@ -2261,14 +2270,17 @@ foreach ([
         'strings' => $bannerStrings,
     ];
 }
-$pages['ci-banner-dashboard'] = [
-    'template' => [
-        [$bannerTemplate, $bannerViewModel('invite'), ['dismissible' => true]],
-        [$startTemplate, $bannerViewModel('invite'), []],
-    ],
-    'viewModel' => null,
-    'strings' => $bannerStrings,
-];
+foreach (['ci-banner-dashboard' => false, 'ci-banner-dashboard-dismissed' => true] as $page => $dismissed) {
+    $banner = $bannerViewModel('invite', true, true, $dismissed);
+    $pages[$page] = [
+        'template' => [
+            [$bannerTemplate, $banner, ['dismissible' => true]],
+            [$startTemplate, $banner, ['dismissible' => true]],
+        ],
+        'viewModel' => null,
+        'strings' => $bannerStrings,
+    ];
+}
 
 /*
  * The invitation to connect a Smaily account (CON-364):

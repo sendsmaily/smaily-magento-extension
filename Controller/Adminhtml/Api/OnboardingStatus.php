@@ -12,7 +12,6 @@ use Magento\Backend\App\Action\Context;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
-use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use Smaily\Connect\Model\Engine\IntelligenceStart;
 
@@ -30,10 +29,9 @@ class OnboardingStatus extends AbstractOnboardingAction implements HttpPostActio
         Context $context,
         JsonFactory $jsonFactory,
         JsonSerializer $serializer,
-        FormKeyValidator $formKeyValidator,
         private readonly IntelligenceStart $intelligenceStart
     ) {
-        parent::__construct($context, $jsonFactory, $serializer, $formKeyValidator);
+        parent::__construct($context, $jsonFactory, $serializer);
     }
 
     /**

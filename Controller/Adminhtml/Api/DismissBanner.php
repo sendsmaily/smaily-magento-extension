@@ -15,7 +15,6 @@ use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
-use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
 use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Smaily\Connect\ViewModel\Adminhtml\IntelligenceBannerData;
@@ -33,12 +32,11 @@ class DismissBanner extends AbstractOnboardingAction implements HttpPostActionIn
         Context $context,
         JsonFactory $jsonFactory,
         JsonSerializer $serializer,
-        FormKeyValidator $formKeyValidator,
         private readonly WriterInterface $configWriter,
         private readonly TypeListInterface $cacheTypeList,
         private readonly DateTime $dateTime
     ) {
-        parent::__construct($context, $jsonFactory, $serializer, $formKeyValidator);
+        parent::__construct($context, $jsonFactory, $serializer);
     }
 
     /**

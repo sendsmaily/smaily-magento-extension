@@ -10,9 +10,11 @@ namespace Smaily\Connect\Test\Unit\ViewModel\Adminhtml;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Request\Http as HttpRequest;
-use Magento\Framework\AuthorizationInterface;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Controller\Adminhtml\Dashboard\Index as DashboardPage;
+use Smaily\Connect\Controller\Adminhtml\Settings\Index as SettingsPage;
+use Smaily\Connect\Controller\Adminhtml\Wizard\Index as WizardPage;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Engine\IntelligenceStart;
@@ -27,7 +29,9 @@ use Smaily\Connect\ViewModel\Adminhtml\IntelligenceBannerData;
  * WooCommerce plugin's CON-350) — none once Campaign Intelligence is
  * connected or without a Smaily marketing account (CON-364), the upsell
  * after Smaily's code 227, the invitation for an account Smaily accepted,
- * none otherwise — and the 30-day Dismiss. No page load asks the engine.
+ * none otherwise — only for admins who may open the Settings, and the
+ * 30-day Dismiss. No page load asks the engine, and a page reads the
+ * Smaily accounts once.
  */
 class IntelligenceBannerDataTest extends TestCase
 {
@@ -36,7 +40,6 @@ class IntelligenceBannerDataTest extends TestCase
     private bool $engineConnected = false;
     private ?string $lastErrorCode = null;
     private bool $verified = true;
-    private bool $allowed = true;
     private bool $offered = true;
     private string $dismissedAt = '';
     private ?Credentials $main = null;
@@ -66,7 +69,7 @@ class IntelligenceBannerDataTest extends TestCase
         self::assertSame('https://shop.sendsmaily.net/', $banner->getLoginUrl());
     }
 
-    public function testNoBannerOnceConnectedOrWithoutAWorkingAccountOrTheResource(): void
+    public function testNoBannerOnceConnectedOrWithoutAWorkingAccount(): void
     {
         $this->engineConnected = true;
         self::assertSame('', $this->banner()->getVariant());
@@ -75,10 +78,59 @@ class IntelligenceBannerDataTest extends TestCase
         $this->verified = false;
         self::assertSame('', $this->banner()->getVariant());
         self::assertFalse($this->banner()->offersStart());
+    }
 
-        $this->verified = true;
-        $this->allowed = false;
-        self::assertSame('', $this->banner()->getVariant());
+    public function testThePageAsksForTheAccountsOncePerRequest(): void
+    {
+        $this->lastErrorCode = ConnectionHealth::PLAN_BLOCKED;
+        $banner = $this->banner(mainReads: 1, offeredReads: 0);
+
+        // Two banners on one page (Settings) share the view model.
+        for ($i = 0; $i < 2; $i++) {
+            self::assertSame(IntelligenceBannerData::VARIANT_UPSELL, $banner->getVariant());
+            self::assertSame('https://shop.sendsmaily.net/', $banner->getLoginUrl());
+            self::assertFalse($banner->offersStart());
+        }
+
+        $this->lastErrorCode = null;
+        $banner = $this->banner(mainReads: 1, offeredReads: 1);
+        for ($i = 0; $i < 2; $i++) {
+            self::assertTrue($banner->offersStart());
+            self::assertSame('https://shop.sendsmaily.net/', $banner->getLoginUrl());
+        }
+    }
+
+    /**
+     * The Dashboard needs only Smaily_Connect::connect, so its banner and
+     * start blocks carry Smaily_Connect::config as their `aclResource`; the
+     * setup and Settings pages need that resource themselves. Every admin
+     * role sees the banner exactly where it may open the Settings.
+     */
+    public function testOnlyAdminsWhoMayOpenTheSettingsGetTheBanner(): void
+    {
+        $root = __DIR__ . '/../../../..';
+        $pages = [
+            'dashboard' => DashboardPage::ADMIN_RESOURCE,
+            'settings' => SettingsPage::ADMIN_RESOURCE,
+            'wizard' => WizardPage::ADMIN_RESOURCE,
+        ];
+        $blocks = 0;
+        foreach ($pages as $page => $pageResource) {
+            $layout = simplexml_load_file($root . '/view/adminhtml/layout/smaily_connect_' . $page . '_index.xml');
+            self::assertNotFalse($layout, $page);
+            $banners = $layout->xpath(
+                '//block[arguments/argument[@name="view_model"]'
+                . '[normalize-space(.)="' . IntelligenceBannerData::class . '"]]'
+            );
+            self::assertNotEmpty($banners, $page);
+            foreach ($banners as $banner) {
+                $blocks++;
+                $resource = (string)$banner['aclResource'] !== '' ? (string)$banner['aclResource'] : $pageResource;
+                self::assertSame('Smaily_Connect::config', $resource, $page . ': ' . $banner['name']);
+            }
+        }
+        self::assertSame(7, $blocks);
+        self::assertSame('Smaily_Connect::connect', $pages['dashboard']);
     }
 
     public function testNoBannerWithoutASmailyMarketingAccount(): void
@@ -115,12 +167,16 @@ class IntelligenceBannerDataTest extends TestCase
         self::assertFalse($this->banner('http')->isFrameable());
     }
 
-    private function banner(string $scheme = 'https'): IntelligenceBannerData
-    {
+    private function banner(
+        string $scheme = 'https',
+        ?int $mainReads = null,
+        ?int $offeredReads = null
+    ): IntelligenceBannerData {
         $engine = $this->createMock(EngineSettings::class);
         $engine->method('isConnected')->willReturn($this->engineConnected);
         $reportBuilder = $this->createMock(ReportBuilder::class);
-        $reportBuilder->method('mainCredentials')->willReturn($this->main);
+        $reportBuilder->expects($mainReads === null ? self::any() : self::exactly($mainReads))
+            ->method('mainCredentials')->willReturn($this->main);
         $health = $this->createMock(ConnectionHealth::class);
         $health->method('smaily')->with('shop')->willReturn(
             ['status' => 'failing', 'last_sync_at' => null, 'last_error_code' => $this->lastErrorCode]
@@ -130,14 +186,13 @@ class IntelligenceBannerDataTest extends TestCase
         $websiteContext = $this->createMock(WebsiteContext::class);
         $websiteContext->method('getWebsiteId')->willReturn(2);
         $start = $this->createMock(IntelligenceStart::class);
-        $start->method('isOffered')->willReturn($this->offered);
+        $start->expects($offeredReads === null ? self::any() : self::exactly($offeredReads))
+            ->method('isOffered')->willReturn($this->offered);
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $scopeConfig->method('getValue')->with(IntelligenceBannerData::XML_PATH_DISMISSED_AT)
             ->willReturn($this->dismissedAt);
         $dateTime = $this->createMock(DateTime::class);
         $dateTime->method('gmtTimestamp')->willReturn(self::NOW);
-        $authorization = $this->createMock(AuthorizationInterface::class);
-        $authorization->method('isAllowed')->with('Smaily_Connect::config')->willReturn($this->allowed);
         $request = $this->createMock(HttpRequest::class);
         $request->method('getScheme')->willReturn($scheme);
         $request->method('getHttpHost')->willReturn('shop.example');
@@ -151,7 +206,6 @@ class IntelligenceBannerDataTest extends TestCase
             $start,
             $scopeConfig,
             $dateTime,
-            $authorization,
             $request
         );
     }

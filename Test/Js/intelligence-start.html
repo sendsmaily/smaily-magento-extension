@@ -32,7 +32,8 @@
   upsell and a 404 brings "Contact Smaily" back. A blocked pop-up asks for
   no link. The upsell, a shop the start is not offered to and a connected
   store ask nothing; the Dashboard's banner, with no panels on its page,
-  opens Settings > Intelligence once connected.
+  opens Settings > Intelligence once connected, and a dismissed one leaves
+  nothing on the page.
 
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
@@ -53,6 +54,8 @@
     <script src="build/ci-banner-none.et_EE.js"></script>
     <script src="build/ci-banner-dashboard.en_US.js"></script>
     <script src="build/ci-banner-dashboard.et_EE.js"></script>
+    <script src="build/ci-banner-dashboard-dismissed.en_US.js"></script>
+    <script src="build/ci-banner-dashboard-dismissed.et_EE.js"></script>
 </head>
 <body>
 <pre id="log"></pre>
@@ -521,6 +524,13 @@
         frame.contentDocument.querySelector('#smaily-start-modal .smaily-design-modal__close').click();
         await wait(50);
         check(locale + ', then, with no panels on the page, it opens Settings > Intelligence', window.navigated);
+        frame.remove();
+
+        frame = await open('ci-banner-dashboard-dismissed.' + locale, true);
+        check(locale + ', a dismissed Dashboard banner leaves no banner, no start window and no status request',
+            !frame.contentDocument.querySelector('.smaily-ci-banner')
+            && !frame.contentDocument.getElementById('smaily-start-modal')
+            && count(frame, 'status') === 0);
         frame.remove();
     }
 

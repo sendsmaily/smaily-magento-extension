@@ -10,7 +10,6 @@ namespace Smaily\Connect\ViewModel\Adminhtml;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Request\Http as HttpRequest;
-use Magento\Framework\AuthorizationInterface;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
@@ -19,6 +18,7 @@ use Smaily\Connect\Model\Engine\EmailDesigns;
 use Smaily\Connect\Model\Engine\IntelligenceStart;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Report\ConnectionHealth;
+use Smaily\Connect\Model\Report\Credentials;
 use Smaily\Connect\Model\Report\ReportBuilder;
 use Smaily\Connect\Model\SmailyUrl;
 
@@ -38,6 +38,11 @@ use Smaily\Connect\Model\SmailyUrl;
  *     invitation;
  *   - otherwise none: the Smaily connection is the thing to fix first.
  *
+ * Only admins who may open the Settings (Smaily_Connect::config, which
+ * the banner's actions answer) see it: the setup and Settings pages need
+ * that resource, and the Dashboard's banner blocks carry it as their
+ * layout `aclResource`.
+ *
  * The banner on top of the Settings tabs and the Dashboard can be
  * dismissed for DISMISS_SECONDS for every admin (a timestamp at the default
  * scope); the one on setup step 4 and the Intelligence tab cannot.
@@ -55,10 +60,14 @@ class IntelligenceBannerData implements ArgumentInterface
     /** Smaily's consultation page: where "Contact Smaily" leads (Woo, Erkki 2026-11-20). */
     public const CONSULTATION_URL = 'https://smaily.com/consultation/';
 
-    /** The banner's actions answer the Settings resource. */
-    private const RESOURCE = 'Smaily_Connect::config';
-
     private ?string $variant = null;
+
+    private ?bool $offersStart = null;
+
+    /** The main Smaily account's credentials (null: none), once $mainRead. */
+    private ?Credentials $main = null;
+
+    private bool $mainRead = false;
 
     public function __construct(
         private readonly EngineSettings $engineSettings,
@@ -69,7 +78,6 @@ class IntelligenceBannerData implements ArgumentInterface
         private readonly IntelligenceStart $intelligenceStart,
         private readonly ScopeConfigInterface $scopeConfig,
         private readonly DateTime $dateTime,
-        private readonly AuthorizationInterface $authorization,
         private readonly HttpRequest $request
     ) {
     }
@@ -95,13 +103,14 @@ class IntelligenceBannerData implements ArgumentInterface
      */
     public function offersStart(): bool
     {
-        return $this->getVariant() === self::VARIANT_INVITE && $this->intelligenceStart->isOffered();
+        return $this->offersStart ??= $this->getVariant() === self::VARIANT_INVITE
+            && $this->intelligenceStart->isOffered();
     }
 
     /** The main Smaily account's own address — the upsell's "Log in to Smaily". */
     public function getLoginUrl(): string
     {
-        $main = $this->reportBuilder->mainCredentials();
+        $main = $this->mainCredentials();
 
         return $main !== null && SmailyUrl::isPlainSubdomain($main->subdomain)
             ? SmailyUrl::forSubdomain($main->subdomain) . '/'
@@ -116,17 +125,26 @@ class IntelligenceBannerData implements ArgumentInterface
     /** The start window may open in a frame over this admin (IntelligenceStart::isFrameable()). */
     public function isFrameable(): bool
     {
-        return IntelligenceStart::isFrameable(
-            EmailDesigns::origin($this->request->getScheme() . '://' . $this->request->getHttpHost(false))
-        );
+        return IntelligenceStart::isFrameable(EmailDesigns::requestOrigin($this->request));
+    }
+
+    /** ReportBuilder::mainCredentials(), read once per request: the variant and the login link both need it. */
+    private function mainCredentials(): ?Credentials
+    {
+        if (!$this->mainRead) {
+            $this->main = $this->reportBuilder->mainCredentials();
+            $this->mainRead = true;
+        }
+
+        return $this->main;
     }
 
     private function variant(): string
     {
-        if (!$this->authorization->isAllowed(self::RESOURCE) || $this->engineSettings->isConnected()) {
+        if ($this->engineSettings->isConnected()) {
             return '';
         }
-        $main = $this->reportBuilder->mainCredentials();
+        $main = $this->mainCredentials();
         if ($main === null) {
             return '';
         }

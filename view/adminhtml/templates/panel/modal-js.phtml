@@ -18,6 +18,13 @@
  * requestClose(); the caller decides what closing means and calls hide().
  * While the modal is open, Tab keeps focus inside it.
  *
+ *   window.smailyPost(url, data).then(function (answer) { ... });
+ *
+ * POSTs data as JSON with the admin's form key, and resolves every answer
+ * as {status, body}: body is the answer's JSON object ({} when it has
+ * none); no answer at all is status 0. Each caller decides what a status
+ * means.
+ *
  * @var \Magento\Backend\Block\Template $block
  */
 ?>
@@ -87,10 +94,28 @@ window.smailyModal = window.smailyModal || function ($, $modal, requestClose) {
             if ($from && $from.length && document.contains($from[0])) {
                 $from.trigger('focus');
             }
-        },
-        isOpen: function () {
-            return open;
         }
     };
+};
+
+window.smailyPost = window.smailyPost || function (url, data) {
+    'use strict';
+
+    var separator = url.indexOf('?') === -1 ? '?' : '&';
+    return fetch(url + separator + 'form_key=' + encodeURIComponent(window.FORM_KEY), {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+        body: JSON.stringify(data || {})
+    }).then(function (response) {
+        return response.json().catch(function () {
+            return {};
+        }).then(function (body) {
+            return {status: response.status, body: body && typeof body === 'object' ? body : {}};
+        });
+    }, function () {
+        return {status: 0, body: {}};
+    });
 };
 </script>

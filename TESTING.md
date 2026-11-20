@@ -210,6 +210,16 @@ disabled while the switch is ticked but not saved, and is enabled once the
 save posts it on. For a new website — on the step and on the Settings
 Contacts tab — the import button stays disabled and the card says that
 contacts start syncing once the Contacts settings are saved, until the save.
+`Test/Js/brand-logos.html` checks the Smaily Connect and Campaign
+Intelligence logos with the admin stylesheet (its text, copied into
+`Test/Js/build/smaily-admin-css.js` by `render-admin.php`: a page opened
+from file:// cannot read the rules of a stylesheet it links): the Connect
+logo above the page title, 28 px high, with the entrance where the block
+data asks for it (the Dashboard; `Test/Unit/AdminBrandTest.php` checks the
+layouts) and still elsewhere, still under the stylesheet's
+prefers-reduced-motion rules, and animated by no other rule; and the boxed
+Campaign Intelligence icon, still, in the banner, on the Dashboard's
+Campaign Intelligence card and beside the Settings and setup titles.
 To check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.

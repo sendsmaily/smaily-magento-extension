@@ -2076,8 +2076,8 @@ $pages['dashboard-unsent'] = [
  * (config/engine-automations.phtml) — and panel/email-designs.phtml, with
  * Campaign Intelligence connected on https://engine.invalid (a host that
  * never answers). Each template has its own view model, as on the page. On
- * email-designs the admin is on the site URL's origin, so the design page
- * opens in the modal; on email-designs-tab it is not, so it opens in a tab.
+ * email-designs the admin is on https, so the design page opens in the
+ * modal; on email-designs-tab it is not, so it opens in a tab.
  */
 $emailDesignsViewModel = static fn (bool $frameable): object => new class ($frameable) {
     /**
@@ -2149,6 +2149,8 @@ foreach (['email-designs' => true, 'email-designs-tab' => false] as $page => $fr
             'Subject: %1',
             'Open in a new tab',
             'Opening the design page…',
+            'The design page did not open.',
+            'Close without saving?',
             'Your browser blocked the new tab. Allow pop-ups for this page and try again.',
             'Campaign Intelligence offers no design for this email.',
         ],

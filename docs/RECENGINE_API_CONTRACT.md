@@ -1,18 +1,19 @@
-# Smaily Recommendation Engine — API Contract v1.34
+# Smaily Recommendation Engine — API Contract v1.35
 
-**Version**: 1.34.0
+**Version**: 1.35.0
 **Published**: 2026-05-19
-**Last updated**: 2026-11-19 (v1.34.0 — a plugin can learn whether "Try Intelligence free" is open before it shows the button: the new `GET /api/v1/onboarding/status` needs no API key and no input and answers `{"start_open": true|false}`; `false` while the start of §21 is switched off. The answer may be cached for 5 minutes, so switching the start on reaches every plugin within 5 minutes with no plugin release. A plugin shows the button only on `true` and treats an error or a timeout as `false` (§21 [Is the start open?](#is-the-start-open)). MINOR bump: additive only — INT-298. Previous: 2026-11-17, v1.33.0 — one code prefix per shop connection: a connector that declares `capabilities: ["connection_prefix"]` at the setup exchange can get a code prefix for its connection (`config.connection.prefix`, for example `c2-`; also on the ping) and puts it in front of every product code, parent product id and order id it sends. Two shops in one engine store can then number their products and orders from 1 without overwriting each other. The nightly list (§3c) and removes (§3b) cover only the calling connection's own products, and the history progress (§25) is kept per connection. A connector without the capability, and every connection made before 1.33.0, has the prefix `""` and changes nothing. The engine side is built and switched off: the engine assigns prefixes only once it is switched on, and the refusal of a connector without the capability (`409 plugin_update_required`) is announced to the connector teams before it is switched on (§1 Status). MINOR bump: additive only — INT-285. Previous: 2026-11-13, v1.32.0 — outcome events: a booking system sends a customer's bookings and their states (`booked`, `cancelled`, `no_show`, `attended`) to the new §6b `POST /api/v1/ingest/outcomes`. An unknown type is stored as `other`, never rejected. A booking holds back the customer's recommendations in a store whose sector reads it. The events are not revenue and teach the engine nothing yet. The shopper's export (§8) and delete (§9) include them. MINOR bump: additive only — INT-259. Previous: 2026-11-13, v1.31.0 — the design page in a modal: a design link minted with `display: "frame"` keeps its session in the page, not in a cookie, so the page works in a frame inside the store admin in every browser; the plugin may name the origin of its admin page (`frame_origin`); the page tells its parent when it is ready and when it has unsaved changes (§22). Drafted as v1.26.0; that number was never published. MINOR bump: additive only — INT-14. Previous: 2026-11-13, v1.30.0 — an order can say where it was made: optional `channel`, `online` or `in_store`; a store's second order system (for example its tills) sends its orders into the same engine store with its own API key, by the sender rules of §5 "A second order source". An in-store order is credited by the same rules as any order, and the store's console shows the credited part made in the store. MINOR bump: one new optional field. Previous: 2026-11-12, v1.29.0 — "Try Intelligence free" from the plugin: the start window of §21 can run in a modal inside the store admin (`display: "frame"`, `frame_origin`); the plugin may pre-fill the console email (`admin_email`) and name the window's language (`language`); every active sector can be picked; the window ends on a welcome step with the history import's progress; the plugin starts the history import after the setup exchange (§1, §25). Published for planning: the frame mode, the two pre-fill fields and the welcome step were specified before the engine side was complete; the engine side was built on 2026-11-13 and is switched off in production with the rest of §21, and a connector keeps the new-window flow as its fallback (§21 Status). MINOR bump: additive only — INT-247. Previous: 2026-11-08, v1.28.0 — a connector can say that its history import stopped, and why: an optional `stop_reason` (`cancelled`, `failed` or `stalled`) on the progress call that names the phase the import reached; the engine stops waiting for that import, and a new `import_id` starts over (§25). MINOR bump: one new optional field and two new response fields — INT-225. Previous: 2026-11-03 (v1.25.0 — the setup exchange names the store's Smaily account (`smaily_subdomain`, §1), so a connector of several websites refuses a link to a store of another account; three optional brand-kit fields (`accent_colour`, `button_radius`, `heading_font_family`), and the store's saved designs follow a brand-kit change: a place that holds the old brand value gets the new one, a value set by hand stays, each updated design gets a new §23 `version`, and the PUT response gains `designs_updated` (§18). MINOR bump: additive only — INT-207, INT-209. Previous: 2026-11-03, v1.24.0 — the contract now states what the engine already does in six places: catalog and browse accept 1–1000 items per request, 100 recommended (§3, §6); every bad API key, also a revoked one, answers one `401 unauthorised` (Authentication, §§17, 19, 20, 22, 24, 25); `event_id` examples are UUIDs (§3–§6); browse `sku` / `category_path` / `search_query` are SHOULD, not required (§6); `raw_attributes` are mapped into tags and every catalog `200` carries `unmapped_attributes` (§3); identity-merge `merge_ts` is optional (§7). Two engine changes: the setup exchange gives `config.batch_size_max` 100 (§1), and timestamps with a UTC offset are accepted and stored in UTC. MINOR bump: no shape change — INT-193. Previous: 2026-11-02, v1.23.0 — a third group of customers to send: a customer who logs in and has given marketing consent is sent at that login, before the identity merge (§4, §25), and a merge that answers `404 customer_not_found` may be retried once after the customer is sent (§7). MINOR bump: no shape change — INT-195. Previous: 2026-11-02, v1.22.0 — an identity merge binds the visitor token it carries with the same rules as an order: the store may create a `vs_` token at login for a shopper who gave marketing consent, and a merge with an unknown `vs_` token creates it for the merge's customer (§7); every merge with a token of the same customer renews it (§5, §15). MINOR bump: no shape change — INT-194. Previous: 2026-11-02, v1.21.0 — one engine store with several websites: the connector reports how the platform shares customer accounts (`store_config.customer_account_scope`, §1 and §25), and customer, order, catalog and storefront rows carry the website (§3, §4, §5, §15); every new field is optional, and a single-website store sends none of them and sees no change. MINOR bump: additive only — INT-171. Previous: 2026-10-28, v1.20.0 — the history import in two parts: the setup exchange and ping give the history window (`config.history`), the connector sends the last 18 months of orders first and the rest newest first down to 60 months, sends no older order, sends the customers its own contact sync puts into Smaily plus every customer with an order inside 60 months, and reports its progress with the new §25. MINOR bump: additive only — INT-185)
+**Last updated**: 2026-11-20 (v1.35.0 — a shopper can ask to be told when a product is back in stock: the connector sends the shopper's request, and a cancel, to the new §6c `POST /api/v1/ingest/stock-alerts`. A logged-in shopper with marketing consent may ask, and a guest may ask with a typed email; the engine keeps a guest's request only when the email belongs to a customer already subscribed to the store's list. The engine sends the alert with its own back-in-stock email (§11 `back_in_stock`) as soon as the product is back, once per customer and product. In a store on the adult-wellness pack the engine stores no request. The connector shows its "Notify me" button only while §12 says that email is live for the store. The shopper's export (§8) and delete (§9) include the requests. The engine side is built and switched off: §6c answers `404` until it is switched on (§6c [Status](#stock-alerts-status)). MINOR bump: additive only — INT-282. Previous: 2026-11-19, v1.34.0 — a plugin can learn whether "Try Intelligence free" is open before it shows the button: the new `GET /api/v1/onboarding/status` needs no API key and no input and answers `{"start_open": true|false}`; `false` while the start of §21 is switched off. The answer may be cached for 5 minutes, so switching the start on reaches every plugin within 5 minutes with no plugin release. A plugin shows the button only on `true` and treats an error or a timeout as `false` (§21 [Is the start open?](#is-the-start-open)). MINOR bump: additive only — INT-298. Previous: 2026-11-17, v1.33.0 — one code prefix per shop connection: a connector that declares `capabilities: ["connection_prefix"]` at the setup exchange can get a code prefix for its connection (`config.connection.prefix`, for example `c2-`; also on the ping) and puts it in front of every product code, parent product id and order id it sends. Two shops in one engine store can then number their products and orders from 1 without overwriting each other. The nightly list (§3c) and removes (§3b) cover only the calling connection's own products, and the history progress (§25) is kept per connection. A connector without the capability, and every connection made before 1.33.0, has the prefix `""` and changes nothing. The engine side is built and switched off: the engine assigns prefixes only once it is switched on, and the refusal of a connector without the capability (`409 plugin_update_required`) is announced to the connector teams before it is switched on (§1 Status). MINOR bump: additive only — INT-285. Previous: 2026-11-13, v1.32.0 — outcome events: a booking system sends a customer's bookings and their states (`booked`, `cancelled`, `no_show`, `attended`) to the new §6b `POST /api/v1/ingest/outcomes`. An unknown type is stored as `other`, never rejected. A booking holds back the customer's recommendations in a store whose sector reads it. The events are not revenue and teach the engine nothing yet. The shopper's export (§8) and delete (§9) include them. MINOR bump: additive only — INT-259. Previous: 2026-11-13, v1.31.0 — the design page in a modal: a design link minted with `display: "frame"` keeps its session in the page, not in a cookie, so the page works in a frame inside the store admin in every browser; the plugin may name the origin of its admin page (`frame_origin`); the page tells its parent when it is ready and when it has unsaved changes (§22). Drafted as v1.26.0; that number was never published. MINOR bump: additive only — INT-14. Previous: 2026-11-13, v1.30.0 — an order can say where it was made: optional `channel`, `online` or `in_store`; a store's second order system (for example its tills) sends its orders into the same engine store with its own API key, by the sender rules of §5 "A second order source". An in-store order is credited by the same rules as any order, and the store's console shows the credited part made in the store. MINOR bump: one new optional field. Previous: 2026-11-12, v1.29.0 — "Try Intelligence free" from the plugin: the start window of §21 can run in a modal inside the store admin (`display: "frame"`, `frame_origin`); the plugin may pre-fill the console email (`admin_email`) and name the window's language (`language`); every active sector can be picked; the window ends on a welcome step with the history import's progress; the plugin starts the history import after the setup exchange (§1, §25). Published for planning: the frame mode, the two pre-fill fields and the welcome step were specified before the engine side was complete; the engine side was built on 2026-11-13 and is switched off in production with the rest of §21, and a connector keeps the new-window flow as its fallback (§21 Status). MINOR bump: additive only — INT-247. Previous: 2026-11-08, v1.28.0 — a connector can say that its history import stopped, and why: an optional `stop_reason` (`cancelled`, `failed` or `stalled`) on the progress call that names the phase the import reached; the engine stops waiting for that import, and a new `import_id` starts over (§25). MINOR bump: one new optional field and two new response fields — INT-225. Previous: 2026-11-03 (v1.25.0 — the setup exchange names the store's Smaily account (`smaily_subdomain`, §1), so a connector of several websites refuses a link to a store of another account; three optional brand-kit fields (`accent_colour`, `button_radius`, `heading_font_family`), and the store's saved designs follow a brand-kit change: a place that holds the old brand value gets the new one, a value set by hand stays, each updated design gets a new §23 `version`, and the PUT response gains `designs_updated` (§18). MINOR bump: additive only — INT-207, INT-209. Previous: 2026-11-03, v1.24.0 — the contract now states what the engine already does in six places: catalog and browse accept 1–1000 items per request, 100 recommended (§3, §6); every bad API key, also a revoked one, answers one `401 unauthorised` (Authentication, §§17, 19, 20, 22, 24, 25); `event_id` examples are UUIDs (§3–§6); browse `sku` / `category_path` / `search_query` are SHOULD, not required (§6); `raw_attributes` are mapped into tags and every catalog `200` carries `unmapped_attributes` (§3); identity-merge `merge_ts` is optional (§7). Two engine changes: the setup exchange gives `config.batch_size_max` 100 (§1), and timestamps with a UTC offset are accepted and stored in UTC. MINOR bump: no shape change — INT-193. Previous: 2026-11-02, v1.23.0 — a third group of customers to send: a customer who logs in and has given marketing consent is sent at that login, before the identity merge (§4, §25), and a merge that answers `404 customer_not_found` may be retried once after the customer is sent (§7). MINOR bump: no shape change — INT-195. Previous: 2026-11-02, v1.22.0 — an identity merge binds the visitor token it carries with the same rules as an order: the store may create a `vs_` token at login for a shopper who gave marketing consent, and a merge with an unknown `vs_` token creates it for the merge's customer (§7); every merge with a token of the same customer renews it (§5, §15). MINOR bump: no shape change — INT-194. Previous: 2026-11-02, v1.21.0 — one engine store with several websites: the connector reports how the platform shares customer accounts (`store_config.customer_account_scope`, §1 and §25), and customer, order, catalog and storefront rows carry the website (§3, §4, §5, §15); every new field is optional, and a single-website store sends none of them and sees no change. MINOR bump: additive only — INT-171. Previous: 2026-10-28, v1.20.0 — the history import in two parts: the setup exchange and ping give the history window (`config.history`), the connector sends the last 18 months of orders first and the rest newest first down to 60 months, sends no older order, sends the customers its own contact sync puts into Smaily plus every customer with an order inside 60 months, and reports its progress with the new §25. MINOR bump: additive only — INT-185)
 **Status**: Stable — basis for plugin implementation
 
 ---
 
 ## Document location and synchronization
 
-This contract lives in four repositories and must stay byte-for-byte synchronized:
+This contract lives in five repositories and must stay byte-for-byte synchronized:
 - `connect/docs/RECENGINE_API_CONTRACT.md` (Smaily Connect — WooCommerce plugin)
 - `shopify-connect/docs/RECENGINE_API_CONTRACT.md` (Smaily Connect — Shopify app)
 - `magento-connect/docs/RECENGINE_API_CONTRACT.md` (Smaily Connect — Magento extension)
+- `smaily-prestashop-module/docs/RECENGINE_API_CONTRACT.md` (Smaily Connect — PrestaShop module, branch `v3`; added 2026-11-20)
 - `re/docs/RECENGINE_API_CONTRACT.md` (rec engine)
 
 When proposing a change (either side):
@@ -53,6 +54,7 @@ This document consolidates the earlier dialogue (`RECENGINE_API_ANALYSIS.md` + `
    - [POST /api/v1/ingest/orders](#5-post-apiv1ingestorders)
    - [POST /api/v1/ingest/browse](#6-post-apiv1ingestbrowse)
    - [POST /api/v1/ingest/outcomes](#6b-post-apiv1ingestoutcomes)
+   - [POST /api/v1/ingest/stock-alerts](#6c-post-apiv1ingeststock-alerts)
    - [POST /api/v1/identity/merge](#7-post-apiv1identitymerge)
    - [GET /api/v1/customer/{email}/export](#8-get-apiv1customeremailexport)
    - [DELETE /api/v1/customer/{email}](#9-delete-apiv1customeremail)
@@ -286,6 +288,7 @@ HTTP 400 Bad Request
 | `/api/v1/ingest/customers` | 100 requests | per 1 second |
 | `/api/v1/ingest/orders` | 100 requests | per 1 second |
 | `/api/v1/ingest/outcomes` | 100 requests | per 1 second |
+| `/api/v1/ingest/stock-alerts` | 100 requests | per 1 second |
 | `/api/v1/ingest/history` | 100 requests | per 1 second |
 | `/api/v1/identity/merge` | 100 requests | per 1 second |
 | `/api/v1/automations/{key}/setup-link` | 10 requests | per 60 seconds |
@@ -349,6 +352,7 @@ Each ingest endpoint has a natural business key that uniquely identifies the rec
 | `/api/v1/ingest/customers` | `(tenant_id, email)` |
 | `/api/v1/ingest/orders` | `(tenant_id, external_order_id)` |
 | `/api/v1/ingest/browse` | (none — browse events are not semantically idempotent) |
+| `/api/v1/ingest/stock-alerts` | `(tenant_id, customer, sku)` (v1.35.0) |
 
 Sending the same record twice updates (UPSERT) — no duplicates. This protects against any retry, regardless of whether the plugin sends an `event_id`.
 
@@ -371,6 +375,7 @@ The per-item `event_id` field is **optional** on catalog / customers / orders �
 - `/api/v1/ingest/customers` — per customer (each `customers[]` object)
 - `/api/v1/ingest/orders` — per order (each `orders[]` object)
 - `/api/v1/ingest/browse` — per event (each `events[]` object)
+- `/api/v1/ingest/stock-alerts` — per item (each `requests[]` object); required (v1.35.0)
 
 **Wire field name**: `event_id` (snake_case, string, UUID v4). The plugin's internal queue column may use a different name (the Smaily Connect plugin uses `event_uuid` internally) — the PayloadBuilder maps it to `event_id` on the wire.
 
@@ -553,6 +558,8 @@ An unknown value is stored as absent (`global`), never a `400`: a failed setup e
 > **Email design keys** (v1.17.0): `emails_design_link` ([§22](#22-post-apiv1emailsemail_keydesign-link)) and `emails_designs` ([§23](#23-get-apiv1emailsdesigns)). `{email_key}` is a placeholder: the plugin replaces it with an email key (URL-encoded; the dot needs no encoding). **The engine returns both keys now** (since 2026-10-22). A connection set up before the endpoints went live has no key and uses the fallback path constant.
 
 > **Console entry key** (v1.19.0): `console_entry` ([§24](#24-post-apiv1consoleentry)). **The engine returns the key only while console entry is switched on**; until then the key is absent and the endpoint answers `404`. A connection set up before v1.19.0, or before console entry went live, has no key and uses the fallback path constant `/api/v1/console/entry`.
+
+> **Stock alerts** (v1.35.0): `ingest_stock_alerts` ([§6c](#6c-post-apiv1ingeststock-alerts)), `"https://intelligence.smaily.com/api/v1/ingest/stock-alerts"`. **The engine returns the key once §6c is live**; until then the key is absent and the endpoint answers `404`. A connection set up before the endpoint went live has no key and uses the fallback path constant `/api/v1/ingest/stock-alerts`.
 
 > **History import** (v1.20.0): `config.history` says how much order history to send and in which order — `start_months` 18 (the start part), `horizon_months` 60 (the oldest order to send, the same for every sector pack), `order` `newest_first` ([§25](#25-post-apiv1ingesthistoryprogress)); `ingest_history_progress` is the progress call. A connection set up before v1.20.0 has neither: it reads `config.history` from the ping ([§2](#2-get-apiv1ingestping)) and uses the fallback path constant `/api/v1/ingest/history/progress`. When neither the exchange nor the ping has the block, use 18 / 60 / `newest_first`.
 
@@ -1504,6 +1511,193 @@ No free text, note, treatment reason or practitioner field exists: the engine st
 
 ---
 
+### 6c. POST /api/v1/ingest/stock-alerts
+
+(v1.35.0, INT-282, Erkki's decisions 2026-11-20) A shopper asks on a product page to be told when an out-of-stock product is back in stock, or cancels that request. The connector's server sends the request here. The engine stores it and sends the alert with the store's back-in-stock email ([§11](#11-get-apiv1automationscatalog) `back_in_stock`) when the product comes back in stock.
+
+<a id="stock-alerts-status"></a>
+**Status** (2026-11-20). The engine side is built and switched off. While it is off, the engine answers this endpoint with `404` and the endpoint map has no `ingest_stock_alerts` key; §8 carries `stock_alert_requests: []` and §9 `records_removed.stock_alert_requests: 0`, because no request is stored. The engine switches it on after the store's back-in-stock email is live, and the guest limits (below) get their numbers before then. Connectors can build against this text now: the button shows only while [§12](#12-get-apiv1automationsconfig) says the store's `back_in_stock` email is `live` (rule 1 under [What each connector builds](#stock-alerts-connector)), and a connector treats `404` as "not available yet" and shows no button. So nothing shows to a shopper before the engine is ready. Two parts are later work and not in this version: the service (transactional) channel (route (a) under [Which account sends the alert](#stock-alerts-routing)) and a guest address that is not on the store's list (version C, under [Who may ask](#stock-alerts-who)).
+
+**When to show the button.** Show the "Notify me" button only when all of these hold:
+
+- the product, or the selected variant, is out of stock and cannot be ordered (no backorders);
+- [§12](#12-get-apiv1automationsconfig) `setup[]` has an item with `trigger_key: "back_in_stock"`, `setup_state: "live"` and `notice: null`;
+- the shopper may ask, by the rules under [Who may ask](#stock-alerts-who).
+
+In every other case show nothing. With `setup_state` `off`, `set_up`, `test` or `stopped`, or with a `notice`, nobody would get the alert yet, so the button would make a promise that nobody keeps. Read §12 on the server and cache the answer for at most 15 minutes. Do not ask §12 on each page view.
+
+**URL**: `POST /api/v1/ingest/stock-alerts`
+
+**Auth**: `Authorization: Bearer sk_...` — server to server only. The browser never calls the engine: the connector's own route receives the button press and relays it, as for browse events ([§6](#6-post-apiv1ingestbrowse)).
+
+**Endpoint map key**: `ingest_stock_alerts` ([§1](#1-post-apisetupexchange)). The engine returns the key once the endpoint is live. A connection set up before then has no key and uses the fallback path constant `/api/v1/ingest/stock-alerts`.
+
+**Rate limit**: 100 requests per second per store ([Rate limiting](#rate-limiting)). The per-store guest limit below applies in addition.
+
+**Request**
+
+```json
+{
+  "requests": [
+    {
+      "event_id": "4c1a7e2b-9d3f-4b8a-a6e1-2f5c8d0b7e93",
+      "action": "request",
+      "requester": "logged_in",
+      "customer_email": "mari@example.com",
+      "external_id": "67",
+      "sku": "c2-woo-101",
+      "requested_at": "2026-11-20T09:12:00Z",
+      "marketing_consent": true,
+      "source": "product_page"
+    },
+    {
+      "event_id": "9b2d5f10-3e7a-4c61-8f0d-6a1e4b7c2d58",
+      "action": "request",
+      "requester": "guest",
+      "customer_email": "jaan@example.com",
+      "sku": "c2-woo-101",
+      "requested_at": "2026-11-20T09:14:00Z",
+      "source": "product_page"
+    }
+  ]
+}
+```
+
+1–100 items per request. The wrapper is validated as a whole (`400 validation_failed`). Each item is validated on its own, as [§6b](#6b-post-apiv1ingestoutcomes).
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `event_id` | UUID v4 string | YES | Transport dedup, as [Idempotency](#idempotency) layer 2: the same `event_id` again within 90 days is counted in `deduplicated` and not written. |
+| `action` | `"request"` \| `"cancel"` | YES | `request`: the shopper asks to be told. `cancel`: the shopper no longer wants the alert. Any other value is an item error (`field: action`). A `cancel` needs `requester: "logged_in"`: a `cancel` with `requester: "guest"` is an item error (`field: requester`), so a typed address can never cancel another person's request. |
+| `requester` | `"logged_in"` \| `"guest"` | YES | `logged_in`: the connector took the shopper's identity from the store's session. `guest`: the shopper was not logged in and typed the email address on the product page. Any other value is an item error (`field: requester`). |
+| `customer_email` | string | `logged_in`: one of the two; `guest`: YES | Matched in any letter case, as [§4](#4-post-apiv1ingestcustomers). For `guest`, the address the shopper typed, trimmed; the engine matches by this email only. |
+| `external_id` | string | `logged_in`: one of the two; `guest`: never | The store's customer id, the `external_id` of [§4](#4-post-apiv1ingestcustomers). Used when no email matches. In a Per Website store, the id the engine holds for any website of the store. Send it for a logged-in shopper. A `guest` item with `external_id` is an item error (`field: external_id`). |
+| `sku` | string (max 72) | YES | The product the shopper asked about: the variant, exactly as the connector sends it in [§3](#3-post-apiv1ingestcatalog), with the [connection prefix](#connection-prefix). A key with a prefix may name only its own products: another `sku` is an item error (`field: sku`, `connection_prefix_mismatch`). A `sku` the engine's catalog does not hold is an item error (`field: sku`, "unknown product"). |
+| `requested_at` | ISO 8601 | YES for `request` | When the shopper pressed the button. A UTC offset is accepted and stored in UTC. |
+| `cancelled_at` | ISO 8601 | YES for `cancel` | When the shopper cancelled. |
+| `marketing_consent` | boolean | YES for a `logged_in` `request`; never for `guest` | Whether the shopper had given the store marketing email consent at the moment of the request, **as the store records it** (for example a newsletter subscription or the checkout opt-in). The engine stores it as the store's statement. It never grants a send: the send rules and [Which account sends the alert](#stock-alerts-routing) decide. A `guest` item with this field is an item error (`field: marketing_consent`): for a guest, the subscribed Smaily contact is the consent. |
+| `source` | string | NO | Where the shopper asked: `product_page`, `account` (the store's account page), `import` (requests the connector held before it was connected, or a platform's own stock-alert list). Another value is stored as sent. Not part of the natural key. |
+
+No free text, note or reason field exists: the engine stores none.
+
+> **Consent field.** [§4](#4-post-apiv1ingestcustomers) says the engine stores no consent. `marketing_consent` is the one exception, and only on this endpoint: it is the store's record of a logged-in shopper's consent at the moment of the request, kept with the request as the store's proof. The engine does not copy it to the customer and does not read it anywhere else.
+
+**Natural key.** One stored request per (store, customer, `sku`), whoever made it. The engine keeps the latest action by its time (`requested_at` or `cancelled_at`):
+
+- A `request` for a product the customer has no request for creates one.
+- A `request` again replaces the stored time, requester, consent and source. It reopens a cancelled request, and it reopens a request whose alert was already sent (the product went out of stock again).
+- A `cancel` closes the request. A `cancel` for a product with no stored request changes nothing and is counted in `processed`.
+- An action older than the stored one (a queue that sends out of order) changes nothing and is counted in `processed`.
+
+<a id="stock-alerts-who"></a>
+**Who may ask.**
+
+- **A logged-in shopper** whom the store has sent with §4 and who has given the store marketing email consent. The connector takes the email and the customer id from the store's session, never from the browser.
+- **A guest** who types an email address on the product page. The engine stores the request only when the address matches an existing customer whose Smaily contact is subscribed at that moment: the contact is in Smaily, is not unsubscribed, and never complained. Such a person already gave the store marketing consent. For any other address — no customer, a customer without a Smaily contact, an unsubscribed contact, a contact that complained — the engine stores nothing and answers `not_subscribed` for the item (below).
+- **A logged-in shopper without marketing consent** sees no button. The connector may show the store's newsletter signup instead.
+
+A typed address that is not on the store's list is a later version (version C): the engine will first send one confirmation email that asks only about this alert, with no newsletter offer, and the request will count only once the person confirms. Version C needs the service channel.
+
+**Adult-wellness store.** In a store on the `adult_wellness` sector pack the engine stores no request, from a logged-in shopper or a guest. Each `request` item is counted in `skipped` with reason `not_offered`, and nothing is written. The connector needs no pack logic: it shows the button by the rules above, and it shows a guest the same neutral message as for every other outcome.
+
+**Customer.** A request never creates a customer.
+
+- `logged_in`: the customer must exist ([§4](#4-post-apiv1ingestcustomers) or [§5](#5-post-apiv1ingestorders)). An unknown customer is an item error (`field: customer`). For a shopper the engine does not know yet, send the customer with §4 first, when the shopper is in the §4 scope, and then the request.
+- `guest`: an address that matches no subscribed customer is not an error. It is counted in `skipped` with reason `not_subscribed`.
+- A request from a customer who objected to profiling ([§10](#10-post-apiv1customeremailopt-out)) is stored and the alert is sent: the shopper asked, and the request is not profiling.
+
+**Engine limits for guests.** The engine skips a `guest` `request` with reason `limit` when the customer already has too many open requests that `guest` items made, or when the store has received too many `guest` requests in the last hour. The numbers are set before the engine side goes live and are added here then. A `logged_in` request has no such limit. The connector has its own limits on the shopper's side (rule 4 below).
+
+**Response `200`**
+
+```json
+{
+  "ok": true, "processed": 1, "deduplicated": 0, "skipped": 1,
+  "skipped_items": [ { "index": 1, "reason": "not_subscribed" } ],
+  "errors": []
+}
+```
+
+`skipped_items[]`: `{index, reason}` per item that the engine accepted and did not store. `reason` is `not_subscribed` (a `guest` address that matches no subscribed customer), `limit` (a `guest` request over the engine's limits) or `not_offered` (any `request` in a store on the adult-wellness pack). The engine gives one reason for every unmatched address: it never says whether the address belongs to a customer, has a Smaily contact, unsubscribed or complained. A skipped item's `event_id` is registered, so a retry of the same item is deduplicated. The engine keeps no copy of the typed address: not in a table, not in a log.
+
+`errors[]`: `{index, field, message}` per refused item — `field: "customer"` for an unknown `logged_in` customer, `field: "sku"` for an unknown product or a `connection_prefix_mismatch`, else the field that failed validation. A refused item's `event_id` is not registered, so a corrected retry is processed.
+
+**Invariant:** `processed + deduplicated + skipped + errors.length == total items`, and `skipped == skipped_items.length`.
+
+> **The answer stays on the connector's server.** `skipped_items` tells the connector what the engine did. The connector never passes it to the browser. To a guest, the connector shows one neutral message for every outcome, and it answers the browser before the engine sees the item (rule 4 below). The endpoint therefore shows the typing person nothing about whether an address is a customer or subscribed.
+
+<a id="stock-alerts-routing"></a>
+**Which account sends the alert.** A requested alert is a service message, not direct marketing: the shopper asked for it, and it is one email about one product.
+
+| Route | When | Account | Who gets it |
+|---|---|---|---|
+| (a) | A service (transactional) account is connected, and the shopper asked | Service channel, separate from the marketing list | Everyone who asked, also without marketing consent or after leaving the list. A guest whose address is not on the list only after the confirmation email (version C). **Later work, not in this version.** |
+| (b) | No service account, and the shopper asked | Marketing account | Subscribed contacts only. **This version.** The same rule holds for a connector's own alert when the store has no engine connection (rule 10 below). |
+| (c) | The engine inferred the interest (bought, viewed, wishlist; no request) | Marketing account | Marketing consent only, as today. An inferred alert is marketing. |
+| (a) + (c) | The same customer and product qualify for both | Service channel | One email, sent by route (a). |
+
+**What the engine does with a request.**
+
+- **When.** At the product's next out-of-stock → in-stock change that the catalog reports ([§3](#3-post-apiv1ingestcatalog), [§3c](#3c-post-apiv1ingestcatalogmanifest)). A request made while the product is in stock is stored and waits for the next such change.
+- **How.** With the store's back-in-stock email (§11 `back_in_stock`), the same Smaily workflow and the same `rec_bis_*` fields as the engine's own back-in-stock alert. The email names the requested product. In this version the alert goes through the store's marketing account (route (b)).
+- **Once.** Once per customer and product: the engine marks the request done when it sends the alert. A new `request` after that opens it again. A guest who types the same address again, or another person who types it, adds no second alert: the natural key holds one request per customer and product.
+- **Before the engine's own alert.** A customer who asked and who also bought or viewed the product gets one email, sent as the alert they asked for.
+- **Rules that do not apply to a request:** the pause between emails (`cooldown_days`) and the spacing rule (`spacing`: 3 days after another engine email, 24 hours after a newsletter). The shopper asked for this product, and the alert loses value with delay.
+- **Rules that always apply** in this version, to a `logged_in` and a `guest` request alike, checked again at the send:
+  - the customer has a Smaily contact, is subscribed, has never complained and did not unsubscribe in the last 30 days (`suppression`);
+  - the product is in stock, can be recommended, and is sold on the customer's website;
+  - the sector pack's never-promote gates (for example a regulated or a safety category);
+  - the store's switches: test mode, the daily cap and the ramp (`ramp`), and the Smaily workflow is active.
+- **Rules the shopper overrides.** The pack's preference gates (species, life stage, fit and size) and "already owns it" or "recently returned it" do not apply.
+- **Daily cap and ramp.** A request counts toward them. An alert held back by the daily cap or the ramp stays open for 24 hours and is sent on the first run with room. After 24 hours the request stays open and waits for the next restock.
+- **Bought it meanwhile.** A customer who bought the product after the request and before the send gets no alert, and the request is done.
+- **Measurement group.** A customer in the store's holdout group gets the alert too. The alert goes to both groups alike, so it counts the same in both and does not move the holdout comparison. A purchase after the alert is not credited to the engine. The store's console shows it on its own line, "requested by the shopper".
+- **Biocides.** The engine adds no sentence to the alert. A store that sells biocides puts this sentence in its back-in-stock email template: "Use biocides safely. Always read the label and product information before use." / „Kasutage biotsiide ohutult. Enne kasutamist lugege alati etiketti ja tooteteavet.“
+- **Recommendations.** A request does not change the customer's recommendations, segment or any other engine output. It is used only for the alert.
+- **Email not live.** While §12 does not say `live`, the engine stores requests and sends nothing. A restock in that time does not close a request.
+
+**Retention.** A request that is not done or cancelled closes 90 days after `requested_at`. A closed request (done, cancelled or expired) is deleted 30 days after it closed. §8 `data_retention_policy.stock_alert_requests` states the period.
+
+<a id="stock-alerts-connector"></a>
+**What each connector builds.**
+
+1. **Show only when live.** Show the button only on an out-of-stock product or variant that cannot be ordered, and only while §12 `setup[]` `back_in_stock` is `setup_state: "live"` with `notice: null`. Read §12 on the server, cache it for at most 15 minutes, and hide the button when the engine answers anything else, an error or a timeout. Show nothing when §6c answers `404`.
+2. **Who may ask.**
+   - **Logged in.** A shopper the connector sends with §4 and who has given the store marketing email consent: one button, no email field, `requester: "logged_in"`. Never trust an email or a customer id sent by the browser for a logged-in shopper: take them from the server session. A logged-in shopper without marketing consent sees no button; the connector may show the store's newsletter signup instead.
+   - **Guest.** A shopper who is not logged in sees the button with one email field. The connector sends the typed address, trimmed, as `customer_email` with `requester: "guest"`, and no `external_id` and no `marketing_consent`. The engine decides whether the address belongs to a subscribed customer.
+3. **Consent.** For a logged-in shopper, send `marketing_consent` as the store records it at the moment of the request (newsletter or checkout opt-in), never inferred. For a guest, send no consent field and show no consent checkbox. The store owns the wording near the button; the connector offers editable default text in ET and EN. A cookie-banner choice is not marketing email consent.
+4. **Server relay, limits and the neutral answer.** The browser posts to the connector's own route. The route needs no engine key in the browser. The server sends §6c with the store's API key.
+   - **Limits.** The route limits guest requests per IP and per typed address, and logged-in requests per session. It has a hidden honeypot field; a filled honeypot is dropped silently.
+   - **Neutral answer to a guest.** The route answers a guest at once, after it puts the item in its queue and before the engine sees it, with the same answer for every outcome — stored, `not_subscribed`, `limit`, `not_offered`, over the connector's own limit, honeypot, validation failure of the address, engine error. The browser gets the same status code, body and text in each case, and the answer never waits for the engine. The message always offers the store's newsletter signup (rule 9).
+   - **Engine answer.** The engine's `skipped_items[].reason` stays on the connector's server. The connector counts it in its logs (counts only) and never shows it to the browser.
+   - A logged-in shopper may see their own real state ("You will be notified"), because it is their own account. After `not_offered` the connector shows no "You will be notified" and keeps no copy.
+   - **No pack logic.** The connector does not check the store's sector pack; it treats `not_offered` as any other answer.
+5. **Queue and `event_id`.** Every item carries a new UUID v4 `event_id`, kept in the connector's queue, so a retry is deduplicated. Send cancels through the same queue, in order.
+6. **Connection prefix.** `sku` is the §3 key with `config.connection.prefix` in front (v1.33.0). Never strip or build a prefix by hand.
+7. **Cancel.** Only a logged-in shopper can cancel. They see "You will be notified" on the product page with a cancel action, and the list of their open requests where the platform has an account page. A cancel sends `action: "cancel"` with `requester: "logged_in"`. A guest has no cancel action.
+8. **Own copy.** The connector keeps a logged-in shopper's open requests (customer, `sku`, time, consent, state) to show and cancel them. The copy is personal data: it is in the platform's privacy export and erasure, and it is deleted by the same retention as the engine's. The connector keeps no copy of a guest's request: the typed address stays only in the queue item until the engine has answered, and the connector then deletes the item, whatever the answer. The connector never builds a list of typed addresses.
+9. **Shopper text** (the store may edit it).
+   - Button: "Notify me when it's back" / „Teata, kui toode on tagasi“.
+   - Logged in, after the request: "We'll email you once when it's back in stock." / „Saadame sulle ühe e-kirja, kui toode on jälle laos.“
+   - Guest field label: "Your email address" / „Sinu e-posti aadress“.
+   - Guest, after every submit: "If this address is on our email list, we'll email you once when it's back in stock. Not on our list yet? Subscribe to our newsletter." / „Kui see aadress on meie e-posti listis, saadame sulle ühe e-kirja, kui toode on jälle laos. Pole veel meie listis? Liitu meie uudiskirjaga.“ The last sentence links to the store's newsletter signup.
+10. **Not connected to the engine.** When the store has no engine connection, the connector runs its own logic: a marketing email to subscribed contacts only, through the store's own Smaily automation (route (b)). A separate automation on a service Smaily account (route (a)) is later work. When the store connects the engine, the connector sends its open requests once to §6c (`source: "import"`) and stops its own alerts, so a shopper never gets two. Without the engine, a guest request follows the same rule: the connector serves only an address that its own Smaily list holds as subscribed, and shows the same neutral answer.
+11. **No logs of identity.** Logs carry counts and error classes, never an email, a typed address, a customer id with a `sku`, or a request body.
+12. **Biocides.** The connector's store guide tells the store to put the biocide sentence (above) in its back-in-stock email template. Neither the engine nor the connector adds it to the email.
+
+**Not in this version.**
+
+- A request reaches the engine only through this endpoint, not as a browse event (§6) or an outcome event (§6b).
+- No endpoint lists a shopper's requests. A connector that shows a logged-in shopper their open requests keeps its own copy (rule 8).
+- A guest's typed address that is not on the store's list (version C, later work).
+- A guest cannot cancel. A guest's request ends when the alert is sent, after 90 days, or when the person unsubscribes from the store's list. A request that a guest made does not show in the shopper's account list.
+- The service channel (route (a), later work). The alert goes only through the store's marketing workflow.
+- No cancel link in the alert email: it is one email, and the request closes when it is sent. A logged-in shopper cancels in the store. Through the marketing account the email carries Smaily's list unsubscribe link, as every marketing email does.
+- A request names one variant. A request for "any variant of this product" is not supported.
+- No request is stored in an adult-wellness store (`not_offered`).
+
+---
+
 ### 7. POST /api/v1/identity/merge
 
 Anonymous visitor → known customer manual merge. The plugin calls this when a customer logs in and we have cookies tied to an anonymous session that we now want to bind to the customer.
@@ -1737,6 +1931,8 @@ GDPR data export. Returns all engine-held data for the customer.
 
 > **`outcome_events`** (v1.32.0) holds the shopper's stored outcome events (§6b), full rows, `[]` when empty. Absent before v1.32.0.
 
+> **`stock_alert_requests`** (v1.35.0) holds the shopper's stored back-in-stock requests (§6c), full rows, `[]` when empty. `data_retention_policy` and `data_retention_purpose` gain the key `stock_alert_requests`: "until the alert is sent, the shopper cancels it, or 90 days pass; then 30 days" and "sending the one alert the shopper asked for, and keeping the store's record of the request". **Absent until the engine side of §6c is built** (§6c [Status](#stock-alerts-status)); the example above is the deployed body.
+
 > **`data_retention_policy`** (v1.13.0, PRO-4108) lists every kind of data the engine's privacy policy (§4 "How long we keep data") lists, with the period after which the engine's nightly cleanup deletes it. Each value is a human-readable string — show it, do not parse it. `recommendations` is the period for an issued recommendation that was not replaced by a newer one; `replaced_recommendations` is the period for a replaced one. `orders` are deleted 60 months after the order date (v1.19.1, INT-185). `customers` and `catalog` are never deleted automatically while the store uses the service; their values start with `indefinite`. When the merchant closes the store's Smaily account, all of the store's data is deleted; removing the plugin only pauses the store ([§16](#16-post-apiv1storeuninstall)). Keys are only added, never renamed or removed, within contract 1.x.
 
 > **`data_retention_purpose`** (v1.14.0, PRO-4116) has the same keys as `data_retention_policy` and says why each period is as long as it is. Each value is a human-readable string — show it, do not parse it. The three tiers: behavioural signals (`browse_events` for identified and anonymous visitors, `email_events`, and since v1.32.0 `outcome_events`) are kept **14 months from the event**; visitor tokens **14 months from their last activity**; outcomes (`recommendations`, `rec_attribution`, `customer_engagement_history`) **730 days**; orders **60 months from the order date** (v1.19.1); master data (`customers`, `catalog`) while the store uses the service.
@@ -1813,6 +2009,8 @@ GDPR full data deletion.
 ```
 
 `records_removed.outcome_events` (v1.32.0): the shopper's outcome events (§6b), deleted with the rest.
+
+`records_removed.stock_alert_requests` (v1.35.0): the shopper's back-in-stock requests (§6c), deleted with the rest. Absent until the engine side of §6c is built.
 
 `audit_log_id` references the `gdpr_audit_log` row that records the deletion fact (not its content) — **required for GDPR compliance as proof**.
 
@@ -1938,6 +2136,8 @@ Returns the automated emails available **for this store**. The list is filtered 
   "docs": "https://intelligence.smaily.com/docs/en/smaily-templates"
 }
 ```
+
+> **`back_in_stock` and shopper requests** (v1.35.0): once §6c is built, the `back_in_stock` description also says that the email notifies a customer who asked for it on the product page ([§6c](#6c-post-apiv1ingeststock-alerts)), once, as soon as the product is back. EN: "Also notifies a customer who asked for it on the product page (contract §6c), once, as soon as the product is back." ET: "Teavitab ka klienti, kes soovis seda tootelehel (leping §6c), ühe korra, kohe kui toode on tagasi." The text is engine copy, not a contract value.
 
 **Field reference** (per `triggers[]` item):
 
@@ -4320,6 +4520,14 @@ curl -X POST https://intelligence.smaily.com/api/v1/ingest/browse \
 - **The gap.** The start of §21 is switched off in production until the terms of service and the data processing agreement are published. A plugin learned that only by pressing the button and getting `404`, so a store would see a button that does nothing.
 - **§21 `GET /api/v1/onboarding/status`** (new): no API key, no input; always `200 {"start_open": true|false}`; `true` exactly when the start takes a request, `false` while it is switched off. `Cache-Control: public, max-age=300`: switching the start on or off reaches every plugin within 5 minutes, with no plugin release. Not counted in the `/api/v1/onboarding/...` rate limit bucket. Live in production.
 - **What the plugin does.** Show the button only on `start_open: true`; treat an error, another answer or a timeout as `false`. **A plugin built for an earlier version keeps working unchanged**: it still hides the button on the start's `404`.
+
+**v1.35.0** (2026-11-20) — **A shopper asks to be told when a product is back**. MINOR bump per the [Versioning](#versioning) rule (one new endpoint, one new endpoint-map key, one new export array, one new delete count; backward-compatible). INT-282, Erkki's decisions 2026-11-17 and 2026-11-20.
+- **Status.** The contract text is published; the engine side is not built. §6c answers `404`, the endpoint map has no `ingest_stock_alerts` key, and §8 and §9 carry no `stock_alert_requests` until it is. Connectors build behind the §12 `back_in_stock` live check, so nothing shows before the engine is ready.
+- **§6c `POST /api/v1/ingest/stock-alerts`** (new): `request` and `cancel` per (customer, sku); the alert goes with the store's back-in-stock email, once, without the pause and spacing rules; suppression, stock, website and never-promote gates always apply; a holdout customer gets it too.
+- **Who may ask.** A logged-in shopper with marketing consent; a guest with a typed email, which the engine keeps only when it matches a customer with a subscribed Smaily contact (`skipped_items[].reason: "not_subscribed"` otherwise). A guest cannot cancel. The connector shows a guest one neutral message for every outcome. In a store on the adult-wellness pack the engine stores no request (`not_offered`).
+- **Routing.** A requested alert is a service message. This version sends it through the store's marketing account to subscribed contacts only (route (b)). The service channel (route (a)) and a guest address not on the list, confirmed by email (version C), are later work.
+- **The connector shows its button** only while §12 `back_in_stock` is `live` with no `notice`.
+- **§8 export**: `stock_alert_requests` and its retention keys (90 days open, then 30 days). **§9 delete**: `records_removed.stock_alert_requests`. **§11**: the `back_in_stock` description names shopper requests.
 
 ### Appendix F: Migration notes
 

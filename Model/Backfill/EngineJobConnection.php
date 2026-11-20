@@ -46,9 +46,9 @@ class EngineJobConnection
 
         if ($job->getData('total_count') === null) {
             $job->setData('total_count', 0);
-            $this->jobManager->complete($job);
+            $this->jobManager->complete($job, Job::REASON_ENGINE_NOT_ACTIVE);
         } else {
-            $this->jobManager->cancel($job);
+            $this->jobManager->cancel($job, Job::REASON_ENGINE_NOT_ACTIVE);
         }
         $this->logger->info('Backfill job stopped: its Campaign Intelligence store is not connected or not active', [
             'job_id' => $job->getId(),

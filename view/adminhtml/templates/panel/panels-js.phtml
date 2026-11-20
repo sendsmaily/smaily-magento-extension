@@ -38,6 +38,7 @@ $urls = [
     'engineExchange' => $block->getUrl('smaily_connect/api/engineexchange'),
     'enginePing' => $block->getUrl('smaily_connect/api/engineping'),
     'backfill' => $block->getUrl('smaily_connect/api/backfillstate'),
+    'consoleEntry' => $block->getUrl('smaily_connect/api/consoleentry'),
     'logFailed' => $block->getUrl('smaily_connect/log', ['_query' => ['filters' => ['status' => 'failed']]]),
 ];
 ?>
@@ -1275,6 +1276,56 @@ window.smailyPanelsInit = function ($) {
             });
         });
 
+        // "Open Campaign Intelligence" (contract §24, CON-230): a pop-up
+        // blocker allows a new tab only in the press itself, and the link
+        // comes later, so the press opens a blank tab at once, cut off from
+        // this page, and sends it to the one-time link when it arrives; on a
+        // failure the tab closes and the line beside the button says why.
+        // The link is never kept. While Campaign Intelligence does not offer
+        // console entry (404), the button goes and the console's sign-in
+        // address shows instead.
+        $('#smaily-w-console-open').on('click', function () {
+            var $button = $(this),
+                tab = window.open('', '_blank'),
+                failed = '<?= $escaper->escapeJs(__('Campaign Intelligence could not be opened. Try again in a minute.')) ?>';
+            result('#smaily-w-console-result', '', true);
+            if (!tab) {
+                result('#smaily-w-console-result',
+                    '<?= $escaper->escapeJs(__('Your browser blocked the new tab. Allow pop-ups for this page and try again.')) ?>',
+                    false);
+                return;
+            }
+            try {
+                tab.opener = null;
+            } catch (ignore) {
+                // A browser that keeps the opener read-only still opens the page.
+            }
+            $button.prop('disabled', true);
+            post(urls.consoleEntry, {}).then(function (data) {
+                var $unavailable;
+                if (typeof data.url === 'string' && data.url.indexOf('https://') === 0) {
+                    tab.location.href = data.url;
+                    return;
+                }
+                tab.close();
+                if (data.error === 'not_available' && typeof data.console_url === 'string'
+                    && data.console_url.indexOf('https://') === 0) {
+                    $button.hide();
+                    $unavailable = $('#smaily-w-console-unavailable');
+                    $unavailable.find('span').text(data.message || '');
+                    $unavailable.find('a').attr('href', data.console_url).text(data.console_url);
+                    $unavailable.show();
+                    return;
+                }
+                result('#smaily-w-console-result', data.message || failed, false);
+            }, function () {
+                tab.close();
+                result('#smaily-w-console-result', failed, false);
+            }).then(function () {
+                $button.prop('disabled', false);
+            });
+        });
+
         // Hold back the catalog import a Connect started (PRO-3741): the
         // card's own cancel. While the import waits for its first cron run
         // nothing has been sent; canceled later, the products it already
@@ -1283,12 +1334,12 @@ window.smailyPanelsInit = function ($) {
             var $button = $(this).prop('disabled', true);
             result('#smaily-w-engine-catalog-holdback-result', '<?= $escaper->escapeJs(__('Canceling…')) ?>', true);
             post(urls.backfill, {job_type: 'catalog', action: 'cancel'}).then(function (data) {
-                var text = '<?= $escaper->escapeJs(__('The catalog import had already finished, so there was nothing left to hold back.')) ?>';
+                var text = '<?= $escaper->escapeJs(__('The catalog import had already finished, so there was nothing left to hold back of it; the customers and orders imports waiting behind it do not start.')) ?>';
                 if (data.status === 'cancelled') {
                     text = data.processed > 0
-                        ? '<?= $escaper->escapeJs(__('Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?>'
+                        ? '<?= $escaper->escapeJs(__('Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent, and the customers and orders imports waiting behind it do not start. Start each import again any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?>'
                             .replace('%1', data.processed)
-                        : '<?= $escaper->escapeJs(__('Held back: the catalog import is canceled. Start it any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?>';
+                        : '<?= $escaper->escapeJs(__('Held back: the catalog import is canceled, and the customers and orders imports waiting behind it do not start. Start each any time under Marketing > Smaily Connect > Settings > Intelligence.')) ?>';
                 }
                 $button.hide();
                 result('#smaily-w-engine-catalog-holdback-result', text, true);

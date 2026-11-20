@@ -55,7 +55,9 @@ use Smaily\Connect\Model\Engine\Payload\OrderPayloadBuilder;
  *     start_part_done: bool,
  *     reported_phase: string|null,
  *     reported_at: int,
- *     failed_at: int
+ *     failed_at: int,
+ *     stalled_since?: int,
+ *     stop_reason?: string|null
  * }
  */
 class HistoryImport
@@ -123,6 +125,8 @@ class HistoryImport
             'reported_phase' => null,
             'reported_at' => 0,
             'failed_at' => 0,
+            'stalled_since' => 0,
+            'stop_reason' => null,
         ];
         $this->flagManager->saveFlag($connection->flagCode(self::FLAG), $state);
 

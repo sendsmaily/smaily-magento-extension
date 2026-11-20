@@ -25,7 +25,8 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
  * catalog import, then one customers import, then one orders import; the
  * tick takes the catalog first. A reconnect while they are queued or running queues no
  * second one, and holding the catalog back before its first cron run (the
- * admin cancel) sends nothing and leaves the import free to be started
+ * admin cancel) sends nothing, cancels the customers and orders imports
+ * queued behind it (CON-367) and leaves the imports free to be started
  * again by hand.
  *
  * CON-237: the imports are the connected connection's — their jobs carry
@@ -157,13 +158,11 @@ class ImportsOnConnectTest extends IntegrationTestCase
     public function testHoldingTheCatalogImportBackBeforeItsFirstRunSendsNothing(): void
     {
         $this->importsOnConnect->start($this->connection(0));
-        // The customers and orders imports are not held back; they are
-        // cancelled here only so that the tick below has nothing to run.
-        $this->jobManager->requestCancel(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE);
-        $this->jobManager->requestCancel(Job::TYPE_ORDERS, Job::TARGET_ENGINE);
 
-        // Hold back: the Settings > Intelligence endpoint's cancel.
-        self::assertSame(1, $this->jobManager->requestCancel(Job::TYPE_CATALOG, Job::TARGET_ENGINE));
+        // Hold back: the Settings > Intelligence endpoint's cancel. The
+        // customers and orders imports queued behind it do not start either
+        // (CON-367, as the WooCommerce plugin's sequence ends).
+        self::assertSame(1, $this->jobManager->cancelEngineSequence(Job::TYPE_CATALOG));
 
         $processor = $this->createMock(ProcessorInterface::class);
         $processor->expects(self::never())->method('process');
@@ -185,5 +184,60 @@ class ImportsOnConnectTest extends IntegrationTestCase
         self::assertNotNull(
             $this->jobManager->startIfIdle(Job::TYPE_CATALOG, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID)
         );
+    }
+
+    /**
+     * CON-367, as the WooCommerce plugin's cancel ends its sequence: the
+     * imports queued behind a cancelled one do not start, one that already
+     * runs is left alone, and another connection's imports are untouched.
+     */
+    public function testACancelStopsTheImportsQueuedBehindItOnly(): void
+    {
+        $this->importsOnConnect->start($this->connection(0));
+        $this->importsOnConnect->start($this->connection(2));
+        $catalog = $this->jobManager->findActive(Job::TYPE_CATALOG, Job::TARGET_ENGINE, 0);
+        self::assertNotNull($catalog);
+        $this->jobManager->markRunning($catalog);
+
+        // The customers card's cancel: the orders import behind it goes too.
+        self::assertSame(1, $this->jobManager->cancelEngineSequence(Job::TYPE_CUSTOMERS, 0));
+        self::assertSame([
+            Job::TYPE_CATALOG => Job::STATUS_RUNNING,
+            Job::TYPE_CUSTOMERS => Job::STATUS_CANCELLED,
+            Job::TYPE_ORDERS => Job::STATUS_CANCELLED,
+        ], $this->statuses(0));
+        self::assertSame([
+            Job::TYPE_CATALOG => Job::STATUS_PENDING,
+            Job::TYPE_CUSTOMERS => Job::STATUS_PENDING,
+            Job::TYPE_ORDERS => Job::STATUS_PENDING,
+        ], $this->statuses(2), 'The other connection\'s imports');
+
+        // The catalog card's cancel of the other connection, its customers
+        // import already running: the queued orders import goes, the
+        // running customers import stays.
+        $customers = $this->jobManager->findActive(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, 2);
+        self::assertNotNull($customers);
+        $this->jobManager->markRunning($customers);
+        $this->jobManager->cancelEngineSequence(Job::TYPE_CATALOG, 2);
+        self::assertSame([
+            Job::TYPE_CATALOG => Job::STATUS_CANCELLED,
+            Job::TYPE_CUSTOMERS => Job::STATUS_RUNNING,
+            Job::TYPE_ORDERS => Job::STATUS_CANCELLED,
+        ], $this->statuses(2));
+    }
+
+    /**
+     * @return array<string, string> job type => status of the connection's jobs
+     */
+    private function statuses(int $key): array
+    {
+        $statuses = [];
+        foreach ($this->fetchAll(self::TABLE) as $row) {
+            if ((int)$row['website_id'] === $key) {
+                $statuses[(string)$row['job_type']] = (string)$row['status'];
+            }
+        }
+
+        return $statuses;
     }
 }

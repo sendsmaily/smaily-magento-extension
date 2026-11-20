@@ -31,7 +31,7 @@ class BackfillTickTest extends TestCase
         $job = $this->createJob(Job::TARGET_ENGINE, null);
         $job->expects(self::once())->method('setData')->with('total_count', 0);
         $jobManager = $this->createJobManager($job);
-        $jobManager->expects(self::once())->method('complete')->with($job);
+        $jobManager->expects(self::once())->method('complete')->with($job, Job::REASON_ENGINE_NOT_ACTIVE);
         $jobManager->expects(self::never())->method('cancel');
         $processor = $this->createMock(ProcessorInterface::class);
         $processor->expects(self::never())->method('process');
@@ -44,7 +44,7 @@ class BackfillTickTest extends TestCase
         $job = $this->createJob(Job::TARGET_ENGINE, 412);
         $job->expects(self::never())->method('setData');
         $jobManager = $this->createJobManager($job);
-        $jobManager->expects(self::once())->method('cancel')->with($job);
+        $jobManager->expects(self::once())->method('cancel')->with($job, Job::REASON_ENGINE_NOT_ACTIVE);
         $jobManager->expects(self::never())->method('complete');
 
         $this->createTick($jobManager, true, [])->execute();

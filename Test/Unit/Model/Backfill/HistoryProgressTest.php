@@ -33,6 +33,13 @@ use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
  *
  * CON-237: each connection reports its own history import, with its own
  * imports' counts, through its own client.
+ *
+ * CON-367 (contract v1.28.0 §25 "Stopped import"): an import that stops
+ * before `complete` — its orders import cancelled, failed or stalled, or,
+ * while the orders import is still queued, its catalog or customers import
+ * cancelled — gets one final report with the phase it reached, its final
+ * counts and `stop_reason`, and nothing after it, as in the WooCommerce
+ * plugin; one a refusal stopped ends with no report.
  */
 class HistoryProgressTest extends TestCase
 {
@@ -62,6 +69,9 @@ class HistoryProgressTest extends TestCase
     private array $calls = [];
 
     private ?\Throwable $engineFails = null;
+
+    /** @var array<string, bool> JobManager::isStalled() by job type */
+    private array $stalled = [];
 
     private Websites&MockObject $websites;
 
@@ -206,13 +216,209 @@ class HistoryProgressTest extends TestCase
         self::assertSame('started', $this->state['reported_phase']);
     }
 
-    public function testACancelledOrdersImportOrASendingStopReportsNothing(): void
+    /**
+     * The merchant cancels the orders import: one final report at once
+     * (not five minutes later), shaped as §25's stopped-import example, and
+     * nothing for that import_id after it.
+     */
+    public function testACancelledOrdersImportSendsOneFinalReportWithItsReason(): void
     {
+        $this->state['reported_phase'] = 'started';
+        $this->state['reported_at'] = self::NOW - 60;
         $this->jobs[9] = $this->job(9, Job::TYPE_ORDERS, Job::STATUS_CANCELLED, 1000, 50);
+        $this->progress()->report();
+
+        self::assertSame([[
+            'import_id' => 'mag-2027-01-15-9',
+            'phase' => 'started',
+            'horizon_start' => '2022-01-15',
+            'entities' => [
+                'catalog' => ['expected' => 300, 'sent' => 300],
+                'customers' => ['expected' => 500, 'sent' => 498],
+                'orders' => ['expected' => 1000, 'sent' => 50, 'oldest_sent_at' => '2026-02-03'],
+                'buyers' => ['expected' => 650],
+            ],
+            'stop_reason' => 'cancelled',
+        ]], $this->calls);
+        self::assertSame('cancelled', $this->state['stop_reason']);
+
+        $this->state['reported_at'] = self::NOW - 3600;
+        $this->progress()->report();
+        self::assertCount(1, $this->calls, 'Nothing after the final report');
+    }
+
+    public function testAFailedOrdersImportReportsThePhaseItReached(): void
+    {
+        $this->state['reported_phase'] = 'start_part_complete';
+        $this->state['reported_at'] = self::NOW - 60;
+        $this->state['start_part_queued_to'] = 5000;
+        $this->state['start_part_done'] = true;
+        $this->jobs[9] = $this->job(9, Job::TYPE_ORDERS, Job::STATUS_FAILED, 1000, 700);
+        $this->progress()->report();
+
+        self::assertSame('start_part_complete', $this->calls[0]['phase']);
+        self::assertSame('failed', $this->calls[0]['stop_reason']);
+        self::assertSame(700, $this->calls[0]['entities']['orders']['sent']);
+    }
+
+    /**
+     * Its counts are final only once the rows the stopped import queued are
+     * delivered (or refused for good).
+     */
+    public function testTheFinalReportWaitsForTheStoppedImportsQueuedRows(): void
+    {
+        $this->state['reported_phase'] = 'started';
+        $this->state['reported_at'] = self::NOW - 600;
+        $this->jobs[9] = $this->job(9, Job::TYPE_ORDERS, Job::STATUS_CANCELLED, 1000, 50);
+        $this->undelivered['9'] = 2;
         $this->progress()->report();
         self::assertCount(0, $this->calls);
 
-        $this->jobs[9] = $this->job(9, Job::TYPE_ORDERS, Job::STATUS_RUNNING, 1000, 50);
+        $this->undelivered['9'] = 0;
+        $this->progress()->report();
+        self::assertSame('cancelled', $this->calls[0]['stop_reason'] ?? null);
+    }
+
+    /**
+     * A stall the import card shows is reported once the check has seen it
+     * for an hour: a cron outage that ends moves the import again first.
+     * Until then the counts go as before.
+     */
+    public function testAStalledOrdersImportIsReportedOnceSeenStalledForAnHour(): void
+    {
+        $this->state['reported_phase'] = 'started';
+        $this->state['reported_at'] = self::NOW - 60;
+        $this->stalled[Job::TYPE_ORDERS] = true;
+        $this->progress()->report();
+        self::assertSame(self::NOW, $this->state['stalled_since']);
+        self::assertCount(0, $this->calls);
+
+        $this->state['stalled_since'] = self::NOW - 3599;
+        $this->state['reported_at'] = self::NOW - 300;
+        $this->progress()->report();
+        self::assertCount(1, $this->calls);
+        self::assertArrayNotHasKey('stop_reason', $this->calls[0], 'Not yet seen stalled for an hour');
+
+        $this->state['stalled_since'] = self::NOW - 3600;
+        $this->progress()->report();
+        self::assertSame('stalled', $this->calls[1]['stop_reason'] ?? null);
+        self::assertSame('started', $this->calls[1]['phase']);
+    }
+
+    public function testAnImportThatMovesAgainIsNoLongerSeenStalled(): void
+    {
+        $this->state['stalled_since'] = self::NOW - 1800;
+        $this->state['reported_phase'] = 'started';
+        $this->state['reported_at'] = self::NOW - 60;
+        $this->progress()->report();
+
+        self::assertSame(0, $this->state['stalled_since']);
+        self::assertCount(0, $this->calls);
+    }
+
+    /**
+     * As the WooCommerce plugin's sequence ends: before the orders import
+     * began, a catalog or customers import cancelled after the import
+     * began stops it (that cancel cancels the queued orders import too),
+     * `started` with `cancelled`, once that import's rows are delivered.
+     * One cancelled before the import began is not this import's.
+     *
+     * @dataProvider partsBeforeTheOrdersProvider
+     */
+    public function testACancelBeforeTheOrdersImportBeganStopsTheImport(int $id, string $jobType, string $entity): void
+    {
+        $this->state['reported_phase'] = 'started';
+        $this->state['reported_at'] = self::NOW - 60;
+        $this->jobs[9] = $this->job(9, Job::TYPE_ORDERS, Job::STATUS_PENDING, 1000, 0);
+        $this->jobs[$id] = $this->job($id, $jobType, Job::STATUS_CANCELLED, 500, 120, '2027-01-15 07:59:59');
+        $this->progress()->report();
+        self::assertCount(0, $this->calls, 'Cancelled before this import began');
+
+        $this->jobs[9] = $this->job(9, Job::TYPE_ORDERS, Job::STATUS_CANCELLED, 1000, 0, '2027-01-15 08:20:00');
+        $this->jobs[$id] = $this->job($id, $jobType, Job::STATUS_CANCELLED, 500, 120, '2027-01-15 08:20:00');
+        $this->undelivered[(string)$id] = 1;
+        $this->progress()->report();
+        self::assertCount(0, $this->calls, 'A row it queued still waits');
+
+        $this->undelivered[(string)$id] = 0;
+        $this->progress()->report();
+        self::assertSame('started', $this->calls[0]['phase']);
+        self::assertSame('cancelled', $this->calls[0]['stop_reason']);
+        self::assertSame(['expected' => 500, 'sent' => 120], $this->calls[0]['entities'][$entity]);
+    }
+
+    /**
+     * @return array<string, array{int, string, string}>
+     */
+    public static function partsBeforeTheOrdersProvider(): array
+    {
+        return [
+            'catalog' => [7, Job::TYPE_CATALOG, 'catalog'],
+            'customers' => [8, Job::TYPE_CUSTOMERS, 'customers'],
+        ];
+    }
+
+    /**
+     * As in the WooCommerce plugin: a failed or stalled catalog or customers
+     * import does not stop the import (its sequence moves on), and once the
+     * orders import runs, only it counts.
+     */
+    public function testOnlyACancelBeforeTheOrdersImportBeganStopsTheImport(): void
+    {
+        $this->state['reported_phase'] = 'started';
+        $this->state['reported_at'] = self::NOW - 60;
+        $this->jobs[9] = $this->job(9, Job::TYPE_ORDERS, Job::STATUS_PENDING, 1000, 0);
+        $this->jobs[7] = $this->job(7, Job::TYPE_CATALOG, Job::STATUS_FAILED, 300, 10, '2027-01-15 09:00:00');
+        $this->jobs[8] = $this->job(8, Job::TYPE_CUSTOMERS, Job::STATUS_RUNNING, 500, 10);
+        $this->stalled[Job::TYPE_CUSTOMERS] = true;
+        $this->state['stalled_since'] = self::NOW - 3600;
+        $this->progress()->report();
+        self::assertCount(0, $this->calls, 'A failed catalog or a stalled customers import is no stop');
+
+        $this->state['reported_at'] = self::NOW - 300;
+        $this->jobs[9] = $this->job(9, Job::TYPE_ORDERS, Job::STATUS_RUNNING, 1000, 40);
+        $this->jobs[8] = $this->job(8, Job::TYPE_CUSTOMERS, Job::STATUS_CANCELLED, 500, 10, '2027-01-15 09:00:00');
+        $this->progress()->report();
+        self::assertCount(1, $this->calls);
+        self::assertArrayNotHasKey('stop_reason', $this->calls[0], 'The orders import runs');
+    }
+
+    /**
+     * An import a refusal stopped (the account is not active) ends with no
+     * report: the WooCommerce plugin reports no stop for it either.
+     */
+    public function testAnImportARefusalStoppedEndsWithoutAReport(): void
+    {
+        $this->state['reported_phase'] = 'started';
+        $this->state['reported_at'] = self::NOW - 600;
+        $this->jobs[9] = $this->job(
+            9,
+            Job::TYPE_ORDERS,
+            Job::STATUS_CANCELLED,
+            1000,
+            50,
+            '2027-01-15 09:00:00',
+            Job::REASON_ENGINE_NOT_ACTIVE
+        );
+        $this->progress()->report();
+        self::assertCount(0, $this->calls);
+        self::assertSame('not_active', $this->state['stop_reason']);
+
+        $this->progress()->report();
+        self::assertCount(0, $this->calls, 'Ended');
+    }
+
+    /**
+     * Nothing to stop for an import the engine never heard of (cancelled
+     * before its first report), nor while sending is not allowed.
+     */
+    public function testAnImportTheEngineNeverHeardOfOrASendingStopReportsNothing(): void
+    {
+        $this->jobs[9] = $this->job(9, Job::TYPE_ORDERS, Job::STATUS_CANCELLED, 1000, 0);
+        $this->progress()->report();
+        self::assertCount(0, $this->calls);
+
+        $this->state['reported_phase'] = 'started';
         $this->progress(null, false)->report();
         self::assertCount(0, $this->calls);
     }
@@ -273,6 +479,9 @@ class HistoryProgressTest extends TestCase
 
         $jobManager = $this->createMock(JobManager::class);
         $jobManager->method('get')->willReturnCallback(fn (int $id): ?Job => $this->jobs[$id] ?? null);
+        $jobManager->method('isStalled')->willReturnCallback(
+            fn (string $type): bool => $this->stalled[$type] ?? false
+        );
         $jobManager->method('latest')->willReturnCallback(function (string $type, string $target, ?int $websiteId): ?Job {
             $this->latestFor[] = $websiteId;
             foreach ($this->jobs as $job) {
@@ -335,14 +544,30 @@ class HistoryProgressTest extends TestCase
         return $client;
     }
 
-    private function job(int $id, string $type, string $status, int $total, int $sent): Job&MockObject
-    {
+    private function job(
+        int $id,
+        string $type,
+        string $status,
+        int $total,
+        int $sent,
+        ?string $completedAt = null,
+        ?string $errorMessage = null
+    ): Job&MockObject {
         $job = $this->createMock(Job::class);
         $job->method('getId')->willReturn($id);
         $job->method('getJobType')->willReturn($type);
         $job->method('getStatus')->willReturn($status);
         $job->method('getData')->willReturnCallback(
-            static fn (string $key = '') => $key === 'total_count' ? $total : null
+            static fn (string $key = '') => match ($key) {
+                'total_count' => $total,
+                'completed_at' => $completedAt,
+                'error_message' => $errorMessage,
+                // A queued or cancelled job here never started.
+                'started_at' => in_array($status, [Job::STATUS_PENDING, Job::STATUS_CANCELLED], true)
+                    ? null
+                    : '2027-01-15 08:00:30',
+                default => null,
+            }
         );
         $job->method('getSentCount')->willReturn($sent);
         $job->method('getProcessedCount')->willReturn($sent);

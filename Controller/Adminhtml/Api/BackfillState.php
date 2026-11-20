@@ -36,8 +36,11 @@ use Smaily\Connect\Model\ResourceModel\Backfill\Job\CollectionFactory;
  * Model/Backfill/ImportStarter, the one smaily:backfill:start shares.
  * "cancel" flips every active job of the type to cancelled; the background
  * worker stops at its next page boundary, and a later "start" begins a
- * fresh import. `stalled` marks a queued or running import that nothing
- * has moved for an hour, or one the tick has set aside
+ * fresh import. A Campaign Intelligence import's cancel also cancels the
+ * imports still queued behind it, as the WooCommerce plugin's cancel ends
+ * its import sequence (JobManager::cancelEngineSequence(), CON-367).
+ * `stalled` marks a queued or running import that nothing has moved for
+ * an hour, or one the tick has set aside
  * (JobManager::isStalled()'s rule, PRO-3915, PRO-3927); a "start"
  * cancels such an import first (JobManager::startIfIdle()), so it cannot
  * block the new one. `blocked_by` is the job type of the import a stalled
@@ -93,6 +96,9 @@ class BackfillState extends AbstractJsonAction implements HttpPostActionInterfac
             if ($refusal !== null) {
                 return $this->jsonResponse($this->aggregate($jobType, $target) + ['message' => (string)$refusal]);
             }
+        } elseif ($action === 'cancel' && $target === Job::TARGET_ENGINE) {
+            // The imports queued behind it do not start either (CON-367).
+            $this->jobManager->cancelEngineSequence($jobType);
         } elseif ($action === 'cancel') {
             $this->jobManager->requestCancel($jobType, $target);
         }

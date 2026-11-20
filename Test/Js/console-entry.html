@@ -1,0 +1,220 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for "Open Campaign Intelligence" on Settings > Intelligence
+  (contract §24, CON-230): the real templates
+  (view/adminhtml/templates/panel/intelligence.phtml and panel/panels-js.phtml),
+  rendered in en_US and et_EE by Test/Js/render-admin.php into Test/Js/build/
+  with Campaign Intelligence connected, run with jQuery from vendor/, one
+  fresh frame per scenario. The press opens a blank tab before it asks the
+  server (a pop-up blocker allows a tab only in the press itself), cuts the
+  tab off from the page, and sends it to the one-time link; a refusal closes
+  the tab and says why, and a 404 replaces the button with the console's
+  sign-in address. Stubbed: window.open (a fake tab recording what happens to
+  it) and the requests (fetch) — the console entry with the ConsoleEntry
+  endpoint's answer, the import cards with an idle import. Run it with
+  bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>console entry harness</title>
+    <script src="build/intelligence-settings-connected.en_US.js"></script>
+    <script src="build/intelligence-settings-connected.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var BUTTON = 'Open Campaign Intelligence';
+    var BLOCKED = 'Your browser blocked the new tab. Allow pop-ups for this page and try again.';
+    var FAILED = 'Campaign Intelligence could not be opened. Try again in a minute.';
+    var LINK = 'https://intelligence.smaily.com/console-entry#g=seg_test_grant';
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    // Runs in the frame before the page: the admin's form key, RequireJS's
+    // require(), window.open (null when `blocked`, else a fake tab), and the
+    // requests: the console entry answers window.answer with its status, an
+    // import card an idle import. `events` records the order of the open and
+    // the request.
+    function stubs(answer, blocked) {
+        return [
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.require = function (deps, callback) { callback(window.jQuery); };',
+            'window.events = [];',
+            'window.consoleRequests = [];',
+            'window.tabs = [];',
+            'window.open = function (url, target) {',
+            '  window.events.push("open");',
+            '  if (' + JSON.stringify(!!blocked) + ') { return null; }',
+            '  var tab = {url: url, target: target, opener: window, closed: false, location: {href: ""},',
+            '    close: function () { tab.closed = true; }};',
+            '  window.tabs.push(tab);',
+            '  return tab; };',
+            'window.fetch = function (url, options) {',
+            '  if (url.indexOf("consoleentry") !== -1) {',
+            '    window.events.push("request");',
+            '    window.consoleRequests.push({url: url, body: options.body});',
+            '    return Promise.resolve(new Response(JSON.stringify(' + JSON.stringify(answer.body) + '),',
+            '      {status: ' + answer.status + ', headers: {"Content-Type": "application/json"}})); }',
+            '  return Promise.resolve(new Response(JSON.stringify({status: "idle", processed: 0, failed: 0,',
+            '    total: 0, percent: 0, finished_at: "", error: ""}), {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>'
+        ].join('\n');
+    }
+
+    // Opens Settings > Intelligence as the page boots it, then presses the button.
+    function press(page, answer, blocked) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.onload = function () {
+                wait(50).then(function () {
+                    frame.contentDocument.getElementById('smaily-w-console-open').click();
+
+                    return wait(50);
+                }).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs(answer, blocked)
+                + '</head><body>' + rendered.html
+                + '<script>window.panels = window.smailyPanelsInit(window.jQuery); window.panels.initAll();<\/script>'
+                + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function visible(doc, id) {
+        var el = doc.getElementById(id);
+
+        return !!el && el.style.display !== 'none' && doc.defaultView.getComputedStyle(el).display !== 'none';
+    }
+
+    function resultText(doc) {
+        return doc.getElementById('smaily-w-console-result').textContent.replace('!', '').trim();
+    }
+
+    async function run(locale) {
+        var page = 'intelligence-settings-connected.' + locale,
+            strings = window.smailyAdminPages[page].strings,
+            frame, doc, win;
+
+        // The link: a blank tab first, cut off from this page, then the link.
+        frame = await press(page, {status: 200, body: {url: LINK}});
+        doc = frame.contentDocument;
+        win = frame.contentWindow;
+        check(locale + ': the button shows on the connected Settings tab with its label',
+            visible(doc, 'smaily-w-console-entry')
+            && doc.getElementById('smaily-w-console-open').textContent.trim() === strings[BUTTON]);
+        check(locale + ': the tab opens before the server is asked', win.events.join(',') === 'open,request');
+        check(locale + ': one request, with the form key and no body data',
+            win.consoleRequests.length === 1
+            && win.consoleRequests[0].url.indexOf('form_key=form-key') !== -1
+            && win.consoleRequests[0].body === '{}');
+        check(locale + ': the tab is cut off from the page', win.tabs[0].opener === null);
+        check(locale + ': the tab goes to the link', win.tabs[0].location.href === LINK && !win.tabs[0].closed);
+        check(locale + ': nothing on the page keeps the link',
+            doc.body.innerHTML.indexOf('seg_test_grant') === -1 && resultText(doc) === '');
+        check(locale + ': the button can be pressed again',
+            !doc.getElementById('smaily-w-console-open').disabled);
+        frame.remove();
+
+        // A blocked pop-up: nothing is asked, the line says why.
+        frame = await press(page, {status: 200, body: {url: LINK}}, true);
+        doc = frame.contentDocument;
+        check(locale + ': a blocked tab asks nothing', frame.contentWindow.consoleRequests.length === 0);
+        check(locale + ': a blocked tab says so', resultText(doc) === strings[BLOCKED]);
+        frame.remove();
+
+        // 404: console entry is not on yet — the button goes, the address shows.
+        frame = await press(page, {status: 404, body: {
+            error: 'not_available',
+            message: 'Not available yet:',
+            console_url: 'https://intelligence.smaily.com/login'
+        }});
+        doc = frame.contentDocument;
+        win = frame.contentWindow;
+        check(locale + ': 404 closes the tab', win.tabs[0].closed);
+        check(locale + ': 404 hides the button', !visible(doc, 'smaily-w-console-open'));
+        check(locale + ': 404 shows the console address in a new tab',
+            visible(doc, 'smaily-w-console-unavailable')
+            && doc.querySelector('#smaily-w-console-unavailable span').textContent === 'Not available yet:'
+            && doc.querySelector('#smaily-w-console-unavailable a').getAttribute('href') === 'https://intelligence.smaily.com/login'
+            && doc.querySelector('#smaily-w-console-unavailable a').getAttribute('target') === '_blank');
+        frame.remove();
+
+        // 429: the server's own words; the button stays.
+        frame = await press(page, {status: 429, body: {error: 'rate_limit_exceeded', message: 'Too many attempts.'}});
+        doc = frame.contentDocument;
+        check(locale + ': a refusal closes the tab', frame.contentWindow.tabs[0].closed);
+        check(locale + ': a refusal shows the server\'s message', resultText(doc) === 'Too many attempts.');
+        check(locale + ': the button stays after a refusal',
+            visible(doc, 'smaily-w-console-open') && !doc.getElementById('smaily-w-console-open').disabled);
+        frame.remove();
+
+        // An answer without a link or a message: the page's own words.
+        frame = await press(page, {status: 502, body: {}});
+        doc = frame.contentDocument;
+        check(locale + ': no link and no message says it could not open', resultText(doc) === strings[FAILED]);
+        check(locale + ': and closes the tab', frame.contentWindow.tabs[0].closed);
+        frame.remove();
+    }
+
+    run('en_US').then(function () {
+        return run('et_EE');
+    }).then(function () {
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    }).catch(function (error) {
+        document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }).then(function () {
+        clearInterval(keepAlive);
+    });
+</script>
+</body>
+</html>

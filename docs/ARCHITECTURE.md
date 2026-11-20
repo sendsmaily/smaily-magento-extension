@@ -349,7 +349,37 @@ below.
   delivered and neither job is queued or running; `complete` once the
   orders job has completed and its rows are delivered; and the counts at
   most every 5 minutes in between. A failed call is logged and tried again
-  5 minutes later, never failing the import. The Orders card shows one bar
+  5 minutes later, never failing the import. **A stopped import**
+  (contract v1.28.0 §25 "Stopped import", CON-367, as the WooCommerce
+  plugin's CON-284) gets one final call, at once, with the phase it reached
+  (never `complete`), its final counts and `stop_reason`, and none after it
+  (the state's `stop_reason`). The stops are the plugin's: its orders job
+  is cancelled (`cancelled`), failed (`failed`) or stalled (`stalled`:
+  `JobManager::isStalled()`, the card's "Stalled", still so after the
+  check has seen it for `STALLED_SECONDS` — the state's `stalled_since` —
+  so a cron outage that ends is not one; the plugin's own test needs
+  Action Scheduler); or, while the orders job is still queued, the latest
+  catalog or customers job was cancelled after the import began
+  (`completed_at` ≥ `until`; `cancelled`, phase `started`, after that
+  job's rows are delivered) — where the plugin's sequence ends: the
+  merchant's cancel of an engine import (`BackfillState` `cancel`,
+  `JobManager::cancelEngineSequence()`; Erkki, 2026-11-20) also cancels
+  each connection's engine jobs still pending with a higher id than that
+  import's latest job — the imports the tick would run after it — and
+  leaves a running one alone, so Hold back the import stops the customers
+  and orders imports queued with the catalog. A failed or stalled catalog
+  or customers job is
+  no stop (the plugin's sequence moves on), and once the orders job runs
+  only it counts. The plugin pauses an import while the account is
+  refused and reports no stop for it; `Cron/BackfillTick` (and
+  `EngineJobConnection`) stop the job instead, with
+  `Job::REASON_ENGINE_NOT_ACTIVE`, so an import ended that way is closed
+  with no call (state `stop_reason` `not_active`, never sent). The call
+  carries no `store_config`. It waits while a row of the stopped job is
+  undelivered, and an import the engine never heard of (no
+  `reported_phase`) is not stopped. Only Run again on Orders is a new
+  import (a new orders job, a new `import_id`), as in the plugin. The
+  Orders card shows one bar
   for the running part (`BackfillState` `history`): the start part's
   share, then the share of the horizon. A pilot-sized history (80,000
   orders, 12,000 in the start part, 40,000 inside the horizon) has its
@@ -556,7 +586,10 @@ below.
   `ordersImportStarted`, and
   `panels-js.phtml` then shows an info banner for each import started —
   the catalog one with **Hold back the
-  import**, which posts the BackfillState `cancel` (`requestCancel()`);
+  import**, which posts the BackfillState `cancel`
+  (`cancelEngineSequence()`: the customers and orders jobs queued behind
+  it are cancelled too, as the WooCommerce plugin's Hold back ends its
+  sequence, CON-367);
   the customers and orders ones point to their card's **Cancel import** — and asks
   the Settings tab's Catalog, Customers and Orders cards for their state; the
   Catalog card renders the Hold back's cancel answer, which
@@ -2791,6 +2824,29 @@ Initial setup, Settings, Log. Design rules:
     this card (`smaily-ci-banner--smaily`, no `data-variant`), so the
     scripts that drive or hide these banners select
     `.smaily-ci-banner[data-variant]`.
+- **"Open Campaign Intelligence" (CON-230, contract §24; as the
+  WooCommerce plugin's CON-228).** Settings > Intelligence shows the button
+  (`panel/intelligence.phtml`, `#smaily-w-console-open`) while Campaign
+  Intelligence is connected and the account is not refused; the page and
+  the endpoint both need `Smaily_Connect::config`. The press opens a blank
+  tab at once (pop-up blockers allow nothing later), cuts its `opener`,
+  and posts to `Api\ConsoleEntry` (`panel/panels-js.phtml`). The endpoint
+  checks the form key, takes the connection the tab shows (the primary:
+  separate stores share it until CON-237 gives them their own) and its
+  client, and calls `Engine\Client::consoleEntry()` — map key
+  `console_entry`, fallback `PATH_CONSOLE_ENTRY`, body `{email}` with the
+  signed-in admin user's own address — one attempt, no retry and no wait,
+  so one press is one engine call. Only an https link is passed on, as
+  `{url}` with `Cache-Control: no-store, private`, and the tab goes to it;
+  nothing stores, logs or caches the link or the email
+  (`ConsoleEntryTest`). Refusals are answered by the engine's status only,
+  never its message (CON-357): 404 (console entry switched off, or a
+  legacy key) `not_available` with `console_url` (the engine origin's
+  `/login`): the button goes and the address shows; 401 `api_key_rejected`
+  (connect again); 403 `tenant_inactive`; 429 `rate_limit_exceeded`; the
+  rest `engine_unavailable`. A failure closes the tab and the line beside
+  the button gives the message (`Test/Js/console-entry.html`). The console
+  is never framed: §24 forbids it.
 - **The Smaily invitation (CON-364, as the WooCommerce plugin's CON-321 /
   CON-351).** `ViewModel\Adminhtml\SmailyInvitationData` decides it: due
   while `ReportBuilder::mainCredentials()` is null (no Smaily marketing

@@ -53,8 +53,8 @@
     'use strict';
 
     var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
-    var HELD_BACK = 'Held back: the catalog import is canceled. Start it any time under Marketing > Smaily Connect > Settings > Intelligence.';
-    var CANCELED = 'Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent. Start the catalog import again any time under Marketing > Smaily Connect > Settings > Intelligence.';
+    var HELD_BACK = 'Held back: the catalog import is canceled, and the customers and orders imports waiting behind it do not start. Start each any time under Marketing > Smaily Connect > Settings > Intelligence.';
+    var CANCELED = 'Canceled: %1 products were already queued for sending and still reach Campaign Intelligence; the rest are not sent, and the customers and orders imports waiting behind it do not start. Start each import again any time under Marketing > Smaily Connect > Settings > Intelligence.';
     var STOREFRONT_HINT = 'Using a separate storefront? Set its Storefront URL before you connect, so that the catalog import sends the storefront\'s product links: go back to the Connect step, open Using a separate storefront? and enter the address as Storefront URL. Or connect now and press Hold back the import.';
     var SETTINGS_STOREFRONT_HINT = 'Using a separate storefront? Set its Storefront URL under Settings > Connection > Using a separate storefront? before you connect, so that the catalog import sends the storefront\'s product links. Or connect now and press Hold back the import.';
     var REFUSED_STOREFRONT = 'Enter the storefront\'s address only, starting with https:// — for example https://shop.example.com — without a path or a query.';
@@ -62,7 +62,7 @@
     var STOREFRONT_CONSENT = 'Your separate storefront sends the browse events itself, so its own cookie consent banner decides when they are sent.';
     var CUSTOMERS_STARTED = 'The customer accounts your contact sync puts into Smaily, and every customer with an order in the order history Campaign Intelligence takes, go to Campaign Intelligence once, in the background, after the catalog import. To hold it back, press Cancel import on the Customers card under Marketing > Smaily Connect > Settings > Intelligence.';
     var ORDERS_STARTED = 'Your order history goes to Campaign Intelligence once, in the background, after the customers import, newest first: the recent orders first, so that Campaign Intelligence can start, then the older ones. No order older than the history Campaign Intelligence takes is sent. To hold it back, press Cancel import on the Orders card under Marketing > Smaily Connect > Settings > Intelligence.';
-    var FINISHED ='The catalog import had already finished, so there was nothing left to hold back.';
+    var FINISHED ='The catalog import had already finished, so there was nothing left to hold back of it; the customers and orders imports waiting behind it do not start.';
     var REIMPORT = 'Saved. Run the catalog import again under Intelligence > Historical imports, so that Campaign Intelligence gets the new product links.';
     var failures = 0;
     var passes = 0;

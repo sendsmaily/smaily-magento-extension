@@ -130,6 +130,29 @@ class BackfillStateTest extends TestCase
         self::assertNull($this->response['history']);
     }
 
+    /**
+     * CON-367: a Campaign Intelligence import's cancel ends its sequence, as
+     * the WooCommerce plugin's does; the contacts import's cancels only it.
+     *
+     * @dataProvider engineImports
+     */
+    public function testAnEngineCancelAlsoCancelsTheImportsQueuedBehindIt(string $jobType): void
+    {
+        $this->jobManager->expects(self::once())->method('cancelEngineSequence')->with($jobType);
+        $this->jobManager->expects(self::never())->method('requestCancel');
+
+        $this->controller(true, ['action' => 'cancel', 'job_type' => $jobType])->execute();
+    }
+
+    public function testTheContactsCancelCancelsOnlyIt(): void
+    {
+        $this->jobManager->expects(self::once())->method('requestCancel')
+            ->with(Job::TYPE_CONTACTS, Job::TARGET_SMAILY);
+        $this->jobManager->expects(self::never())->method('cancelEngineSequence');
+
+        $this->controller(true, ['action' => 'cancel', 'job_type' => Job::TYPE_CONTACTS])->execute();
+    }
+
     public function testTheContactsImportStartsWhileCampaignIntelligenceIsNotConnected(): void
     {
         $this->jobManager->expects(self::once())->method('startIfIdle')

@@ -119,13 +119,16 @@ class HistoryImportTest extends IntegrationTestCase
         $this->clock->travel(600);
         self::assertSame($state, $this->historyImport->begin($job, $this->one), 'Begun once per orders import');
 
+        // CON-367: a cancelled import's final report is in (§25 "Stopped
+        // import"); Run again is a new import with an import_id of its own.
         $this->jobManager->requestCancel(Job::TYPE_ORDERS, Job::TARGET_ENGINE);
+        $this->historyImport->update($this->one, ['stop_reason' => 'cancelled']);
         $next = $this->jobManager->start(Job::TYPE_ORDERS, Job::TARGET_ENGINE, Job::ENGINE_WEBSITE_ID);
-        self::assertSame(
-            (int)$next->getId(),
-            $this->historyImport->begin($next, $this->one)['orders_job_id'],
-            'Run again begins anew'
-        );
+        $again = $this->historyImport->begin($next, $this->one);
+        self::assertSame((int)$next->getId(), $again['orders_job_id'], 'Run again begins anew');
+        self::assertSame(sprintf('mag-%s-%d', gmdate('Y-m-d', $this->clock->now()), $next->getId()), $again['import_id']);
+        self::assertNotSame($state['import_id'], $again['import_id']);
+        self::assertNull($again['stop_reason'] ?? null, 'The new import has not stopped');
     }
 
     /**

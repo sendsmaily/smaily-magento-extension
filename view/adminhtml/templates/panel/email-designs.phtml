@@ -341,9 +341,9 @@ require(['jquery'], function ($) {
         }
     }
 
-    // A fresh tab link in a new tab: the frame's link is good for the
-    // frame only. No question over unsaved changes: a question would outlast
-    // the click's pop-up allowance (as in the WooCommerce plugin).
+    // A new tab with a fresh tab link: the frame's link is for the frame
+    // only. No question over unsaved changes: a question would outlast the
+    // click's pop-up allowance (as in the WooCommerce plugin).
     $modal.find('.smaily-design-modal__newtab').on('click', function () {
         var key, $slot;
         if (!current) {

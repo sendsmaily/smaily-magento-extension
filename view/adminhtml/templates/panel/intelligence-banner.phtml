@@ -34,7 +34,8 @@ if ($variant === '' || ($dismissible && $viewModel->isDismissed())) {
 }
 $upsell = $variant === IntelligenceBannerData::VARIANT_UPSELL;
 $loginUrl = $viewModel->getLoginUrl();
-$gradientId = $dismissible ? 'smaily-ci-banner-mark-top' : 'smaily-ci-banner-mark';
+// The Campaign Intelligence icon from the logo pack (CON-372), static.
+$iconUrl = $block->getViewFileUrl('Smaily_Connect::images/campaign-intelligence-icon.svg');
 $hidden = ' hidden';
 ?>
 <section class="smaily-ci-banner<?= $dismissible ? ' smaily-ci-banner--top' : '' ?>"
@@ -44,18 +45,7 @@ $hidden = ' hidden';
          data-login-url="<?= $escaper->escapeHtmlAttr($loginUrl) ?>">
     <div class="smaily-ci-banner__main">
         <div class="smaily-ci-banner__head">
-            <span class="smaily-ci-banner__logo" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="28" height="28" focusable="false">
-                    <defs>
-                        <linearGradient id="<?= /* @noEscape */ $gradientId ?>" x1="0" y1="0" x2="1" y2="1">
-                            <stop offset="0%" stop-color="#ff5c9d"/>
-                            <stop offset="100%" stop-color="#7cc4ff"/>
-                        </linearGradient>
-                    </defs>
-                    <rect x="3" y="3" width="12" height="12" rx="4" fill="none" stroke="url(#<?= /* @noEscape */ $gradientId ?>)" stroke-width="2"/>
-                    <rect x="9" y="9" width="12" height="12" rx="4" fill="none" stroke="url(#<?= /* @noEscape */ $gradientId ?>)" stroke-width="2"/>
-                </svg>
-            </span>
+            <img class="smaily-ci-banner__logo" src="<?= $escaper->escapeUrl($iconUrl) ?>" width="44" height="44" alt="">
             <?php // The product name: not translated. ?>
             <h2 class="smaily-ci-banner__title">Campaign <span class="smaily-ci-banner__accent">Intelligence</span></h2>
         </div>
@@ -69,10 +59,7 @@ $hidden = ' hidden';
     </div>
     <div class="smaily-ci-banner__panel" aria-hidden="true">
         <span class="smaily-ci-banner__panel-label">
-            <svg viewBox="0 0 24 24" width="16" height="16" focusable="false">
-                <rect x="3" y="3" width="12" height="12" rx="4" fill="none" stroke="#2a1028" stroke-width="2"/>
-                <rect x="9" y="9" width="12" height="12" rx="4" fill="none" stroke="#2a1028" stroke-width="2"/>
-            </svg>
+            <img src="<?= $escaper->escapeUrl($iconUrl) ?>" width="16" height="16" alt="">
             <?= $escaper->escapeHtml(__('Engine in action')) ?>
         </span>
         <p class="smaily-ci-banner__panel-heading"><?= $escaper->escapeHtml(__('What the engine recommends you do next')) ?></p>

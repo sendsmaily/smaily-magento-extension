@@ -96,6 +96,34 @@ class ConnectionPrefixTest extends TestCase
     }
 
     /**
+     * @dataProvider configPrefixes
+     * @param array<string, mixed> $config
+     */
+    public function testTheConfigBlocksPrefixIsReadByTheContractsShape(array $config, ?string $expected): void
+    {
+        self::assertSame($expected, ConnectionPrefix::configPrefix($config));
+    }
+
+    /**
+     * @return array<string, array{0: array<string, mixed>, 1: string|null}>
+     */
+    public static function configPrefixes(): array
+    {
+        return [
+            'an engine before v1.33.0' => [['history' => []], ''],
+            'a connection without a prefix' => [['connection' => ['prefix' => '']], ''],
+            'a prefix' => [['connection' => ['prefix' => 'c2-']], 'c2-'],
+            'the longest prefix' => [['connection' => ['prefix' => 'c9999-']], 'c9999-'],
+            'no prefix in the block' => [['connection' => []], null],
+            'a prefix from zero' => [['connection' => ['prefix' => 'c0-']], null],
+            'upper case' => [['connection' => ['prefix' => 'C2-']], null],
+            'too long' => [['connection' => ['prefix' => 'c10000-']], null],
+            'a trailing newline' => [['connection' => ['prefix' => "c2-\n"]], null],
+            'not a string' => [['connection' => ['prefix' => 2]], null],
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function catalogRow(): array

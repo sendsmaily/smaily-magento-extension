@@ -242,8 +242,8 @@ below.
   the storefront pages keep the keys bare, and
   `Payload\ConnectionPrefix::item()` puts the prefix in front of the
   catalog `sku` and `tags.product_id`, the order's `external_order_id` and
-  its lines' `sku`, and the browse `sku` (`Cron/FlushIngestQueue`, the
-  relay); `FlushIngestQueue` does the §3b ids and `CatalogManifest` the
+  its lines' `sku`, and the browse `sku` (`Cron/FlushIngestQueue`,
+  `Client::relayBrowse()`); `FlushIngestQueue` does the §3b ids and `CatalogManifest` the
   §3c skus. Customers carry none. A row keeps its item as it was sent; a
   §3b id the engine names in `errors[]` (another connection's) fails its
   row. A connection with the prefix `""` — every connection until the

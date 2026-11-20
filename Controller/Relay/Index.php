@@ -19,7 +19,6 @@ use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\BrowseEventValidator;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
-use Smaily\Connect\Model\Engine\Payload\ConnectionPrefix;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
@@ -88,15 +87,11 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
             return $result->setData(['ok' => false, 'error' => 'events array required']);
         }
 
-        // Each sku under the connection's prefix (contract v1.33.0 §6,
-        // CON-359): the page holds it without one, also a page cached
-        // before a connect.
-        $prefix = $this->settings->getConnectionPrefix();
         $events = [];
         foreach (array_slice(array_values($rawEvents), 0, self::MAX_EVENTS) as $event) {
             $clean = is_array($event) ? $this->validator->sanitize($event) : null;
             if ($clean !== null) {
-                $events[] = ConnectionPrefix::item(Client::DOMAIN_BROWSE, $clean, $prefix);
+                $events[] = $clean;
             }
         }
         if (!$events) {

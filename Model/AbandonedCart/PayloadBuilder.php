@@ -16,6 +16,7 @@ use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Item;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
+use Smaily\Connect\Model\Client\FailureText;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\StorefrontScript;
 
@@ -316,7 +317,7 @@ class PayloadBuilder
         } catch (\Throwable $exception) {
             $this->logger->debug('Abandoned cart image URL failed', [
                 'product_id' => $product->getId(),
-                'error' => $exception->getMessage(),
+                'error' => FailureText::of($exception),
             ]);
 
             return null;

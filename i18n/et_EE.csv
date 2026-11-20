@@ -502,6 +502,7 @@
 "Smaily API request failed with HTTP %1: %2","Smaily API päring ebaõnnestus (HTTP %1): %2"
 "Smaily API request failed: %1","Smaily API päring ebaõnnestus: %1"
 "Smaily API returned a malformed response body","Smaily API tagastas vigase vastuse"
+"Smaily API returned code %1","Smaily API tagastas koodi %1"
 "Smaily API returned code %1: %2","Smaily API tagastas koodi %1: %2"
 "Smaily Campaign Intelligence is unreachable","Smaily Campaign Intelligence pole kättesaadav"
 "Smaily Connect","Smaily Connect"

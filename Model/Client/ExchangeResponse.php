@@ -10,33 +10,49 @@ namespace Smaily\Connect\Model\Client;
 
 /**
  * An HTTP reply as a queue row keeps it for the Log's Details (PRO-1965):
- * the status and the body — decoded when it is JSON, else the start of the
- * text (an HTML error page). Stored, never logged; the Details drawer shows
- * it through the PayloadRedactor. Shared by the Smaily and engine clients.
+ * the status and the body when it is JSON, without any `message` in it —
+ * the text Smaily or Campaign Intelligence wrote can name a customer
+ * (CON-357); its codes and fields stay. A body that is not JSON (an HTML
+ * error page) is not kept. Stored, never logged; the Details drawer shows it
+ * through the PayloadRedactor. Shared by the Smaily and engine clients.
  */
 class ExchangeResponse
 {
-    private const MAX_TEXT_LENGTH = 2000;
-
     /**
      * @return array{http_status: int, body: mixed}
      */
     public static function of(int $status, string $body): array
     {
-        return self::ofDecoded($status, $body, json_decode($body, true));
+        return self::ofDecoded($status, json_decode($body, true));
     }
 
     /**
      * The same for a body the caller has already decoded.
      *
-     * @param mixed $decoded $body decoded
+     * @param mixed $decoded the body decoded
      * @return array{http_status: int, body: mixed}
      */
-    public static function ofDecoded(int $status, string $body, mixed $decoded): array
+    public static function ofDecoded(int $status, mixed $decoded): array
     {
         return [
             'http_status' => $status,
-            'body' => is_array($decoded) ? $decoded : mb_substr($body, 0, self::MAX_TEXT_LENGTH),
+            'body' => is_array($decoded) ? self::withoutMessages($decoded) : null,
         ];
+    }
+
+    /**
+     * @param array<int|string, mixed> $body
+     * @return array<int|string, mixed>
+     */
+    private static function withoutMessages(array $body): array
+    {
+        unset($body['message']);
+        foreach ($body as $key => $value) {
+            if (is_array($value)) {
+                $body[$key] = self::withoutMessages($value);
+            }
+        }
+
+        return $body;
     }
 }

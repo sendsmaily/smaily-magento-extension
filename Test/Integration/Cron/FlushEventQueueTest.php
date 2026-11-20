@@ -33,6 +33,7 @@ use Smaily\Connect\Model\Engine\Client as EngineClient;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\MergeCustomerSender;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
+use Smaily\Connect\Model\Log\FailureMessage;
 use Smaily\Connect\Model\Log\QueueRowLoader;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
@@ -312,14 +313,15 @@ class FlushEventQueueTest extends IntegrationTestCase
     /**
      * PRO-1962: Smaily answers HTTP 200 with the envelope code 203 "invalid
      * data" — resending identical data can never succeed, so the row fails
-     * on the first attempt with a named class, Smaily's answer kept.
+     * on the first attempt with a named class. CON-357: the row and the Log
+     * keep Smaily's code, never its message, which can name the contact.
      */
     public function testAnInvalidDataEnvelopeIsRecordedFailedOnTheFirstAttempt(): void
     {
         $this->enqueueContact('f-invalid-data');
 
         $this->runCron(['contact.sync' => $this->realContactSync([
-            new Response(200, [], '{"code":203,"message":"Invalid data"}'),
+            new Response(200, [], '{"code":203,"message":"Invalid data: Mari Maasikas, mari@example.com"}'),
         ])]);
 
         self::assertCount(1, $this->requests, 'A single contact is not sent again');
@@ -327,11 +329,17 @@ class FlushEventQueueTest extends IntegrationTestCase
         self::assertSame(Event::STATUS_FAILED, $row['status']);
         self::assertSame('1', (string)$row['attempts'], 'The other four attempts are not spent');
         self::assertNull($row['next_retry_at']);
-        self::assertSame('permanent_envelope_203: Smaily API returned code 203: Invalid data', $row['last_error']);
+        self::assertSame('permanent_envelope_203: Smaily API returned code 203', $row['last_error']);
         self::assertSame(
-            ['http_status' => 200, 'body' => ['code' => 203, 'message' => 'Invalid data']],
+            ['http_status' => 200, 'body' => ['code' => 203]],
             json_decode((string)$row['last_response'], true)
         );
+        $shown = $this->objectManager->create(FailureMessage::class)->forDisplay((string)$row['last_error']);
+        self::assertSame('Smaily API returned code 203', $shown);
+        foreach ([(string)$row['last_error'], (string)$row['last_response'], $shown] as $kept) {
+            self::assertStringNotContainsString('mari@example.com', $kept);
+            self::assertStringNotContainsString('Maasikas', $kept);
+        }
     }
 
     /**
@@ -363,7 +371,7 @@ class FlushEventQueueTest extends IntegrationTestCase
             self::assertSame(Event::STATUS_SENT, $rows[$uuid]['status'], $uuid);
             self::assertNull($rows[$uuid]['last_error']);
             self::assertSame(
-                ['http_status' => 200, 'body' => ['code' => 101, 'message' => 'OK']],
+                ['http_status' => 200, 'body' => ['code' => 101]],
                 json_decode((string)$rows[$uuid]['last_response'], true)
             );
         }
@@ -371,10 +379,10 @@ class FlushEventQueueTest extends IntegrationTestCase
         self::assertSame(Event::STATUS_FAILED, $refused['status']);
         self::assertSame('1', (string)$refused['attempts']);
         self::assertNull($refused['next_retry_at']);
-        self::assertSame('permanent_envelope_203: Smaily API returned code 203: Invalid email', $refused['last_error']);
+        self::assertSame('permanent_envelope_203: Smaily API returned code 203', $refused['last_error']);
         self::assertSame($this->contacts(3), json_decode((string)$refused['sent_payload'], true));
         self::assertSame(
-            ['http_status' => 200, 'body' => ['code' => 203, 'message' => 'Invalid email']],
+            ['http_status' => 200, 'body' => ['code' => 203]],
             json_decode((string)$refused['last_response'], true)
         );
     }
@@ -405,10 +413,10 @@ class FlushEventQueueTest extends IntegrationTestCase
                 $row['next_retry_at'],
                 'Each row on its own step of the ladder'
             );
-            self::assertSame('Smaily API request failed with HTTP 503: Service unavailable', $row['last_error']);
+            self::assertSame('Smaily API request failed with HTTP 503', $row['last_error']);
             self::assertSame($this->contacts($n), json_decode((string)$row['sent_payload'], true));
             self::assertSame(
-                ['http_status' => 503, 'body' => 'Service unavailable'],
+                ['http_status' => 503, 'body' => null],
                 json_decode((string)$row['last_response'], true)
             );
             self::assertNull($row['claim_token'], 'The claim is cleared as a single failure clears it');
@@ -479,11 +487,10 @@ class FlushEventQueueTest extends IntegrationTestCase
 
     /**
      * PRO-1964 with PRO-3753: the contacts of a 203 group go again one by
-     * one, and each refused contact keeps its own answer — two refused
-     * with the same answer are written together, each with its own
-     * request body.
+     * one, and the refused contacts, whose reason is Smaily's code alone
+     * (CON-357), are written together, each with its own request body.
      */
-    public function testContactsSentAloneAfterA203KeepTheirOwnAnswers(): void
+    public function testContactsSentAloneAfterA203AreWrittenTogether(): void
     {
         $this->enqueueContacts(4);
 
@@ -495,23 +502,22 @@ class FlushEventQueueTest extends IntegrationTestCase
             new Response(200, [], '{"code":203,"message":"Invalid phone"}'),
         ])]));
 
-        self::assertSame(2, $writes, 'The two "Invalid email" rows together, the other alone');
+        self::assertSame(1, $writes, 'The three refused rows together');
         $rows = array_column($this->fetchAll(EventResource::TABLE_NAME), null, 'event_uuid');
         self::assertSame(Event::STATUS_SENT, $rows['f-c2']['status']);
-        $answers = ['f-c1' => 'Invalid email', 'f-c3' => 'Invalid email', 'f-c4' => 'Invalid phone'];
-        foreach ($answers as $uuid => $message) {
+        foreach (['f-c1', 'f-c3', 'f-c4'] as $uuid) {
             $row = $rows[$uuid];
             self::assertSame(Event::STATUS_FAILED, $row['status'], $uuid);
             self::assertSame('1', (string)$row['attempts'], $uuid);
             self::assertNull($row['next_retry_at'], $uuid);
-            self::assertSame('permanent_envelope_203: Smaily API returned code 203: ' . $message, $row['last_error']);
+            self::assertSame('permanent_envelope_203: Smaily API returned code 203', $row['last_error']);
             self::assertSame(
                 $this->contacts((int)substr($uuid, 3)),
                 json_decode((string)$row['sent_payload'], true),
                 $uuid . ' keeps only its own contact'
             );
             self::assertSame(
-                ['http_status' => 200, 'body' => ['code' => 203, 'message' => $message]],
+                ['http_status' => 200, 'body' => ['code' => 203]],
                 json_decode((string)$row['last_response'], true)
             );
         }
@@ -567,7 +573,7 @@ class FlushEventQueueTest extends IntegrationTestCase
             self::assertSame(Event::STATUS_PENDING, $row['status']);
             self::assertSame('1', (string)$row['attempts']);
             self::assertSame($this->clockDate(EventQueue::BACKOFF_SECONDS[0]), $row['next_retry_at']);
-            self::assertSame('Smaily API returned code 216: Unknown error', $row['last_error']);
+            self::assertSame('Smaily API returned code 216', $row['last_error']);
         }
     }
 
@@ -582,7 +588,7 @@ class FlushEventQueueTest extends IntegrationTestCase
         $row = $this->fetchAll(EventResource::TABLE_NAME)[0];
         self::assertSame(Event::STATUS_PENDING, $row['status']);
         self::assertSame($this->clockDate(EventQueue::BACKOFF_SECONDS[0]), $row['next_retry_at']);
-        self::assertSame('Smaily API returned code 216: Unknown error', $row['last_error']);
+        self::assertSame('Smaily API returned code 216', $row['last_error']);
     }
 
     public function testASlowDownParksTheRowForExactlyTheRequestedTime(): void
@@ -660,11 +666,15 @@ class FlushEventQueueTest extends IntegrationTestCase
             'This row\'s part of the request body, exactly as it was posted'
         );
         self::assertSame(
-            ['http_status' => 200, 'body' => ['code' => 101, 'message' => 'OK']],
+            ['http_status' => 200, 'body' => ['code' => 101]],
             json_decode((string)$row['last_response'], true)
         );
     }
 
+    /**
+     * CON-357: a reply that is not JSON is recorded by its status alone; its
+     * text is not kept.
+     */
     public function testARefusedRowRecordsWhatTheServerAnswered(): void
     {
         $this->enqueueContact('f-refused-evidence');
@@ -675,7 +685,7 @@ class FlushEventQueueTest extends IntegrationTestCase
         self::assertSame(Event::STATUS_FAILED, $row['status']);
         self::assertSame([['email' => 'a@example.com']], json_decode((string)$row['sent_payload'], true));
         self::assertSame(
-            ['http_status' => 404, 'body' => 'Not found'],
+            ['http_status' => 404, 'body' => null],
             json_decode((string)$row['last_response'], true)
         );
     }
@@ -697,7 +707,7 @@ class FlushEventQueueTest extends IntegrationTestCase
         self::assertStringContainsString('timed out', (string)$row['last_error']);
         self::assertSame([['email' => 'a@example.com']], json_decode((string)$row['sent_payload'], true));
         self::assertSame(
-            ['http_status' => 503, 'body' => 'Service unavailable'],
+            ['http_status' => 503, 'body' => null],
             json_decode((string)$row['last_response'], true),
             'PRO-1963: the attempt without an answer does not erase the answer before it'
         );

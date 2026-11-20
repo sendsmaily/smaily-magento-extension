@@ -14,6 +14,7 @@ use Smaily\Connect\Model\Backfill\HistoryProgress;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Backfill\ProcessorInterface;
+use Smaily\Connect\Model\Client\FailureText;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Logger\Logger;
 
@@ -75,7 +76,7 @@ class BackfillTick
             $this->logger->error('Backfill job failed', [
                 'job_id' => $job->getId(),
                 'type' => $key,
-                'error' => $exception->getMessage(),
+                'error' => FailureText::of($exception),
             ]);
         }
 
@@ -100,7 +101,7 @@ class BackfillTick
         try {
             $this->historyImport->beginQueued();
         } catch (\Throwable $exception) {
-            $this->logger->error('History import could not begin', ['error' => $exception->getMessage()]);
+            $this->logger->error('History import could not begin', ['error' => FailureText::of($exception)]);
         }
     }
 

@@ -12,6 +12,7 @@ use Magento\CatalogInventory\Model\StockRegistryStorage;
 use Magento\Framework\FlagManager;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
+use Smaily\Connect\Model\Client\FailureText;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Payload\CatalogPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
@@ -169,7 +170,7 @@ class CatalogManifest
         } catch (\Throwable $exception) {
             $this->logger->error(
                 'Nightly catalog manifest not sent: building the product list failed',
-                $this->context($connection, ['error' => $exception->getMessage()])
+                $this->context($connection, ['error' => FailureText::of($exception)])
             );
             $this->recordUnsent($connection, self::REASON_BUILD);
 

@@ -10,8 +10,8 @@ namespace Smaily\Connect\Model\Queue;
 
 use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\RequestRefusedException;
-use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\Exception\TransportException;
+use Smaily\Connect\Model\Client\FailureText;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 
 /**
@@ -25,8 +25,10 @@ use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
  *    payload), stored as `permanent_http_<code>: <message>`; a Smaily error
  *    envelope on HTTP 200 whose code ApiException::isPermanent() names (203
  *    "invalid data", PRO-1962), stored as `permanent_envelope_<code>:
- *    <message>`; or a handler's own verdict (a malformed payload, a row no
- *    handler takes). The row is parked as failed on the first attempt.
+ *    <message>` — the client's own message, which names the code, never
+ *    the server's text (CON-357); or a handler's own verdict (a malformed
+ *    payload, a row no handler takes). The row is parked as failed on the
+ *    first attempt.
  *  - TEMPORARY: anything else — a 429 (spaced by Smaily's Retry-After when
  *    it sent one), a 5xx, a network failure, any other error envelope —
  *    keeps the ladder (1m, 5m, 15m, 1h, then failed: about 81 minutes).
@@ -66,10 +68,12 @@ class Failure
     /**
      * The verdict on a failure a client threw. The row keeps the English
      * source text of a Smaily message; the Log translates it (PRO-3628).
+     * Any other error is kept by its type, code and place, never its text
+     * (FailureText, CON-357).
      */
     public static function of(\Throwable $failure): self
     {
-        $message = $failure instanceof SmailyClientException ? $failure->getSourceMessage() : $failure->getMessage();
+        $message = FailureText::of($failure);
         if ($failure instanceof RequestRefusedException || $failure instanceof EngineRequestException) {
             return self::refused('http', $failure->getHttpStatus(), $message);
         }

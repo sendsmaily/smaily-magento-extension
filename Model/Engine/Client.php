@@ -704,13 +704,12 @@ class Client
                 }
 
                 if ($status !== 429 && $status < 500) {
-                    $this->recordHealth($authenticated, $this->errorCode($status, $errorBody), false);
+                    $errorCode = $this->errorCode($status, $errorBody);
+                    $this->recordHealth($authenticated, $errorCode, false);
+                    // The engine's error code, never its message, which can
+                    // name the customer (CON-357).
                     throw new EngineRequestException(
-                        (string)__(
-                            'Engine request failed with HTTP %1: %2',
-                            $status,
-                            (string)($errorBody['message'] ?? $errorBody['error'] ?? 'unknown error')
-                        ),
+                        (string)__('Engine request failed with HTTP %1: %2', $status, $errorCode),
                         $status,
                         $errorBody
                     );
@@ -718,10 +717,11 @@ class Client
 
                 if ($attempt >= count($retryDelays)) {
                     $this->recordHealth($authenticated, $this->errorCode($status, $errorBody), false);
+                    // Guzzle's exception quotes the answer, which can name
+                    // the customer: it is not chained (CON-357).
                     throw new EngineTransportException(
                         (string)__('Engine request failed with HTTP %1 after retries', $status),
-                        $status,
-                        $exception
+                        $status
                     );
                 }
 

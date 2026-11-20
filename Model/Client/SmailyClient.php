@@ -40,7 +40,9 @@ use Smaily\Connect\Model\SmailyUrl;
  * (wizard step 1, Test connection, workflow loading). The exception keeps the
  * English source text too (getSourceMessage()): the queue stores that, and
  * the Log translates it in the admin's language (Model\Log\FailureMessage,
- * whose list names these messages).
+ * whose list names these messages). A message names the HTTP status, Smaily's
+ * code or the network error, never the text of Smaily's answer, which can
+ * name the contact (CON-357).
  */
 class SmailyClient
 {
@@ -51,11 +53,6 @@ class SmailyClient
 
     private const TIMEOUT_SECONDS = 30;
     private const CONNECT_TIMEOUT_SECONDS = 10;
-
-    /**
-     * The most of Smaily's answer an HTTP error message quotes (PRO-3749).
-     */
-    private const MAX_ANSWER_LENGTH = 500;
 
     private ?HttpClient $httpClient = null;
 
@@ -217,12 +214,14 @@ class SmailyClient
         try {
             $response = $this->getHttpClient()->request($method, $uri, $options);
         } catch (BadResponseException $exception) {
+            // Guzzle's message quotes the URL and the start of the answer,
+            // which can name the contact: it is never chained (CON-357).
             $status = $exception->getResponse()->getStatusCode();
             // The answer is read and decoded once, for the exchange and for
-            // what the error says.
+            // the package check.
             $body = (string)$exception->getResponse()->getBody();
             $decoded = json_decode($body, true);
-            $this->lastExchange['response'] = ExchangeResponse::ofDecoded($status, $body, $decoded);
+            $this->lastExchange['response'] = ExchangeResponse::ofDecoded($status, $decoded);
             $this->logger->error('Smaily API HTTP error', [
                 'method' => $method,
                 'endpoint' => $uri,
@@ -238,36 +237,31 @@ class SmailyClient
                         'Smaily refused the request because this account\'s package does not include API access.'
                         . ' Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all.'
                     ),
-                    $status,
-                    $exception
+                    $status
                 );
             }
             if (in_array($status, [401, 403], true)) {
                 // Wherever the refusal came from (the queue included), these
                 // credentials are no longer "Connected" (PRO-3560).
                 $this->verifiedCredentials->refuse($this->subdomain, $this->username, $this->password);
-                // Our own sentence instead of Smaily's body, on purpose: it
-                // names what to fix, and the Log's error column shows it
-                // where other refusals show the server's words. The body
-                // stays in the exchange, for the Details drawer (PRO-2508).
-                throw new AuthenticationException(__('Smaily API credentials were rejected'), $status, $exception);
+                // Our own sentence, on purpose: it names what to fix. The
+                // answer's code stays in the exchange, for the Details
+                // drawer (PRO-2508).
+                throw new AuthenticationException(__('Smaily API credentials were rejected'), $status);
             }
-            // Smaily's answer goes with the status, as the engine client's
-            // does, so the Log's error column says what Smaily said (PRO-3749).
-            $answer = $this->answerOf($body, $decoded);
-            $message = $answer === ''
-                ? __('Smaily API request failed with HTTP %1', $status)
-                : __('Smaily API request failed with HTTP %1: %2', $status, $answer);
+            // The status only, never Smaily's answer: its text can name the
+            // contact (CON-357). The exchange keeps the answer's code.
+            $message = __('Smaily API request failed with HTTP %1', $status);
             // Typed here, as the engine client types its failures: a 4xx
             // other than 429 refuses this request, retrying cannot change
             // it (PRO-1961); a 429 or a 5xx may pass later.
             if ($status !== 429 && $status < 500) {
-                throw new RequestRefusedException($message, $status, $exception);
+                throw new RequestRefusedException($message, $status);
             }
             throw new TransportException(
                 $message,
                 $status,
-                $exception,
+                null,
                 $this->retryAfterSeconds($exception->getResponse())
             );
         } catch (GuzzleException $exception) {
@@ -310,11 +304,9 @@ class SmailyClient
 
         if ($refused) {
             throw new ApiException(
-                __(
-                    'Smaily API returned code %1: %2',
-                    (int)$decoded['code'],
-                    (string)($decoded['message'] ?? 'unknown error')
-                ),
+                // The code only, never Smaily's message, which can name the
+                // contact (CON-357).
+                __('Smaily API returned code %1', (int)$decoded['code']),
                 (int)$decoded['code'],
                 $decoded
             );
@@ -377,27 +369,6 @@ class SmailyClient
         return is_array($decoded)
             && isset($decoded['code'])
             && (int)$decoded['code'] === PlanBlockedException::SMAILY_CODE;
-    }
-
-    /**
-     * What Smaily answered with an HTTP error, in one line: the envelope's
-     * message when the answer is JSON, else its text without markup (an HTML
-     * error page), cut to MAX_ANSWER_LENGTH. '' when there is nothing to
-     * quote — a JSON answer without a message included, which stays whole
-     * in the exchange for the Details drawer.
-     *
-     * @param mixed $decoded $body decoded
-     */
-    private function answerOf(string $body, mixed $decoded): string
-    {
-        if (is_array($decoded)) {
-            $body = isset($decoded['message']) && is_scalar($decoded['message']) ? (string)$decoded['message'] : '';
-        }
-        $answer = trim((string)preg_replace('/\s+/u', ' ', strip_tags($body)));
-
-        return mb_strlen($answer) > self::MAX_ANSWER_LENGTH
-            ? mb_substr($answer, 0, self::MAX_ANSWER_LENGTH) . '…'
-            : $answer;
     }
 
     /**

@@ -65,18 +65,28 @@ class MergeCustomerSenderTest extends TestCase
         self::assertNull($this->sender()->send(42));
     }
 
+    /**
+     * CON-357: the reason names the field, never the engine's message, which
+     * can name the customer.
+     */
     public function testARefusedItemIsRecordedFailedAndItsReasonAnswered(): void
     {
         $this->client->method('ingest')->willReturn([
             'ok' => true,
             'processed' => 0,
             'deduplicated' => 0,
-            'errors' => [['index' => 0, 'email' => 'person@example.com', 'field' => 'email', 'message' => 'Invalid']],
+            'errors' => [[
+                'index' => 0,
+                'email' => 'person@example.com',
+                'field' => 'email',
+                'message' => 'Mari Maasikas (person@example.com) is invalid',
+            ]],
         ]);
-        $this->ingestQueue->expects(self::once())->method('markFailed')->with($this->event, 'email: Invalid', true);
+        $this->ingestQueue->expects(self::once())->method('markFailed')
+            ->with($this->event, 'email: rejected by engine', true);
         $this->ingestQueue->expects(self::never())->method('markSent');
 
-        self::assertSame('email: Invalid', $this->sender()->send(42));
+        self::assertSame('email: rejected by engine', $this->sender()->send(42));
     }
 
     public function testAFailedRequestIsHandedOnAndNotRecorded(): void

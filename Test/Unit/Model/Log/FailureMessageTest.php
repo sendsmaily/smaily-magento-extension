@@ -41,14 +41,14 @@ class FailureMessageTest extends TestCase
     }
 
     /**
-     * PRO-1962: a permanent envelope rejection reads as Smaily's answer, its
-     * class kept for the drawer.
+     * PRO-1962: a permanent envelope rejection reads as Smaily's code
+     * (CON-357), its class kept for the drawer.
      */
-    public function testAnEnvelopeRejectionShowsTheAnswerAndKeepsItsClass(): void
+    public function testAnEnvelopeRejectionShowsTheCodeAndKeepsItsClass(): void
     {
-        $stored = 'permanent_envelope_203: Smaily API returned code 203: Invalid data';
+        $stored = 'permanent_envelope_203: Smaily API returned code 203';
 
-        self::assertSame('Smaily API returned code 203: Invalid data', $this->failureMessage->forDisplay($stored));
+        self::assertSame('Smaily API returned code 203', $this->failureMessage->forDisplay($stored));
         self::assertSame('permanent_envelope_203', $this->failureMessage->failureClass($stored));
     }
 
@@ -84,12 +84,16 @@ class FailureMessageTest extends TestCase
                 'permanent_http_404: Smaily API request failed with HTTP 404',
                 'Smaily API päring ebaõnnestus (HTTP 404)',
             ],
-            // PRO-3749: Smaily's answer after the status, kept as it is.
+            // Stored before CON-357 with Smaily's answer, which is shown as stored.
             'refusal with an answer' => [
                 'permanent_http_400: Smaily API request failed with HTTP 400: Field birthday: not a date',
                 'Smaily API päring ebaõnnestus (HTTP 400): Field birthday: not a date',
             ],
             'error envelope' => [
+                'Smaily API returned code 203',
+                'Smaily API tagastas koodi 203',
+            ],
+            'error envelope stored before CON-357' => [
                 'Smaily API returned code 203: Invalid data',
                 'Smaily API tagastas koodi 203: Invalid data',
             ],

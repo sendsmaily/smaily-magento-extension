@@ -10,6 +10,7 @@ namespace Smaily\Connect\Cron;
 
 use Magento\Framework\Serialize\Serializer\Json;
 use Smaily\Connect\Model\Backfill\JobManager;
+use Smaily\Connect\Model\Client\FailureText;
 use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Connection;
@@ -20,6 +21,7 @@ use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Payload\ConnectionPrefix;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
+use Smaily\Connect\Model\Engine\Queue\ItemError;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\OptOutReplay;
 
@@ -108,7 +110,7 @@ class FlushIngestQueue
             // The other domains still go out; the claimed markers come back
             // through requeueStale().
             $this->logger->error('Catalog build of changed products failed', [
-                'error' => $exception->getMessage(),
+                'error' => FailureText::of($exception),
             ]);
         }
 
@@ -343,7 +345,7 @@ class FlushIngestQueue
         $refused = [];
         foreach ((array)($response['errors'] ?? []) as $error) {
             if (is_array($error) && is_scalar($error['product_id'] ?? null)) {
-                $refused[(string)$error['product_id']] = $this->engineErrorMessage($error, 'product_ids');
+                $refused[(string)$error['product_id']] = ItemError::reason($error, 'product_ids');
             }
         }
         foreach ($keyed as [$event, $productId]) {
@@ -407,21 +409,6 @@ class FlushIngestQueue
     }
 
     /**
-     * One entry of the engine's `errors[]` as a row's failure message:
-     * `<field>: <message>`.
-     *
-     * @param array<mixed> $error
-     */
-    private function engineErrorMessage(array $error, string $defaultField): string
-    {
-        return sprintf(
-            '%s: %s',
-            (string)($error['field'] ?? $defaultField),
-            (string)($error['message'] ?? 'rejected by engine')
-        );
-    }
-
-    /**
      * @param IngestEvent[] $events indexed 0..n-1 in send order
      * @param array<int, array<string, mixed>> $items the same indexes
      * @param array<string, mixed> $response
@@ -437,7 +424,7 @@ class FlushIngestQueue
         $errorsByIndex = [];
         foreach ((array)($response['errors'] ?? []) as $error) {
             if (is_array($error) && isset($error['index'])) {
-                $errorsByIndex[(int)$error['index']] = $this->engineErrorMessage($error, 'item');
+                $errorsByIndex[(int)$error['index']] = ItemError::reason($error, 'item');
             }
         }
 

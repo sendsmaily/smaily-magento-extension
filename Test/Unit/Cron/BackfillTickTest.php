@@ -134,7 +134,9 @@ class BackfillTickTest extends TestCase
     /**
      * CON-233: an import that stops stores where the error happened, never
      * its message, which can quote a customer's data — the import card
-     * shows what is stored. Every import passes this router.
+     * shows what is stored. Every import passes this router. CON-357: the
+     * log names the error's type, code and place, never its text either — a
+     * database error quotes the row it refused.
      *
      * @dataProvider imports
      */
@@ -148,15 +150,30 @@ class BackfillTickTest extends TestCase
                 $stored = $error;
             });
         $processor = $this->createMock(ProcessorInterface::class);
-        $processor->method('process')->willThrowException(
-            new \InvalidArgumentException('Unable to unserialize value. Error: customer data 4711')
+        $processor->method('process')->willThrowException(new \PDOException(
+            "SQLSTATE[23000]: Duplicate entry 'mari@example.com' for key 'email' (Mari Maasikas)",
+            23000
+        ));
+        $logged = [];
+        $logger = $this->createMock(Logger::class);
+        $logger->method('error')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$logged): void {
+                $logged[] = [$message, $context];
+            }
         );
 
-        $this->createTick($jobManager, false, [$jobType . ':' . $target => $processor])->execute();
+        $this->createTick($jobManager, false, [$jobType . ':' . $target => $processor], null, null, $logger)
+            ->execute();
 
-        self::assertMatchesRegularExpression('/^InvalidArgumentException at BackfillTickTest\.php:\d+$/', $stored);
-        self::assertStringNotContainsString('4711', (string)$stored);
-        self::assertStringNotContainsString('unserialize', (string)$stored);
+        self::assertMatchesRegularExpression('/^PDOException at BackfillTickTest\.php:\d+$/', $stored);
+        self::assertMatchesRegularExpression(
+            '/^PDOException at BackfillTickTest\.php:\d+ \(code 23000\)$/',
+            $logged[0][1]['error'] ?? ''
+        );
+        $kept = (string)$stored . json_encode($logged);
+        self::assertStringNotContainsString('mari@example.com', $kept);
+        self::assertStringNotContainsString('Maasikas', $kept);
+        self::assertStringNotContainsString('Duplicate entry', $kept);
     }
 
     /**
@@ -200,7 +217,8 @@ class BackfillTickTest extends TestCase
         bool $refused,
         array $processors,
         ?HistoryImport $historyImport = null,
-        ?HistoryProgress $historyProgress = null
+        ?HistoryProgress $historyProgress = null,
+        ?Logger $logger = null
     ): BackfillTick {
         $settings = $this->createMock(EngineSettings::class);
         $settings->method('isRefused')->willReturn($refused);
@@ -208,7 +226,7 @@ class BackfillTickTest extends TestCase
         return new BackfillTick(
             $jobManager,
             $settings,
-            $this->createMock(Logger::class),
+            $logger ?? $this->createMock(Logger::class),
             $historyImport ?? $this->createMock(HistoryImport::class),
             $historyProgress ?? $this->createMock(HistoryProgress::class),
             $processors

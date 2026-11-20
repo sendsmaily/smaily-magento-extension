@@ -380,11 +380,12 @@ class JobManager
      * Stop one job the way an admin cancel does, leaving the progress and
      * total it has already recorded untouched — for a worker that finds its
      * own reason to stop at a page boundary (PRO-1764: the contact-sync
-     * switch turned off mid-import).
+     * switch turned off mid-import). $reason is stored as its error_message
+     * (Job::REASON_ENGINE_NOT_ACTIVE).
      */
-    public function cancel(Job $job): void
+    public function cancel(Job $job, ?string $reason = null): void
     {
-        if ($this->finish($job, Job::STATUS_CANCELLED)) {
+        if ($this->finish($job, Job::STATUS_CANCELLED, $reason === null ? [] : ['error_message' => $reason])) {
             $job->setData('status', Job::STATUS_CANCELLED);
         }
     }

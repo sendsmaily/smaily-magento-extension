@@ -353,17 +353,29 @@ below.
   (contract v1.28.0 §25 "Stopped import", CON-367, as the WooCommerce
   plugin's CON-284) gets one final call, at once, with the phase it reached
   (never `complete`), its final counts and `stop_reason`, and none after it
-  (the state's `stop_reason`): its orders job, or — while the start part
-  is not complete — the latest customers job, ended after the import began
-  (`completed_at` ≥ `until`), is cancelled (`cancelled`), failed (`failed`)
-  or stalled (`stalled`: `JobManager::isStalled()`, the card's "Stalled",
-  still so after the check has seen it for `STALLED_SECONDS` — the state's
-  `stalled_since` — so a cron outage that ends is not one). A customers
-  job's stop reports `started`; the call carries no `store_config`. It
-  waits while a row of the stopped job is undelivered, and an import the
-  engine never heard of (no `reported_phase`) is not stopped. The catalog
-  job does not stop the import. Run again on Orders is a new import (a new
-  orders job, a new `import_id`). The Orders card shows one bar
+  (the state's `stop_reason`). The stops are the plugin's: its orders job
+  is cancelled (`cancelled`), failed (`failed`) or stalled (`stalled`:
+  `JobManager::isStalled()`, the card's "Stalled", still so after the
+  check has seen it for `STALLED_SECONDS` — the state's `stalled_since` —
+  so a cron outage that ends is not one; the plugin's own test needs
+  Action Scheduler); or, while the orders job is still queued, the latest
+  catalog or customers job was cancelled after the import began
+  (`completed_at` ≥ `until`; `cancelled`, phase `started`) — where the
+  plugin's sequence ends (there the orders import then never starts; here
+  the queued orders job still runs, its rows still reach the engine, and
+  the import stays reported as stopped). A failed or stalled catalog or
+  customers job is
+  no stop (the plugin's sequence moves on), and once the orders job runs
+  only it counts. The plugin pauses an import while the account is
+  refused and reports no stop for it; `Cron/BackfillTick` (and
+  `EngineJobConnection`) stop the job instead, with
+  `Job::REASON_ENGINE_NOT_ACTIVE`, so an import ended that way is closed
+  with no call (state `stop_reason` `not_active`, never sent). The call
+  carries no `store_config`. It waits while a row of the stopped job is
+  undelivered, and an import the engine never heard of (no
+  `reported_phase`) is not stopped. Only Run again on Orders is a new
+  import (a new orders job, a new `import_id`), as in the plugin. The
+  Orders card shows one bar
   for the running part (`BackfillState` `history`): the start part's
   share, then the share of the horizon. A pilot-sized history (80,000
   orders, 12,000 in the start part, 40,000 inside the horizon) has its

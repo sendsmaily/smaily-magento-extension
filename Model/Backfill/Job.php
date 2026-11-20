@@ -50,6 +50,14 @@ class Job extends AbstractModel
     public const REASON_CONTACT_SYNC_INACTIVE = 'Contact sync was not active for this website';
 
     /**
+     * Why a Campaign Intelligence import stopped without the merchant: its
+     * account was refused, or its connection is gone (Cron\BackfillTick,
+     * EngineJobConnection). Kept in error_message; the history import a
+     * stop like this ends reports no stop for it (HistoryProgress, CON-367).
+     */
+    public const REASON_ENGINE_NOT_ACTIVE = 'Campaign Intelligence was not connected or not active';
+
+    /**
      * @inheritDoc
      */
     protected function _construct()

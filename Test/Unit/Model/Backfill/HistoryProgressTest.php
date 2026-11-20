@@ -35,10 +35,11 @@ use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
  * imports' counts, through its own client.
  *
  * CON-367 (contract v1.28.0 §25 "Stopped import"): an import that stops
- * before `complete` — its orders import, or before the start part its
- * customers import, cancelled, failed or stalled — gets one final report
- * with the phase it reached, its final counts and `stop_reason`, and
- * nothing after it.
+ * before `complete` — its orders import cancelled, failed or stalled, or,
+ * while the orders import is still queued, its catalog or customers import
+ * cancelled — gets one final report with the phase it reached, its final
+ * counts and `stop_reason`, and nothing after it, as in the WooCommerce
+ * plugin; one a refusal stopped ends with no report.
  */
 class HistoryProgressTest extends TestCase
 {
@@ -316,63 +317,93 @@ class HistoryProgressTest extends TestCase
     }
 
     /**
-     * Before its start part is in, the import's customers import stopping
-     * stops the import: `started` with its reason. One cancelled before the
-     * import began is not this import's.
+     * As the WooCommerce plugin's sequence ends: while the orders import is
+     * still queued, a catalog or customers import cancelled after the
+     * import began stops it, `started` with `cancelled`. One cancelled
+     * before the import began is not this import's.
+     *
+     * @dataProvider partsBeforeTheOrdersProvider
      */
-    public function testACustomersImportThatStopsBeforeTheStartPartStopsTheImport(): void
+    public function testACancelBeforeTheOrdersImportBeganStopsTheImport(int $id, string $jobType, string $entity): void
     {
         $this->state['reported_phase'] = 'started';
         $this->state['reported_at'] = self::NOW - 60;
-        $this->state['start_part_queued_to'] = 5000;
-        $this->undelivered['9:5000'] = 1;
-        $this->jobs[8] = $this->job(8, Job::TYPE_CUSTOMERS, Job::STATUS_CANCELLED, 500, 120, '2027-01-15 07:59:59');
+        $this->jobs[9] = $this->job(9, Job::TYPE_ORDERS, Job::STATUS_PENDING, 1000, 0);
+        $this->jobs[$id] = $this->job($id, $jobType, Job::STATUS_CANCELLED, 500, 120, '2027-01-15 07:59:59');
         $this->progress()->report();
         self::assertCount(0, $this->calls, 'Cancelled before this import began');
 
-        $this->jobs[8] = $this->job(8, Job::TYPE_CUSTOMERS, Job::STATUS_CANCELLED, 500, 120, '2027-01-15 08:20:00');
-        $this->undelivered['8'] = 1;
+        $this->jobs[$id] = $this->job($id, $jobType, Job::STATUS_CANCELLED, 500, 120, '2027-01-15 08:20:00');
+        $this->undelivered[(string)$id] = 1;
         $this->progress()->report();
-        self::assertCount(0, $this->calls, 'A customer row it queued still waits');
+        self::assertCount(0, $this->calls, 'A row it queued still waits');
 
-        $this->undelivered['8'] = 0;
+        $this->undelivered[(string)$id] = 0;
         $this->progress()->report();
         self::assertSame('started', $this->calls[0]['phase']);
         self::assertSame('cancelled', $this->calls[0]['stop_reason']);
-        self::assertSame(['expected' => 500, 'sent' => 120], $this->calls[0]['entities']['customers']);
-        self::assertFalse($this->state['start_part_done']);
-    }
-
-    public function testACustomersImportThatFailsOrStallsStopsTheImportToo(): void
-    {
-        $this->state['reported_phase'] = 'started';
-        $this->state['reported_at'] = self::NOW - 60;
-        $this->jobs[8] = $this->job(8, Job::TYPE_CUSTOMERS, Job::STATUS_FAILED, 500, 10, '2027-01-15 09:00:00');
-        $this->progress()->report();
-        self::assertSame('failed', $this->calls[0]['stop_reason'] ?? null);
-
-        $this->state['stop_reason'] = null;
-        $this->state['stalled_since'] = self::NOW - 3600;
-        $this->jobs[8] = $this->job(8, Job::TYPE_CUSTOMERS, Job::STATUS_RUNNING, 500, 10);
-        $this->stalled[Job::TYPE_CUSTOMERS] = true;
-        $this->progress()->report();
-        self::assertSame('stalled', $this->calls[1]['stop_reason'] ?? null);
+        self::assertSame(['expected' => 500, 'sent' => 120], $this->calls[0]['entities'][$entity]);
     }
 
     /**
-     * Once the start part is in, the customers import has done its part: a
-     * later customers import stopping leaves the history import running.
+     * @return array<string, array{int, string, string}>
      */
-    public function testACustomersImportAfterTheStartPartDoesNotStopTheImport(): void
+    public static function partsBeforeTheOrdersProvider(): array
     {
-        $this->state['reported_phase'] = 'start_part_complete';
+        return [
+            'catalog' => [7, Job::TYPE_CATALOG, 'catalog'],
+            'customers' => [8, Job::TYPE_CUSTOMERS, 'customers'],
+        ];
+    }
+
+    /**
+     * As in the WooCommerce plugin: a failed or stalled catalog or customers
+     * import does not stop the import (its sequence moves on), and once the
+     * orders import runs, only it counts.
+     */
+    public function testOnlyACancelBeforeTheOrdersImportBeganStopsTheImport(): void
+    {
+        $this->state['reported_phase'] = 'started';
+        $this->state['reported_at'] = self::NOW - 60;
+        $this->jobs[9] = $this->job(9, Job::TYPE_ORDERS, Job::STATUS_PENDING, 1000, 0);
+        $this->jobs[7] = $this->job(7, Job::TYPE_CATALOG, Job::STATUS_FAILED, 300, 10, '2027-01-15 09:00:00');
+        $this->jobs[8] = $this->job(8, Job::TYPE_CUSTOMERS, Job::STATUS_RUNNING, 500, 10);
+        $this->stalled[Job::TYPE_CUSTOMERS] = true;
+        $this->state['stalled_since'] = self::NOW - 3600;
+        $this->progress()->report();
+        self::assertCount(0, $this->calls, 'A failed catalog or a stalled customers import is no stop');
+
         $this->state['reported_at'] = self::NOW - 300;
-        $this->state['start_part_done'] = true;
+        $this->jobs[9] = $this->job(9, Job::TYPE_ORDERS, Job::STATUS_RUNNING, 1000, 40);
         $this->jobs[8] = $this->job(8, Job::TYPE_CUSTOMERS, Job::STATUS_CANCELLED, 500, 10, '2027-01-15 09:00:00');
         $this->progress()->report();
+        self::assertCount(1, $this->calls);
+        self::assertArrayNotHasKey('stop_reason', $this->calls[0], 'The orders import runs');
+    }
 
-        self::assertSame('start_part_complete', $this->calls[0]['phase']);
-        self::assertArrayNotHasKey('stop_reason', $this->calls[0]);
+    /**
+     * An import a refusal stopped (the account is not active) ends with no
+     * report: the WooCommerce plugin reports no stop for it either.
+     */
+    public function testAnImportARefusalStoppedEndsWithoutAReport(): void
+    {
+        $this->state['reported_phase'] = 'started';
+        $this->state['reported_at'] = self::NOW - 600;
+        $this->jobs[9] = $this->job(
+            9,
+            Job::TYPE_ORDERS,
+            Job::STATUS_CANCELLED,
+            1000,
+            50,
+            '2027-01-15 09:00:00',
+            Job::REASON_ENGINE_NOT_ACTIVE
+        );
+        $this->progress()->report();
+        self::assertCount(0, $this->calls);
+        self::assertSame('not_active', $this->state['stop_reason']);
+
+        $this->progress()->report();
+        self::assertCount(0, $this->calls, 'Ended');
     }
 
     /**
@@ -426,11 +457,7 @@ class HistoryProgressTest extends TestCase
 
         self::assertSame([2], $this->callKeys);
         self::assertSame('started', $this->calls[0]['phase']);
-        self::assertSame(
-            [2, 2, 2],
-            $this->latestFor,
-            'Its own customers import (whether it stopped), catalog and customers imports'
-        );
+        self::assertSame([2, 2], $this->latestFor, 'Its own catalog and customers imports');
     }
 
     private function progress(
@@ -521,7 +548,8 @@ class HistoryProgressTest extends TestCase
         string $status,
         int $total,
         int $sent,
-        ?string $completedAt = null
+        ?string $completedAt = null,
+        ?string $errorMessage = null
     ): Job&MockObject {
         $job = $this->createMock(Job::class);
         $job->method('getId')->willReturn($id);
@@ -531,6 +559,7 @@ class HistoryProgressTest extends TestCase
             static fn (string $key = '') => match ($key) {
                 'total_count' => $total,
                 'completed_at' => $completedAt,
+                'error_message' => $errorMessage,
                 default => null,
             }
         );

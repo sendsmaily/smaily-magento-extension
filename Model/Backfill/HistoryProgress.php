@@ -37,18 +37,27 @@ use Smaily\Connect\Model\Logger\Logger;
  * A stopped import (contract v1.28.0 §25 "Stopped import", CON-367, as the
  * WooCommerce plugin's CON-284) gets ONE final report, at once, with the
  * phase it reached (never `complete`), its final counts and `stop_reason`,
- * and nothing after it: its orders import, or — before the start part is
- * complete — its customers import (the latest, ended after the import
- * began), was cancelled (`cancelled`), failed (`failed`) or stalled
- * (`stalled`: JobManager::isStalled(), the import card's "Stalled", still
- * so after the progress check has seen it for JobManager::STALLED_SECONDS,
- * so that a cron outage that ends is not mistaken for one). A customers
- * import's stop reports `started`. The report waits while a row the
- * stopped import queued is still undelivered, so its counts are final, and
- * an import the engine has heard nothing of is not reported. Run again on
- * the Orders card starts a new import, with a new `import_id`
- * (HistoryImport::begin()). The catalog import does not stop the history
- * import.
+ * and nothing after it:
+ *   - its orders import was cancelled (`cancelled`), failed (`failed`) or
+ *     stalled (`stalled`: JobManager::isStalled(), the import card's
+ *     "Stalled", still so after the progress check has seen it for
+ *     JobManager::STALLED_SECONDS — the WooCommerce plugin's test needs
+ *     Action Scheduler, and the wait keeps a cron outage that ends from
+ *     counting as one);
+ *   - before its orders import began (still queued), its catalog or
+ *     customers import was cancelled after the import began
+ *     (`cancelled`, phase `started`) — where the WooCommerce plugin's
+ *     sequence ends. Once the orders import runs, only it counts; a failed
+ *     or stalled catalog or customers import never stops the import (the
+ *     plugin's sequence moves on).
+ * A part stopped because the account was refused or the connection is gone
+ * (Job::REASON_ENGINE_NOT_ACTIVE) ends the import with no report: the
+ * WooCommerce plugin pauses such an import and reports no stop, but
+ * Cron\BackfillTick stops the job, so this one cannot resume. The report
+ * waits while a row the stopped import queued is still undelivered, so its
+ * counts are final, and an import the engine has heard nothing of is not
+ * reported. Only Run again on the Orders card starts a new import, with a
+ * new `import_id` (HistoryImport::begin()), as in the plugin.
  *
  * Each Campaign Intelligence connection's history import is reported on
  * its own (CON-237): its state, its imports (the jobs whose website_id is
@@ -67,6 +76,9 @@ class HistoryProgress
     public const STOP_CANCELLED = 'cancelled';
     public const STOP_FAILED = 'failed';
     public const STOP_STALLED = 'stalled';
+
+    /** Kept in the state for an import a refusal ended; never sent (not a §25 value). */
+    public const STOP_NOT_ACTIVE = 'not_active';
 
     public function __construct(
         private readonly HistoryImport $historyImport,
@@ -168,6 +180,12 @@ class HistoryProgress
         } elseif ($stalledSince !== 0) {
             $state = $this->historyImport->update($connection, ['stalled_since' => 0]);
         }
+        // Stopped because the account was refused: it ends with no report.
+        if ($stop !== null && $stop['reason'] === self::STOP_NOT_ACTIVE) {
+            $this->historyImport->update($connection, ['stop_reason' => self::STOP_NOT_ACTIVE]);
+
+            return;
+        }
         // The engine has heard nothing of a stopped import: there is
         // nothing to stop. Its final counts wait for its queued rows.
         if ($stop !== null && ($state['reported_phase'] === null
@@ -176,7 +194,7 @@ class HistoryProgress
             return;
         }
 
-        $phase = $stop !== null && $stop['job']->getJobType() === Job::TYPE_CUSTOMERS
+        $phase = $stop !== null && $stop['job']->getJobType() !== Job::TYPE_ORDERS
             ? self::PHASE_STARTED
             : $this->phase($state, $ordersJob, $connection);
         if ($phase !== self::PHASE_STARTED && !$state['start_part_done']) {
@@ -222,9 +240,9 @@ class HistoryProgress
     /**
      * Why the history import stopped before `complete`, with the job of the
      * part that stopped; null while it goes on. Its orders import, then —
-     * until the start part is complete — the latest customers import, when
-     * that one ended after the import began (an earlier one is not this
-     * import's).
+     * while that one is still queued — the latest catalog or customers
+     * import, when it was cancelled after the import began (an earlier one
+     * is not this import's).
      *
      * @param array<string, mixed> $state HistoryImport::state()
      * @return array{reason: string, job: Job}|null
@@ -235,29 +253,35 @@ class HistoryProgress
         if ($reason !== null) {
             return ['reason' => $reason, 'job' => $ordersJob];
         }
-        if ($state['start_part_done']) {
+        if ($ordersJob->getStatus() !== Job::STATUS_PENDING) {
             return null;
         }
-        $customersJob = $this->jobManager->latest(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, $connection->key());
-        if ($customersJob === null) {
-            return null;
-        }
-        $reason = $this->stopReason($customersJob, $connection);
-        if ($reason === null || ($reason !== self::STOP_STALLED
-            && (string)$customersJob->getData('completed_at') < (string)$state['until'])
-        ) {
-            return null;
+        foreach ([Job::TYPE_CATALOG, Job::TYPE_CUSTOMERS] as $jobType) {
+            $job = $this->jobManager->latest($jobType, Job::TARGET_ENGINE, $connection->key());
+            if ($job !== null && $job->getStatus() === Job::STATUS_CANCELLED
+                && (string)$job->getData('completed_at') >= (string)$state['until']
+            ) {
+                return [
+                    'reason' => $this->notActive($job) ? self::STOP_NOT_ACTIVE : self::STOP_CANCELLED,
+                    'job' => $job,
+                ];
+            }
         }
 
-        return ['reason' => $reason, 'job' => $customersJob];
+        return null;
     }
 
     /**
-     * The §25 `stop_reason` of one import job: cancelled, failed, or queued
-     * or running but stalled (JobManager::isStalled()); null otherwise.
+     * The §25 `stop_reason` of the orders import: cancelled, failed, or
+     * queued or running but stalled (JobManager::isStalled());
+     * STOP_NOT_ACTIVE when a refusal stopped it; null otherwise.
      */
     private function stopReason(Job $job, Connection $connection): ?string
     {
+        if ($this->notActive($job)) {
+            return self::STOP_NOT_ACTIVE;
+        }
+
         return match ($job->getStatus()) {
             Job::STATUS_CANCELLED => self::STOP_CANCELLED,
             Job::STATUS_FAILED => self::STOP_FAILED,
@@ -268,6 +292,12 @@ class HistoryProgress
             ) ? self::STOP_STALLED : null,
             default => null,
         };
+    }
+
+    /** Whether the job stopped because its account was refused or its connection is gone. */
+    private function notActive(Job $job): bool
+    {
+        return $job->getData('error_message') === Job::REASON_ENGINE_NOT_ACTIVE;
     }
 
     /**

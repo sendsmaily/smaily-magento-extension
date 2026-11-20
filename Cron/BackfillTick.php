@@ -114,14 +114,16 @@ class BackfillTick
      * mid-import is stopped at this page boundary like an admin cancel,
      * keeping the total and the progress it really achieved — the same
      * treatment the contacts import gets when its switch goes off (PRO-1764).
+     * Either way the job keeps Job::REASON_ENGINE_NOT_ACTIVE, so the history
+     * import it ends reports no stop (CON-367).
      */
     private function stopEngineJob(Job $job, string $key): void
     {
         if ($job->getData('total_count') === null) {
             $job->setData('total_count', 0);
-            $this->jobManager->complete($job);
+            $this->jobManager->complete($job, Job::REASON_ENGINE_NOT_ACTIVE);
         } else {
-            $this->jobManager->cancel($job);
+            $this->jobManager->cancel($job, Job::REASON_ENGINE_NOT_ACTIVE);
         }
 
         $this->logger->info('Backfill job stopped: the Campaign Intelligence account is not active', [

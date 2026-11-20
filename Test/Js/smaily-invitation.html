@@ -21,10 +21,13 @@
   assistive technology, Welcome email and Abandoned cart reminder, each
   "Automated"), with no Dismiss; "Connect your Smaily account" goes to the
   Subdomain field, opening a finished setup's form first; the panels'
-  boot with Campaign Intelligence connected leaves it alone. On the
+  boot with Campaign Intelligence connected leaves it alone. On Settings it
+  sits on top of the Connection tab, without Dismiss, and its "Connect your
+  Smaily account" goes to the Subdomain field. On the
   Dashboard it carries "Connect your Smaily account" to Settings >
   Connection and Dismiss to the dismiss link with the form key. No banner
-  once a Smaily account is connected, nor on the Dashboard once dismissed.
+  once a Smaily account is connected (setup, Settings, Dashboard), nor on
+  the Dashboard once dismissed.
 
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
@@ -45,6 +48,10 @@
     <script src="build/invite-dashboard-dismissed.et_EE.js"></script>
     <script src="build/invite-dashboard-connected.en_US.js"></script>
     <script src="build/invite-dashboard-connected.et_EE.js"></script>
+    <script src="build/invite-settings.en_US.js"></script>
+    <script src="build/invite-settings.et_EE.js"></script>
+    <script src="build/invite-settings-connected.en_US.js"></script>
+    <script src="build/invite-settings-connected.et_EE.js"></script>
 </head>
 <body>
 <pre id="log"></pre>
@@ -211,6 +218,34 @@
         frame.remove();
     }
 
+    async function settings(locale) {
+        var page = 'invite-settings.' + locale,
+            strings = window.smailyAdminPages[page].strings,
+            frame = await open(page),
+            doc = frame.contentDocument,
+            element = banner(doc),
+            tab = doc.querySelector('.smaily-tab-panel[data-tab="connection"]'),
+            connect = element && action(element, 'connect');
+
+        check(locale + ', Settings: the banner sits on top of the Connection tab, above its heading',
+            shown(element) && element.parentElement === tab
+            && tab.firstElementChild === element && tab.querySelector('h3') === element.nextElementSibling);
+        common(locale, 'Settings', element, strings);
+        check(locale + ', Settings: no Dismiss', !element.querySelector('.smaily-ci-banner__dismiss'));
+        check(locale + ', Settings: "Connect your Smaily account" is a button',
+            connect.tagName === 'BUTTON' && text(connect) === strings['Connect your Smaily account']);
+        connect.click();
+        check(locale + ', Settings: "Connect your Smaily account" goes to the Subdomain field',
+            doc.activeElement === doc.getElementById('smaily-w-subdomain'));
+        frame.remove();
+
+        frame = await open('invite-settings-connected.' + locale);
+        check(locale + ', Settings: no banner once a Smaily account is connected',
+            !banner(frame.contentDocument)
+            && shown(frame.contentDocument.querySelector('.smaily-tab-panel[data-tab="connection"] h3')));
+        frame.remove();
+    }
+
     async function dashboard(locale) {
         var page = 'invite-dashboard.' + locale,
             strings = window.smailyAdminPages[page].strings,
@@ -244,6 +279,7 @@
             for (var locale of ['en_US', 'et_EE']) {
                 log('# ' + locale);
                 await setup(locale);
+                await settings(locale);
                 await dashboard(locale);
             }
         } catch (error) {

@@ -2381,6 +2381,15 @@ foreach ([
         'strings' => $invitationStrings,
     ];
 }
+// invite-settings(-connected): on top of the Settings > Connection tab (no
+// Dismiss), and none once a Smaily account is connected.
+foreach (['invite-settings' => true, 'invite-settings-connected' => false] as $page => $due) {
+    $pages[$page] = [
+        'data' => ['context' => 'settings', 'children' => $pages['settings-website']['data']['children']
+            + ['invitation.banner' => [$invitationTemplate, $invitationViewModel($due), []]]],
+        'strings' => $invitationStrings,
+    ] + $pages['settings-website'];
+}
 
 $render = static function (string $template, object $block, Escaper $escaper): string {
     ob_start();

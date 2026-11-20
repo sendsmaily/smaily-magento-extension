@@ -20,8 +20,9 @@ use Smaily\Connect\Model\UserGuide;
 /**
  * The invitation to a store with no Smaily account (CON-364, as the
  * WooCommerce plugin's CON-321 / CON-351): the banner
- * (panel/smaily-invitation-banner.phtml) on setup step 1 and the Dashboard,
- * and the admin system message on every page (Adminhtml\SmailyInvitationNotice).
+ * (panel/smaily-invitation-banner.phtml) on setup step 1, Settings >
+ * Connection and the Dashboard, and the admin system message on every page
+ * (Adminhtml\SmailyInvitationNotice).
  *
  * Due while no Smaily marketing account is connected — the installation
  * report's rule, ReportBuilder::mainCredentials(), so a Transactional
@@ -30,7 +31,7 @@ use Smaily\Connect\Model\UserGuide;
  * Dashboard banner and the system message share one Dismiss
  * (Controller\Adminhtml\Invitation\Dismiss), kept as a time at the default
  * scope: it hides both for DISMISS_SECONDS for every admin. The banner on
- * setup step 1 cannot be dismissed.
+ * setup step 1 and Settings > Connection cannot be dismissed.
  */
 class SmailyInvitationData implements ArgumentInterface
 {
@@ -78,7 +79,7 @@ class SmailyInvitationData implements ArgumentInterface
         return self::SIGNUP_URL;
     }
 
-    /** "Connect your Smaily account" away from setup step 1: Settings > Connection (the setup until it is finished). */
+    /** "Connect your Smaily account" on the Dashboard: Settings > Connection (the setup until it is finished). */
     public function getConnectUrl(): string
     {
         return $this->urlBuilder->getUrl('smaily_connect/settings', ['_query' => ['tab' => 'connection']]);

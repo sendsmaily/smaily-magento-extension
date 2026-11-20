@@ -188,7 +188,9 @@
                 primaryRule = rules.filter(function (rule) {
                     return rule.selectorText === '.smaily-ui .action-primary';
                 })[0],
-                unscoped;
+                unscoped,
+                muted,
+                errorStatus;
 
             check('the token sheet holds the palette', Object.keys(PALETTE).every(function (name) {
                 return root.getPropertyValue(name).trim() === PALETTE[name];
@@ -233,6 +235,21 @@
                 doc.activeElement === native && style(native).backgroundColor === 'rgb(186, 64, 0)'
                 && style(native).boxShadow.indexOf('rgb(0, 123, 219)') !== -1);
 
+            // CON-365: a long error after Save Automations wraps within the
+            // tab footer instead of widening the page.
+            doc.querySelector('.smaily-tab-panel[data-tab="connection"]').style.display = 'none';
+            doc.querySelector('.smaily-tab-panel[data-tab="automations"]').style.display = 'block';
+            errorStatus = doc.getElementById('smaily-w-automations-result');
+            errorStatus.className = 'smaily-result smaily-inline-status err is-error';
+            errorStatus.innerHTML = '<span class="smaily-inline-status__error">!</span><span>Could not load the workflow'
+                + ' list: Smaily API request failed: cURL error 7: Failed to connect to example.sendsmaily.net port 443'
+                + ' after 0 ms: Could not connect to server (see https://curl.se/libcurl/c/libcurl-errors.html)'
+                + ' for https://example.sendsmaily.net/api/autoresponder.php?page=1&limit=100</span>';
+            check('a long error wraps within the tab footer',
+                errorStatus.getBoundingClientRect().right <= errorStatus.parentNode.getBoundingClientRect().right + 0.5
+                && errorStatus.getBoundingClientRect().height > 30
+                && doc.documentElement.scrollWidth <= doc.defaultView.innerWidth);
+
             aa('white on the primary button', WHITE, PRIMARY);
             aa('white on the focused primary button', WHITE, PRIMARY_HOVER);
             aa('brand text links on white', BRAND_TEXT, WHITE);
@@ -241,6 +258,15 @@
             aa('primary step number on white', PRIMARY, WHITE);
             aa('card title on the selected tint', 'rgb(48, 48, 48)', SELECTED);
             aa('card description on the selected tint', 'rgb(90, 90, 90)', SELECTED);
+
+            // CON-365: the lightest text (notes, captions) on white, the grey
+            // canvas and the selected tint, where a note can sit.
+            muted = doc.createElement('span');
+            muted.style.color = 'var(--s-text-3)';
+            doc.body.appendChild(muted);
+            aa('the lightest text on white', style(muted).color, WHITE);
+            aa('the lightest text on the grey canvas', style(muted).color, 'rgb(244, 244, 244)');
+            aa('the lightest text on the selected tint', style(muted).color, SELECTED);
         }).then(function () {
             return open('ci-banner-dashboard.en_US');
         }).then(function (doc) {
@@ -248,7 +274,9 @@
                 cta = banner.querySelector('.smaily-ci-banner__cta:not([hidden])'),
                 title = banner.querySelector('.smaily-ci-banner__title'),
                 accent = banner.querySelector('.smaily-ci-banner__accent'),
-                note = banner.querySelector('.smaily-ci-banner__note');
+                note = banner.querySelector('.smaily-ci-banner__note'),
+                heading = banner.querySelector('.smaily-ci-banner__panel-heading'),
+                chip = banner.querySelector('.smaily-ci-banner__chip');
 
             check('banner: the card in the selected tint with its border',
                 style(banner).backgroundImage.indexOf(SELECTED) !== -1
@@ -263,6 +291,11 @@
             aa('white on the plum "Requires a paid Smaily plan" pill', WHITE, PLUM);
             aa('the note\'s link in brand text on the selected tint', BRAND_TEXT, SELECTED);
             aa('the note on the selected tint', style(note).color, SELECTED);
+            // CON-365: the illustration's heading on its white panel over the
+            // selected tint, and the chip text on the chip.
+            aa('the panel heading on white', style(heading).color, WHITE);
+            aa('the panel heading on the selected tint', style(heading).color, SELECTED);
+            aa('the chip text on the chip', style(chip).color, style(chip).backgroundColor);
         }).then(function () {
             return open('invite-dashboard.en_US');
         }).then(function (doc) {

@@ -2300,6 +2300,10 @@ $bannerStrings = [
     'Engine in action',
     'Campaign Intelligence',
     'Show recommendations in your store',
+    'For product pages, the cart or the order success page, add a widget instance under Content > Elements > Widgets'
+        . ' with Smaily recommendations as the Type. For a page or a block, press Insert Widget... in the content editor'
+        . ' and pick Smaily recommendations (in Page Builder, in a Text element or an HTML Code element). Shoppers who'
+        . ' accept marketing cookies see the products Smaily recommends to them.',
     'How to add it →',
     'Connected: %1 (engine %2)',
     'The catalog import has started',

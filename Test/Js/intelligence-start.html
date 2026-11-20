@@ -334,6 +334,16 @@
             && shown(doc.getElementById('smaily-w-recs-hint'))
             && doc.querySelector('#smaily-w-recs-hint a').getAttribute('href')
                 === 'https://smaily.com/connect-magento/#set-storefront-recs');
+        // CON-365: the card names both ways to place the widget.
+        var recsNote = doc.querySelector('#smaily-w-recs-hint .note').firstChild.textContent.trim();
+        check(locale + ', the recommendations card names a widget instance and the widget in a page or a block',
+            recsNote === strings['For product pages, the cart or the order success page, add a widget instance under'
+                + ' Content > Elements > Widgets with Smaily recommendations as the Type. For a page or a block, press'
+                + ' Insert Widget... in the content editor and pick Smaily recommendations (in Page Builder, in a Text'
+                + ' element or an HTML Code element). Shoppers who accept marketing cookies see the products Smaily'
+                + ' recommends to them.']
+            && ['Content > Elements > Widgets', 'Insert Widget...', 'Text', 'HTML Code']
+                .every(function (label) { return recsNote.indexOf(label) !== -1; }));
         frame.remove();
 
         // Escape before `created`: nothing is created, the button is back.

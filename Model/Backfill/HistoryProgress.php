@@ -32,8 +32,23 @@ use Smaily\Connect\Model\Logger\Logger;
  * is reported at once, and while the import runs, the counts at most every
  * REPORT_EVERY_SECONDS. A call that fails is logged and tried again after
  * REPORT_EVERY_SECONDS; it never stops or fails the import. Nothing is
- * reported once `complete` is in, nor for an orders import that was
- * cancelled or stopped.
+ * reported once `complete` is in.
+ *
+ * A stopped import (contract v1.28.0 §25 "Stopped import", CON-367, as the
+ * WooCommerce plugin's CON-284) gets ONE final report, at once, with the
+ * phase it reached (never `complete`), its final counts and `stop_reason`,
+ * and nothing after it: its orders import, or — before the start part is
+ * complete — its customers import (the latest, ended after the import
+ * began), was cancelled (`cancelled`), failed (`failed`) or stalled
+ * (`stalled`: JobManager::isStalled(), the import card's "Stalled", still
+ * so after the progress check has seen it for JobManager::STALLED_SECONDS,
+ * so that a cron outage that ends is not mistaken for one). A customers
+ * import's stop reports `started`. The report waits while a row the
+ * stopped import queued is still undelivered, so its counts are final, and
+ * an import the engine has heard nothing of is not reported. Run again on
+ * the Orders card starts a new import, with a new `import_id`
+ * (HistoryImport::begin()). The catalog import does not stop the history
+ * import.
  *
  * Each Campaign Intelligence connection's history import is reported on
  * its own (CON-237): its state, its imports (the jobs whose website_id is
@@ -47,6 +62,11 @@ class HistoryProgress
 
     /** At most this often while the import runs (§25 "When to call"), and after a failed call. */
     public const REPORT_EVERY_SECONDS = 300;
+
+    /** §25 `stop_reason` values (v1.28.0). */
+    public const STOP_CANCELLED = 'cancelled';
+    public const STOP_FAILED = 'failed';
+    public const STOP_STALLED = 'stalled';
 
     public function __construct(
         private readonly HistoryImport $historyImport,
@@ -125,33 +145,59 @@ class HistoryProgress
     {
         $state = $this->historyImport->state($connection);
         if ($state === null || $state['reported_phase'] === self::PHASE_COMPLETE
+            || ($state['stop_reason'] ?? null) !== null
             || !$connection->settings()->isSendingAllowed()
         ) {
             return;
         }
         $ordersJob = $this->jobManager->get((int)$state['orders_job_id']);
-        if ($ordersJob === null
-            || in_array($ordersJob->getStatus(), [Job::STATUS_CANCELLED, Job::STATUS_FAILED], true)
+        if ($ordersJob === null) {
+            return;
+        }
+
+        $now = (int)$this->dateTime->gmtTimestamp();
+        $stop = $this->stopped($state, $ordersJob, $connection);
+        $stalledSince = (int)($state['stalled_since'] ?? 0);
+        if ($stop !== null && $stop['reason'] === self::STOP_STALLED) {
+            if ($stalledSince === 0) {
+                $state = $this->historyImport->update($connection, ['stalled_since' => $now]);
+            }
+            if ($stalledSince === 0 || $now - $stalledSince < JobManager::STALLED_SECONDS) {
+                $stop = null;
+            }
+        } elseif ($stalledSince !== 0) {
+            $state = $this->historyImport->update($connection, ['stalled_since' => 0]);
+        }
+        // The engine has heard nothing of a stopped import: there is
+        // nothing to stop. Its final counts wait for its queued rows.
+        if ($stop !== null && ($state['reported_phase'] === null
+            || $this->ingestQueue->countUndelivered([(int)$stop['job']->getId()]) > 0)
         ) {
             return;
         }
 
-        $phase = $this->phase($state, $ordersJob, $connection);
+        $phase = $stop !== null && $stop['job']->getJobType() === Job::TYPE_CUSTOMERS
+            ? self::PHASE_STARTED
+            : $this->phase($state, $ordersJob, $connection);
         if ($phase !== self::PHASE_STARTED && !$state['start_part_done']) {
             $state = $this->historyImport->update($connection, ['start_part_done' => true]);
         }
 
-        $now = (int)$this->dateTime->gmtTimestamp();
         if ($now - (int)$state['failed_at'] < self::REPORT_EVERY_SECONDS
-            || ($phase === $state['reported_phase'] && $now - (int)$state['reported_at'] < self::REPORT_EVERY_SECONDS)
+            || ($stop === null && $phase === $state['reported_phase']
+                && $now - (int)$state['reported_at'] < self::REPORT_EVERY_SECONDS)
         ) {
             return;
         }
 
+        $body = $this->body($state, $ordersJob, $phase, $connection);
+        if ($stop !== null) {
+            // The final report: the phase reached, the counts and why (§25 "Stopped import").
+            unset($body['store_config']);
+            $body['stop_reason'] = $stop['reason'];
+        }
         try {
-            $this->connections->client($connection)->historyProgress(
-                $this->body($state, $ordersJob, $phase, $connection)
-            );
+            $this->connections->client($connection)->historyProgress($body);
         } catch (\Throwable $exception) {
             $this->historyImport->update($connection, ['failed_at' => $now]);
             $this->logger->info('Campaign Intelligence history progress report failed', [
@@ -164,8 +210,64 @@ class HistoryProgress
         }
         $this->historyImport->update(
             $connection,
-            ['reported_phase' => $phase, 'reported_at' => $now, 'failed_at' => 0]
+            [
+                'reported_phase' => $phase,
+                'reported_at' => $now,
+                'failed_at' => 0,
+                'stop_reason' => $stop['reason'] ?? null,
+            ]
         );
+    }
+
+    /**
+     * Why the history import stopped before `complete`, with the job of the
+     * part that stopped; null while it goes on. Its orders import, then —
+     * until the start part is complete — the latest customers import, when
+     * that one ended after the import began (an earlier one is not this
+     * import's).
+     *
+     * @param array<string, mixed> $state HistoryImport::state()
+     * @return array{reason: string, job: Job}|null
+     */
+    private function stopped(array $state, Job $ordersJob, Connection $connection): ?array
+    {
+        $reason = $this->stopReason($ordersJob, $connection);
+        if ($reason !== null) {
+            return ['reason' => $reason, 'job' => $ordersJob];
+        }
+        if ($state['start_part_done']) {
+            return null;
+        }
+        $customersJob = $this->jobManager->latest(Job::TYPE_CUSTOMERS, Job::TARGET_ENGINE, $connection->key());
+        if ($customersJob === null) {
+            return null;
+        }
+        $reason = $this->stopReason($customersJob, $connection);
+        if ($reason === null || ($reason !== self::STOP_STALLED
+            && (string)$customersJob->getData('completed_at') < (string)$state['until'])
+        ) {
+            return null;
+        }
+
+        return ['reason' => $reason, 'job' => $customersJob];
+    }
+
+    /**
+     * The §25 `stop_reason` of one import job: cancelled, failed, or queued
+     * or running but stalled (JobManager::isStalled()); null otherwise.
+     */
+    private function stopReason(Job $job, Connection $connection): ?string
+    {
+        return match ($job->getStatus()) {
+            Job::STATUS_CANCELLED => self::STOP_CANCELLED,
+            Job::STATUS_FAILED => self::STOP_FAILED,
+            Job::STATUS_PENDING, Job::STATUS_RUNNING => $this->jobManager->isStalled(
+                $job->getJobType(),
+                Job::TARGET_ENGINE,
+                $connection->key()
+            ) ? self::STOP_STALLED : null,
+            default => null,
+        };
     }
 
     /**

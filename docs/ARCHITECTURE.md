@@ -349,7 +349,21 @@ below.
   delivered and neither job is queued or running; `complete` once the
   orders job has completed and its rows are delivered; and the counts at
   most every 5 minutes in between. A failed call is logged and tried again
-  5 minutes later, never failing the import. The Orders card shows one bar
+  5 minutes later, never failing the import. **A stopped import**
+  (contract v1.28.0 §25 "Stopped import", CON-367, as the WooCommerce
+  plugin's CON-284) gets one final call, at once, with the phase it reached
+  (never `complete`), its final counts and `stop_reason`, and none after it
+  (the state's `stop_reason`): its orders job, or — while the start part
+  is not complete — the latest customers job, ended after the import began
+  (`completed_at` ≥ `until`), is cancelled (`cancelled`), failed (`failed`)
+  or stalled (`stalled`: `JobManager::isStalled()`, the card's "Stalled",
+  still so after the check has seen it for `STALLED_SECONDS` — the state's
+  `stalled_since` — so a cron outage that ends is not one). A customers
+  job's stop reports `started`; the call carries no `store_config`. It
+  waits while a row of the stopped job is undelivered, and an import the
+  engine never heard of (no `reported_phase`) is not stopped. The catalog
+  job does not stop the import. Run again on Orders is a new import (a new
+  orders job, a new `import_id`). The Orders card shows one bar
   for the running part (`BackfillState` `history`): the start part's
   share, then the share of the horizon. A pilot-sized history (80,000
   orders, 12,000 in the start part, 40,000 inside the horizon) has its

@@ -269,8 +269,9 @@ class SmailyClientTest extends TestCase
 
     /**
      * CON-357: an answer's text can name the contact, so an error names the
-     * HTTP status or Smaily's code and never the text, and the recorded reply
-     * keeps a JSON answer's code without its message and no other answer.
+     * HTTP status or Smaily's code and never the text, chains no exception
+     * that quotes it, and the recorded reply keeps a JSON answer's code
+     * without its message and no other answer.
      *
      * @return array<string, array{0: Response, 1: string, 2: mixed}>
      */
@@ -291,6 +292,17 @@ class SmailyClientTest extends TestCase
                 new Response(503, [], 'Mari Maasikas, mari@example.com could not be saved'),
                 'Smaily API request failed with HTTP 503',
                 null,
+            ],
+            'credentials refused' => [
+                new Response(401, [], 'No access for Mari Maasikas, mari@example.com'),
+                'Smaily API credentials were rejected',
+                null,
+            ],
+            'package without API access' => [
+                new Response(403, [], '{"code": 227, "message": "Mari Maasikas, mari@example.com: paid package"}'),
+                'Smaily refused the request because this account\'s package does not include API access.'
+                    . ' Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all.',
+                ['code' => 227],
             ],
             'error envelope' => [
                 new Response(200, [], '{"code": 203, "message": "Invalid data: Mari Maasikas, mari@example.com"}'),
@@ -316,6 +328,7 @@ class SmailyClientTest extends TestCase
         } catch (SmailyClientException $exception) {
             self::assertSame($expected, $exception->getSourceMessage());
             self::assertSame($expected, $exception->getMessage());
+            self::assertNull($exception->getPrevious(), 'Guzzle\'s exception quotes the answer');
         }
         self::assertSame(
             ['http_status' => $response->getStatusCode(), 'body' => $recordedBody],

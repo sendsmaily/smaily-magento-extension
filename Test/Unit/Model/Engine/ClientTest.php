@@ -207,6 +207,7 @@ class ClientTest extends TestCase
             self::fail('Expected EngineRequestException');
         } catch (EngineRequestException $exception) {
             self::assertSame('Engine request failed with HTTP 404: customer_not_found', $exception->getMessage());
+            self::assertNull($exception->getPrevious());
         }
         self::assertSame(
             [
@@ -215,6 +216,25 @@ class ClientTest extends TestCase
             ],
             $client->lastExchange()['response'] ?? null
         );
+    }
+
+    /**
+     * CON-357: an outage that outlasts the retries chains no exception:
+     * Guzzle's quotes the answer, which can name the customer.
+     */
+    public function testAnOutageChainsNoExceptionQuotingTheAnswer(): void
+    {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/ingest/customers');
+        $answer = '{"error":"internal","message":"Mari Maasikas, mari@example.com could not be saved"}';
+        $client = $this->createClient(array_fill(0, 6, new Response(503, [], $answer)));
+
+        try {
+            $client->ingest(Client::DOMAIN_CUSTOMERS, []);
+            self::fail('Expected EngineTransportException');
+        } catch (EngineTransportException $exception) {
+            self::assertSame('Engine request failed with HTTP 503 after retries', $exception->getMessage());
+            self::assertNull($exception->getPrevious());
+        }
     }
 
     /**

@@ -214,6 +214,8 @@ class SmailyClient
         try {
             $response = $this->getHttpClient()->request($method, $uri, $options);
         } catch (BadResponseException $exception) {
+            // Guzzle's message quotes the URL and the start of the answer,
+            // which can name the contact: it is never chained (CON-357).
             $status = $exception->getResponse()->getStatusCode();
             // The answer is read and decoded once, for the exchange and for
             // the package check.
@@ -235,8 +237,7 @@ class SmailyClient
                         'Smaily refused the request because this account\'s package does not include API access.'
                         . ' Upgrade the package in Smaily to connect — until then the credentials cannot be checked at all.'
                     ),
-                    $status,
-                    $exception
+                    $status
                 );
             }
             if (in_array($status, [401, 403], true)) {
@@ -246,7 +247,7 @@ class SmailyClient
                 // Our own sentence, on purpose: it names what to fix. The
                 // answer's code stays in the exchange, for the Details
                 // drawer (PRO-2508).
-                throw new AuthenticationException(__('Smaily API credentials were rejected'), $status, $exception);
+                throw new AuthenticationException(__('Smaily API credentials were rejected'), $status);
             }
             // The status only, never Smaily's answer: its text can name the
             // contact (CON-357). The exchange keeps the answer's code.
@@ -255,12 +256,12 @@ class SmailyClient
             // other than 429 refuses this request, retrying cannot change
             // it (PRO-1961); a 429 or a 5xx may pass later.
             if ($status !== 429 && $status < 500) {
-                throw new RequestRefusedException($message, $status, $exception);
+                throw new RequestRefusedException($message, $status);
             }
             throw new TransportException(
                 $message,
                 $status,
-                $exception,
+                null,
                 $this->retryAfterSeconds($exception->getResponse())
             );
         } catch (GuzzleException $exception) {

@@ -717,10 +717,11 @@ class Client
 
                 if ($attempt >= count($retryDelays)) {
                     $this->recordHealth($authenticated, $this->errorCode($status, $errorBody), false);
+                    // Guzzle's exception quotes the answer, which can name
+                    // the customer: it is not chained (CON-357).
                     throw new EngineTransportException(
                         (string)__('Engine request failed with HTTP %1 after retries', $status),
-                        $status,
-                        $exception
+                        $status
                     );
                 }
 

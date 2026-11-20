@@ -30,7 +30,7 @@
   --s-border:#e3e3e3;  --s-border-2:#c9c9c9;  --s-border-strong:#adadad;
 
   /* Text */
-  --s-text:#303030;    --s-text-2:#5a5a5a;    --s-text-3:#8a8a8a;
+  --s-text:#303030;    --s-text-2:#5a5a5a;    --s-text-3:#686868;
   --s-link:var(--s-brand-text); --s-link-hover:var(--s-plum);
 
   /* Brand: the Campaign Intelligence palette (CON-376) */
@@ -884,7 +884,7 @@ html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hi
 .smaily-ci-banner__dismiss:hover { color: var(--s-plum); }
 .smaily-ci-banner__panel { flex: 1 1 0; min-width: 0; margin: 8px -28px -28px 0; padding: 20px 0 20px 20px; border: 1px solid var(--s-selected-border); border-right: 0; border-bottom: 0; border-radius: 16px 0 0 0; background: rgba(255, 255, 255, .6); -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent 100%); mask-image: linear-gradient(to bottom, #000 45%, transparent 100%); }
 .smaily-ci-banner__panel-label { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border: 1px solid #e7e1ee; border-radius: 8px; background: #fff; font-size: 13px; font-weight: 500; }
-.smaily-ci-banner .smaily-ci-banner__panel-heading { margin: 20px 0 0; font-size: 14px; color: #8a8494; }
+.smaily-ci-banner .smaily-ci-banner__panel-heading { margin: 20px 0 0; font-size: 14px; color: #6b6577; }
 .smaily-ci-banner__row { display: flex; width: max-content; min-width: 100%; box-sizing: border-box; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 14px; border: 1px solid #ece8f1; border-right: 0; border-radius: 10px 0 0 10px; background: #fff; font-size: 14px; font-weight: 500; white-space: nowrap; }
 .smaily-ci-banner__row--1 { opacity: .6; }
 .smaily-ci-banner__icon { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; }
@@ -900,7 +900,7 @@ html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hi
 .smaily-ci-banner a.smaily-ci-banner__dismiss:hover { color: var(--s-plum); }
 .smaily-ci-banner__icon--mail { background: #fde4ef; color: var(--s-magenta); }
 .smaily-ci-banner__icon--cart { background: #fef3c7; color: #d97706; }
-.smaily-ci-banner__chip { flex: none; padding: 4px 10px; border-radius: 6px; background: #f1eef5; color: #8a8494; font-size: 12px; }
+.smaily-ci-banner__chip { flex: none; padding: 4px 10px; border-radius: 6px; background: #f1eef5; color: #6b6577; font-size: 12px; }
 @media (max-width: 960px) {
     .smaily-ci-banner__panel { display: none; }
 }

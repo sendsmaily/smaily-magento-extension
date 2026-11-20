@@ -229,7 +229,9 @@ reads the primary token, plain and focused, while a native
 rule naming `.action-primary` is scoped to one of our containers; the
 Campaign Intelligence banner and the Smaily invitation use plum, primary,
 brand text and the selected tint; every text colour set from the palette
-meets WCAG AA on its background.
+meets WCAG AA on its background, and so do the lightest text colour (on
+white, the grey canvas and the selected tint) and the banner illustration's
+heading and chips.
 To check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.

@@ -123,6 +123,27 @@ class ReportBuilder
     }
 
     /**
+     * Whether the installation sends with exactly one Smaily marketing
+     * account and no per-language accounts (mode A): only such a shop may
+     * start Campaign Intelligence itself (contract §21 rule 3, CON-363).
+     */
+    public function hasOneSmailyAccount(): bool
+    {
+        $subdomains = [];
+        foreach ($this->accounts() as $account) {
+            if ($account['role'] !== self::ROLE_MARKETING) {
+                continue;
+            }
+            if ($account['language'] !== '') {
+                return false;
+            }
+            $subdomains[$account['credentials']->subdomain] = true;
+        }
+
+        return count($subdomains) === 1;
+    }
+
+    /**
      * The report, or null when there is none to send: no Smaily marketing
      * account is connected, or the installation has no valid address.
      *

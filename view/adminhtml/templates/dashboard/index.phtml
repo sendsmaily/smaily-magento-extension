@@ -114,6 +114,8 @@ $bannersSuppressed = $verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardD
 $showFailures = $failed > 0 && !$bannersSuppressed;
 ?>
 <div id="smaily-dashboard" class="smaily-ui smaily-dashboard">
+    <?php // The Campaign Intelligence banner (CON-363); Dismiss hides it for 30 days. ?>
+    <?= $block->getChildHtml('intelligence.banner.top') ?>
     <?php if ($showFailures): ?>
     <div class="smaily-banner smaily-banner--warning smaily-dashboard-banner" role="status">
         <span class="smaily-banner__icon">&#9888;</span>
@@ -254,3 +256,4 @@ $showFailures = $failed > 0 && !$bannersSuppressed;
         </div>
     </div>
 </div>
+<?= $block->getChildHtml('intelligence.start') ?>

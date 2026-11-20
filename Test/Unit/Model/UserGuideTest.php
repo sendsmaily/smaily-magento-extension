@@ -43,4 +43,13 @@ class UserGuideTest extends TestCase
 
         self::assertStringContainsString('id="' . UserGuide::SECTION_CONSENT_TOOL . '"', $site);
     }
+
+    public function testTheRecommendationsWidgetSectionIsInTheGuideSite(): void
+    {
+        $site = (string)file_get_contents(self::ROOT . '/docs/site/index.html');
+        $panel = (string)file_get_contents(self::ROOT . '/view/adminhtml/templates/panel/intelligence.phtml');
+
+        self::assertStringContainsString('id="' . UserGuide::SECTION_STOREFRONT_RECOMMENDATIONS . '"', $site);
+        self::assertStringContainsString('UserGuide::SECTION_STOREFRONT_RECOMMENDATIONS', $panel);
+    }
 }

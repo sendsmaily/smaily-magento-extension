@@ -827,6 +827,57 @@ html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hi
     .smaily-design-modal__header { flex-wrap: wrap; }
 }
 
+/* The Campaign Intelligence start window (CON-363) in the same modal:
+ * §21 asks for at least 560 x 640 CSS pixels; a smaller window scrolls. */
+.smaily-start-modal .smaily-design-modal__dialog { max-width: 720px; max-height: 760px; }
+.smaily-start-modal .smaily-design-modal__body { overflow: auto; }
+.smaily-start-modal__frame { min-width: 560px; min-height: 640px; }
+
+/* --- Campaign Intelligence banner (CON-363) --------------------------------
+ * Marketing's design (the WooCommerce plugin's PromoBanner, CON-350): a
+ * lilac card with a logo tile, a title, a short pitch, a dark call to
+ * action and, on wide screens, a decorative panel on the right that fades
+ * out. No remote fonts or images. */
+.smaily-ci-banner { position: relative; display: flex; gap: 32px; margin: 0 0 var(--sp-5); padding: 28px; overflow: hidden; border: 1px solid #ebe3f3; border-radius: 16px; background: linear-gradient(100deg, #fcfaff 0%, #f7f1fd 55%, #efe5fb 100%); color: #2a1028; font-family: var(--font); }
+.smaily-ci-banner [hidden], .smaily-ci-banner .smaily-ci-banner__cta[hidden], .smaily-ci-banner--aside { display: none; }
+.smaily-ci-banner__main { flex: 1 1 0; min-width: 0; max-width: 440px; }
+.smaily-ci-banner__head { display: flex; align-items: center; gap: 14px; }
+.smaily-ci-banner__logo { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 10px; background: #2a1028; }
+.smaily-ci-banner .smaily-ci-banner__title { margin: 0; padding: 0; font-size: 22px; font-weight: 600; line-height: 1.2; color: #2a1028; }
+.smaily-ci-banner__accent { color: #8a5cb8; }
+.smaily-ci-banner .smaily-ci-banner__body { margin: 16px 0 0; font-size: 15px; line-height: 1.45; }
+.smaily-ci-banner__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 20px; }
+.smaily-ci-banner .smaily-ci-banner__cta, .smaily-ci-banner .smaily-ci-banner__cta:visited { display: inline-flex; align-items: center; padding: 10px 18px; border: 0; border-radius: 8px; background: linear-gradient(90deg, #2a1028 0%, #5e3b72 100%); color: #fff; font: 600 14px/1.3 var(--font); text-decoration: none; cursor: pointer; }
+.smaily-ci-banner .smaily-ci-banner__cta:hover, .smaily-ci-banner .smaily-ci-banner__cta:focus { color: #fff; background: linear-gradient(90deg, #3a1738 0%, #6e4885 100%); text-decoration: none; }
+.smaily-ci-banner .smaily-ci-banner__cta:focus-visible, .smaily-ci-banner__dismiss:focus-visible { outline: 2px solid #5e3b72; outline-offset: 2px; box-shadow: none; }
+.smaily-ci-banner .smaily-ci-banner__cta:disabled { opacity: .6; cursor: progress; }
+.smaily-ci-banner .smaily-ci-banner__note { margin: 12px 0 0; font-size: 13px; line-height: 1.4; color: #6b6577; }
+.smaily-ci-banner__note a { color: #6b3f8c; font-weight: 500; }
+.smaily-ci-banner__corner { position: absolute; top: 12px; right: 16px; z-index: 1; display: flex; align-items: center; gap: 12px; }
+.smaily-ci-banner__pill { padding: 6px 16px; border-radius: 999px; background: #2a1028; color: #fff; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.smaily-ci-banner__dismiss { padding: 0; border: 0; background: none; color: #6b6577; font: 400 13px/1.3 var(--font); text-decoration: underline; cursor: pointer; }
+.smaily-ci-banner__dismiss:hover { color: #2a1028; }
+.smaily-ci-banner__panel { flex: 1 1 0; min-width: 0; margin: 8px -28px -28px 0; padding: 20px 0 20px 20px; border: 1px solid #ebe3f3; border-right: 0; border-bottom: 0; border-radius: 16px 0 0 0; background: rgba(255, 255, 255, .6); -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent 100%); mask-image: linear-gradient(to bottom, #000 45%, transparent 100%); }
+.smaily-ci-banner__panel-label { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border: 1px solid #e7e1ee; border-radius: 8px; background: #fff; font-size: 13px; font-weight: 500; }
+.smaily-ci-banner .smaily-ci-banner__panel-heading { margin: 20px 0 0; font-size: 14px; color: #8a8494; }
+.smaily-ci-banner__row { display: flex; width: max-content; min-width: 100%; box-sizing: border-box; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 14px; border: 1px solid #ece8f1; border-right: 0; border-radius: 10px 0 0 10px; background: #fff; font-size: 14px; font-weight: 500; white-space: nowrap; }
+.smaily-ci-banner__row--1 { opacity: .6; }
+.smaily-ci-banner__icon { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; }
+.smaily-ci-banner__icon--clock { background: #fde4ef; color: #e91e63; }
+.smaily-ci-banner__icon--undo { background: #fef3c7; color: #d97706; }
+.smaily-ci-banner__row-text { flex: 1 1 auto; }
+.smaily-ci-banner__chip { flex: none; padding: 4px 10px; border-radius: 6px; background: #f1eef5; color: #8a8494; font-size: 12px; }
+@media (max-width: 960px) {
+    .smaily-ci-banner__panel { display: none; }
+}
+@media (max-width: 767px) {
+    .smaily-ci-banner { padding: 44px 20px 20px; }
+}
+
+/* "Show recommendations in your store" on the connected Intelligence tab (CON-363). */
+.smaily-recs-hint { margin: var(--sp-4) 0; }
+.smaily-recs-hint__title { display: block; margin-bottom: var(--sp-1); color: var(--s-text); }
+
 /* --- Log details slide-out: attempt timeline ------------------------------ */
 .smaily-log-details-retry { display: flex; gap: var(--sp-2); align-items: center; background: var(--s-info-soft); border: 1px solid var(--s-info-border); color: var(--s-info); border-radius: var(--r-3); padding: 11px 14px; font-size: var(--fs-13); line-height: 1.45; }
 .smaily-log-details-retry.is-terminal { background: var(--s-neutral-soft); border-color: var(--s-neutral-border); color: var(--s-text-2); }

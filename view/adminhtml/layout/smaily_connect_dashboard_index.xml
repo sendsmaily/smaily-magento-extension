@@ -18,6 +18,21 @@
                 <arguments>
                     <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\DashboardData</argument>
                 </arguments>
+                <block class="Magento\Backend\Block\Template"
+                       name="smaily.intelligence.banner.top" as="intelligence.banner.top"
+                       template="Smaily_Connect::panel/intelligence-banner.phtml">
+                    <arguments>
+                        <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\IntelligenceBannerData</argument>
+                        <argument name="dismissible" xsi:type="boolean">true</argument>
+                    </arguments>
+                </block>
+                <block class="Magento\Backend\Block\Template"
+                       name="smaily.intelligence.start" as="intelligence.start"
+                       template="Smaily_Connect::panel/intelligence-start.phtml">
+                    <arguments>
+                        <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\IntelligenceBannerData</argument>
+                    </arguments>
+                </block>
             </block>
             <block class="Magento\Backend\Block\Template"
                    name="smaily.version"

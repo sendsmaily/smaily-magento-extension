@@ -27,4 +27,7 @@ class UserGuide
 
     /** Section "Connecting your cookie consent tool". */
     public const SECTION_CONSENT_TOOL = 'connecting-your-cookie-consent-tool';
+
+    /** Section "Recommendations on your store's pages" (the Smaily recommendations widget). */
+    public const SECTION_STOREFRONT_RECOMMENDATIONS = 'set-storefront-recs';
 }

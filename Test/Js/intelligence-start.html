@@ -1,0 +1,549 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the Campaign Intelligence banner and "Try
+  Intelligence free" (CON-363, contract §21): the real templates —
+  panel/intelligence-banner.phtml on top of the Settings tabs and as the
+  Intelligence tab's child above the setup link field,
+  panel/intelligence.phtml, panel/panels-js.phtml and
+  panel/intelligence-start.phtml — rendered in en_US and et_EE by
+  Test/Js/render-admin.php into Test/Js/build/, with the admin stylesheet
+  and jQuery from vendor/, one fresh frame per scenario. Stubbed:
+  RequireJS's require(), the requests (fetch) — answered as the
+  OnboardingStatus, OnboardingStart, EngineExchange and DismissBanner
+  endpoints answer — and window.open. The engine is https://engine.invalid.
+
+  Checked: the invitation shows "Contact Smaily" until the server says the
+  start is open, then "Try Intelligence free", with one status request for
+  both banners on the page; Dismiss hides the top banner and tells the
+  server. On an https admin a press asks for a frame and shows the start
+  window in the modal (no referrer), which waits for `ready` from the
+  engine's origin only; a setup message from the engine's origin goes to
+  the setup exchange, and the connection shows when the frame closes (its
+  `closed` message, Escape). No `ready` in 10 seconds, no `display` or a
+  refused frame origin offer "Open in a new window", which opens the window
+  in the press itself and gives it the link. Each refusal shows §21's text
+  for its code, never the engine's words; a 403 turns the banner into the
+  upsell and a 404 brings "Contact Smaily" back. A blocked pop-up asks for
+  no link. The upsell, a shop the start is not offered to and a connected
+  store ask nothing; the Dashboard's banner, with no panels on its page,
+  opens Settings > Intelligence once connected.
+
+  Run it with bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>intelligence start harness</title>
+    <script src="build/ci-start-frame.en_US.js"></script>
+    <script src="build/ci-start-frame.et_EE.js"></script>
+    <script src="build/ci-start-window.en_US.js"></script>
+    <script src="build/ci-start-window.et_EE.js"></script>
+    <script src="build/ci-banner-upsell.en_US.js"></script>
+    <script src="build/ci-banner-upsell.et_EE.js"></script>
+    <script src="build/ci-banner-separate.en_US.js"></script>
+    <script src="build/ci-banner-separate.et_EE.js"></script>
+    <script src="build/ci-banner-none.en_US.js"></script>
+    <script src="build/ci-banner-none.et_EE.js"></script>
+    <script src="build/ci-banner-dashboard.en_US.js"></script>
+    <script src="build/ci-banner-dashboard.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var CSS = '../../view/adminhtml/web/css/smaily-admin.css';
+    var ENGINE = 'https://engine.invalid';
+    var START = ENGINE + '/onboarding/start/f/AQx#t=AQ3f';
+    var FRAME = {status: 200, body: {start_url: START, display: 'frame', engine_origin: ENGINE}};
+    var WINDOW = {status: 200, body: {start_url: START, display: 'window', engine_origin: ENGINE}};
+    var CONNECTED = {
+        connected: true,
+        tenantName: 'Pilot',
+        engineVersion: '1.34.0',
+        catalogImportStarted: true,
+        customersImportStarted: false,
+        ordersImportStarted: false
+    };
+    var ENGINE_WORDS = 'The engine\'s own words';
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    // Runs in the frame before the page. window.events lists, in order,
+    // every window opened ("open") and every request ("status",
+    // "start <display>", "exchange <setup_url>", "dismiss"). A start
+    // answers after 30 ms from window.starts (FRAME when it is empty); a
+    // `network` entry is no answer.
+    function stubs(startOpen, starts) {
+        return [
+            '<link rel="stylesheet" href="' + CSS + '">',
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.events = [];',
+            'window.tabs = [];',
+            'window.blockTabs = false;',
+            'window.startOpen = ' + JSON.stringify(startOpen) + ';',
+            'window.starts = ' + JSON.stringify(starts || []) + ';',
+            'window.exchangeAnswer = ' + JSON.stringify(CONNECTED) + ';',
+            'window.addEventListener("beforeunload", function () { parent.navigated = true; });',
+            'window.open = function () {',
+            '  window.events.push("open");',
+            '  if (window.blockTabs) { return null; }',
+            '  var tab = {location: {href: ""}, closed: false, close: function () { this.closed = true; }};',
+            '  window.tabs.push(tab);',
+            '  return tab;',
+            '};',
+            'function answer(body, status) {',
+            '  return new Response(JSON.stringify(body), {status: status || 200,',
+            '    headers: {"Content-Type": "application/json"}}); }',
+            'window.fetch = function (url, options) {',
+            '  var body = JSON.parse(options.body || "{}");',
+            '  if (url.indexOf("onboardingstatus") !== -1) {',
+            '    window.events.push("status");',
+            '    return Promise.resolve(answer({start_open: window.startOpen}));',
+            '  }',
+            '  if (url.indexOf("onboardingstart") !== -1) {',
+            '    window.events.push("start " + body.display);',
+            '    var next = window.starts.length ? window.starts.shift() : ' + JSON.stringify(FRAME) + ';',
+            '    return new Promise(function (resolve, reject) { setTimeout(function () {',
+            '      if (next.network) { reject(new TypeError("Failed to fetch")); return; }',
+            '      resolve(answer(next.body, next.status));',
+            '    }, 30); });',
+            '  }',
+            '  if (url.indexOf("engineexchange") !== -1) {',
+            '    window.events.push("exchange " + body.setup_url);',
+            '    return Promise.resolve(answer(window.exchangeAnswer));',
+            '  }',
+            '  if (url.indexOf("dismissbanner") !== -1) {',
+            '    window.events.push("dismiss");',
+            '    return Promise.resolve(answer({dismissed: true}));',
+            '  }',
+            '  return Promise.resolve(answer({status: "queued", processed: 0, failed: 0, total: 10, percent: 0,',
+            '    finished_at: "", error: ""}));',
+            '};',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>',
+            '<script>window.require = function (deps, callback) { callback(window.jQuery); };<\/script>'
+        ].join('\n');
+    }
+
+    // Opens a page; one with the panels boots them as the Settings page does.
+    function open(page, startOpen, starts) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.style.width = '1200px';
+            frame.style.height = '900px';
+            frame.onload = function () {
+                wait(100).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs(startOpen, starts)
+                + '</head><body>' + rendered.html
+                + (rendered.html.indexOf('smailyPanelsInit = function') === -1 ? ''
+                    : '<script>window.panels = window.smailyPanelsInit(window.jQuery); window.panels.initAll();<\/script>')
+                + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function shown(element) {
+        return !!element && element.offsetParent !== null;
+    }
+
+    function count(frame, prefix) {
+        return frame.contentWindow.events.filter(function (entry) {
+            return entry.indexOf(prefix) === 0;
+        }).length;
+    }
+
+    function banners(doc) {
+        return {
+            top: doc.querySelector('.smaily-ci-banner--top'),
+            tab: doc.querySelector('.smaily-card .smaily-ci-banner')
+        };
+    }
+
+    function action(banner, name) {
+        return banner.querySelector('[data-action="' + name + '"]');
+    }
+
+    function note(banner) {
+        var element = banner.querySelector('.smaily-ci-banner__note');
+
+        return element.hidden ? '' : element.textContent;
+    }
+
+    function modalOpen(doc) {
+        var modal = doc.getElementById('smaily-start-modal');
+
+        return !!modal && !modal.hidden;
+    }
+
+    function message(frame, origin, data) {
+        frame.contentWindow.dispatchEvent(new frame.contentWindow.MessageEvent('message', {data: data, origin: origin}));
+    }
+
+    function key(doc, name) {
+        doc.dispatchEvent(new doc.defaultView.KeyboardEvent('keydown', {key: name, bubbles: true}));
+    }
+
+    // The banner on the Intelligence tab, pressed; the answer has arrived.
+    async function press(frame) {
+        action(banners(frame.contentDocument).tab, 'start').click();
+        await wait(80);
+    }
+
+    async function invitation(locale) {
+        var page = 'ci-start-frame.' + locale,
+            strings = window.smailyAdminPages[page].strings,
+            frame = await open(page, false),
+            doc = frame.contentDocument,
+            b = banners(doc);
+
+        check(locale + ', the invitation\'s pitch, above the setup link field',
+            b.tab.querySelector('.smaily-ci-banner__body').textContent
+                === strings['Connect your store with Smaily, and add personalized product recommendations to your campaigns, tailored to each customer’s interests.']
+            && !!(b.tab.compareDocumentPosition(doc.getElementById('smaily-w-setup-url')) & Node.DOCUMENT_POSITION_FOLLOWING)
+            && shown(doc.getElementById('smaily-w-setup-url')));
+        check(locale + ', the decorative panel is hidden from assistive technology',
+            b.tab.querySelector('.smaily-ci-banner__panel').getAttribute('aria-hidden') === 'true'
+            && b.tab.querySelector('.smaily-ci-banner__panel').textContent.indexOf(strings['Engine in action']) !== -1);
+        check(locale + ', the start closed: "Contact Smaily" opens the consultation page, one status request for both banners',
+            count(frame, 'status') === 1
+            && shown(action(b.top, 'contact')) && shown(action(b.tab, 'contact'))
+            && action(b.tab, 'contact').textContent === strings['Contact Smaily']
+            && action(b.tab, 'contact').getAttribute('href') === 'https://smaily.com/consultation/'
+            && !shown(action(b.tab, 'start')) && note(b.tab) === '');
+        check(locale + ', only the top banner can be dismissed',
+            !!b.top.querySelector('.smaily-ci-banner__dismiss') && !b.tab.querySelector('.smaily-ci-banner__dismiss')
+            && b.top.querySelector('.smaily-ci-banner__dismiss').textContent === strings['Dismiss']);
+        b.top.querySelector('.smaily-ci-banner__dismiss').click();
+        await wait(20);
+        check(locale + ', Dismiss hides the top banner and tells the server',
+            !shown(b.top) && shown(b.tab) && count(frame, 'dismiss') === 1);
+        frame.remove();
+
+        frame = await open(page, true);
+        b = banners(frame.contentDocument);
+        check(locale + ', the start open: both banners read "Try Intelligence free", one status request',
+            count(frame, 'status') === 1
+            && shown(action(b.top, 'start')) && shown(action(b.tab, 'start'))
+            && action(b.tab, 'start').textContent === strings['Try Intelligence free']
+            && !shown(action(b.tab, 'contact')));
+        frame.remove();
+    }
+
+    async function frameStart(locale) {
+        var page = 'ci-start-frame.' + locale,
+            strings = window.smailyAdminPages[page].strings,
+            frame = await open(page, true),
+            doc = frame.contentDocument,
+            win = frame.contentWindow,
+            b = banners(doc),
+            iframe;
+
+        action(b.tab, 'start').click();
+        await wait(5);
+        check(locale + ', a press asks for a frame and says it is connecting',
+            win.events.join() === 'status,start frame'
+            && note(b.tab) === strings['Connecting your shop · Sending your shop address · Checking your Smaily account']
+            && action(b.tab, 'start').disabled);
+        await wait(80);
+        iframe = doc.querySelector('#smaily-start-modal iframe');
+        check(locale + ', the start window opens in the modal, with no referrer, waiting for ready',
+            modalOpen(doc) && !!iframe && iframe.getAttribute('src') === START
+            && iframe.getAttribute('referrerpolicy') === 'no-referrer'
+            && iframe.getAttribute('title') === strings['Campaign Intelligence']
+            && !doc.querySelector('#smaily-start-modal .smaily-design-modal__loading').hidden
+            && doc.activeElement === doc.querySelector('#smaily-start-modal .smaily-design-modal__close'));
+
+        message(frame, 'https://evil.invalid', {type: 'smaily_intelligence_onboarding', event: 'ready'});
+        check(locale + ', ready from another origin changes nothing',
+            !doc.querySelector('#smaily-start-modal .smaily-design-modal__loading').hidden);
+        message(frame, ENGINE, {type: 'smaily_intelligence_onboarding', event: 'ready'});
+        check(locale + ', ready from the engine shows the window',
+            doc.querySelector('#smaily-start-modal .smaily-design-modal__loading').hidden);
+
+        message(frame, 'https://evil.invalid', {type: 'smaily_intelligence_setup', setup_url: ENGINE + '/setup/tok_evil'});
+        message(frame, ENGINE, {type: 'smaily_intelligence_setup', setup_url: 'https://evil.invalid/setup/tok_x'});
+        await wait(20);
+        check(locale + ', a setup message from another origin, or naming another host, is not exchanged',
+            count(frame, 'exchange') === 0);
+
+        message(frame, ENGINE, {type: 'smaily_intelligence_setup', setup_token: 'tok_1', setup_url: ENGINE + '/setup/tok_1'});
+        message(frame, ENGINE, {type: 'smaily_intelligence_onboarding', event: 'created'});
+        await wait(30);
+        check(locale + ', the setup link goes to the setup exchange; the welcome step stays on screen',
+            win.events.indexOf('exchange ' + ENGINE + '/setup/tok_1') !== -1 && count(frame, 'exchange') === 1
+            && modalOpen(doc) && !shown(doc.getElementById('smaily-w-engine-connected')));
+
+        message(frame, ENGINE, {type: 'smaily_intelligence_onboarding', event: 'closed'});
+        await wait(30);
+        check(locale + ', closing the window shows the connection and its imports, and no banner',
+            !modalOpen(doc) && !doc.querySelector('#smaily-start-modal iframe')
+            && shown(doc.getElementById('smaily-w-engine-connected'))
+            && doc.getElementById('smaily-w-engine-status').textContent
+                === strings['Connected: %1 (engine %2)'].replace('%1', 'Pilot').replace('%2', '1.34.0')
+            && shown(doc.getElementById('smaily-w-engine-catalog-import'))
+            && !shown(b.tab) && !shown(b.top)
+            && shown(doc.getElementById('smaily-w-recs-hint'))
+            && doc.querySelector('#smaily-w-recs-hint a').getAttribute('href')
+                === 'https://smaily.com/connect-magento/#set-storefront-recs');
+        frame.remove();
+
+        // Escape before `created`: nothing is created, the button is back.
+        frame = await open(page, true);
+        doc = frame.contentDocument;
+        b = banners(doc);
+        await press(frame);
+        key(doc, 'Escape');
+        await wait(20);
+        check(locale + ', Escape closes the window and connects nothing',
+            !modalOpen(doc) && shown(action(b.tab, 'start'))
+            && action(b.tab, 'start').textContent === strings['Try Intelligence free']
+            && !shown(doc.getElementById('smaily-w-engine-connected')));
+        frame.remove();
+    }
+
+    async function fallback(locale) {
+        var page = 'ci-start-frame.' + locale,
+            strings = window.smailyAdminPages[page].strings,
+            frame = await open(page, true),
+            doc = frame.contentDocument,
+            win = frame.contentWindow,
+            b = banners(doc);
+
+        await press(frame);
+        await wait(10100);
+        check(locale + ', no ready in 10 seconds: the frame goes and "Open in a new window" is offered',
+            !modalOpen(doc) && !doc.querySelector('#smaily-start-modal iframe')
+            && action(b.tab, 'start').textContent === strings['Open in a new window']
+            && note(b.tab) === strings['The setup window did not open here.']);
+
+        win.events.length = 0;
+        action(b.tab, 'start').click();
+        await wait(80);
+        check(locale + ', the new window opens in the press, before a fresh link is asked for, and gets it',
+            win.events.join() === 'open,start window' && win.tabs[0].location.href === START
+            && note(b.tab) === strings['Finish the setup in the window that opened. If the extension does not connect by itself, copy the setup link that window shows into Setup URL or token from Smaily under Marketing > Smaily Connect > Settings > Intelligence.']);
+
+        message(frame, ENGINE, {type: 'smaily_intelligence_setup', setup_token: 'tok_2'});
+        await wait(30);
+        check(locale + ', the window\'s setup token is exchanged and the store shows connected at once',
+            win.events.indexOf('exchange ' + ENGINE + '/setup/tok_2') !== -1
+            && shown(doc.getElementById('smaily-w-engine-connected')) && !shown(b.tab));
+        frame.remove();
+
+        frame = await open(page, true, [WINDOW]);
+        b = banners(frame.contentDocument);
+        await press(frame);
+        check(locale + ', an answer without a frame offers a new window',
+            !modalOpen(frame.contentDocument) && action(b.tab, 'start').textContent === strings['Open in a new window']);
+        frame.remove();
+
+        frame = await open(page, true, [{status: 400, body: {error: 'frame_origin_not_allowed'}}]);
+        b = banners(frame.contentDocument);
+        await press(frame);
+        check(locale + ', a refused frame origin offers a new window',
+            action(b.tab, 'start').textContent === strings['Open in a new window']);
+        frame.remove();
+    }
+
+    async function refusals(locale) {
+        var page = 'ci-start-frame.' + locale,
+            strings = window.smailyAdminPages[page].strings,
+            console = ENGINE + '/console/6d1f/home',
+            cases = [
+                [{status: 401, body: {error: 'smaily_login_refused', message: ENGINE_WORDS}}, 'login refused'],
+                [{status: 403, body: {error: 'smaily_paid_package_required', message: ENGINE_WORDS}}, 'paid package'],
+                [{status: 404, body: {error: 'not_found', message: ENGINE_WORDS}}, 'closed'],
+                [{status: 409, body: {error: 'store_exists', console_url: console, message: ENGINE_WORDS}}, 'store exists'],
+                [{status: 429, body: {error: 'rate_limited'}}, 'unavailable'],
+                [{status: 502, body: {error: 'unavailable'}}, 'unavailable'],
+                [{network: true}, 'unavailable'],
+                [{status: 502, body: {error: 'start_failed', message: ENGINE_WORDS}}, 'failed']
+            ],
+            i, frame, b, text, consoleLink;
+
+        for (i = 0; i < cases.length; i++) {
+            frame = await open(page, true, [cases[i][0]]);
+            b = banners(frame.contentDocument);
+            await press(frame);
+            text = note(b.tab);
+            check(locale + ', ' + cases[i][1] + ' (' + (cases[i][0].status || 'no answer') + '): no engine words, no window',
+                text.indexOf(ENGINE_WORDS) === -1 && !modalOpen(frame.contentDocument));
+            switch (cases[i][1]) {
+                case 'login refused':
+                    check(locale + ', a refused login says so and links the Smaily connection settings',
+                        text === strings['Smaily refused the API login stored in this extension. Check it in the extension settings and try again. No store was created.'] + ' ' + strings['Open the Smaily connection settings']
+                        && b.tab.querySelector('.smaily-ci-banner__note a').getAttribute('href')
+                            === 'https://store.example/admin/smaily_connect/settings/');
+                    break;
+                case 'paid package':
+                    check(locale + ', code 227 turns the banner into the upsell',
+                        text === strings['Intelligence needs a paid Smaily package. Your Smaily account is on the free package. Trying Intelligence is free, but it works only with a paid Smaily package. No store was created and nothing was sent.']
+                        && shown(b.tab.querySelector('.smaily-ci-banner__pill')) && shown(action(b.tab, 'login'))
+                        && !shown(action(b.tab, 'start')) && !shown(action(b.tab, 'contact')));
+                    break;
+                case 'closed':
+                    check(locale + ', a 404 brings "Contact Smaily" back',
+                        text === '' && shown(action(b.tab, 'contact')) && !shown(action(b.tab, 'start')));
+                    break;
+                case 'store exists':
+                    consoleLink = b.tab.querySelector('.smaily-ci-banner__note a');
+                    check(locale + ', an account with a store gets Open console and the paste instruction',
+                        text === strings['This Smaily account already has a store in Intelligence.'] + ' '
+                            + strings['Open console'] + ' '
+                            + strings['To connect this extension, create a setup link in the console (Settings → Connections) and paste it into Setup URL or token from Smaily.']
+                        && consoleLink.getAttribute('href') === console && consoleLink.getAttribute('target') === '_blank');
+                    break;
+                case 'unavailable':
+                    check(locale + ', no answer from Smaily: try again shortly, with the same button',
+                        text === strings['Smaily did not answer. Try again shortly.']
+                        && shown(action(b.tab, 'start')) && !action(b.tab, 'start').disabled);
+                    break;
+                default:
+                    check(locale + ', any other refusal: the generic line',
+                        text === strings['Campaign Intelligence could not be started. Try again later, or contact Smaily.']);
+            }
+            frame.remove();
+        }
+    }
+
+    async function newWindow(locale) {
+        var page = 'ci-start-window.' + locale,
+            strings = window.smailyAdminPages[page].strings,
+            frame = await open(page, true, [WINDOW]),
+            win = frame.contentWindow,
+            b = banners(frame.contentDocument);
+
+        await press(frame);
+        check(locale + ', an admin that cannot frame it opens a window in the press, then asks for its link',
+            win.events.join() === 'status,open,start window' && win.tabs[0].location.href === START);
+        frame.remove();
+
+        frame = await open(page, true);
+        win = frame.contentWindow;
+        b = banners(frame.contentDocument);
+        win.blockTabs = true;
+        await press(frame);
+        check(locale + ', a blocked window asks for no link and says how to allow it',
+            count(frame, 'start') === 0
+            && note(b.tab) === strings['Your browser blocked the new tab. Allow pop-ups for this page and try again.']);
+        frame.remove();
+
+        frame = await open(page, true, [{status: 409, body: {error: 'store_exists'}}]);
+        win = frame.contentWindow;
+        await press(frame);
+        check(locale + ', a refused start closes the window it opened', win.tabs[0].closed);
+        frame.remove();
+    }
+
+    async function others(locale) {
+        var strings = window.smailyAdminPages['ci-banner-upsell.' + locale].strings,
+            frame = await open('ci-banner-upsell.' + locale, true),
+            b = banners(frame.contentDocument);
+
+        check(locale + ', the upsell: its pill, "Log in to Smaily" to the account, no status request',
+            shown(b.tab.querySelector('.smaily-ci-banner__pill'))
+            && b.tab.querySelector('.smaily-ci-banner__pill').textContent === strings['Requires a paid Smaily plan']
+            && action(b.tab, 'login').getAttribute('href') === 'https://shop.sendsmaily.net/'
+            && action(b.tab, 'login').textContent === strings['Log in to Smaily']
+            && note(b.tab) === strings['Campaign Intelligence requires a paid Smaily plan. Log in to Smaily to review your plan options.']
+            && !shown(action(b.tab, 'contact')) && count(frame, 'status') === 0);
+        frame.remove();
+
+        frame = await open('ci-banner-separate.' + locale, true);
+        b = banners(frame.contentDocument);
+        check(locale + ', a shop the start is not offered to keeps "Contact Smaily" and asks nothing',
+            shown(action(b.tab, 'contact')) && !shown(action(b.tab, 'start')) && count(frame, 'status') === 0);
+        frame.remove();
+
+        frame = await open('ci-banner-none.' + locale, true);
+        check(locale + ', no banner and no start window for a connected store',
+            !frame.contentDocument.querySelector('.smaily-ci-banner')
+            && !frame.contentDocument.getElementById('smaily-start-modal')
+            && shown(frame.contentDocument.getElementById('smaily-w-setup-url')));
+        frame.remove();
+
+        window.navigated = false;
+        frame = await open('ci-banner-dashboard.' + locale, true);
+        b = banners(frame.contentDocument);
+        action(b.top, 'start').click();
+        await wait(80);
+        message(frame, ENGINE, {type: 'smaily_intelligence_onboarding', event: 'ready'});
+        message(frame, ENGINE, {type: 'smaily_intelligence_setup', setup_url: ENGINE + '/setup/tok_3'});
+        await wait(30);
+        check(locale + ', the Dashboard\'s banner keeps the welcome step until the window closes',
+            modalOpen(frame.contentDocument) && !window.navigated);
+        frame.contentDocument.querySelector('#smaily-start-modal .smaily-design-modal__close').click();
+        await wait(50);
+        check(locale + ', then, with no panels on the page, it opens Settings > Intelligence', window.navigated);
+        frame.remove();
+    }
+
+    (async function () {
+        try {
+            for (var locale of ['en_US', 'et_EE']) {
+                log('# ' + locale);
+                await invitation(locale);
+                await frameStart(locale);
+                await fallback(locale);
+                await refusals(locale);
+                await newWindow(locale);
+                await others(locale);
+            }
+        } catch (error) {
+            failures++;
+            log('FAIL ' + (error && error.stack ? error.stack : error));
+        }
+        clearInterval(keepAlive);
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    })();
+</script>
+</body>
+</html>

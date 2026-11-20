@@ -208,7 +208,7 @@
 "Connect","Ühenda"
 "Connect Campaign Intelligence to set up these automations","Nende automaatikate seadistamiseks ühenda Campaign Intelligence"
 "Connect your Smaily account","Ühenda oma Smaily konto"
-"Connect your Smaily account. You can find API credentials in Smaily under Preferences > API. Credentials can be overridden per website, or per store view for per-language Smaily accounts.","Ühenda oma Smaily konto. API kasutajaandmed leiad Smailyst menüüst Preferences > API. Kasutajaandmeid saab üle kirjutada veebisaidi kaupa või keelepõhiste Smaily kontode jaoks poevaate kaupa."
+"Connect your Smaily account. You can find API credentials in Smaily under gear icon → Integrations. Credentials can be overridden per website, or per store view for per-language Smaily accounts.","Ühenda oma Smaily konto. API kasutajaandmed leiad Smailyst: hammasratas → Liidestused. Kasutajaandmeid saab üle kirjutada veebisaidi kaupa või keelepõhiste Smaily kontode jaoks poevaate kaupa."
 "Connected","Ühendatud"
 "Connected (%1)","Ühendatud (%1)"
 "Connected with the saved credentials.","Ühendatud salvestatud kasutajaandmetega."

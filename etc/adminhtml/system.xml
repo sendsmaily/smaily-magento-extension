@@ -40,7 +40,7 @@
             <group id="connection" translate="label comment" type="text" sortOrder="10"
                    showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>API Connection</label>
-                <comment>Connect your Smaily account. You can find API credentials in Smaily under Preferences &gt; API. Credentials can be overridden per website, or per store view for per-language Smaily accounts.</comment>
+                <comment>Connect your Smaily account. You can find API credentials in Smaily under gear icon → Integrations. Credentials can be overridden per website, or per store view for per-language Smaily accounts.</comment>
                 <field id="subdomain" translate="label comment" type="text" sortOrder="10"
                        showInDefault="1" showInWebsite="1" showInStore="1" canRestore="1">
                     <label>Subdomain</label>

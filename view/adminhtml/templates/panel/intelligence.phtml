@@ -141,10 +141,12 @@ $isRefused = $viewModel->isEngineRefused();
         </div>
         <?php if ($isSettings): ?>
         <?php // How the recommendations reach the store's pages (CON-363, as
-        // the WooCommerce plugin's CON-347): the widget, who sees it, and the guide. ?>
+        // the WooCommerce plugin's CON-347): the widget, who sees it, and the guide.
+        // Both ways to place it (CON-365): a widget instance for product
+        // pages, the cart or the order success page; the widget in a page or a block. ?>
         <div class="smaily-card smaily-recs-hint" id="smaily-w-recs-hint">
             <strong class="smaily-recs-hint__title"><?= $escaper->escapeHtml(__('Show recommendations in your store')) ?></strong>
-            <p class="note"><?= $escaper->escapeHtml(__('Add the Smaily recommendations widget to a page or a block: in the content editor press Insert Widget... and pick Smaily recommendations as the Widget Type. Shoppers who accept marketing cookies see the products Smaily recommends to them.')) ?>
+            <p class="note"><?= $escaper->escapeHtml(__('For product pages, the cart or the order success page, add a widget instance under Content > Elements > Widgets with Smaily recommendations as the Type. For a page or a block, press Insert Widget... in the content editor and pick Smaily recommendations (in Page Builder, in a Text element or an HTML Code element). Shoppers who accept marketing cookies see the products Smaily recommends to them.')) ?>
                 <a href="<?= $escaper->escapeUrl(\Smaily\Connect\Model\UserGuide::URL . '#' . \Smaily\Connect\Model\UserGuide::SECTION_STOREFRONT_RECOMMENDATIONS) ?>" target="_blank" rel="noopener noreferrer"><?= $escaper->escapeHtml(__('How to add it →')) ?></a></p>
         </div>
         <?php else: ?>

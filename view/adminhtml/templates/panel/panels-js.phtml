@@ -125,6 +125,11 @@ window.smailyPanelsInit = function ($) {
         $('#smaily-w-connection-account').text(verified && accountName
             ? '<?= $escaper->escapeJs(__('as "%1"')) ?>'.replace('%1', accountName)
             : '');
+        // Smaily accepted the account: the invitation to connect one goes
+        // (CON-364, as the WooCommerce plugin's Step1Connect).
+        if (verified) {
+            $('.smaily-ci-banner--smaily').hide();
+        }
     }
 
     // --- Form errors (PRO-3562, the pack's two-layer error model) -----------

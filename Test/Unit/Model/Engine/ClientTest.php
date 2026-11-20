@@ -188,6 +188,53 @@ class ClientTest extends TestCase
         );
     }
 
+    /**
+     * CON-357: the engine's message can name the customer (a 404 echoes the
+     * address it was asked about), so the error names the status and the
+     * engine's code, and the recorded reply keeps no message at any depth.
+     */
+    public function testAnErrorNamesTheEngineCodeNeverItsMessage(): void
+    {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/ingest/customers');
+        $client = $this->createClient([new Response(404, [], (string)json_encode([
+            'error' => 'customer_not_found',
+            'message' => 'No customer found with email mari@example.com (Mari Maasikas).',
+            'details' => ['errors' => [['field' => 'email', 'message' => 'Mari Maasikas, mari@example.com']]],
+        ]))]);
+
+        try {
+            $client->ingest(Client::DOMAIN_CUSTOMERS, []);
+            self::fail('Expected EngineRequestException');
+        } catch (EngineRequestException $exception) {
+            self::assertSame('Engine request failed with HTTP 404: customer_not_found', $exception->getMessage());
+        }
+        self::assertSame(
+            [
+                'http_status' => 404,
+                'body' => ['error' => 'customer_not_found', 'details' => ['errors' => [['field' => 'email']]]],
+            ],
+            $client->lastExchange()['response'] ?? null
+        );
+    }
+
+    /**
+     * CON-357: an answer that is not the engine's JSON (a proxy's page) is
+     * named by its status, and its text is not recorded.
+     */
+    public function testAnErrorPageIsNamedByItsStatus(): void
+    {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/ingest/customers');
+        $client = $this->createClient([new Response(400, [], '<html>Mari Maasikas, mari@example.com</html>')]);
+
+        try {
+            $client->ingest(Client::DOMAIN_CUSTOMERS, []);
+            self::fail('Expected EngineRequestException');
+        } catch (EngineRequestException $exception) {
+            self::assertSame('Engine request failed with HTTP 400: http_400', $exception->getMessage());
+        }
+        self::assertSame(['http_status' => 400, 'body' => null], $client->lastExchange()['response'] ?? null);
+    }
+
     public function testRateLimitRetriesWithRetryAfterFromBody(): void
     {
         $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/ingest/ping');

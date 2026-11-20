@@ -8,18 +8,29 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Unit\Cron;
 
+use GuzzleHttp\Client as HttpClient;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Response;
+use Magento\Framework\App\ProductMetadataInterface;
+use Magento\Framework\App\Request\Http;
 use Magento\Framework\FlagManager;
 use Magento\Framework\Notification\NotifierInterface;
 use Magento\Framework\Stdlib\DateTime\DateTime;
+use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Cron\HealthCheck;
+use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\ConsentSource;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Engine\SleeperInterface;
 use Smaily\Connect\Model\Health\QueueHealth;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Report\ConnectionHealth;
+use Smaily\Connect\Model\StorefrontScript;
 
 /**
  * A deactivated account is a verdict, not an outage, and the two need
@@ -75,6 +86,74 @@ class HealthCheckTest extends TestCase
         $notifier->expects(self::never())->method('addMajor');
 
         $this->createCron(false, $flags, $notifier)->execute();
+    }
+
+    /**
+     * CON-357: the engine's message can name a customer, so the admin inbox
+     * and the log name the engine's code instead.
+     */
+    public function testTheOutageNoticeNamesTheEngineCodeNeverItsMessage(): void
+    {
+        $settings = $this->createMock(Settings::class);
+        $settings->method('isConnected')->willReturn(true);
+        $settings->method('getApiKey')->willReturn('sk_test_key');
+        $settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/ingest/ping');
+        $factory = $this->createMock(HttpClientFactory::class);
+        $factory->method('create')->willReturnCallback(static fn (array $config): HttpClient => new HttpClient(
+            ['handler' => HandlerStack::create(new MockHandler([new Response(404, [], (string)json_encode([
+                'error' => 'customer_not_found',
+                'message' => 'No customer found with email mari@example.com (Mari Maasikas).',
+            ]))]))] + $config
+        ));
+        $storeManager = $this->createMock(StoreManagerInterface::class);
+        $client = new Client(
+            $settings,
+            $factory,
+            $this->createMock(ProductMetadataInterface::class),
+            $storeManager,
+            $this->createMock(Logger::class),
+            $this->createMock(SleeperInterface::class),
+            new StorefrontScript($storeManager, $this->createMock(Http::class)),
+            $this->createMock(ConnectionHealth::class)
+        );
+
+        $flags = $this->createMock(FlagManager::class);
+        $flags->method('getFlagData')->willReturnCallback(
+            static fn (string $flag): ?int => $flag === HealthCheck::FLAG_ENGINE_DOWN_SINCE ? 1_757_000_000 - 7200 : null
+        );
+        $notifier = $this->createMock(NotifierInterface::class);
+        $notice = '';
+        $notifier->expects(self::once())->method('addMajor')->willReturnCallback(
+            static function (string $title, string $body) use (&$notice): void {
+                $notice = $body;
+            }
+        );
+        $logged = [];
+        $logger = $this->createMock(Logger::class);
+        $logger->method('error')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$logged): void {
+                $logged[] = [$message, $context];
+            }
+        );
+        $dateTime = $this->createMock(DateTime::class);
+        $dateTime->method('gmtTimestamp')->willReturn(1_757_000_000);
+
+        (new HealthCheck(
+            $settings,
+            $client,
+            $flags,
+            $notifier,
+            $this->createMock(QueueHealth::class),
+            $dateTime,
+            $logger,
+            $this->createMock(ConsentSource::class)
+        ))->execute();
+
+        self::assertStringContainsString('Engine request failed with HTTP 404: customer_not_found', $notice);
+        $kept = $notice . json_encode($logged);
+        self::assertStringNotContainsString('mari@example.com', $kept);
+        self::assertStringNotContainsString('Maasikas', $kept);
+        self::assertNotSame([], $logged);
     }
 
     private function createCron(

@@ -41,6 +41,10 @@ class FlushIngestQueueTest extends IntegrationTestCase
         $this->queue = $this->objectManager->create(IngestQueue::class);
     }
 
+    /**
+     * CON-357: a refused row keeps the field, never the engine's message,
+     * which can name the customer.
+     */
     public function testD6ResponseMapsPerItemErrorsOntoBatchRows(): void
     {
         $this->queue->enqueue('catalog', ['sku' => 'OK-1'], null, null, 'fi-1');
@@ -53,7 +57,11 @@ class FlushIngestQueueTest extends IntegrationTestCase
             ->willReturn([
                 'processed' => 2,
                 'deduplicated' => 0,
-                'errors' => [['index' => 1, 'field' => 'price', 'message' => 'must be a number']],
+                'errors' => [[
+                    'index' => 1,
+                    'field' => 'price',
+                    'message' => 'Mari Maasikas (mari@example.com): must be a number',
+                ]],
             ]);
         $this->runCron($client);
 
@@ -61,7 +69,7 @@ class FlushIngestQueueTest extends IntegrationTestCase
         self::assertSame(IngestEvent::STATUS_SENT, $rows['fi-1']['status']);
         self::assertSame(IngestEvent::STATUS_SENT, $rows['fi-3']['status']);
         self::assertSame(IngestEvent::STATUS_FAILED, $rows['fi-2']['status'], 'Per-item errors are terminal');
-        self::assertSame('price: must be a number', $rows['fi-2']['last_error']);
+        self::assertSame('price: rejected by engine', $rows['fi-2']['last_error']);
         self::assertNull($rows['fi-2']['next_retry_at']);
     }
 
@@ -466,9 +474,9 @@ class FlushIngestQueueTest extends IntegrationTestCase
         self::assertSame(2, $writes, 'One write per reason');
         $rows = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), null, 'event_uuid');
         $reasons = [
-            'fi-g1' => 'price: must be a number',
-            'fi-g3' => 'price: must be a number',
-            'fi-g4' => 'sku: required',
+            'fi-g1' => 'price: rejected by engine',
+            'fi-g3' => 'price: rejected by engine',
+            'fi-g4' => 'sku: rejected by engine',
         ];
         foreach ($reasons as $uuid => $reason) {
             self::assertSame(IngestEvent::STATUS_FAILED, $rows[$uuid]['status'], $uuid);

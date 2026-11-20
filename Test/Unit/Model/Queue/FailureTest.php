@@ -112,6 +112,22 @@ class FailureTest extends TestCase
     }
 
     /**
+     * CON-357: an error that is not a client's — a database write, say —
+     * keeps the ladder and is stored by its type, code and place, never its
+     * text, which can quote a customer's data.
+     */
+    public function testAnyOtherErrorIsStoredWithoutItsText(): void
+    {
+        $failure = Failure::of(new \PDOException(
+            "SQLSTATE[23000]: Duplicate entry 'mari@example.com' for key 'email' (Mari Maasikas)",
+            23000
+        ));
+
+        self::assertFalse($failure->permanent);
+        self::assertMatchesRegularExpression('/^PDOException at FailureTest\.php:\d+ \(code 23000\)$/', $failure->reason);
+    }
+
+    /**
      * PRO-1961: a handler's own verdict that the row can never be sent
      * (a malformed payload, a row no handler takes).
      */

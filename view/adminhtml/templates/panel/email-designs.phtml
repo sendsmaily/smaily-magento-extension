@@ -22,26 +22,33 @@
  *
  * A press opens the email's design page (§22) in a frame over the admin
  * (Erkki, 2026-10-27: every engine page a connector opens shows in an
- * in-admin modal over the darkened page, a new tab only as a fallback;
- * the WooCommerce plugin still opens a tab). The modal shows at once with
- * a loading state, the server mints the one-time link
- * (smaily_connect/api/designlink) and the frame gets it. The engine lets
- * only the origin of the site URL the extension gave it frame the page
- * (§22 Embedding rule 1), so an admin on another origin, or not on https,
- * opens the page in a new tab instead: the tab is opened blank in the
- * press itself (a pop-up blocker allows a tab only there), cut off from
- * this page, and sent to the link when it arrives; on a failure it closes
- * and the card says why. A frame the browser refuses cannot be told apart
- * from a slow one, so the modal's header always offers "Open in a new
- * tab" (a fresh link: the first one is used), and a hint points at it when
- * the frame has not loaded after a few seconds.
+ * in-admin modal over the darkened page, a new tab only as a fallback).
+ * The modal shows at once with a loading state, and the server mints a
+ * one-time frame link (smaily_connect/api/designlink, `display: 'frame'`;
+ * contract 1.31.0, CON-366, as the WooCommerce plugin's CON-311): its
+ * session lives in the page, not in a cookie, so the page works where the
+ * browser blocks third-party cookies. The server names the admin's origin
+ * when it is not the shop's (§22 `frame_origin`). Each opening mints its
+ * own link, set once as the frame's src and never reloaded; the frame
+ * sends no referrer (the admin's address carries its secret key). The
+ * loading state lasts until the page posts `ready`. 20 seconds after the
+ * frame got its link without one, or when the engine refuses the admin's
+ * origin, the modal says "The design page did not open." and offers "Open
+ * in a new tab" (a fresh tab link), which its header always offers too.
+ * An http admin opens the page in a new tab instead: the tab is opened
+ * blank in the press itself (a pop-up blocker allows a tab only there),
+ * cut off from this page, and sent to the link when it arrives; on a
+ * failure it closes and the card says why.
  *
  * The design page posts {type: 'smaily_intelligence_design', event:
- * 'saved' | 'closed'} to this page (§22 Embedding rule 4); only a message
- * from the engine's origin counts. "saved" reads the list again; "closed"
- * closes the modal, which reads it again too. After a design page in a
- * tab, the list is read again when the admin comes back to this tab. The
- * link is never kept: it lives only in the frame or the tab.
+ * 'ready' | 'changes' | 'saved' | 'closed'} to this page (§22 Embedding
+ * rule 4); only a message from the engine's origin counts. `changes`
+ * carries `unsaved`: while it is true, Esc, the close button and the
+ * backdrop ask "Close without saving?" first. "saved" reads the list
+ * again; "closed" closes the modal at once (the page asked its own
+ * question), which reads it again too. After a design page in a tab, the
+ * list is read again when the admin comes back to this tab. The link is
+ * never kept: it lives only in the frame or the tab.
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
@@ -57,8 +64,8 @@ $config = [
     'linkUrl' => (string)$block->getUrl('smaily_connect/api/designlink'),
     'engineOrigin' => $viewModel->getEngineOrigin(),
     'frameable' => $viewModel->isFrameable(),
-    // Milliseconds before the modal points at "Open in a new tab".
-    'hintDelay' => 8000,
+    // §22 Embedding rule 5: the page says `ready` within this time.
+    'readyTimeout' => 20000,
 ];
 $strings = [
     'label' => (string)__('Email design'),
@@ -67,6 +74,7 @@ $strings = [
     'subject' => (string)__('Subject: %1'),
     'failed' => (string)__('The design page could not be opened. Try again in a minute.'),
     'popupBlocked' => (string)__('Your browser blocked the new tab. Allow pop-ups for this page and try again.'),
+    'closeUnsaved' => (string)__('Close without saving?'),
     'states' => [
         'none' => (string)__('No design saved yet'),
         'starter' => (string)__('Starter design'),
@@ -93,8 +101,9 @@ $strings = [
             <div class="smaily-banner smaily-banner--warning smaily-design-modal__hint" hidden>
                 <span class="smaily-banner__icon">&#9888;</span>
                 <div class="smaily-banner__body">
-                    <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('Is the design page not showing? Your browser may not allow it inside the Magento admin. Press Open in a new tab.')) ?></div>
+                    <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('The design page did not open.')) ?></div>
                 </div>
+                <button type="button" class="action-secondary smaily-design-modal__newtab"><span><?= $escaper->escapeHtml(__('Open in a new tab')) ?></span></button>
             </div>
             <div class="smaily-banner smaily-banner--error smaily-design-modal__error" role="alert" hidden>
                 <span class="smaily-banner__icon">&#9888;</span>
@@ -118,10 +127,16 @@ require(['jquery'], function ($) {
     // counts up `opening`, so the answer to an earlier open is dropped.
     var current = null;
     var opening = 0;
-    var hintTimer = null;
+    var readyTimer = null;
+    // The page's last `unsaved` (§22 `changes`); false until its first.
+    var unsaved = false;
     var $modal = $('#smaily-design-modal').appendTo(document.body);
-    // Showing, hiding, focus and Escape: panel/modal-js.phtml.
+    // Showing, hiding, focus and Escape: panel/modal-js.phtml. The close
+    // button, Esc and the backdrop ask first over unsaved changes.
     var modal = window.smailyModal($, $modal, function () {
+        if (unsaved && !window.confirm(strings.closeUnsaved)) {
+            return;
+        }
         closeModal();
     });
     var $body = $modal.find('.smaily-design-modal__body');
@@ -191,10 +206,23 @@ require(['jquery'], function ($) {
         }).then(render);
     }
 
-    // The one-time link: only a page on the engine's own origin, the origin
-    // whose messages this page takes.
-    function requestLink(key) {
-        return post(config.linkUrl, {email_key: key, return_url: window.location.href}).then(function (body) {
+    // The one-time link, `display` 'frame' or 'tab' (§22): only a page on
+    // the engine's own origin, the origin whose messages this page takes.
+    // A refusal keeps the server's code: 'frame_origin_not_allowed' when
+    // the engine does not let this admin frame the page.
+    function requestLink(key, display) {
+        return window.smailyPost(config.linkUrl, {
+            email_key: key,
+            return_url: window.location.href,
+            display: display
+        }).then(function (answer) {
+            var body = answer.body,
+                error;
+            if (answer.status < 200 || answer.status > 299) {
+                error = new Error(body.message || strings.failed);
+                error.code = String(body.error || '');
+                throw error;
+            }
             if (typeof body.url !== 'string' || body.url.indexOf(config.engineOrigin + '/') !== 0) {
                 throw new Error(strings.failed);
             }
@@ -221,7 +249,7 @@ require(['jquery'], function ($) {
             // A browser that keeps the opener read-only still opens the page.
         }
         awaitingReturn = true;
-        requestLink(key).then(function (url) {
+        requestLink(key, 'tab').then(function (url) {
             tab.location.href = url;
         }, function (error) {
             tab.close();
@@ -241,10 +269,17 @@ require(['jquery'], function ($) {
     document.addEventListener('visibilitychange', onReturn);
 
     // --- The modal --------------------------------------------------------
+    // No `ready` in time, or a refused origin: say so and offer the tab.
+    function showFallback() {
+        $loading.prop('hidden', true);
+        $hint.prop('hidden', false);
+    }
+
     function openModal(key, $slot, $trigger) {
         var ticket = ++opening,
             name;
         current = {key: key, slot: $slot};
+        unsaved = false;
         name = $slot.closest('.smaily-engine-trigger').find('.smaily-engine-trigger__name').first().text();
         $modal.find('.smaily-design-modal__title').text(strings.title.replace('%1', function () {
             return name;
@@ -255,25 +290,32 @@ require(['jquery'], function ($) {
         $error.prop('hidden', true);
         modal.show($trigger);
 
-        requestLink(key).then(function (url) {
+        requestLink(key, 'frame').then(function (url) {
             var $frame;
             if (ticket !== opening || !current) {
                 return;
             }
-            $frame = $('<iframe class="smaily-design-modal__frame"></iframe>')
-                .attr('title', $modal.find('.smaily-design-modal__title').text())
-                .on('load', function () {
-                    clearTimeout(hintTimer);
-                    $loading.prop('hidden', true);
-                    $hint.prop('hidden', true);
-                });
+            // §22 Embedding rule 6: the clipboard and full screen for the
+            // editor, no referrer, no sandbox. The link is set once and
+            // never reloaded: a reload ends a frame link's session.
+            $frame = $('<iframe class="smaily-design-modal__frame"></iframe>').attr({
+                title: $modal.find('.smaily-design-modal__title').text(),
+                allow: 'clipboard-read; clipboard-write; fullscreen',
+                referrerpolicy: 'no-referrer'
+            });
             $body.append($frame);
             $frame.attr('src', url);
-            hintTimer = setTimeout(function () {
-                $hint.prop('hidden', false);
-            }, config.hintDelay);
+            // Not the frame's `load`: it fires for an expired link too.
+            readyTimer = setTimeout(showFallback, config.readyTimeout);
         }, function (error) {
             if (ticket !== opening || !current) {
+                return;
+            }
+            if (error.code === 'frame_origin_not_allowed') {
+                // This admin's origin may not frame the page: the next
+                // press opens a tab at once.
+                config.frameable = false;
+                showFallback();
                 return;
             }
             $loading.prop('hidden', true);
@@ -289,8 +331,9 @@ require(['jquery'], function ($) {
             return;
         }
         current = null;
+        unsaved = false;
         opening++;
-        clearTimeout(hintTimer);
+        clearTimeout(readyTimer);
         $body.find('iframe').remove();
         modal.hide();
         if (reread !== false) {
@@ -298,7 +341,9 @@ require(['jquery'], function ($) {
         }
     }
 
-    // A fresh link in a new tab: the frame's link is used up once opened.
+    // A fresh tab link in a new tab: the frame's link is good for the
+    // frame only. No question over unsaved changes: a question would outlast
+    // the click's pop-up allowance (as in the WooCommerce plugin).
     $modal.find('.smaily-design-modal__newtab').on('click', function () {
         var key, $slot;
         if (!current) {
@@ -318,7 +363,17 @@ require(['jquery'], function ($) {
             || data.type !== 'smaily_intelligence_design') {
             return;
         }
-        if (data.event === 'closed') {
+        if (data.event === 'ready') {
+            if (current) {
+                clearTimeout(readyTimer);
+                $loading.prop('hidden', true);
+                $hint.prop('hidden', true);
+            }
+        } else if (data.event === 'changes') {
+            if (typeof data.unsaved === 'boolean') {
+                unsaved = data.unsaved;
+            }
+        } else if (data.event === 'closed') {
             if (current) {
                 closeModal();
             } else {

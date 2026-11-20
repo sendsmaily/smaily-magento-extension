@@ -11,18 +11,26 @@
   and panel/email-designs.phtml — rendered in en_US and et_EE by
   Test/Js/render-admin.php into Test/Js/build/, with the admin stylesheet
   and jQuery from vendor/, one fresh frame per page and locale. Stubbed:
-  RequireJS's require(), the requests (fetch) and window.open. The design
-  list (contract §23) names Welcome, Abandoned cart, Order confirmation and
-  both Campaign Intelligence emails, not First order or Shipping
-  confirmation; a design link for Order confirmation is refused.
+  RequireJS's require(), the requests (fetch), window.open and
+  window.confirm. The design list (contract §23) names Welcome, Abandoned
+  cart, Order confirmation and both Campaign Intelligence emails, not First
+  order or Shipping confirmation; a design link for Order confirmation is
+  refused, and a frame link for Abandoned cart is refused for the admin's
+  origin (§22 `frame_origin`).
 
   A card shows "Edit design" only while it is on and the list names its
   key, after its workflow. On the email-designs page the admin may frame
   the design page: a press shows the modal before the link is asked for,
-  and the frame gets the link. Esc, the close button, the backdrop and a
-  "closed" message from the engine's origin close the modal; a message
-  from another origin changes nothing; a "saved" message reads the list
-  again. "Open in a new tab" opens the tab before it asks for a fresh link.
+  and the frame gets a `display: "frame"` link with no referrer (CON-366).
+  The loading state lasts until the engine page's `ready`; without one,
+  20 seconds after the frame got its link the modal says the page did not
+  open and offers "Open in a new tab". Esc, the close button, the backdrop
+  and a "closed" message from the engine's origin close the modal; while
+  the page reports unsaved changes, the first three ask "Close without
+  saving?" first. A message from another origin changes nothing; a "saved"
+  message reads the list again. "Open in a new tab" opens the tab before
+  it asks for a fresh `display: "tab"` link. A refused frame origin offers
+  the tab, and the next press opens a tab at once.
   On the email-designs-tab page the admin may not frame it: a press opens
   the tab before the request, the admin's return reads the list again, and
   a refused link closes the tab and says why on the card.
@@ -87,7 +95,9 @@
     // window.events lists, in order, every tab opened and every request:
     // "open", "designs" and "link <email key>". A design link answers after
     // 30 ms, so a check can see the page while it waits; Order
-    // confirmation's link is refused.
+    // confirmation's link is refused, and so is Abandoned cart's frame link
+    // (the engine refuses the admin's origin). window.confirm answers
+    // window.confirmAnswer and lists its questions in window.confirms.
     function stubs() {
         return [
             '<link rel="stylesheet" href="' + CSS + '">',
@@ -97,6 +107,9 @@
             'window.requests = [];',
             'window.tabs = [];',
             'window.blockTabs = false;',
+            'window.confirms = [];',
+            'window.confirmAnswer = false;',
+            'window.confirm = function (text) { window.confirms.push(text); return window.confirmAnswer; };',
             'window.open = function () {',
             '  window.events.push("open");',
             '  if (window.blockTabs) { return null; }',
@@ -116,12 +129,14 @@
             '    return Promise.resolve(answer(' + JSON.stringify(DESIGNS) + '));',
             '  }',
             '  if (url.indexOf("api/designlink/") !== -1) {',
-            '    var key = JSON.parse(body).email_key;',
+            '    var key = JSON.parse(body).email_key, display = JSON.parse(body).display;',
             '    window.events.push("link " + key);',
             '    window.modalAtRequest = !document.getElementById("smaily-design-modal").hidden;',
             '    return new Promise(function (resolve) { setTimeout(function () {',
             '      resolve(key === "transactional.order_confirmation"',
             '        ? answer({error: "unknown_email", message: "No design here"}, 404)',
+            '        : key === "plugin.abandoned_cart" && display === "frame"',
+            '        ? answer({error: "frame_origin_not_allowed", message: "Not here"}, 400)',
             '        : answer({url: "' + LINK + '"}));',
             '    }, 30); });',
             '  }',
@@ -275,9 +290,24 @@
                 button(doc, emailKey).click();
                 await wait(100);
             },
+            // The body of the last design link request.
+            lastLink = function () {
+                var links = win.requests.filter(function (request) {
+                    return request.url.indexOf('api/designlink/') !== -1;
+                });
+                return JSON.parse(links[links.length - 1].body);
+            },
+            design = function (data) {
+                message(frame, ENGINE, Object.assign({type: 'smaily_intelligence_design', email_key: 'plugin.welcome'}, data));
+            },
+            loading = function () {
+                return shown(doc.querySelector('.smaily-design-modal__loading'));
+            },
+            hint = doc.querySelector('.smaily-design-modal__hint'),
             name;
 
         tick(frame, doc.getElementById('smaily-w-welcome-enabled'), true);
+        tick(frame, doc.getElementById('smaily-w-abandoned-enabled'), true);
         tick(frame, doc.getElementById('smaily-tx-order_confirmation-enabled'), true);
         name = doc.getElementById('smaily-w-welcome-enabled').closest('.smaily-engine-trigger')
             .querySelector('.smaily-engine-trigger__name').textContent;
@@ -293,11 +323,18 @@
             && doc.querySelector('.smaily-design-modal__newtab').textContent.trim() === strings['Open in a new tab']);
         check(locale + ', focus moves into the modal', dialog.contains(doc.activeElement));
         await wait(100);
-        check(locale + ', the frame gets the link',
+        check(locale + ', the frame gets a frame link (§22 display "frame") for the email',
             !!designFrame() && designFrame().getAttribute('src') === LINK
-            && JSON.parse(win.requests.filter(function (request) {
-                return request.url.indexOf('api/designlink/') !== -1;
-            })[0].body).email_key === 'plugin.welcome');
+            && lastLink().email_key === 'plugin.welcome' && lastLink().display === 'frame');
+        check(locale + ', the frame sends no referrer, passes the clipboard and full screen on, and has no sandbox',
+            designFrame().getAttribute('referrerpolicy') === 'no-referrer'
+            && designFrame().getAttribute('allow') === 'clipboard-read; clipboard-write; fullscreen'
+            && !designFrame().hasAttribute('sandbox'));
+        check(locale + ', the loading state stays until the page says ready', loading() && !shown(hint));
+        message(frame, 'https://evil.example', {type: 'smaily_intelligence_design', event: 'ready', email_key: 'plugin.welcome'});
+        check(locale + ', "ready" from another origin changes nothing', loading());
+        design({event: 'ready'});
+        check(locale + ', "ready" from the engine ends the loading state', !loading() && !shown(hint));
 
         // Focus stays in the modal: Tab from the last control goes to the first.
         designFrame().focus();
@@ -341,13 +378,67 @@
         check(locale + ', "closed" from the engine closes the modal and reads the design list again',
             !modalOpen(doc) && !designFrame() && count(frame, 'designs') === reads + 2);
 
+        // Unsaved changes (§22 `changes`): the admin's own close asks first.
+        await press('plugin.welcome');
+        design({event: 'ready'});
+        design({event: 'changes', unsaved: true});
+        win.confirmAnswer = false;
+        key(doc, 'Escape');
+        doc.querySelector('.smaily-design-modal__close').click();
+        doc.querySelector('.smaily-design-modal__backdrop').click();
+        check(locale + ', over unsaved changes Esc, the close button and the backdrop ask "Close without saving?"; No keeps the modal',
+            modalOpen(doc) && !!designFrame() && win.confirms.length === 3
+            && win.confirms.every(function (text) {
+                return text === strings['Close without saving?'];
+            }));
+        win.confirmAnswer = true;
+        doc.querySelector('.smaily-design-modal__close').click();
+        check(locale + ', Yes closes the modal', !modalOpen(doc) && !designFrame() && win.confirms.length === 4);
+
+        await press('plugin.welcome');
+        key(doc, 'Escape');
+        check(locale + ', a new opening starts with no unsaved changes', !modalOpen(doc) && win.confirms.length === 4);
+
+        await press('plugin.welcome');
+        design({event: 'changes', unsaved: true});
+        design({event: 'changes', unsaved: false});
+        key(doc, 'Escape');
+        check(locale + ', after a save ("changes" with unsaved false) Esc closes without asking',
+            !modalOpen(doc) && win.confirms.length === 4);
+
+        await press('plugin.welcome');
+        design({event: 'changes', unsaved: true});
+        design({event: 'closed'});
+        await wait(20);
+        check(locale + ', "closed" from the page closes at once (the page asked itself)',
+            !modalOpen(doc) && win.confirms.length === 4);
+
+        // No `ready` within 20 seconds: the modal offers the new tab.
+        await press('plugin.welcome');
+        await wait(19000);
+        check(locale + ', before 20 seconds the loading state stays', loading() && !shown(hint));
+        await wait(1100);
+        check(locale + ', no "ready" in 20 seconds: "The design page did not open." with "Open in a new tab"',
+            !loading() && shown(hint)
+            && hint.querySelector('.smaily-banner__message').textContent === strings['The design page did not open.']
+            && hint.querySelector('.smaily-design-modal__newtab').textContent.trim() === strings['Open in a new tab']);
+        design({event: 'ready'});
+        check(locale + ', a later "ready" removes the offer', !shown(hint) && !loading());
+        win.events.length = 0;
+        hint.querySelector('.smaily-design-modal__newtab').click();
+        check(locale + ', the offer\'s button opens the tab before it asks for a fresh tab link',
+            win.events[0] === 'open' && win.events[1] === 'link plugin.welcome' && !modalOpen(doc)
+            && lastLink().display === 'tab');
+        win.tabs.length = 0;
+        await wait(100);
+
         // "Open in a new tab": the tab first, then a fresh link.
         await press('plugin.welcome');
         win.events.length = 0;
         doc.querySelector('.smaily-design-modal__newtab').click();
-        check(locale + ', "Open in a new tab" opens the tab before it asks for a fresh link and closes the modal',
+        check(locale + ', "Open in a new tab" opens the tab before it asks for a fresh tab link and closes the modal',
             win.events[0] === 'open' && win.events[1] === 'link plugin.welcome' && !modalOpen(doc)
-            && win.tabs[0].opener === null);
+            && win.tabs[0].opener === null && lastLink().display === 'tab');
         await wait(100);
         check(locale + ', the tab gets the fresh link', win.tabs[0].location.href === LINK && !win.tabs[0].closed);
 
@@ -359,6 +450,22 @@
             && doc.querySelector('.smaily-design-modal__error .smaily-banner__message').textContent === 'No design here'
             && !shown(doc.querySelector('.smaily-design-modal__loading')));
         key(doc, 'Escape');
+
+        // The engine refuses the admin's origin (§22 frame_origin): the
+        // modal offers the tab, and the next press opens one at once.
+        await press('plugin.abandoned_cart');
+        check(locale + ', a refused frame origin offers "Open in a new tab", no frame and no error',
+            modalOpen(doc) && !designFrame() && shown(hint) && !loading()
+            && !shown(doc.querySelector('.smaily-design-modal__error')));
+        key(doc, 'Escape');
+        win.events.length = 0;
+        win.tabs.length = 0;
+        button(doc, 'plugin.abandoned_cart').click();
+        check(locale + ', after a refused frame origin a press opens a tab at once with a tab link',
+            win.events[0] === 'open' && win.events[1] === 'link plugin.abandoned_cart' && !modalOpen(doc)
+            && lastLink().display === 'tab');
+        await wait(100);
+        check(locale + ', that tab gets the link', win.tabs[0].location.href === LINK);
         frame.remove();
     }
 
@@ -377,7 +484,11 @@
             win.events[0] === 'open' && win.events[1] === 'link plugin.welcome' && !modalOpen(doc)
             && win.tabs[0].opener === null);
         await wait(100);
-        check(locale + ', the tab gets the link', win.tabs[0].location.href === LINK);
+        check(locale + ', the tab gets a tab link (§22 display "tab")',
+            win.tabs[0].location.href === LINK
+            && JSON.parse(win.requests.filter(function (request) {
+                return request.url.indexOf('api/designlink/') !== -1;
+            })[0].body).display === 'tab');
         reads = count(frame, 'designs');
         win.dispatchEvent(new win.Event('focus'));
         await wait(20);

@@ -25,6 +25,7 @@ class DescriptionText
 {
     private const BLOCKS_PATTERN = '#<(style|script)\b[^>]*>.*?</\1\s*>#is';
     private const DIRECTIVE_PATTERN = '/\{\{.*?\}\}/s';
+    private const TAG_PATTERN = '#</?[a-zA-Z!][^>]*>#';
     private const BLOCK_END_PATTERN =
         '#</(?:p|div|li|h[1-6]|tr|td|th|figure|blockquote|section|article|ul|ol)\s*>|<br\s*/?>#i';
 
@@ -33,8 +34,10 @@ class DescriptionText
      */
     public static function fromHtml(string $html): string
     {
-        $text = self::stripMarkup($html);
-        $text = self::stripMarkup(self::decode($text));
+        $text = strip_tags(self::stripMarkup($html));
+        // Decoded text keeps a bare < or > ("&lt;5 kg", "1&lt;2"): only a
+        // sequence that opens like a tag goes.
+        $text = (string)preg_replace(self::TAG_PATTERN, '', self::stripMarkup(self::decode($text)));
         $text = self::decode($text);
 
         // One space for each run of spaces, one line break for each run of
@@ -54,8 +57,7 @@ class DescriptionText
     {
         $html = (string)preg_replace(self::BLOCKS_PATTERN, '', $html);
         $html = (string)preg_replace(self::DIRECTIVE_PATTERN, '', $html);
-        $html = (string)preg_replace(self::BLOCK_END_PATTERN, "$0\n", $html);
 
-        return strip_tags($html);
+        return (string)preg_replace(self::BLOCK_END_PATTERN, "$0\n", $html);
     }
 }

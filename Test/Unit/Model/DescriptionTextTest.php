@@ -91,4 +91,16 @@ class DescriptionTextTest extends TestCase
             )
         );
     }
+
+    public function testDecodedComparisonsKeepTheirSigns(): void
+    {
+        self::assertSame('1<2 and 3>2', DescriptionText::fromHtml('<p>1&lt;2 and 3&gt;2</p>'));
+        self::assertSame('<5 kg', DescriptionText::fromHtml('<p>&lt;5 kg</p>'));
+        self::assertSame('price < 10 €', DescriptionText::fromHtml('price &lt; 10 &euro;'));
+    }
+
+    public function testAnEscapedTagStillGoes(): void
+    {
+        self::assertSame('Text', DescriptionText::fromHtml('&lt;p&gt;Text&lt;/p&gt;'));
+    }
 }

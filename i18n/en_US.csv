@@ -208,7 +208,7 @@
 "Connect","Connect"
 "Connect Campaign Intelligence to set up these automations","Connect Campaign Intelligence to set up these automations"
 "Connect your Smaily account","Connect your Smaily account"
-"Connect your Smaily account. You can find API credentials in Smaily under Preferences > API. Credentials can be overridden per website, or per store view for per-language Smaily accounts.","Connect your Smaily account. You can find API credentials in Smaily under Preferences > API. Credentials can be overridden per website, or per store view for per-language Smaily accounts."
+"Connect your Smaily account. You can find API credentials in Smaily under gear icon → Integrations. Credentials can be overridden per website, or per store view for per-language Smaily accounts.","Connect your Smaily account. You can find API credentials in Smaily under gear icon → Integrations. Credentials can be overridden per website, or per store view for per-language Smaily accounts."
 "Connected","Connected"
 "Connected (%1)","Connected (%1)"
 "Connected with the saved credentials.","Connected with the saved credentials."

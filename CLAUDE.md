@@ -501,6 +501,10 @@ is written in English.
   master; 3.0.0 cut, its tag waits for Erkki).
   2026-11-14 session end: 4/5 (3.0.0 and 3.0.1 released; 3.0.1 submitted
   to the Adobe Commerce Marketplace; CON-209 Done).
+  2026-11-20: 5/5 (CON-147 closed: the first pilot store runs v3
+  connected to Campaign Intelligence; 3.0.2 cut with the connection
+  prefix, Try Intelligence free, logos and palette; its tag waits for
+  Erkki; Marketplace 3.0.1 marketing resubmitted).
 - **UI/UX parity** — shape: trend (open-ended polish, no date). Gauge: open
   Stories in the Feature (state not Done/Canceled). Values 2026-10-02: 4 open
   in the morning, 3 in the evening; 2026-10-03: 1 open (PRO-1357; PRO-1398 done, PRO-1385

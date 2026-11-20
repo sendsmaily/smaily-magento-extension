@@ -40,6 +40,7 @@ use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
 use Smaily\Connect\Model\StorefrontScript;
 use Smaily\Connect\Model\StorefrontUrl;
+use Smaily\Connect\Test\Unit\Model\DescriptionTextTest;
 
 /**
  * PRO-1231: every catalog row (upsert and tombstone alike) carries the §3
@@ -84,6 +85,20 @@ class CatalogPayloadBuilderTest extends TestCase
 
         self::assertFalse($item['in_stock']);
         self::assertSame('17', $item['tags']['product_id']);
+    }
+
+    /**
+     * CON-358: the row's description is the text of a Page Builder
+     * description, without its CSS rules or widget and media directives.
+     */
+    public function testTheDescriptionIsThePageBuilderDescriptionsTextOnly(): void
+    {
+        $item = $this->createBuilder('42')->build(
+            $this->product(42, 'BAG', shortDescription: DescriptionTextTest::PAGE_BUILDER_HTML),
+            $this->oneStore()
+        );
+
+        self::assertSame("A roomy canvas bag for every trip.\n\nPattern:", $item['description']);
     }
 
     /**
@@ -1030,7 +1045,8 @@ class CatalogPayloadBuilderTest extends TestCase
         float $price = 19.99,
         array $websiteIds = [],
         string $productUrl = 'https://shop.example/shirt',
-        array $categoryIds = []
+        array $categoryIds = [],
+        string $shortDescription = 'A fine shirt'
     ): Product&MockObject {
         $amount = $this->createMock(AmountInterface::class);
         $amount->method('getValue')->willReturn($price);
@@ -1051,7 +1067,7 @@ class CatalogPayloadBuilderTest extends TestCase
         $product->method('getWebsiteIds')->willReturn($websiteIds);
         $product->method('getAttributeText')->willReturn(false);
         $product->method('getData')->willReturnCallback(
-            static fn (string $key = '', $index = null) => ['short_description' => 'A fine shirt'][$key] ?? ''
+            static fn (string $key = '', $index = null) => ['short_description' => $shortDescription][$key] ?? ''
         );
 
         return $product;

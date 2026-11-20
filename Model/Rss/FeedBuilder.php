@@ -15,6 +15,7 @@ use Magento\Catalog\Model\Product\Visibility;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Store\Api\Data\StoreInterface;
+use Smaily\Connect\Model\DescriptionText;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\StorefrontUrl;
 
@@ -156,9 +157,9 @@ class FeedBuilder
             $item->addChild('pubDate', gmdate(DATE_RSS, (int)strtotime($createdAt)));
         }
 
-        $description = trim(strip_tags(
+        $description = DescriptionText::fromHtml(
             (string)($product->getData('short_description') ?: $product->getData('description'))
-        ));
+        );
         if ($description !== '') {
             $item->addChildWithCdata('description', $description);
         }

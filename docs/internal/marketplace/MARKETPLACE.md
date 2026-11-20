@@ -84,7 +84,21 @@ Rules: Adobe's [marketing review guidelines](https://developer.adobe.com/commerc
 description's opening paragraph; no logos of Adobe or Magento. The long
 description lists the features vertically, as bullets made with the
 editor's own bullet button, under a "Features" heading formatted as
-Header 2 or Header 3 (marketing review, 18 Nov 2026).
+Header 2 or Header 3 (marketing review, 18 Nov 2026). An integration's
+long description follows Adobe's integration format (marketing review,
+20 Nov 2026), in this order:
+
+1. An introductory paragraph about the integrated company or service;
+   its first mention is a **bold** hyperlink to its website.
+2. A second paragraph on what the extension does and how it works, what
+   changes in the store's UI, and which customizations are possible,
+   with examples.
+3. An "Account & Pricing" section, its heading formatted as Header 2 or
+   Header 3 and its content in **bold**: whether a separate account is
+   required; whether it is created at installation or separately (with
+   the sign-up link); whether the service has fees (with the pricing
+   link); and whom to contact for account setup and pricing.
+4. Then the Features and any other content.
 
 **Title:** `Smaily Connect`
 
@@ -96,6 +110,11 @@ nothing without a Smaily account, so the name cannot be removed. The
 marketing review of 18 Nov 2026 asked to remove "the developer/company
 name" from the title. The portal has no field for a note to the
 reviewer, so the long description's first sentence says what Smaily is.
+
+The second refusal (20 Nov 2026) repeated the title objection. On the
+owner's decision the title stays: a support request (SALES0907379, sent
+through https://commercemarketplace.adobe.com/contact-us/, category
+Seller) asks Adobe to accept "Smaily" as the integrated service's name.
 
 **Category:** Marketing › Email Marketing and Marketing › Marketing Automation (as the listing has).
 
@@ -109,11 +128,43 @@ reviewer, so the long description's first sentence says what Smaily is.
 
 **Long description** (as resubmitted on 2026-11-20):
 
-> Smaily Connect connects your Magento store to Smaily, an email
-> marketing platform. **The extension is free. It needs a Smaily account
-> with a package that includes API access. Campaign Intelligence is an
-> optional paid Smaily add-on; its price depends on the number of
-> contacts (smaily.com/campaign-intelligence).**
+> **[Smaily](https://smaily.com/)** is an email marketing and automation
+> platform for online stores. Merchants use it to design and send
+> newsletters, run automated emails such as welcome series and
+> abandoned-cart reminders, segment their contacts, and manage subscriber
+> consent in line with the GDPR.
+>
+> Smaily Connect connects your Magento store to your Smaily account.
+> After installation, a guided setup in the Magento admin asks for your
+> Smaily API credentials and walks you through which contacts to sync,
+> which Smaily workflows your automated emails start, and whether to add
+> a newsletter checkbox at checkout. From then on, new subscribers and
+> customers reach Smaily as they happen, an unsubscribe in Smaily comes
+> back to the store, and store events start the welcome, first-order and
+> abandoned-cart workflows you picked. On the storefront only two
+> optional things change: a newsletter checkbox at checkout, and a
+> product-recommendations widget you can place on any page. Everything
+> else is set in the admin: the lawful basis for syncing, the workflows,
+> single-use discount codes, and one Smaily account or workflow per store
+> language. For example, a store can remind shoppers who left items in
+> their cart with an email that shows those products and restores the
+> cart in one click, or welcome every new subscriber with a discount
+> code.
+>
+> ## Account & Pricing
+>
+> - **A Smaily account is required.**
+> - **The account is not created during installation. Create it
+>   separately at
+>   [sendsmaily.net/account/register](https://www.sendsmaily.net/account/register/).**
+> - **The extension is free. Smaily is a paid service and needs a plan
+>   that includes API access: see
+>   [smaily.com/pricing](https://smaily.com/pricing/).**
+> - **Campaign Intelligence is an optional paid Smaily add-on; its price
+>   depends on the number of contacts: see
+>   [smaily.com/campaign-intelligence](https://smaily.com/campaign-intelligence/).**
+> - **For account setup and pricing, contact Smaily at
+>   support@smaily.com.**
 >
 > ## Features
 >

@@ -414,7 +414,9 @@ require(['jquery'], function ($) {
         }
     });
 
-    $('.smaily-ci-banner').each(function () {
+    // [data-variant]: the Campaign Intelligence banners, not the Smaily
+    // invitation that shares their card (CON-364).
+    $('.smaily-ci-banner[data-variant]').each(function () {
         var banner = {
             $el: $(this),
             variant: String($(this).attr('data-variant')),

@@ -19,6 +19,14 @@
                     <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\DashboardData</argument>
                 </arguments>
                 <block class="Magento\Backend\Block\Template"
+                       name="smaily.invitation.banner" as="invitation.banner"
+                       template="Smaily_Connect::panel/smaily-invitation-banner.phtml">
+                    <arguments>
+                        <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\SmailyInvitationData</argument>
+                        <argument name="dismissible" xsi:type="boolean">true</argument>
+                    </arguments>
+                </block>
+                <block class="Magento\Backend\Block\Template"
                        name="smaily.intelligence.banner.top" as="intelligence.banner.top"
                        template="Smaily_Connect::panel/intelligence-banner.phtml">
                     <arguments>

@@ -905,8 +905,9 @@ window.smailyPanelsInit = function ($) {
     function engineConnected(tenantName, engineVersion) {
         intelligenceConnected = true;
         $('#smaily-w-engine-disconnected').hide();
-        // A connected store sees no Campaign Intelligence banner (CON-363).
-        $('.smaily-ci-banner').hide();
+        // A connected store sees no Campaign Intelligence banner (CON-363);
+        // the Smaily invitation shares its card, not its data-variant.
+        $('.smaily-ci-banner[data-variant]').hide();
         $('#smaily-w-engine-connected').show();
         // Settings only: browse tracking is the tab's one thing to save (PRO-3567).
         $('#smaily-w-intelligence-footer').show();

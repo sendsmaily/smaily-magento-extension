@@ -19,6 +19,13 @@
                     <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\WizardData</argument>
                 </arguments>
                 <block class="Magento\Backend\Block\Template"
+                       name="smaily.invitation.banner" as="invitation.banner"
+                       template="Smaily_Connect::panel/smaily-invitation-banner.phtml">
+                    <arguments>
+                        <argument name="view_model" xsi:type="object">Smaily\Connect\ViewModel\Adminhtml\SmailyInvitationData</argument>
+                    </arguments>
+                </block>
+                <block class="Magento\Backend\Block\Template"
                        name="smaily.panel.connection" as="panel.connection"
                        template="Smaily_Connect::panel/connection.phtml">
                     <arguments>

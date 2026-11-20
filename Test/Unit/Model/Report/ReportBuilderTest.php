@@ -8,7 +8,10 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Unit\Model\Report;
 
+use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\ProductMetadataInterface;
+use Magento\Framework\AuthorizationInterface;
+use Magento\Framework\Data\Form\FormKey;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\UrlInterface;
 use Magento\Store\Model\Store;
@@ -28,6 +31,7 @@ use Smaily\Connect\Model\Report\Credentials;
 use Smaily\Connect\Model\Report\ReportBuilder;
 use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\SubdomainNormalizer;
+use Smaily\Connect\ViewModel\Adminhtml\SmailyInvitationData;
 
 /**
  * CON-234: the installation report body, as contract installation-report-v1
@@ -146,6 +150,17 @@ class ReportBuilderTest extends TestCase
         self::assertNull($builder->mainCredentials());
         self::assertNull($builder->build(ReportBuilder::EVENT_SNAPSHOT, 'daily'));
         self::assertNull($builder->build(ReportBuilder::EVENT_DEACTIVATED));
+    }
+
+    public function testATransactionalAccountAloneLeavesTheSmailyInvitationDue(): void
+    {
+        // CON-364: the invitation asks this builder whether a Smaily marketing account is connected.
+        $this->accounts = [];
+        $this->transactional = [0 => ['example-transactional', 'api-user', 'secret']];
+        self::assertTrue($this->invitation()->isDue());
+
+        $this->accounts = [0 => ['example', 'api-user', 'not-a-real-password']];
+        self::assertFalse($this->invitation()->isDue());
     }
 
     /**
@@ -576,6 +591,21 @@ class ReportBuilderTest extends TestCase
         $health->method('engine')->willReturnCallback(fn (string $tenant): array => $this->engineHealth[$tenant] ?? $none);
 
         return $health;
+    }
+
+    private function invitation(): SmailyInvitationData
+    {
+        $authorization = $this->createMock(AuthorizationInterface::class);
+        $authorization->method('isAllowed')->willReturn(true);
+
+        return new SmailyInvitationData(
+            $this->builder(),
+            $this->createMock(ScopeConfigInterface::class),
+            $this->clock(),
+            $authorization,
+            $this->createMock(UrlInterface::class),
+            $this->createMock(FormKey::class)
+        );
     }
 
     private function clock(): DateTime

@@ -25,6 +25,9 @@ class UserGuide
 {
     public const URL = 'https://smaily.com/connect-magento/';
 
+    /** Section "Step 1 — Connect your Smaily account": where the API credentials are created. */
+    public const SECTION_SETUP_CONNECT = 'setup-connect';
+
     /** Section "Connecting your cookie consent tool". */
     public const SECTION_CONSENT_TOOL = 'connecting-your-cookie-consent-tool';
 

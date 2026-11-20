@@ -30,6 +30,8 @@ use Smaily\Connect\Model\SmailyUrl;
  *
  * Which banner, if any:
  *   - Campaign Intelligence connected → none;
+ *   - no Smaily marketing account connected → none: the Smaily invitation
+ *     (SmailyInvitationData, CON-364) shows instead;
  *   - the main Smaily account's last answer was code 227 (its package has
  *     no API access, ConnectionHealth::PLAN_BLOCKED) → the upsell;
  *   - Smaily accepted the account saved for the page's website → the
@@ -125,9 +127,10 @@ class IntelligenceBannerData implements ArgumentInterface
             return '';
         }
         $main = $this->reportBuilder->mainCredentials();
-        if ($main !== null
-            && $this->health->smaily($main->subdomain)['last_error_code'] === ConnectionHealth::PLAN_BLOCKED
-        ) {
+        if ($main === null) {
+            return '';
+        }
+        if ($this->health->smaily($main->subdomain)['last_error_code'] === ConnectionHealth::PLAN_BLOCKED) {
             return self::VARIANT_UPSELL;
         }
 

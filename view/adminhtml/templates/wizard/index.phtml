@@ -155,6 +155,8 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
     </ul>
 
     <div class="<?= /* @noEscape */ $panelClass(1) ?>" data-step="1">
+        <?php // The invitation to connect a Smaily account (CON-364): stays until one is connected. ?>
+        <?= $block->getChildHtml('invitation.banner') ?>
         <?= /* @noEscape */ $stepHead(1, $setupCompleted ? $completedPill : '') ?>
         <?php if ($setupCompleted): ?>
         <?php

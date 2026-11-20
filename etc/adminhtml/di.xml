@@ -12,11 +12,13 @@
         <plugin name="smaily_connect_installation_report" type="Smaily\Connect\Plugin\Adminhtml\ReportConfigSave"/>
     </type>
 
-    <!-- The customers-import notice in the admin's system messages (PRO-4007). -->
+    <!-- The customers-import notice (PRO-4007) and the invitation to connect
+         a Smaily account (CON-364) in the admin's system messages. -->
     <type name="Magento\Framework\Notification\MessageList">
         <arguments>
             <argument name="messages" xsi:type="array">
                 <item name="smaily_connect_customers_import" xsi:type="string">Smaily\Connect\Model\Adminhtml\CustomersImportNotice</item>
+                <item name="smaily_connect_invitation" xsi:type="string">Smaily\Connect\Model\Adminhtml\SmailyInvitationNotice</item>
             </argument>
         </arguments>
     </type>

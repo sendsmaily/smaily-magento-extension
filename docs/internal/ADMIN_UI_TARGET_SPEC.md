@@ -407,7 +407,7 @@ sub-systems on this tab):
 |---|---|
 | Welcome | enable toggle + workflow select |
 | First order | enable toggle + workflow select |
-| Abandoned cart | enable toggle + workflow select + cutoff minutes (10–1440, default 30) |
+| Abandoned cart | enable toggle + workflow select + cutoff minutes (10–1435, default 30; CON-368) |
 | Per-language workflow mapping table (modes A/B only) | language / workflow select / default-fallback radio, per trigger |
 
 **Resolved (Erkki, 2026-07-14, §4.2) — retired in PRO-1760:** Abandoned Cart

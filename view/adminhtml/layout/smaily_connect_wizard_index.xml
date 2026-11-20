@@ -11,6 +11,13 @@
         <css src="Smaily_Connect::css/smaily-admin.css"/>
     </head>
     <body>
+        <!-- The Smaily Connect logo above the page title (CON-372). -->
+        <referenceContainer name="main.top">
+            <block class="Magento\Backend\Block\Template"
+                   name="smaily.brand"
+                   template="Smaily_Connect::brand.phtml"
+                   before="page.title"/>
+        </referenceContainer>
         <referenceContainer name="content">
             <block class="Magento\Backend\Block\Template"
                    name="smaily.wizard"

@@ -162,6 +162,18 @@ $block = static fn (object $viewModel, array $data = []): object => new class ($
     {
         return 'https://store.example/';
     }
+
+    /**
+     * The module's static file in the repository, as a harness page under
+     * Test/Js reaches it (CON-372).
+     *
+     * @param string $fileId Smaily_Connect::<path under view/adminhtml/web>
+     * @return string
+     */
+    public function getViewFileUrl(string $fileId): string
+    {
+        return '../../view/adminhtml/web/' . explode('::', $fileId, 2)[1];
+    }
 };
 
 /*
@@ -1862,6 +1874,47 @@ foreach ($discountPages as $page => [$rules, $hasRules]) {
 }
 
 /*
+ * settings-long-wait: the settings-discount page of a website whose
+ * abandoned-cart reminder is on with a cutoff saved before the cutoff had a
+ * maximum, 1440 minutes, with which no reminder is sent (CON-368).
+ */
+$pages['settings-long-wait'] = [
+    'viewModel' => new class ($discountViewModel([], true)) {
+        /**
+         * @param object $inner
+         */
+        public function __construct(private readonly object $inner)
+        {
+        }
+
+        /**
+         * @param string $name
+         * @param array<int, mixed> $arguments
+         * @return mixed
+         */
+        public function __call(string $name, array $arguments): mixed
+        {
+            return $this->inner->$name(...$arguments);
+        }
+
+        /**
+         * @return string
+         */
+        public function getBootJson(): string
+        {
+            $boot = json_decode($this->inner->getBootJson(), true);
+            $boot['automations']['abandonedEnabled'] = true;
+            $boot['automations']['abandonedCutoff'] = 1440;
+
+            return (string)json_encode($boot);
+        }
+    },
+    'template' => $pages['settings-discount']['template'],
+    'data' => $pages['settings-discount']['data'],
+    'strings' => $discountStrings,
+];
+
+/*
  * The Dashboard (view/adminhtml/templates/dashboard/index.phtml): set up,
  * Smaily and Campaign Intelligence connected, browse tracking on, nothing
  * failed. The -storefront page has a Storefront URL saved (PRO-3918); the
@@ -2049,8 +2102,8 @@ $pages['dashboard-unsent'] = [
  * (config/engine-automations.phtml) — and panel/email-designs.phtml, with
  * Campaign Intelligence connected on https://engine.invalid (a host that
  * never answers). Each template has its own view model, as on the page. On
- * email-designs the admin is on the site URL's origin, so the design page
- * opens in the modal; on email-designs-tab it is not, so it opens in a tab.
+ * email-designs the admin is on https, so the design page opens in the
+ * modal; on email-designs-tab it is not, so it opens in a tab.
  */
 $emailDesignsViewModel = static fn (bool $frameable): object => new class ($frameable) {
     /**
@@ -2122,6 +2175,8 @@ foreach (['email-designs' => true, 'email-designs-tab' => false] as $page => $fr
             'Subject: %1',
             'Open in a new tab',
             'Opening the design page…',
+            'The design page did not open.',
+            'Close without saving?',
             'Your browser blocked the new tab. Allow pop-ups for this page and try again.',
             'Campaign Intelligence offers no design for this email.',
         ],
@@ -2337,7 +2392,7 @@ $invitationViewModel = static fn (bool $due = true, bool $dismissed = false): ob
      */
     public function getSignupUrl(): string
     {
-        return 'https://www.sendsmaily.net';
+        return 'https://www.sendsmaily.net/account/register/';
     }
 
     /**
@@ -2405,6 +2460,20 @@ foreach (['invite-settings' => true, 'invite-settings-connected' => false] as $p
     ] + $pages['settings-website'];
 }
 
+/*
+ * The Smaily Connect logo above the page title (CON-372, brand.phtml): with
+ * the entrance (the Dashboard) and still (every other page).
+ */
+foreach (['brand-entrance' => ['entrance' => true], 'brand-still' => []] as $page => $data) {
+    $pages[$page] = [
+        'template' => $root . '/view/adminhtml/templates/brand.phtml',
+        // The template reads no view model.
+        'viewModel' => new stdClass(),
+        'data' => $data,
+        'strings' => [],
+    ];
+}
+
 $render = static function (string $template, object $block, Escaper $escaper): string {
     ob_start();
     include $template;
@@ -2448,6 +2517,18 @@ foreach ($pages as $name => $page) {
     }
 }
 StoreLocale::reset();
+
+// The admin stylesheet as a string, for Test/Js/brand-logos.html (CON-372):
+// a page opened from file:// cannot read the rules of a stylesheet it links,
+// and that harness reads the prefers-reduced-motion rules to apply them.
+$css = file_get_contents($root . '/view/adminhtml/web/css/smaily-admin.css'); // phpcs:ignore Magento2.Functions.DiscouragedFunction
+$file = $build . '/smaily-admin-css.js';
+if ($css === false || file_put_contents( // phpcs:ignore Magento2.Functions.DiscouragedFunction
+    $file,
+    'window.smailyAdminCss = ' . json_encode($css, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ";\n"
+) === false) {
+    throw new RuntimeException('Cannot write ' . $file . '.');
+}
 
 // The merchant user guide (docs/site/index.html) as a string, for
 // Test/Js/user-guide-site.html: a page opened from file:// cannot read

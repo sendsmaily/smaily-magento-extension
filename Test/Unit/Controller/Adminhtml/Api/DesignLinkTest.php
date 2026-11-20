@@ -69,17 +69,53 @@ class DesignLinkTest extends TestCase
         $emailDesigns = $this->createMock(EmailDesigns::class);
         $emailDesigns->method('isAvailable')->willReturn(true);
         $emailDesigns->expects(self::once())->method('designLink')
-            ->with('plugin.abandoned_cart', 'https://shop.example/admin/smaily_connect/settings/', 'et')
+            ->with(
+                'plugin.abandoned_cart',
+                'https://shop.example/admin/smaily_connect/settings/',
+                'et',
+                true,
+                'https://admin.shop.example'
+            )
             ->willReturn('https://intelligence.smaily.com/design/email/dl_7Hc2');
 
         $this->designLink($emailDesigns, [
             'email_key' => 'plugin.abandoned_cart',
             'return_url' => 'https://shop.example/admin/smaily_connect/settings/',
+            'display' => 'frame',
         ])->execute();
 
         self::assertSame(200, $this->status);
         self::assertSame(['url' => 'https://intelligence.smaily.com/design/email/dl_7Hc2'], $this->response);
         self::assertSame('no-store', $this->headers['Cache-Control'] ?? null);
+    }
+
+    /**
+     * CON-366: only `display: 'frame'` asks for a frame link; "Open in a
+     * new tab" and the tab of an admin that may not frame the page send
+     * `tab`, and anything else counts as a tab too.
+     *
+     * @dataProvider tabDisplayProvider
+     */
+    public function testAnyOtherDisplayMintsATabLink(?string $display): void
+    {
+        $emailDesigns = $this->createMock(EmailDesigns::class);
+        $emailDesigns->method('isAvailable')->willReturn(true);
+        $emailDesigns->expects(self::once())->method('designLink')
+            ->with('plugin.welcome', '', 'et', false, 'https://admin.shop.example')
+            ->willReturn('https://intelligence.smaily.com/design/email/dl_1');
+
+        $this->designLink($emailDesigns, ['email_key' => 'plugin.welcome'] + ($display === null ? [] : ['display' => $display]))
+            ->execute();
+
+        self::assertSame(200, $this->status);
+    }
+
+    /**
+     * @return array<string, array{?string}>
+     */
+    public static function tabDisplayProvider(): array
+    {
+        return ['tab' => ['tab'], 'none' => [null], 'unknown' => ['window']];
     }
 
     public function testAnInvalidFormKeyIsRefusedBeforeTheEngineIsAsked(): void
@@ -225,6 +261,22 @@ class DesignLinkTest extends TestCase
             ],
             '503 unavailable' => [new EngineTransportException('x', 503), 502, 'engine_unavailable', $retry],
             'no answer' => [new EngineTransportException('x'), 502, 'engine_unavailable', $retry],
+            '422 frame_origin refused' => [
+                new EngineRequestException('x', 422, ['error' => 'validation_failed', 'errors' => [
+                    ['field' => 'frame_origin', 'message' => 'not in the registrable domain of the site'],
+                ]]),
+                400,
+                'frame_origin_not_allowed',
+                'The design page did not open.',
+            ],
+            '422 for another field' => [
+                new EngineRequestException('x', 422, ['error' => 'validation_failed', 'errors' => [
+                    ['field' => 'return_url', 'message' => 'must be https'],
+                ]]),
+                502,
+                'engine_unavailable',
+                $retry,
+            ],
             'not an https link' => [
                 new EngineRequestException('x', 502, ['error' => 'invalid_engine_response']),
                 502,
@@ -321,6 +373,9 @@ class DesignLinkTest extends TestCase
     {
         $request = $this->createMock(HttpRequest::class);
         $request->method('getContent')->willReturn((string)json_encode($body));
+        // The admin runs on a host of its own (CON-366).
+        $request->method('getScheme')->willReturn('https');
+        $request->method('getHttpHost')->willReturn('admin.shop.example');
         $authorization = $this->createMock(AuthorizationInterface::class);
         $authorization->method('isAllowed')->willReturnCallback(
             static fn (string $resource): bool => in_array($resource, $allowed, true)

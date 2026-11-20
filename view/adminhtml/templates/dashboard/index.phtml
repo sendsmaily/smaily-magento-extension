@@ -70,7 +70,9 @@ if ($verdict === \Smaily\Connect\ViewModel\Adminhtml\DashboardData::VERDICT_INCO
     $verdictText = __('Everything is running — deliveries to Smaily are flowing normally.');
 }
 
-// Connection strip: [label, sub-line, is-on, pill variant, pill label].
+// Connection strip: [label, sub-line, is-on, pill variant, pill label,
+// icon]; the Campaign Intelligence card carries the logo pack's icon
+// (CON-372), static whatever the state.
 // The engine row's three strings come from one state (see the view model).
 $engineState = $viewModel->getEngineStateLabels();
 $connections = [
@@ -82,6 +84,7 @@ $connections = [
         $viewModel->isSmailyConnected(),
         $viewModel->isSmailyConnected() ? 'active' : 'failed',
         $viewModel->isSmailyConnected() ? __('Connected') : __('Not connected'),
+        null,
     ],
     [
         __('Campaign Intelligence'),
@@ -89,6 +92,7 @@ $connections = [
         $viewModel->isEngineConnected() && !$engineRefused,
         $engineState['variant'],
         $engineState['label'],
+        $block->getViewFileUrl('Smaily_Connect::images/campaign-intelligence-icon.svg'),
     ],
     [
         __('Browse tracking'),
@@ -102,6 +106,7 @@ $connections = [
         $viewModel->isBrowseTrackingEnabled(),
         $viewModel->isBrowseTrackingEnabled() ? 'active' : 'off',
         $viewModel->isBrowseTrackingEnabled() ? __('On') : __('Off'),
+        null,
     ],
 ];
 ?>
@@ -164,12 +169,12 @@ $showFailures = $failed > 0 && !$bannersSuppressed;
     </div>
 
     <div class="smaily-connections">
-        <?php foreach ($connections as [$label, $sub, $isOn, $pillVariant, $pillLabel]): ?>
+        <?php foreach ($connections as [$label, $sub, $isOn, $pillVariant, $pillLabel, $icon]): ?>
         <?php // Pack connection card: the dot in its own column beside label, sub-line and pill (PRO-3568). ?>
         <div class="smaily-connection <?= $isOn ? 'is-on' : 'is-off' ?>">
             <span class="smaily-dot"></span>
             <div class="smaily-connection-body">
-                <div class="smaily-connection-label"><?= $escaper->escapeHtml($label) ?></div>
+                <div class="smaily-connection-label"><?php if ($icon !== null): ?><img class="smaily-ci-icon" src="<?= $escaper->escapeUrl($icon) ?>" width="18" height="18" alt=""><?php endif; ?><?= $escaper->escapeHtml($label) ?></div>
                 <div class="smaily-connection-sub"><?= $escaper->escapeHtml($sub) ?></div>
                 <span class="smaily-pill smaily-pill--<?= $escaper->escapeHtmlAttr($pillVariant) ?>">
                     <span class="smaily-pill__dot"></span><?= $escaper->escapeHtml($pillLabel) ?>

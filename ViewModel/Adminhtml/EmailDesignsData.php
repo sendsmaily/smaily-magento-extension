@@ -10,8 +10,8 @@ namespace Smaily\Connect\ViewModel\Adminhtml;
 
 use Magento\Framework\App\Request\Http as HttpRequest;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
-use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\EmailDesigns;
+use Smaily\Connect\Model\Engine\IntelligenceStart;
 use Smaily\Connect\Model\Engine\Settings;
 
 /**
@@ -26,7 +26,6 @@ class EmailDesignsData implements ArgumentInterface
     public function __construct(
         private readonly EmailDesigns $emailDesigns,
         private readonly Settings $settings,
-        private readonly Client $client,
         private readonly HttpRequest $request
     ) {
     }
@@ -44,19 +43,18 @@ class EmailDesignsData implements ArgumentInterface
     }
 
     /**
-     * Whether the engine lets this admin frame its design page: it allows
-     * only the origin of the site URL the extension gives it as
-     * `plugin_info.site_url` (the default store view's address), on https
-     * (§22 Embedding rule 1). An admin on another origin — its own admin
-     * host, another port, or plain http — opens the page in a new tab.
-     * Read from the request as the admin's browser sent it, so a TLS proxy
-     * counts as Magento counts it (Http::isSecure()).
+     * Whether the design page may open in a frame over this admin: an admin
+     * on https. The engine frames it for the origin of the site URL the
+     * extension gives it as `plugin_info.site_url` (§22 Embedding rule 1
+     * (a)), and for an admin origin of its own that the link names as
+     * `frame_origin` (rule 1 (d), contract 1.31.0, CON-366) when it is in
+     * the site's registrable domain; a refused origin falls back to a new
+     * tab. An http admin opens the page in a new tab. Read from the request
+     * as the admin's browser sent it, so a TLS proxy counts as Magento
+     * counts it (Http::isSecure()).
      */
     public function isFrameable(): bool
     {
-        $siteOrigin = EmailDesigns::origin($this->client->siteUrl());
-
-        return str_starts_with($siteOrigin, 'https://')
-            && $siteOrigin === EmailDesigns::requestOrigin($this->request);
+        return IntelligenceStart::isFrameable(EmailDesigns::requestOrigin($this->request));
     }
 }

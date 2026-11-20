@@ -175,7 +175,7 @@
             && element.getAttribute('aria-label') === 'Smaily');
         check(locale + ', ' + where + ': "Create a Smaily account" opens Smaily\'s sign-up page in a new tab',
             text(signup) === strings['Create a Smaily account'] && shown(signup)
-            && signup.getAttribute('href') === 'https://www.sendsmaily.net'
+            && signup.getAttribute('href') === 'https://www.sendsmaily.net/account/register/'
             && signup.getAttribute('target') === '_blank'
             && signup.getAttribute('rel') === 'noopener noreferrer');
         check(locale + ', ' + where + ': the panel shows the automations Magento has, each automated, for the eye only',

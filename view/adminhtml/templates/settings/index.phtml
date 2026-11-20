@@ -160,7 +160,8 @@ $tabs = [
         </div>
     </div>
     <div class="smaily-tab-panel" data-tab="intelligence">
-        <h3><?= $escaper->escapeHtml(__('Campaign Intelligence')) ?></h3>
+        <?php // The Campaign Intelligence icon from the logo pack (CON-372), static. ?>
+        <h3><img class="smaily-ci-icon" src="<?= $escaper->escapeUrl($block->getViewFileUrl('Smaily_Connect::images/campaign-intelligence-icon.svg')) ?>" width="24" height="24" alt=""><?= $escaper->escapeHtml(__('Campaign Intelligence')) ?></h3>
         <p class="smaily-tab-desc"><?= $escaper->escapeHtml(__('Your store’s connection to Campaign Intelligence, storefront browse tracking and historical imports.')) ?></p>
         <?= $block->getChildHtml('panel.intelligence') ?>
         <?php // Only a connected engine leaves something to save here (browse

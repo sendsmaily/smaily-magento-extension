@@ -163,7 +163,8 @@ window.smailyPanelsInit = function ($) {
             subdomain: '#smaily-w-subdomain',
             username: '#smaily-w-username',
             password: '#smaily-w-password',
-            storefront_url: '#smaily-w-storefront-url'
+            storefront_url: '#smaily-w-storefront-url',
+            abandoned_cutoff: '#smaily-w-cutoff'
         };
         var account = /^accounts\.([a-z]{2,3})\.(subdomain|username|password)$/.exec(String(key || ''));
         var transactional = /^transactional\.(subdomain|username|password)$/.exec(String(key || ''));
@@ -1034,6 +1035,14 @@ window.smailyPanelsInit = function ($) {
         $('#smaily-w-firstorder-enabled').prop('checked', boot.automations.firstOrderEnabled);
         $('#smaily-w-abandoned-enabled').prop('checked', boot.automations.abandonedEnabled);
         $('#smaily-w-cutoff').val(boot.automations.abandonedCutoff);
+        // A cutoff saved before it had a maximum (CON-368) sends no reminder:
+        // the switched-on card says so under the field, in the save's words.
+        if (boot.automations.abandonedEnabled
+            && boot.automations.abandonedCutoff > parseInt($('#smaily-w-cutoff').attr('max'), 10)) {
+            $('#smaily-w-cutoff').addClass('is-invalid').attr('aria-invalid', 'true').after(
+                $('<p class="smaily-field-error"></p>').text('<?= $escaper->escapeJs((string)\Smaily\Connect\Model\Config\Backend\AbandonedCutoff::refusal()) ?>')
+            );
+        }
         $('#smaily-w-welcome-workflow').data('saved', boot.automations.welcomeWorkflow);
         $('#smaily-w-firstorder-workflow').data('saved', boot.automations.firstOrderWorkflow);
         $('#smaily-w-abandoned-workflow').data('saved', boot.automations.abandonedWorkflow);

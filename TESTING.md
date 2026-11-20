@@ -131,14 +131,22 @@ Campaign Intelligence cards with `panel/email-designs.phtml`, the design
 list (contract §23) and the design links answered by stubs, and checks in
 both languages that a card shows **Edit design** after its workflow only
 while it is on and the list names its email; that a press shows the modal
-with its loading state before the link is asked for and puts the link in
-its frame; that Esc, the close button, the backdrop and a `closed` message
-from the engine's origin close it, that a message from another origin or of
-another type changes nothing and a `saved` one reads the list again; that
-focus stays in the modal; that **Open in a new tab** opens the tab before it
-asks for a fresh link; and that an admin that may not frame the page opens a
-tab before the request, reads the list again on its return, and closes the
-tab with the reason on the card when the link is refused (CON-257).
+with its loading state before the link is asked for and puts a
+`display: "frame"` link in its frame, with no referrer, the clipboard and
+full screen allowed and no sandbox; that the loading state lasts until the
+engine page's `ready`, and that without one the modal says **The design
+page did not open.** after 20 seconds and offers **Open in a new tab**; that
+Esc, the close button, the backdrop and a `closed` message from the
+engine's origin close it, and that over unsaved changes (`changes` with
+`unsaved: true`) the first three ask **Close without saving?** first; that a
+message from another origin or of another type changes nothing and a
+`saved` one reads the list again; that focus stays in the modal; that
+**Open in a new tab** opens the tab before it asks for a fresh
+`display: "tab"` link; that a refused frame origin offers the tab and the
+next press opens one at once; and that an admin that may not frame the page
+opens a tab before the request, reads the list again on its return, and
+closes the tab with the reason on the card when the link is refused
+(CON-257, CON-366).
 `Test/Js/intelligence-connect.html` renders the
 Campaign Intelligence panel with its behaviour (`panel/intelligence.phtml`
 and `panel/panels-js.phtml`) as the initial setup's step and as the
@@ -202,6 +210,16 @@ disabled while the switch is ticked but not saved, and is enabled once the
 save posts it on. For a new website — on the step and on the Settings
 Contacts tab — the import button stays disabled and the card says that
 contacts start syncing once the Contacts settings are saved, until the save.
+`Test/Js/brand-logos.html` checks the Smaily Connect and Campaign
+Intelligence logos with the admin stylesheet (its text, copied into
+`Test/Js/build/smaily-admin-css.js` by `render-admin.php`: a page opened
+from file:// cannot read the rules of a stylesheet it links): the Connect
+logo above the page title, 28 px high, with the entrance where the block
+data asks for it (the Dashboard; `Test/Unit/AdminBrandTest.php` checks the
+layouts) and still elsewhere, still under the stylesheet's
+prefers-reduced-motion rules, and animated by no other rule; and the boxed
+Campaign Intelligence icon, still, in the banner, on the Dashboard's
+Campaign Intelligence card and beside the Settings and setup titles.
 To check another admin screen, add its template(s)
 and view model to `$pages` in `Test/Js/render-admin.php` and a page under
 `Test/Js/`. phpcs leaves the rendered `Test/Js/build/` out.

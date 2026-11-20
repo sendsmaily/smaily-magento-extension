@@ -154,6 +154,39 @@ class AbandonedCartTest extends IntegrationTestCase
         self::assertSame(StateManager::STATUS_SKIPPED, $this->statusOf(6));
     }
 
+    /**
+     * CON-368: at the longest cutoff the Settings save accepts, a cart that
+     * passes it just after a run is reminded by the next run, five minutes
+     * later, before it leaves the scan's 24 hours.
+     */
+    public function testAtTheLongestCutoffTheNextRunRemindsTheCart(): void
+    {
+        $cutoff = AbandonedCart::MAX_CUTOFF_MINUTES;
+        $this->cartIdleFor(7, 'late@example.com', $cutoff * 60 - 1);
+        $this->cron(null, $cutoff)->execute();
+        self::assertSame([], $this->queueRowsByEntity(), 'Not idle long enough yet');
+
+        $this->clock->travel(AbandonedCart::RUN_INTERVAL_SECONDS);
+        $this->cron(null, $cutoff)->execute();
+
+        self::assertSame(StateManager::STATUS_MAILED, $this->statusOf(7));
+    }
+
+    /**
+     * CON-368: one minute longer, that cart leaves the scan before the next
+     * run reaches it, so no reminder could be sent: the save refuses it.
+     */
+    public function testOneMinutePastTheLongestCutoffTheCartIsNeverReminded(): void
+    {
+        $cutoff = AbandonedCart::MAX_CUTOFF_MINUTES + 1;
+        $this->cartIdleFor(7, 'late@example.com', $cutoff * 60 - 1);
+        $this->cron(null, $cutoff)->execute();
+        $this->clock->travel(AbandonedCart::RUN_INTERVAL_SECONDS);
+        $this->cron(null, $cutoff)->execute();
+
+        self::assertSame([], $this->queueRowsByEntity());
+    }
+
     public function testAReminderOlderThan24HoursDoesNotHoldTheNextOneBack(): void
     {
         $this->stateManager->markMailed(1, 1, 'shopper@example.com');
@@ -495,7 +528,7 @@ class AbandonedCartTest extends IntegrationTestCase
         $this->assertSkipped(3, AutomationHandler::SKIPPED_UNSUBSCRIBED_IN_SMAILY);
     }
 
-    private function cron(?Emulation $emulation = null): AbandonedCart
+    private function cron(?Emulation $emulation = null, int $cutoffMinutes = 30): AbandonedCart
     {
         $store = $this->createMock(Store::class);
         $store->method('getId')->willReturn(1);
@@ -512,7 +545,7 @@ class AbandonedCartTest extends IntegrationTestCase
         $config = $this->createMock(Config::class);
         $config->method('isAbandonedCartEnabled')->willReturn(true);
         $config->method('isConnected')->willReturn(true);
-        $config->method('getAbandonedCutoffMinutes')->willReturn(30);
+        $config->method('getAbandonedCutoffMinutes')->willReturn($cutoffMinutes);
         $config->method('getSyncMode')->willReturnCallback(fn (): string => $this->syncMode);
         // The reminder does not depend on whether contact sync runs (CON-196).
         $config->method('isContactSyncActive')->willReturn(false);
@@ -716,6 +749,21 @@ class AbandonedCartTest extends IntegrationTestCase
             'customer_id' => $customerId,
             'subscriber_email' => $email,
             'subscriber_status' => $status,
+        ]);
+    }
+
+    /**
+     * Seed an active cart with items, idle for the given seconds.
+     */
+    private function cartIdleFor(int $quoteId, string $email, int $seconds): void
+    {
+        $this->connection->insert('quote', [
+            'entity_id' => $quoteId,
+            'store_id' => 1,
+            'is_active' => 1,
+            'items_count' => 1,
+            'customer_email' => $email,
+            'updated_at' => $this->clockDate(-$seconds),
         ]);
     }
 

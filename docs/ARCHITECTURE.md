@@ -251,7 +251,7 @@ below.
 - **The send pace (CON-232)** lives in one place, `Model/Engine/IngestPace`:
   one request at a time, at most `REQUESTS_PER_SECOND` (5; the contract
   allows 100 a second per ingest route, and the engine contract is to name
-  a target pace (1.34.0 does not yet) — its answer changes that one
+  a target pace (1.35.0 does not yet) — its answer changes that one
   number), for at most
   `SEND_BUDGET_SECONDS` (40) a run, under the minute between runs. A 429
   (also one a retry got past, `Client::wasThrottled()`), a batch that
@@ -1519,6 +1519,18 @@ name in `abandoned_cart_url` and `store_url` (`magento` under bin/magento),
 so `Model\StorefrontScript` puts the storefront's `index.php` in its place,
 as for catalog product links (PRO-3732).
 
+**The longest cutoff (CON-368, as the WooCommerce plugin's CON-326).** A
+cart leaves the scan 24 hours after its last change and the scan runs every
+5 minutes (`RUN_INTERVAL_SECONDS`, pinned to `etc/crontab.xml` by a unit
+test), so `AbandonedCart::MAX_CUTOFF_MINUTES` = 24 h minus one run = 1435
+minutes is the longest cutoff that leaves every cart one run inside the
+window. `WizardStepSaver` refuses a longer one while the reminder is on
+(nothing of the automations is saved) and leaves the stored one as it is
+while the reminder is off; Stores > Configuration and `config:set` refuse it
+through `Model\Config\Backend\AbandonedCutoff`. A longer cutoff stored before
+the limit is not rewritten: the switched-on card shows the refusal under
+**Wait (minutes)** when the page opens.
+
 **One build per store (PRO-1960).** Before the reminder rules below weigh
 the page, the cron builds every candidate's payload, grouped by store: one
 frontend emulation per store around the whole build (Magento allows one
@@ -2657,37 +2669,55 @@ Initial setup, Settings, Log. Design rules:
     wait, like `emailDesigns()`. `return_url` (the admin page) goes along
     only when it is https on the host of `Client::siteUrl()`, the site URL
     the setup exchange sends as `plugin_info.site_url`; `language` is the
-    admin locale's two letters. Only an https link is passed on, and the
-    page takes only a link on the engine's origin. The answer is `{url}`
-    with `Cache-Control: no-store`; the link is never stored, logged or
-    cached (`DesignLinkTest::testTheLinkIsNeverLogged`). Engine failures
-    map to the admin's words: 404 `unknown_email`, any other 404 (route not
-    offered), 401, 403, 429 and the rest (5xx, no answer) each have their
-    message.
+    admin locale's two letters. `display` (contract 1.31.0, CON-366, as the
+    WooCommerce plugin's CON-311) is `frame` when the page asks for one,
+    else `tab`; a frame link names the admin request's origin
+    (`EmailDesigns::requestOrigin()`) as `frame_origin` when it is not the
+    origin of `Client::siteUrl()` (§22 Embedding rule 1 (d)). The engine's
+    422 naming `frame_origin` (`EmailDesigns::refusesFrameOrigin()`) is
+    answered `400 frame_origin_not_allowed`. Only an https link is passed
+    on, and the page takes only a link on the engine's origin. The answer
+    is `{url}` with `Cache-Control: no-store`; the link is never stored,
+    logged or cached (`DesignLinkTest::testTheLinkIsNeverLogged`). Engine
+    failures map to the admin's words: 404 `unknown_email`, any other 404
+    (route not offered), 401, 403, 429 and the rest (5xx, no answer) each
+    have their message.
   - **Modal first, new tab as the fallback (Erkki, 2026-10-27: every engine
     page a connector opens shows in an in-admin modal over a darkened page;
-    a deliberate difference from the WooCommerce plugin, which opens a
-    tab).** The engine lets a design page be framed only by the origin of
-    `plugin_info.site_url`, on https (§22 Embedding rule 1).
-    `EmailDesignsData::isFrameable()` compares it with the admin request's
-    origin (`Http::getScheme()` — `isSecure()`, so a TLS proxy counts as
-    Magento counts it — and `getHttpHost(false)`). When they match, a press
-    opens the modal at once with a loading state, asks for the link, and
-    puts it in an iframe; Esc, the close button, a backdrop click and a
-    `closed` message close it, focus stays inside it and returns to the
-    button. A frame the browser refuses (CSP `frame-ancestors`, a
-    third-party cookie block) cannot be told apart from a slow one, so the
-    header always has **Open in a new tab** (a fresh link: the first one is
-    used) and a hint points at it when the frame has not loaded after 8 s.
-    When the origins differ — an admin on a host of its own, another port,
-    plain http — a press opens the page in a new tab as the WooCommerce
-    plugin does: a blank tab opened in the click itself (pop-up blockers
-    allow nothing later), its `opener` cut, sent to the link when it
-    arrives, closed with the reason on the card on a failure.
+    a modal also where the WooCommerce plugin, without `frame_origin`,
+    opens a tab).** The engine frames a design page for the origin of
+    `plugin_info.site_url` on https (§22 Embedding rule 1 (a)) and, since
+    contract 1.31.0, for the link's `frame_origin`: https, in the site
+    host's registrable domain (rule 1 (d)).
+    `EmailDesignsData::isFrameable()` is an https admin request (`Http::getScheme()` — `isSecure()`, so a TLS
+    proxy counts as Magento counts it — and `getHttpHost(false)`), as for
+    the Campaign Intelligence start. There a press opens the modal at once
+    with a loading state, mints a `display: "frame"` link — its session
+    lives in the page, not in a cookie, so it works where third-party
+    cookies are blocked (Safari) — and sets it once as the src of an iframe
+    with `allow="clipboard-read; clipboard-write; fullscreen"`,
+    `referrerpolicy="no-referrer"` and no sandbox (rule 6); every opening
+    mints its own link, never reloaded. The modal covers the window with a
+    24 px margin. The loading state lasts until the page posts `ready`
+    (not the frame's `load`, which also fires for an expired link); 20 s
+    after the src was set without one, or on `frame_origin_not_allowed`,
+    the modal says **The design page did not open.** with **Open in a new
+    tab**, which the header always offers too (a fresh `tab` link); after a
+    refused origin the page's next press opens a tab at once. Esc, the
+    close button and a backdrop click close the modal — after **Close
+    without saving?** (`window.confirm`) while the last `changes` said
+    `unsaved: true`; **Open in a new tab** does not ask (a question would
+    outlast the click's pop-up allowance, as in WooCommerce). Focus stays
+    inside the modal and returns to the button. An http admin opens the
+    page in a new tab as the WooCommerce plugin does: a blank tab opened in
+    the click itself (pop-up blockers allow nothing later), its `opener`
+    cut, sent to the link when it arrives, closed with the reason on the
+    card on a failure.
   - **Messages.** Only a message from the origin of the engine base URL
-    with `type: 'smaily_intelligence_design'` counts; `saved` reads §23
-    again, `closed` closes the modal (which reads it). The message is a
-    hint: no state or id is taken from it.
+    with `type: 'smaily_intelligence_design'` counts; `ready` ends the
+    loading state, `changes` keeps `unsaved`, `saved` reads §23 again,
+    `closed` closes the modal at once (the page asked its own question),
+    which reads it. The message is a hint: no state or id is taken from it.
   - **The pushed workflow (CON-258, as the WooCommerce plugin's CON-173
     and CON-218).** Every successful §23 read hands the list to
     `Engine\EmailDesignWorkflows::remember()`, which keeps
@@ -2823,7 +2853,8 @@ Initial setup, Settings, Log. Design rules:
   account; a Transactional account alone does not count) and only for an
   admin with `Smaily_Connect::config`. `panel/smaily-invitation-banner.phtml`
   draws marketing's banner (body, **Connect your Smaily account**, **Create
-  a Smaily account** to `https://www.sendsmaily.net`, the API-user note, a
+  a Smaily account** to Smaily's sign-up page,
+  `https://www.sendsmaily.net/account/register/`, the API-user note, a
   decorative panel with the two automations Magento has — the WooCommerce
   plugin's third row, Payment reminder, is not one) on top of setup step 1
   and of the Settings > Connection tab (the WooCommerce plugin's
@@ -2954,7 +2985,7 @@ Initial setup, Settings, Log. Design rules:
 ## Wire contracts
 
 The authoritative engine contract is
-[RECENGINE_API_CONTRACT.md](RECENGINE_API_CONTRACT.md) (v1.34.0, byte-synced
+[RECENGINE_API_CONTRACT.md](RECENGINE_API_CONTRACT.md) (v1.35.0, byte-synced
 across the Smaily connect repositories). Load-bearing invariants
 implemented here:
 

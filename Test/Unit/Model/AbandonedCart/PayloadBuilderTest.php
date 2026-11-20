@@ -30,6 +30,7 @@ use Smaily\Connect\Model\AbandonedCart\PayloadBuilder;
 use Smaily\Connect\Model\AbandonedCart\RestoreTokenManager;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\StorefrontScript;
+use Smaily\Connect\Test\Unit\Model\DescriptionTextTest;
 
 /**
  * PRO-1275: the reminder recipient falls back from quote.customer_email (set
@@ -223,6 +224,35 @@ class PayloadBuilderTest extends TestCase
             self::assertSame('199.00', $address['product_base_price_' . $slot]);
         }
         self::assertSame('2', $addresses[22]['product_quantity_2']);
+    }
+
+    /**
+     * CON-358: a product's description is the text of a Page Builder
+     * description, without its CSS rules or widget and media directives.
+     */
+    public function testAProductDescriptionIsThePageBuilderDescriptionsTextOnly(): void
+    {
+        $product = $this->createMock(Product::class);
+        $product->method('getId')->willReturn(7);
+        $product->method('getData')->willReturnMap([
+            ['short_description', null, DescriptionTextTest::PAGE_BUILDER_HTML],
+            ['description', null, null],
+        ]);
+        $product->method('getPriceInfo')->willReturn($this->priceInfo(199.0));
+
+        $collection = $this->createMock(ProductCollection::class);
+        foreach (['setStoreId', 'addAttributeToSelect', 'addIdFilter', 'addPriceData'] as $method) {
+            $collection->method($method)->willReturnSelf();
+        }
+        $collection->method('getItems')->willReturn([$product]);
+        $products = $this->createMock(ProductCollectionFactory::class);
+        $products->method('create')->willReturn($collection);
+
+        $addresses = $this->builder(products: $products)->buildAll(1, [
+            $this->quote('mari@example.com', null, null, [$this->item('Bag', 'BAG-1', 1.0, 149.0)], 21),
+        ]);
+
+        self::assertSame("A roomy canvas bag for every trip.\nPattern:", $addresses[21]['product_description_1']);
     }
 
     /**

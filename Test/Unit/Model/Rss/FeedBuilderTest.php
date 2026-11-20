@@ -24,6 +24,7 @@ use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Rss\FeedBuilder;
 use Smaily\Connect\Model\StorefrontUrl;
+use Smaily\Connect\Test\Unit\Model\DescriptionTextTest;
 
 /**
  * PRO-3660: a store with a separate storefront lists each item's link and
@@ -58,6 +59,17 @@ class FeedBuilderTest extends TestCase
         self::assertSame(self::IMAGE_URL, (string)$item->enclosure['url']);
     }
 
+    /**
+     * CON-358: an item's description is the text of a Page Builder
+     * description, without its CSS rules or widget and media directives.
+     */
+    public function testAnItemDescriptionIsThePageBuilderDescriptionsTextOnly(): void
+    {
+        $item = $this->firstItem($this->build('', DescriptionTextTest::PAGE_BUILDER_HTML));
+
+        self::assertSame("A roomy canvas bag for every trip.\nPattern:", (string)$item->description);
+    }
+
     private function firstItem(string $xml): \SimpleXMLElement
     {
         $rss = simplexml_load_string($xml);
@@ -66,7 +78,7 @@ class FeedBuilderTest extends TestCase
         return $rss->channel->item[0];
     }
 
-    private function build(string $storefrontUrl): string
+    private function build(string $storefrontUrl, string $description = ''): string
     {
         $config = $this->createMock(Config::class);
         $config->method('getStorefrontUrl')->with(3)->willReturn($storefrontUrl);
@@ -82,7 +94,9 @@ class FeedBuilderTest extends TestCase
         $product->method('getName')->willReturn('Oak table');
         $product->method('getProductUrl')->willReturn('https://backend.example.com/oak-table.html?a=1');
         $product->method('getCreatedAt')->willReturn('2026-10-01 10:00:00');
-        $product->method('getData')->willReturn('');
+        $product->method('getData')->willReturnCallback(
+            static fn (string $key = '') => $key === 'description' ? $description : ''
+        );
         $product->method('getPriceInfo')->willReturn($priceInfo);
 
         $collection = $this->createMock(Collection::class);

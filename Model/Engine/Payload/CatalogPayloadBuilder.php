@@ -24,6 +24,7 @@ use Magento\Store\Model\App\Emulation;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
+use Smaily\Connect\Model\DescriptionText;
 use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
 use Smaily\Connect\Model\StorefrontScript;
@@ -697,7 +698,7 @@ class CatalogPayloadBuilder
     private function description(Product $product): ?string
     {
         $raw = (string)($product->getData('short_description') ?: $product->getData('description'));
-        $text = trim(strip_tags($raw));
+        $text = DescriptionText::fromHtml($raw);
         if ($text === '') {
             return null;
         }

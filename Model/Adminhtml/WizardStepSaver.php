@@ -85,6 +85,10 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  *   store-wide save — and the CON-190 rules about the store-wide account do
  *   not apply: there is none. The `shape` step changes the shape
  *   (StoreLayout::toSeparateStores() / toOneStore()).
+ * - A connection save that puts another Smaily account in the place of a
+ *   saved one removes the workflows picked from the saved one (CON-396,
+ *   removeReplacedWorkflows()): no automation is sent through an account
+ *   with another account's workflow.
  * Store-wide mapping rows are website 0's. The setup-completed flag is one
  * mark for the store (default scope). Intelligence and RSS are default
  * scope as before.
@@ -118,6 +122,9 @@ class WizardStepSaver
     /** Whether the last save changed how the websites are run (CON-279). */
     private bool $shapeChanged = false;
 
+    /** Whether the last connection save removed the workflows of a replaced Smaily account (CON-396). */
+    private bool $workflowsRemoved = false;
+
     public function __construct(
         private readonly WriterInterface $configWriter,
         private readonly EncryptorInterface $encryptor,
@@ -147,6 +154,7 @@ class WizardStepSaver
         $this->returnedToStoreWide = false;
         $this->ownAccountStarted = false;
         $this->shapeChanged = false;
+        $this->workflowsRemoved = false;
         // The scope the section's saved values are read from: the selected
         // website, or for the initial setup the store (WebsiteContext).
         $websiteId = $this->websiteContext->getWebsiteId();
@@ -249,6 +257,16 @@ class WizardStepSaver
     public function isOwnAccountStarted(): bool
     {
         return $this->ownAccountStarted;
+    }
+
+    /**
+     * Whether the last save removed the workflows of a Smaily account that
+     * another account replaced (CON-396): the page shows the automations
+     * without them only after a reload.
+     */
+    public function isWorkflowsRemoved(): bool
+    {
+        return $this->workflowsRemoved;
     }
 
     /**
@@ -566,6 +584,19 @@ class WizardStepSaver
             return $errors;
         }
 
+        // The Smaily accounts this save replaces (CON-396), read before
+        // anything is written: the website's one account (in mode A the
+        // default fallback account), for a store-wide save also the one
+        // saved at the default scope, and in mode A each language's own.
+        $replaced = fn (string $saved): bool => $saved !== '' && strcasecmp($saved, $subdomain) !== 0;
+        $accountReplaced = $replaced($this->normalizer->normalize($this->config->getWebsiteSubdomain($websiteId)))
+            || ($target === null && $replaced($this->normalizer->normalize(
+                $this->config->getWebsiteSubdomain(WebsiteContext::STORE_WIDE)
+            )));
+        $replacedLanguages = $previousMode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
+            ? $this->replacedLanguageAccounts($data, $heldAccounts)
+            : [];
+
         // The initial setup's Connect step (`initial_setup`) continues only
         // with an account Smaily accepts, as in the WooCommerce and Shopify
         // setups (CON-417): it is checked before anything is saved, and a
@@ -613,10 +644,11 @@ class WizardStepSaver
         // the per-store-view credential overrides written for this website's
         // per-language accounts are removed, so every store view of this
         // website follows the single account again. The per-language
-        // workflow rows are kept for a switch back to mode A; the Router and
-        // the mapping editor read only the active mode's rows (mode B never
-        // posts them through the single account,
-        // Mapping\Collection::addModeFilter(), CON-184).
+        // workflow rows stay in the table, but the Router and the mapping
+        // editor read only the active mode's rows (mode B never posts them
+        // through the single account, Mapping\Collection::addModeFilter(),
+        // CON-184), and a switch back to mode A removes them: their
+        // accounts are gone (removeReplacedWorkflows(), CON-396).
         if ($previousMode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
             && $mode !== MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
             && $websiteId !== WebsiteContext::STORE_WIDE
@@ -628,6 +660,14 @@ class WizardStepSaver
                 }
             }
         }
+
+        $this->workflowsRemoved = $this->removeReplacedWorkflows(
+            $target,
+            $accountReplaced,
+            $replacedLanguages,
+            $previousMode !== MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
+                && $mode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
+        );
 
         if ($storefrontUrl !== null) {
             $savedStorefrontUrl = StorefrontUrl::normalize(
@@ -758,6 +798,94 @@ class WizardStepSaver
         }
 
         return null;
+    }
+
+    /**
+     * Mode A to mode A: the languages whose posted account is another
+     * Smaily account (another subdomain) than the one its store view held
+     * before the save. A block without both a subdomain and a username
+     * saves no account and replaces none.
+     *
+     * @param array<string, mixed> $data
+     * @param array<int, array{language: string, account: string, password: string}> $heldAccounts
+     * @return string[]
+     */
+    private function replacedLanguageAccounts(array $data, array $heldAccounts): array
+    {
+        $languages = [];
+        foreach ((array)($data['accounts'] ?? []) as $account) {
+            if (!is_array($account)) {
+                continue;
+            }
+            $language = (string)($account['language'] ?? '');
+            $storeId = $language === '' ? null : $this->representativeStoreId($heldAccounts, $language);
+            $accountSubdomain = $this->normalizer->normalize((string)($account['subdomain'] ?? ''));
+            if ($storeId === null || $accountSubdomain === '' || trim((string)($account['username'] ?? '')) === '') {
+                continue;
+            }
+            $heldSubdomain = $this->normalizer->normalize(explode("\n", $heldAccounts[$storeId]['account'])[0]);
+            if ($heldSubdomain !== '' && strcasecmp($heldSubdomain, $accountSubdomain) !== 0) {
+                $languages[] = $language;
+            }
+        }
+
+        return $languages;
+    }
+
+    /**
+     * A workflow belongs to the Smaily account it was picked from (CON-396):
+     * where a save puts another Smaily account in the place of a saved one,
+     * the workflows picked from the saved one are removed, and those
+     * automations send nothing until a workflow of the new account is
+     * picked. Another API user of the same subdomain lists the same
+     * workflows and replaces nothing.
+     * - The one account: the workflows saved at the written scope, and at
+     *   every website that sends through it — for a store-wide save each
+     *   website without a Smaily account of its own; a single-website
+     *   install's store and website are one, so both scopes.
+     * - A language's own account (mode A): that language's rows.
+     * - Entering mode A: the rows of the per-language accounts saved in an
+     *   earlier mode A, whose accounts leaving it removed.
+     * Returns whether any workflow was removed.
+     *
+     * @param string[] $replacedLanguages
+     */
+    private function removeReplacedWorkflows(
+        ?int $target,
+        bool $accountReplaced,
+        array $replacedLanguages,
+        bool $perLanguageStarted
+    ): bool {
+        $removed = false;
+        if ($accountReplaced) {
+            $single = !$this->websiteContext->hasMultipleWebsites();
+            $websiteIds = $target === null ? [] : [$target];
+            if ($target === null || $single) {
+                $removed = $this->overrides->removeWorkflows(null, Mapping::ACCOUNT_DEFAULT);
+            }
+            if ($target === null) {
+                $ownAccounts = $this->overrides->ownValues(WebsiteOverrides::CONNECTION);
+                foreach ($this->storeManager->getWebsites() as $website) {
+                    $id = (int)$website->getId();
+                    if ($single || !isset($ownAccounts[$id][Config::XML_PATH_SUBDOMAIN])) {
+                        $websiteIds[] = $id;
+                    }
+                }
+            }
+            foreach ($websiteIds as $id) {
+                $removed = $this->overrides->removeWorkflows($id, Mapping::ACCOUNT_DEFAULT) || $removed;
+            }
+        }
+        if ($target !== null) {
+            if ($perLanguageStarted) {
+                $removed = $this->overrides->removeWorkflows($target, null) || $removed;
+            }
+            foreach ($replacedLanguages as $language) {
+                $removed = $this->overrides->removeWorkflows($target, $language) || $removed;
+            }
+        }
+
+        return $removed;
     }
 
     /**
@@ -1053,12 +1181,15 @@ class WizardStepSaver
         // Router prefers over website 0's.
         // Only the rows of the mode the panel posts them for are replaced:
         // the other per-language mode's rows stay for a switch back (CON-188).
+        // A website's own rows hide the store-wide rows it reads beside them,
+        // also where it clears a workflow (CON-396).
         if (isset($data['mappings']) && is_array($data['mappings'])) {
             return $this->mappingSaver->save(
                 $data['mappings'],
                 $target ?? 0,
                 $this->availableWorkflowIdsByAccount($websiteId),
-                (string)($data['mappings_mode'] ?? $this->config->getMultilingualMode($websiteId))
+                (string)($data['mappings_mode'] ?? $this->config->getMultilingualMode($websiteId)),
+                $target !== null && !$ownAccount
             );
         }
 

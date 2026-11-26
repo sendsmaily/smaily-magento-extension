@@ -107,6 +107,8 @@ class WizardStepSaverTest extends TestCase
         $this->transactionalSaver = $this->createMock(TransactionalSettingsSaver::class);
         $this->overrides = $this->createMock(WebsiteOverrides::class);
         $this->storeLayout = $this->createMock(StoreLayout::class);
+        $storeManager = $this->createMock(StoreManagerInterface::class);
+        $storeManager->method('getWebsites')->willReturn([]);
 
         $this->saved = [];
         $this->configWriter->method('save')->willReturnCallback(
@@ -130,7 +132,7 @@ class WizardStepSaverTest extends TestCase
             $this->accountResolver,
             $this->config,
             $this->websiteContext,
-            $this->createMock(StoreManagerInterface::class),
+            $storeManager,
             $this->mappingSaver,
             $this->clientProvider,
             new ConfigRowNormalizer(),

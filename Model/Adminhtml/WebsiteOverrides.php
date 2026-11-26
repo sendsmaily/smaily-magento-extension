@@ -473,6 +473,53 @@ class WebsiteOverrides
     }
 
     /**
+     * Removes the workflows picked from one Smaily account of a scope
+     * (CON-396): a workflow belongs to the account it was picked from, so
+     * an account that another Smaily account replaces takes its workflows
+     * with it. $websiteId null is the store-wide scope (the default scope,
+     * the mapping rows of website 0). $accountKey names the account:
+     * Mapping::ACCOUNT_DEFAULT is the scope's one account, whose workflows
+     * are also the automations' workflows saved at the scope (set to none
+     * where the scope holds one); null is every per-language account (mode
+     * A) of the website; else a language's own account. A row without a
+     * workflow (MappingSaver's hiding row) names no account's workflow and
+     * stays. Returns whether any workflow was removed.
+     */
+    public function removeWorkflows(?int $websiteId, ?string $accountKey): bool
+    {
+        $connection = $this->resource->getConnection();
+        $removed = false;
+        if ($accountKey === Mapping::ACCOUNT_DEFAULT) {
+            $scope = $websiteId === null ? ScopeConfigInterface::SCOPE_TYPE_DEFAULT : ScopeInterface::SCOPE_WEBSITES;
+            foreach ($connection->fetchPairs(
+                $connection->select()
+                    ->from($this->resource->getTableName('core_config_data'), ['path', 'value'])
+                    ->where('scope = ?', $scope)
+                    ->where('scope_id = ?', $websiteId ?? 0)
+                    ->where('path IN (?)', self::WORKFLOW_PATHS)
+            ) as $path => $value) {
+                if ((int)$value > 0) {
+                    $this->configWriter->save((string)$path, '0', $scope, $websiteId ?? 0);
+                    $removed = true;
+                }
+            }
+        }
+        $where = [
+            'website_id = ?' => $websiteId ?? 0,
+            'trigger_type IN (?)' => Trigger::ALL,
+            'workflow_id > ?' => 0,
+        ];
+        if ($accountKey === null) {
+            $where['account_key NOT IN (?)'] = [Mapping::ACCOUNT_DEFAULT, Mapping::ACCOUNT_TRANSACTIONAL];
+        } else {
+            $where['account_key = ?'] = $accountKey;
+        }
+
+        return $connection->delete($this->resource->getTableName(MappingResource::TABLE_NAME), $where) > 0
+            || $removed;
+    }
+
+    /**
      * @return int[]
      */
     private function websiteIds(): array

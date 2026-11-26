@@ -145,6 +145,15 @@ class Client
     public const PATH_CONSOLE_ENTRY = '/api/v1/console/entry';
 
     /**
+     * Fallback paths of a Campaign Intelligence email's test send (§19) and
+     * real-sends switch (§20), map keys `automations_test_send` and
+     * `automations_go_live`, for a connection exchanged before the engine
+     * returned them. `{key}` is a placeholder like `{email}`.
+     */
+    public const PATH_AUTOMATIONS_TEST_SEND = '/api/v1/automations/{key}/test-send';
+    public const PATH_AUTOMATIONS_GO_LIVE = '/api/v1/automations/{key}/go-live';
+
+    /**
      * @var array{request: array<int|string, mixed>, response: array{http_status: int, body: mixed}|null}|null
      */
     private ?array $lastExchange = null;
@@ -605,6 +614,56 @@ class Client
             singleAttempt: true,
             timeoutSeconds: self::EMAIL_DESIGNS_TIMEOUT_SECONDS
         );
+    }
+
+    /**
+     * One test email of a Campaign Intelligence email (§19) to one address
+     * the admin typed: `{ok, trigger_key, accepted_at, sender}`. One
+     * attempt, no retry and no wait: a retry after a 502 can send a second
+     * email (§19), so the admin presses again.
+     *
+     * @return array<string, mixed>
+     */
+    public function automationTestSend(string $key, string $email): array
+    {
+        return $this->request(
+            'POST',
+            $this->automationEndpoint('automations_test_send', self::PATH_AUTOMATIONS_TEST_SEND, $key),
+            ['email' => $email],
+            singleAttempt: true,
+            timeoutSeconds: self::EMAIL_DESIGNS_TIMEOUT_SECONDS
+        );
+    }
+
+    /**
+     * Switch a Campaign Intelligence email's real sends on or off (§20):
+     * `{ok, trigger_key, changed, setup_state, live_since, daily_limit}`.
+     * On (test mode off) carries the admin's confirmation and the admin's
+     * user id, never an email address or a name; off carries `live` only.
+     * One attempt, as the admin waits on it.
+     *
+     * @return array<string, mixed>
+     */
+    public function automationRealSends(string $key, bool $live, string $switchedBy): array
+    {
+        $body = $live ? ['live' => true, 'confirmed' => true, 'switched_by' => $switchedBy] : ['live' => false];
+
+        return $this->request(
+            'POST',
+            $this->automationEndpoint('automations_go_live', self::PATH_AUTOMATIONS_GO_LIVE, $key),
+            $body,
+            singleAttempt: true,
+            timeoutSeconds: self::EMAIL_DESIGNS_TIMEOUT_SECONDS
+        );
+    }
+
+    /**
+     * An automation endpoint with its `{key}` placeholder replaced by the
+     * URL-encoded catalogue key (§1), never printf'd.
+     */
+    private function automationEndpoint(string $mapKey, string $fallbackPath, string $key): string
+    {
+        return str_replace('{key}', rawurlencode($key), $this->endpoint($mapKey, $fallbackPath));
     }
 
     /**

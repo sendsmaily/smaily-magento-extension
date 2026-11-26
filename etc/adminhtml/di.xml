@@ -22,13 +22,4 @@
             </argument>
         </arguments>
     </type>
-
-    <!-- Admin grid data sources. -->
-    <type name="Magento\Framework\View\Element\UiComponent\DataProvider\CollectionFactory">
-        <arguments>
-            <argument name="collections" xsi:type="array">
-                <item name="smaily_log_grid_data_source" xsi:type="string">Smaily\Connect\Model\ResourceModel\Log\Collection</item>
-            </argument>
-        </arguments>
-    </type>
 </config>

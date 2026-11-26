@@ -1184,25 +1184,34 @@ below.
   parks, one line ("Ingest events failed permanently"). Both queues write
   through the one `Model\Queue\RowWriter`, and a row parked alone gets the
   same line as a group, with a count of 1.
-- **A catalog row never goes after a newer one (CON-423).** A catalog
-  row carries the product's whole state as the store saw it when the row
-  was built, and the engine takes the last row it gets. Rows go in id
-  order, but a row that failed waits on the ladder while later rows of
-  the product go, and the Log's Retry and Send again send an older row
-  late — the older stock or price went back, and the engine read each
-  stock flip as a real one. `FlushIngestQueue` hands every claimed catalog
-  batch to `IngestQueue::supersededRows()` first: of the batch's rows of
-  one product only the latest goes, and that one does not go either when
-  a later row of the product (same connection) is queued, being sent or
+- **A catalog, customer or order row never goes after a newer one
+  (CON-423, CON-448).** A catalog row carries the product's whole state
+  as the store saw it when the row was built, a customers row the
+  customer's, an orders row the order's, and the engine takes the last
+  row it gets (an order row replaces the order and its lines; a customer
+  row with a new email renames the customer its `external_id` names,
+  contract §4 Identity). Rows go in id order, but a row that failed waits
+  on the ladder while later rows of the entity go, and the Log's Retry
+  and Send again send an older row late — the older stock or price, the
+  order as it was before its refund, the customer's old email went back,
+  and the engine read each stock flip as a real one. `FlushIngestQueue`
+  hands every claimed batch of a domain in `IngestQueue::SUPERSEDED_REASONS`
+  to `IngestQueue::supersededRows()` first: of the batch's rows of one
+  entity (the row's `entity_id`: product id, customer id, order increment
+  id) only the latest goes, and that one does not go either when a later
+  row of the entity (same connection) is queued, being sent or
   delivered. A row's place is its id, or for a Send again row the id of
   the row it sends again (`Log\Resend`'s record). Only a row that may go
   late — tried before (attempts, or the error a Retry keeps) or sent again
   — is looked up, in one read for the batch; a row that keeps its turn
   goes before every later row by the claim order. The rows it names are
-  closed by `markSkipped()` as `sent` with `IngestQueue::SKIPPED_SUPERSEDED`
-  in `last_error`, which the Log (`Collection::intelligenceStatusExpression()`,
-  `QueueRowLoader`) and the Dashboard read as Skipped, as for the
-  marketing queue. The stock hooks' duplicate check
+  closed by `markSkipped()` as `sent` with the domain's reason
+  (`SUPERSEDED_REASONS`) in `last_error`, which the Log
+  (`Collection::intelligenceStatusExpression()`, `QueueRowLoader`) and
+  the Dashboard read as Skipped, as for the marketing queue. A history
+  import's row follows the same rule; a skipped one is not counted in the
+  job's `sent_count`. Browse events are not states and are never skipped.
+  The stock hooks' duplicate check
   (`latestUndeliveredPayloads()`) does not compare with a row that may go
   late: it may be skipped, so a row equal to it is queued.
 - **Smaily envelope codes (PRO-1962; proposed as the cross-platform

@@ -19,6 +19,7 @@ use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Log\QueueRowLoader;
 use Smaily\Connect\Model\Log\Resend;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\OptOutReplay;
@@ -596,6 +597,149 @@ class FlushIngestQueueTest extends IntegrationTestCase
         $rows = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), null, 'event_uuid');
         self::assertSame(IngestEvent::STATUS_SENT, $rows['f-old']['status']);
         self::assertNull($rows['f-old']['last_error']);
+    }
+
+    /**
+     * CON-448: an order row carries the whole order, as a catalog row the
+     * whole product. A history import's row of an order that failed waits
+     * for its retry while the order's refund row goes; at its retry it is
+     * skipped, never sent: it would put the order back as it was before the
+     * refund. Another order's row in the batch goes.
+     */
+    public function testARetriedOrderRowIsSkippedOnceALaterRowOfTheOrderWent(): void
+    {
+        $jobId = (int)$this->objectManager->create(JobManager::class)->start('orders', 'engine', 0)->getId();
+        $this->queue->enqueue(Client::DOMAIN_ORDERS, [
+            'external_order_id' => '100000007',
+            'status' => 'complete',
+        ], '100000007', null, 'o-old', $jobId);
+        $this->queue->markFailed($this->queue->claimBatch(Client::DOMAIN_ORDERS, 10)[0], 'HTTP 503');
+        $this->queue->enqueue(Client::DOMAIN_ORDERS, [
+            'external_order_id' => '100000007',
+            'status' => 'refunded',
+        ], '100000007', null, 'o-new');
+        $this->queue->markSent($this->queue->claimBatch(Client::DOMAIN_ORDERS, 10)[0]);
+        $this->queue->enqueue(Client::DOMAIN_ORDERS, ['external_order_id' => '100000008'], '100000008', null, 'o-other');
+        $this->clock->travel(IngestQueue::BACKOFF_SECONDS[0]);
+
+        $client = $this->createMock(Client::class);
+        $client->expects(self::once())->method('ingest')
+            ->with(Client::DOMAIN_ORDERS, self::callback(
+                static fn (array $items): bool => array_column($items, 'event_id') === ['o-other']
+            ))
+            ->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+        $this->runCron($client);
+
+        $rows = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(IngestEvent::STATUS_SENT, $rows['o-old']['status']);
+        self::assertSame(IngestQueue::SKIPPED_SUPERSEDED_ORDER, $rows['o-old']['last_error']);
+        self::assertSame('1', (string)$rows['o-old']['attempts'], 'Closed without another attempt');
+        self::assertSame(IngestEvent::STATUS_SENT, $rows['o-other']['status']);
+        self::assertNull($rows['o-other']['last_error']);
+        self::assertSame(0, $this->queue->countUndelivered([$jobId]), 'The import does not wait for the row');
+    }
+
+    /**
+     * CON-448: the same for a customer row. The queue names the customer by
+     * the store's customer id, as the engine does when the email changed
+     * (contract §4 Identity): an older row sent late would put the old
+     * email back.
+     */
+    public function testARetriedCustomerRowIsSkippedOnceALaterRowOfTheCustomerWent(): void
+    {
+        $this->queue->enqueue(Client::DOMAIN_CUSTOMERS, [
+            'email' => 'old@example.invalid',
+            'external_id' => '5',
+        ], '5', null, 'c-old');
+        $this->queue->markFailed($this->queue->claimBatch(Client::DOMAIN_CUSTOMERS, 10)[0], 'HTTP 503');
+        $this->queue->enqueue(Client::DOMAIN_CUSTOMERS, [
+            'email' => 'new@example.invalid',
+            'external_id' => '5',
+        ], '5', null, 'c-new');
+        $this->queue->markSent($this->queue->claimBatch(Client::DOMAIN_CUSTOMERS, 10)[0]);
+        $this->queue->enqueue(Client::DOMAIN_CUSTOMERS, [
+            'email' => 'other@example.invalid',
+            'external_id' => '6',
+        ], '6', null, 'c-other');
+        $this->clock->travel(IngestQueue::BACKOFF_SECONDS[0]);
+
+        $client = $this->createMock(Client::class);
+        $client->expects(self::once())->method('ingest')
+            ->with(Client::DOMAIN_CUSTOMERS, self::callback(
+                static fn (array $items): bool => array_column($items, 'event_id') === ['c-other']
+            ))
+            ->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+        $this->runCron($client);
+
+        $rows = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(IngestEvent::STATUS_SENT, $rows['c-old']['status']);
+        self::assertSame(IngestQueue::SKIPPED_SUPERSEDED_CUSTOMER, $rows['c-old']['last_error']);
+        self::assertSame(IngestEvent::STATUS_SENT, $rows['c-other']['status']);
+        self::assertNull($rows['c-other']['last_error']);
+    }
+
+    /**
+     * CON-448: of two rows of an order, or of a customer, that come due
+     * together only the later goes.
+     */
+    public function testOfTwoRowsOfAnOrderOrACustomerThatComeDueTogetherOnlyTheLaterGoes(): void
+    {
+        $this->queue->enqueue(Client::DOMAIN_ORDERS, ['status' => 'processing'], '100000007', null, 'ob-1');
+        $this->queue->enqueue(Client::DOMAIN_ORDERS, ['status' => 'complete'], '100000007', null, 'ob-2');
+        $this->queue->enqueue(Client::DOMAIN_CUSTOMERS, ['email' => 'a@example.invalid'], '5', null, 'cb-1');
+        $this->queue->enqueue(Client::DOMAIN_CUSTOMERS, ['email' => 'b@example.invalid'], '5', null, 'cb-2');
+
+        $sent = [];
+        $client = $this->createMock(Client::class);
+        $client->method('ingest')->willReturnCallback(
+            static function (string $domain, array $items) use (&$sent): array {
+                $sent[$domain] = array_column($items, 'event_id');
+
+                return ['processed' => count($items), 'deduplicated' => 0, 'errors' => []];
+            }
+        );
+        $this->runCron($client);
+
+        self::assertSame([Client::DOMAIN_CUSTOMERS => ['cb-2'], Client::DOMAIN_ORDERS => ['ob-2']], $sent);
+        $rows = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(IngestQueue::SKIPPED_SUPERSEDED_ORDER, $rows['ob-1']['last_error']);
+        self::assertSame(IngestQueue::SKIPPED_SUPERSEDED_CUSTOMER, $rows['cb-1']['last_error']);
+    }
+
+    /**
+     * CON-448: the Log's "Retry" of an older order row and its "Send again"
+     * of an older customer row follow the same rule once a later row went.
+     */
+    public function testTheLogsRetryAndSendAgainOfAnOlderOrderOrCustomerRowAreSkipped(): void
+    {
+        $this->queue->enqueue(Client::DOMAIN_ORDERS, ['status' => 'complete'], '100000007', null, 'ol-old');
+        $this->queue->markFailed($this->queue->claimBatch(Client::DOMAIN_ORDERS, 10)[0], 'HTTP 400', true);
+        $this->queue->enqueue(Client::DOMAIN_ORDERS, ['status' => 'closed'], '100000007', null, 'ol-new');
+        $this->queue->markSent($this->queue->claimBatch(Client::DOMAIN_ORDERS, 10)[0]);
+        $this->queue->enqueue(Client::DOMAIN_CUSTOMERS, ['email' => 'old@example.invalid'], '5', null, 'cl-old');
+        $this->queue->markFailed($this->queue->claimBatch(Client::DOMAIN_CUSTOMERS, 10)[0], 'HTTP 400', true);
+        $this->queue->enqueue(Client::DOMAIN_CUSTOMERS, ['email' => 'new@example.invalid'], '5', null, 'cl-new');
+        $this->queue->markSent($this->queue->claimBatch(Client::DOMAIN_CUSTOMERS, 10)[0]);
+
+        $ids = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), 'id', 'event_uuid');
+        self::assertSame(1, $this->queue->retry([(int)$ids['ol-old']]));
+        $row = $this->objectManager->create(QueueRowLoader::class)->load('intelligence-' . $ids['cl-old']);
+        self::assertIsArray($row);
+        self::assertTrue($this->objectManager->create(Resend::class)->resend($row, 'admin'));
+
+        $client = $this->createMock(Client::class);
+        $client->expects(self::never())->method('ingest');
+        $this->runCron($client);
+
+        $rows = $this->fetchAll(IngestEventResource::TABLE_NAME);
+        self::assertCount(5, $rows);
+        $byUuid = array_column($rows, null, 'event_uuid');
+        self::assertSame(IngestEvent::STATUS_SENT, $byUuid['ol-old']['status']);
+        self::assertSame(IngestQueue::SKIPPED_SUPERSEDED_ORDER, $byUuid['ol-old']['last_error']);
+        $again = end($rows);
+        self::assertSame('5', (string)$again['entity_id']);
+        self::assertSame(IngestEvent::STATUS_SENT, $again['status']);
+        self::assertSame(IngestQueue::SKIPPED_SUPERSEDED_CUSTOMER, $again['last_error']);
     }
 
     /**

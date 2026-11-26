@@ -73,8 +73,11 @@ class FailureMessage
         IdentityMergeHandler::SKIPPED_OPTED_OUT,
         AbandonedCart::SKIPPED_RECENTLY_REMINDED,
         AbandonedCart::SKIPPED_UNSUBSCRIBED_IN_STORE,
-        // A catalog row a newer row of the product superseded (CON-423).
+        // A catalog, customer or order row a newer row of the same entity
+        // superseded (CON-423, CON-448).
         IngestQueue::SKIPPED_SUPERSEDED,
+        IngestQueue::SKIPPED_SUPERSEDED_CUSTOMER,
+        IngestQueue::SKIPPED_SUPERSEDED_ORDER,
         // Why a nightly catalog manifest was not sent (PRO-3854).
         CatalogManifest::TOO_MANY_PRODUCTS,
         // Why an identity merge that met `404 customer_not_found` was parked (CON-262).

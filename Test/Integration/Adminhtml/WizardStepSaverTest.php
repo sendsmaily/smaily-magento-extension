@@ -261,7 +261,8 @@ class WizardStepSaverTest extends IntegrationTestCase
             $this->createMock(RuleSource::class),
             $this->createMock(StoreDate::class),
             $this->storeLayout($storeManager),
-            $this->createMock(SharedAccountModes::class)
+            $this->createMock(SharedAccountModes::class),
+            $this->router()
         );
     }
 

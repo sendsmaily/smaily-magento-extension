@@ -841,7 +841,7 @@ class WizardData implements ArgumentInterface
         if (!$this->isMultilingualModeSaved()) {
             return MultilingualMode::MODE_PER_LANGUAGE_WORKFLOWS;
         }
-        $mode =$this->config->getMultilingualMode($this->websiteContext->getWebsiteId())
+        $mode = $this->config->getMultilingualMode($this->websiteContext->getWebsiteId())
             ?: MultilingualMode::MODE_SINGLE;
 
         // Per-language accounts are a website's own on a 2+-website install

@@ -646,7 +646,10 @@ class Client
      */
     public function automationRealSends(string $key, bool $live, string $switchedBy): array
     {
-        $body = $live ? ['live' => true, 'confirmed' => true, 'switched_by' => $switchedBy] : ['live' => false];
+        $body = $live ? ['live' => true, 'confirmed' => true] : ['live' => false];
+        if ($live && $switchedBy !== '') {
+            $body['switched_by'] = $switchedBy;
+        }
 
         return $this->request(
             'POST',

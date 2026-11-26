@@ -117,6 +117,26 @@ class SyncDispatcher
     }
 
     /**
+     * A customer's first-order email (CON-387): read and sent by the queue
+     * handler as a reminder is, by the same rule — never to a contact who
+     * unsubscribed in Smaily, and to an address Smaily does not have only
+     * when $toNewContact.
+     *
+     * @param array<string, string|int> $address must contain "email"
+     */
+    public function dispatchFirstOrder(int $storeId, array $address, bool $toNewContact): void
+    {
+        $payload = $this->automationPayload(Trigger::FIRST_ORDER, $storeId, $address);
+        $payload[AutomationHandler::CONTACT_CHECK] = ['new_contact' => $toNewContact];
+        $this->eventQueue->enqueue(
+            EventType::AUTOMATION_TRIGGER,
+            $payload,
+            $this->contactEntity->of((string)($address['email'] ?? '')),
+            $this->websiteId($storeId)
+        );
+    }
+
+    /**
      * Records an automation in the Log as skipped, with the reason, instead
      * of queueing it to be sent; the row shows what dispatchAutomation()
      * would have sent.

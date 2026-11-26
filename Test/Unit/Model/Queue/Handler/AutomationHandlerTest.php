@@ -495,6 +495,45 @@ class AutomationHandlerTest extends TestCase
         self::assertSame([1 => $failure], $results);
     }
 
+    /**
+     * CON-387: a first-order email reads its contact by the same rule. It has
+     * no cart, so a skip closes only its row.
+     *
+     * @dataProvider contactReadCases
+     * @param array<int|string, mixed>|\Throwable $contact
+     */
+    public function testAFirstOrderEmailGoesByTheContactInSmaily(
+        array|\Throwable $contact,
+        bool $newContact,
+        ?string $skipReason
+    ): void {
+        $client = $this->createMock(SmailyClient::class);
+        $read = $client->expects(self::once())->method('get')
+            ->with(SmailyClient::ENDPOINT_CONTACT, ['email' => 'person@example.com']);
+        $contact instanceof \Throwable ? $read->willThrowException($contact) : $read->willReturn($contact);
+        $client->expects($skipReason === null ? self::once() : self::never())->method('post');
+        $cartState = $this->createMock(StateManager::class);
+        $cartState->expects(self::never())->method('markReminderSkipped');
+
+        $event = $this->firstOrderEvent($newContact);
+        $results = $this->reminderHandler($client, $cartState)->handle([$event]);
+
+        self::assertEquals([1 => $skipReason === null ? true : new Skipped($skipReason)], $results);
+    }
+
+    public function testAFirstOrderEmailWaitsWhenSmailyCannotBeRead(): void
+    {
+        $failure = new TransportException('Smaily API request failed with HTTP 503', 503);
+        $client = $this->createMock(SmailyClient::class);
+        $client->method('get')->willThrowException($failure);
+        $client->expects(self::never())->method('post');
+
+        $event = $this->firstOrderEvent(true);
+        $results = $this->reminderHandler($client, $this->createMock(StateManager::class))->handle([$event]);
+
+        self::assertSame([1 => $failure], $results);
+    }
+
     public function testAnotherAutomationIsPostedWithoutAContactRead(): void
     {
         $client = $this->createMock(SmailyClient::class);
@@ -614,6 +653,22 @@ class AutomationHandlerTest extends TestCase
         }
         $this->eventQueue = $this->createMock(EventQueue::class);
         $this->eventQueue->method('decodePayload')->willReturn($payload);
+        $event = $this->createMock(Event::class);
+        $event->method('getId')->willReturn(1);
+
+        return $event;
+    }
+
+    private function firstOrderEvent(bool $newContact): Event
+    {
+        $this->eventQueue = $this->createMock(EventQueue::class);
+        $this->eventQueue->method('decodePayload')->willReturn([
+            'trigger_type' => 'first_order',
+            'store_id' => 1,
+            'website_id' => 1,
+            'address' => ['email' => 'person@example.com'],
+            AutomationHandler::CONTACT_CHECK => ['new_contact' => $newContact],
+        ]);
         $event = $this->createMock(Event::class);
         $event->method('getId')->willReturn(1);
 

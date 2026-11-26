@@ -15,6 +15,8 @@ use Magento\Newsletter\Model\SubscriptionManagerInterface;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Magento\Store\Model\StoreManagerInterface;
+use Smaily\Connect\Cron\AbandonedCart;
+use Smaily\Connect\Model\AbandonedCart\ReminderConsent;
 use Smaily\Connect\Model\AbandonedCart\StateManager;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Config;
@@ -28,7 +30,8 @@ use Smaily\Connect\Model\ContactSync\SyncDispatcher;
  * 2. A cart that WAS reminded gets its purchase marker (and its still-queued
  *    reminder withdrawn), so the follow-up workflow can exit.
  * 3. Checkout newsletter opt-in and guest-email contact sync.
- * 4. First-order automation for a customer's first purchase.
+ * 4. First-order automation for a customer's first purchase, by the
+ *    abandoned-cart reminder's rule (ReminderConsent, CON-387).
  */
 class OrderPlaced implements ObserverInterface
 {
@@ -40,7 +43,8 @@ class OrderPlaced implements ObserverInterface
         private readonly OrderCollectionFactory $orderCollectionFactory,
         private readonly StoreManagerInterface $storeManager,
         private readonly SubscriptionManagerInterface $subscriptionManager,
-        private readonly StorefrontSubscription $storefrontSubscription
+        private readonly StorefrontSubscription $storefrontSubscription,
+        private readonly ReminderConsent $consent
     ) {
     }
 
@@ -78,7 +82,7 @@ class OrderPlaced implements ObserverInterface
 
         $this->markCartPurchased($email, $storeId, $websiteId, $wasReminded);
         $this->syncContact($order, $email, $storeId, $websiteId, $optedIn);
-        $this->triggerFirstOrder($order, $email, $storeId, $websiteId);
+        $this->triggerFirstOrder($order, $email, $storeId, $websiteId, $optedIn);
     }
 
     /**
@@ -144,8 +148,20 @@ class OrderPlaced implements ObserverInterface
         }
     }
 
-    private function triggerFirstOrder(OrderInterface $order, string $email, int $storeId, int $websiteId): void
-    {
+    /**
+     * Who gets the first-order email follows the website's contact-sync mode,
+     * as the abandoned-cart reminder does (CON-387): a customer unsubscribed
+     * in the store under legitimate interest is recorded in the Log as
+     * skipped; every other email is queued, and the queue reads the contact
+     * in Smaily before it sends (AutomationHandler::CONTACT_CHECK).
+     */
+    private function triggerFirstOrder(
+        OrderInterface $order,
+        string $email,
+        int $storeId,
+        int $websiteId,
+        bool $optedIn
+    ): void {
         $customerId = (int)$order->getCustomerId();
         if ($customerId <= 0 || !$this->config->isFirstOrderEnabled($websiteId)) {
             return;
@@ -184,6 +200,35 @@ class OrderPlaced implements ObserverInterface
             // Store name is decorative in the payload; proceed without it.
         }
 
-        $this->dispatcher->dispatchAutomation(Trigger::FIRST_ORDER, $storeId, $address);
+        $verdict = $this->consent->verdict($websiteId, $this->storeIds($websiteId), $email, $customerId, $optedIn);
+        if ($verdict === ReminderConsent::SKIP_UNSUBSCRIBED) {
+            $this->dispatcher->recordSkippedAutomation(
+                Trigger::FIRST_ORDER,
+                $storeId,
+                $address,
+                AbandonedCart::SKIPPED_UNSUBSCRIBED_IN_STORE
+            );
+
+            return;
+        }
+
+        $this->dispatcher->dispatchFirstOrder($storeId, $address, $verdict === ReminderConsent::SEND);
+    }
+
+    /**
+     * The website's store views, whose newsletter records are the customer's.
+     *
+     * @return int[]
+     */
+    private function storeIds(int $websiteId): array
+    {
+        $storeIds = [];
+        foreach ($this->storeManager->getStores() as $store) {
+            if ((int)$store->getWebsiteId() === $websiteId) {
+                $storeIds[] = (int)$store->getId();
+            }
+        }
+
+        return $storeIds;
     }
 }

@@ -38,6 +38,10 @@ use Smaily\Connect\Model\Privacy\AddressMatch;
  * A newsletter record is the cart's when it holds the cart's address in any
  * letter case, a capital with an accent too; an address that differs by an
  * accent is another shopper's (CON-243, AddressMatch).
+ *
+ * The first-order email follows the same rule (CON-387, verdict()): the
+ * order's checkout tick is the cart's, and the queue reads the contact in
+ * Smaily before it sends, as for a reminder.
  */
 class ReminderConsent
 {
@@ -76,21 +80,48 @@ class ReminderConsent
 
         $verdicts = [];
         foreach ($carts as $quoteId => $cart) {
-            $status = $this->statusOf($cart, $statuses);
-            if (isset($ticked[$quoteId])) {
-                $verdicts[$quoteId] = self::SEND;
-            } elseif (!$requiresOptin) {
-                $verdicts[$quoteId] = $status === Subscriber::STATUS_UNSUBSCRIBED
-                    ? self::SKIP_UNSUBSCRIBED
-                    : self::SEND;
-            } else {
-                $verdicts[$quoteId] = $status === Subscriber::STATUS_SUBSCRIBED
-                    ? self::SEND
-                    : self::SEND_TO_SUBSCRIBED_CONTACT;
-            }
+            $verdicts[$quoteId] = self::decide(
+                isset($ticked[$quoteId]),
+                $requiresOptin,
+                $this->statusOf($cart, $statuses)
+            );
         }
 
         return $verdicts;
+    }
+
+    /**
+     * The verdict for one shopper of one website: a customer's first order
+     * (CON-387), $ticked when they ticked the checkout newsletter box on it.
+     *
+     * @param int[] $storeIds the website's store views
+     * @return string self::SEND, SEND_TO_SUBSCRIBED_CONTACT or SKIP_UNSUBSCRIBED
+     */
+    public function verdict(int $websiteId, array $storeIds, string $email, int $customerId, bool $ticked): string
+    {
+        $shopper = ['email' => $email, 'customer_id' => $customerId];
+
+        return self::decide(
+            $ticked,
+            $this->mode->requiresOptin($websiteId),
+            $this->statusOf($shopper, $this->newsletterStatuses($storeIds, [$shopper]))
+        );
+    }
+
+    /**
+     * The rule itself, for a shopper's tick, the website's mode and their
+     * newsletter status on the website.
+     */
+    private static function decide(bool $ticked, bool $requiresOptin, ?int $status): string
+    {
+        if ($ticked) {
+            return self::SEND;
+        }
+        if (!$requiresOptin) {
+            return $status === Subscriber::STATUS_UNSUBSCRIBED ? self::SKIP_UNSUBSCRIBED : self::SEND;
+        }
+
+        return $status === Subscriber::STATUS_SUBSCRIBED ? self::SEND : self::SEND_TO_SUBSCRIBED_CONTACT;
     }
 
     /**

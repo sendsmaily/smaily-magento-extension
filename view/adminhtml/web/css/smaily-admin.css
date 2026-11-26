@@ -993,6 +993,8 @@ html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hi
  * still showed browser-default inputs and Magento's dark secondary buttons. */
 .smaily-ui .smaily-card > h2 { margin: 0 0 var(--sp-2); font-size: var(--fs-16); font-weight: 700; color: var(--s-text); }
 .smaily-ui .smaily-card > p:not(.message) { margin: 0 0 var(--sp-4); font-size: var(--fs-13); color: var(--s-text-2); }
+/* The per-language modes' notes above the automation cards (CON-461), as the card's own paragraphs. */
+.smaily-ui .smaily-ml-notes > p { margin: 0 0 var(--sp-4); font-size: var(--fs-13); color: var(--s-text-2); }
 .smaily-ui .smaily-field label {
     font-size: var(--fs-13); font-weight: 600; color: var(--s-text); margin-bottom: 5px;
 }

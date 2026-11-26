@@ -17,6 +17,7 @@ use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Automation\Mapping;
+use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
@@ -78,7 +79,8 @@ class WizardData implements ArgumentInterface
         private readonly RuleSource $ruleSource,
         private readonly StoreDate $storeDate,
         private readonly StoreLayout $storeLayout,
-        private readonly SharedAccountModes $sharedAccountModes
+        private readonly SharedAccountModes $sharedAccountModes,
+        private readonly Router $router
     ) {
     }
 
@@ -1006,6 +1008,54 @@ class WizardData implements ArgumentInterface
         }
 
         return $triggers;
+    }
+
+    /**
+     * Each store-event automation's card in a per-language mode (CON-461,
+     * as in the WooCommerce plugin): a workflow per store language and the
+     * language whose row is the Default fallback, read through the Router,
+     * so a card shows what each language is sent today.
+     *
+     * Mode b shows each language the workflow it gets now, its own or the
+     * one it falls back to (the default fallback row's, or the trigger's
+     * workflow in system config). Mode a shows each language only its own
+     * row: its select lists its own account's workflows. The Default
+     * fallback is the row of the workflow a contact without a language gets:
+     * the fallback row when it is a store language's, else, in mode a, the
+     * default fallback account's language, and in mode b the first language
+     * that gets that workflow, or the first language. A save from the card
+     * then keeps every store language's workflow (CON-461).
+     *
+     * @return array<string, array{workflows: array<string, int>, fallback: string}>
+     */
+    public function getLanguageWorkflows(string $mode): array
+    {
+        $websiteId = $this->websiteContext->getWebsiteId();
+        $languages = $this->getDetectedLanguages();
+        $cards = [];
+        foreach (Trigger::ALL as $trigger) {
+            $workflows = [];
+            foreach ($languages as $language) {
+                $match = $this->router->resolve($trigger, $websiteId, $language, $mode);
+                $own = $mode !== MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS || $match?->language === $language;
+                $workflows[$language] = $own ? ($match->workflowId ?? 0) : 0;
+            }
+            $fallback = $this->router->resolveFallback($trigger, $websiteId, $mode);
+            $fallbackLanguage = $fallback?->language;
+            if (!in_array($fallbackLanguage, $languages, true)) {
+                $fallbackLanguage = $mode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
+                    ? $this->config->getFallbackLanguage($websiteId)
+                    : array_search($fallback->workflowId ?? 0, $workflows, true);
+            }
+            $cards[$trigger] = [
+                'workflows' => $workflows,
+                'fallback' => in_array($fallbackLanguage, $languages, true)
+                    ? (string)$fallbackLanguage
+                    : (string)($languages[0] ?? ''),
+            ];
+        }
+
+        return $cards;
     }
 
     /**

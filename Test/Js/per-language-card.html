@@ -1,0 +1,256 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the per-language automation card (CON-461, as in the
+  WooCommerce plugin): the real initial setup and Settings templates,
+  rendered in en_US and et_EE by Test/Js/render-admin.php into Test/Js/build/,
+  with the admin stylesheet (view/adminhtml/web/css/smaily-admin.css) and
+  jQuery from vendor/, one fresh frame per page and locale. Stubbed:
+  RequireJS's require(), the browser's confirm (answered OK) and the
+  requests (fetch) — a workflow list answers three workflows, a save
+  answers as saved.
+
+  The website is in One account, per-language workflows (mode B) with ET and
+  LV. On the setup's Automations step and on Settings > Automations each
+  store-event automation is one card: while it is on, a row per store
+  language with its workflow and a Default fallback radio on one of the rows,
+  in the place of the card's own Smaily Workflow, and no "None" row and no
+  separate Per-language workflows card. Welcome shows its saved workflows
+  with LV's row the Default fallback; an automation without workflows has
+  the first language's row as its Default fallback. The save posts each
+  language's workflow, the Default fallback's row flagged, for mode B; moving
+  the Default fallback moves the flag.
+
+  Run it with bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>per-language card harness</title>
+    <script src="build/setup-per-language.en_US.js"></script>
+    <script src="build/setup-per-language.et_EE.js"></script>
+    <script src="build/settings-per-language.en_US.js"></script>
+    <script src="build/settings-per-language.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var CSS = '../../view/adminhtml/web/css/smaily-admin.css';
+    var WORKFLOWS = {workflows: [{id: '201', name: 'Tere'}, {id: '202', name: 'Sveiki'}, {id: '203', name: 'Hello'}]};
+    var SAVED = {saved: true, errors: [], workflows: [], status: 'idle', verified: true};
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    function stubs() {
+        return [
+            '<link rel="stylesheet" href="' + CSS + '">',
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.confirm = function () { return true; };',
+            'window.requests = [];',
+            'window.fetch = function (url, options) {',
+            '  window.requests.push({url: url, body: JSON.parse(options.body || "{}")});',
+            '  var answer = url.indexOf("/workflows/") !== -1 ? ' + JSON.stringify(WORKFLOWS)
+                + ' : ' + JSON.stringify(SAVED) + ';',
+            '  return Promise.resolve(new Response(JSON.stringify(answer),',
+            '    {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>',
+            '<script>window.require = function (deps, callback) { callback(window.jQuery); };<\/script>'
+        ].join('\n');
+    }
+
+    function open(page) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.onload = function () {
+                wait(50).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs()
+                + '</head><body>' + rendered.html + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function shown(element) {
+        return !!element && element.offsetParent !== null;
+    }
+
+    function tick(frame, selector, on) {
+        var input = frame.contentDocument.querySelector(selector);
+        input.checked = on;
+        frame.contentWindow.jQuery(input).trigger('change');
+    }
+
+    function lastSave(frame) {
+        var saves = frame.contentWindow.requests.filter(function (request) {
+            return request.body.step === 'automations';
+        });
+
+        return saves.length ? saves[saves.length - 1].body.data : null;
+    }
+
+    // A card's rows as "<language>=<workflow>", and its Default fallback.
+    function rows(doc, trigger) {
+        return Array.prototype.map.call(
+            doc.querySelectorAll('.smaily-ml-workflow[data-trigger=' + trigger + ']'),
+            function (select) {
+                return select.getAttribute('data-language') + '=' + select.value;
+            }
+        ).join(' ') + ' fallback=' + (doc.querySelector('input[name=smaily-ml-fallback-' + trigger + ']:checked') || {}).value;
+    }
+
+    // The checks shared by the setup's Automations step and Settings >
+    // Automations; `save` saves the automations and resolves once posted.
+    async function card(frame, label, strings, save) {
+        var doc = frame.contentDocument,
+            welcome = doc.getElementById('smaily-w-welcome-enabled').closest('.smaily-store-trigger'),
+            table = welcome.querySelector('.smaily-ml-table'),
+            headers = Array.prototype.map.call(table.querySelectorAll('th'), function (th) {
+                return th.textContent.trim();
+            }),
+            data;
+
+        check(label + ': every store-event card holds its own rows, one per store language',
+            doc.querySelectorAll('.smaily-store-trigger .smaily-ml-table').length === 3
+            && table.querySelectorAll('tbody tr').length === 2);
+        check(label + ': no separate Per-language workflows card',
+            !Array.prototype.some.call(doc.querySelectorAll('h2'), function (h2) {
+                return h2.textContent.trim() === strings['Per-language workflows'];
+            }));
+        check(label + ': no "None" row', doc.querySelectorAll('input[name^=smaily-ml-fallback-][value=""]').length === 0
+            && doc.querySelectorAll('.smaily-ml-none').length === 0);
+        check(label + ': the Default fallback column in the admin\'s language',
+            headers[2] === strings['Default fallback']
+            && (/en_US/.test(label) || strings['Default fallback'] !== 'Default fallback'));
+        check(label + ': Welcome off: its rows hide', !shown(table));
+
+        tick(frame, '#smaily-w-welcome-enabled', true);
+        check(label + ': Welcome on: its rows show in the card', shown(table));
+        check(label + ': no card\'s own Smaily Workflow beside them',
+            !shown(doc.getElementById('smaily-w-welcome-workflow')));
+        check(label + ': the note says where the Default fallback sends, in the admin\'s language',
+            Array.prototype.some.call(doc.querySelectorAll('#smaily-ml-mapping .smaily-ml-hint-b'), function (note) {
+                return shown(note) && note.textContent.indexOf(
+                    strings['Contacts whose language has no workflow get the workflow of the row marked Default fallback.']
+                ) !== -1;
+            }));
+        check(label + ': Welcome shows its saved workflows, LV the Default fallback',
+            rows(doc, 'welcome') === 'et=201 lv=202 fallback=lv');
+        check(label + ': First order without workflows: the first language is its Default fallback',
+            rows(doc, 'first_order') === 'et= lv= fallback=et');
+
+        data = await save();
+        check(label + ': the save posts each language\'s workflow, LV flagged, for mode B',
+            !!data && data.mappings_mode === 'b' && JSON.stringify(data.mappings) === JSON.stringify([
+                {trigger_type: 'welcome', language: 'et', account_key: 'default', workflow_id: 201, is_default_fallback: false},
+                {trigger_type: 'welcome', language: 'lv', account_key: 'default', workflow_id: 202, is_default_fallback: true}
+            ]));
+
+        tick(frame, 'input[name=smaily-ml-fallback-welcome][value=et]', true);
+        data = await save();
+        check(label + ': moving the Default fallback to ET moves the flag',
+            !!data && data.mappings[0].is_default_fallback === true && data.mappings[1].is_default_fallback === false);
+    }
+
+    async function setup(locale) {
+        var frame = await open('setup-per-language.' + locale),
+            doc = frame.contentDocument;
+
+        // Continue from Connect (saved: its summary) and Contacts to Automations.
+        doc.getElementById('smaily-w-next').click();
+        await wait(100);
+        doc.getElementById('smaily-w-next').click();
+        await wait(100);
+        await card(frame, locale + ', setup', window.smailyAdminPages['setup-per-language.' + locale].strings,
+            async function () {
+                doc.getElementById('smaily-w-next').click();
+                await wait(100);
+                // Continue moved on: back to the Automations step.
+                doc.getElementById('smaily-w-back').click();
+                await wait(100);
+
+                return lastSave(frame);
+            });
+        frame.remove();
+    }
+
+    async function settings(locale) {
+        var frame = await open('settings-per-language.' + locale),
+            doc = frame.contentDocument;
+
+        doc.querySelector('.smaily-tabs li[data-tab=automations]').click();
+        await wait(100);
+        await card(frame, locale + ', Settings', window.smailyAdminPages['settings-per-language.' + locale].strings,
+            async function () {
+                doc.getElementById('smaily-w-automations-save').click();
+                await wait(100);
+
+                return lastSave(frame);
+            });
+        frame.remove();
+    }
+
+    (async function () {
+        try {
+            for (var locale of ['en_US', 'et_EE']) {
+                log('# ' + locale);
+                await setup(locale);
+                await settings(locale);
+            }
+        } catch (error) {
+            failures++;
+            log('FAIL ' + (error && error.stack ? error.stack : error));
+        }
+        clearInterval(keepAlive);
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    })();
+</script>
+</body>
+</html>

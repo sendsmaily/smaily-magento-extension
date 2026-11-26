@@ -17,6 +17,7 @@ use Smaily\Connect\Model\Adminhtml\SetupGuard;
 use Smaily\Connect\Model\Adminhtml\SharedAccountModes;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
+use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
@@ -76,7 +77,10 @@ class WizardDataTest extends IntegrationTestCase
             $this->createMock(RuleSource::class),
             $this->createMock(StoreDate::class),
             $this->createMock(StoreLayout::class),
-            $this->createMock(SharedAccountModes::class)
+            $this->createMock(SharedAccountModes::class),
+            $this->objectManager->create(Router::class, [
+                'overrides' => $this->createMock(WebsiteOverrides::class),
+            ])
         );
     }
 

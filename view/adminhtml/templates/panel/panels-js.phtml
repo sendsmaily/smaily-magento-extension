@@ -399,28 +399,25 @@ window.smailyPanelsInit = function ($) {
         $('#smaily-ml-mapping-off').toggle(isMultilingual && !mapping);
         $('#smaily-ml-mapping .smaily-ml-hint-a').toggle(mode === 'a');
         $('#smaily-ml-mapping .smaily-ml-hint-b').toggle(mode === 'b');
-        // Mode A never starts the cards' workflow: it belongs to no
-        // per-language account (CON-188). Hidden, it keeps its saved value.
-        $('.smaily-store-trigger .smaily-w-workflow').closest('label').toggle(!modeA);
+        // In modes A and B each card shows its workflow per language in the
+        // place of its own (CON-461). Mode A never starts the card's own
+        // workflow: it belongs to no per-language account (CON-188).
+        // Hidden, it keeps its saved value.
+        $('.smaily-store-trigger .smaily-w-workflow').closest('label').toggle(!mapping);
         $('#smaily-ml-modes .smaily-choice').removeClass('is-selected');
         $('input[name=smaily-w-mlmode][value=' + mode + ']').closest('.smaily-choice').addClass('is-selected');
         showUnmappedLanguages();
     }
 
     /**
-     * The per-language workflow tables follow their store-event card's
-     * switch, as the card's own workflow does (CON-256): a switched-off
-     * automation's table hides, keeping its picks for the save, and the
-     * editor shows only in a per-language mode while one of the cards is on.
+     * Each store-event card's workflow per language shows in a per-language
+     * mode (CON-461); like the card's own workflow it hides while the card
+     * is off (CON-256), keeping its picks for the save. The modes' notes
+     * show while one of the cards is on.
      */
     function applyMappingTables(mapping) {
-        var anyOn = false;
-        $('.smaily-ml-trigger').each(function () {
-            var on = $('#' + $(this).data('switch')).is(':checked');
-            $(this).toggle(on);
-            anyOn = anyOn || on;
-        });
-        $('#smaily-ml-mapping').toggle(mapping && anyOn);
+        $('.smaily-ml-trigger').toggle(mapping);
+        $('#smaily-ml-mapping').toggle(mapping && $('.smaily-ml-trigger').closest('.is-active').length > 0);
     }
 
     function mlAccountFields($block) {
@@ -526,7 +523,7 @@ window.smailyPanelsInit = function ($) {
                     return select.options.length ? (select.value || '') : String($(select).data('saved') || '');
                 };
                 var fallback = $('input[name=smaily-ml-fallback-' + trigger + ']:checked').val() || '';
-                if (!$('#' + $trigger.data('switch')).is(':checked')
+                if (!$trigger.closest('.smaily-store-trigger').hasClass('is-active')
                     || $trigger.data('unlisted-fallback-a')
                     || (fallback && workflow(fallback))
                     || (accountFallback && workflow(accountFallback))) {
@@ -536,7 +533,8 @@ window.smailyPanelsInit = function ($) {
                     return !workflow(language);
                 });
                 if (missing.length) {
-                    $('<li/>').text($trigger.children('label').text() + ': ' + missing.join(', ').toUpperCase())
+                    $('<li/>').text($trigger.closest('.smaily-store-trigger').find('.smaily-engine-trigger__name').text()
+                        + ': ' + missing.join(', ').toUpperCase())
                         .appendTo($list);
                 }
             });
@@ -1165,7 +1163,7 @@ window.smailyPanelsInit = function ($) {
             applyMlMode(next);
             loadMappingWorkflows();
         });
-        // The per-language tables follow their card's switch (CON-256).
+        // The per-language modes' notes show while a card is on (CON-461).
         $(document).on(
             'change',
             '#smaily-w-welcome-enabled, #smaily-w-firstorder-enabled, #smaily-w-abandoned-enabled',

@@ -17,6 +17,7 @@ use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
 use Smaily\Connect\Model\Adminhtml\SharedAccountModes;
+use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Backfill\ContactAudience;
@@ -147,7 +148,8 @@ class ContactAudienceTest extends IntegrationTestCase
             $this->createMock(RuleSource::class),
             $this->createMock(StoreDate::class),
             $this->createMock(StoreLayout::class),
-            $this->createMock(SharedAccountModes::class)
+            $this->createMock(SharedAccountModes::class),
+            $this->createMock(Router::class)
         );
 
         $walked = [];

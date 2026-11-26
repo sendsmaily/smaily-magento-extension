@@ -8,12 +8,15 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\ViewModel\Adminhtml;
 
+use Magento\Backend\Model\Auth\Session as AuthSession;
+use Magento\Framework\DataObject;
 use Magento\Framework\Locale\ResolverInterface as LocaleResolver;
 use Magento\Framework\Phrase;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\EmailTestMode;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Settings;
 
@@ -34,8 +37,22 @@ class AutomationsForm implements ArgumentInterface
         private readonly Settings $settings,
         private readonly Client $client,
         private readonly SmailyClientProvider $smailyClientProvider,
-        private readonly LocaleResolver $localeResolver
+        private readonly LocaleResolver $localeResolver,
+        private readonly AuthSession $authSession
     ) {
+    }
+
+    /**
+     * The address "Send test email" offers first: the logged-in admin's own
+     * (CON-458). It reaches Campaign Intelligence only when the admin
+     * presses the button.
+     */
+    public function getAdminEmail(): string
+    {
+        // A DataObject holding `email`; Magento_User is not a dependency of this module.
+        $user = $this->authSession->getUser();
+
+        return $user instanceof DataObject ? (string)$user->getData('email') : '';
     }
 
     public function isEngineConnected(): bool
@@ -84,6 +101,7 @@ class AutomationsForm implements ArgumentInterface
         }
 
         $configured = [];
+        $setup = [];
         try {
             $config = $this->client->getAutomationsConfig();
             foreach ((array)($config['configs'] ?? []) as $row) {
@@ -91,6 +109,7 @@ class AutomationsForm implements ArgumentInterface
                     $configured[(string)$row['trigger_key']] = $row;
                 }
             }
+            $setup = EmailTestMode::states($config);
         } catch (EngineException) {
             // Fall through with defaults; the load error is already surfaced.
         }
@@ -119,6 +138,11 @@ class AutomationsForm implements ArgumentInterface
                 'daily_cap' => $existing['daily_cap'] ?? null,
                 'test_mode' => (bool)($existing['test_mode'] ?? true),
                 'test_emails' => implode(', ', (array)($existing['test_emails'] ?? [])),
+                // The test mode switch and the test send (CON-458) show only
+                // for an email Campaign Intelligence reports a setup state
+                // for (§12 `setup[]`, contract v1.15.0); null keeps the card
+                // without them.
+                'setup' => $setup[$key] ?? null,
             ];
         }
 

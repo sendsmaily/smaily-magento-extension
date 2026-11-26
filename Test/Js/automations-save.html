@@ -33,14 +33,13 @@
     'use strict';
 
     var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
-    var NOTE = 'Smaily switches real sends on after you confirm. Until then the trigger runs in test mode.';
     var failures = 0;
     var passes = 0;
 
     // The Save endpoint's answers (Controller/Adminhtml/Automations/Save) to
-    // the request below. Replenishment due asked for real sends and the
-    // engine kept it in test mode; Post-purchase already sent to real
-    // customers, so the engine stored it active; Win-back stays off.
+    // the request below. Replenishment due is stored in test mode;
+    // Post-purchase already sent to real customers, so the engine stored it
+    // active; Win-back stays off.
     var ANSWERS = {
         stored: {
             saved: true,
@@ -86,8 +85,8 @@
         ].join('\n');
     }
 
-    // Opens the tab, asks for real sends on Replenishment due and switches
-    // Post-purchase on, saves, and returns the frame once the answer is shown.
+    // Opens the tab, switches Replenishment due and Post-purchase on, saves,
+    // and returns the frame once the answer is shown.
     function save(locale, answer) {
         return new Promise(function (resolve, reject) {
             var frame = document.createElement('iframe'),
@@ -104,7 +103,6 @@
 
                 try {
                     card(doc, 'replenish_due', 'enabled').checked = true;
-                    card(doc, 'replenish_due', 'test_mode').checked = false;
                     card(doc, 'replenish_due', 'workflow_id').value = '101';
                     card(doc, 'post_purchase', 'enabled').checked = true;
                     card(doc, 'post_purchase', 'workflow_id').value = '102';
@@ -130,9 +128,9 @@
         return field ? element.querySelector('[data-field="' + field + '"]') : element;
     }
 
-    // One card against the state it should show: the pill, the border class,
-    // both checkboxes and the go-live note.
-    function shows(label, doc, key, strings, mode, enabled, testMode) {
+    // One card against the state it should show: the pill, the border class
+    // and Enabled.
+    function shows(label, doc, key, strings, mode, enabled) {
         var element = card(doc, key),
             pill = element.querySelector('.smaily-pill'),
             names = {off: 'Off', test: 'Test mode', active: 'Active'};
@@ -143,10 +141,6 @@
             && element.classList.contains('is-' + mode));
         check(label + ': Enabled is ' + (enabled ? 'ticked' : 'not ticked'),
             card(doc, key, 'enabled').checked === enabled);
-        check(label + ': Test mode is ' + (testMode ? 'ticked' : 'not ticked'),
-            card(doc, key, 'test_mode').checked === testMode);
-        check(label + ': the go-live note is ' + (mode === 'active' ? 'hidden' : 'shown'),
-            element.querySelector('.smaily-engine-trigger__hint').hidden === (mode === 'active'));
     }
 
     function result(doc) {
@@ -167,16 +161,13 @@
         frame = await save(locale, ANSWERS.stored);
         doc = frame.contentDocument;
         body = frame.contentWindow.requests.length === 1 ? frame.contentWindow.requests[0].body : '';
-        check(locale + ': the save asks for real sends on Replenishment due',
+        check(locale + ': the save switches Replenishment due on and posts no test mode (CON-458)',
             body.indexOf(encodeURIComponent('triggers[replenish_due][enabled]') + '=1') !== -1
-            && body.indexOf(encodeURIComponent('triggers[replenish_due][test_mode]')) === -1);
-        shows(locale + ', Replenishment due kept in test mode', doc, 'replenish_due', strings,
-            'test', true, true);
-        shows(locale + ', Post-purchase stored active', doc, 'post_purchase', strings,
-            'active', true, false);
-        shows(locale + ', Win-back left off', doc, 'winback_risk', strings, 'off', false, true);
-        check(locale + ': the result says saved, with the go-live note',
-            result(doc) === strings['Saved.'] + ' ' + strings[NOTE]);
+            && body.indexOf('test_mode') === -1);
+        shows(locale + ', Replenishment due in test mode', doc, 'replenish_due', strings, 'test', true);
+        shows(locale + ', Post-purchase stored active', doc, 'post_purchase', strings, 'active', true);
+        shows(locale + ', Win-back left off', doc, 'winback_risk', strings, 'off', false);
+        check(locale + ': the result says saved', result(doc) === strings['Saved.']);
         frame.remove();
 
         frame = await save(locale, ANSWERS.readFailed);
@@ -184,7 +175,7 @@
         check(locale + ', stored state not readable: the result asks for a reload',
             result(doc) === strings['Saved. Reload the page to see the state of each trigger.']);
         shows(locale + ', stored state not readable: Replenishment due keeps the page\'s state', doc,
-            'replenish_due', strings, 'off', true, false);
+            'replenish_due', strings, 'off', true);
         frame.remove();
     }
 

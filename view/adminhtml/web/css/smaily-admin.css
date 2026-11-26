@@ -772,7 +772,18 @@
 .smaily-engine-trigger__name { font-size: var(--fs-14); font-weight: 700; color: var(--s-text); }
 .smaily-engine-trigger__desc { font-size: var(--fs-12); color: var(--s-text-3); }
 /* The go-live step (PRO-3734): who switches real sends on. */
-.smaily-engine-trigger__hint { font-size: var(--fs-12); color: var(--s-text-2); margin-top: var(--sp-2); }
+/* A Campaign Intelligence email's Test mode and test send (CON-458). */
+.smaily-test-mode { margin-top: var(--sp-2); display: flex; flex-direction: column; gap: var(--sp-1); font-size: var(--fs-13); color: var(--s-text-2); }
+.smaily-test-mode__switch { display: inline-flex; align-items: center; gap: 6px; font-weight: 400; }
+.smaily-test-mode__switch input { margin: 0; }
+.smaily-test-mode__status { font-weight: 600; color: var(--s-text); }
+.smaily-test-mode__test[hidden], .smaily-test-mode__status[hidden], .smaily-test-mode__notice[hidden], .smaily-test-mode__result[hidden] { display: none; }
+.smaily-test-mode__text { margin: 0; }
+.smaily-test-mode__send { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.smaily-test-mode__address { width: 20rem; max-width: 100%; }
+.smaily-test-mode .note { margin: 0; font-size: var(--fs-12); }
+.smaily-test-mode__result ul { margin: var(--sp-1) 0 0 1.2em; padding: 0; }
+.smaily-test-mode__result.is-error { color: var(--s-danger); }
 .smaily-engine-trigger__controls { display: flex; gap: var(--sp-3); flex-wrap: wrap; align-items: flex-end; }
 .smaily-engine-trigger__ctrl { display: flex; flex-direction: column; gap: var(--sp-1); }
 .smaily-engine-trigger__ctrl > span { font-size: var(--fs-11); font-weight: 700; color: var(--s-text-3); text-transform: uppercase; letter-spacing: .4px; }
@@ -845,6 +856,12 @@ html.smaily-design-modal-open, html.smaily-design-modal-open body { overflow: hi
 .smaily-start-modal .smaily-design-modal__dialog { max-width: 720px; max-height: 760px; }
 .smaily-start-modal .smaily-design-modal__body { overflow: auto; }
 .smaily-start-modal__frame { min-width: 560px; min-height: 640px; }
+
+/* "Turn off test mode?" (CON-458) in the same modal, sized to its text. */
+.smaily-confirm-modal .smaily-design-modal__dialog { max-width: 480px; height: auto; }
+.smaily-confirm-modal .smaily-design-modal__body { padding: var(--sp-4) var(--sp-5); background: var(--s-surface); font-size: var(--fs-13); color: var(--s-text); }
+.smaily-confirm-modal .smaily-design-modal__body p { margin: 0 0 var(--sp-4); }
+.smaily-confirm-modal__buttons { display: flex; gap: var(--sp-2); }
 
 /* --- Smaily Connect and Campaign Intelligence logos (CON-372) --------------
  * The Connect lockup above the page title (brand.phtml), 28 px high on the

@@ -24,6 +24,7 @@ declare(strict_types=1);
 use Magento\Framework\Escaper;
 use Magento\Framework\Translate\InlineInterface;
 use Magento\Framework\ZendEscaper;
+use Smaily\Connect\Model\Engine\EmailTestMode;
 use Smaily\Connect\Test\Unit\Support\StoreLocale;
 
 $root = dirname(__DIR__, 2);
@@ -197,6 +198,7 @@ $trigger = static fn (string $key, string $name, bool $testMode): array => [
     'daily_cap' => null,
     'test_mode' => $testMode,
     'test_emails' => '',
+    'setup' => null,
 ];
 $automationsViewModel = static fn (array $rows, bool $refused): object => new class ($rows, $refused) {
     /**
@@ -241,11 +243,27 @@ $automationsViewModel = static fn (array $rows, bool $refused): object => new cl
     }
 
     /**
+     * @return string
+     */
+    public function getAdminEmail(): string
+    {
+        return 'admin@store.example';
+    }
+
+    /**
+     * A row's §12 `setup[]` item (`setup_item`) is described here, while
+     * the page renders, so its texts are in the page's locale (CON-458).
+     *
      * @return array<int, array<string, mixed>>
      */
     public function getRows(): array
     {
-        return $this->rows;
+        return array_map(
+            static fn (array $row): array => isset($row['setup_item'])
+                ? ['setup' => EmailTestMode::describe($row['setup_item'])] + $row
+                : $row,
+            $this->rows
+        );
     }
 };
 $pages = [
@@ -262,7 +280,54 @@ $pages = [
             'Active',
             'Saved.',
             'Saved. Reload the page to see the state of each trigger.',
-            'Smaily switches real sends on after you confirm. Until then the trigger runs in test mode.',
+        ],
+    ],
+    /*
+     * Test mode and the test send of the Campaign Intelligence emails
+     * (CON-458), each email enabled, as §12 `setup[]` reads it:
+     * Replenishment due in test mode, Post-purchase sending to real
+     * customers at the ramp's second step, Win-back stopped until Smaily
+     * reviews the stop, and Browse abandon without a setup item (an engine
+     * before contract v1.15.0), so without the switch.
+     */
+    'automations-test-mode' => [
+        'template' => $root . '/view/adminhtml/templates/config/engine-automations.phtml',
+        'viewModel' => $automationsViewModel([
+            ['enabled' => true, 'setup_item' => ['setup_state' => 'test', 'daily_limit' => null]]
+                + $trigger('replenish_due', 'Replenishment due', true),
+            ['enabled' => true, 'setup_item' => ['setup_state' => 'live', 'daily_limit' => 25]]
+                + $trigger('post_purchase', 'Post-purchase', false),
+            ['enabled' => true, 'setup_item' => [
+                'setup_state' => 'stopped',
+                'stop_reason' => 'auto_stop_complaint',
+                'go_live_blockers' => ['stopped_needs_review'],
+            ]] + $trigger('winback_risk', 'Win-back', true),
+            ['enabled' => true] + $trigger('browse_abandon', 'Browse abandon', true),
+        ], false),
+        'strings' => [
+            'Test mode',
+            'Active',
+            'The email goes to test addresses only.',
+            'Send test email',
+            'This address is added to the Smaily list as a test contact.',
+            'Sending to real customers · up to %1 emails today',
+            'Sending to real customers',
+            'Smaily reviews this stop before the email can send again',
+            'Starts when your sender domain is verified in Smaily',
+            'Turn off test mode?',
+            '“%1” will start going to your store\'s real customers, at first up to 10 emails a day, then 25 and 50.',
+            'Turn off',
+            'Cancel',
+            'Smaily accepted the test email. Check the inbox.',
+            'The test email cannot be sent yet:',
+            'No Smaily workflow sends this email yet',
+            'No customer has recommendations for this email yet',
+            'Smaily refused to send from %1. Check your sender domain in Smaily.',
+            'Too many test emails were sent in the last hour. Try again later.',
+            'Smaily did not answer, so nothing was sent. Press Send test email to try again.',
+            'Test mode stays on:',
+            'The email has no subject',
+            'Campaign Intelligence did not answer. Try again in a minute.',
         ],
     ],
     // The same tab while Campaign Intelligence refuses the account (PRO-2465).

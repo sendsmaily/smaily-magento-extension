@@ -330,11 +330,11 @@
             field = function (key, name) {
                 return card(key).querySelector('[data-field="' + name + '"]');
             },
-            settings = ['workflow_id', 'cooldown_days', 'daily_cap', 'test_mode', 'test_emails'],
+            settings = ['workflow_id', 'cooldown_days', 'daily_cap', 'test_emails'],
             hidden = function (key) {
                 return settings.every(function (name) {
                     return !shown(field(key, name));
-                }) && !shown(card(key).querySelector('.smaily-engine-trigger__hint'));
+                });
             },
             body;
 
@@ -342,7 +342,7 @@
             shown(card('replenish_due').querySelector('.smaily-engine-trigger__name'))
             && shown(field('replenish_due', 'enabled')) && hidden('replenish_due'));
         tick(frame, field('replenish_due', 'enabled'), true);
-        check(locale + ', engine trigger on: the workflow, Cooldown, Daily Cap, Test mode and Test Emails show',
+        check(locale + ', engine trigger on: the workflow, Cooldown, Daily Cap and Test Emails show',
             settings.every(function (name) {
                 return shown(field('replenish_due', name));
             }));

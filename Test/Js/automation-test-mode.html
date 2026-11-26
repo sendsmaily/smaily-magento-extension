@@ -1,0 +1,321 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for a Campaign Intelligence email's Test mode and test
+  send (CON-458; contract §19, §20): the real template
+  (view/adminhtml/templates/config/engine-automations.phtml), rendered in
+  en_US and et_EE by Test/Js/render-admin.php into Test/Js/build/
+  (automations-test-mode), runs with its own inline script and jQuery from
+  vendor/, one fresh frame per scenario. Stubbed: only the requests (fetch),
+  each answered with the next recorded answer of the server
+  (Controller/Adminhtml/Automations/TestSend and TestMode) in the page's
+  locale. Run it with bin/test-js.sh; the page ends with "RESULT: PASS" or
+  "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>automation test mode harness</title>
+    <script src="build/automations-test-mode.en_US.js"></script>
+    <script src="build/automations-test-mode.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var failures = 0;
+    var passes = 0;
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    // Runs in the frame before the page: the admin's form key, every
+    // request answered with the next answer of window.answers, and
+    // Magento's require() as far as the template uses it.
+    var STUBS = [
+        '<script>',
+        'window.FORM_KEY = "form-key";',
+        'window.requests = [];',
+        'window.answers = [];',
+        'window.fetch = function (url, options) {',
+        '  var answer = window.answers.shift() || {status: 500, body: {}};',
+        '  window.requests.push({url: url, body: JSON.parse(options.body)});',
+        '  return Promise.resolve(new Response(JSON.stringify(answer.body),',
+        '    {status: answer.status, headers: {"Content-Type": "application/json"}})); };',
+        '<\/script>',
+        '<script src="' + JQUERY + '"><\/script>',
+        '<script>window.require = function (deps, callback) { callback(window.jQuery); };<\/script>'
+    ].join('\n');
+
+    function open(locale) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                page = (window.smailyAdminPages || {})['automations-test-mode.' + locale];
+
+            if (!page) {
+                reject(new Error('Test/Js/build/automations-test-mode.' + locale
+                    + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.onload = function () {
+                resolve(frame);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + STUBS
+                + '</head><body>' + page.html + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function block(doc, key) {
+        return doc.querySelector('.smaily-engine-trigger[data-trigger="' + key + '"] .smaily-test-mode');
+    }
+
+    function part(doc, key, name) {
+        return block(doc, key).querySelector('.smaily-test-mode__' + name);
+    }
+
+    function text(element) {
+        return element ? element.textContent.replace(/\s+/g, ' ').trim() : '';
+    }
+
+    function pill(doc, key) {
+        return text(doc.querySelector('.smaily-engine-trigger[data-trigger="' + key + '"] .smaily-pill'));
+    }
+
+    // Changes the switch as a click does.
+    function toggle(frame, key, on) {
+        var input = part(frame.contentDocument, key, 'toggle');
+        input.checked = on;
+        frame.contentWindow.jQuery(input).trigger('change');
+    }
+
+    function modal(doc) {
+        return doc.getElementById('smaily-test-mode-modal');
+    }
+
+    async function run(locale) {
+        var strings = window.smailyAdminPages['automations-test-mode.' + locale].strings,
+            stop = strings['Smaily reviews this stop before the email can send again'],
+            frame = await open(locale),
+            win = frame.contentWindow,
+            doc = frame.contentDocument,
+            page,
+            request,
+            items;
+
+        log('# ' + locale);
+        if (locale !== 'en_US') {
+            check(locale + ': the page is translated', strings['Send test email'] !== 'Send test email');
+        }
+
+        // As the page opens.
+        check(locale + ', test state: Test mode is on by default', part(doc, 'replenish_due', 'toggle').checked);
+        check(locale + ', test state: the switch is labelled Test mode',
+            text(block(doc, 'replenish_due').querySelector('.smaily-test-mode__switch')) === strings['Test mode']);
+        check(locale + ', test state: the email goes to test addresses only',
+            !part(doc, 'replenish_due', 'test').hidden
+            && text(part(doc, 'replenish_due', 'text')) === strings['The email goes to test addresses only.']);
+        check(locale + ', test state: the address starts as the admin\'s own',
+            part(doc, 'replenish_due', 'address').value === 'admin@store.example');
+        check(locale + ', test state: Send test email and the test contact note',
+            text(part(doc, 'replenish_due', 'button')) === strings['Send test email']
+            && text(block(doc, 'replenish_due').querySelector('.note'))
+                .indexOf(strings['This address is added to the Smaily list as a test contact.']) === 0);
+        check(locale + ', test state: no state line', part(doc, 'replenish_due', 'status').hidden);
+        check(locale + ', live: Test mode is off and the test send hides',
+            !part(doc, 'post_purchase', 'toggle').checked && part(doc, 'post_purchase', 'test').hidden);
+        check(locale + ', live: the state line names today\'s limit',
+            text(part(doc, 'post_purchase', 'status'))
+                === strings['Sending to real customers · up to %1 emails today'].replace('%1', '25'));
+        check(locale + ', stopped: Test mode is on and Smaily reviews the stop',
+            part(doc, 'winback_risk', 'toggle').checked && text(part(doc, 'winback_risk', 'status')) === stop);
+        check(locale + ', no setup state: no Test mode switch', !block(doc, 'browse_abandon'));
+        page = doc.body.textContent;
+        check(locale + ': nothing says go live',
+            !/go live|go-live|mine päriselt käima|switches real sends on after you confirm/i.test(page));
+        check(locale + ': the save posts neither the switch nor the address',
+            !doc.querySelector('.smaily-test-mode [data-field]'));
+        check(locale + ': the dialog is closed', modal(doc).hidden);
+
+        // Send test email, accepted.
+        win.answers.push({status: 200, body: {
+            ok: true,
+            message: strings['Smaily accepted the test email. Check the inbox.'],
+            reasons: [],
+            state: {test_mode: true, mode: 'test', status: '', notice: ''}
+        }});
+        part(doc, 'replenish_due', 'button').click();
+        await wait(30);
+        request = win.requests[0] || {};
+        check(locale + ', test send: one request to the test send with the key and the address',
+            win.requests.length === 1 && request.url.indexOf('smaily_connect/automations/testsend/') !== -1
+            && request.url.indexOf('form_key=form-key') !== -1
+            && request.body.email_key === 'replenish_due' && request.body.email === 'admin@store.example');
+        check(locale + ', test send: the result says Smaily accepted it',
+            text(part(doc, 'replenish_due', 'result')) === strings['Smaily accepted the test email. Check the inbox.']
+            && !part(doc, 'replenish_due', 'result').classList.contains('is-error'));
+
+        // Refusals, each shown in plain words and never sent again.
+        [
+            [409, strings['The test email cannot be sent yet:'],
+                [strings['No Smaily workflow sends this email yet'],
+                    strings['No customer has recommendations for this email yet']]],
+            [409, strings['Smaily refused to send from %1. Check your sender domain in Smaily.']
+                .replace('%1', 'news@store.example'), []],
+            [429, strings['Too many test emails were sent in the last hour. Try again later.'], []],
+            [502, strings['Smaily did not answer, so nothing was sent. Press Send test email to try again.'], []]
+        ].forEach(function (refusal) {
+            win.answers.push({status: refusal[0], body: {
+                ok: false, error: 'x', message: refusal[1], reasons: refusal[2], state: null
+            }});
+        });
+        for (var i = 0; i < 4; i++) {
+            var count = win.requests.length,
+                answer = win.answers[0];
+            part(doc, 'replenish_due', 'address').value = 'tester@store.example';
+            part(doc, 'replenish_due', 'button').click();
+            await wait(30);
+            items = Array.prototype.map.call(
+                part(doc, 'replenish_due', 'result').querySelectorAll('li'),
+                function (li) {
+                    return text(li);
+                }
+            );
+            check(locale + ', test send refused (' + answer.status + '): one request, the typed address',
+                win.requests.length === count + 1 && win.requests[count].body.email === 'tester@store.example');
+            check(locale + ', test send refused (' + answer.status + '): shown as an error in plain words',
+                text(part(doc, 'replenish_due', 'result').querySelector('span')) === answer.body.message
+                && items.join('|') === answer.body.reasons.join('|')
+                && part(doc, 'replenish_due', 'result').classList.contains('is-error'));
+        }
+        check(locale + ', test send refused: the button can be pressed again',
+            !part(doc, 'replenish_due', 'button').disabled);
+
+        // Turning test mode off asks first; Cancel changes nothing.
+        page = win.requests.length;
+        toggle(frame, 'replenish_due', false);
+        check(locale + ', turn off: the dialog opens and asks first',
+            !modal(doc).hidden && win.requests.length === page
+            && part(doc, 'replenish_due', 'toggle').checked);
+        check(locale + ', turn off: the dialog\'s title',
+            text(doc.getElementById('smaily-test-mode-modal-title')) === strings['Turn off test mode?']);
+        check(locale + ', turn off: the dialog names the email and the first daily limits',
+            text(doc.getElementById('smaily-test-mode-modal-text')) === strings['“%1” will start going to your store\'s'
+                + ' real customers, at first up to 10 emails a day, then 25 and 50.'].replace('%1', 'Replenishment due'));
+        check(locale + ', turn off: the buttons are Turn off and Cancel',
+            text(modal(doc).querySelector('.smaily-confirm-modal__confirm')) === strings['Turn off']
+            && text(modal(doc).querySelector('.smaily-confirm-modal__cancel')) === strings.Cancel);
+        modal(doc).querySelector('.smaily-confirm-modal__cancel').click();
+        await wait(30);
+        check(locale + ', turn off cancelled: no request and Test mode stays on',
+            modal(doc).hidden && win.requests.length === page && part(doc, 'replenish_due', 'toggle').checked);
+
+        // Turn off: real sends on, and the card shows the state read after.
+        win.answers.push({status: 200, body: {ok: true, message: '', reasons: [], state: {
+            test_mode: false,
+            mode: 'active',
+            status: strings['Sending to real customers · up to %1 emails today'].replace('%1', '10'),
+            notice: strings['Starts when your sender domain is verified in Smaily']
+        }}});
+        toggle(frame, 'replenish_due', false);
+        modal(doc).querySelector('.smaily-confirm-modal__confirm').click();
+        await wait(30);
+        request = win.requests[page] || {body: {}};
+        check(locale + ', turned off: one request to the switch with test_mode false',
+            win.requests.length === page + 1 && request.url.indexOf('smaily_connect/automations/testmode/') !== -1
+            && request.body.email_key === 'replenish_due' && request.body.test_mode === false);
+        check(locale + ', turned off: the dialog closes, Test mode is off and the test send hides',
+            modal(doc).hidden && !part(doc, 'replenish_due', 'toggle').checked
+            && part(doc, 'replenish_due', 'test').hidden);
+        check(locale + ', turned off: the state line, the notice and the pill',
+            text(part(doc, 'replenish_due', 'status'))
+                === strings['Sending to real customers · up to %1 emails today'].replace('%1', '10')
+            && text(part(doc, 'replenish_due', 'notice'))
+                === strings['Starts when your sender domain is verified in Smaily']
+            && pill(doc, 'replenish_due') === strings.Active);
+        check(locale + ', turned off: no result line', part(doc, 'replenish_due', 'result').hidden);
+
+        // Back on: no dialog.
+        win.answers.push({status: 200, body: {ok: true, message: '', reasons: [], state: {
+            test_mode: true, mode: 'test', status: '', notice: ''
+        }}});
+        toggle(frame, 'post_purchase', true);
+        await wait(30);
+        request = win.requests[page + 1] || {body: {}};
+        check(locale + ', back on: no dialog, one request with test_mode true',
+            modal(doc).hidden && request.body.email_key === 'post_purchase' && request.body.test_mode === true);
+        check(locale + ', back on: Test mode is on, the test send shows, the state line hides',
+            part(doc, 'post_purchase', 'toggle').checked && !part(doc, 'post_purchase', 'test').hidden
+            && part(doc, 'post_purchase', 'status').hidden && pill(doc, 'post_purchase') === strings['Test mode']);
+
+        // A stop Smaily has not reviewed yet keeps test mode on.
+        win.answers.push({status: 409, body: {ok: false, error: 'go_live_blocked',
+            message: strings['Test mode stays on:'], reasons: [stop, strings['The email has no subject']],
+            state: {test_mode: true, mode: 'test', status: stop, notice: ''}}});
+        toggle(frame, 'winback_risk', false);
+        modal(doc).querySelector('.smaily-confirm-modal__confirm').click();
+        await wait(30);
+        items = Array.prototype.map.call(part(doc, 'winback_risk', 'result').querySelectorAll('li'), text);
+        check(locale + ', blocked: Test mode stays on and the reasons are listed',
+            part(doc, 'winback_risk', 'toggle').checked
+            && text(part(doc, 'winback_risk', 'result').querySelector('span')) === strings['Test mode stays on:']
+            && items.join('|') === stop + '|' + strings['The email has no subject']
+            && text(part(doc, 'winback_risk', 'status')) === stop);
+
+        // No answer at all: the card says so and keeps its state.
+        win.answers.push({status: 500, body: {}});
+        toggle(frame, 'post_purchase', false);
+        modal(doc).querySelector('.smaily-confirm-modal__confirm').click();
+        await wait(30);
+        check(locale + ', no answer: Test mode stays on and the card says so',
+            part(doc, 'post_purchase', 'toggle').checked
+            && text(part(doc, 'post_purchase', 'result'))
+                === strings['Campaign Intelligence did not answer. Try again in a minute.']);
+        frame.remove();
+    }
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping while the frames load
+    // until the result is written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    run('en_US').then(function () {
+        return run('et_EE');
+    }).then(function () {
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    }).catch(function (error) {
+        document.getElementById('result').textContent = 'RESULT: FAIL (' + error.message + ')';
+    }).then(function () {
+        clearInterval(keepAlive);
+    });
+</script>
+</body>
+</html>

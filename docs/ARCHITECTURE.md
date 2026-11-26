@@ -1639,6 +1639,21 @@ Smaily adds an address it does not have when a workflow is triggered, and
 `force_opt_in = false` keeps an unsubscribe; the reminder carries no
 status, so it never re-subscribes anyone.
 
+**The first-order email follows the same rule (CON-387; Erkki, 2026-11-26).**
+`Observer\OrderPlaced` weighs a customer's first order with
+`ReminderConsent::verdict()`: the same decision as `verdicts()`, for one
+customer of the website (its store views, from `getStores()`), with the
+checkout tick read from the order's tracker row before `markCompleted()`.
+Under legitimate interest a customer unsubscribed in the store is recorded
+through `SyncDispatcher::recordSkippedAutomation()` with
+`Cron\AbandonedCart::SKIPPED_UNSUBSCRIBED_IN_STORE`. Every other first order
+is queued through `SyncDispatcher::dispatchFirstOrder()`, whose payload
+carries `AutomationHandler::CONTACT_CHECK` (`new_contact`, as in
+`CART_REMINDER`); the handler reads the contact the same way, with the same
+skip reasons and the same retry on a failed read. It has no cart, so a skip
+closes only its row. A first-order row queued before this change carries no
+`CONTACT_CHECK` and is posted without a read, as before.
+
 **Where the WooCommerce plugin differs.** Its *include guests* setting holds
 a guest's reminder back in the consent mode. Magento's **Include guest order
 emails** applies only under legitimate interest (`Mode::includeGuests()`

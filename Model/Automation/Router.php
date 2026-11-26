@@ -84,38 +84,78 @@ class Router
     ) {
     }
 
-    public function resolve(string $trigger, int $websiteId, string $language): ?WorkflowMatch
-    {
-        $mode = $this->config->getMultilingualMode($websiteId);
-        $ownAccount = $this->overrides->usesOtherAccount($websiteId);
+    /**
+     * `$mode` is the website's saved multilingual mode when null; the
+     * Automations tab passes the mode whose rows it shows.
+     */
+    public function resolve(
+        string $trigger,
+        int $websiteId,
+        string $language,
+        ?string $mode = null
+    ): ?WorkflowMatch {
+        $mode ??= $this->config->getMultilingualMode($websiteId);
 
         if ($mode === MultilingualMode::MODE_SINGLE || $mode === MultilingualMode::MODE_SINGLE_WORKFLOW) {
-            return $this->configDefault($trigger, $websiteId, $ownAccount, Mapping::LANGUAGE_DEFAULT);
+            return $this->configDefault(
+                $trigger,
+                $websiteId,
+                $this->overrides->usesOtherAccount($websiteId),
+                Mapping::LANGUAGE_DEFAULT
+            );
         }
 
         $effectiveLanguage = $language !== '' ? $language : Mapping::LANGUAGE_DEFAULT;
-        // The website's own rows win over the store-wide rows (website 0),
-        // which a website on another Smaily account does not read.
-        $websiteIds = $ownAccount ? [$websiteId] : [$websiteId, 0];
 
-        $match = $this->findMapping($trigger, $websiteIds, $effectiveLanguage, $mode)
-            ?? $this->findFallbackMapping($trigger, $websiteIds, $mode);
+        return $this->findMapping($trigger, $this->websiteIds($websiteId), $effectiveLanguage, $mode)
+            ?? $this->resolveFallback($trigger, $websiteId, $mode, $effectiveLanguage);
+    }
+
+    /**
+     * What a per-language mode (a or b) starts for a contact whose language
+     * has no workflow of its own: the trigger's default fallback row, else
+     * mode b's config default, else mode a's row of the default fallback
+     * account's language (see the class comment). `$language` is the
+     * contact's: mode b's config default goes out in it. The Automations tab
+     * reads it to put its Default fallback on the row that holds this
+     * workflow (CON-461).
+     */
+    public function resolveFallback(
+        string $trigger,
+        int $websiteId,
+        string $mode,
+        string $language = Mapping::LANGUAGE_DEFAULT
+    ): ?WorkflowMatch {
+        $ownAccount = $this->overrides->usesOtherAccount($websiteId);
+        $websiteIds = $ownAccount ? [$websiteId] : [$websiteId, 0];
+        $match = $this->findFallbackMapping($trigger, $websiteIds, $mode);
         if ($match !== null) {
             return $match;
         }
         if ($mode !== MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS) {
             // Mode b's one workflow for every language without its own: it
             // goes out in the contact's language.
-            return $this->configDefault($trigger, $websiteId, $ownAccount, $effectiveLanguage);
+            return $this->configDefault($trigger, $websiteId, $ownAccount, $language);
         }
 
         // Mode A: the default fallback account's own row for the trigger.
         $fallbackLanguage = $this->config->getFallbackLanguage($websiteId);
-        if ($fallbackLanguage === '' || $fallbackLanguage === $effectiveLanguage) {
+        if ($fallbackLanguage === '' || $fallbackLanguage === $language) {
             return null;
         }
 
         return $this->findMapping($trigger, $websiteIds, $fallbackLanguage, $mode);
+    }
+
+    /**
+     * The website's own rows win over the store-wide rows (website 0),
+     * which a website on another Smaily account does not read.
+     *
+     * @return int[]
+     */
+    private function websiteIds(int $websiteId): array
+    {
+        return $this->overrides->usesOtherAccount($websiteId) ? [$websiteId] : [$websiteId, 0];
     }
 
     /**

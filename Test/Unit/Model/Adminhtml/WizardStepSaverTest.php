@@ -568,6 +568,86 @@ class WizardStepSaverTest extends TestCase
     }
 
     /**
+     * CON-417: the initial setup continues only with an account Smaily
+     * accepts — one it refuses, or a Smaily it cannot reach, is refused with
+     * the WooCommerce setup's message, and nothing is saved.
+     *
+     * @dataProvider failedCheckProvider
+     */
+    public function testTheInitialSetupRefusesAnAccountThatFailsTheCheckAndSavesNothing(
+        SmailyClientException $failure
+    ): void {
+        $client = $this->createMock(SmailyClient::class);
+        $client->method('validateCredentials')->willThrowException($failure);
+        $this->clientFactory->method('create')->willReturn($client);
+
+        $errors = $this->saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'password' => 'wrong',
+            'storefront_url' => 'https://shop.example.com',
+            'initial_setup' => true,
+        ]);
+
+        self::assertSame(
+            [['field' => 'step', 'message' => 'Test your Smaily connection to continue.']],
+            $errors
+        );
+        self::assertSame([], $this->saved);
+        self::assertFalse($this->saver->isConnectionAccepted());
+    }
+
+    /**
+     * @return array<string, array{0: SmailyClientException}>
+     */
+    public static function failedCheckProvider(): array
+    {
+        return [
+            'Smaily refuses the account' => [new AuthenticationException('refused', 401)],
+            'Smaily cannot be reached' => [new SmailyClientException('timeout')],
+        ];
+    }
+
+    public function testTheInitialSetupRefusesAKeptPasswordWhenNoneIsSaved(): void
+    {
+        $this->config->method('getWebsitePassword')->willReturn('');
+        $this->clientFactory->expects(self::never())->method('create');
+
+        $errors = $this->saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'password' => '',
+            'initial_setup' => true,
+        ]);
+
+        self::assertSame('Test your Smaily connection to continue.', $errors[0]['message'] ?? null);
+        self::assertSame([], $this->saved);
+    }
+
+    /**
+     * CON-417: an account Smaily accepts is saved as before, asking Smaily
+     * once.
+     */
+    public function testTheInitialSetupSavesAnAccountSmailyAccepts(): void
+    {
+        $this->clientFactory->expects(self::once())->method('create')
+            ->with(['subdomain' => 'demo', 'username' => 'api-user', 'password' => 'secret'])
+            ->willReturn($this->createMock(SmailyClient::class));
+
+        $errors = $this->saver->save('connect', [
+            'subdomain' => 'demo',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'initial_setup' => true,
+        ]);
+
+        self::assertSame([], $errors);
+        self::assertSame('demo', $this->savedValue(Config::XML_PATH_SUBDOMAIN));
+        self::assertSame('enc:secret', $this->savedValue(Config::XML_PATH_PASSWORD));
+        self::assertTrue($this->saver->isConnectionAccepted());
+    }
+
+    /**
      * PRO-3570: the connection status shows the answer of the check a save
      * made, without a reload — the saver tells whether Smaily accepted the
      * credentials it just saved.

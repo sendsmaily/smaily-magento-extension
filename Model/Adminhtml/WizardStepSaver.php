@@ -566,6 +566,18 @@ class WizardStepSaver
             return $errors;
         }
 
+        // The initial setup's Connect step (`initial_setup`) continues only
+        // with an account Smaily accepts, as in the WooCommerce and Shopify
+        // setups (CON-417): it is checked before anything is saved, and a
+        // refusal saves nothing.
+        $initialSetup = !empty($data['initial_setup']);
+        if ($initialSetup) {
+            $this->checkCredentials($subdomain, $username, $password, $websiteId);
+            if (!$this->connectionAccepted) {
+                return [['field' => 'step', 'message' => (string)__('Test your Smaily connection to continue.')]];
+            }
+        }
+
         $this->write(Config::XML_PATH_SUBDOMAIN, $subdomain, $target);
         $this->write(Config::XML_PATH_USERNAME, $username, $target);
         // An empty password keeps the saved one; a store-wide save writes it
@@ -625,7 +637,9 @@ class WizardStepSaver
             $this->write(Config::XML_PATH_STOREFRONT_URL, $storefrontUrl, $target);
         }
 
-        $this->checkCredentials($subdomain, $username, $password, $websiteId);
+        if (!$initialSetup) {
+            $this->checkCredentials($subdomain, $username, $password, $websiteId);
+        }
 
         return [];
     }
@@ -887,8 +901,10 @@ class WizardStepSaver
      * Saving the connection is a real check (PRO-3560): Smaily is asked once
      * whether it accepts the credentials just saved, and SmailyClient
      * remembers the answer for the Dashboard and the Connection status. The
-     * save never depends on it — a refusal or an unreachable Smaily is shown
-     * as "Not connected", not as a failed save.
+     * Settings save never depends on it — a refusal or an unreachable Smaily
+     * is shown as "Not connected", not as a failed save; the initial setup
+     * asks before it saves and saves only an account Smaily accepts
+     * (CON-417).
      *
      * The account checked is the one saved at website scope — the single
      * account, or in mode A the default fallback account. An empty or masked

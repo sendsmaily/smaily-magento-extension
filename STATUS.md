@@ -7,92 +7,91 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-11-20 session end — **3.0.2 is released.** The
-GitHub release
-[3.0.2](https://github.com/sendsmaily/smaily-magento-extension/releases/tag/3.0.2)
-("3.0.2 — Try Intelligence free, shared stores, new look") was published
-on Erkki's go; the release workflow attached both ZIPs and their
-`.sha256`, the Hyvä mirror carries tag 3.0.2, and Packagist lists 3.0.2
-for both `smaily/smailyformagento` and `smaily/module-connect-hyva`.
-3.0.0 and 3.0.1 were released on 2026-11-14. The cut (#282) collects
-13 changelog fragments into 12 bullets: CON-356's price bullet is merged
-into CON-363's banner bullet (the banner replaced the introduction that
-held the price link), and CON-364's bullet names the Stores >
-Configuration wording of #273.
+_Last updated: 2026-11-26 — **3.0.3 is cut** (the `release/3.0.3`
+PR); its tag waits for Erkki's go. 3.0.3 is a hotfix: two merchant
+reports against 3.0.2 on Magento 2.4.9. The cut collects 6 changelog
+fragments into 6 bullets, in landing order, under a lead sentence that
+names the two serious fixes (admin grids, developer mode).
 
-**Merged since 3.0.1:**
-- #262 (guide), #264 (admin) CON-356: no Campaign Intelligence price.
-- #263, #278: engine contract 1.34.0, 1.35.0.
-- #265 + #266 CON-359: the connection prefix in front of every product
-  code and order number sent to the engine.
-- #267 + #271 CON-363: the Campaign Intelligence banner and **Try
-  Intelligence free** (onboarding start; the engine keeps starts closed
-  in production).
-- #268 CON-357: stored and logged errors keep only the code and its
-  place, never the remote text.
-- #269 + #272 + #273 CON-364: the Smaily-account invitation (setup
-  step 1, Settings › Connection, Dashboard, system message; hidden after
-  a successful **Test connection**) and gear icon › Integrations
-  wording.
-- #270: the Marketplace kit's description in the integration format.
-- #274 CON-366: **Edit design** frame mode (third-party cookies blocked,
-  an admin on its own subdomain).
-- #275 CON-368: abandoned-cart wait at most 1435 minutes; **Create a
-  Smaily account** opens the sign-up page.
-- #276 CON-230 (**Open Campaign Intelligence**, a one-time console link)
-  and CON-367 (§25 `stop_reason` for a stopped history import; Hold back
-  / Cancel import also cancel the queued imports, as in Woo).
-- #277 CON-372: the logos.
-- #279 + #281 CON-376 palette, CON-365 recommendations placement, and
-  contrast fixes.
-- #280 CON-358: Page Builder markup out of descriptions (the bullet
-  tells merchants to press **Run again** on **Catalog**).
+**Merged since 3.0.2:**
+- #285 CON-440 (was PRO-4322): a newsletter status change is read from
+  the saved status. Magento's changed flag is unreliable: code that
+  writes the field directly (for example Magento's newsletter Problem
+  Reports) loses it, and a status loaded as a string sets it on an
+  unchanged save. **Note:** the squash commit 1d67c39 on `master`
+  carries CON-434's description by mistake (a parallel worker
+  overwrote the PR body); the PR body is restored, history is not
+  rewritten.
+- #286 CON-434: the Smaily Log grid's data-source registration moved
+  from `etc/adminhtml/di.xml` to `etc/di.xml`. On every 3.0.x every core
+  admin grid (orders, invoices, shipments, credit memos, customers, CMS
+  pages and blocks) failed with "Not registered handle" in every mode.
+  Very likely the cause of the 3.0.1 Marketplace MFTF grid failures —
+  the earlier reading here ("Adobe's test environment", Magento's own
+  filter buttons) was wrong.
+- #287 CON-387: the **First order** email follows the abandoned-cart
+  reminder's consent rule, with a Smaily status lookup first.
+- #288: engine contract 1.37.1 (copy only; the wire changes are carried
+  by CON-383, CON-421, CON-412, CON-432).
+- #289 CON-436: Campaign Intelligence newsletter join, rejoin and leave
+  read from the saved status.
+- #290 CON-417: setup step 1 **Continue** only after a passed **Test
+  connection** (browser and server).
+- #291 CON-437: each event declared once in `etc/events.xml` — on every
+  3.0.x developer mode answered 500 on every page.
 
-**Marketplace (CON-152):** 3.0.1, submission `2q6w4ofnme`. Technical
-part "Awaiting Manual QA" (MFTF 6/20 failed, on Magento's own admin grid
-filter buttons — not the extension's code). Marketing part refused
-twice (the title as a "developer name", then the integration
-description format); resubmitted 2026-11-20 in the integration format.
-Support request SALES0907379 asks Adobe to accept the title as the
-integrated service's name. The Marketplace user-guide PDF still says
-"Preferences > API" (and version 3.0.1): regenerate it from
-`docs/internal/marketplace/user-guide.html` before the next Marketplace
-submission.
+**Marketplace (CON-152):** resubmit from 3.0.3 as a new version draft,
+with the user-guide PDF regenerated from
+`docs/internal/marketplace/user-guide.html` (gear icon › Integrations,
+version 3.0.3). The 3.0.1 submission `2q6w4ofnme` is still in review.
 
-**Pilot:** CON-147 closed (5/5): the first pilot store runs v3
-connected to Campaign Intelligence. CON-283 found no code defect: the
-multi-website pilot store (one store, 3.0.x) presses **Run again** on
-**Catalog**.
+**Sandbox:** now in developer mode (it ran in default mode before
+2026-11-26, which is why CON-437 never showed there).
 
-**Human acceptance pending:** CON-363 — a live **Try Intelligence free**
-start (the engine keeps starts closed in production) and the Estonian
-proofread; CON-366 — Safari on an https admin, and an admin on its own
-subdomain; CON-230 — a real console sign-in once the engine switches §24
-on; CON-356 shipped in 3.0.2. The Estonian proofread list for the 3.0.2
-texts went to Erkki on 2026-11-20; his corrections land in one
-follow-up PR.
+**Human acceptance pending:** the Estonian proofread of the guide's new
+first-order section (CON-387) and step-1 text (CON-417); CON-414's guide
+sentence on what the installation report sends — no such sentence is in
+the guide yet, it needs writing; CON-363, CON-366 and CON-230 as before.
 
-**Gotchas:** an unreachable engine makes one ingest flush take about
-90 s for 2 rows (10 s connect timeout × retries) — check that cron runs
-do not overlap. A network-error Log row keeps cURL's local English text
-(no remote text, by design). The onboarding-status and banner-dismiss
-calls also carry `form_key` in the query string (minor). Worktrees under
-`.claude/worktrees` leak into the sandbox compile: remove them first.
-Magento's first-time system-messages popup is never drawn on
-2.4.4–2.4.9 (its collection is never loaded), so a link in a system
-message shows only in the **System Messages** list. A `release/*` branch
-takes one push (CLAUDE.md).
+**Gotchas:** a PR body can be overwritten by a parallel worker (#285) —
+before a merge, check that the body names the PR's own issue. The
+`bin/magento` GDPR command still uses the contract's deprecated
+email-in-path endpoints (§8–§10, deprecated in 1.37.0, no removal date);
+it moves to §8b/§9b with CON-412. Earlier gotchas (engine timeouts,
+cURL text in a network-error row, `form_key` in the query string,
+worktrees in the sandbox compile, the system-messages popup, one push
+per `release/*` branch) still hold.
+
+**Open question for Erkki:** with double opt-in on, a checkout tick
+counts as consent for the abandoned-cart reminder and the first-order
+email before the shopper confirms the subscription (the existing rule,
+unchanged by CON-387). Keep it?
 
 **Next session opens with:**
-1. Erkki's Estonian proofread corrections for the 3.0.2 texts (one PR).
-2. The Marketplace review results for 3.0.1 (`2q6w4ofnme`; support
-   request SALES0907379 about the title); afterwards submit 3.0.2 as a
-   new version with a regenerated user-guide PDF (gear icon ›
-   Integrations, version 3.0.2).
-3. Designs for Erkki: CON-369 payment reminder and CON-361 stock alerts
-   (contract 1.35.0 §6c).
-4. CON-283: the multi-website pilot store presses **Run again** on
-   **Catalog**; then check the engine._
+1. The 3.0.3 tag on Erkki's go; then a reply to the two merchant
+   reports (CON-434, CON-440 — CON-440 also asks the store which module
+   saves its newsletter signups) and the Marketplace resubmission from
+   3.0.3.
+2. CON-421 (orders in the store's default currency) and CON-432 part 1
+   (stale contact changes, closes CON-394) — in progress on 2026-11-26.
+3. CON-432 parts 2–3: workflows after an account change (= CON-396),
+   privacy-request pacing, import refusal counts, consent alignment, the
+   shared-account warning.
+4. CON-423 (stock flips) and CON-419 (Estonian wordings, with CON-414's
+   sentence).
+5. Designs CON-369 and CON-361 wait for Erkki._
+
+_Earlier (2026-11-20 session end): **3.0.2 was released** on Erkki's
+go (#282 cut, 13 fragments into 12 bullets; both ZIPs, the Hyvä mirror
+tag and Packagist for both packages). In it: the connection prefix
+(CON-359), the Campaign Intelligence banner and **Try Intelligence
+free** (CON-363), errors without remote text (CON-357), the Smaily
+account invitation (CON-364), **Edit design** frame mode (CON-366), the
+1435-minute cart wait (CON-368), **Open Campaign Intelligence**
+(CON-230), queued-import cancel and §25 `stop_reason` (CON-367), logos
+and palette (CON-372, CON-376), clean Page Builder descriptions
+(CON-358). CON-147 closed (5/5). Marketplace 3.0.1 marketing part
+resubmitted in the integration format (support request SALES0907379)._
 
 _Earlier (2026-11-14 session end): **3.0.0 (#256, tag on ff15243) and
 3.0.1 (#260, tag on 63a80e8; PHP 8.5, #259) were released; 3.0.1 was

@@ -23,7 +23,7 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * POST {step: connect|subscribers|automations|intelligence|finish|shape, data: {...}}
  * -> {saved: bool, errors: [{field, message}], verified?: bool, accountName?: string,
  *     storefrontUrlChanged?: bool, transactionalVerified?: bool, returnedToStoreWide?: true,
- *     ownAccountStarted?: true, shapeChanged?: bool, websiteId?: int}
+ *     ownAccountStarted?: true, workflowsRemoved?: true, shapeChanged?: bool, websiteId?: int}
  *
  * The shape step (CON-279) answers the website the page opens next: the
  * selected one, or the default website when the page set the whole store
@@ -33,7 +33,8 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * values of a tab says so (CON-179), so the page reloads to show them; so
  * does a connection save that moved the website onto another Smaily account
  * than the store-wide one, whose automations then start from no workflow
- * (CON-190).
+ * (CON-190), and a connection save that replaced a Smaily account and
+ * removed the workflows picked from it (CON-396).
  *
  * The finish step also answers whether Smaily accepted the saved
  * credentials at the last check (PRO-3560), for the Overview step's copy.
@@ -90,6 +91,9 @@ class SaveStep extends AbstractJsonAction implements HttpPostActionInterface
         }
         if ($this->stepSaver->isOwnAccountStarted()) {
             $response['ownAccountStarted'] = true;
+        }
+        if ($this->stepSaver->isWorkflowsRemoved()) {
+            $response['workflowsRemoved'] = true;
         }
         if ($step === 'connect' && $errors === []) {
             $response['verified'] = $this->stepSaver->isConnectionAccepted();

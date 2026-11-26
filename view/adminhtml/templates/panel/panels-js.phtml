@@ -63,6 +63,9 @@ window.smailyPanelsInit = function ($) {
     var mlModeCurrent = isMultilingual ? (boot.connection.multilingualMode || 'single') : 'single';
     var mlModeSaved = mlModeCurrent;
     var mlSwitchConfirmed = false;
+    // Whether the merchant agreed that per-language accounts take the place
+    // of the saved Smaily account (CON-396).
+    var mlAccountsConfirmed = false;
     // The stored contact-sync answer, and whether contacts sync — that
     // answer and the saved Contacts settings (PRO-4036): from the page load,
     // then from a save of the Contacts panel, which saves those settings
@@ -303,6 +306,7 @@ window.smailyPanelsInit = function ($) {
                 mlModeCurrent = data.multilingual_mode || mlModeCurrent;
                 mlModeSaved = mlModeCurrent;
                 mlSwitchConfirmed = false;
+                mlAccountsConfirmed = false;
                 // The top-level account just saved — the single account or
                 // the default fallback account — is the website's, the one
                 // an empty password now keeps (PRO-3690, PRO-3718).
@@ -1113,13 +1117,23 @@ window.smailyPanelsInit = function ($) {
         // Multilingual mode cards: live re-render of the dependent sections,
         // with a confirm before leaving a SAVED mode that carries
         // per-language configuration (the switch removes mode-A store-view
-        // credentials on save and stops using the workflow mappings).
+        // credentials on save and stops using the workflow mappings), and
+        // before per-language accounts take the place of a saved Smaily
+        // account (CON-396: the default fallback account replaces it, and
+        // the workflows of a replaced account are removed on save).
         // Unsaved exploration between the cards never asks.
         applyMlMode(mlModeCurrent);
         $(document).on('change', 'input[name=smaily-w-mlmode]', function () {
             var next = $(this).val();
             var leavingConfigured = (mlModeSaved === 'a' || mlModeSaved === 'b') && next !== mlModeSaved;
-            if (leavingConfigured && !mlSwitchConfirmed) {
+            var enteringAccounts = next === 'a' && mlModeSaved !== 'a' && !!boot.websiteAccount.subdomain;
+            if (enteringAccounts) {
+                if (!mlAccountsConfirmed && !window.confirm('<?= $escaper->escapeJs(__('Switching the multilingual mode changes how contacts and automations are routed. The default fallback account takes the place of the Smaily account saved now; where it is another Smaily account, the workflows picked from the saved account are removed. Workflows picked earlier for per-language accounts are removed too. Continue?')) ?>')) {
+                    $('input[name=smaily-w-mlmode][value=' + mlModeCurrent + ']').prop('checked', true);
+                    return;
+                }
+                mlAccountsConfirmed = true;
+            } else if (leavingConfigured && !mlSwitchConfirmed) {
                 var message = '<?= $escaper->escapeJs(__('Switching the multilingual mode changes how contacts and automations are routed. Per-language accounts and workflow mappings that no longer apply stop being used (per-store-view credentials are removed on save). Continue?')) ?>';
                 if (!window.confirm(message)) {
                     $('input[name=smaily-w-mlmode][value=' + mlModeCurrent + ']').prop('checked', true);
@@ -1429,6 +1443,36 @@ window.smailyPanelsInit = function ($) {
         return data;
     }
 
+    /**
+     * A connection save that puts another Smaily account (another subdomain)
+     * in the place of a saved one removes the workflows picked from the
+     * saved one (CON-396), so it asks first: the website's account (in mode
+     * A the default fallback account) and each per-language account saved
+     * in mode A. A change into per-language accounts asked on its mode card.
+     * A declined save throws an error marked `cancelled`, which the page
+     * shows as nothing.
+     */
+    function confirmReplacedAccounts(data) {
+        var replaced = function (subdomain, saved) {
+            saved = String(saved || '').trim().toLowerCase();
+            return saved !== '' && String(subdomain || '').trim().toLowerCase() !== saved;
+        };
+        var asks = !(data.multilingual_mode === 'a' && mlModeSaved !== 'a')
+            && (replaced(data.subdomain, boot.websiteAccount.subdomain)
+                || (data.accounts || []).some(function (account) {
+                    return replaced(
+                        account.subdomain,
+                        $('.smaily-ml-account[data-language=' + account.language + ']').data('saved-subdomain')
+                    );
+                }));
+        if (asks && !window.confirm('<?= $escaper->escapeJs(__('This replaces a saved Smaily account. The workflows picked from the replaced account are removed: those automations send nothing until you pick workflows of the new account under Automations. Continue?')) ?>')) {
+            var cancelled = new Error('');
+            cancelled.cancelled = true;
+            throw cancelled;
+        }
+        return data;
+    }
+
     // --- Per-panel save payloads (shared savestep endpoint) -----------------
     var collect = {
         connect: function () {
@@ -1493,7 +1537,7 @@ window.smailyPanelsInit = function ($) {
                         ['accounts.' + fallback + '.password']
                     );
                 }
-                return withTransactional(withStorefrontUrl({
+                return confirmReplacedAccounts(withTransactional(withStorefrontUrl({
                     // The fallback account's credentials double as the
                     // default-scope credentials (any unmatched scope uses
                     // them), Woo mode-A parity.
@@ -1503,7 +1547,7 @@ window.smailyPanelsInit = function ($) {
                     multilingual_mode: mode,
                     fallback_language: fallback,
                     accounts: accounts
-                }));
+                })));
             }
             var creds = credentials();
             if (!connected && (!creds.subdomain || !creds.username || !creds.password)) {
@@ -1520,12 +1564,12 @@ window.smailyPanelsInit = function ($) {
                     ['password']
                 );
             }
-            return withTransactional(withStorefrontUrl({
+            return confirmReplacedAccounts(withTransactional(withStorefrontUrl({
                 subdomain: creds.subdomain,
                 username: creds.username,
                 password: creds.password,
                 multilingual_mode: mode
-            }));
+            })));
         },
         subscribers: function () {
             var data = {

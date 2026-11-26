@@ -1,0 +1,196 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the questions before a Smaily account is replaced
+  (CON-396): the real Settings templates, rendered in en_US and et_EE by
+  Test/Js/render-admin.php into Test/Js/build/, run with jQuery from vendor/,
+  one fresh frame per locale. Stubbed: RequireJS's require(), the browser's
+  confirm (it records each question and answers window.confirmAnswer) and the
+  requests (fetch), each answered as saved with an empty workflow list.
+
+  The website is saved in one account with per-language workflows (mode B)
+  on the Smaily account `shop`. Picking "Per-language Smaily accounts" asks
+  first, once: the default fallback account takes the saved account's place
+  and the workflows of a replaced account are removed; a declined question
+  keeps the saved mode. A Connection save with another subdomain asks first
+  too; declined, nothing is saved and no failure is shown. A save of the same
+  account asks nothing.
+
+  Run it with bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>account change harness</title>
+    <script src="build/settings-account-change.en_US.js"></script>
+    <script src="build/settings-account-change.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var ENTER = 'Switching the multilingual mode changes how contacts and automations are routed. The default fallback'
+        + ' account takes the place of the Smaily account saved now; where it is another Smaily account, the'
+        + ' workflows picked from the saved account are removed. Workflows picked earlier for per-language accounts'
+        + ' are removed too. Continue?';
+    var REPLACE = 'This replaces a saved Smaily account. The workflows picked from the replaced account are removed:'
+        + ' those automations send nothing until you pick workflows of the new account under Automations. Continue?';
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    function stubs() {
+        return [
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.require = function (deps, callback) { callback(window.jQuery); };',
+            'window.confirms = [];',
+            'window.confirmAnswer = false;',
+            'window.confirm = function (text) { window.confirms.push(text); return window.confirmAnswer; };',
+            'window.requests = [];',
+            'window.fetch = function (url, options) {',
+            '  window.requests.push({url: url, body: JSON.parse(options.body || "{}")});',
+            '  return Promise.resolve(new Response(JSON.stringify({saved: true, errors: [], workflows: [], status: "idle"}),',
+            '    {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>'
+        ].join('\n');
+    }
+
+    function open(page) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.onload = function () {
+                wait(50).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs()
+                + '</head><body>' + rendered.html + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function pickMode(frame, mode) {
+        var input = frame.contentDocument.querySelector('input[name=smaily-w-mlmode][value=' + mode + ']');
+        input.checked = true;
+        frame.contentWindow.jQuery(input).trigger('change');
+    }
+
+    function checkedMode(frame) {
+        return frame.contentDocument.querySelector('input[name=smaily-w-mlmode]:checked').value;
+    }
+
+    function connectSaves(frame) {
+        return frame.contentWindow.requests.filter(function (request) {
+            return request.body.step === 'connect';
+        }).length;
+    }
+
+    async function saveConnection(frame, subdomain) {
+        var $ = frame.contentWindow.jQuery;
+        $('#smaily-w-subdomain').val(subdomain);
+        $('#smaily-w-password').val('new-secret');
+        frame.contentDocument.getElementById('smaily-w-connection-save').click();
+        await wait(100);
+    }
+
+    async function run(locale) {
+        var page = 'settings-account-change.' + locale,
+            strings = window.smailyAdminPages[page].strings,
+            frame = await open(page),
+            win = frame.contentWindow,
+            result = frame.contentDocument.getElementById('smaily-w-test-result');
+
+        check(locale + ': the questions are in the admin\'s language',
+            locale === 'en_US' || (strings[ENTER] !== ENTER && strings[REPLACE] !== REPLACE));
+
+        pickMode(frame, 'a');
+        check(locale + ': per-language accounts ask before they take the saved account\'s place',
+            win.confirms.length === 1 && win.confirms[0] === strings[ENTER]);
+        check(locale + ': declined, the saved mode stays', checkedMode(frame) === 'b');
+
+        win.confirmAnswer = true;
+        pickMode(frame, 'a');
+        pickMode(frame, 'b');
+        pickMode(frame, 'a');
+        check(locale + ': agreed, the question is asked once', win.confirms.length === 2 && checkedMode(frame) === 'a');
+        pickMode(frame, 'b');
+
+        win.confirms = [];
+        win.confirmAnswer = false;
+        await saveConnection(frame, 'SHOP');
+        check(locale + ': the saved account in another case asks nothing',
+            win.confirms.length === 0 && connectSaves(frame) === 1);
+
+        await saveConnection(frame, 'other-shop');
+        check(locale + ': another Smaily account asks before it is saved',
+            win.confirms.length === 1 && win.confirms[0] === strings[REPLACE]);
+        check(locale + ': declined, nothing is saved', connectSaves(frame) === 1);
+        check(locale + ': declined, no failure is shown',
+            result.textContent.trim() === '' && !frame.contentDocument.querySelector('.smaily-form-banner'));
+
+        win.confirmAnswer = true;
+        await saveConnection(frame, 'other-shop');
+        check(locale + ': agreed, the account is saved', connectSaves(frame) === 2);
+        frame.remove();
+    }
+
+    (async function () {
+        try {
+            for (var locale of ['en_US', 'et_EE']) {
+                log('# ' + locale);
+                await run(locale);
+            }
+        } catch (error) {
+            failures++;
+            log('FAIL ' + (error && error.stack ? error.stack : error));
+        }
+        clearInterval(keepAlive);
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    })();
+</script>
+</body>
+</html>

@@ -1872,6 +1872,33 @@ $pages['settings-modes'] = [
 ];
 
 /*
+ * The settings-account-change page (CON-396) renders Settings for the
+ * Latvia website of the two-website store above, saved in one account with
+ * per-language workflows (mode B) on the Smaily account `shop`.
+ */
+$accountChangeStrings = [
+    'Switching the multilingual mode changes how contacts and automations are routed. The default fallback account'
+        . ' takes the place of the Smaily account saved now; where it is another Smaily account, the workflows picked'
+        . ' from the saved account are removed. Workflows picked earlier for per-language accounts are removed too.'
+        . ' Continue?',
+    'This replaces a saved Smaily account. The workflows picked from the replaced account are removed: those'
+        . ' automations send nothing until you pick workflows of the new account under Automations. Continue?',
+    'Switching the multilingual mode changes how contacts and automations are routed. Per-language accounts and'
+        . ' workflow mappings that no longer apply stop being used (per-store-view credentials are removed on save).'
+        . ' Continue?',
+];
+$pages['settings-account-change'] = [
+    'template' => $root . '/view/adminhtml/templates/settings/index.phtml',
+    'viewModel' => $websitesViewModel(false),
+    'data' => ['context' => 'settings', 'children' => [
+        'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
+        'panel.automations' => $root . '/view/adminhtml/templates/panel/automations.phtml',
+        'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+    ]],
+    'strings' => $accountChangeStrings,
+];
+
+/*
  * The Automations tab's discount code (CON-198) for the Latvia website of
  * the two-website store above: the settings-discount page lists two cart
  * price rules that can generate codes; the settings-discount-empty page has

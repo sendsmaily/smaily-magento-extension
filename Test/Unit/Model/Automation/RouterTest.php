@@ -274,6 +274,7 @@ class RouterTest extends TestCase
                     return $collection;
                 }
             );
+            $collection->method('addHiddenSharedRowsFilter')->willReturnSelf();
             $collection->method('setOrder')->willReturnSelf();
             $collection->method('setPageSize')->willReturnSelf();
             $collection->method('getFirstItem')->willReturn($item ?? $this->emptyMapping());

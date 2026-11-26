@@ -512,6 +512,98 @@ class WizardStepSaverTest extends IntegrationTestCase
     }
 
     /**
+     * CON-396: another Smaily account saved for all websites takes the
+     * workflows picked from the replaced one with it — the store-wide ones
+     * and the own ones of a website that sends through it — but not those of
+     * a website on a Smaily account of its own.
+     */
+    public function testAnotherStoreWideAccountRemovesTheWorkflowsPickedFromTheReplacedOne(): void
+    {
+        $this->insertRow('default', 0, Config::XML_PATH_MULTILINGUAL_MODE, 'b');
+        $this->saver('0')->save('connect', [
+            'subdomain' => 'shop',
+            'username' => 'api-user',
+            'password' => 'secret',
+            'multilingual_mode' => 'b',
+        ]);
+        $this->saver('0')->save('automations', [
+            'welcome_workflow' => '800',
+            'mappings' => [
+                ['trigger_type' => 'welcome', 'language' => 'et', 'account_key' => 'default', 'workflow_id' => 900],
+            ],
+        ]);
+        $this->insertRow('websites', self::MAIN, Config::XML_PATH_FIRST_ORDER_WORKFLOW, '801');
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_SUBDOMAIN, 'second-shop');
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_WELCOME_WORKFLOW, '950');
+        $router = $this->router();
+        self::assertSame(900, $router->resolve('welcome', self::MAIN, 'et')?->workflowId);
+        self::assertSame(801, $router->resolve('first_order', self::MAIN, 'et')?->workflowId);
+
+        $saver = $this->saver('0');
+        self::assertSame([], $saver->save('connect', [
+            'subdomain' => 'new-shop',
+            'username' => 'api-user',
+            'password' => 'new-secret',
+            'multilingual_mode' => 'b',
+        ]));
+
+        self::assertTrue($saver->isWorkflowsRemoved());
+        foreach (['welcome', 'first_order'] as $trigger) {
+            self::assertNull($router->resolve($trigger, self::MAIN, 'et'), $trigger);
+        }
+        self::assertSame(950, $router->resolve('welcome', self::SECOND, 'et')?->workflowId);
+    }
+
+    /**
+     * CON-396: a website with its own automations sends what its page
+     * shows. The page shows the store-wide rows beside the website's own; a
+     * workflow cleared there is saved as the website's own row without a
+     * workflow, which hides the store-wide row — the store-wide default
+     * fallback too — from the website, while the other website still
+     * sends it. Saved again unchanged, it stays cleared.
+     */
+    public function testAWorkflowAWebsiteClearsHidesTheStoreWideOneFromIt(): void
+    {
+        $encryptor = $this->objectManager->get(EncryptorInterface::class);
+        $this->insertRow('default', 0, Config::XML_PATH_SUBDOMAIN, 'shop');
+        $this->insertRow('default', 0, Config::XML_PATH_USERNAME, 'api-user');
+        $this->insertRow('default', 0, Config::XML_PATH_PASSWORD, $encryptor->encrypt('secret'));
+        $this->insertRow('default', 0, Config::XML_PATH_MULTILINGUAL_MODE, 'b');
+        $clientFactory = $this->createMock(SmailyClientFactory::class);
+        $clientFactory->method('create')->willReturnCallback(function (): SmailyClient {
+            $client = $this->createMock(SmailyClient::class);
+            $client->method('getAutomationWorkflows')->willReturn([['id' => 4, 'title' => 'ET'], ['id' => 10, 'title' => 'EN']]);
+
+            return $client;
+        });
+        $provider = new SmailyClientProvider($this->config, $clientFactory);
+        $row = static fn (string $language, int $workflowId, bool $fallback): array => [
+            'trigger_type' => 'welcome',
+            'language' => $language,
+            'account_key' => 'default',
+            'workflow_id' => $workflowId,
+            'is_default_fallback' => $fallback,
+        ];
+        self::assertSame([], $this->saver('0', [self::MAIN, self::SECOND], $provider)->save('automations', [
+            'mappings_mode' => 'b',
+            'mappings' => [$row('et', 4, false), $row('en', 10, true)],
+        ]));
+
+        $own = ['own' => true, 'mappings_mode' => 'b', 'mappings' => [$row('et', 4, false)]];
+        foreach ([1, 2] as $save) {
+            self::assertSame([], $this->saver((string)self::SECOND, [self::MAIN, self::SECOND], $provider)
+                ->save('automations', $own), 'save ' . $save);
+
+            $router = $this->router();
+            self::assertNull($router->resolve('welcome', self::SECOND, 'en'), 'save ' . $save);
+            self::assertNull($router->resolve('welcome', self::SECOND, 'lv'), 'The store-wide fallback is hidden');
+            self::assertSame(4, $router->resolve('welcome', self::SECOND, 'et')?->workflowId);
+            self::assertSame(10, $router->resolve('welcome', self::MAIN, 'en')?->workflowId);
+            self::assertSame(10, $router->resolve('welcome', self::MAIN, 'lv')?->workflowId);
+        }
+    }
+
+    /**
      * CON-190: on a store with one website nothing changes — its Smaily
      * account saved at its website scope (an initial setup before the
      * update) starts the store's workflows as before.

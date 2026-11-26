@@ -1566,6 +1566,18 @@ numbering is per Smaily account), and mirrors state onto
 subscriber-save observer never echoes the write back to Smaily. Writes use
 import mode — no Magento emails.
 
+Smaily keeps one subscription status per address, so where websites sync
+contacts to one Smaily account (one subdomain, read per store view, so a
+store view with an account of its own puts its website on that account)
+with different contact sync modes, the reconcile of a Subscribers only
+website can mark subscribed a customer whom an All customers website sent.
+The behaviour stays; the Contacts panel (Settings > Contacts and the
+initial setup's step 2) warns each website of such a group, from the saved
+settings, with each website and its mode (`Model\Adminhtml\SharedAccountModes`,
+CON-432, the rule of the four connectors; a website whose contact sync is
+not active is left out; the initial setup on a 2+-website install reads
+every account).
+
 ### Abandoned cart
 
 `Cron/AbandonedCart` scans the native `quote` table (active, has items +

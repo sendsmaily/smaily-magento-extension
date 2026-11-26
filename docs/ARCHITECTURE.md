@@ -102,7 +102,13 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   are looked up for the event's website with the store-wide rows
   (`website_id 0` — the initial setup's and a store-wide Settings save's,
   CON-179, and the 2.8.x migration's default-scope seeding) as the
-  fallback; a website's own row wins. A website of a 2+-website install
+  fallback; a website's own row wins, and hides the store-wide row of the
+  same trigger, language and account — also where it holds no workflow
+  (`workflow_id` 0: `MappingSaver` writes it where a website with its own
+  automations clears a workflow the store-wide rows hold, and
+  `Mapping\Collection::addHiddenSharedRowsFilter()` keeps the hidden
+  store-wide row out of the default-fallback lookup), so the website sends
+  what its Automations tab shows (CON-396). A website of a 2+-website install
   that uses another Smaily account than the store-wide one
   (`WebsiteOverrides::usesOtherAccount()`, see "Multi-website") reads only
   its own rows and the workflows saved at its website scope (CON-190): the
@@ -114,8 +120,9 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   (`account_key = default`), mode `a` the per-language accounts' rows
   (`account_key` = the language) and the language-less `default` rows of
   the 2.8.x migration. A website that switches between the two keeps both
-  modes' rows, so a switch back finds them, but a workflow id never goes
-  through an account it was not picked from. A matched
+  modes' rows (until a switch back to mode `a` removes the per-language
+  accounts' rows, see "Admin UI"), but a workflow id never goes through an
+  account it was not picked from. A matched
   row's `account_key` travels with the workflow (`WorkflowMatch`) and the
   handler posts through THAT account's credentials
   (`Multilingual\AccountResolver` maps the key to a store view; `default`,
@@ -2610,7 +2617,27 @@ Initial setup, Settings, Log. Design rules:
   (workflow dropdowns loaded live per account). All sections show/hide
   live on mode change with no save round-trip; leaving mode `a` removes
   the per-store-view credential overrides on save (confirmed in the UI
-  first) and keeps its mapping rows. The editor shows each of modes `a`/`b`
+  first) and keeps its mapping rows unread. **A workflow belongs to the
+  Smaily account it was picked from (CON-396):** a connection save that
+  puts another Smaily account (another subdomain; another API user of the
+  same subdomain lists the same workflows) in the place of a saved one
+  removes the workflows picked from it (`WizardStepSaver::removeReplacedWorkflows()`
+  → `WebsiteOverrides::removeWorkflows()`): for the one account the
+  workflows saved at the written scope and the `default` rows there, for a
+  store-wide save also at every website without its own Smaily account,
+  and on a single-website install both scopes (the store and its website
+  are one); for a mode-`a` language whose block names another account, that
+  language's rows; and on entering mode `a`, the rows of the per-language
+  accounts of an earlier mode `a`, whose accounts leaving it removed. Mode
+  `a` puts the default fallback account in the place of the website's
+  account, so it is such a save. The automations concerned then find no
+  workflow and are skipped with the reason until a workflow of the new
+  account is picked. The UI asks first — on the per-language accounts card
+  while an account is saved, and in `collect.connect` before a save whose
+  account (or a mode-`a` block's) has another subdomain than the saved one
+  (a declined question cancels the save silently) — and a save that
+  removed workflows answers `workflowsRemoved`, on which Settings and the
+  initial setup reload. The editor shows each of modes `a`/`b`
   its own rows, as the Router reads them (`WizardData::getSavedMappings($mode)`
   renders both modes' rows on every select, `data-saved-a`/`data-saved-b`,
   and each trigger's fallback, `data-fallback-a`/`-b`); a live switch of

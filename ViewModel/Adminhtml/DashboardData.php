@@ -21,12 +21,20 @@ use Smaily\Connect\Model\Engine\CatalogManifest;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Health\QueueHealth;
 use Smaily\Connect\Model\Log\StatusPill;
+use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Ui\Component\QueueStatusOptions;
 
 /**
  * Operational dashboard data. The verdict reuses the HealthCheck cron's
  * state (engine-down flag) and query (failed rows in 24h) so the dashboard
  * and the admin notifications always agree.
+ *
+ * Under separate stores (CON-281) the Dashboard follows the website
+ * selector, as Settings does: the Smaily account and the marketing queue's
+ * figures (contact syncs and automations, failed and queued rows, recent
+ * activity) are the selected website's — else the default website's —
+ * while Campaign Intelligence stays the whole installation's. Under one
+ * store the figures are the whole installation's.
  */
 class DashboardData implements ArgumentInterface
 {
@@ -46,6 +54,9 @@ class DashboardData implements ArgumentInterface
     /** @var array{nights: int, reason: string}|false|null false once read and nothing to say */
     private array|false|null $unsentProductList = null;
 
+    /** The separate store shown (null: one store); false until read. */
+    private int|false|null $separateStoreId = false;
+
     public function __construct(
         private readonly Config $config,
         private readonly EngineSettings $engineSettings,
@@ -58,8 +69,22 @@ class DashboardData implements ArgumentInterface
         private readonly StatusPill $statusPill,
         private readonly QueueStatusOptions $statusOptions,
         private readonly DateTime $dateTime,
-        private readonly CatalogManifest $catalogManifest
+        private readonly CatalogManifest $catalogManifest,
+        private readonly StoreLayout $storeLayout
     ) {
+    }
+
+    /**
+     * The query of a link to Settings or the initial setup: under separate
+     * stores it opens the website the Dashboard shows (CON-281).
+     *
+     * @return array<string, array<string, int>>
+     */
+    public function getWebsiteQuery(): array
+    {
+        $websiteId = $this->separateStoreId();
+
+        return $websiteId === null ? [] : ['_query' => ['website' => $websiteId]];
     }
 
     public function isSetupCompleted(): bool
@@ -243,7 +268,7 @@ class DashboardData implements ArgumentInterface
     public function getFailedLast24h(): int
     {
         if ($this->failed24h === null) {
-            $this->failed24h = $this->queueHealth->failedSince(86400);
+            $this->failed24h = $this->queueHealth->failedSince(86400, $this->separateStoreId());
         }
 
         return $this->failed24h;
@@ -275,7 +300,7 @@ class DashboardData implements ArgumentInterface
 
     public function getContactSyncsDelivered(): int
     {
-        return $this->stats->contactSyncsDelivered();
+        return $this->stats->contactSyncsDelivered($this->separateStoreId());
     }
 
     public function getCatalogItemsDelivered(): int
@@ -285,7 +310,7 @@ class DashboardData implements ArgumentInterface
 
     public function getQueuedToday(): int
     {
-        return $this->stats->queuedToday();
+        return $this->stats->queuedToday($this->separateStoreId());
     }
 
     /**
@@ -301,12 +326,27 @@ class DashboardData implements ArgumentInterface
     {
         $labels = array_column($this->statusOptions->toOptionArray(), 'label', 'value');
         $rows = [];
-        foreach ($this->stats->recentActivity($limit) as $row) {
+        foreach ($this->stats->recentActivity($limit, $this->separateStoreId()) as $row) {
             $row['status_label'] = $labels[$row['status']] ?? $row['status'];
             $row['status_pill'] = $this->statusPill->variant($row['status']);
             $rows[] = $row;
         }
 
         return $rows;
+    }
+
+    /**
+     * The website a separate store's Dashboard shows (CON-281): the
+     * selected one, else the default website; null under one store.
+     */
+    private function separateStoreId(): ?int
+    {
+        if ($this->separateStoreId === false) {
+            $this->separateStoreId = $this->storeLayout->isSeparateStores()
+                ? $this->websiteContext->getWebsiteId()
+                : null;
+        }
+
+        return $this->separateStoreId;
     }
 }

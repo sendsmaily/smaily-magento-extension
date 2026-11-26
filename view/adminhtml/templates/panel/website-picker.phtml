@@ -1,0 +1,34 @@
+<?php
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * The website selector of separate stores (CON-279): one link per website
+ * with the Smaily subdomain it uses (or Not set up), reloading the page
+ * with `?website=<id>`; the selected website — else the default website —
+ * is marked. Drawn only on a 2+-website install set up as separate stores:
+ * at the top of the initial setup and Settings (panel/store-shape.phtml,
+ * whose script keeps the page's other query parameters on a click) and of
+ * the Dashboard (CON-281). Its block's view model is WizardData.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+/** @var \Smaily\Connect\ViewModel\Adminhtml\WizardData $viewModel */
+$viewModel = $block->getData('view_model');
+if (!$viewModel->hasMultipleWebsites() || !$viewModel->isSeparateStores()) {
+    return;
+}
+$selectedWebsiteId = $viewModel->getSelectedWebsiteId();
+?>
+<nav class="smaily-website-picker" id="smaily-website-picker" aria-label="<?= $escaper->escapeHtmlAttr(__('Website')) ?>">
+    <?php foreach ($viewModel->getWebsiteAccounts() as $websiteId => $website): ?>
+    <?php $active = $websiteId === $selectedWebsiteId; ?>
+    <a class="smaily-website-picker__item<?= $active ? ' is-active' : '' ?>"
+       href="?website=<?= (int)$websiteId ?>" data-website-id="<?= (int)$websiteId ?>"<?= $active ? ' aria-current="page"' : '' ?>>
+        <span class="smaily-website-picker__name"><?= $escaper->escapeHtml($website['name']) ?></span>
+        <span class="smaily-website-picker__account"><?= $escaper->escapeHtml($website['subdomain'] !== '' ? $website['subdomain'] . '.sendsmaily.net' : __('Not set up')) ?></span>
+    </a>
+    <?php endforeach; ?>
+</nav>

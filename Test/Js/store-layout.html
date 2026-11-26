@@ -235,8 +235,8 @@
         check(label + 'Save', text(doc.getElementById('smaily-shape-save')) === strings.Save);
         pick(frame, 'one');
         check(label + 'one store says Latvia\'s settings become everyone\'s', text(doc.getElementById('smaily-shape-to-one'))
-            === format(strings['All websites then use the settings of %1: its Smaily account, Contacts settings and'
-                + ' automations. The other websites\' own settings are removed.'], 'Latvia')
+            === format(strings['All websites then use the settings of %1: its Smaily account, Contacts settings,'
+                + ' automations and transactional emails. The other websites\' own settings are removed.'], 'Latvia')
             && shown(doc.getElementById('smaily-shape-to-one')));
 
         window.recorded = [];

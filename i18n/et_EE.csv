@@ -38,7 +38,7 @@
 "All languages share one Smaily account; each language fires its own workflow from the list.","Kõik keeled jagavad üht Smaily kontot; iga keel käivitab nimekirjast oma töövoo."
 "All products","Kõik tooted"
 "All systems normal","Kõik toimib normaalselt"
-"All websites then use the settings of %1: its Smaily account, Contacts settings and automations. The other websites' own settings are removed.","Seejärel kasutavad kõik veebisaidid veebisaidi %1 seadeid: selle Smaily kontot, kontaktide seadeid ja automaatikaid. Teiste veebisaitide oma seaded eemaldatakse."
+"All websites then use the settings of %1: its Smaily account, Contacts settings, automations and transactional emails. The other websites' own settings are removed.","Seejärel kasutavad kõik veebisaidid veebisaidi %1 seadeid: selle Smaily kontot, kontaktide seadeid, automaatikaid ja tehingulisi kirju. Teiste veebisaitide oma seaded eemaldatakse."
 "Allow personalized recommendations","Luba personaalsed soovitused"
 "Also sync emails from guest orders without the checkout newsletter opt-in. Applies only in the All customers (legitimate interest) mode; in the other modes a guest is synced only after ticking the checkout newsletter checkbox.","Sünkrooni ka nende külalistellimuste e-posti aadressid, kus kassas uudiskirja nõusolekut ei antud. Kehtib ainult režiimis „Kõik kliendid (õigustatud huvi)“; teistes režiimides sünkroonitakse külaline ainult siis, kui ta märgib kassas uudiskirja märkeruudu."
 "API Connection","API ühendus"

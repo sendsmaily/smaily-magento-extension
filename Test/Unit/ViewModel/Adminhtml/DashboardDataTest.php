@@ -20,6 +20,7 @@ use Smaily\Connect\Model\Engine\CatalogManifest;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Health\QueueHealth;
 use Smaily\Connect\Model\Log\StatusPill;
+use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Ui\Component\QueueStatusOptions;
 use Smaily\Connect\ViewModel\Adminhtml\DashboardData;
 
@@ -261,7 +262,8 @@ class DashboardDataTest extends TestCase
             new StatusPill(),
             new QueueStatusOptions(),
             $dateTime,
-            $catalogManifest
+            $catalogManifest,
+            $this->createMock(StoreLayout::class)
         );
     }
 }

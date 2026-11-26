@@ -24,6 +24,11 @@ use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
  * fabricated. Retention caveat: the queue janitor keeps sent rows for 30
  * days, so "delivered" counters are rolling-window numbers, and the tiles
  * are labelled accordingly.
+ *
+ * A website id (the Dashboard of a separate store, CON-281) narrows the
+ * marketing queue — the rows sent through that website's Smaily account —
+ * to the website's rows; the Campaign Intelligence queue stays the whole
+ * installation's, as its connection does.
  */
 class DashboardStats
 {
@@ -40,14 +45,14 @@ class DashboardStats
      * Log reads those as Skipped and Withdrawn
      * (LogCollection::smailyStatusExpression()), and they are not counted.
      */
-    public function contactSyncsDelivered(): int
+    public function contactSyncsDelivered(?int $websiteId = null): int
     {
         $status = LogCollection::smailyStatusExpression($this->resourceConnection->getConnection(), 'q');
 
         return $this->count(EventResource::TABLE_NAME, [
             'event_type = ?' => EventType::CONTACT_SYNC,
             $status . ' = ?' => Event::STATUS_SENT,
-        ]);
+        ] + $this->websiteCondition($websiteId));
     }
 
     /**
@@ -72,7 +77,7 @@ class DashboardStats
      * waiting to be sent — the first attempt or a retry (PRO-3628). A row
      * sent, failed or being sent right now is not counted.
      */
-    public function queuedToday(): int
+    public function queuedToday(?int $websiteId = null): int
     {
         $midnight = $this->dateTime->gmtDate('Y-m-d 00:00:00');
         $total = 0;
@@ -80,7 +85,7 @@ class DashboardStats
             $total += $this->count($table, [
                 'created_at >= ?' => $midnight,
                 'status = ?' => 'pending',
-            ]);
+            ] + ($table === EventResource::TABLE_NAME ? $this->websiteCondition($websiteId) : []));
         }
 
         return $total;
@@ -95,7 +100,7 @@ class DashboardStats
      * @return array<int, array{source: string, type: string, entity_id: string,
      *     status: string, updated_at: string}>
      */
-    public function recentActivity(int $limit = 10): array
+    public function recentActivity(int $limit = 10, ?int $websiteId = null): array
     {
         $connection = $this->resourceConnection->getConnection();
         $rows = [];
@@ -110,6 +115,9 @@ class DashboardStats
             ->order('q.updated_at DESC')
             ->order('q.id DESC')
             ->limit($limit);
+        if ($websiteId !== null) {
+            $eventSelect->where('q.website_id = ?', $websiteId);
+        }
         foreach ($connection->fetchAll($eventSelect) as $row) {
             $row = array_map('strval', $row);
             $row['entity_id'] = EntityLabel::forDisplay($row['type'], $row['entity_id']);
@@ -136,7 +144,17 @@ class DashboardStats
     }
 
     /**
-     * @param array<string, string> $where
+     * The marketing queue's condition for a website's rows; none for null.
+     *
+     * @return array<string, int>
+     */
+    private function websiteCondition(?int $websiteId): array
+    {
+        return $websiteId === null ? [] : ['q.website_id = ?' => $websiteId];
+    }
+
+    /**
+     * @param array<string, string|int> $where
      */
     private function count(string $table, array $where): int
     {

@@ -38,7 +38,7 @@
 "All languages share one Smaily account; each language fires its own workflow from the list.","All languages share one Smaily account; each language fires its own workflow from the list."
 "All products","All products"
 "All systems normal","All systems normal"
-"All websites then use the settings of %1: its Smaily account, Contacts settings and automations. The other websites' own settings are removed.","All websites then use the settings of %1: its Smaily account, Contacts settings and automations. The other websites' own settings are removed."
+"All websites then use the settings of %1: its Smaily account, Contacts settings, automations and transactional emails. The other websites' own settings are removed.","All websites then use the settings of %1: its Smaily account, Contacts settings, automations and transactional emails. The other websites' own settings are removed."
 "Allow personalized recommendations","Allow personalized recommendations"
 "Also sync emails from guest orders without the checkout newsletter opt-in. Applies only in the All customers (legitimate interest) mode; in the other modes a guest is synced only after ticking the checkout newsletter checkbox.","Also sync emails from guest orders without the checkout newsletter opt-in. Applies only in the All customers (legitimate interest) mode; in the other modes a guest is synced only after ticking the checkout newsletter checkbox."
 "API Connection","API Connection"

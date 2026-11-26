@@ -27,9 +27,11 @@ class QueueHealth
     }
 
     /**
-     * Failed rows across both delivery queues within the last N seconds.
+     * Failed rows across both delivery queues within the last N seconds;
+     * with a website, the marketing queue's rows of that website only (the
+     * Dashboard of a separate store, CON-281).
      */
-    public function failedSince(int $seconds = 86400): int
+    public function failedSince(int $seconds = 86400, ?int $websiteId = null): int
     {
         $cutoff = $this->dateTime->gmtDate('Y-m-d H:i:s', $this->dateTime->gmtTimestamp() - $seconds);
         $connection = $this->resourceConnection->getConnection();
@@ -39,6 +41,9 @@ class QueueHealth
                 ->from($this->resourceConnection->getTableName($table), ['cnt' => 'COUNT(*)'])
                 ->where('status = ?', 'failed')
                 ->where('updated_at >= ?', $cutoff);
+            if ($websiteId !== null && $table === EventResource::TABLE_NAME) {
+                $select->where('website_id = ?', $websiteId);
+            }
             $failed += (int)$connection->fetchOne($select);
         }
 

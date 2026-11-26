@@ -14,6 +14,7 @@ use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
+use Smaily\Connect\Model\Adminhtml\SharedAccountModes;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Backfill\ContactAudience;
@@ -74,7 +75,8 @@ class WizardDataTest extends IntegrationTestCase
             $this->createMock(WebsiteOverrides::class),
             $this->createMock(RuleSource::class),
             $this->createMock(StoreDate::class),
-            $this->createMock(StoreLayout::class)
+            $this->createMock(StoreLayout::class),
+            $this->createMock(SharedAccountModes::class)
         );
     }
 

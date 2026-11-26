@@ -20,6 +20,7 @@ use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
 use Smaily\Connect\Model\Adminhtml\SetupNotice;
+use Smaily\Connect\Model\Adminhtml\SharedAccountModes;
 use Smaily\Connect\Model\Adminhtml\TransactionalSettingsSaver;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
@@ -34,6 +35,7 @@ use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
+use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\ModuleVersion;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
@@ -1146,6 +1148,57 @@ class WizardStepSaverTest extends IntegrationTestCase
                     'workflow_id', 'is_default_fallback'])
                 ->order(['website_id', 'trigger_type', 'language'])
         );
+    }
+
+    /**
+     * CON-432: Smaily keeps one subscription status per address, so the
+     * websites that sync contacts to one Smaily account with different
+     * contact sync modes are each warned, from the saved settings — in
+     * Settings and in the initial setup, which reads every website. A
+     * website whose contact sync is off, or on another Smaily account, is
+     * no part of the group; a store view with the shared account of its own
+     * puts its website back in it.
+     */
+    public function testTheWebsitesOfOneSmailyAccountWithDifferentContactSyncModesAreWarned(): void
+    {
+        $modes = new SharedAccountModes(
+            $this->config,
+            new Mode($this->config),
+            $this->storeManager([self::MAIN, self::SECOND]),
+            new SubdomainNormalizer()
+        );
+        $this->saver('0')->save('connect', ['subdomain' => 'shop', 'username' => 'api-user', 'password' => 'secret']);
+        $this->saver('0')->save('subscribers', ['sync_mode' => 'consent']);
+        foreach ([0, self::MAIN, self::SECOND] as $websiteId) {
+            self::assertSame([], $modes->of($websiteId), 'one mode warns nobody: ' . $websiteId);
+        }
+
+        $this->saver((string)self::SECOND)->save('subscribers', ['own' => true, 'sync_mode' => 'legitimate_interest']);
+        $expected = [
+            ['website' => 'Website ' . self::MAIN, 'mode' => 'consent'],
+            ['website' => 'Website ' . self::SECOND, 'mode' => 'legitimate_interest'],
+        ];
+        foreach ([0, self::MAIN, self::SECOND] as $websiteId) {
+            self::assertSame($expected, $modes->of($websiteId), 'website ' . $websiteId);
+        }
+
+        $this->saver((string)self::SECOND)->save('subscribers', ['own' => true, 'sync_enabled' => false]);
+        self::assertSame([], $modes->of(self::MAIN), 'a website whose contact sync is off sends nobody');
+        $this->saver((string)self::SECOND)->save('subscribers', ['own' => true, 'sync_enabled' => true]);
+        self::assertSame($expected, $modes->of(self::MAIN));
+
+        $this->saver((string)self::SECOND)->save('connect', [
+            'own' => true,
+            'subdomain' => 'second-shop',
+            'username' => 'api-second',
+            'password' => 'second-secret',
+        ]);
+        foreach ([0, self::MAIN, self::SECOND] as $websiteId) {
+            self::assertSame([], $modes->of($websiteId), 'the website on another account left the group: ' . $websiteId);
+        }
+
+        $this->insertRow('stores', self::SECOND, Config::XML_PATH_SUBDOMAIN, 'Shop');
+        self::assertSame($expected, $modes->of(self::MAIN), 'a store view on the shared account');
     }
 
     private function insertRow(string $scope, int $scopeId, string $path, string $value): void

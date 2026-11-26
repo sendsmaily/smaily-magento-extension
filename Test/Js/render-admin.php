@@ -573,6 +573,17 @@ $intelligenceViewModel = static fn (
     }
 
     /**
+     * No other website on the Smaily account uses another contact sync mode
+     * (CON-432).
+     *
+     * @return array<int, array{website: string, mode: string}>
+     */
+    public function getSharedAccountModes(): array
+    {
+        return [];
+    }
+
+    /**
      * @return string[]
      */
     public function getSelectedSyncFields(): array
@@ -741,6 +752,65 @@ $pages['contacts-settings'] = [
         'Done, %1 of %2 synced — Smaily did not take %3. The Log keeps the reason for each contact.',
         'View them in the Log',
     ],
+];
+/*
+ * The Contacts tab and the initial setup's Contacts step of a website whose
+ * Smaily account another website uses with another contact sync mode: both
+ * warn, naming each website with its mode (CON-432).
+ */
+$sharedAccountViewModel = static fn (object $inner): object => new class ($inner) {
+    /**
+     * @param object $inner
+     */
+    public function __construct(private readonly object $inner)
+    {
+    }
+
+    /**
+     * @param string $name
+     * @param array<int, mixed> $arguments
+     * @return mixed
+     */
+    public function __call(string $name, array $arguments): mixed
+    {
+        return $this->inner->$name(...$arguments);
+    }
+
+    /**
+     * @return array<int, array{website: string, mode: string}>
+     */
+    public function getSharedAccountModes(): array
+    {
+        return [
+            ['website' => 'Main Website', 'mode' => 'consent'],
+            ['website' => 'Second Website', 'mode' => 'legitimate_interest'],
+        ];
+    }
+};
+$sharedAccountStrings = [
+    'Websites on this Smaily account use different contact sync modes',
+    'Contact sync modes on this Smaily account: %1. Smaily keeps one subscription status per email address,'
+        . ' so a contact that one website sends can be marked subscribed in another website too.'
+        . ' Give these websites the same contact sync mode, or each website its own Smaily account.',
+    'Subscribers only (consent)',
+    'All customers (legitimate interest)',
+];
+$pages['contacts-settings-shared'] = [
+    'template' => [
+        $root . '/view/adminhtml/templates/panel/subscribers.phtml',
+        $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+    ],
+    'viewModel' => $sharedAccountViewModel($intelligenceViewModel('', false, true, true)),
+    'data' => ['context' => 'settings'],
+    'strings' => $sharedAccountStrings,
+];
+$pages['contacts-setup-shared'] = [
+    'template' => [
+        $root . '/view/adminhtml/templates/panel/subscribers.phtml',
+        $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+    ],
+    'viewModel' => $sharedAccountViewModel($intelligenceViewModel('', false, true, true)),
+    'strings' => $sharedAccountStrings,
 ];
 /*
  * The initial setup's Contacts step (the same panel without the Settings
@@ -1411,6 +1481,17 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
     public function getSyncMode(): string
     {
         return 'consent';
+    }
+
+    /**
+     * No other website on the Smaily account uses another contact sync mode
+     * (CON-432).
+     *
+     * @return array<int, array{website: string, mode: string}>
+     */
+    public function getSharedAccountModes(): array
+    {
+        return [];
     }
 
     /**

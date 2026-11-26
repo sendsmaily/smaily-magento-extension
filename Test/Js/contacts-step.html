@@ -22,7 +22,10 @@
   contacts start syncing when it is saved (PRO-4036). For a new website, on
   the step and on the Settings Contacts tab, Start import stays disabled and
   the import card says that contacts start syncing once the Contacts
-  settings are saved, until they are (PRO-4037).
+  settings are saved, until they are (PRO-4037). Where another website
+  uses the website's Smaily account with another contact sync mode, the step
+  and the Settings Contacts tab warn, naming each website with its mode;
+  elsewhere they do not (CON-432).
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
 -->
@@ -38,6 +41,10 @@
     <script src="build/contacts-settings-off.et_EE.js"></script>
     <script src="build/contacts-settings-new.en_US.js"></script>
     <script src="build/contacts-settings-new.et_EE.js"></script>
+    <script src="build/contacts-setup-shared.en_US.js"></script>
+    <script src="build/contacts-setup-shared.et_EE.js"></script>
+    <script src="build/contacts-settings-shared.en_US.js"></script>
+    <script src="build/contacts-settings-shared.et_EE.js"></script>
 </head>
 <body>
 <pre id="log"></pre>
@@ -48,6 +55,10 @@
     var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
     var SWITCH = 'Sync contacts to Smaily';
     var STARTS = 'Contacts start syncing to Smaily when you save this step.';
+    var SHARED_TITLE = 'Websites on this Smaily account use different contact sync modes';
+    var SHARED_MESSAGE = 'Contact sync modes on this Smaily account: %1. Smaily keeps one subscription status per email address,'
+        + ' so a contact that one website sends can be marked subscribed in another website too.'
+        + ' Give these websites the same contact sync mode, or each website its own Smaily account.';
     var UNSAVED = 'Contacts start syncing to Smaily once the Contacts settings are saved, so an import would send nothing yet. Save them to import.';
     var failures = 0;
     var passes = 0;
@@ -151,6 +162,21 @@
             && note.style.display !== 'none' && note.textContent.trim() === text;
     }
 
+    // The warning of websites on one Smaily account with different contact
+    // sync modes (CON-432): its title, and its message naming each website
+    // with its mode as the mode cards name it, in the page's language.
+    function warnsSharedAccount(doc, page) {
+        var strings = window.smailyAdminPages[page].strings,
+            banner = doc.getElementById('smaily-w-shared-account-modes'),
+            websites = 'Main Website — ' + strings['Subscribers only (consent)']
+                + '; Second Website — ' + strings['All customers (legitimate interest)'];
+
+        return banner !== null
+            && banner.querySelector('.smaily-banner__title').textContent.trim() === strings[SHARED_TITLE]
+            && banner.querySelector('.smaily-banner__message').textContent.trim()
+                === strings[SHARED_MESSAGE].replace('%1', websites);
+    }
+
     // Ticks Sync contacts to Smaily as the merchant does, without saving.
     function tickOn(frame) {
         var toggle = frame.contentDocument.getElementById('smaily-w-sync-enabled');
@@ -237,6 +263,28 @@
         data = await save(frame);
         check(locale + ', Settings, a new website, saved: the import button is enabled',
             data.sync_enabled === true && importable(doc));
+        frame.remove();
+
+        // Websites on one Smaily account with different contact sync modes
+        // (CON-432): the step and the Settings Contacts tab warn.
+        ['contacts-setup-shared', 'contacts-settings-shared'].forEach(function (page) {
+            if (locale !== 'en_US') {
+                check(locale + ', ' + page + ': the warning is translated',
+                    window.smailyAdminPages[page + '.' + locale].strings[SHARED_TITLE] !== SHARED_TITLE
+                    && window.smailyAdminPages[page + '.' + locale].strings[SHARED_MESSAGE] !== SHARED_MESSAGE);
+            }
+        });
+        frame = await open('contacts-setup-shared.' + locale);
+        check(locale + ', the step warns of the websites on its Smaily account with different contact sync modes',
+            warnsSharedAccount(frame.contentDocument, 'contacts-setup-shared.' + locale));
+        frame.remove();
+        frame = await open('contacts-settings-shared.' + locale);
+        check(locale + ', Settings warns of the websites on its Smaily account with different contact sync modes',
+            warnsSharedAccount(frame.contentDocument, 'contacts-settings-shared.' + locale));
+        frame.remove();
+        frame = await open('contacts-setup.' + locale);
+        check(locale + ', one contact sync mode on the Smaily account: no warning',
+            frame.contentDocument.getElementById('smaily-w-shared-account-modes') === null);
         frame.remove();
     }
 

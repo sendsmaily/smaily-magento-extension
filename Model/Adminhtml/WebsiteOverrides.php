@@ -287,6 +287,29 @@ class WebsiteOverrides
     }
 
     /**
+     * Whether a value of the path is saved for the website — a row at its
+     * website scope or at the default scope — rather than only the module's
+     * etc/config.xml default, which a read returns the same way (CON-461).
+     * STORE_WIDE (0) asks the default scope.
+     */
+    public function isSaved(string $path, int $websiteId): bool
+    {
+        $connection = $this->resource->getConnection();
+
+        return (bool)$connection->fetchOne(
+            $connection->select()
+                ->from($this->resource->getTableName('core_config_data'), ['config_id'])
+                ->where('path = ?', $path)
+                ->where(
+                    $connection->quoteInto('scope = ?', ScopeConfigInterface::SCOPE_TYPE_DEFAULT)
+                    . ' OR (' . $connection->quoteInto('scope = ?', ScopeInterface::SCOPE_WEBSITES)
+                    . ' AND ' . $connection->quoteInto('scope_id = ?', $websiteId) . ')'
+                )
+                ->limit(1)
+        );
+    }
+
+    /**
      * Gives a website, as its own values, every store-wide value of the
      * section it does not hold yet (CON-279): each default-scope row is
      * copied to its website scope as stored (the password stays

@@ -1989,15 +1989,24 @@ $pages['settings-separate'] = [
  * per-language modes: mode A's Welcome workflow for ET (the fallback), and
  * mode B's Welcome workflows for ET and LV (LV the fallback). The
  * settings-modes-single page: the same website saved in the stored default,
- * 'single', which has no card (CON-461).
+ * 'single', which has no card (CON-461). The settings-modes-unsaved page:
+ * the same website with no mode saved, shown in mode B (CON-461).
  */
-$modesViewModel = static fn (string $mode): object => new class ($websitesViewModel(false), $mode) {
+$modesViewModel = static fn (string $mode, bool $saved): object => new class (
+    $websitesViewModel(false),
+    $mode,
+    $saved
+) {
     /**
      * @param object $inner
      * @param string $mode
+     * @param bool $saved
      */
-    public function __construct(private readonly object $inner, private readonly string $mode)
-    {
+    public function __construct(
+        private readonly object $inner,
+        private readonly string $mode,
+        private readonly bool $saved
+    ) {
     }
 
     /**
@@ -2045,14 +2054,19 @@ $modesViewModel = static fn (string $mode): object => new class ($websitesViewMo
     {
         $boot = json_decode($this->inner->getBootJson(), true, 512, JSON_THROW_ON_ERROR);
         $boot['connection']['multilingualMode'] = $this->mode;
+        $boot['connection']['multilingualModeSaved'] = $this->saved;
 
         return (string)json_encode($boot);
     }
 };
-foreach (['settings-modes' => 'a', 'settings-modes-single' => 'single'] as $page => $mode) {
+foreach ([
+    'settings-modes' => ['a', true],
+    'settings-modes-single' => ['single', true],
+    'settings-modes-unsaved' => ['b', false],
+] as $page => [$mode, $saved]) {
     $pages[$page] = [
         'template' => $root . '/view/adminhtml/templates/settings/index.phtml',
-        'viewModel' => $modesViewModel($mode),
+        'viewModel' => $modesViewModel($mode, $saved),
         'data' => ['context' => 'settings', 'children' => [
             'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
             'panel.automations' => $root . '/view/adminhtml/templates/panel/automations.phtml',

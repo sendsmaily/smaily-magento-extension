@@ -2676,7 +2676,13 @@ Initial setup, Settings, Log. Design rules:
   (js-translation.json never collects `$t()` from phtml).
 - **Multilingual UI is part of the shared panels.** When more than one
   store-view language is detected (`Multilingual\AccountResolver`), the
-  Connection panel renders the routing-mode choice cards; mode `a` swaps
+  Connection panel renders the routing-mode choice cards — modes `a`, `b`
+  and `c`; `single`, etc/config.xml's default, has no card. As in the
+  WooCommerce plugin (CON-461), a mode never saved (no `multilingual_mode`
+  row at the website's or the default scope,
+  `WebsiteOverrides::isSaved()`) shows `b` picked, and the save stores
+  it; until then the Router reads `single`. A saved `single` shows no card
+  picked and its save keeps it until one is picked. Mode `a` swaps
   the single credential block for per-language blocks (each with its own
   Test connection — saved accounts re-test via `store_id` against the
   saved store-view credentials) plus a default-fallback picker whose

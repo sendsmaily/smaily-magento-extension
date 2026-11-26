@@ -31,6 +31,11 @@
   the question on the per-language accounts card leaves none picked and the
   save still keeps 'single'; picking a card saves that card's mode.
 
+  A website with no mode saved (CON-461, as in the WooCommerce plugin): the
+  three cards with "One account, per-language automations" picked, and its
+  save stores it; picking another card asks nothing, since nothing routes
+  through a per-language mode yet.
+
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
 -->
@@ -42,6 +47,8 @@
     <script src="build/settings-modes.et_EE.js"></script>
     <script src="build/settings-modes-single.en_US.js"></script>
     <script src="build/settings-modes-single.et_EE.js"></script>
+    <script src="build/settings-modes-unsaved.en_US.js"></script>
+    <script src="build/settings-modes-unsaved.et_EE.js"></script>
 </head>
 <body>
 <pre id="log"></pre>
@@ -252,6 +259,40 @@
         frame.remove();
     }
 
+    // No mode saved on a multilingual website (CON-461).
+    async function unsaved(locale) {
+        var frame = await open('settings-modes-unsaved.' + locale),
+            doc = frame.contentDocument,
+            asked = 0,
+            saveConnection = async function () {
+                doc.getElementById('smaily-w-connection-save').click();
+                await wait(100);
+
+                return (lastSave(frame, 'connect') || {}).multilingual_mode;
+            };
+
+        check(locale + ', unsaved: three cards, per-language workflows picked',
+            Array.prototype.map.call(doc.querySelectorAll('input[name=smaily-w-mlmode]'), function (input) {
+                return input.value;
+            }).join() === 'a,b,c'
+            && doc.querySelector('input[name=smaily-w-mlmode]:checked').value === 'b'
+            && doc.querySelector('#smaily-ml-modes .smaily-choice.is-selected input').value === 'b');
+        check(locale + ', unsaved: the Connection save stores per-language workflows', await saveConnection() === 'b');
+        frame.remove();
+
+        frame = await open('settings-modes-unsaved.' + locale);
+        doc = frame.contentDocument;
+        frame.contentWindow.confirm = function () {
+            asked++;
+
+            return true;
+        };
+        pickMode(frame, 'c');
+        check(locale + ', unsaved: picking another card asks nothing', asked === 0);
+        check(locale + ', unsaved: the save stores the picked card', await saveConnection() === 'c');
+        frame.remove();
+    }
+
     function tick(frame, selector) {
         var input = frame.contentDocument.querySelector(selector);
         input.checked = true;
@@ -264,6 +305,7 @@
                 log('# ' + locale);
                 await run(locale);
                 await single(locale);
+                await unsaved(locale);
             }
         } catch (error) {
             failures++;

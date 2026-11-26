@@ -61,7 +61,9 @@ window.smailyPanelsInit = function ($) {
     var mlLanguages = (boot.multilingual || {}).languages || [];
     var isMultilingual = mlLanguages.length > 1;
     var mlModeCurrent = isMultilingual ? (boot.connection.multilingualMode || 'single') : 'single';
-    var mlModeSaved = mlModeCurrent;
+    // A mode never saved is shown as per-language workflows while routing
+    // stays 'single' until a save (CON-461): leaving it asks nothing.
+    var mlModeSaved = boot.connection.multilingualModeSaved === false ? 'single' : mlModeCurrent;
     var mlSwitchConfirmed = false;
     // Whether the merchant agreed that per-language accounts take the place
     // of the saved Smaily account (CON-396).

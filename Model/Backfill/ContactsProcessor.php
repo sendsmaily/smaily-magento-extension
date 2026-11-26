@@ -13,6 +13,7 @@ use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Framework\Api\SearchCriteriaBuilder;
 use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
+use Smaily\Connect\Model\Client\FailureText;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
@@ -228,7 +229,7 @@ class ContactsProcessor implements ProcessorInterface
             $this->logger->error('Contacts backfill batch failed', [
                 'store_id' => $storeId,
                 'count' => count($contacts),
-                'error' => $exception->getMessage(),
+                'error' => FailureText::of($exception),
             ]);
             $reason = Failure::of($exception)->reason;
             foreach ($contacts as $contact) {

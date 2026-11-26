@@ -29,6 +29,7 @@ use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
+use Smaily\Connect\Test\Unit\Support\StoreLocale;
 
 /**
  * PRO-1764: the website's stored contact-sync answer gates the historical
@@ -47,6 +48,14 @@ class ContactsProcessorTest extends TestCase
 
     /** @var list<array{string, array<string, mixed>, string, ?string, int}> the rows the import put in the Log */
     private array $logged = [];
+
+    /** @var list<array{string, array<string, mixed>}> the lines the import wrote to the log file */
+    private array $logLines = [];
+
+    protected function tearDown(): void
+    {
+        StoreLocale::reset();
+    }
 
     public function testSyncDisabledSendsNothingAndReportsAZeroTotal(): void
     {
@@ -274,6 +283,34 @@ class ContactsProcessorTest extends TestCase
         );
     }
 
+    /**
+     * CON-451: the log file keeps what CON-357 keeps of a failure — the
+     * client's English message, which names Smaily's code only — never the
+     * exception's own message.
+     */
+    public function testAFailedPageIsLoggedWithTheErrorCodeOnly(): void
+    {
+        StoreLocale::use('et_EE');
+        $client = $this->createMock(SmailyClient::class);
+        $client->method('post')
+            ->willThrowException(new ApiException(__('Smaily API returned code %1', 216), 216));
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->method('forStore')->willReturn($client);
+
+        $audience = $this->createAudience(SyncMode::MODE_CONSENT, 1);
+        $audience->method('subscriberPage')->willReturnOnConsecutiveCalls([
+            $this->row(81, 'u1@example.invalid', true),
+        ], []);
+
+        $this->createProcessor($this->createMock(JobManager::class), $audience, $clientProvider, true)
+            ->process($this->createJob(null, ['0', '81']));
+
+        self::assertSame([[
+            'Contacts backfill batch failed',
+            ['store_id' => 5, 'count' => 1, 'error' => 'Smaily API returned code 216'],
+        ]], $this->logLines);
+    }
+
     public function testCheckoutOptInOnlySendsNobodyAndReportsAZeroTotal(): void
     {
         $clientProvider = $this->createMock(SmailyClientProvider::class);
@@ -386,6 +423,10 @@ class ContactsProcessorTest extends TestCase
                 return true;
             }
         );
+        $logger = $this->createMock(Logger::class);
+        $logger->method('error')->willReturnCallback(function (string $message, array $context = []): void {
+            $this->logLines[] = [$message, $context];
+        });
         $contactEntity = $this->createMock(ContactEntity::class);
         $contactEntity->method('of')->willReturnCallback(static fn (string $email): string => 'entity:' . $email);
 
@@ -398,7 +439,7 @@ class ContactsProcessorTest extends TestCase
             $payloadBuilder,
             $clientProvider,
             $config,
-            $this->createMock(Logger::class),
+            $logger,
             $eventQueue,
             $contactEntity
         );

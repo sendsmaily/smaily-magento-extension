@@ -210,6 +210,16 @@ disabled while the switch is ticked but not saved, and is enabled once the
 save posts it on. For a new website — on the step and on the Settings
 Contacts tab — the import button stays disabled and the card says that
 contacts start syncing once the Contacts settings are saved, until the save.
+`Test/Js/setup-connection-test.html` renders the initial setup's Connect
+step (`wizard/index.phtml` with `panel/connection.phtml`) in both
+languages: with a saved account Smaily did not accept at the last check,
+**Continue** is disabled with "Test your Smaily connection to continue."
+beside it and a click saves nothing; a refused **Test connection** leaves
+it so, an accepted one enables it, and an edited credential asks for the
+test again. **Continue** then posts the step with `initial_setup` and moves
+on to Contacts; a save that refuses the account keeps the setup on Connect
+with the message above the form and Contacts locked. A saved account
+Smaily accepted continues at once (CON-417).
 `Test/Js/brand-logos.html` checks the Smaily Connect and Campaign
 Intelligence logos with the admin stylesheet (its text, copied into
 `Test/Js/build/smaily-admin-css.js` by `render-admin.php`: a page opened

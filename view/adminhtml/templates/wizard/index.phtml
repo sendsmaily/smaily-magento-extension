@@ -244,6 +244,8 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
             <?php if ($setupCompleted): ?>
             <button type="button" class="action-secondary" id="smaily-w-edit-credentials"><span><?= $escaper->escapeHtml(__('Edit credentials')) ?></span></button>
             <?php endif; ?>
+            <?php // Beside Continue while the Connect step waits for a passed connection test (CON-417). ?>
+            <span class="smaily-continue-hint" id="smaily-w-continue-hint" role="note" style="display:none"><?= $escaper->escapeHtml(__('Test your Smaily connection to continue.')) ?></span>
             <span class="smaily-result" id="smaily-w-save-result"></span>
             <button type="button" class="action-primary" id="smaily-w-next"><span><?= $escaper->escapeHtml(__('Continue')) ?></span></button>
         </div>
@@ -294,7 +296,18 @@ require(['jquery'], function ($) {
         $('#smaily-w-edit-credentials').toggle(summary && step === 1);
         $('#smaily-w-save-result').text('');
         panels.clearFormErrors($('#smaily-wizard-main'));
+        gateConnect();
         window.scrollTo(0, 0);
+    }
+
+    // The Connect form continues only once the connection test passed, as
+    // in the WooCommerce and Shopify setups (CON-417); the server refuses
+    // an account Smaily does not accept as well. The summary of a finished
+    // setup saves nothing and moves on.
+    function gateConnect() {
+        var waits = step === 1 && !summary && !panels.isTested();
+        $('#smaily-w-next').prop('disabled', waits);
+        $('#smaily-w-continue-hint').toggle(waits);
     }
 
     /**
@@ -317,7 +330,11 @@ require(['jquery'], function ($) {
 
     var stepSavers = {
         // The summary saves nothing: Continue only moves on.
-        1: function () { return summary ? Promise.resolve() : save('connect', panels.collect.connect, 'connection'); },
+        1: function () {
+            return summary ? Promise.resolve() : save('connect', function () {
+                return $.extend(panels.collect.connect(), {initial_setup: true});
+            }, 'connection');
+        },
         2: function () { return save('subscribers', panels.collect.subscribers, 'subscribers'); },
         3: function () { return save('automations', panels.collect.automations, 'automations'); },
         4: function () {
@@ -358,8 +375,10 @@ require(['jquery'], function ($) {
             panels.result('#smaily-w-save-result', '<?= $escaper->escapeJs(__('Saving failed.')) ?>', false);
         }).finally(function () {
             $button.prop('disabled', false);
+            gateConnect();
         });
     });
+    $(document).on('smaily:connection-tested', gateConnect);
     $('#smaily-w-edit-credentials').on('click', function () {
         summary = false;
         render();

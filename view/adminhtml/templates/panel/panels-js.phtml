@@ -49,6 +49,12 @@ window.smailyPanelsInit = function ($) {
     var boot = <?= /* @noEscape */ $viewModel->getBootJson() ?>;
     var urls = <?= /* @noEscape */ json_encode(array_map('strval', $urls)) ?>;
     var connected = boot.connected;
+    // Whether the Smaily account a connection save sends passed its
+    // connection test (CON-417, as in the WooCommerce setup): the saved
+    // account Smaily accepted at the last check, then the answer of each
+    // Test connection; edited credentials need a new test. The initial
+    // setup's Continue waits for it.
+    var tested = !!boot.verified;
     // Campaign Intelligence connected: from the page load, then from a
     // Connect (engineConnected()).
     var intelligenceConnected = false;
@@ -256,6 +262,17 @@ window.smailyPanelsInit = function ($) {
             // Settings selector currently targets.
             store_id: boot.storeId
         };
+    }
+
+    function setTested(value) {
+        tested = value;
+        $(document).trigger('smaily:connection-tested');
+    }
+
+    // The default fallback account in mode A: the account a connection
+    // save sends in place of the single account.
+    function isFallbackAccount($block) {
+        return String($block.data('language')) === $('input[name=smaily-w-fallback]:checked').val();
     }
 
     function saveStep(name, data) {
@@ -1111,6 +1128,10 @@ window.smailyPanelsInit = function ($) {
                 mlSwitchConfirmed = true;
             }
             switchMappingRows(mlModeCurrent, next);
+            // Into or out of mode A, the save sends another account.
+            if ((mlModeCurrent === 'a') !== (next === 'a')) {
+                setTested(false);
+            }
             mlModeCurrent = next;
             applyMlMode(next);
             loadMappingWorkflows();
@@ -1150,6 +1171,9 @@ window.smailyPanelsInit = function ($) {
             }
             result($result, '<?= $escaper->escapeJs(__('Testing…')) ?>', true);
             post(urls.test, creds).then(function (data) {
+                if (isFallbackAccount($block)) {
+                    setTested(!!data.connected);
+                }
                 if (data.connected) {
                     result($result, '<?= $escaper->escapeJs(__('Connected!')) ?>', true);
                     loadMappingWorkflows();
@@ -1164,8 +1188,20 @@ window.smailyPanelsInit = function ($) {
         // dropdowns without saving (same idiom as the default credentials).
         var mlCredentialTimer = null;
         $(document).on('input', '.smaily-ml-account input', function () {
+            if (isFallbackAccount($(this).closest('.smaily-ml-account'))) {
+                setTested(false);
+            }
             clearTimeout(mlCredentialTimer);
             mlCredentialTimer = setTimeout(loadMappingWorkflows, 1200);
+        });
+
+        // Edited credentials, or another default fallback account, need a
+        // new connection test (CON-417).
+        $(document).on('input', '#smaily-w-subdomain, #smaily-w-username, #smaily-w-password', function () {
+            setTested(false);
+        });
+        $(document).on('change', 'input[name=smaily-w-fallback]', function () {
+            setTested(false);
         });
 
         // Connection test. A failed test is shown like a failed save
@@ -1177,6 +1213,7 @@ window.smailyPanelsInit = function ($) {
             result('#smaily-w-test-result', '<?= $escaper->escapeJs(__('Testing…')) ?>', true);
             post(urls.test, credentials()).then(function (data) {
                 connected = !!data.connected;
+                setTested(connected);
                 if (data.checked) {
                     setConnectionStatus(!!data.connected, data.accountName);
                 }
@@ -1606,6 +1643,7 @@ window.smailyPanelsInit = function ($) {
         initAll: initAll,
         collect: collect,
         isConnected: function () { return connected; },
+        isTested: function () { return tested; },
         isIntelligenceConnected: function () { return intelligenceConnected; }
     };
 };

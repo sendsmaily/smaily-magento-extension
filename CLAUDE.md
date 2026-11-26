@@ -211,6 +211,11 @@ start one.
   2.4.9 / PHP 8.5 on every PR (no database needed; TESTING.md "Magento
   compile"). Plain 2.4.4 no longer installs from today's packages; the
   2.4.4 patch releases do.
+- **A grid `CollectionFactory` `collections` registration goes in
+  etc/di.xml, never an area di.xml** (CON-434): Magento lays an area's
+  arguments over the global ones whole, so the admin's order, customer
+  and CMS grids lost their registrations ("Not registered handle").
+  `Test/Unit/GridDataSourceRegistrationTest.php` fails on it.
 - Sandbox: `docker compose up -d` — real Magento 2 at
   `localhost:8080/admin` (admin / smailydev1, 2FA modules disabled). The repo
   is bind-mounted as the module; `vendor/` inside the container is shadowed by

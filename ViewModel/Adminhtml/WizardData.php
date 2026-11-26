@@ -12,6 +12,7 @@ use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
+use Smaily\Connect\Model\Adminhtml\SharedAccountModes;
 use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
@@ -76,7 +77,8 @@ class WizardData implements ArgumentInterface
         private readonly WebsiteOverrides $overrides,
         private readonly RuleSource $ruleSource,
         private readonly StoreDate $storeDate,
-        private readonly StoreLayout $storeLayout
+        private readonly StoreLayout $storeLayout,
+        private readonly SharedAccountModes $sharedAccountModes
     ) {
     }
 
@@ -772,6 +774,18 @@ class WizardData implements ArgumentInterface
     public function getSyncMode(): string
     {
         return $this->mode->mode($this->websiteContext->getWebsiteId());
+    }
+
+    /**
+     * The websites on a Smaily account of the selected website (the initial
+     * setup on a 2+-website install: of any website) with their contact sync
+     * modes, where those modes differ (CON-432) — the Contacts panel warns.
+     *
+     * @return list<array{website: string, mode: string}>
+     */
+    public function getSharedAccountModes(): array
+    {
+        return $this->sharedAccountModes->of($this->websiteContext->getWebsiteId());
     }
 
     /**

@@ -12,6 +12,7 @@ use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
+use Smaily\Connect\Model\Adminhtml\SharedAccountModes;
 use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
@@ -114,7 +115,8 @@ class WizardDataTest extends TestCase
             $this->overrides,
             $this->createMock(RuleSource::class),
             $this->createMock(StoreDate::class),
-            $this->storeLayout
+            $this->storeLayout,
+            $this->createMock(SharedAccountModes::class)
         );
     }
 

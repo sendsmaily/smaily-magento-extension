@@ -107,6 +107,28 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
         </label>
         <?php endforeach; ?>
         </div>
+        <?php // Websites on one Smaily account with different contact sync
+        // modes, from the saved settings (CON-432, Model\Adminhtml\SharedAccountModes),
+        // each named with its mode as the cards above name it. ?>
+        <?php $sharedAccountModes = $viewModel->getSharedAccountModes(); ?>
+        <?php if ($sharedAccountModes !== []): ?>
+        <div class="smaily-banner smaily-banner--warning" id="smaily-w-shared-account-modes" role="status" style="margin-top:1.5rem;">
+            <span class="smaily-banner__icon">&#9888;</span>
+            <div class="smaily-banner__body">
+                <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('Websites on this Smaily account use different contact sync modes')) ?></div>
+                <div class="smaily-banner__message"><?= $escaper->escapeHtml(__(
+                    'Contact sync modes on this Smaily account: %1. Smaily keeps one subscription status per email address,'
+                    . ' so a contact that one website sends can be marked subscribed in another website too.'
+                    . ' Give these websites the same contact sync mode, or each website its own Smaily account.',
+                    implode('; ', array_map(
+                        static fn (array $entry): string => $entry['website'] . ' — '
+                            . (string)($subscriberModes[$entry['mode']]['title'] ?? $entry['mode']),
+                        $sharedAccountModes
+                    ))
+                )) ?></div>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <div class="smaily-field" style="margin-top:2rem;">
             <label><?= $escaper->escapeHtml(__('Extra fields to sync with each contact')) ?></label>

@@ -11,7 +11,11 @@
  * description and Enabled (CON-256, as the WooCommerce plugin's CON-255):
  * .is-closed hides its .smaily-trigger-settings — Test mode, the workflow,
  * Cooldown, Daily Cap and Test Emails. They stay in the form, and the save
- * posts every field of every trigger, so nothing hidden is lost.
+ * posts every field of every trigger, so nothing hidden is lost. "Edit
+ * design" (CON-257) follows the workflow when Campaign Intelligence lists
+ * the trigger's design (panel/email-designs.phtml). A trigger with a field
+ * to fix (the engine refused the save over one of its fields) stays open
+ * while it is off, so the field can be seen.
  *
  * Test mode (CON-458, as the WooCommerce plugin's CON-455) shows below
  * Enabled for an email Campaign Intelligence reports a setup state for
@@ -23,10 +27,7 @@
  * Each answer carries the card's state as Campaign Intelligence reads it
  * after the call, which the card shows: the switch, the pill, the state
  * line and the notice. The switch and the test send are not form fields:
- * the save never posts them. "Edit design" (CON-257) follows the workflow when Campaign
- * Intelligence lists the trigger's design (panel/email-designs.phtml). A
- * trigger with a field to fix (the engine refused the save over
- * one of its fields) stays open while it is off, so the field can be seen.
+ * the save never posts them.
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
@@ -110,7 +111,7 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
                             <div class="smaily-test-mode__test"<?= $setup['test_mode'] ? '' : ' hidden' ?>>
                                 <p class="smaily-test-mode__text"><?= $escaper->escapeHtml(__('The email goes to test addresses only.')) ?></p>
                                 <div class="smaily-test-mode__send">
-                                    <input type="email" class="smaily-test-mode__address" value="<?= $escaper->escapeHtmlAttr($viewModel->getAdminEmail()) ?>" aria-label="<?= $escaper->escapeHtmlAttr(__('Test email address')) ?>"/>
+                                    <input type="text" inputmode="email" autocomplete="email" class="smaily-test-mode__address" value="<?= $escaper->escapeHtmlAttr($viewModel->getAdminEmail()) ?>" aria-label="<?= $escaper->escapeHtmlAttr(__('Test email address')) ?>"/>
                                     <button type="button" class="action-secondary smaily-test-mode__button"><span><?= $escaper->escapeHtml(__('Send test email')) ?></span></button>
                                 </div>
                                 <p class="note"><?= $escaper->escapeHtml(__('This address is added to the Smaily list as a test contact.')) ?> <?= $escaper->escapeHtml(__('The test shows the design your Smaily workflow holds.')) ?></p>

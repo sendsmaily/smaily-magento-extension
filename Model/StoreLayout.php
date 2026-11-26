@@ -20,8 +20,8 @@ use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
  * How the websites of a 2+-website install are run (CON-279, owner decision
  * 2026-11-03): one store in several versions, set up once for the whole
  * store (CON-179), or separate stores, each website set up on its own as a
- * single store is — its own Smaily account, Contacts settings and
- * automations, saved at its website scope.
+ * single store is — its own Smaily account, Contacts settings,
+ * automations and transactional-email account, saved at its website scope.
  *
  * The shape is read from the data: the websites hold separate Smaily
  * accounts and no store-wide one (WebsiteOverrides::holdsSeparateAccounts();
@@ -56,11 +56,12 @@ class StoreLayout
     public const ONE_STORE = 'one';
     public const SEPARATE_STORES = 'separate';
 
-    /** The sections every separate store holds as its own. */
+    /** The sections every separate store holds as its own (the transactional emails since CON-281). */
     private const SECTIONS = [
         WebsiteOverrides::CONNECTION,
         WebsiteOverrides::SUBSCRIBERS,
         WebsiteOverrides::AUTOMATIONS,
+        WebsiteOverrides::TRANSACTIONAL,
     ];
 
     public function __construct(
@@ -109,8 +110,8 @@ class StoreLayout
     /**
      * One store to separate stores: every website keeps what it reads now,
      * as its own values — each store-wide value of the Smaily account, the
-     * Contacts settings and the automations it does not hold is copied to
-     * it — and the store-wide values go, so that a website added later
+     * Contacts settings, the automations and the transactional emails it
+     * does not hold is copied to it — and the store-wide values go, so that a website added later
      * starts as a store of its own with nothing set. A website on another
      * Smaily account than the store-wide one keeps only its own workflows
      * (CON-190). Separate stores already: nothing changes.
@@ -146,7 +147,8 @@ class StoreLayout
      * the merchant is looking at; the default website when none) become the
      * values for all websites, and every website's own values of the
      * Smaily account (with its store views' per-language accounts), the
-     * Contacts settings and the automations are removed. One store already:
+     * Contacts settings, the automations and the transactional emails are
+     * removed. One store already:
      * nothing changes.
      */
     public function toOneStore(?int $websiteId = null): void

@@ -26,21 +26,28 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * saves for the whole store (CON-179). A website follows the store-wide
  * value (the default scope) of a setting unless it holds its own value: a
  * row at its website scope — from Settings, from the 2.8.x migration, or from
- * an initial setup run before CON-179, which saved per website. For the
- * automations a website's own workflow mapping rows count as well.
+ * an initial setup run before CON-179, which saved per website.
  *
  * The settings come in three sections, each kept or returned as a whole: the
  * Smaily account (Settings > Connection), the Contacts settings and the
- * automations. The internal mark that a website's Contacts settings were
- * saved (Config::XML_PATH_CONTACTS_CONFIRMED) is not an own value: the
- * migration writes it for every website that synced, and it is never
- * removed, so a website that synced keeps syncing.
+ * automations. A fourth, the transactional emails (their account, switches
+ * and workflows), has no "own" switch under one store — a website saves its
+ * switches for itself and may use its own account
+ * (TransactionalSettingsSaver) — but a change of the store's layout
+ * (StoreLayout, CON-281) carries it as it carries the three. For the
+ * automations and the transactional emails a website's own workflow
+ * mapping rows of the section count as own values too. The internal mark
+ * that a website's Contacts settings were saved
+ * (Config::XML_PATH_CONTACTS_CONFIRMED) is not an own value: the migration
+ * writes it for every website that synced, and it is never removed, so a
+ * website that synced keeps syncing.
  */
 class WebsiteOverrides
 {
     public const CONNECTION = 'connection';
     public const SUBSCRIBERS = 'subscribers';
     public const AUTOMATIONS = 'automations';
+    public const TRANSACTIONAL = 'transactional';
 
     public const PATHS = [
         self::CONNECTION => [
@@ -77,6 +84,28 @@ class WebsiteOverrides
             Config::XML_PATH_ABANDONED_COUPON_RULE,
             Config::XML_PATH_ABANDONED_COUPON_DAYS,
         ],
+        self::TRANSACTIONAL => [
+            Config::XML_PATH_TRANSACTIONAL_ENABLED,
+            Config::XML_PATH_TRANSACTIONAL_SUBDOMAIN,
+            Config::XML_PATH_TRANSACTIONAL_USERNAME,
+            Config::XML_PATH_TRANSACTIONAL_PASSWORD,
+            Config::XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT,
+            Config::XML_PATH_TRANSACTIONAL_PERSONAL_DATA,
+            Config::XML_PATH_ORDER_CONFIRMATION_ENABLED,
+            Config::XML_PATH_SHIPMENT_CONFIRMATION_ENABLED,
+        ],
+    ];
+
+    /** The workflow mapping rows of the sections that have them. */
+    private const MAPPING_ROWS = [
+        self::AUTOMATIONS => [
+            'trigger_type IN (?)' => Trigger::ALL,
+            'account_key <> ?' => Mapping::ACCOUNT_TRANSACTIONAL,
+        ],
+        self::TRANSACTIONAL => [
+            'trigger_type IN (?)' => Trigger::TRANSACTIONAL,
+            'account_key = ?' => Mapping::ACCOUNT_TRANSACTIONAL,
+        ],
     ];
 
     /** The automations' workflows in system config. */
@@ -103,7 +132,8 @@ class WebsiteOverrides
     /**
      * The own values of every real website that holds any for the section,
      * in website order: website id => [path => value]; for the automations
-     * the number of its own workflow mapping rows under 'mappings'.
+     * and the transactional emails the number of its own workflow mapping
+     * rows of the section under 'mappings'.
      *
      * @return array<int, array<string, string>>
      */
@@ -124,15 +154,15 @@ class WebsiteOverrides
         ) as $row) {
             $own[(int)$row['scope_id']][(string)$row['path']] = (string)$row['value'];
         }
-        if ($section === self::AUTOMATIONS) {
-            foreach ($connection->fetchPairs(
-                $connection->select()
-                    ->from($this->resource->getTableName(MappingResource::TABLE_NAME), ['website_id', 'COUNT(*)'])
-                    ->where('website_id IN (?)', $websiteIds)
-                    ->where('trigger_type IN (?)', Trigger::ALL)
-                    ->where('account_key <> ?', Mapping::ACCOUNT_TRANSACTIONAL)
-                    ->group('website_id')
-            ) as $websiteId => $count) {
+        if (isset(self::MAPPING_ROWS[$section])) {
+            $select = $connection->select()
+                ->from($this->resource->getTableName(MappingResource::TABLE_NAME), ['website_id', 'COUNT(*)'])
+                ->where('website_id IN (?)', $websiteIds)
+                ->group('website_id');
+            foreach (self::MAPPING_ROWS[$section] as $condition => $value) {
+                $select->where($condition, $value);
+            }
+            foreach ($connection->fetchPairs($select) as $websiteId => $count) {
                 $own[(int)$websiteId]['mappings'] = (string)$count;
             }
         }
@@ -268,6 +298,12 @@ class WebsiteOverrides
      * than the store-wide one, CON-190, which never started the store-wide
      * workflows) a workflow it does not hold is saved as none, and no
      * store-wide mapping row is copied.
+     *
+     * The transactional emails (CON-281) follow their own account, not the
+     * Smaily account: a website without transactional workflows of its own
+     * and without its own transactional account reads every store-wide
+     * transactional row (WizardData::getTransactionalTriggers()), so it gets
+     * them all; any other website gets none.
      */
     public function copyStoreWideToWebsite(string $section, int $websiteId, bool $storeWideWorkflows = true): void
     {
@@ -287,6 +323,11 @@ class WebsiteOverrides
         if ($section === self::AUTOMATIONS && $storeWideWorkflows) {
             $this->copyMappingRows(0, $websiteId);
         }
+        if ($section === self::TRANSACTIONAL && !isset($own['mappings'])
+            && !isset($own[Config::XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT])
+        ) {
+            $this->replaceTransactionalRows(0, $websiteId);
+        }
     }
 
     /**
@@ -296,13 +337,17 @@ class WebsiteOverrides
      * mapping rows join the store-wide rows (website 0), its own winning.
      * The store-wide values never take per-language Smaily accounts: mode A
      * becomes Single language there, and the rows of the per-language
-     * accounts stay the website's. The website's own values stay until
-     * removeOwnValues().
+     * accounts stay the website's. The transactional emails' store-wide rows
+     * become the rows the website reads: its own, where it holds any or uses
+     * its own transactional account (CON-281). The mark of a website's own
+     * transactional account is not written at the default scope. The
+     * website's own values stay until removeOwnValues().
      */
     public function promoteToStoreWide(string $section, int $websiteId): void
     {
-        foreach ($this->ownValues($section)[$websiteId] ?? [] as $path => $value) {
-            if ($path === 'mappings') {
+        $own = $this->ownValues($section)[$websiteId] ?? [];
+        foreach ($own as $path => $value) {
+            if ($path === 'mappings' || $path === Config::XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT) {
                 continue;
             }
             if ($path === Config::XML_PATH_MULTILINGUAL_MODE && $value === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS) {
@@ -313,29 +358,25 @@ class WebsiteOverrides
         if ($section === self::AUTOMATIONS) {
             $this->copyMappingRows($websiteId, 0, true);
         }
+        if ($section === self::TRANSACTIONAL
+            && (isset($own['mappings']) || isset($own[Config::XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT]))
+        ) {
+            $this->replaceTransactionalRows($websiteId, 0);
+        }
     }
 
     /**
      * Removes the store-wide values of the section (CON-279, one store to
      * separate stores, once every website holds them as its own): its
-     * default-scope rows, and for the automations the store-wide mapping
-     * rows (website 0), the transactional ones apart.
+     * default-scope rows, and for the automations and the transactional
+     * emails the section's store-wide mapping rows (website 0).
      */
     public function removeStoreWideValues(string $section): void
     {
         foreach (self::PATHS[$section] as $path) {
             $this->configWriter->delete($path);
         }
-        if ($section === self::AUTOMATIONS) {
-            $this->resource->getConnection()->delete(
-                $this->resource->getTableName(MappingResource::TABLE_NAME),
-                [
-                    'website_id = ?' => 0,
-                    'trigger_type IN (?)' => Trigger::ALL,
-                    'account_key <> ?' => Mapping::ACCOUNT_TRANSACTIONAL,
-                ]
-            );
-        }
+        $this->deleteMappingRows($section, 0);
     }
 
     /**
@@ -440,10 +481,10 @@ class WebsiteOverrides
     }
 
     /**
-     * Removes a website's own values of the section, so it follows the
-     * store-wide values again. For the Smaily account, with
-     * $storeViewAccounts, its store views' own accounts (multilingual mode
-     * A, which it set for itself) go as well.
+     * Removes a website's own values of the section, with its mapping rows
+     * of the section, so it follows the store-wide values again. For the
+     * Smaily account, with $storeViewAccounts, its store views' own accounts
+     * (multilingual mode A, which it set for itself) go as well.
      */
     public function removeOwnValues(string $section, int $websiteId, bool $storeViewAccounts = false): void
     {
@@ -460,15 +501,43 @@ class WebsiteOverrides
                 }
             }
         }
-        if ($section === self::AUTOMATIONS) {
-            $this->resource->getConnection()->delete(
-                $this->resource->getTableName(MappingResource::TABLE_NAME),
-                [
-                    'website_id = ?' => $websiteId,
-                    'trigger_type IN (?)' => Trigger::ALL,
-                    'account_key <> ?' => Mapping::ACCOUNT_TRANSACTIONAL,
-                ]
-            );
+        $this->deleteMappingRows($section, $websiteId);
+    }
+
+    /**
+     * Deletes the section's workflow mapping rows of one website id (0: the
+     * store-wide rows); a section without mapping rows has none.
+     */
+    private function deleteMappingRows(string $section, int $websiteId): void
+    {
+        if (!isset(self::MAPPING_ROWS[$section])) {
+            return;
+        }
+        $this->resource->getConnection()->delete(
+            $this->resource->getTableName(MappingResource::TABLE_NAME),
+            ['website_id = ?' => $websiteId] + self::MAPPING_ROWS[$section]
+        );
+    }
+
+    /**
+     * Gives one website id the transactional rows of another, in place of
+     * its own (CON-281): a website reads its transactional rows as one set
+     * (WizardData::getTransactionalTriggers()), so they are never merged.
+     */
+    private function replaceTransactionalRows(int $fromWebsiteId, int $toWebsiteId): void
+    {
+        $connection = $this->resource->getConnection();
+        $table = $this->resource->getTableName(MappingResource::TABLE_NAME);
+        $select = $connection->select()
+            ->from($table, ['trigger_type', 'language', 'account_key', 'workflow_id', 'is_default_fallback'])
+            ->where('website_id = ?', $fromWebsiteId);
+        foreach (self::MAPPING_ROWS[self::TRANSACTIONAL] as $condition => $value) {
+            $select->where($condition, $value);
+        }
+        $rows = $connection->fetchAll($select);
+        $this->deleteMappingRows(self::TRANSACTIONAL, $toWebsiteId);
+        foreach ($rows as $row) {
+            $connection->insert($table, ['website_id' => $toWebsiteId] + $row);
         }
     }
 

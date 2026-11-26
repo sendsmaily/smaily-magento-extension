@@ -145,6 +145,31 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   (`Model/Queue/HandlerPool`); adding an event type = adding a handler.
 - Payloads are built at enqueue time (`ContactSync\SubscriberPayloadBuilder`,
   `ContactSync\SyncDispatcher`) and stored on the row.
+- **A stale subscription is never sent (CON-394, CON-432).** A row carries
+  the status the store saw when it was queued, and a row that failed waits
+  for its retry while a later row of the same contact may be delivered. So
+  `Queue\Handler\ContactSyncHandler` asks `ContactSync\StaleSubscription` at
+  every attempt, before anything is sent, which rows of its batch are stale,
+  and closes those as Skipped
+  (`ContactSyncHandler::SKIPPED_STALE_SUBSCRIPTION`). A row is stale when it
+  subscribes (`is_unsubscribed` 0) and a later row of the same contact that
+  carries a status, 0 or 1, was delivered (`EventQueue::contactSyncsOf()`,
+  the Log's delivered rule). The same contact is the same entity
+  (`ContactEntity`) in the same Smaily account, the subdomain the row's
+  store view sends through: store views or websites that share an account
+  share the contact; the same address in two accounts is two contacts. A row
+  without a status (a profile save, an order, the purchase marker), and a
+  later row not delivered, make nothing stale. A row that unsubscribes is
+  never stale: sent late, it can only narrow who is subscribed, as in the
+  PrestaShop connector. A "Send again" row stands where the row it sends
+  again stood (`Log\Resend`'s `of`), and the handler posts a batch in the
+  order its changes were made (`StaleSubscription::inChangeOrder()`): the
+  queue hands a claimed batch over in the order its claim reads it back, not
+  in id order. The extension's contacts import posts directly and never
+  sends `is_unsubscribed` 0, so it is never stale; it leaves no queue row,
+  so it makes no queued row stale either. The Log's **Send again** and
+  **Retry** ask the same class (`ResendGuard::REASON_NEWER_SUBSCRIPTION`),
+  the pattern of `ProfilingConsentHandler`'s replaced choice.
 - **A subscription status goes only with a change of the status (CON-196,
   the same rule in every Smaily connector).** A change of a subscriber's
   newsletter status is a consent act whoever makes it — the shopper on the
@@ -1220,9 +1245,12 @@ below.
   belongs to the table's owner (`EventQueue::laterDeliveredOfSameTrigger()`)
   and answers for a whole grid page or mass-retry selection at once. Ingest
   rows are idempotent upserts and `contact.sync` repeats a state, so only
-  `erased` reaches them. Send again NEVER touches the failed row: it
-  enqueues a NEW row with the same event and payload — the failed row is
-  the history, the new row is the audit record (Woo DECISIONS, same call) —
+  `erased` reaches them — and, for a `contact.sync` that would put a stale
+  subscription into Smaily, `newer_subscription` (CON-394, the queue
+  handler's own answer, `ContactSync\StaleSubscription`). Send again NEVER
+  touches the failed row: it enqueues a NEW row with the same event and
+  payload — the failed row is the history, the new row is the audit record
+  (Woo DECISIONS, same call) —
   and the decision rides in the new row's payload under
   `Model\Log\Resend::PAYLOAD_KEY`
   (`_resend: {of, by, at}`, Z-suffixed), which both `decodePayload()`

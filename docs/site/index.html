@@ -2066,6 +2066,7 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
             <tr><td>"Skipped: this shopper unsubscribed from the store's newsletter."</td><td>Nothing — no reminder or first-order email goes to a shopper who unsubscribed.</td></tr>
             <tr><td>"Skipped: this shopper unsubscribed in Smaily."</td><td>Nothing — no reminder or first-order email goes to a contact who unsubscribed in Smaily, in any mode.</td></tr>
             <tr><td>"Skipped: Smaily does not have this contact, and the purchase marker would create it as a subscriber."</td><td>Nothing — the purchase marker never creates a contact.</td></tr>
+            <tr><td>"Skipped: the shopper has since changed their newsletter subscription, and the newer choice already reached Smaily."</td><td>Nothing — a subscription that was tried again late never undoes the shopper's newer choice in Smaily. A late unsubscribe is still sent.</td></tr>
             <tr><td>"Skipped: the shopper has since changed their personalization preference, …"</td><td>Nothing — the newer choice goes on its own row.</td></tr>
             <tr><td>"Skipped: the shopper opted out of personalized recommendations, so their browsing is not linked to their address."</td><td>Nothing — this respects the opt-out.</td></tr>
             <tr><td><strong>Withdrawn</strong>: the reminder was withdrawn because the shopper completed the purchase</td><td>Nothing — the shopper bought before the reminder went out.</td></tr>
@@ -2086,6 +2087,7 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
             <tr><td>„Vahele jäetud: see ostja loobus poe uudiskirjast.“</td><td>Midagi — loobunud ostjale meeldetuletust ega esimese tellimuse kirja ei saadeta.</td></tr>
             <tr><td>„Vahele jäetud: see ostja on Smailys loobunud.“</td><td>Midagi — Smailys loobunud kontaktile meeldetuletust ega esimese tellimuse kirja ei saadeta, üheski režiimis.</td></tr>
             <tr><td>„Vahele jäetud: Smailys ei ole seda kontakti ja ostu märge looks selle tellijana.“</td><td>Midagi — ostu märge ei loo kunagi kontakti.</td></tr>
+            <tr><td>„Vahele jäetud: ostja on vahepeal oma uudiskirja tellimust muutnud ja uuem valik on juba Smailysse jõudnud.“</td><td>Midagi — hiljem uuesti proovitud tellimus ei tühista kunagi ostja uuemat valikut Smailys. Hiline loobumine saadetakse ikkagi.</td></tr>
             <tr><td>„Vahele jäetud: ostja on vahepeal oma personaliseerimise eelistust muutnud, …“</td><td>Midagi — uuem valik saadetakse eraldi real.</td></tr>
             <tr><td>„Vahele jäetud: ostja loobus personaalsetest soovitustest, seega tema sirvimist ei seota tema e-posti aadressiga.“</td><td>Midagi — nii austatakse loobumist.</td></tr>
             <tr><td><strong>Tagasi võetud</strong>: meeldetuletus võeti tagasi, sest ostja viis ostu lõpule</td><td>Midagi — ostja ostis enne, kui meeldetuletus teele läks.</td></tr>
@@ -2103,7 +2105,7 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
         <li><strong>No retry.</strong> A delivery that was refused outright — wrong credentials, a deleted workflow, data Smaily or Campaign Intelligence calls invalid — is marked <strong>Failed</strong> at once, so you see it now.</li>
         <li><strong>Retry</strong> — select failed rows in the grid and choose <strong>Retry</strong>. Rows that cannot safely be sent again are left alone and counted ("… skipped because sending again would not be safe").</li>
         <li><strong>Send again</strong> — on one failed row (in the grid or in <strong>Details</strong>), queues a new attempt as a new row; the failed row stays as your record.</li>
-        <li><strong>No Send again button?</strong> Sending again would reach the shopper twice or reach nobody: the reminder was withdrawn, a later message of the same kind already reached the contact, the contact's data was erased, or it is a nightly product list (built afresh each night).</li>
+        <li><strong>No Send again button?</strong> Sending again would reach the shopper twice, reach nobody or undo a newer choice: the reminder was withdrawn, a later message of the same kind already reached the contact, a newer subscription change of the contact already reached Smaily, the contact's data was erased, or it is a nightly product list (built afresh each night).</li>
       </ul>
       <p>Fix the cause first (see the tables above), then retry.</p>
     </div>
@@ -2113,7 +2115,7 @@ unzip smaily-connect-magento2-hyva.zip -d app/code/Hyva/SmailyConnect</code></pr
         <li><strong>Kordust pole.</strong> Otse tagasi lükatud saadetis — valed kasutajaandmed, kustutatud töövoog, andmed, mida Smaily või Campaign Intelligence nimetab vigaseks — märgitakse kohe <strong>Ebaõnnestunud</strong>, et näeksid seda kohe.</li>
         <li><strong>Proovi uuesti</strong> — vali tabelis ebaõnnestunud read ja vali <strong>Proovi uuesti</strong>. Read, mida pole ohutu uuesti saata, jäetakse puutumata ja loendatakse („… jäeti vahele, sest uuesti saatmine poleks ohutu“).</li>
         <li><strong>Saada uuesti</strong> — ühel ebaõnnestunud real (tabelis või jaotises <strong>Üksikasjad</strong>) paneb uue katse järjekorda uue reana; ebaõnnestunud rida jääb sinu jaoks ajaloona alles.</li>
-        <li><strong>Nuppu „Saada uuesti“ pole?</strong> Uuesti saatmine jõuaks ostjani kaks korda või ei jõuaks kellenigi: meeldetuletus võeti tagasi, sama liiki hilisem kiri on kontaktini juba jõudnud, kontakti andmed on kustutatud või on tegu öise tootenimekirjaga (koostatakse igal ööl uuesti).</li>
+        <li><strong>Nuppu „Saada uuesti“ pole?</strong> Uuesti saatmine jõuaks ostjani kaks korda, ei jõuaks kellenigi või muudaks uuema valiku tagasi: meeldetuletus võeti tagasi, sama liiki hilisem kiri on kontaktini juba jõudnud, kontakti uuem tellimuse muudatus on juba Smailysse jõudnud, kontakti andmed on kustutatud või on tegu öise tootenimekirjaga (koostatakse igal ööl uuesti).</li>
       </ul>
       <p>Kõrvalda kõigepealt põhjus (vt ülalolevaid tabeleid) ja proovi siis uuesti.</p>
     </div>

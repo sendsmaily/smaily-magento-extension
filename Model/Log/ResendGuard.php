@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Log;
 
 use Magento\Framework\Phrase;
+use Smaily\Connect\Model\ContactSync\StaleSubscription;
 use Smaily\Connect\Model\Engine\CatalogManifest;
 use Smaily\Connect\Model\Privacy\Erasure;
 use Smaily\Connect\Model\Queue\Event;
@@ -28,10 +29,13 @@ use Smaily\Connect\Model\ResourceModel\Log\Collection;
  * the reminder was withdrawn on purpose, a later message of the same kind
  * already reached the contact, or the contact's data is gone. Everything
  * else is safe — an engine ingest row is an idempotent upsert, and a
- * contact sync or an identity merge repeats a state, not a message. The
- * fourth is the plain one: only a failed row is sent again at all. A
- * nightly catalog manifest row is never sent again: its list was the store
- * as it was that night, and the next night sends a new one (PRO-3854).
+ * contact sync or an identity merge repeats a state, not a message, with
+ * one exception: a contact sync that would put a stale subscription into
+ * Smaily, which the queue's handler skips by the same answer
+ * (ContactSync\StaleSubscription, CON-394). The fourth is the plain one:
+ * only a failed row is sent again at all. A nightly catalog manifest row is
+ * never sent again: its list was the store as it was that night, and the
+ * next night sends a new one (PRO-3854).
  */
 class ResendGuard
 {
@@ -53,8 +57,15 @@ class ResendGuard
      */
     public const REASON_NIGHTLY = 'nightly';
 
+    /**
+     * A newer subscription change of the contact already reached Smaily
+     * (CON-394): this one would undo it.
+     */
+    public const REASON_NEWER_SUBSCRIPTION = 'newer_subscription';
+
     public function __construct(
-        private readonly EventQueue $eventQueue
+        private readonly EventQueue $eventQueue,
+        private readonly StaleSubscription $staleSubscription
     ) {
     }
 
@@ -80,6 +91,7 @@ class ResendGuard
         $refused = [];
         $notFailed = [];
         $automation = [];
+        $contactSyncs = [];
 
         foreach ($rows as $id => $row) {
             $reason = $source === Collection::SOURCE_INTELLIGENCE
@@ -100,10 +112,19 @@ class ResendGuard
             ) {
                 $automation[$id] = $entityId;
             }
+            if ($source === Collection::SOURCE_SMAILY
+                && (string)($row['type'] ?? '') === EventType::CONTACT_SYNC
+                && $entityId !== ''
+            ) {
+                $contactSyncs[$id] = $entityId;
+            }
         }
 
         foreach ($this->eventQueue->laterDeliveredOfSameTrigger($automation) as $id) {
             $refused[$id] = self::REASON_SUPERSEDED;
+        }
+        foreach ($this->staleSubscription->among($contactSyncs) as $id) {
+            $refused[$id] = self::REASON_NEWER_SUBSCRIPTION;
         }
 
         // A row that must never be sent again is named as such even where it
@@ -131,6 +152,10 @@ class ResendGuard
             self::REASON_NOT_FAILED => __('Only a failed event can be sent again.'),
             self::REASON_NIGHTLY => __(
                 'The product list is built afresh each night, so this one is not sent again.'
+            ),
+            self::REASON_NEWER_SUBSCRIPTION => __(
+                'A newer subscription change of this contact already reached Smaily; '
+                . 'sending this one again would undo it.'
             ),
             default => new Phrase(''),
         };

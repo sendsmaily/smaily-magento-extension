@@ -432,12 +432,17 @@ window.smailyPanelsInit = function ($) {
         };
     }
 
+    // Whether two subdomains name the same Smaily account: trimmed, in any
+    // case.
+    function sameSubdomain(subdomain, other) {
+        return String(subdomain || '').trim().toLowerCase() === String(other || '').trim().toLowerCase();
+    }
+
     // Whether typed credentials name another account than the one the form
     // was drawn with (PRO-3690): an empty password keeps the saved one only
     // for that account. The subdomain is compared in any case.
     function accountChanged(fields, savedSubdomain, savedUsername) {
-        return String(fields.subdomain || '').trim().toLowerCase()
-                !== String(savedSubdomain || '').trim().toLowerCase()
+        return !sameSubdomain(fields.subdomain, savedSubdomain)
             || String(fields.username || '').trim() !== String(savedUsername || '').trim();
     }
 
@@ -1123,20 +1128,25 @@ window.smailyPanelsInit = function ($) {
         // the workflows of a replaced account are removed on save).
         // Unsaved exploration between the cards never asks.
         applyMlMode(mlModeCurrent);
+        // Ask before a mode switch; declined, the card checked before stays.
+        var confirmSwitch = function (message) {
+            if (window.confirm(message)) {
+                return true;
+            }
+            $('input[name=smaily-w-mlmode][value=' + mlModeCurrent + ']').prop('checked', true);
+            return false;
+        };
         $(document).on('change', 'input[name=smaily-w-mlmode]', function () {
             var next = $(this).val();
             var leavingConfigured = (mlModeSaved === 'a' || mlModeSaved === 'b') && next !== mlModeSaved;
             var enteringAccounts = next === 'a' && mlModeSaved !== 'a' && !!boot.websiteAccount.subdomain;
             if (enteringAccounts) {
-                if (!mlAccountsConfirmed && !window.confirm('<?= $escaper->escapeJs(__('Switching the multilingual mode changes how contacts and automations are routed. The default fallback account takes the place of the Smaily account saved now; where it is another Smaily account, the workflows picked from the saved account are removed. Workflows picked earlier for per-language accounts are removed too. Continue?')) ?>')) {
-                    $('input[name=smaily-w-mlmode][value=' + mlModeCurrent + ']').prop('checked', true);
+                if (!mlAccountsConfirmed && !confirmSwitch('<?= $escaper->escapeJs(__('Switching the multilingual mode changes how contacts and automations are routed. The default fallback account takes the place of the Smaily account saved now; where it is another Smaily account, the workflows picked from the saved account are removed. Workflows picked earlier for per-language accounts are removed too. Continue?')) ?>')) {
                     return;
                 }
                 mlAccountsConfirmed = true;
             } else if (leavingConfigured && !mlSwitchConfirmed) {
-                var message = '<?= $escaper->escapeJs(__('Switching the multilingual mode changes how contacts and automations are routed. Per-language accounts and workflow mappings that no longer apply stop being used (per-store-view credentials are removed on save). Continue?')) ?>';
-                if (!window.confirm(message)) {
-                    $('input[name=smaily-w-mlmode][value=' + mlModeCurrent + ']').prop('checked', true);
+                if (!confirmSwitch('<?= $escaper->escapeJs(__('Switching the multilingual mode changes how contacts and automations are routed. Per-language accounts and workflow mappings that no longer apply stop being used (per-store-view credentials are removed on save). Continue?')) ?>')) {
                     return;
                 }
                 mlSwitchConfirmed = true;
@@ -1454,8 +1464,7 @@ window.smailyPanelsInit = function ($) {
      */
     function confirmReplacedAccounts(data) {
         var replaced = function (subdomain, saved) {
-            saved = String(saved || '').trim().toLowerCase();
-            return saved !== '' && String(subdomain || '').trim().toLowerCase() !== saved;
+            return String(saved || '').trim() !== '' && !sameSubdomain(subdomain, saved);
         };
         var asks = !(data.multilingual_mode === 'a' && mlModeSaved !== 'a')
             && (replaced(data.subdomain, boot.websiteAccount.subdomain)

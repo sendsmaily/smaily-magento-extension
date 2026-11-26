@@ -12,6 +12,7 @@ use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Newsletter\Model\Subscriber;
 use Smaily\Connect\Model\Engine\CustomerIngest;
+use Smaily\Connect\Model\Newsletter\SubscriberStatus;
 
 /**
  * A customer's newsletter subscription enters a status the contact sync
@@ -27,13 +28,6 @@ use Smaily\Connect\Model\Engine\CustomerIngest;
  * Not behind the ReconcileGuard, like the other engine subscriber
  * observers: a status Smaily's consent mirror writes is the subscriber's
  * status too, and the scope reads it.
- *
- * A status change is read from the status saved against the status loaded,
- * not from the subscriber's status-changed flag (CON-436, as the contact
- * sync since PRO-4322): code that sets the status field directly leaves the
- * flag unset, and setStatus() sets it for the unchanged status when the
- * loaded value is a string, so the flag both lost changes and sent repeated
- * saves again.
  */
 class SubscriberJoined implements ObserverInterface
 {
@@ -51,7 +45,7 @@ class SubscriberJoined implements ObserverInterface
     {
         $subscriber = $observer->getEvent()->getData('subscriber');
         if (!$subscriber instanceof Subscriber
-            || !$subscriber->dataHasChangedFor('subscriber_status')
+            || !SubscriberStatus::changed($subscriber)
             || !in_array((int)$subscriber->getStatus(), self::SENT_STATUSES, true)
             || in_array((int)$subscriber->getOrigData('subscriber_status'), self::SENT_STATUSES, true)
         ) {

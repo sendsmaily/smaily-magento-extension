@@ -15,7 +15,7 @@ use Magento\Newsletter\Model\SubscriptionManagerInterface;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Magento\Store\Model\StoreManagerInterface;
-use Smaily\Connect\Cron\AbandonedCart;
+use Magento\Store\Model\Website;
 use Smaily\Connect\Model\AbandonedCart\ReminderConsent;
 use Smaily\Connect\Model\AbandonedCart\StateManager;
 use Smaily\Connect\Model\Automation\Trigger;
@@ -206,7 +206,7 @@ class OrderPlaced implements ObserverInterface
                 Trigger::FIRST_ORDER,
                 $storeId,
                 $address,
-                AbandonedCart::SKIPPED_UNSUBSCRIBED_IN_STORE
+                ReminderConsent::SKIPPED_UNSUBSCRIBED_IN_STORE
             );
 
             return;
@@ -222,13 +222,12 @@ class OrderPlaced implements ObserverInterface
      */
     private function storeIds(int $websiteId): array
     {
-        $storeIds = [];
-        foreach ($this->storeManager->getStores() as $store) {
-            if ((int)$store->getWebsiteId() === $websiteId) {
-                $storeIds[] = (int)$store->getId();
-            }
+        try {
+            $website = $this->storeManager->getWebsite($websiteId);
+        } catch (LocalizedException) {
+            return [];
         }
 
-        return $storeIds;
+        return $website instanceof Website ? array_map('intval', $website->getStoreIds()) : [];
     }
 }

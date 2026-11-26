@@ -48,12 +48,6 @@ use Smaily\Connect\Model\Logger\Logger;
  */
 class AbandonedCart
 {
-    public const SKIPPED_RECENTLY_REMINDED = 'Skipped: this address already got an abandoned-cart reminder'
-        . ' for another cart in the last 24 hours. Nothing was sent.';
-
-    public const SKIPPED_UNSUBSCRIBED_IN_STORE = 'Skipped: this shopper unsubscribed from the store\'s newsletter.'
-        . ' Nothing was sent.';
-
     private const MAX_AGE_SECONDS = 86400;
 
     /** How often the scan runs: etc/crontab.xml, every 5 minutes. */
@@ -187,7 +181,7 @@ class AbandonedCart
                     Trigger::ABANDONED_CART,
                     $storeId,
                     $address,
-                    self::SKIPPED_UNSUBSCRIBED_IN_STORE
+                    ReminderConsent::SKIPPED_UNSUBSCRIBED_IN_STORE
                 );
                 continue;
             }
@@ -198,7 +192,7 @@ class AbandonedCart
                     Trigger::ABANDONED_CART,
                     $storeId,
                     $address,
-                    self::SKIPPED_RECENTLY_REMINDED
+                    ReminderConsent::SKIPPED_RECENTLY_REMINDED
                 );
                 continue;
             }

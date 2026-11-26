@@ -162,6 +162,51 @@ class StaleSubscriptionTest extends IntegrationTestCase
         self::assertSame([1, 2], $stale->among([1 => self::EMAIL, 2 => self::EMAIL]));
     }
 
+    /**
+     * The read starts after the smallest place among the rows checked: a
+     * delivered row at or below it cannot make any of them stale, so the
+     * contact's older history is not read. A "Send again" row's place is
+     * the row it sends again, so the read reaches back to it, not to its
+     * own id.
+     */
+    public function testTheReadLeavesOutDeliveredRowsBeforeTheOldestPlaceChecked(): void
+    {
+        $this->change(true);
+        $this->markDelivered(1);
+        $this->change(false);
+        $this->markFailed(2);
+        $this->change(true);
+        $this->markDelivered(3);
+        $this->change(false);
+        // A "Send again" of row 2: row 5 stands at place 2.
+        $this->queue->enqueue(EventType::CONTACT_SYNC, [
+            'store_id' => 1,
+            'contact' => ['email' => self::EMAIL, 'is_unsubscribed' => 0],
+            Resend::PAYLOAD_KEY => ['of' => 2, 'by' => 'admin', 'at' => '2026-11-26T00:00:00Z'],
+        ], self::EMAIL, 1);
+
+        $readIds = function (array $ids, int $deliveredAfter): array {
+            $read = array_column($this->queue->contactSyncsOf([self::EMAIL], $ids, $deliveredAfter), 'id');
+            sort($read);
+
+            return $read;
+        };
+        self::assertSame([1, 2, 3, 4, 5], $readIds([2, 4, 5], 0), 'Without a bound every delivered row is read');
+        self::assertSame([2, 3, 4, 5], $readIds([2, 4, 5], 2), 'The delivered row 1 is not read');
+
+        $checked = [2 => self::EMAIL, 4 => self::EMAIL, 5 => self::EMAIL];
+        $payloads = [];
+        foreach ([2, 4, 5] as $id) {
+            $payloads[$id] = (array)json_decode(
+                (string)$this->fetchRow(EventResource::TABLE_NAME, $id)['payload'],
+                true
+            );
+        }
+        $stale = $this->objectManager->create(StaleSubscription::class);
+        self::assertSame([2, 5], $stale->among($checked), 'Row 3 makes row 2 and its Send again stale');
+        self::assertSame($stale->among($checked), $stale->among($checked, $payloads), 'The bound changes no verdict');
+    }
+
     public function testSendAgainAndRetryRefuseAStaleSubscription(): void
     {
         $this->change(false);

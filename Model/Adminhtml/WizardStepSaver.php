@@ -588,11 +588,13 @@ class WizardStepSaver
         // anything is written: the website's one account (in mode A the
         // default fallback account), for a store-wide save also the one
         // saved at the default scope, and in mode A each language's own.
-        $replaced = fn (string $saved): bool => $saved !== '' && strcasecmp($saved, $subdomain) !== 0;
-        $accountReplaced = $replaced($this->normalizer->normalize($this->config->getWebsiteSubdomain($websiteId)))
-            || ($target === null && $replaced($this->normalizer->normalize(
-                $this->config->getWebsiteSubdomain(WebsiteContext::STORE_WIDE)
-            )));
+        $accountReplaced = $this->isOtherAccount(
+            $this->normalizer->normalize($this->config->getWebsiteSubdomain($websiteId)),
+            $subdomain
+        ) || ($target === null && $this->isOtherAccount(
+            $this->normalizer->normalize($this->config->getWebsiteSubdomain(WebsiteContext::STORE_WIDE)),
+            $subdomain
+        ));
         $replacedLanguages = $previousMode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS
             ? $this->replacedLanguageAccounts($data, $heldAccounts)
             : [];
@@ -824,12 +826,22 @@ class WizardStepSaver
                 continue;
             }
             $heldSubdomain = $this->normalizer->normalize(explode("\n", $heldAccounts[$storeId]['account'])[0]);
-            if ($heldSubdomain !== '' && strcasecmp($heldSubdomain, $accountSubdomain) !== 0) {
+            if ($this->isOtherAccount($heldSubdomain, $accountSubdomain)) {
                 $languages[] = $language;
             }
         }
 
         return $languages;
+    }
+
+    /**
+     * Whether a save replaces the saved Smaily account with another one: an
+     * account was saved, and the new one is another subdomain. Both sides
+     * come normalized (SubdomainNormalizer, lower case).
+     */
+    private function isOtherAccount(string $saved, string $new): bool
+    {
+        return $saved !== '' && $saved !== $new;
     }
 
     /**

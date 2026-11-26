@@ -105,4 +105,19 @@ class Resend
 
         return $payload;
     }
+
+    /**
+     * Where a row's change stands among its entity's rows: the row it sends
+     * again, for a "Send again" row, else its own id. Never above the row's
+     * own id — a "Send again" row is queued after the row it sends again.
+     * Static for the same reason as stripRecord().
+     *
+     * @param array<int|string, mixed> $payload the decoded payload as stored, the record included
+     */
+    public static function placeOf(int $id, array $payload): int
+    {
+        $of = (int)($payload[self::PAYLOAD_KEY]['of'] ?? 0);
+
+        return $of > 0 ? $of : $id;
+    }
 }

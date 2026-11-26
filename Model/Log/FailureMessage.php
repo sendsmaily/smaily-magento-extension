@@ -8,7 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Log;
 
-use Smaily\Connect\Cron\AbandonedCart;
+use Smaily\Connect\Model\AbandonedCart\ReminderConsent;
 use Smaily\Connect\Model\Engine\CatalogManifest;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
@@ -71,8 +71,8 @@ class FailureMessage
         AutomationHandler::SKIPPED_UNSUBSCRIBED_IN_SMAILY,
         ProfilingConsentHandler::SKIPPED_REPLACED,
         IdentityMergeHandler::SKIPPED_OPTED_OUT,
-        AbandonedCart::SKIPPED_RECENTLY_REMINDED,
-        AbandonedCart::SKIPPED_UNSUBSCRIBED_IN_STORE,
+        ReminderConsent::SKIPPED_RECENTLY_REMINDED,
+        ReminderConsent::SKIPPED_UNSUBSCRIBED_IN_STORE,
         // A catalog, customer or order row a newer row of the same entity
         // superseded (CON-423, CON-448).
         IngestQueue::SKIPPED_SUPERSEDED,

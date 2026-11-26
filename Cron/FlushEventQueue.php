@@ -82,10 +82,12 @@ class FlushEventQueue
         $failed = [];
         foreach ($events as $event) {
             $result = $results[(int)$event->getId()] ?? 'Handler returned no result for event';
-            if ($result instanceof Pending && $result->delaySeconds > 0) {
-                $postponed[$result->delaySeconds][] = $event;
-            } elseif ($result instanceof Pending) {
-                $waiting[] = $event;
+            if ($result instanceof Pending) {
+                if ($result->delaySeconds > 0) {
+                    $postponed[$result->delaySeconds][] = $event;
+                } else {
+                    $waiting[] = $event;
+                }
             } elseif ($result === true) {
                 $this->eventQueue->markSent($event);
             } elseif ($result instanceof Skipped) {

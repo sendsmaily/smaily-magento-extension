@@ -123,8 +123,8 @@ class EventQueue
         string $eventType,
         array $payload,
         string $reason,
-        ?string $entityId = null,
-        int $websiteId = 0
+        ?string $entityId,
+        int $websiteId
     ): bool {
         return $this->insert($eventType, $payload, $entityId, $websiteId, null, [
             'status' => Event::STATUS_FAILED,
@@ -291,7 +291,7 @@ class EventQueue
             return;
         }
 
-        $dueAt = $this->dateTime->gmtDate('Y-m-d H:i:s', $this->dateTime->gmtTimestamp() + $seconds);
+        $dueAt = $this->dueIn($seconds);
         $this->unclaim(
             ['id IN (?)' => array_map(static fn (Event $event): int => (int)$event->getId(), $events)],
             ['next_retry_at' => $dueAt]
@@ -607,26 +607,8 @@ class EventQueue
             return [];
         }
 
-        $connection = $this->resourceConnection->getConnection();
-        $rows = $connection->fetchAll(
-            $connection->select()
-                ->from(
-                    $this->resourceConnection->getTableName(EventResource::TABLE_NAME),
-                    [
-                        'id',
-                        'entity_id',
-                        'payload',
-                        'delivered' => new \Zend_Db_Expr(
-                            'CASE WHEN ' . $this->deliveredCondition() . ' THEN 1 ELSE 0 END'
-                        ),
-                    ]
-                )
-                ->where('event_type = ?', EventType::AUTOMATION_TRIGGER)
-                ->where('entity_id IN (?)', array_values(array_unique($entityIds)))
-        );
-
         $byEntity = [];
-        foreach ($rows as $row) {
+        foreach ($this->rowsWithDelivered(EventType::AUTOMATION_TRIGGER, $entityIds) as $row) {
             $byEntity[(string)$row['entity_id']][(int)$row['id']] = [
                 'trigger' => $this->triggerOf((string)$row['payload']),
                 'delivered' => (int)$row['delivered'] === 1,
@@ -653,44 +635,74 @@ class EventQueue
     /**
      * The contact syncs of these contacts that a stale subscription is read
      * against (CON-394, ContactSync\StaleSubscription): the rows $ids and
-     * every delivered one, by deliveredCondition(), each with its payload as
-     * stored, a "Send again" record included. One read through the queue's
-     * (entity_id, event_type, status) index, without a lock.
+     * every delivered one, by deliveredCondition(), above $deliveredAfter,
+     * each with its payload as stored, a "Send again" record included. One
+     * read through the queue's (entity_id, event_type, status) index,
+     * without a lock.
+     *
+     * $deliveredAfter is the smallest place (Log\Resend::placeOf()) among
+     * the rows $ids, or 0 for every delivered row. Nothing that matters is
+     * left out: only a delivered row whose place is after a checked row's
+     * place can make that row stale, and a row's place is never above its
+     * own id — so a delivered row at or below the smallest place cannot
+     * make any of them stale, and the contact's older history is not read.
      *
      * @param string[] $entityIds
      * @param int[] $ids
      * @return list<array{id: int, entity_id: string, payload: array<int|string, mixed>, delivered: bool}>
      */
-    public function contactSyncsOf(array $entityIds, array $ids): array
+    public function contactSyncsOf(array $entityIds, array $ids, int $deliveredAfter): array
     {
         if (!$entityIds || !$ids) {
             return [];
         }
-
-        $connection = $this->resourceConnection->getConnection();
-        $delivered = $this->deliveredCondition();
-        $rows = $connection->fetchAll(
-            $connection->select()
-                ->from(
-                    $this->resourceConnection->getTableName(EventResource::TABLE_NAME),
-                    [
-                        'id',
-                        'entity_id',
-                        'payload',
-                        'delivered' => new \Zend_Db_Expr('CASE WHEN ' . $delivered . ' THEN 1 ELSE 0 END'),
-                    ]
-                )
-                ->where('entity_id IN (?)', array_values(array_unique($entityIds)))
-                ->where('event_type = ?', EventType::CONTACT_SYNC)
-                ->where('(' . $delivered . ' OR id IN (?))', array_map('intval', $ids))
-        );
 
         return array_map(fn (array $row): array => [
             'id' => (int)$row['id'],
             'entity_id' => (string)$row['entity_id'],
             'payload' => $this->payloadDecoder->decode((string)$row['payload']),
             'delivered' => (int)$row['delivered'] === 1,
-        ], $rows);
+        ], $this->rowsWithDelivered(EventType::CONTACT_SYNC, $entityIds, $ids, $deliveredAfter));
+    }
+
+    /**
+     * The rows of one event type for these entities: id, entity_id, the
+     * payload as stored and `delivered`, 1 when the row reached the contact
+     * by deliveredCondition(), else 0. With $ids, only those rows and the
+     * delivered ones above $deliveredAfter.
+     *
+     * @param string[] $entityIds
+     * @param int[]|null $ids
+     * @return list<array<string, mixed>>
+     */
+    private function rowsWithDelivered(
+        string $eventType,
+        array $entityIds,
+        ?array $ids = null,
+        int $deliveredAfter = 0
+    ): array {
+        $connection = $this->resourceConnection->getConnection();
+        $delivered = $this->deliveredCondition();
+        $select = $connection->select()
+            ->from(
+                $this->resourceConnection->getTableName(EventResource::TABLE_NAME),
+                [
+                    'id',
+                    'entity_id',
+                    'payload',
+                    'delivered' => new \Zend_Db_Expr('CASE WHEN ' . $delivered . ' THEN 1 ELSE 0 END'),
+                ]
+            )
+            ->where('entity_id IN (?)', array_values(array_unique($entityIds)))
+            ->where('event_type = ?', $eventType);
+        if ($ids !== null) {
+            $select->where(
+                '((' . $delivered . ' AND ' . $connection->quoteInto('id > ?', $deliveredAfter) . ')'
+                . ' OR ' . $connection->quoteInto('id IN (?)', array_map('intval', $ids)) . ')'
+            );
+        }
+
+        return $connection->fetchAll($select);
     }
 
     /**
@@ -830,6 +842,14 @@ class EventQueue
             ? min($retryAfter, self::BACKOFF_SECONDS[count(self::BACKOFF_SECONDS) - 1])
             : self::BACKOFF_SECONDS[min($attempts, count(self::BACKOFF_SECONDS)) - 1];
 
-        return $this->dateTime->gmtDate('Y-m-d H:i:s', $this->dateTime->gmtTimestamp() + $backoff);
+        return $this->dueIn($backoff);
+    }
+
+    /**
+     * The UTC time $seconds from now, as next_retry_at stores it.
+     */
+    private function dueIn(int $seconds): string
+    {
+        return $this->dateTime->gmtDate('Y-m-d H:i:s', $this->dateTime->gmtTimestamp() + $seconds);
     }
 }

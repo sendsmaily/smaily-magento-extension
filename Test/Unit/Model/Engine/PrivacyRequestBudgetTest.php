@@ -12,6 +12,7 @@ use Magento\Framework\App\CacheInterface;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\PrivacyRequestBudget;
+use Smaily\Connect\Model\Queue\EventQueue;
 
 /**
  * CON-432: the engine's limit on privacy requests, 10 in 60 seconds per
@@ -31,18 +32,17 @@ class PrivacyRequestBudgetTest extends TestCase
     {
         $budget = $this->budget();
         for ($i = 0; $i < PrivacyRequestBudget::LIMIT; $i++) {
-            self::assertSame(0, $budget->waitSeconds(self::STORE));
-            $budget->spend(self::STORE);
+            self::assertSame(0, $budget->take(self::STORE));
             $this->now += 3;
         }
 
         // The first request went 30 seconds ago.
-        self::assertSame(30, $budget->waitSeconds(self::STORE));
+        self::assertSame(30, $budget->take(self::STORE));
+        self::assertSame(30, $budget->waitSeconds(self::STORE), 'A turn not given is not counted');
         self::assertSame(0, $budget->waitSeconds(self::OTHER_STORE), 'Each engine store has a limit of its own');
 
         $this->now += 30;
-        self::assertSame(0, $budget->waitSeconds(self::STORE));
-        $budget->spend(self::STORE);
+        self::assertSame(0, $budget->take(self::STORE));
         self::assertSame(3, $budget->waitSeconds(self::STORE), 'The second request leaves the window next');
     }
 
@@ -70,6 +70,11 @@ class PrivacyRequestBudgetTest extends TestCase
             $budget->pause(self::OTHER_STORE, 10 * PrivacyRequestBudget::MAX_PAUSE_SECONDS)
         );
         self::assertSame(PrivacyRequestBudget::MAX_PAUSE_SECONDS, $budget->waitSeconds(self::OTHER_STORE));
+        self::assertSame(
+            EventQueue::BACKOFF_SECONDS[array_key_last(EventQueue::BACKOFF_SECONDS)],
+            PrivacyRequestBudget::MAX_PAUSE_SECONDS,
+            'The ceiling is the last rung of the retry ladder'
+        );
     }
 
     public function testAnEmptyOrUnreadableCacheAllowsARequest(): void
@@ -80,7 +85,7 @@ class PrivacyRequestBudgetTest extends TestCase
         foreach (array_keys($this->cache) as $key) {
             $this->cache[$key] = 'not json';
         }
-        $budget->spend(self::STORE);
+        self::assertSame(0, $budget->take(self::STORE));
         $this->cache = array_map(static fn (): string => '{"sent":"x"}', $this->cache);
         self::assertSame(0, $budget->waitSeconds(self::STORE));
     }

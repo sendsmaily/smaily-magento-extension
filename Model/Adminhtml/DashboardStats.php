@@ -10,9 +10,9 @@ namespace Smaily\Connect\Model\Adminhtml;
 
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Stdlib\DateTime\DateTime;
+use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Log\EntityLabel;
 use Smaily\Connect\Model\Queue\Event;
-use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Model\ResourceModel\Log\Collection as LogCollection;
@@ -35,33 +35,35 @@ class DashboardStats
 
     /**
      * Delivered contact syncs still in the 30-day retention window: rows
-     * that reached Smaily (PRO-3634). The queue also closes a row as `sent`
-     * when it skips it (reason in `last_error`) or withdraws it
-     * (`last_response` = CANCELLED_RESPONSE); the Log reads those as
-     * Skipped and Withdrawn, and they are not counted here.
+     * that reached Smaily (PRO-3634), the rows the Log shows as Sent. The
+     * queue also closes a row as `sent` when it skips or withdraws it; the
+     * Log reads those as Skipped and Withdrawn
+     * (LogCollection::smailyStatusExpression()), and they are not counted.
      */
     public function contactSyncsDelivered(): int
     {
+        $status = LogCollection::smailyStatusExpression($this->resourceConnection->getConnection(), 'q');
+
         return $this->count(EventResource::TABLE_NAME, [
-            'status = ?' => Event::STATUS_SENT,
             'event_type = ?' => EventType::CONTACT_SYNC,
-            "COALESCE(last_error, '') = ?" => '',
-            "COALESCE(last_response, '') <> ?" => EventQueue::CANCELLED_RESPONSE,
+            $status . ' = ?' => Event::STATUS_SENT,
         ]);
     }
 
     /**
-     * Delivered catalog items still in the 30-day retention window. The
-     * ingest queue also closes a catalog row as `sent` when a newer row of
-     * the product supersedes it (reason in `last_error`, CON-423); the Log
-     * reads it as Skipped, and it is not counted here.
+     * Delivered catalog items still in the 30-day retention window, the
+     * rows the Log shows as Sent. The ingest queue also closes a catalog row
+     * as `sent` when a newer row of the product supersedes it (CON-423); the
+     * Log reads it as Skipped (LogCollection::intelligenceStatusExpression()),
+     * and it is not counted.
      */
     public function catalogItemsDelivered(): int
     {
+        $status = LogCollection::intelligenceStatusExpression($this->resourceConnection->getConnection(), 'q');
+
         return $this->count(IngestEventResource::TABLE_NAME, [
-            'status = ?' => 'sent',
             'domain = ?' => 'catalog',
-            "COALESCE(last_error, '') = ?" => '',
+            $status . ' = ?' => IngestEvent::STATUS_SENT,
         ]);
     }
 
@@ -140,7 +142,7 @@ class DashboardStats
     {
         $connection = $this->resourceConnection->getConnection();
         $select = $connection->select()
-            ->from($this->resourceConnection->getTableName($table), ['cnt' => 'COUNT(*)']);
+            ->from(['q' => $this->resourceConnection->getTableName($table)], ['cnt' => 'COUNT(*)']);
         foreach ($where as $condition => $value) {
             $select->where($condition, $value);
         }

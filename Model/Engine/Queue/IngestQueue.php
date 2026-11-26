@@ -14,6 +14,7 @@ use Magento\Framework\DB\Select;
 use Magento\Framework\Exception\AlreadyExistsException;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\Stdlib\DateTime\DateTime;
+use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Log\Resend;
 use Smaily\Connect\Model\Logger\Logger;
@@ -50,6 +51,26 @@ class IngestQueue
      */
     public const SKIPPED_SUPERSEDED = 'Skipped: the product changed again, and a newer row carries its current'
         . ' details to Campaign Intelligence. Nothing was sent.';
+
+    /** The same for an order row (CON-448). */
+    public const SKIPPED_SUPERSEDED_ORDER = 'Skipped: the order changed again, and a newer row carries its current'
+        . ' details to Campaign Intelligence. Nothing was sent.';
+
+    /** The same for a customer row (CON-448). */
+    public const SKIPPED_SUPERSEDED_CUSTOMER = 'Skipped: the customer\'s account changed again, and a newer row'
+        . ' carries its current details to Campaign Intelligence. Nothing was sent.';
+
+    /**
+     * The domains whose row carries the entity's whole state, so that an
+     * older row sent after a newer one would put older values back in the
+     * engine (supersededRows()), each with the reason its skipped row
+     * keeps. Browse events are not states; each one counts.
+     */
+    public const SUPERSEDED_REASONS = [
+        Client::DOMAIN_CATALOG => self::SKIPPED_SUPERSEDED,
+        Client::DOMAIN_CUSTOMERS => self::SKIPPED_SUPERSEDED_CUSTOMER,
+        Client::DOMAIN_ORDERS => self::SKIPPED_SUPERSEDED_ORDER,
+    ];
 
     /**
      * The columns markFailedMany() writes: a failure's outcome and its
@@ -276,9 +297,13 @@ class IngestQueue
     /**
      * The rows of a claimed batch that a later row of the same entity
      * supersedes (CON-423), for a domain whose row carries the entity's
-     * whole state — the catalog: the newest row is the product as the store
-     * last saw it, and an older one sent after it would put an older stock
-     * or price back in the engine.
+     * whole state (SUPERSEDED_REASONS): the newest row is the product, the
+     * customer or the order as the store last saw it, and an older one sent
+     * after it would put an older stock or price, an older order (before
+     * its refund) or an older customer (their old email, which the engine
+     * finds by the customer id, contract §4) back in the engine (CON-448).
+     * The entity is the row's entity_id: the product id, the customer id,
+     * the order's increment id.
      *
      * Rows go in the order they were queued, but not always: a row that
      * failed waits for its retry while later rows go, and the Log's "Retry"

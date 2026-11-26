@@ -7,79 +7,114 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-11-26 — **3.0.3 is cut** (the `release/3.0.3`
-PR); its tag waits for Erkki's go. 3.0.3 is a hotfix: two merchant
-reports against 3.0.2 on Magento 2.4.9. The cut collects 6 changelog
-fragments into 6 bullets, in landing order, under a lead sentence that
-names the two serious fixes (admin grids, developer mode).
+_Last updated: 2026-11-26 evening — **3.1.0 is cut** (the
+`release/3.1.0` PR); its tag waits for Erkki's go. The cut collects 10
+changelog fragments into 10 bullets, in landing order, under a lead
+sentence that tells a store selling in more than one currency, or
+showing a display currency other than its base currency, to press
+**Run again** on **Orders** and **Catalog** under **Settings >
+Intelligence** after upgrading.
 
-**Merged since 3.0.2:**
-- #285 CON-440 (was PRO-4322): a newsletter status change is read from
-  the saved status. Magento's changed flag is unreliable: code that
-  writes the field directly (for example Magento's newsletter Problem
-  Reports) loses it, and a status loaded as a string sets it on an
-  unchanged save. **Note:** the squash commit 1d67c39 on `master`
-  carries CON-434's description by mistake (a parallel worker
-  overwrote the PR body); the PR body is restored, history is not
-  rewritten.
-- #286 CON-434: the Smaily Log grid's data-source registration moved
-  from `etc/adminhtml/di.xml` to `etc/di.xml`. On every 3.0.x every core
-  admin grid (orders, invoices, shipments, credit memos, customers, CMS
-  pages and blocks) failed with "Not registered handle" in every mode.
-  Very likely the cause of the 3.0.1 Marketplace MFTF grid failures —
-  the earlier reading here ("Adobe's test environment", Magento's own
-  filter buttons) was wrong.
-- #287 CON-387: the **First order** email follows the abandoned-cart
-  reminder's consent rule, with a Smaily status lookup first.
-- #288: engine contract 1.37.1 (copy only; the wire changes are carried
-  by CON-383, CON-421, CON-412, CON-432).
-- #289 CON-436: Campaign Intelligence newsletter join, rejoin and leave
-  read from the saved status.
-- #290 CON-417: setup step 1 **Continue** only after a passed **Test
-  connection** (browser and server).
-- #291 CON-437: each event declared once in `etc/events.xml` — on every
-  3.0.x developer mode answered 500 on every page.
+**3.0.3 was released on 26 Nov** (hotfix: admin grids CON-434,
+developer mode CON-437, newsletter status CON-440 (was PRO-4322),
+engine newsletter events CON-436, first-order consent CON-387, setup
+connection test CON-417) **and submitted to the Marketplace** as a new
+version (CON-152; submission `xiggy2ui4q`: the technical part in
+automated testing, the marketing part awaiting review with the
+rewritten description and the 3.0.3 user-guide PDF; title "Smaily
+Connect" until Adobe support answers which title it accepts). The 3.0.1
+submission `2q6w4ofnme` is left to finish.
 
-**Marketplace (CON-152):** resubmit from 3.0.3 as a new version draft,
-with the user-guide PDF regenerated from
-`docs/internal/marketplace/user-guide.html` (gear icon › Integrations,
-version 3.0.3). The 3.0.1 submission `2q6w4ofnme` is still in review.
+**Merged since 3.0.3:**
+- #293: the Marketplace description, rewritten after the third refusal.
+- #294 CON-421: orders go to Campaign Intelligence in the store's base
+  currency.
+- #295 CON-394: a stale contact sync is skipped; a late unsubscribe is
+  always delivered.
+- #296 CON-423: a stale catalog row is skipped — the stock flips came
+  from retried rows sent after newer ones.
+- #297 CON-432: privacy requests paced to 10 a minute per engine store,
+  a 429 delays without using a retry, the contact import counts
+  refusals.
+- #298 CON-396: the workflows of a replaced Smaily account are removed,
+  after a question.
+- #299: the lock moved past the phpseclib and symfony/filesystem
+  advisories.
+- #300 CON-447: catalog prices in the base currency (checked live in
+  the sandbox).
+- #301: engine contract 1.37.2.
+- #302 CON-448: a stale order or customer row is skipped.
+- #303 CON-419: „küpsiste bänner“; CON-414's installation-report
+  sentence completed in the guide.
+- #304 CON-451: a failed contact import's log line carries the error
+  code only.
+- #305 CON-432: the warning for websites sharing one Smaily account
+  with different contact sync modes.
+- #306: the simplification review of the day's changes.
 
-**Sandbox:** now in developer mode (it ran in default mode before
-2026-11-26, which is why CON-437 never showed there).
+**Decisions of 26 Nov** (Erkki, recorded on CON-397): a late
+unsubscribe is always delivered; with double opt-in a checkout tick
+counts as consent before the shopper confirms; a guest's checkout tick
+syncs in every mode (WooCommerce CON-439); the welcome email follows
+contact sync; a store-side newsletter unsubscribe reaches Smaily in
+every mode (PrestaShop asked to follow in CON-452); `smaily:gdpr erase`
+fails loudly and asks to be run again when the engine delete fails;
+catalog and orders go in the store's base currency. Re-entering
+per-language accounts drops the per-language workflows kept from an
+earlier stay (accepted as built).
 
-**Human acceptance pending:** the Estonian proofread of the guide's new
-first-order section (CON-387) and step-1 text (CON-417); CON-414's guide
-sentence on what the installation report sends — no such sentence is in
-the guide yet, it needs writing; CON-363, CON-366 and CON-230 as before.
+**Human acceptance pending:** the Estonian proofread of today's new
+texts — guide: the first-order section, setup step 1, the shared-account
+warning, the privacy and import texts, the CON-423/CON-448 Log reasons
+and guide rows, the installation-report sentence; admin: the two
+account-change questions and the import card text. CON-153 on the pilot
+store. CON-363, CON-366 and CON-230 as before.
 
-**Gotchas:** a PR body can be overwritten by a parallel worker (#285) —
-before a merge, check that the body names the PR's own issue. The
-`bin/magento` GDPR command still uses the contract's deprecated
-email-in-path endpoints (§8–§10, deprecated in 1.37.0, no removal date);
-it moves to §8b/§9b with CON-412. Earlier gotchas (engine timeouts,
-cURL text in a network-error row, `form_key` in the query string,
-worktrees in the sandbox compile, the system-messages popup, one push
-per `release/*` branch) still hold.
-
-**Open question for Erkki:** with double opt-in on, a checkout tick
-counts as consent for the abandoned-cart reminder and the first-order
-email before the shopper confirms the subscription (the existing rule,
-unchanged by CON-387). Keep it?
+**Gotchas and technical notes:**
+- A PR body can be overwritten by a parallel worker: before a merge,
+  check that the body names the PR's own issue (master commit 1d67c39
+  carries CON-434's text by that mistake; history is not rewritten).
+- The sandbox now runs in developer mode.
+- About 30 places log or store a typed client exception's translated
+  message instead of `FailureText` (already code-only; consistency
+  only).
+- The JS has no `SubdomainNormalizer` twin: "demo.sendsmaily.net"
+  against a saved "demo" asks the replace confirmation.
+- `ResendGuard` could pass payloads to `among()` for the bounded read.
+- `contactSyncsDelivered` counts sent rows without `sent_payload IS NOT
+  NULL`, unlike `deliveredCondition()`.
+- `MergeCustomerSender` records its row with the customer's store view
+  instead of the connection's canonical store.
+- The nightly manifest checks the queue before it builds its list.
+- The engine's §19 test send, §20 go-live switch and §12 notice are
+  live (contract 1.37.2) and not built in the extension.
+- `bin/magento smaily:gdpr` still uses the deprecated §8–§10 endpoints;
+  it moves with CON-412.
+- Earlier gotchas (engine timeouts, cURL text in a network-error row,
+  `form_key` in the query string, worktrees in the sandbox compile, the
+  system-messages popup, one push per `release/*` branch) still hold.
 
 **Next session opens with:**
-1. The 3.0.3 tag on Erkki's go; then a reply to the two merchant
-   reports (CON-434, CON-440 — CON-440 also asks the store which module
-   saves its newsletter signups) and the Marketplace resubmission from
-   3.0.3.
-2. CON-421 (orders in the store's default currency) and CON-432 part 1
-   (stale contact changes, closes CON-394) — in progress on 2026-11-26.
-3. CON-432 parts 2–3: workflows after an account change (= CON-396),
-   privacy-request pacing, import refusal counts, consent alignment, the
-   shared-account warning.
-4. CON-423 (stock flips) and CON-419 (Estonian wordings, with CON-414's
-   sentence).
-5. Designs CON-369 and CON-361 wait for Erkki._
+1. The 3.1.0 tag on Erkki's go; then the upgrade note to merchants
+   about **Run again**.
+2. The Marketplace 3.0.3 review results and Adobe support's answer on
+   the title.
+3. CON-281 (separate stores: the Dashboard shows only the default
+   website) and CON-252 (an accented capital in an email address makes
+   two shoppers).
+4. A design for the engine's §19 test send and §20 go-live switch in
+   the extension.
+5. Designs CON-369 (payment reminder) and CON-361 (stock alerts) wait
+   for Erkki._
+
+_Earlier (2026-11-26 morning, the 3.0.3 cut): **3.0.3 was cut (#292)**,
+a hotfix for two merchant reports against 3.0.2 on Magento 2.4.9; 6
+fragments into 6 bullets. Merged since 3.0.2: #285 CON-440 newsletter
+status from the saved status, #286 CON-434 the Log grid's data source
+in `etc/di.xml` (every core admin grid failed with "Not registered
+handle"; likely the cause of the 3.0.1 Marketplace MFTF failures), #287
+CON-387 first-order consent, #288 contract 1.37.1, #289 CON-436, #290
+CON-417, #291 CON-437 (developer mode answered 500 on every page)._
 
 _Earlier (2026-11-20 session end): **3.0.2 was released** on Erkki's
 go (#282 cut, 13 fragments into 12 bullets; both ZIPs, the Hyvä mirror

@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Unit\ViewModel;
 
+use Magento\Backend\Model\Auth\Session as AuthSession;
 use Magento\Framework\Locale\ResolverInterface as LocaleResolver;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
@@ -44,7 +45,8 @@ class AutomationsFormTest extends TestCase
             $settings,
             $client,
             $this->createMock(SmailyClientProvider::class),
-            $localeResolver
+            $localeResolver,
+            $this->createMock(AuthSession::class)
         );
 
         $rows = $form->getRows();
@@ -74,7 +76,8 @@ class AutomationsFormTest extends TestCase
             $settings,
             $client,
             $this->createMock(SmailyClientProvider::class),
-            $this->createMock(LocaleResolver::class)
+            $this->createMock(LocaleResolver::class),
+            $this->createMock(AuthSession::class)
         );
 
         self::assertTrue($form->isEngineConnected());

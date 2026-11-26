@@ -9,13 +9,25 @@
  *
  * A trigger whose Enabled is not ticked shows only its name, pill,
  * description and Enabled (CON-256, as the WooCommerce plugin's CON-255):
- * .is-closed hides its .smaily-trigger-settings — the workflow, Cooldown,
- * Daily Cap, Test mode, Test Emails and the go-live note. They stay in the
- * form, and the save posts every field of every trigger, so nothing hidden
- * is lost. "Edit design" (CON-257) follows the workflow when Campaign
- * Intelligence lists the trigger's design (panel/email-designs.phtml). A
- * trigger with a field to fix (the engine refused the save over
- * one of its fields) stays open while it is off, so the field can be seen.
+ * .is-closed hides its .smaily-trigger-settings — Test mode, the workflow,
+ * Cooldown, Daily Cap and Test Emails. They stay in the form, and the save
+ * posts every field of every trigger, so nothing hidden is lost. "Edit
+ * design" (CON-257) follows the workflow when Campaign Intelligence lists
+ * the trigger's design (panel/email-designs.phtml). A trigger with a field
+ * to fix (the engine refused the save over one of its fields) stays open
+ * while it is off, so the field can be seen.
+ *
+ * Test mode (CON-458, as the WooCommerce plugin's CON-455) shows below
+ * Enabled for an email Campaign Intelligence reports a setup state for
+ * (§12 `setup[]`). It is on in every state but live. While it is on, the
+ * card offers "Send test email" (§19, smaily_connect/automations/testsend)
+ * to an address that starts as the admin's own. Turning it off asks "Turn
+ * off test mode?" first, then switches real sends on (§20,
+ * smaily_connect/automations/testmode); turning it on again asks nothing.
+ * Each answer carries the card's state as Campaign Intelligence reads it
+ * after the call, which the card shows: the switch, the pill, the state
+ * line and the notice. The switch and the test send are not form fields:
+ * the save never posts them.
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
@@ -89,11 +101,24 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
                         <div class="smaily-engine-trigger__desc"><?= $escaper->escapeHtml($row['description']) ?></div>
                         <div class="smaily-engine-trigger__controls" style="margin-top:8px;">
                             <span class="smaily-engine-trigger__ctrl"><label><input type="checkbox" data-field="enabled" <?= $row['enabled'] ? 'checked' : '' ?>/> <?= $escaper->escapeHtml(__('Enabled')) ?></label></span>
-                            <span class="smaily-engine-trigger__ctrl smaily-trigger-settings"><label><input type="checkbox" data-field="test_mode" <?= $row['test_mode'] ? 'checked' : '' ?>/> <?= $escaper->escapeHtml(__('Test mode')) ?></label></span>
                         </div>
-                        <?php // The go-live step (PRO-3734): the engine keeps a trigger in test
-                            // mode until a Smaily operator switches real sends on. ?>
-                        <div class="smaily-engine-trigger__hint smaily-trigger-settings"<?= $modeClass === 'is-active' ? ' hidden' : '' ?>><?= $escaper->escapeHtml(__('Smaily switches real sends on after you confirm. Until then the trigger runs in test mode.')) ?></div>
+                        <?php $setup = $row['setup'] ?? null; ?>
+                        <?php if ($setup !== null): ?>
+                        <div class="smaily-test-mode smaily-trigger-settings" data-email-name="<?= $escaper->escapeHtmlAttr($row['name']) ?>">
+                            <label class="smaily-test-mode__switch"><input type="checkbox" class="smaily-test-mode__toggle" <?= $setup['test_mode'] ? 'checked' : '' ?>/> <?= $escaper->escapeHtml(__('Test mode')) ?></label>
+                            <div class="smaily-test-mode__status"<?= $setup['status'] === '' ? ' hidden' : '' ?>><?= $escaper->escapeHtml($setup['status']) ?></div>
+                            <div class="smaily-test-mode__notice"<?= $setup['notice'] === '' ? ' hidden' : '' ?>><?= $escaper->escapeHtml($setup['notice']) ?></div>
+                            <div class="smaily-test-mode__test"<?= $setup['test_mode'] ? '' : ' hidden' ?>>
+                                <p class="smaily-test-mode__text"><?= $escaper->escapeHtml(__('The email goes to test addresses only.')) ?></p>
+                                <div class="smaily-test-mode__send">
+                                    <input type="text" inputmode="email" autocomplete="email" class="smaily-test-mode__address" value="<?= $escaper->escapeHtmlAttr($viewModel->getAdminEmail()) ?>" aria-label="<?= $escaper->escapeHtmlAttr(__('Test email address')) ?>"/>
+                                    <button type="button" class="action-secondary smaily-test-mode__button"><span><?= $escaper->escapeHtml(__('Send test email')) ?></span></button>
+                                </div>
+                                <p class="note"><?= $escaper->escapeHtml(__('This address is added to the Smaily list as a test contact.')) ?> <?= $escaper->escapeHtml(__('The test shows the design your Smaily workflow holds.')) ?></p>
+                            </div>
+                            <div class="smaily-test-mode__result" role="status" hidden></div>
+                        </div>
+                        <?php endif; ?>
                     </div>
                     <div class="smaily-engine-trigger__controls smaily-trigger-settings">
                         <label class="smaily-engine-trigger__ctrl">
@@ -149,6 +174,25 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
         </button>
         <span id="smaily-engine-automations-result" class="smaily-inline-status"></span>
     </div>
+    <div class="smaily-design-modal smaily-confirm-modal" id="smaily-test-mode-modal" hidden>
+        <div class="smaily-design-modal__backdrop"></div>
+        <div class="smaily-design-modal__dialog" role="alertdialog" aria-modal="true" aria-labelledby="smaily-test-mode-modal-title" aria-describedby="smaily-test-mode-modal-text" tabindex="-1">
+            <div class="smaily-design-modal__header">
+                <h2 class="smaily-design-modal__title" id="smaily-test-mode-modal-title"><?= $escaper->escapeHtml(__('Turn off test mode?')) ?></h2>
+                <div class="smaily-design-modal__actions">
+                    <button type="button" class="smaily-design-modal__close" aria-label="<?= $escaper->escapeHtmlAttr(__('Close')) ?>" title="<?= $escaper->escapeHtmlAttr(__('Close')) ?>">&times;</button>
+                </div>
+            </div>
+            <div class="smaily-design-modal__body">
+                <p id="smaily-test-mode-modal-text"></p>
+                <div class="smaily-confirm-modal__buttons">
+                    <button type="button" class="action-primary smaily-confirm-modal__confirm"><span><?= $escaper->escapeHtml(__('Turn off')) ?></span></button>
+                    <button type="button" class="action-secondary smaily-confirm-modal__cancel"><span><?= $escaper->escapeHtml(__('Cancel')) ?></span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?= /* @noEscape */ $block->fetchView($block->getTemplateFile('Smaily_Connect::panel/modal-js.phtml')) ?>
     <script>
     require(['jquery'], function ($) {
         'use strict';
@@ -237,42 +281,128 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
         }
 
         // After a save, every card shows the state the engine stored (§12),
-        // not the one requested: a trigger asking for real sends stays in
-        // test mode until Smaily switches them on (PRO-3734). Returns true
-        // when a trigger asked for real sends and the engine kept test mode.
-        var goLiveNote = '<?= $escaper->escapeJs(__('Smaily switches real sends on after you confirm. Until then the trigger runs in test mode.')) ?>',
-            pills = {
-                'off': '<?= $escaper->escapeJs(__('Off')) ?>',
-                'test': '<?= $escaper->escapeJs(__('Test mode')) ?>',
-                'active': '<?= $escaper->escapeJs(__('Active')) ?>'
-            };
+        // not the one requested (PRO-3734).
+        var pills = {
+            'off': '<?= $escaper->escapeJs(__('Off')) ?>',
+            'test': '<?= $escaper->escapeJs(__('Test mode')) ?>',
+            'active': '<?= $escaper->escapeJs(__('Active')) ?>'
+        };
+
+        function showMode($card, mode) {
+            $card.removeClass('is-off is-test is-active').addClass('is-' + mode);
+            $card.find('.smaily-pill')
+                .removeClass('smaily-pill--off smaily-pill--test smaily-pill--active')
+                .addClass('smaily-pill--' + mode)
+                .contents().last().replaceWith(document.createTextNode(pills[mode]));
+        }
 
         function showStoredStates(states) {
-            var keptInTest = false;
             $('#smaily-engine-automations-table .smaily-engine-trigger').each(function () {
                 var $card = $(this),
                     state = states[$card.data('trigger')];
                 if (!state) {
                     return;
                 }
-                var $enabled = $card.find('[data-field="enabled"]'),
-                    $testMode = $card.find('[data-field="test_mode"]'),
-                    mode = !state.enabled ? 'off' : (state.test_mode ? 'test' : 'active');
-                if ($enabled.is(':checked') && !$testMode.is(':checked') && mode === 'test') {
-                    keptInTest = true;
-                }
-                $enabled.prop('checked', state.enabled);
-                $testMode.prop('checked', state.test_mode);
-                $card.removeClass('is-off is-test is-active').addClass('is-' + mode);
+                $card.find('[data-field="enabled"]').prop('checked', state.enabled);
+                showMode($card, !state.enabled ? 'off' : (state.test_mode ? 'test' : 'active'));
                 applyOpen($card);
-                $card.find('.smaily-pill')
-                    .removeClass('smaily-pill--off smaily-pill--test smaily-pill--active')
-                    .addClass('smaily-pill--' + mode)
-                    .contents().last().replaceWith(document.createTextNode(pills[mode]));
-                $card.find('.smaily-engine-trigger__hint').prop('hidden', mode === 'active');
             });
-            return keptInTest;
         }
+
+        // Test mode and the test send of a Campaign Intelligence email
+        // (CON-458; contract §19, §20). The server answers {ok, message,
+        // reasons, state}; `state` is the card's state as Campaign
+        // Intelligence reads it after the call (§12), null when unknown.
+        var testMode = {
+                sendUrl: '<?= $escaper->escapeJs($block->getUrl('smaily_connect/automations/testsend')) ?>',
+                switchUrl: '<?= $escaper->escapeJs($block->getUrl('smaily_connect/automations/testmode')) ?>',
+                confirm: '<?= $escaper->escapeJs(__('“%1” will start going to your store\'s real customers, at first up to 10 emails a day, then 25 and 50.')) ?>',
+                failed: '<?= $escaper->escapeJs(__('Campaign Intelligence did not answer. Try again in a minute.')) ?>',
+                sending: '<?= $escaper->escapeJs(__('Sending…')) ?>'
+            },
+            $modal = $('#smaily-test-mode-modal').appendTo(document.body),
+            $pending = null,
+            modal = window.smailyModal($, $modal, function () {
+                closeConfirm();
+            });
+
+        function showState($block, state) {
+            if (!state) {
+                return;
+            }
+            $block.find('.smaily-test-mode__toggle').prop('checked', state.test_mode);
+            $block.find('.smaily-test-mode__status').text(state.status).prop('hidden', state.status === '');
+            $block.find('.smaily-test-mode__notice').text(state.notice).prop('hidden', state.notice === '');
+            $block.find('.smaily-test-mode__test').prop('hidden', !state.test_mode);
+            showMode($block.closest('.smaily-engine-trigger'), state.mode);
+        }
+
+        function showAnswer($block, answer) {
+            var body = answer.body || {},
+                $result = $block.find('.smaily-test-mode__result').empty(),
+                $list;
+            showState($block, body.state);
+            if (body.message || body.ok !== true) {
+                $result.append($('<span></span>').text(body.message || testMode.failed));
+            }
+            if ((body.reasons || []).length) {
+                $list = $('<ul></ul>').appendTo($result);
+                body.reasons.forEach(function (reason) {
+                    $list.append($('<li></li>').text(reason));
+                });
+            }
+            $result.toggleClass('is-error', body.ok !== true).prop('hidden', $result.is(':empty'));
+        }
+
+        function switchTestMode($block, on) {
+            var $toggle = $block.find('.smaily-test-mode__toggle').prop('disabled', true);
+            return window.smailyPost(testMode.switchUrl, {
+                email_key: String($block.closest('.smaily-engine-trigger').data('trigger')),
+                test_mode: on
+            }).then(function (answer) {
+                $toggle.prop('disabled', false);
+                showAnswer($block, answer);
+            });
+        }
+
+        function closeConfirm() {
+            var $block = $pending;
+            $pending = null;
+            modal.hide();
+            return $block;
+        }
+
+        // Turning test mode off asks first; the switch shows the change only
+        // once Campaign Intelligence made it.
+        $('#smaily-engine-automations-table').on('change', '.smaily-test-mode__toggle', function () {
+            var $block = $(this).closest('.smaily-test-mode');
+            if ($(this).is(':checked')) {
+                switchTestMode($block, true);
+                return;
+            }
+            $(this).prop('checked', true);
+            $pending = $block;
+            $('#smaily-test-mode-modal-text').text(testMode.confirm.replace('%1', $block.data('email-name')));
+            modal.show($(this));
+        });
+        $modal.find('.smaily-confirm-modal__cancel').on('click', closeConfirm);
+        $modal.find('.smaily-confirm-modal__confirm').on('click', function () {
+            switchTestMode(closeConfirm(), false);
+        });
+
+        // One press, one test email: a refusal is shown, never retried.
+        $('#smaily-engine-automations-table').on('click', '.smaily-test-mode__button', function () {
+            var $button = $(this).prop('disabled', true),
+                $block = $button.closest('.smaily-test-mode');
+            $block.find('.smaily-test-mode__result').removeClass('is-error').text(testMode.sending).prop('hidden', false);
+            window.smailyPost(testMode.sendUrl, {
+                email_key: String($block.closest('.smaily-engine-trigger').data('trigger')),
+                email: $block.find('.smaily-test-mode__address').val()
+            }).then(function (answer) {
+                $button.prop('disabled', false);
+                showAnswer($block, answer);
+            });
+        });
 
         $('#smaily-engine-automations-save').on('click', function () {
             if (!validate()) {
@@ -315,8 +445,8 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
                     var message = '<?= $escaper->escapeJs(__('Saved.')) ?>';
                     if (!data.states) {
                         message = '<?= $escaper->escapeJs(__('Saved. Reload the page to see the state of each trigger.')) ?>';
-                    } else if (showStoredStates(data.states)) {
-                        message += ' ' + goLiveNote;
+                    } else {
+                        showStoredStates(data.states);
                     }
                     $result.text(message).css('color', '#006400');
                 } else {

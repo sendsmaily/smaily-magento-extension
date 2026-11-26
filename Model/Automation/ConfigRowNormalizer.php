@@ -81,7 +81,9 @@ class ConfigRowNormalizer
             'automation_map' => $map === [] ? new \stdClass() : $map,
             'cooldown_days' => max(1, min(365, (int)($data['cooldown_days'] ?? 7))),
             'daily_cap' => $dailyCap === '' ? null : max(1, min(100000, (int)$dailyCap)),
-            'test_mode' => !empty($data['test_mode']),
+            // No `test_mode`: the card's Test mode switch is §20, and an
+            // omitted key keeps the stored value (§13 v1.15.0), so a save
+            // never switches real sends off (CON-458).
             'test_emails' => array_slice($testEmails, 0, 50),
         ];
     }

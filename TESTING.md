@@ -110,10 +110,9 @@ loads the result with jQuery from `vendor/` (the copy PHPUnit's coverage
 report ships; the module's dev install has no Magento `lib/web`).
 `Test/Js/automations-save.html` saves the Automations tab with the save
 request answered by a recorded answer of the save endpoint and checks each Campaign Intelligence trigger's
-card in both languages: a trigger that asked for real sends and was kept in
-test mode shows Test mode with the box ticked again and the go-live note,
-and the result adds the note; a trigger the engine stored active shows
-Active without the note; a trigger left off stays Off; when the stored
+card in both languages: the save posts no test mode; a trigger stored in
+test mode shows Test mode, a trigger the engine stored active shows
+Active, and a trigger left off stays Off; when the stored
 state could not be read, the result asks for a reload and the cards keep
 the page's state; while Campaign Intelligence refuses the account, the tab
 says so and shows no triggers and no save button.
@@ -126,6 +125,13 @@ card off and on again keeps its values and the save posts them; that the
 per-language tables follow their card in mode A, which still hides the
 card's own workflow; and that a Campaign Intelligence trigger the engine
 refused over a field stays open while it is off (CON-256).
+`Test/Js/automation-test-mode.html` renders the Campaign Intelligence cards
+with their states (test, live at 25 a day, stopped, and one without a
+state) and checks in both languages that Test mode is on by default with
+the test send and its note, the live and stopped state lines, the test
+send's request and each refusal shown as answered and sent once, the
+"Turn off test mode?" dialog and its Cancel, the switch's requests, and
+the state the card shows after each answer (CON-458).
 `Test/Js/email-designs.html` renders the store-run, transactional and
 Campaign Intelligence cards with `panel/email-designs.phtml`, the design
 list (contract §23) and the design links answered by stubs, and checks in

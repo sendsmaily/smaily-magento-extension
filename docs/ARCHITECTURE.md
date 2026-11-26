@@ -3149,13 +3149,27 @@ implemented here:
   logged.
 - Smaily marketing API: HTTP Basic; success envelope `{code:101}`, 203 =
   invalid data, 206 = email not found (`Model\Client\SmailyClient`).
-- Engine automations config (§13): every row carries all eight keys;
-  validation is all-or-nothing; `per_language` rows saved by other
-  platforms survive a Magento save. The engine stores a row asking for
-  real sends in test mode until a Smaily operator switches them on, so
+- Engine automations config (§13): every row carries every required key
+  and never `test_mode` (an omitted key keeps the stored value, so a save
+  never switches real sends off); validation is all-or-nothing;
+  `per_language` rows saved by other platforms survive a Magento save.
   `Automations\Save` reads §12 after a successful PUT and answers each
   trigger's stored `enabled` / `test_mode`; the Automations tab redraws
   its cards from that, never from the request.
+- A Campaign Intelligence email's test mode and test send (CON-458, as
+  the WooCommerce plugin's CON-455): a card whose email has a §12
+  `setup[]` item shows a Test mode switch, on in every state but `live`
+  (`Engine\EmailTestMode::describe()`). While it is on, "Send test email"
+  calls §19 (`Automations\TestSend`) for one typed address — the admin's
+  own by default; the extension keeps no copy. Turning it off asks "Turn
+  off test mode?" first, then calls §20 `live: true, confirmed: true`
+  with the admin's user id as `switched_by` (`Automations\TestMode`);
+  turning it on again calls `live: false` without a question. Both are
+  one attempt with no retry (a retried test send can send a second
+  email), go to the map key or its fallback path (§1), and answer the
+  card's state read again from §12 with any refusal in the admin's
+  words. A card without a `setup[]` item (an engine before contract
+  v1.15.0) has no switch; a Smaily operator switches its real sends.
 
 ### Installation report (CON-234)
 

@@ -281,9 +281,9 @@
             doc = frame.contentDocument,
             win = frame.contentWindow,
             strings = window.smailyAdminPages['email-designs.' + locale].strings,
-            dialog = doc.querySelector('.smaily-design-modal__dialog'),
+            dialog = doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__dialog'),
             designFrame = function () {
-                return doc.querySelector('.smaily-design-modal__frame');
+                return doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__frame');
             },
             reads,
             press = async function (emailKey) {
@@ -301,9 +301,9 @@
                 message(frame, ENGINE, Object.assign({type: 'smaily_intelligence_design', email_key: 'plugin.welcome'}, data));
             },
             loading = function () {
-                return shown(doc.querySelector('.smaily-design-modal__loading'));
+                return shown(doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__loading'));
             },
-            hint = doc.querySelector('.smaily-design-modal__hint'),
+            hint = doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__hint'),
             name;
 
         tick(frame, doc.getElementById('smaily-w-welcome-enabled'), true);
@@ -315,12 +315,12 @@
         button(doc, 'plugin.welcome').click();
         check(locale + ', a press shows the modal with its loading state before the link is asked for',
             modalOpen(doc) && win.modalAtRequest === true
-            && shown(doc.querySelector('.smaily-design-modal__loading'))
-            && doc.querySelector('.smaily-design-modal__loading').textContent.trim() === strings['Opening the design page…']
+            && shown(doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__loading'))
+            && doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__loading').textContent.trim() === strings['Opening the design page…']
             && win.events.indexOf('open') === -1);
         check(locale + ', the modal is titled with the email and offers "Open in a new tab"',
-            doc.querySelector('.smaily-design-modal__title').textContent === strings['Edit design: %1'].replace('%1', name)
-            && doc.querySelector('.smaily-design-modal__newtab').textContent.trim() === strings['Open in a new tab']);
+            doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__title').textContent === strings['Edit design: %1'].replace('%1', name)
+            && doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__newtab').textContent.trim() === strings['Open in a new tab']);
         check(locale + ', focus moves into the modal', dialog.contains(doc.activeElement));
         await wait(100);
         check(locale + ', the frame gets a frame link (§22 display "frame") for the email',
@@ -340,7 +340,7 @@
         designFrame().focus();
         key(doc, 'Tab');
         check(locale + ', Tab from the frame wraps to "Open in a new tab"',
-            doc.activeElement === doc.querySelector('.smaily-design-modal__newtab'));
+            doc.activeElement === doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__newtab'));
         key(doc, 'Tab', true);
         check(locale + ', Shift+Tab from the first control wraps to the frame', doc.activeElement === designFrame());
 
@@ -352,11 +352,11 @@
         check(locale + ', closing reads the design list again', count(frame, 'designs') === reads + 1);
 
         await press('plugin.welcome');
-        doc.querySelector('.smaily-design-modal__close').click();
+        doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__close').click();
         check(locale + ', the close button closes the modal', !modalOpen(doc) && !designFrame());
 
         await press('plugin.welcome');
-        doc.querySelector('.smaily-design-modal__backdrop').click();
+        doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__backdrop').click();
         check(locale + ', a backdrop click closes the modal', !modalOpen(doc));
 
         await press('plugin.welcome');
@@ -384,15 +384,15 @@
         design({event: 'changes', unsaved: true});
         win.confirmAnswer = false;
         key(doc, 'Escape');
-        doc.querySelector('.smaily-design-modal__close').click();
-        doc.querySelector('.smaily-design-modal__backdrop').click();
+        doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__close').click();
+        doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__backdrop').click();
         check(locale + ', over unsaved changes Esc, the close button and the backdrop ask "Close without saving?"; No keeps the modal',
             modalOpen(doc) && !!designFrame() && win.confirms.length === 3
             && win.confirms.every(function (text) {
                 return text === strings['Close without saving?'];
             }));
         win.confirmAnswer = true;
-        doc.querySelector('.smaily-design-modal__close').click();
+        doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__close').click();
         check(locale + ', Yes closes the modal', !modalOpen(doc) && !designFrame() && win.confirms.length === 4);
 
         await press('plugin.welcome');
@@ -435,7 +435,7 @@
         // "Open in a new tab": the tab first, then a fresh link.
         await press('plugin.welcome');
         win.events.length = 0;
-        doc.querySelector('.smaily-design-modal__newtab').click();
+        doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__newtab').click();
         check(locale + ', "Open in a new tab" opens the tab before it asks for a fresh tab link and closes the modal',
             win.events[0] === 'open' && win.events[1] === 'link plugin.welcome' && !modalOpen(doc)
             && win.tabs[0].opener === null && lastLink().display === 'tab');
@@ -446,9 +446,9 @@
         await press('transactional.order_confirmation');
         check(locale + ', a refused link shows the reason in the modal, and no frame',
             modalOpen(doc) && !designFrame()
-            && shown(doc.querySelector('.smaily-design-modal__error'))
-            && doc.querySelector('.smaily-design-modal__error .smaily-banner__message').textContent === 'No design here'
-            && !shown(doc.querySelector('.smaily-design-modal__loading')));
+            && shown(doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__error'))
+            && doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__error .smaily-banner__message').textContent === 'No design here'
+            && !shown(doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__loading')));
         key(doc, 'Escape');
 
         // The engine refuses the admin's origin (§22 frame_origin): the
@@ -456,7 +456,7 @@
         await press('plugin.abandoned_cart');
         check(locale + ', a refused frame origin offers "Open in a new tab", no frame and no error',
             modalOpen(doc) && !designFrame() && shown(hint) && !loading()
-            && !shown(doc.querySelector('.smaily-design-modal__error')));
+            && !shown(doc.getElementById('smaily-design-modal').querySelector('.smaily-design-modal__error')));
         key(doc, 'Escape');
         win.events.length = 0;
         win.tabs.length = 0;

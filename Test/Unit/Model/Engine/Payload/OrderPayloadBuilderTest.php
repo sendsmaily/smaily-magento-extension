@@ -110,6 +110,50 @@ class OrderPayloadBuilderTest extends TestCase
     }
 
     /**
+     * CON-421 (contract v1.36.1 §5, one currency per store): an order the
+     * shopper paid in another currency goes in the store's default
+     * currency, Magento's base currency, at that order's own rate — the
+     * base amounts Magento stored with it. The amounts the shopper paid in
+     * are never read.
+     */
+    public function testAnOrderInAnotherCurrencyGoesInTheBaseCurrencyAtItsOwnRate(): void
+    {
+        $item = $this->createMock(OrderItemInterface::class);
+        $item->method('getSku')->willReturn('POC-DENT');
+        $item->method('getQtyOrdered')->willReturn(2.0);
+        $item->method('getBaseRowTotalInclTax')->willReturn(40.00);
+        $item->method('getBaseDiscountAmount')->willReturn(4.00);
+        $item->expects(self::never())->method('getRowTotalInclTax');
+        $item->expects(self::never())->method('getDiscountAmount');
+
+        $order = $this->createMock(OrderInterface::class);
+        $order->method('getStoreId')->willReturn(1);
+        $order->method('getState')->willReturn(Order::STATE_COMPLETE);
+        $order->method('getCustomerEmail')->willReturn('mari@example.com');
+        $order->method('getCreatedAt')->willReturn('2026-07-01 10:00:00');
+        $order->method('getIncrementId')->willReturn('100000042');
+        // Paid in USD at 1.25 USD per EUR; the base currency is EUR.
+        $order->method('getOrderCurrencyCode')->willReturn('USD');
+        $order->method('getGrandTotal')->willReturn(52.50);
+        $order->method('getDiscountAmount')->willReturn(-5.00);
+        $order->method('getBaseCurrencyCode')->willReturn('EUR');
+        $order->method('getBaseGrandTotal')->willReturn(42.00);
+        $order->method('getBaseDiscountAmount')->willReturn(-4.00);
+        $order->method('getItems')->willReturn([$item]);
+
+        $payload = $this->builder->build($order);
+
+        self::assertNotNull($payload);
+        self::assertSame('EUR', $payload['currency']);
+        self::assertSame(42.0, $payload['total_amount']);
+        self::assertSame(4.0, $payload['discount_amount']);
+        self::assertSame(
+            [['sku' => 'POC-DENT', 'qty' => 2, 'unit_price' => 20.0, 'line_total' => 36.0, 'discount_amount' => 4.0]],
+            $payload['items']
+        );
+    }
+
+    /**
      * Contract v1.4.0 amount semantics: every money field is GROSS
      * (tax-inclusive) — line basis row_total_incl_tax, total_amount is the
      * grand total charged — and the sender invariant
@@ -583,9 +627,11 @@ class OrderPayloadBuilderTest extends TestCase
         $order->method('getCustomerEmail')->willReturn('Mari@Example.com ');
         $order->method('getCreatedAt')->willReturn('2026-07-01 10:00:00');
         $order->method('getIncrementId')->willReturn('100000042');
-        $order->method('getGrandTotal')->willReturn($grandTotal);
-        $order->method('getOrderCurrencyCode')->willReturn('EUR');
-        $order->method('getDiscountAmount')->willReturn(
+        // An order in the default currency: its base amounts are its
+        // amounts, at rate 1.
+        $order->method('getBaseGrandTotal')->willReturn($grandTotal);
+        $order->method('getBaseCurrencyCode')->willReturn('EUR');
+        $order->method('getBaseDiscountAmount')->willReturn(
             -array_sum(array_column($items, 3))
         );
         // entity_id 0 short-circuits the attribution lookup; a NULL
@@ -611,8 +657,8 @@ class OrderPayloadBuilderTest extends TestCase
         $item = $this->createMock(OrderItemInterface::class);
         $item->method('getSku')->willReturn($sku);
         $item->method('getQtyOrdered')->willReturn((float)$qty);
-        $item->method('getRowTotalInclTax')->willReturn($rowTotalInclTax);
-        $item->method('getDiscountAmount')->willReturn($discount);
+        $item->method('getBaseRowTotalInclTax')->willReturn($rowTotalInclTax);
+        $item->method('getBaseDiscountAmount')->willReturn($discount);
 
         return $item;
     }

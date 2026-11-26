@@ -1134,6 +1134,107 @@ class ClientTest extends TestCase
     }
 
     /**
+     * CON-458: a test send (§19) is one attempt to the fallback path of a
+     * connection exchanged before the engine returned the key, with the
+     * one typed address: a 502 is never retried, as a retry can send a
+     * second email.
+     */
+    public function testATestSendIsOneAttemptAndA502IsNotRetried(): void
+    {
+        $this->settings->method('getEndpoint')->with('automations_test_send')->willReturn(null);
+        $this->settings->method('getEngineBaseUrl')->willReturn('https://engine.example');
+        $client = $this->createClient([new Response(502, [], '{"error":"smaily_unavailable"}')]);
+
+        try {
+            $client->automationTestSend('replenish_due', 'owner@shop.example');
+            self::fail('A 502 must fail at once');
+        } catch (EngineTransportException $exception) {
+            self::assertSame(502, $exception->getCode());
+        }
+
+        self::assertCount(1, $this->history);
+        self::assertSame([], $this->sleeps);
+        $request = $this->history[0]['request'];
+        self::assertSame('POST', $request->getMethod());
+        self::assertSame(
+            'https://engine.example/api/v1/automations/replenish_due/test-send',
+            (string)$request->getUri()
+        );
+        self::assertSame('{"email":"owner@shop.example"}', (string)$request->getBody());
+        self::assertSame('Bearer sk_test_key', $request->getHeaderLine('Authorization'));
+    }
+
+    /**
+     * CON-458: a refused test send keeps the engine's error body for the
+     * admin's words, and is not asked again.
+     */
+    public function testARefusedTestSendCarriesItsReasons(): void
+    {
+        $this->settings->method('getEndpoint')
+            ->willReturn('https://engine.example/api/v1/automations/{key}/test-send');
+        $client = $this->createClient([new Response(
+            409,
+            [],
+            '{"error":"not_ready","details":{"reasons":["no_workflow"]}}'
+        )]);
+
+        try {
+            $client->automationTestSend('win back', 'owner@shop.example');
+            self::fail('A 409 must fail');
+        } catch (EngineRequestException $exception) {
+            self::assertSame(409, $exception->getHttpStatus());
+            self::assertSame(['reasons' => ['no_workflow']], $exception->getErrorBody()['details']);
+        }
+
+        self::assertCount(1, $this->history);
+        self::assertSame(
+            'https://engine.example/api/v1/automations/win%20back/test-send',
+            (string)$this->history[0]['request']->getUri()
+        );
+    }
+
+    /**
+     * CON-458: turning test mode off switches real sends on (§20) with the
+     * admin's confirmation and user id; turning it on again sends `live`
+     * only. Each is one attempt.
+     *
+     * @dataProvider realSendsBodies
+     */
+    public function testTheRealSendsSwitchSendsWhatTheContractAsks(bool $live, string $switchedBy, string $body): void
+    {
+        $this->settings->method('getEndpoint')->with('automations_go_live')
+            ->willReturn('https://engine.example/api/v1/automations/{key}/go-live');
+        $client = $this->createClient([new Response(429, [], '{"error":"rate_limit_exceeded"}')]);
+
+        try {
+            $client->automationRealSends('replenish_due', $live, $switchedBy);
+            self::fail('A 429 must fail at once');
+        } catch (EngineTransportException $exception) {
+            self::assertSame(429, $exception->getCode());
+        }
+
+        self::assertCount(1, $this->history);
+        self::assertSame([], $this->sleeps);
+        self::assertSame(
+            'https://engine.example/api/v1/automations/replenish_due/go-live',
+            (string)$this->history[0]['request']->getUri()
+        );
+        self::assertSame($body, (string)$this->history[0]['request']->getBody());
+    }
+
+    /**
+     * @return array<string, array{bool, string, string}>
+     */
+    public static function realSendsBodies(): array
+    {
+        return [
+            'test mode off' => [true, '17', '{"live":true,"confirmed":true,"switched_by":"17"}'],
+            'test mode off, no admin user' => [true, '', '{"live":true,"confirmed":true}'],
+            'test mode on again' => [false, '17', '{"live":false}'],
+        ];
+    }
+
+    /**
      * @param array<int, Response|callable> $responses
      */
     private function createClient(

@@ -60,8 +60,9 @@ class FailureMessage
         'Smaily API returned code %1',
         'Smaily API credentials are not configured (store scope: %1)',
         'The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.',
-        // Not errors: the reasons a row was closed without sending (PRO-3619, PRO-3634, PRO-3693, CON-195).
+        // Not errors: the reasons a row was closed without sending (PRO-3619, PRO-3634, PRO-3693, CON-195, CON-394).
         ContactSyncHandler::SKIPPED_NOT_A_CONTACT,
+        ContactSyncHandler::SKIPPED_STALE_SUBSCRIPTION,
         AutomationHandler::SKIPPED_NO_WORKFLOW,
         AutomationHandler::SKIPPED_NO_LANGUAGE_WORKFLOW,
         AutomationHandler::SKIPPED_NO_OWN_ACCOUNT_WORKFLOW,

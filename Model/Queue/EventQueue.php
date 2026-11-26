@@ -605,6 +605,49 @@ class EventQueue
     }
 
     /**
+     * The contact syncs of these contacts that a stale subscription is read
+     * against (CON-394, ContactSync\StaleSubscription): the rows $ids and
+     * every delivered one, by deliveredCondition(), each with its payload as
+     * stored, a "Send again" record included. One read through the queue's
+     * (entity_id, event_type, status) index, without a lock.
+     *
+     * @param string[] $entityIds
+     * @param int[] $ids
+     * @return list<array{id: int, entity_id: string, payload: array<int|string, mixed>, delivered: bool}>
+     */
+    public function contactSyncsOf(array $entityIds, array $ids): array
+    {
+        if (!$entityIds || !$ids) {
+            return [];
+        }
+
+        $connection = $this->resourceConnection->getConnection();
+        $delivered = $this->deliveredCondition();
+        $rows = $connection->fetchAll(
+            $connection->select()
+                ->from(
+                    $this->resourceConnection->getTableName(EventResource::TABLE_NAME),
+                    [
+                        'id',
+                        'entity_id',
+                        'payload',
+                        'delivered' => new \Zend_Db_Expr('CASE WHEN ' . $delivered . ' THEN 1 ELSE 0 END'),
+                    ]
+                )
+                ->where('entity_id IN (?)', array_values(array_unique($entityIds)))
+                ->where('event_type = ?', EventType::CONTACT_SYNC)
+                ->where('(' . $delivered . ' OR id IN (?))', array_map('intval', $ids))
+        );
+
+        return array_map(fn (array $row): array => [
+            'id' => (int)$row['id'],
+            'entity_id' => (string)$row['entity_id'],
+            'payload' => $this->payloadDecoder->decode((string)$row['payload']),
+            'delivered' => (int)$row['delivered'] === 1,
+        ], $rows);
+    }
+
+    /**
      * Which of these consent-row entities already have a profiling opt-out
      * waiting for the engine (PRO-3760): a consent row carrying an opt-out,
      * pending — a retry in its backoff too — or being sent. One query. The

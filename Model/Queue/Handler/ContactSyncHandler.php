@@ -14,6 +14,7 @@ use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
+use Smaily\Connect\Model\ContactSync\StaleSubscription;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
@@ -26,7 +27,10 @@ use Smaily\Connect\Model\Queue\Skipped;
  * (multilingual mode A) hit the right account; a group Smaily refuses as
  * invalid data goes again one contact per request (PRO-3753). An
  * abandoned-cart purchase marker is posted only after a read finds the
- * contact in Smaily (PRO-3619).
+ * contact in Smaily (PRO-3619). A row that would put a stale subscription
+ * into Smaily is closed as skipped, at every attempt and before anything is
+ * sent, so a retry never undoes a newer choice of the contact's that was
+ * already delivered (ContactSync\StaleSubscription, CON-394).
  *
  * Event payload shape: {store_id: int, contact: {email, ...}}.
  */
@@ -35,10 +39,14 @@ class ContactSyncHandler implements EventHandlerInterface
     public const SKIPPED_NOT_A_CONTACT = 'Skipped: Smaily does not have this contact, and the purchase marker'
         . ' would create it as a subscriber. Nothing was sent.';
 
+    public const SKIPPED_STALE_SUBSCRIPTION = 'Skipped: the shopper has since changed their newsletter subscription,'
+        . ' and the newer choice already reached Smaily. Nothing was sent.';
+
     public function __construct(
         private readonly SmailyClientProvider $clientProvider,
         private readonly EventQueue $eventQueue,
-        private readonly Logger $logger
+        private readonly Logger $logger,
+        private readonly StaleSubscription $staleSubscription
     ) {
     }
 
@@ -49,7 +57,12 @@ class ContactSyncHandler implements EventHandlerInterface
     {
         $results = [];
         $byStore = [];
-        foreach ($events as $event) {
+        $stale = array_flip($this->staleSubscription->among($this->subscribing($events)));
+        foreach ($this->staleSubscription->inChangeOrder($events) as $event) {
+            if (isset($stale[(int)$event->getId()])) {
+                $results[(int)$event->getId()] = new Skipped(self::SKIPPED_STALE_SUBSCRIPTION);
+                continue;
+            }
             $payload = $this->eventQueue->decodePayload($event);
             $contact = $payload['contact'] ?? null;
             if (!is_array($contact) || empty($contact['email'])) {
@@ -73,6 +86,25 @@ class ContactSyncHandler implements EventHandlerInterface
         }
 
         return $results;
+    }
+
+    /**
+     * The rows of the batch that subscribe the contact, the only ones that
+     * can be stale: no read of the queue for a batch without one.
+     *
+     * @param Event[] $events
+     * @return array<int, string> entity id by row id
+     */
+    private function subscribing(array $events): array
+    {
+        $subscribing = [];
+        foreach ($events as $event) {
+            if (StaleSubscription::subscribes($this->eventQueue->decodePayload($event))) {
+                $subscribing[(int)$event->getId()] = (string)$event->getEntityId();
+            }
+        }
+
+        return $subscribing;
     }
 
     /**

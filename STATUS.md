@@ -7,50 +7,45 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-11-26 evening — **3.1.0 is cut** (the
-`release/3.1.0` PR); its tag waits for Erkki's go. The cut collects 10
-changelog fragments into 10 bullets, in landing order, under a lead
-sentence that tells a store selling in more than one currency, or
-showing a display currency other than its base currency, to press
-**Run again** on **Orders** and **Catalog** under **Settings >
+_Last updated: 2026-11-26 session end — **3.1.0 is released** (26 Nov,
+on Erkki's go; tag on the cut commit 49097e1; both ZIPs, the Hyvä
+mirror tag 3.1.0 and Packagist 3.1.0 for both packages). 3.0.3 was
+released earlier the same day. A store that sells in more than one
+currency, or whose display currency differs from its base currency,
+presses **Run again** on **Orders** and **Catalog** under **Settings >
 Intelligence** after upgrading.
 
-**3.0.3 was released on 26 Nov** (hotfix: admin grids CON-434,
-developer mode CON-437, newsletter status CON-440 (was PRO-4322),
-engine newsletter events CON-436, first-order consent CON-387, setup
-connection test CON-417) **and submitted to the Marketplace** as a new
-version (CON-152; submission `xiggy2ui4q`: the technical part in
-automated testing, the marketing part awaiting review with the
-rewritten description and the 3.0.3 user-guide PDF; title "Smaily
-Connect" until Adobe support answers which title it accepts). The 3.0.1
-submission `2q6w4ofnme` is left to finish.
+**Marketplace (CON-152):** 3.0.3 is submitted as a new version
+(`xiggy2ui4q`): the technical part in automated testing, the marketing
+part awaiting review with the rewritten description and the 3.0.3
+user-guide PDF. The title "Smaily Connect" waits for Adobe support's
+answer (Erkki replied to the support request on 26 Nov, asking which
+title it accepts). The 3.0.1 submission `2q6w4ofnme` is left to finish.
+The new draft's title reverted to "Smaily Ecommerce Integration" and
+was reset by hand — check it on every new draft.
 
-**Merged since 3.0.3:**
-- #293: the Marketplace description, rewritten after the third refusal.
-- #294 CON-421: orders go to Campaign Intelligence in the store's base
-  currency.
-- #295 CON-394: a stale contact sync is skipped; a late unsubscribe is
-  always delivered.
-- #296 CON-423: a stale catalog row is skipped — the stock flips came
-  from retried rows sent after newer ones.
-- #297 CON-432: privacy requests paced to 10 a minute per engine store,
-  a 429 delays without using a retry, the contact import counts
-  refusals.
-- #298 CON-396: the workflows of a replaced Smaily account are removed,
-  after a question.
-- #299: the lock moved past the phpseclib and symfony/filesystem
-  advisories.
-- #300 CON-447: catalog prices in the base currency (checked live in
-  the sandbox).
-- #301: engine contract 1.37.2.
-- #302 CON-448: a stale order or customer row is skipped.
-- #303 CON-419: „küpsiste bänner“; CON-414's installation-report
-  sentence completed in the guide.
-- #304 CON-451: a failed contact import's log line carries the error
-  code only.
-- #305 CON-432: the warning for websites sharing one Smaily account
-  with different contact sync modes.
-- #306: the simplification review of the day's changes.
+**Merged since 3.1.0 (on master, not released yet):**
+- #308 CON-281: separate stores — the Dashboard follows the website
+  selector; a layout change carries the transactional-email account.
+- #309 CON-458: the Campaign Intelligence email cards get the **Test
+  mode** switch (§20) and **Send test email** (§19), in the wording
+  agreed for all plugins on 26 Nov; the old "Smaily switches real sends
+  on" note is removed. Not yet tried against the live engine.
+- #310 CON-461 part 1: three language-mode cards, no "Single language"
+  card; the setup ends on an Overview that lists what is active, with a
+  Background tasks (cron) card, and **Finish** opens the Dashboard; the
+  guest switch shows only in legitimate-interest mode, in WooCommerce's
+  wording.
+- #311 CON-461 part 2: the per-language modes show one card per
+  automation, with a workflow per language and a fallback radio. No
+  data is rewritten — the card reads today's routing. One exception
+  after the merchant's next save: in mode B with every language mapped
+  and the "None" fallback, a contact without a store language is sent
+  through the first language's workflow.
+- #312: the Dashboard's Quick links end with "User Guide".
+- #313 CON-461: a multi-language store that never saved a mode shows B
+  picked (detected by the absence of a saved `multilingual_mode` row);
+  WooCommerce's EN/ET card titles.
 
 **Decisions of 26 Nov** (Erkki, recorded on CON-397): a late
 unsubscribe is always delivered; with double opt-in a checkout tick
@@ -61,14 +56,29 @@ every mode (PrestaShop asked to follow in CON-452); `smaily:gdpr erase`
 fails loudly and asks to be run again when the engine delete fails;
 catalog and orders go in the store's base currency. Re-entering
 per-language accounts drops the per-language workflows kept from an
-earlier stay (accepted as built).
+earlier stay (accepted as built). Later the same day: the §19/§20
+wording is shared by all plugins (test mode on or off, never "go
+live"); under separate stores the Dashboard follows the website
+selector; mode B is the default for a new multi-language store; the
+automation cards take WooCommerce's titles; the Dashboard gets a "User
+Guide" quick link; an identity merge for a customer the store never
+sends ends quietly (CON-465, not built yet).
 
-**Human acceptance pending:** the Estonian proofread of today's new
-texts — guide: the first-order section, setup step 1, the shared-account
-warning, the privacy and import texts, the CON-423/CON-448 Log reasons
-and guide rows, the installation-report sentence; admin: the two
-account-change questions and the import card text. CON-153 on the pilot
-store. CON-363, CON-366 and CON-230 as before.
+**Asked elsewhere:** INT-332 (engine: one normal form for an email
+address as an identity — CON-252 waits for it); CON-441 (WooCommerce:
+the per-language mode setup gate); CON-452 (PrestaShop: the guest tick,
+the welcome email, the store-side unsubscribe).
+
+**Human acceptance pending:** the Estonian proofread of all of 26 Nov's
+new texts — guide: the first-order section, setup step 1, the
+shared-account warning, the privacy and import texts, the Log skip
+reasons, the installation-report sentence, the test-mode section, the
+language-mode cards and the per-language card, the Overview, the guest
+switch, the Quick links; admin: the account-change questions, the
+import card, the test-mode strings, the Overview items. CON-458 against
+the live engine (a real test send and a test-mode switch on a connected
+store). CON-153 on the pilot store. CON-363, CON-366 and CON-230 as
+before.
 
 **Gotchas and technical notes:**
 - A PR body can be overwritten by a parallel worker: before a merge,
@@ -86,26 +96,46 @@ store. CON-363, CON-366 and CON-230 as before.
 - `MergeCustomerSender` records its row with the customer's store view
   instead of the connection's canonical store.
 - The nightly manifest checks the queue before it builds its list.
-- The engine's §19 test send, §20 go-live switch and §12 notice are
-  live (contract 1.37.2) and not built in the extension.
+- The engine's §19 test send and §20 test-mode switch are built on the
+  email cards since #309; the §12 notice is live (contract 1.37.2) and
+  not built in the extension.
 - `bin/magento smaily:gdpr` still uses the deprecated §8–§10 endpoints;
   it moves with CON-412.
+- In mode B the card's own config workflow X is still the router's last
+  resort but is no longer shown: it sends only if the merchant empties
+  the fallback row (WooCommerce would send nothing). A candidate issue.
+- Card B shows both the "Most common" badge and WooCommerce's subtitle
+  "Most common setup.".
+- The Stores > Configuration comment on `multilingual_mode` still uses
+  the old shorthand names.
+- The `tracker-consent.html` harness flaked once in CI ("RESULT:
+  RUNNING"); a rerun passes.
+- Under separate stores the Dashboard's Failed count is per website,
+  while the HealthCheck notice counts the whole installation, and the
+  Log has no website filter.
 - Earlier gotchas (engine timeouts, cURL text in a network-error row,
   `form_key` in the query string, worktrees in the sandbox compile, the
   system-messages popup, one push per `release/*` branch) still hold.
 
 **Next session opens with:**
-1. The 3.1.0 tag on Erkki's go; then the upgrade note to merchants
-   about **Run again**.
-2. The Marketplace 3.0.3 review results and Adobe support's answer on
-   the title.
-3. CON-281 (separate stores: the Dashboard shows only the default
-   website) and CON-252 (an accented capital in an email address makes
-   two shoppers).
-4. A design for the engine's §19 test send and §20 go-live switch in
-   the extension.
-5. Designs CON-369 (payment reminder) and CON-361 (stock alerts) wait
+1. The Marketplace 3.0.3 review results and Adobe support's answer on
+   the title; then decide whether 3.1.x goes to the Marketplace.
+2. The Estonian proofread list (Erkki).
+3. CON-465 (an identity merge for a never-sent customer ends quietly).
+4. Cut the next release (3.2.0: #308–#313) on Erkki's go.
+5. CON-252 after INT-332's answer.
+6. Designs CON-369 (payment reminder) and CON-361 (stock alerts) wait
    for Erkki._
+
+_Earlier (2026-11-26 evening, the 3.1.0 cut): **3.1.0 was cut (#307)**;
+10 fragments into 10 bullets under a lead sentence on **Run again** for
+multi-currency stores. Merged between 3.0.3 and the cut: #293 the
+Marketplace description, #294 CON-421 and #300 CON-447 (orders and
+catalog prices in the base currency), #295 CON-394, #296 CON-423 and
+#302 CON-448 (stale contact, catalog, order and customer rows skipped),
+#297 CON-432 (privacy requests paced), #298 CON-396, #299 lock, #301
+contract 1.37.2, #303 CON-419, #304 CON-451, #305 CON-432
+(shared-account warning), #306 simplification review._
 
 _Earlier (2026-11-26 morning, the 3.0.3 cut): **3.0.3 was cut (#292)**,
 a hotfix for two merchant reports against 3.0.2 on Magento 2.4.9; 6

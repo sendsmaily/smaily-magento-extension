@@ -28,6 +28,7 @@ use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
 use Smaily\Connect\Model\Automation\MappingSaver;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Client\CredentialCheck;
+use Smaily\Connect\Model\Client\Exception\AuthenticationException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientFactory;
@@ -79,11 +80,13 @@ class WizardStepSaverTest extends IntegrationTestCase
      *
      * @param int[] $websiteIds the store's websites
      * @param SmailyClientProvider|null $smailyClientProvider null: no Smaily account can be reached
+     * @param SmailyClientFactory|null $clientFactory null: Smaily accepts every account it is asked about
      */
     private function saver(
         ?string $websiteParam,
         array $websiteIds = [self::MAIN, self::SECOND],
-        ?SmailyClientProvider $smailyClientProvider = null
+        ?SmailyClientProvider $smailyClientProvider = null,
+        ?SmailyClientFactory $clientFactory = null
     ): WizardStepSaver {
         $storeManager = $this->storeManager($websiteIds);
         if ($smailyClientProvider === null) {
@@ -105,7 +108,7 @@ class WizardStepSaverTest extends IntegrationTestCase
             $smailyClientProvider,
             new ConfigRowNormalizer(),
             // Smaily is never asked: the client factory returns a mock.
-            new CredentialCheck($this->createMock(SmailyClientFactory::class), $this->config),
+            new CredentialCheck($clientFactory ?? $this->createMock(SmailyClientFactory::class), $this->config),
             $this->createMock(SetupNotice::class),
             $this->createMock(TransactionalSettingsSaver::class),
             $overrides = new WebsiteOverrides(
@@ -251,6 +254,43 @@ class WizardStepSaverTest extends IntegrationTestCase
             self::assertSame('plain-secret', $this->config->getWebsitePassword($websiteId));
             self::assertSame(45, $this->config->getAbandonedCutoffMinutes($websiteId));
         }
+    }
+
+    /**
+     * CON-417: the initial setup's Connect step saves nothing when Smaily
+     * refuses the account — no Smaily account, no Storefront URL, and a
+     * website picked for the step's values keeps its own — and saves an
+     * account Smaily accepts as before.
+     */
+    public function testTheInitialSetupSavesNothingWhenSmailyRefusesTheAccount(): void
+    {
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_SUBDOMAIN, 'second');
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_USERNAME, 'second-user');
+        $before = $this->allConfigRows();
+        $client = $this->createMock(SmailyClient::class);
+        $client->method('validateCredentials')->willThrowException(new AuthenticationException('refused', 401));
+        $refusing = $this->createMock(SmailyClientFactory::class);
+        $refusing->method('create')->willReturn($client);
+        $post = [
+            'subdomain' => 'shop',
+            'username' => 'api-user',
+            'password' => 'wrong-secret',
+            'multilingual_mode' => 'single',
+            'storefront_url' => 'https://shop.example.com',
+            'use_store_wide' => [self::SECOND],
+            'initial_setup' => true,
+        ];
+
+        $errors = $this->saver('0', [self::MAIN, self::SECOND], null, $refusing)->save('connect', $post);
+
+        self::assertSame([['field' => 'step', 'message' => 'Test your Smaily connection to continue.']], $errors);
+        self::assertSame($before, $this->allConfigRows());
+
+        $post['password'] = 'plain-secret';
+        self::assertSame([], $this->saver('0')->save('connect', $post));
+        self::assertSame([['default', 0]], $this->scopesOf(Config::XML_PATH_SUBDOMAIN));
+        self::assertSame('shop', $this->config->getWebsiteSubdomain(self::SECOND));
+        self::assertSame('plain-secret', $this->config->getWebsitePassword(self::MAIN));
     }
 
     /**

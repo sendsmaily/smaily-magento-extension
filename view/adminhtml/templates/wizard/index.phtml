@@ -47,9 +47,7 @@ $viewModel = $block->getData('view_model');
 // The user guide's address is set in one place, Model/UserGuide.php.
 $userGuideUrl = \Smaily\Connect\Model\UserGuide::URL;
 
-$settingsUrl = $block->getUrl('smaily_connect/settings');
 $dashboardUrl = $block->getUrl('smaily_connect/dashboard');
-$logUrl = $block->getUrl('smaily_connect/log');
 
 // The websites that hold their own values of a step's settings (CON-179),
 // under the step's own panel: each keeps them unless "Use this step's
@@ -107,7 +105,7 @@ $stepTitles = [
     2 => __('Contact synchronization to Smaily'),
     3 => __('Map store events to Smaily automations'),
     4 => __('Campaign Intelligence (optional)'),
-    5 => __('You are all set!'),
+    5 => __('Overview'),
 ];
 // A finished setup reopens on a read-only summary of the connection, with a
 // Completed marker and "Edit credentials" (PRO-3563, the pack's
@@ -208,33 +206,40 @@ $stepHead = static function (int $stepNo, string $marker = '') use ($escaper, $s
     <div class="<?= /* @noEscape */ $panelClass(4) ?>" data-step="4"><?= /* @noEscape */ $stepHead(4) ?><?= $block->getChildHtml('panel.intelligence') ?></div>
 
     <!-- Step 5: Overview (wizard-only) -->
+    <?php // As the WooCommerce setup's Overview (CON-461): what is active,
+    // drawn from the steps each time the Overview shows (render() below),
+    // and Finish beside Back in the step footer. ?>
     <div class="<?= /* @noEscape */ $panelClass(5) ?>" data-step="5">
         <?= /* @noEscape */ $stepHead(5) ?>
         <div class="smaily-card">
             <?php // One of the two shows: Smaily accepted the saved credentials (PRO-3560) or not. ?>
-            <p id="smaily-w-overview-connected"><?= $escaper->escapeHtml(__('Smaily Connect is now syncing in near-real-time. Here is where everything lives from now on:')) ?></p>
-            <p id="smaily-w-overview-not-connected" style="display:none"><?= $escaper->escapeHtml(__('Syncing starts once Smaily accepts the credentials — check them in Settings > Connection and test the connection. Here is where everything lives from now on:')) ?></p>
-            <ul class="smaily-overview-links">
-                <li><a href="<?= $escaper->escapeUrl($settingsUrl) ?>"><?= $escaper->escapeHtml(__('Settings')) ?></a> — <?= $escaper->escapeHtml(__('every setting from the initial setup as always-available tabs, including the historical imports and the RSS feed URL builder')) ?></li>
-                <li><a href="<?= $escaper->escapeUrl($logUrl) ?>"><?= $escaper->escapeHtml(__('Log')) ?></a> — <?= $escaper->escapeHtml(__('every delivery to Smaily and Campaign Intelligence with retry; check here first if something seems off')) ?></li>
-                <li><?= $escaper->escapeHtml(__('Product RSS feed for the Smaily template editor:')) ?> <code><?= $escaper->escapeHtml($block->getBaseUrl() . 'smaily/rss/feed') ?></code><br/>
-                    <span class="note"><?= $escaper->escapeHtml(__('Need a category-filtered or sorted feed? Use the URL builder under Settings > RSS.')) ?>
-                        <a href="<?= $escaper->escapeUrl($block->getUrl('smaily_connect/settings', ['_query' => ['tab' => 'rss']])) ?>"><?= $escaper->escapeHtml(__('Open the URL builder')) ?></a></span></li>
-                <li><a href="<?= $escaper->escapeUrl($userGuideUrl) ?>" target="_blank" rel="noopener noreferrer"><?= $escaper->escapeHtml(__('User Guide')) ?></a> — <?= $escaper->escapeHtml(__('the full merchant documentation: every feature, setting and troubleshooting steps')) ?></li>
+            <p id="smaily-w-overview-connected"><?= $escaper->escapeHtml(__('Smaily Connect is configured and ready. Make sure that all settings are correct and click Finish to save.')) ?></p>
+            <p id="smaily-w-overview-not-connected" style="display:none"><?= $escaper->escapeHtml(__('Syncing starts once Smaily accepts the credentials — check them in Settings > Connection and test the connection.')) ?></p>
+            <h2><?= $escaper->escapeHtml(__('What\'s active')) ?></h2>
+            <ul class="smaily-overview-active" id="smaily-w-overview-active">
+                <?php foreach ([
+                    'smaily' => __('Smaily connected'),
+                    'contacts' => __('Contact sync enabled'),
+                    'welcome' => __('Welcome'),
+                    'firstorder' => __('First order'),
+                    'abandoned' => __('Abandoned cart'),
+                    'intelligence' => __('Campaign Intelligence'),
+                ] as $item => $itemLabel): ?>
+                <li class="smaily-overview-item" data-item="<?= $escaper->escapeHtmlAttr($item) ?>">
+                    <span class="smaily-overview-item__mark" aria-hidden="true"></span>
+                    <span class="smaily-overview-item__body">
+                        <span class="smaily-overview-item__label"><?= $escaper->escapeHtml($itemLabel) ?></span>
+                        <span class="smaily-overview-item__detail"></span>
+                    </span>
+                </li>
+                <?php endforeach; ?>
             </ul>
-            <p class="note"><?= $escaper->escapeHtml(__('Tip: make sure the Magento cron runs every minute — deliveries are queued and flushed by the smaily_connect cron group.')) ?></p>
         </div>
-        <?php // The step footer (Back/Continue) is hidden here; this one moves
-        // the merchant on: the Dashboard first, Settings as the alternative. ?>
-        <div class="smaily-footer smaily-overview-footer">
-            <div>
-                <a class="action-secondary" href="<?= $escaper->escapeUrl($settingsUrl) ?>">
-                    <span><?= $escaper->escapeHtml(__('Open Settings')) ?></span>
-                </a>
-                <a class="action-primary" href="<?= $escaper->escapeUrl($dashboardUrl) ?>">
-                    <span><?= $escaper->escapeHtml(__('Go to Dashboard')) ?></span>
-                </a>
-            </div>
+        <?php // What Magento's background tasks need: its cron. ?>
+        <div class="smaily-card" id="smaily-w-overview-cron">
+            <h2><?= $escaper->escapeHtml(__('Background tasks')) ?></h2>
+            <p><?= $escaper->escapeHtml(__('Make sure the Magento cron runs every minute — deliveries are queued and flushed by the smaily_connect cron group.')) ?>
+                <a href="<?= $escaper->escapeUrl($userGuideUrl) ?>" target="_blank" rel="noopener noreferrer"><?= $escaper->escapeHtml(__('User Guide')) ?></a></p>
         </div>
     </div>
 
@@ -268,9 +273,11 @@ require(['jquery'], function ($) {
     // stepper derives "done" (unlocked, clickable) from maxStep, so going
     // Back never re-locks steps that were already completed.
     var step = <?= (int)$startStep ?>, maxStep = <?= (int)$reachedStep ?>;
-    // Whether Smaily accepted the saved credentials (PRO-3560): from the page
-    // load, then from the finish step's answer.
+    // Whether Smaily accepted the saved credentials (PRO-3560), and the
+    // Smaily account's subdomain: from the page load, then from the Connect
+    // step's answer.
     var verified = !!panels.boot.verified;
+    var account = panels.boot.connection.subdomain || '';
     // A finished setup opens on the connection summary (PRO-3563) until
     // "Edit credentials" returns the form.
     var summary = $('#smaily-w-summary').length > 0;
@@ -284,13 +291,13 @@ require(['jquery'], function ($) {
         $('.smaily-step-panel[data-step=' + step + ']').addClass('active');
         $('#smaily-w-overview-connected').toggle(verified);
         $('#smaily-w-overview-not-connected').toggle(!verified);
-        $('#smaily-w-back').toggle(step > 1 && step < 5);
-        $('#smaily-w-next').toggle(step < 5);
-        // Overview has no step actions: drop the footer (and its divider).
-        $('#smaily-wizard-main > .smaily-footer').toggle(step < 5);
-        $('#smaily-w-next span').text(step === 4
+        $('#smaily-w-back').toggle(step > 1);
+        $('#smaily-w-next span').text(step === 5
             ? '<?= $escaper->escapeJs(__('Finish')) ?>'
             : '<?= $escaper->escapeJs(__('Continue')) ?>');
+        if (step === 5) {
+            renderOverview();
+        }
         $('#smaily-w-summary').toggle(summary);
         $('#smaily-w-connect-form').toggle(!summary);
         $('#smaily-w-edit-credentials').toggle(summary && step === 1);
@@ -298,6 +305,33 @@ require(['jquery'], function ($) {
         panels.clearFormErrors($('#smaily-wizard-main'));
         gateConnect();
         window.scrollTo(0, 0);
+    }
+
+    // What is active (CON-461), as the WooCommerce setup's Overview lists
+    // it, read from the steps as they are now.
+    function renderOverview() {
+        var item = function (name, active, detail) {
+            var $item = $('#smaily-w-overview-active [data-item=' + name + ']');
+            $item.toggleClass('is-active', active);
+            $item.find('.smaily-overview-item__mark').text(active ? '✓' : '○');
+            $item.find('.smaily-overview-item__detail').text(detail || '');
+        };
+        var $mlMode = $('input[name=smaily-w-mlmode]:checked');
+        var $syncEnabled = $('#smaily-w-sync-enabled');
+        var syncing = !$syncEnabled.length || $syncEnabled.is(':checked');
+        item('smaily', verified, [
+            account && $mlMode.val() !== 'a' ? account + '.sendsmaily.net' : '',
+            $mlMode.closest('.smaily-choice').find('.smaily-choice__title').text()
+        ].filter(Boolean).join(' · '));
+        item('contacts', syncing, syncing
+            ? $('input[name=smaily-w-mode]:checked').closest('.smaily-choice').find('.smaily-choice__title').text()
+            : '');
+        ['welcome', 'firstorder', 'abandoned'].forEach(function (name) {
+            item(name, $('#smaily-w-' + name + '-enabled').is(':checked'));
+        });
+        item('intelligence', panels.isIntelligenceConnected(), panels.isIntelligenceConnected()
+            ? '<?= $escaper->escapeJs(__('Connected')) ?>'
+            : '<?= $escaper->escapeJs(__('Not connected (optional)')) ?>');
     }
 
     // The Connect form continues only once the connection test passed, as
@@ -337,13 +371,10 @@ require(['jquery'], function ($) {
         },
         2: function () { return save('subscribers', panels.collect.subscribers, 'subscribers'); },
         3: function () { return save('automations', panels.collect.automations, 'automations'); },
-        4: function () {
-            return save('intelligence', panels.collect.intelligence).then(function () {
-                return panels.saveStep('finish', {});
-            }).then(function (response) {
-                verified = !!response.verified;
-            });
-        }
+        4: function () { return save('intelligence', panels.collect.intelligence); },
+        // Finish marks the setup done; the click below then opens the
+        // Dashboard, as the WooCommerce setup's Finish leaves the setup.
+        5: function () { return panels.saveStep('finish', {}); }
     };
 
     panels.initAll();
@@ -359,6 +390,14 @@ require(['jquery'], function ($) {
             if (response && response.workflowsRemoved) {
                 window.location.reload();
                 return;
+            }
+            if (step === 5) {
+                window.location.href = '<?= $escaper->escapeJs($dashboardUrl) ?>';
+                return;
+            }
+            if (response && typeof response.verified === 'boolean') {
+                verified = response.verified;
+                account = response.accountName || account;
             }
             // A changed Storefront URL reaches a connected Campaign
             // Intelligence only with the next catalog import: the step the

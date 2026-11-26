@@ -31,6 +31,9 @@ class SchemaInstaller
     /** Magento_Sales's declarative schema, the source of the order table. */
     private const SALES_SCHEMA = 'vendor/magento/module-sales/etc/db_schema.xml';
 
+    /** Magento_Directory's declarative schema, the source of the currency rate table. */
+    private const DIRECTORY_SCHEMA = 'vendor/magento/module-directory/etc/db_schema.xml';
+
     /** Magento_SalesRule's declarative schema, the source of the coupon tables. */
     private const SALES_RULE_SCHEMA = 'vendor/magento/module-sales-rule/etc/db_schema.xml';
 
@@ -145,6 +148,20 @@ class SchemaInstaller
             . ' PRIMARY KEY (`entity_id`, `quote_id`)'
             . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
         );
+    }
+
+    /**
+     * The core directory_currency_rate table as Magento ships it: the rates
+     * a store converts its base-currency prices at.
+     */
+    public function createCurrencyRate(): void
+    {
+        $this->createMagentoTable(self::DIRECTORY_SCHEMA, 'directory_currency_rate');
+    }
+
+    public function dropCurrencyRate(): void
+    {
+        $this->connection->query('DROP TABLE IF EXISTS `directory_currency_rate`');
     }
 
     /**

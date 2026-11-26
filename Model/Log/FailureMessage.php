@@ -10,6 +10,7 @@ namespace Smaily\Connect\Model\Log;
 
 use Smaily\Connect\Cron\AbandonedCart;
 use Smaily\Connect\Model\Engine\CatalogManifest;
+use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
 use Smaily\Connect\Model\Queue\Handler\ContactSyncHandler;
 use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
@@ -72,6 +73,8 @@ class FailureMessage
         IdentityMergeHandler::SKIPPED_OPTED_OUT,
         AbandonedCart::SKIPPED_RECENTLY_REMINDED,
         AbandonedCart::SKIPPED_UNSUBSCRIBED_IN_STORE,
+        // A catalog row a newer row of the product superseded (CON-423).
+        IngestQueue::SKIPPED_SUPERSEDED,
         // Why a nightly catalog manifest was not sent (PRO-3854).
         CatalogManifest::TOO_MANY_PRODUCTS,
         // Why an identity merge that met `404 customer_not_found` was parked (CON-262).

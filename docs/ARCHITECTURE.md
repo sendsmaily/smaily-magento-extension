@@ -535,7 +535,8 @@ below.
   instead — several markers for one product build one row — and the queue
   leaves out a built row when the product's newest unsent catalog row
   (pending or being sent; one row per product read in SQL,
-  `IngestQueue::latestUndeliveredPayloads()`) is that very row, compared as
+  `IngestQueue::latestUndeliveredPayloads()`; not a row that may go late,
+  CON-423) is that very row, compared as
   the queue stores it, which is what keeps a product save at one
   row: it queues its row itself and reaches the stock hooks on the way. A
   product deleted between marker and build is not in the collection; its
@@ -1172,6 +1173,27 @@ below.
   parks, one line ("Ingest events failed permanently"). Both queues write
   through the one `Model\Queue\RowWriter`, and a row parked alone gets the
   same line as a group, with a count of 1.
+- **A catalog row never goes after a newer one (CON-423).** A catalog
+  row carries the product's whole state as the store saw it when the row
+  was built, and the engine takes the last row it gets. Rows go in id
+  order, but a row that failed waits on the ladder while later rows of
+  the product go, and the Log's Retry and Send again send an older row
+  late — the older stock or price went back, and the engine read each
+  stock flip as a real one. `FlushIngestQueue` hands every claimed catalog
+  batch to `IngestQueue::supersededRows()` first: of the batch's rows of
+  one product only the latest goes, and that one does not go either when
+  a later row of the product (same connection) is queued, being sent or
+  delivered. A row's place is its id, or for a Send again row the id of
+  the row it sends again (`Log\Resend`'s record). Only a row that may go
+  late — tried before (attempts, or the error a Retry keeps) or sent again
+  — is looked up, in one read for the batch; a row that keeps its turn
+  goes before every later row by the claim order. The rows it names are
+  closed by `markSkipped()` as `sent` with `IngestQueue::SKIPPED_SUPERSEDED`
+  in `last_error`, which the Log (`Collection::intelligenceStatusExpression()`,
+  `QueueRowLoader`) and the Dashboard read as Skipped, as for the
+  marketing queue. The stock hooks' duplicate check
+  (`latestUndeliveredPayloads()`) does not compare with a row that may go
+  late: it may be skipped, so a row equal to it is queued.
 - **Smaily envelope codes (PRO-1962; proposed as the cross-platform
   canon for the WooCommerce and Shopify plugins).** Smaily can refuse a
   request with HTTP 200 and a non-101 code in the body (an

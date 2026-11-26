@@ -44,6 +44,14 @@ class IngestQueue
     public const BACKOFF_SECONDS = [60, 300, 900, 3600, 21600];
 
     /**
+     * The reason a catalog row is closed without sending it (CON-423,
+     * supersededRows()), stored as English source text and shown in the
+     * admin's language (Log\FailureMessage).
+     */
+    public const SKIPPED_SUPERSEDED = 'Skipped: the product changed again, and a newer row carries its current'
+        . ' details to Campaign Intelligence. Nothing was sent.';
+
+    /**
      * The columns markFailedMany() writes: a failure's outcome and its
      * exchange, plus the released claim and the outcome's time
      * (outcomeFields()) — what the model's own save in markFailed() writes
@@ -224,6 +232,11 @@ class IngestQueue
      * delivered rows are retained. With $engineConnection, only that
      * connection's rows.
      *
+     * A newest row that may go after a later one — tried before, or a
+     * "Send again" — is left out (CON-423): a later row may already be
+     * delivered, and supersededRows() then skips it, so a row equal to it
+     * is no duplicate.
+     *
      * @param string[] $entityIds
      * @return array<string, string> entity id => payload as stored
      */
@@ -247,15 +260,115 @@ class IngestQueue
             return [];
         }
         $select = $connection->select()
-            ->from(['queue' => $this->table()], ['entity_id', 'payload'])
+            ->from(['queue' => $this->table()], ['id', 'entity_id', 'payload', 'attempts', 'last_error'])
             ->join(['newest' => $newest], 'newest.id = queue.id', []);
 
         $payloads = [];
         foreach ($connection->fetchAll($select) as $row) {
-            $payloads[(string)$row['entity_id']] = (string)$row['payload'];
+            if (!$this->mayGoLate($row)) {
+                $payloads[(string)$row['entity_id']] = (string)$row['payload'];
+            }
         }
 
         return $payloads;
+    }
+
+    /**
+     * The rows of a claimed batch that a later row of the same entity
+     * supersedes (CON-423), for a domain whose row carries the entity's
+     * whole state — the catalog: the newest row is the product as the store
+     * last saw it, and an older one sent after it would put an older stock
+     * or price back in the engine.
+     *
+     * Rows go in the order they were queued, but not always: a row that
+     * failed waits for its retry while later rows go, and the Log's "Retry"
+     * and "Send again" send an older row late. So, by place — a "Send
+     * again" row stands where the row it sends again stood (Log\Resend's
+     * record), any other row at its own id:
+     * - of the batch's rows of one entity only the latest goes;
+     * - that row does not go either when a later row of the entity is
+     *   queued, being sent or delivered — never a failed one. Only a row
+     *   that may go late (tried before, or sent again) is looked up: a row
+     *   that keeps its turn goes before every later row. One read for the
+     *   batch.
+     * With $engineConnection, only that connection's rows count.
+     *
+     * @param IngestEvent[] $events
+     * @return IngestEvent[]
+     */
+    public function supersededRows(string $domain, array $events, ?Connection $engineConnection = null): array
+    {
+        $byEntity = [];
+        foreach ($events as $event) {
+            $entityId = (string)$event->getEntityId();
+            if ($entityId !== '') {
+                $byEntity[$entityId][] = $event;
+            }
+        }
+
+        $superseded = [];
+        $late = [];
+        foreach ($byEntity as $entityId => $rows) {
+            usort(
+                $rows,
+                fn (IngestEvent $a, IngestEvent $b): int => $this->place($a->getData()) <=> $this->place($b->getData())
+            );
+            $latest = array_pop($rows);
+            array_push($superseded, ...$rows);
+            if ($this->mayGoLate($latest->getData())) {
+                $late[$entityId] = $latest;
+            }
+        }
+        if (!$late) {
+            return $superseded;
+        }
+
+        $places = array_map(fn (IngestEvent $event): int => $this->place($event->getData()), $late);
+        $connection = $this->resourceConnection->getConnection();
+        $select = $connection->select()
+            ->from($this->table(), ['id', 'entity_id', 'payload'])
+            ->where('domain = ?', $domain)
+            ->where('entity_id IN (?)', array_map('strval', array_keys($late)))
+            ->where('id > ?', min($places))
+            ->where('id NOT IN (?)', $this->ids($events))
+            ->where('status IN (?)', [
+                IngestEvent::STATUS_PENDING,
+                IngestEvent::STATUS_SENDING,
+                IngestEvent::STATUS_SENT,
+            ]);
+        if (!$this->applyConnection($select, $engineConnection)) {
+            return $superseded;
+        }
+        foreach ($connection->fetchAll($select) as $row) {
+            $entityId = (string)$row['entity_id'];
+            if (isset($late[$entityId]) && $this->place($row) > $places[$entityId]) {
+                $superseded[] = $late[$entityId];
+                unset($late[$entityId]);
+            }
+        }
+
+        return $superseded;
+    }
+
+    /**
+     * Close rows without sending them, the reason in last_error: stored as
+     * sent, as the marketing queue stores a skipped row (PRO-3619), which
+     * the Log reads as Skipped.
+     *
+     * @param IngestEvent[] $events
+     */
+    public function markSkipped(array $events, string $reason): void
+    {
+        if (!$events) {
+            return;
+        }
+
+        $this->resourceConnection->getConnection()->update(
+            $this->table(),
+            ['status' => IngestEvent::STATUS_SENT, 'next_retry_at' => null, 'last_error' => $reason]
+                + $this->outcomeFields(),
+            ['id IN (?)' => $this->ids($events)]
+        );
     }
 
     /**
@@ -708,6 +821,33 @@ class IngestQueue
             'ids' => $this->ids($parked),
             'error' => $error,
         ]);
+    }
+
+    /**
+     * Where a row stands among its entity's rows: the row it sends again,
+     * for a "Send again" row (Log\Resend's record), else its own id.
+     *
+     * @param array<string, mixed> $row the stored row: id and payload
+     */
+    private function place(array $row): int
+    {
+        $of = (int)($this->payloadDecoder->decode((string)($row['payload'] ?? ''))[Resend::PAYLOAD_KEY]['of'] ?? 0);
+
+        return $of > 0 ? $of : (int)($row['id'] ?? 0);
+    }
+
+    /**
+     * Whether a row may go after a later row of its entity: it was tried
+     * before (the Log's "Retry" resets its attempts, not its error), or it
+     * sends an older row again.
+     *
+     * @param array<string, mixed> $row the stored row: id, payload, attempts and last_error
+     */
+    private function mayGoLate(array $row): bool
+    {
+        return (int)($row['attempts'] ?? 0) > 0
+            || (string)($row['last_error'] ?? '') !== ''
+            || $this->place($row) !== (int)($row['id'] ?? 0);
     }
 
     /**

@@ -114,6 +114,7 @@
 "Shipping confirmation","Shipping confirmation"
 "Shipping Confirmation","Shipping Confirmation"
 "Skipped: the shopper has since changed their newsletter subscription, and the newer choice already reached Smaily. Nothing was sent.","Skipped: the shopper has since changed their newsletter subscription, and the newer choice already reached Smaily. Nothing was sent."
+"Skipped: the product changed again, and a newer row carries its current details to Campaign Intelligence. Nothing was sent.","Skipped: the product changed again, and a newer row carries its current details to Campaign Intelligence. Nothing was sent."
 "Skipped: this automation has no Smaily workflow for the contact's language (%1), and no default fallback workflow either. Nothing was sent.","Skipped: this automation has no Smaily workflow for the contact's language (%1), and no default fallback workflow either. Nothing was sent."
 "Skipped: the website %1 uses another Smaily account than the one saved for all websites, and no workflow of its account is picked for this automation. Nothing was sent.","Skipped: the website %1 uses another Smaily account than the one saved for all websites, and no workflow of its account is picked for this automation. Nothing was sent."
 "Smaily Connect is running, but no nightly product list has gone to Campaign Intelligence for %1 nights.","Smaily Connect is running, but no nightly product list has gone to Campaign Intelligence for %1 nights."

@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Integration\Log;
 
+use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Log\QueueRowLoader;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
@@ -41,6 +42,20 @@ class LogStatusTest extends IntegrationTestCase
 
         self::assertSame(Collection::STATUS_SKIPPED, $this->rowLoader->load('smaily-1')['status'] ?? null);
         self::assertSame(['smaily-1' => Collection::STATUS_SKIPPED], $this->gridStatuses());
+    }
+
+    /**
+     * CON-423: the engine ingest queue closes a catalog row a newer row of
+     * the product superseded the same way.
+     */
+    public function testACatalogRowANewerRowSupersededReadsAsSkipped(): void
+    {
+        $ingestQueue = $this->objectManager->create(IngestQueue::class);
+        $ingestQueue->enqueue('catalog', ['sku' => 'P7'], '7', null, 'i-1');
+        $ingestQueue->markSkipped($ingestQueue->claimBatch('catalog', 10), IngestQueue::SKIPPED_SUPERSEDED);
+
+        self::assertSame(Collection::STATUS_SKIPPED, $this->rowLoader->load('intelligence-1')['status'] ?? null);
+        self::assertSame(['intelligence-1' => Collection::STATUS_SKIPPED], $this->gridStatuses());
     }
 
     public function testADeliveredRowReadsAsSent(): void

@@ -263,29 +263,31 @@ class CatalogPayloadBuilderTest extends TestCase
     }
 
     /**
-     * PRO-1762 (contract v1.7.0 §3): every catalog row carries the currency
-     * the price we send is actually denominated in — the canonical store's
-     * DISPLAY currency, which is what Magento's price readers convert into,
-     * not the base currency the amount is stored in.
+     * CON-447 (contract §3 `currency`, §5 "One currency per store"): every
+     * catalog row carries the base currency of the store view its price is
+     * read at, the currency the price goes in, as every order does
+     * (CON-421) — not the store's display currency. Before CON-447 it was
+     * the display currency (PRO-1762), which the price was converted into.
      */
-    public function testCatalogRowCarriesTheCanonicalStoresDisplayCurrency(): void
+    public function testCatalogRowCarriesTheBaseCurrencyOfTheStoreViewItIsPricedAt(): void
     {
         $canonicalStore = $this->createMock(Store::class);
         $canonicalStore->method('getId')->willReturn(1);
-        $canonicalStore->method('getBaseCurrencyCode')->willReturn('EUR');
+        $canonicalStore->method('getBaseCurrencyCode')->willReturn('GBP');
         $canonicalStore->method('getDefaultCurrencyCode')->willReturn('USD');
 
         $storeManager = $this->createMock(StoreManagerInterface::class);
         $storeManager->method('getStores')->willReturn([]);
         $storeManager->method('getDefaultStoreView')->willReturn($canonicalStore);
+        $storeManager->method('getStore')->willReturn($canonicalStore);
 
         $product = $this->product(42, 'SHIRT');
         $product->method('getStoreId')->willReturn(1);
 
         $builder = $this->createBuilder('42', null, $storeManager);
 
-        self::assertSame('USD', $builder->build($product, $this->oneStore())['currency']);
-        self::assertSame('USD', $builder->buildTombstone($product, $this->oneStore())['currency']);
+        self::assertSame('GBP', $builder->build($product, $this->oneStore())['currency']);
+        self::assertSame('GBP', $builder->buildTombstone($product, $this->oneStore())['currency']);
     }
 
     /**
@@ -532,7 +534,7 @@ class CatalogPayloadBuilderTest extends TestCase
     /**
      * CON-237: the row of a separate store's engine store lists only its own
      * websites, takes its language map from them, and is linked and priced
-     * at its canonical store view, in that store view's currency.
+     * at its canonical store view, in that store view's base currency.
      */
     public function testAConnectionsRowHoldsOnlyItsOwnWebsitesReadAtItsStoreView(): void
     {
@@ -546,7 +548,7 @@ class CatalogPayloadBuilderTest extends TestCase
             'en' => 'https://shop.example/s5/shirt',
             'ru' => 'https://shop.example/s6/shirt',
         ], $item['product_url']);
-        self::assertSame('USD', $item['currency'], 'The currency of its canonical store view');
+        self::assertSame('USD', $item['currency'], 'The base currency of its canonical store view');
     }
 
     /**
@@ -611,7 +613,7 @@ class CatalogPayloadBuilderTest extends TestCase
             $store->method('getId')->willReturn($storeId);
             $store->method('getWebsiteId')->willReturn($websiteOf[$storeId]);
             $store->method('getIsActive')->willReturn($storeId === 7 ? '0' : '1');
-            $store->method('getDefaultCurrencyCode')->willReturn($websiteOf[$storeId] === 1 ? 'EUR' : 'USD');
+            $store->method('getBaseCurrencyCode')->willReturn($websiteOf[$storeId] === 1 ? 'EUR' : 'USD');
             $stores[$storeId] = $store;
         }
         $websites = [];
@@ -628,7 +630,7 @@ class CatalogPayloadBuilderTest extends TestCase
         $storeManager->method('getWebsites')->willReturn($websites);
         $storeManager->method('getWebsite')->willReturnCallback(fn (int $id): Website => $websites[$id]);
         $storeManager->method('getDefaultStoreView')->willReturn($stores[1]);
-        $storeManager->method('getStore')->willReturnCallback(fn ($id): Store => $stores[(int)$id]);
+        $storeManager->method('getStore')->willReturnCallback(fn ($id = null): Store => $stores[(int)($id ?? 1)]);
 
         $languageResolver = $this->createMock(LanguageResolver::class);
         $languageResolver->method('forStore')->willReturnCallback(

@@ -41,6 +41,7 @@ use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Backfill\ContactsProcessor;
 use Smaily\Connect\Model\Backfill\Job;
 use Smaily\Connect\Model\Backfill\JobManager;
+use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
@@ -53,6 +54,7 @@ use Smaily\Connect\Model\ContactSync\SyncDispatcher;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\LanguageResolver;
 use Smaily\Connect\Model\Queue\ContactEntity;
+use Smaily\Connect\Model\Queue\Event as QueueEvent;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
@@ -137,6 +139,55 @@ class SubscriptionStatusTest extends IntegrationTestCase
             ['email' => 'subscribed@example.com'],
             ['email' => 'left@example.com', 'is_unsubscribed' => 1],
         ], $this->fields($posted));
+    }
+
+    /**
+     * CON-432: a contact Smaily refuses during the import counts as failed on
+     * the job and is kept in the Log as a failed contact sync with Smaily's
+     * code, never its text; Send again from the Log puts it back in the
+     * queue. The contacts Smaily took are not in the Log.
+     */
+    public function testAContactSmailyRefusesInTheImportIsKeptInTheLogWithItsReason(): void
+    {
+        $this->seedSubscriber('good@example.com', Subscriber::STATUS_SUBSCRIBED);
+        $this->seedSubscriber('bad@example.com', Subscriber::STATUS_SUBSCRIBED);
+
+        $client = $this->createMock(SmailyClient::class);
+        $client->method('post')->willReturnCallback(static function (string $endpoint, array $contacts): array {
+            if (count($contacts) > 1 || $contacts[0]['email'] === 'bad@example.com') {
+                throw new ApiException('Smaily API returned code 203: Invalid data', 203);
+            }
+
+            return [];
+        });
+        $clientProvider = $this->createMock(SmailyClientProvider::class);
+        $clientProvider->method('forStore')->willReturn($client);
+
+        /** @var JobManager $jobManager */
+        $jobManager = $this->objectManager->create(JobManager::class);
+        $job = $jobManager->start(Job::TYPE_CONTACTS, Job::TARGET_SMAILY, 1);
+        $this->contactsProcessor($jobManager, $clientProvider)->process($job);
+
+        $stored = $this->fetchRow('smaily_backfill_job', (int)$job->getId());
+        self::assertSame(Job::STATUS_COMPLETED, $stored['status']);
+        self::assertSame(['1', '1'], [(string)$stored['processed_count'], (string)$stored['failed_count']]);
+
+        $rows = $this->fetchAll(EventResource::TABLE_NAME);
+        self::assertCount(1, $rows, 'Only the refused contact is in the Log');
+        self::assertSame(EventType::CONTACT_SYNC, $rows[0]['event_type']);
+        self::assertSame(QueueEvent::STATUS_FAILED, $rows[0]['status']);
+        self::assertSame('1', (string)$rows[0]['website_id']);
+        self::assertStringStartsWith('permanent_envelope_203: ', (string)$rows[0]['last_error']);
+        self::assertSame(['bad@example.com'], array_column($this->queuedContacts(), 'email'));
+        self::assertSame(
+            $this->objectManager->get(ContactEntity::class)->of('bad@example.com'),
+            $rows[0]['entity_id']
+        );
+
+        /** @var EventQueue $queue */
+        $queue = $this->objectManager->get(EventQueue::class);
+        self::assertSame(1, $queue->retry([(int)$rows[0]['id']]));
+        self::assertSame(QueueEvent::STATUS_PENDING, $this->fetchAll(EventResource::TABLE_NAME)[0]['status']);
     }
 
     /**
@@ -447,7 +498,9 @@ class SubscriptionStatusTest extends IntegrationTestCase
             $this->payloadBuilder(),
             $clientProvider,
             $this->config(),
-            $this->createMock(Logger::class)
+            $this->createMock(Logger::class),
+            $this->objectManager->get(EventQueue::class),
+            $this->objectManager->get(ContactEntity::class)
         );
     }
 

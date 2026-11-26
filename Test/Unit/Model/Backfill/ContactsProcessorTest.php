@@ -26,6 +26,9 @@ use Smaily\Connect\Model\Config\Source\SyncMode;
 use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\ContactSync\SubscriberPayloadBuilder;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Queue\ContactEntity;
+use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\EventType;
 
 /**
  * PRO-1764: the website's stored contact-sync answer gates the historical
@@ -41,6 +44,9 @@ use Smaily\Connect\Model\Logger\Logger;
 class ContactsProcessorTest extends TestCase
 {
     private const WEBSITE_ID = 2;
+
+    /** @var list<array{string, array<string, mixed>, string, ?string, int}> the rows the import put in the Log */
+    private array $logged = [];
 
     public function testSyncDisabledSendsNothingAndReportsAZeroTotal(): void
     {
@@ -227,6 +233,14 @@ class ContactsProcessorTest extends TestCase
 
         $emails = array_map(static fn (int $n): string => 'u' . $n . '@example.invalid', range(1, 5));
         self::assertSame([$emails, ...array_map(static fn (string $email): array => [$email], $emails)], $posted);
+        // CON-432: the refused contact is kept in the Log with Smaily's code.
+        self::assertSame([[
+            EventType::CONTACT_SYNC,
+            ['store_id' => 5, 'contact' => ['email' => 'u3@example.invalid']],
+            'permanent_envelope_203: Smaily API returned code 203: Invalid data',
+            'entity:u3@example.invalid',
+            self::WEBSITE_ID,
+        ]], $this->logged);
     }
 
     public function testAnotherRefusalOfAPageFailsThePageInOneRequest(): void
@@ -248,6 +262,16 @@ class ContactsProcessorTest extends TestCase
 
         $this->createProcessor($jobManager, $audience, $clientProvider, true, SyncMode::MODE_CONSENT)
             ->process($this->createJob(null, ['0', '72']));
+
+        // CON-432: each contact of the refused page is kept in the Log.
+        self::assertSame(
+            ['u1@example.invalid', 'u2@example.invalid'],
+            array_map(static fn (array $row): string => $row[1]['contact']['email'], $this->logged)
+        );
+        self::assertSame(
+            ['Smaily API returned code 216: Unknown error'],
+            array_values(array_unique(array_column($this->logged, 2)))
+        );
     }
 
     public function testCheckoutOptInOnlySendsNobodyAndReportsAZeroTotal(): void
@@ -354,6 +378,17 @@ class ContactsProcessorTest extends TestCase
         $searchResults->method('getItems')->willReturn([]);
         $customerRepository->method('getList')->willReturn($searchResults);
 
+        $eventQueue = $this->createMock(EventQueue::class);
+        $eventQueue->method('enqueueFailed')->willReturnCallback(
+            function (string $type, array $payload, string $reason, ?string $entityId, int $websiteId): bool {
+                $this->logged[] = [$type, $payload, $reason, $entityId, $websiteId];
+
+                return true;
+            }
+        );
+        $contactEntity = $this->createMock(ContactEntity::class);
+        $contactEntity->method('of')->willReturnCallback(static fn (string $email): string => 'entity:' . $email);
+
         return new ContactsProcessor(
             $jobManager,
             $audience,
@@ -363,7 +398,9 @@ class ContactsProcessorTest extends TestCase
             $payloadBuilder,
             $clientProvider,
             $config,
-            $this->createMock(Logger::class)
+            $this->createMock(Logger::class),
+            $eventQueue,
+            $contactEntity
         );
     }
 }

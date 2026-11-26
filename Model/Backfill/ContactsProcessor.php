@@ -20,6 +20,10 @@ use Smaily\Connect\Model\Config\Source\SyncMode;
 use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\ContactSync\SubscriberPayloadBuilder;
 use Smaily\Connect\Model\Logger\Logger;
+use Smaily\Connect\Model\Queue\ContactEntity;
+use Smaily\Connect\Model\Queue\EventQueue;
+use Smaily\Connect\Model\Queue\EventType;
+use Smaily\Connect\Model\Queue\Failure;
 
 /**
  * Backfills a website's existing contacts into Smaily: the audience of the
@@ -45,6 +49,11 @@ use Smaily\Connect\Model\Logger\Logger;
  * contact path (PRO-1764). The mode is
  * read on every tick, so a mode changed mid-import decides what the rest of
  * the walk sends.
+ *
+ * A contact the import could not deliver — Smaily refused it, or the
+ * request failed — counts as failed on the job and is kept in the Log as a
+ * failed contact sync with its reason (CON-432): the finished import's card
+ * says how many and points there, and Send again sends it.
  */
 class ContactsProcessor implements ProcessorInterface
 {
@@ -61,7 +70,9 @@ class ContactsProcessor implements ProcessorInterface
         private readonly SubscriberPayloadBuilder $payloadBuilder,
         private readonly SmailyClientProvider $clientProvider,
         private readonly Config $config,
-        private readonly Logger $logger
+        private readonly Logger $logger,
+        private readonly EventQueue $eventQueue,
+        private readonly ContactEntity $contactEntity
     ) {
     }
 
@@ -121,7 +132,7 @@ class ContactsProcessor implements ProcessorInterface
                 return;
             }
 
-            [$processed, $failed] = $this->sendPage($page);
+            [$processed, $failed] = $this->sendPage($websiteId, $page);
             $this->jobManager->recordProgress($job, $processed, $failed, $newCursor);
 
             if ($this->jobManager->isCancelled($job)) {
@@ -160,7 +171,7 @@ class ContactsProcessor implements ProcessorInterface
      * @param list<array{id: int, email: string, store_id: int, customer_id: int, subscribed: ?bool}> $page
      * @return array{int, int} processed, failed
      */
-    private function sendPage(array $page): array
+    private function sendPage(int $websiteId, array $page): array
     {
         $customers = $this->loadCustomers($page);
 
@@ -181,7 +192,7 @@ class ContactsProcessor implements ProcessorInterface
         $processed = 0;
         $failed = 0;
         foreach ($byStore as $storeId => $contacts) {
-            $sent = $this->post($storeId, $contacts);
+            $sent = $this->post($websiteId, $storeId, $contacts);
             $processed += $sent;
             $failed += count($contacts) - $sent;
         }
@@ -193,11 +204,12 @@ class ContactsProcessor implements ProcessorInterface
      * Post one store's contacts in one request; how many of them Smaily
      * took. A group Smaily refuses as invalid data (203) goes again one
      * contact per request, so only the refused contact counts as failed
-     * (PRO-3753, as the queued contact sync).
+     * (PRO-3753, as the queued contact sync). A contact not taken goes to
+     * the Log with the reason (CON-432).
      *
      * @param list<array<string, mixed>> $contacts
      */
-    private function post(int $storeId, array $contacts, ?SmailyClient $client = null): int
+    private function post(int $websiteId, int $storeId, array $contacts, ?SmailyClient $client = null): int
     {
         try {
             $client ??= $this->clientProvider->forStore($storeId);
@@ -208,7 +220,7 @@ class ContactsProcessor implements ProcessorInterface
             if (count($contacts) > 1 && $exception instanceof ApiException && $exception->isInvalidData()) {
                 $sent = 0;
                 foreach ($contacts as $contact) {
-                    $sent += $this->post($storeId, [$contact], $client);
+                    $sent += $this->post($websiteId, $storeId, [$contact], $client);
                 }
 
                 return $sent;
@@ -218,6 +230,16 @@ class ContactsProcessor implements ProcessorInterface
                 'count' => count($contacts),
                 'error' => $exception->getMessage(),
             ]);
+            $reason = Failure::of($exception)->reason;
+            foreach ($contacts as $contact) {
+                $this->eventQueue->enqueueFailed(
+                    EventType::CONTACT_SYNC,
+                    ['store_id' => $storeId, 'contact' => $contact],
+                    $reason,
+                    $this->contactEntity->of((string)$contact['email']),
+                    $websiteId
+                );
+            }
 
             return 0;
         }

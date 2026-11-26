@@ -1,5 +1,18 @@
 # Changelog
 
+### 3.0.3
+
+A fix release for 3.0.0 to 3.0.2, for every store on 3.0.x: with the extension installed, the admin's order, invoice, shipment, credit memo, customer, page and block grids did not load, and in Magento's developer mode every page failed.
+
+**Changes since 3.0.2**
+
+- A newsletter subscription or unsubscribe now reaches Smaily also when the code that saves it, for example a third-party newsletter popup or checkout extension, sets the subscription status without marking it as changed; and saving a subscriber whose status stays the same no longer sends the contact to Smaily again.
+- The admin's grids load again: **Sales > Orders**, **Invoices**, **Shipments** and **Credit Memos**, **Customers > All Customers** and **Content > Pages** and **Blocks** no longer fail with "Not registered handle".
+- The **First order** email now follows the contact sync mode, as the abandoned-cart reminder does: under **Subscribers only (consent)** and **Checkout opt-in only** it goes only to a customer who agreed to marketing emails in the store (a newsletter subscriber, or a tick of the checkout newsletter box on that order) or who is a subscribed contact in Smaily; under **All customers (legitimate interest)** it goes to every customer except one who unsubscribed from the store's newsletter. In every mode the store first reads the contact in Smaily, and a contact who unsubscribed there gets none. A first-order email that is not sent shows in the Log as **Skipped** with the reason; while Smaily cannot be reached, the email waits and is tried again.
+- A newsletter signup, resubscription or unsubscribe now reaches Campaign Intelligence also when the code that saves it, for example a third-party newsletter popup or checkout extension, sets the subscription status without marking it as changed; and saving a subscriber whose status stays the same no longer sends it to Campaign Intelligence again.
+- In the **Initial setup**, **Continue** on the Connect step waits until **Test connection** succeeds, with "Test your Smaily connection to continue." beside it, as in the WooCommerce and Shopify setups. An account Smaily does not accept is no longer saved there; **Settings > Connection** still saves it.
+- Magento's developer mode works with the extension again: every page failed there and `bin/magento` listed none of its commands. Default and production mode were not affected.
+
 ### 3.0.2
 
 **Changes since 3.0.1**

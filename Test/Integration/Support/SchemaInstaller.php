@@ -203,7 +203,8 @@ class SchemaInstaller
 
     /**
      * Minimal mirrors of the core customer_entity and newsletter_subscriber
-     * tables — only the columns the contact import's audience reads.
+     * tables — only the columns the contact import's audience reads, and
+     * the confirmation code a newsletter confirmation or unsubscribe checks.
      */
     public function createContactTables(): void
     {
@@ -224,6 +225,7 @@ class SchemaInstaller
             . ' `customer_id` INT UNSIGNED NOT NULL DEFAULT 0,'
             . ' `subscriber_email` VARCHAR(150) NULL,'
             . ' `subscriber_status` INT NOT NULL DEFAULT 0,'
+            . ' `subscriber_confirm_code` VARCHAR(32) NULL DEFAULT NULL,'
             . ' PRIMARY KEY (`subscriber_id`)'
             . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
         );

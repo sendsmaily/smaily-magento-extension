@@ -48,6 +48,12 @@ use Smaily\Connect\Model\Automation\Trigger;
  * (CON-196, the same rule in every Smaily connector): it always sends
  * is_unsubscribed, 0 or 1, and a subscription may re-subscribe a contact who
  * unsubscribed in Smaily. Every other write leaves the status out.
+ *
+ * A status change is read from the status saved against the status loaded,
+ * not from the subscriber's status-changed flag (PRO-4322): code that sets
+ * the status field directly leaves the flag unset, and setStatus() sets it
+ * for the unchanged status when the loaded value is a string, so the flag
+ * both lost signups and sent repeated saves again.
  */
 class SubscriberSaveAfter implements ObserverInterface
 {
@@ -77,7 +83,7 @@ class SubscriberSaveAfter implements ObserverInterface
         $websiteId = $this->dispatcher->websiteId($storeId);
         if (!$this->config->isContactSyncActive($websiteId)
             || !$this->config->isConnected($storeId)
-            || !$subscriber->isStatusChanged()
+            || !$subscriber->dataHasChangedFor('subscriber_status')
         ) {
             return;
         }

@@ -29,11 +29,14 @@ use Magento\Framework\Translate\Inline\StateInterface;
 use Magento\Newsletter\Helper\Data as NewsletterHelper;
 use Magento\Newsletter\Model\ResourceModel\Subscriber as SubscriberResource;
 use Magento\Newsletter\Model\Subscriber;
+use Magento\Newsletter\Model\CustomerSubscriberCache;
 use Magento\Newsletter\Model\SubscriberFactory;
+use Magento\Newsletter\Model\SubscriptionManager;
 use Magento\Newsletter\Model\SubscriptionManagerInterface;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
+use Psr\Log\LoggerInterface;
 use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Backfill\ContactsProcessor;
 use Smaily\Connect\Model\Backfill\Job;
@@ -68,6 +71,12 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  * status it holds and creates a new contact as subscribed. On real
  * newsletter_subscriber rows, the real queue and Magento's own subscriber
  * model; the Smaily client is stubbed.
+ *
+ * PRO-4322: the status change is read from the saved status itself, not
+ * only from the subscriber's status-changed flag, which code that sets the
+ * status field directly leaves unset. Magento's own newsletter form, its
+ * confirmation link and its unsubscribe link run here through Magento's
+ * SubscriptionManager and subscriber model, unchanged.
  */
 class SubscriptionStatusTest extends IntegrationTestCase
 {
@@ -78,6 +87,8 @@ class SubscriptionStatusTest extends IntegrationTestCase
     private string $syncMode = SyncMode::MODE_CONSENT;
 
     private string $area = 'adminhtml';
+
+    private bool $connected = true;
 
     protected function setUp(): void
     {
@@ -228,6 +239,123 @@ class SubscriptionStatusTest extends IntegrationTestCase
     }
 
     /**
+     * PRO-4322: a guest signs up through the storefront newsletter form
+     * ("Need to Confirm" off): one contact sync, subscribed.
+     */
+    public function testAGuestNewsletterFormSignupIsSentOnce(): void
+    {
+        $this->area = 'frontend';
+
+        $this->subscriptionManager()->subscribe('guest@example.com', 1);
+
+        self::assertSame([['email' => 'guest@example.com', 'is_unsubscribed' => 0]], $this->queuedContacts());
+    }
+
+    /**
+     * PRO-4322: a guest who unsubscribed signs up again through the form, and
+     * a subscribed guest leaves through the unsubscribe link: one sync each.
+     */
+    public function testAGuestResubscriptionAndUnsubscribeAreSentOnceEach(): void
+    {
+        $this->area = 'frontend';
+        $this->seedSubscriber('returning@example.com', Subscriber::STATUS_UNSUBSCRIBED);
+        $this->seedSubscriber('leaving@example.com', Subscriber::STATUS_SUBSCRIBED, 0, 'leavecode');
+
+        $this->subscriptionManager()->subscribe('returning@example.com', 1);
+        $this->subscriptionManager()->unsubscribe('leaving@example.com', 1, 'leavecode');
+
+        self::assertSame([
+            ['email' => 'returning@example.com', 'is_unsubscribed' => 0],
+            ['email' => 'leaving@example.com', 'is_unsubscribed' => 1],
+        ], $this->queuedContacts());
+    }
+
+    /**
+     * PRO-3606, PRO-4322: with "Need to Confirm" on, the signup waits for its
+     * confirmation and sends nothing; the confirmation link sends it once.
+     */
+    public function testADoubleOptInSignupIsSentOnlyWhenConfirmed(): void
+    {
+        $this->area = 'frontend';
+        $this->env->getScopeConfig()->setValue(Subscriber::XML_PATH_CONFIRMATION_FLAG, 1);
+
+        $subscriber = $this->subscriptionManager()->subscribe('pending@example.com', 1);
+
+        self::assertSame(Subscriber::STATUS_NOT_ACTIVE, (int)$subscriber->getSubscriberStatus());
+        self::assertSame([], $this->queuedContacts());
+
+        $confirming = $this->newSubscriber($this->observingEventManager(new StorefrontSubscription()));
+        $confirming->loadBySubscriberEmail('pending@example.com', 1);
+        self::assertTrue($confirming->confirm((string)$subscriber->getSubscriberConfirmCode()));
+
+        self::assertSame([['email' => 'pending@example.com', 'is_unsubscribed' => 0]], $this->queuedContacts());
+    }
+
+    /**
+     * PRO-4322: signing up again while subscribed, and a save of the
+     * subscriber that keeps its status, send nothing more.
+     */
+    public function testASaveWithoutAStatusChangeSendsNothingMore(): void
+    {
+        $this->area = 'frontend';
+        $this->subscriptionManager()->subscribe('guest@example.com', 1);
+
+        $this->subscriptionManager()->subscribe('guest@example.com', 1);
+        $resource = $this->subscriberResource();
+        $subscriber = $this->newSubscriber($this->observingEventManager(new StorefrontSubscription()), $resource);
+        $subscriber->loadBySubscriberEmail('guest@example.com', 1);
+        $resource->save($subscriber->setStatus(Subscriber::STATUS_SUBSCRIBED)->setStoreId(2));
+
+        self::assertSame([['email' => 'guest@example.com', 'is_unsubscribed' => 0]], $this->queuedContacts());
+    }
+
+    /**
+     * PRO-4322: a status set on the field directly, without the subscriber's
+     * status-changed flag, is a status change too.
+     */
+    public function testAStatusSetWithoutTheChangedFlagIsSent(): void
+    {
+        $id = $this->seedSubscriber('flagless@example.com', Subscriber::STATUS_UNSUBSCRIBED);
+        $resource = $this->subscriberResource();
+        $subscriber = $this->newSubscriber($this->observingEventManager(new StorefrontSubscription()), $resource);
+        $resource->load($subscriber, $id);
+
+        $resource->save($subscriber->setSubscriberStatus(Subscriber::STATUS_SUBSCRIBED));
+
+        self::assertFalse($subscriber->isStatusChanged());
+        self::assertSame([['email' => 'flagless@example.com', 'is_unsubscribed' => 0]], $this->queuedContacts());
+    }
+
+    /**
+     * PRO-3606, PRO-4322: the mode and connection checks still hold for a
+     * newsletter-form signup — in the checkout-opt-in-only mode, or with the
+     * store not connected, nothing is sent.
+     *
+     * @dataProvider signupsThatSendNothing
+     */
+    public function testANewsletterFormSignupSendsNothingWhereTheSettingsSayNo(string $mode, bool $connected): void
+    {
+        $this->area = 'frontend';
+        $this->syncMode = $mode;
+        $this->connected = $connected;
+
+        $this->subscriptionManager()->subscribe('guest@example.com', 1);
+
+        self::assertSame([], $this->queuedContacts());
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: bool}>
+     */
+    public static function signupsThatSendNothing(): array
+    {
+        return [
+            'checkout opt-in only' => [SyncMode::MODE_CHECKOUT_OPTIN, true],
+            'not connected' => [SyncMode::MODE_CONSENT, false],
+        ];
+    }
+
+    /**
      * Change a stored subscriber's status through Magento's subscriber model,
      * its save event dispatched to the module's observer, in the test's area.
      * A REST save is the checkout opt-in, marked as OrderPlaced marks it.
@@ -235,6 +363,23 @@ class SubscriptionStatusTest extends IntegrationTestCase
     private function changeStatus(int $subscriberId, int $status): void
     {
         $storefrontSubscription = new StorefrontSubscription();
+        $eventManager = $this->observingEventManager($storefrontSubscription);
+
+        $save = function () use ($subscriberId, $status, $eventManager): void {
+            $resource = $this->subscriberResource();
+            $subscriber = $this->newSubscriber($eventManager, $resource);
+            $resource->load($subscriber, $subscriberId);
+            $resource->save($subscriber->setStatus($status)->setStatusChanged(true));
+        };
+        $this->area === 'webapi_rest' ? $storefrontSubscription->run($save) : $save();
+    }
+
+    /**
+     * An event manager that hands a subscriber save to the module's observer,
+     * in the test's area.
+     */
+    private function observingEventManager(StorefrontSubscription $storefrontSubscription): EventManagerInterface
+    {
         $appState = $this->createMock(State::class);
         $appState->method('getAreaCode')->willReturn($this->area);
         $observer = new SubscriberSaveAfter(
@@ -256,13 +401,31 @@ class SubscriptionStatusTest extends IntegrationTestCase
             }
         );
 
-        $save = function () use ($subscriberId, $status, $eventManager): void {
-            $resource = $this->subscriberResource();
-            $subscriber = $this->newSubscriber($eventManager, $resource);
-            $resource->load($subscriber, $subscriberId);
-            $resource->save($subscriber->setStatus($status)->setStatusChanged(true));
-        };
-        $this->area === 'webapi_rest' ? $storefrontSubscription->run($save) : $save();
+        return $eventManager;
+    }
+
+    /**
+     * Magento's own SubscriptionManager — what the storefront newsletter
+     * form calls — on real subscriber models whose saves reach the observer.
+     */
+    private function subscriptionManager(): SubscriptionManager
+    {
+        $eventManager = $this->observingEventManager(new StorefrontSubscription());
+        $resource = $this->subscriberResource();
+        $subscriberFactory = $this->createMock(SubscriberFactory::class);
+        $subscriberFactory->method('create')->willReturnCallback(
+            fn (): Subscriber => $this->newSubscriber($eventManager, $resource)
+        );
+
+        return $this->objectManager->create(SubscriptionManager::class, [
+            'subscriberFactory' => $subscriberFactory,
+            'logger' => $this->createMock(LoggerInterface::class),
+            'storeManager' => $this->storeManager,
+            'scopeConfig' => $this->env->getScopeConfig(),
+            'customerAccountManagement' => $this->createMock(AccountManagementInterface::class),
+            'customerRepository' => $this->createMock(CustomerRepositoryInterface::class),
+            'customerSubscriberCache' => $this->createMock(CustomerSubscriberCache::class),
+        ]);
     }
 
     private function contactsProcessor(JobManager $jobManager, SmailyClientProvider $clientProvider): ContactsProcessor
@@ -310,13 +473,14 @@ class SubscriptionStatusTest extends IntegrationTestCase
     }
 
     /**
-     * Contact sync active and connected, in the test's mode, no optional fields.
+     * Contact sync active, connected unless the test says not, in the test's
+     * mode, no optional fields.
      */
     private function config(): Config
     {
         $config = $this->createMock(Config::class);
         $config->method('isContactSyncActive')->willReturn(true);
-        $config->method('isConnected')->willReturn(true);
+        $config->method('isConnected')->willReturnCallback(fn (): bool => $this->connected);
         $config->method('getSyncMode')->willReturnCallback(fn (): string => $this->syncMode);
         $config->method('getSyncFields')->willReturn([]);
 
@@ -378,13 +542,14 @@ class SubscriptionStatusTest extends IntegrationTestCase
         return $storeManager;
     }
 
-    private function seedSubscriber(string $email, int $status, int $customerId = 0): int
+    private function seedSubscriber(string $email, int $status, int $customerId = 0, ?string $code = null): int
     {
         $this->connection->insert('newsletter_subscriber', [
             'store_id' => 1,
             'customer_id' => $customerId,
             'subscriber_email' => $email,
             'subscriber_status' => $status,
+            'subscriber_confirm_code' => $code,
         ]);
 
         return (int)$this->connection->fetchOne(

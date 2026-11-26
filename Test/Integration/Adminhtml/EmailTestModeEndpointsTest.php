@@ -60,6 +60,12 @@ class EmailTestModeEndpointsTest extends IntegrationTestCase
 
     private int $status = 200;
 
+    public function testBothEndpointsNeedTheIntelligenceAutomationsResource(): void
+    {
+        self::assertSame('Smaily_Connect::automations', TestSend::ADMIN_RESOURCE);
+        self::assertSame('Smaily_Connect::automations', TestMode::ADMIN_RESOURCE);
+    }
+
     public function testATestSendGoesToTheMappedEndpointWithTheTypedAddress(): void
     {
         $settings = $this->connectedSettings();

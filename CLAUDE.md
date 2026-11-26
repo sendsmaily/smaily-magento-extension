@@ -216,6 +216,11 @@ start one.
   arguments over the global ones whole, so the admin's order, customer
   and CMS grids lost their registrations ("Not registered handle").
   `Test/Unit/GridDataSourceRegistrationTest.php` fails on it.
+- **Each event name once per events.xml** (CON-437): developer mode
+  validates the file against events.xsd and a repeated `<event>` stops
+  every page and `bin/magento`; default and production mode do not
+  validate, so only developer mode shows it. Add an observer to the
+  event's one block. `Test/Unit/EventDeclarationTest.php` fails on it.
 - Sandbox: `docker compose up -d` — real Magento 2 at
   `localhost:8080/admin` (admin / smailydev1, 2FA modules disabled). The repo
   is bind-mounted as the module; `vendor/` inside the container is shadowed by

@@ -50,6 +50,11 @@ use Smaily\Connect\Model\Privacy\OptOutReplay;
  * only marked changed (CatalogIngest::buildChanged(), PRO-1967), so they go
  * out with this run's catalog batch.
  *
+ * A catalog row that a later row of the same product supersedes is closed
+ * as skipped before the batch is sent (IngestQueue::supersededRows(),
+ * CON-423): a retried row never puts an older stock or price back after a
+ * newer row went.
+ *
  * D6 responses are per-item: errors[].index maps back onto the batch rows,
  * so a 200 never marks the whole batch sent blindly (contract scar #5).
  * Transport failures (429 after retries, 5xx, network) reschedule the batch
@@ -185,6 +190,19 @@ class FlushIngestQueue
         $events = $this->queue->claimBatch($domain, Client::DOMAIN_BATCH_LIMITS[$domain], $connection);
         if (!$events) {
             return false;
+        }
+        if ($domain === Client::DOMAIN_CATALOG) {
+            // An older row of a product never goes after a newer one (CON-423).
+            $superseded = $this->queue->supersededRows($domain, $events, $connection);
+            $this->queue->markSkipped($superseded, IngestQueue::SKIPPED_SUPERSEDED);
+            $events = array_values(array_udiff(
+                $events,
+                $superseded,
+                static fn (IngestEvent $a, IngestEvent $b): int => (int)$a->getId() <=> (int)$b->getId()
+            ));
+            if (!$events) {
+                return true;
+            }
         }
         $client = $this->connections->client($connection);
 

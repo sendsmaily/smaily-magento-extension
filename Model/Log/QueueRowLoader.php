@@ -106,8 +106,9 @@ class QueueRowLoader
     /**
      * The row as the Log reads it. A withdrawn row is stored as sent with
      * the cancelled marker in place of an API reply (PRO-2453), a skipped
-     * one as sent with its reason in last_error (PRO-3619); each reads as
-     * its own status here, by the same rule the grid's UNION applies.
+     * one as sent with its reason in last_error (PRO-3619; in the engine
+     * ingest queue too, CON-423); each reads as its own status here, by the
+     * same rule the grid's UNION applies.
      *
      * @param array<string, mixed> $row
      * @return array<string, mixed>
@@ -116,10 +117,12 @@ class QueueRowLoader
     {
         $row['source'] = $source;
         $row['type'] = (string)($row[$typeColumn] ?? '');
-        if ($source !== Collection::SOURCE_SMAILY || (string)($row['status'] ?? '') !== Event::STATUS_SENT) {
+        if ((string)($row['status'] ?? '') !== Event::STATUS_SENT) {
             return $row;
         }
-        if ((string)($row['last_response'] ?? '') === EventQueue::CANCELLED_RESPONSE) {
+        if ($source === Collection::SOURCE_SMAILY
+            && (string)($row['last_response'] ?? '') === EventQueue::CANCELLED_RESPONSE
+        ) {
             $row['status'] = Collection::STATUS_WITHDRAWN;
         } elseif ((string)($row['last_error'] ?? '') !== '') {
             $row['status'] = Collection::STATUS_SKIPPED;

@@ -179,6 +179,21 @@ class IngestQueueTest extends IntegrationTestCase
     }
 
     /**
+     * CON-423: a newest unsent row that was tried before may be skipped at
+     * its retry — a later row of the product may already be delivered — so
+     * a row equal to it is queued, not left out.
+     */
+    public function testEnqueueChangedPayloadsQueuesARowEqualToARowThatWasTriedBefore(): void
+    {
+        $this->queue->enqueue('catalog', ['sku' => 'SKU-7'], '7', 1, 't-7');
+        $this->queue->markFailed($this->queue->claimBatch('catalog', 10)[0], 'HTTP 503');
+
+        self::assertSame([], $this->queue->latestUndeliveredPayloads('catalog', ['7']));
+        $primary = $this->engineConnection(0, $this->createMock(Settings::class), [1], [1], 1, true);
+        self::assertSame(1, $this->queue->enqueueChangedPayloads('catalog', ['7' => ['sku' => 'SKU-7']], $primary));
+    }
+
+    /**
      * PRO-1967: a product save queues its row and also reaches the stock
      * hooks; the row their marker builds is the same row, still waiting to be
      * sent, so it is not queued a second time. A different row is, and so is

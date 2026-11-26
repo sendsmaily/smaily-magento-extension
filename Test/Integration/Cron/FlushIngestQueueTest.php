@@ -19,6 +19,7 @@ use Smaily\Connect\Model\Engine\IngestPace;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Log\Resend;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\OptOutReplay;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
@@ -488,6 +489,113 @@ class FlushIngestQueueTest extends IntegrationTestCase
             self::assertSame(IngestEvent::STATUS_SENT, $rows[$uuid]['status'], $uuid);
             self::assertNull($rows[$uuid]['last_error'], $uuid);
         }
+    }
+
+    /**
+     * CON-423: a catalog row that failed waits for its retry while a later
+     * row of the product goes. At its retry it is closed as skipped, never
+     * sent: it would put the older stock back in the engine. Another
+     * product's row in the batch goes.
+     */
+    public function testARetriedCatalogRowIsSkippedOnceALaterRowOfTheProductWent(): void
+    {
+        $this->queue->enqueue(Client::DOMAIN_CATALOG, ['sku' => 'P7', 'in_stock' => false], '7', null, 's-old');
+        $this->queue->markFailed($this->queue->claimBatch(Client::DOMAIN_CATALOG, 10)[0], 'HTTP 503');
+        $this->queue->enqueue(Client::DOMAIN_CATALOG, ['sku' => 'P7', 'in_stock' => true], '7', null, 's-new');
+        $this->queue->markSent($this->queue->claimBatch(Client::DOMAIN_CATALOG, 10)[0]);
+        $this->queue->enqueue(Client::DOMAIN_CATALOG, ['sku' => 'P8', 'in_stock' => true], '8', null, 's-other');
+        $this->clock->travel(IngestQueue::BACKOFF_SECONDS[0]);
+
+        $client = $this->createMock(Client::class);
+        $client->expects(self::once())->method('ingest')
+            ->with(Client::DOMAIN_CATALOG, self::callback(
+                static fn (array $items): bool => array_column($items, 'event_id') === ['s-other']
+            ))
+            ->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+        $this->runCron($client);
+
+        $rows = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(IngestEvent::STATUS_SENT, $rows['s-old']['status']);
+        self::assertSame(IngestQueue::SKIPPED_SUPERSEDED, $rows['s-old']['last_error']);
+        self::assertSame('1', (string)$rows['s-old']['attempts'], 'Closed without another attempt');
+        self::assertNull($rows['s-old']['next_retry_at']);
+        self::assertNull($rows['s-old']['claim_token']);
+        self::assertSame(IngestEvent::STATUS_SENT, $rows['s-other']['status']);
+        self::assertNull($rows['s-other']['last_error']);
+    }
+
+    /**
+     * CON-423: of two rows of a product that come due together only the
+     * later goes, whatever order the claim hands them in.
+     */
+    public function testOfTwoRowsOfAProductThatComeDueTogetherOnlyTheLaterGoes(): void
+    {
+        $this->queue->enqueue(Client::DOMAIN_CATALOG, ['sku' => 'P7', 'in_stock' => true], '7', null, 'b-1');
+        $this->queue->enqueue(Client::DOMAIN_CATALOG, ['sku' => 'P7', 'in_stock' => false], '7', null, 'b-2');
+
+        $client = $this->createMock(Client::class);
+        $client->expects(self::once())->method('ingest')
+            ->with(Client::DOMAIN_CATALOG, self::callback(
+                static fn (array $items): bool => array_column($items, 'event_id') === ['b-2']
+            ))
+            ->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+        $this->runCron($client);
+
+        $rows = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(IngestQueue::SKIPPED_SUPERSEDED, $rows['b-1']['last_error']);
+        self::assertSame(IngestEvent::STATUS_SENT, $rows['b-2']['status']);
+        self::assertNull($rows['b-2']['last_error']);
+    }
+
+    /**
+     * CON-423: a "Send again" row stands where the row it sends again
+     * stood, so it is skipped once a row of the product later than that
+     * one went — and with no batch left, nothing is sent at all.
+     */
+    public function testASendAgainOfAnOlderCatalogRowIsSkippedOnceALaterRowWent(): void
+    {
+        $this->queue->enqueue(Client::DOMAIN_CATALOG, ['sku' => 'P7', 'in_stock' => false], '7', null, 'r-old');
+        $this->queue->markFailed($this->queue->claimBatch(Client::DOMAIN_CATALOG, 10)[0], 'HTTP 400', true);
+        $this->queue->enqueue(Client::DOMAIN_CATALOG, ['sku' => 'P7', 'in_stock' => true], '7', null, 'r-new');
+        $this->queue->markSent($this->queue->claimBatch(Client::DOMAIN_CATALOG, 10)[0]);
+        $this->queue->enqueue(Client::DOMAIN_CATALOG, [
+            'sku' => 'P7',
+            'in_stock' => false,
+            Resend::PAYLOAD_KEY => ['of' => 1, 'by' => 'admin', 'at' => '2026-11-26T10:00:00Z'],
+        ], '7', null, 'r-again');
+
+        $client = $this->createMock(Client::class);
+        $client->expects(self::never())->method('ingest');
+        $this->runCron($client);
+
+        $rows = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(IngestEvent::STATUS_SENT, $rows['r-again']['status']);
+        self::assertSame(IngestQueue::SKIPPED_SUPERSEDED, $rows['r-again']['last_error']);
+    }
+
+    /**
+     * CON-423: a later row that failed supersedes nothing — the retried
+     * row is the newest the engine can still get, and goes.
+     */
+    public function testARetriedCatalogRowGoesWhenTheLaterRowOfTheProductFailed(): void
+    {
+        $this->queue->enqueue(Client::DOMAIN_CATALOG, ['sku' => 'P7', 'in_stock' => false], '7', null, 'f-old');
+        $this->queue->markFailed($this->queue->claimBatch(Client::DOMAIN_CATALOG, 10)[0], 'HTTP 503');
+        $this->queue->enqueue(Client::DOMAIN_CATALOG, ['sku' => 'P7', 'in_stock' => true], '7', null, 'f-new');
+        $this->queue->markFailed($this->queue->claimBatch(Client::DOMAIN_CATALOG, 10)[0], 'price: rejected', true);
+        $this->clock->travel(IngestQueue::BACKOFF_SECONDS[0]);
+
+        $client = $this->createMock(Client::class);
+        $client->expects(self::once())->method('ingest')
+            ->with(Client::DOMAIN_CATALOG, self::callback(
+                static fn (array $items): bool => array_column($items, 'event_id') === ['f-old']
+            ))
+            ->willReturn(['processed' => 1, 'deduplicated' => 0, 'errors' => []]);
+        $this->runCron($client);
+
+        $rows = array_column($this->fetchAll(IngestEventResource::TABLE_NAME), null, 'event_uuid');
+        self::assertSame(IngestEvent::STATUS_SENT, $rows['f-old']['status']);
+        self::assertNull($rows['f-old']['last_error']);
     }
 
     /**

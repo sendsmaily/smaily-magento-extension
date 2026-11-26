@@ -15,6 +15,7 @@ use Magento\Framework\DB\Select;
 use Magento\Framework\Event\ManagerInterface as EventManager;
 use Magento\Framework\View\Element\UiComponent\DataProvider\SearchResult;
 use Psr\Log\LoggerInterface as Logger;
+use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Log\FailureMessage;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
@@ -68,6 +69,23 @@ class Collection extends SearchResult
             $connection->quote(Event::STATUS_SENT),
             $connection->quote(EventQueue::CANCELLED_RESPONSE),
             $connection->quote(self::STATUS_WITHDRAWN),
+            $connection->quote(self::STATUS_SKIPPED),
+            $alias
+        ));
+    }
+
+    /**
+     * The status the Log shows for a row of the engine ingest queue, as SQL
+     * over its columns (prefixed with $alias): a sent row with a skip reason
+     * reads Skipped (a catalog row a newer row superseded, CON-423), any
+     * other row its stored status. The grid and the Dashboard's recent
+     * activity both read it from here.
+     */
+    public static function intelligenceStatusExpression(AdapterInterface $connection, string $alias): \Zend_Db_Expr
+    {
+        return new \Zend_Db_Expr(sprintf(
+            'CASE WHEN %3$s.status = %1$s AND %3$s.last_error <> \'\' THEN %2$s ELSE %3$s.status END',
+            $connection->quote(IngestEvent::STATUS_SENT),
             $connection->quote(self::STATUS_SKIPPED),
             $alias
         ));
@@ -188,12 +206,12 @@ class Collection extends SearchResult
                 'source' => new \Zend_Db_Expr($connection->quote($source)),
                 'type' => 'q.' . $typeColumn,
                 'entity_id' => 'q.entity_id',
-                // Only the marketing queue withdraws or skips rows, so only
-                // its half can carry either marker; the grid label and the
-                // status filter both read this one derived column.
+                // Only the marketing queue withdraws rows; both queues skip
+                // rows. The grid label and the status filter both read this
+                // one derived column.
                 'status' => $source === self::SOURCE_SMAILY
                     ? self::smailyStatusExpression($connection, 'q')
-                    : 'q.status',
+                    : self::intelligenceStatusExpression($connection, 'q'),
                 'attempts' => 'q.attempts',
                 'last_error' => 'q.last_error',
                 'created_at' => 'q.created_at',

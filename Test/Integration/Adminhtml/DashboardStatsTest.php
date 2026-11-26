@@ -9,6 +9,8 @@ declare(strict_types=1);
 namespace Smaily\Connect\Test\Integration\Adminhtml;
 
 use Smaily\Connect\Model\Adminhtml\DashboardStats;
+use Smaily\Connect\Model\Engine\Queue\IngestEvent;
+use Smaily\Connect\Model\Engine\Queue\IngestQueue;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
@@ -72,7 +74,8 @@ class DashboardStatsTest extends IntegrationTestCase
     /**
      * PRO-3634: the Campaign Intelligence tile counts a catalog item only
      * when the engine accepted it: a row waiting, being sent or failed is
-     * not counted, nor is a product removal (its own domain).
+     * not counted, nor is a product removal (its own domain) or a row a
+     * newer row of the product superseded (CON-423).
      */
     public function testCatalogItemsDeliveredCountsOnlyTheRowsTheEngineAccepted(): void
     {
@@ -84,6 +87,7 @@ class DashboardStatsTest extends IntegrationTestCase
         $this->ingestRow('sending', $today);
         $this->ingestRow('failed', $today);
         $this->ingestRow('sent', $today, 'catalog_remove');
+        $this->ingestRow('sent', $today, 'catalog', IngestQueue::SKIPPED_SUPERSEDED);
 
         self::assertSame(2, $this->objectManager->create(DashboardStats::class)->catalogItemsDelivered());
     }
@@ -105,12 +109,14 @@ class DashboardStatsTest extends IntegrationTestCase
         ]);
         $this->smailyRow('failed', $today, 5, ['last_error' => 'boom']);
         $this->ingestRow('sent', $today);
+        $this->ingestRow('sent', $today, 'catalog', IngestQueue::SKIPPED_SUPERSEDED);
 
         $statuses = [];
         foreach ($this->objectManager->create(DashboardStats::class)->recentActivity() as $row) {
             $statuses[$row['source']][] = $row['status'];
         }
         sort($statuses['smaily']);
+        sort($statuses['intelligence']);
 
         self::assertSame(
             [
@@ -120,7 +126,7 @@ class DashboardStatsTest extends IntegrationTestCase
                     Collection::STATUS_SKIPPED,
                     Collection::STATUS_WITHDRAWN,
                 ],
-                'intelligence' => ['sent'],
+                'intelligence' => [IngestEvent::STATUS_SENT, Collection::STATUS_SKIPPED],
             ],
             $statuses
         );
@@ -172,14 +178,19 @@ class DashboardStatsTest extends IntegrationTestCase
         ]);
     }
 
-    private function ingestRow(string $status, string $createdAt, string $domain = 'catalog'): void
-    {
+    private function ingestRow(
+        string $status,
+        string $createdAt,
+        string $domain = 'catalog',
+        ?string $lastError = null
+    ): void {
         $this->connection->insert(IngestEventResource::TABLE_NAME, [
             'domain' => $domain,
             'entity_id' => '1',
             'event_uuid' => 'dash-' . ++$this->sequence,
             'payload' => '{}',
             'status' => $status,
+            'last_error' => $lastError,
             'created_at' => $createdAt,
             'updated_at' => $createdAt,
         ]);

@@ -52,14 +52,16 @@ class DashboardStats
 
     /**
      * Delivered catalog items still in the 30-day retention window. The
-     * ingest queue marks a row `sent` only on the engine's answer — it
-     * never skips or withdraws one.
+     * ingest queue also closes a catalog row as `sent` when a newer row of
+     * the product supersedes it (reason in `last_error`, CON-423); the Log
+     * reads it as Skipped, and it is not counted here.
      */
     public function catalogItemsDelivered(): int
     {
         return $this->count(IngestEventResource::TABLE_NAME, [
             'status = ?' => 'sent',
             'domain = ?' => 'catalog',
+            "COALESCE(last_error, '') = ?" => '',
         ]);
     }
 
@@ -83,10 +85,10 @@ class DashboardStats
     }
 
     /**
-     * The latest queue rows from both queues, newest first. A marketing-queue
-     * row's status is the one the Log shows (PRO-3642): Skipped and
-     * Withdrawn are read off the row the same way, never shown as Sent; its
-     * Entity too (PRO-3765, EntityLabel).
+     * The latest queue rows from both queues, newest first. A row's status
+     * is the one the Log shows (PRO-3642; an ingest row's too, CON-423):
+     * Skipped and Withdrawn are read off the row the same way, never shown
+     * as Sent; a marketing-queue row's Entity too (PRO-3765, EntityLabel).
      *
      * @return array<int, array{source: string, type: string, entity_id: string,
      *     status: string, updated_at: string}>
@@ -113,10 +115,10 @@ class DashboardStats
         }
 
         $ingestSelect = $connection->select()
-            ->from($this->resourceConnection->getTableName(IngestEventResource::TABLE_NAME), [
+            ->from(['q' => $this->resourceConnection->getTableName(IngestEventResource::TABLE_NAME)], [
                 'type' => 'domain',
                 'entity_id',
-                'status',
+                'status' => LogCollection::intelligenceStatusExpression($connection, 'q'),
                 'updated_at',
             ])
             ->order('updated_at DESC')

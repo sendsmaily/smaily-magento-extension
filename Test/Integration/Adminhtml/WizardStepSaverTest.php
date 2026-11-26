@@ -26,8 +26,10 @@ use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
+use Smaily\Connect\Model\Automation\Mapping;
 use Smaily\Connect\Model\Automation\MappingSaver;
 use Smaily\Connect\Model\Automation\Router;
+use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Client\CredentialCheck;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
@@ -1019,6 +1021,108 @@ class WizardStepSaverTest extends IntegrationTestCase
     }
 
     /**
+     * CON-281: one store to separate stores carries the transactional-email
+     * account, its switches and its workflows as the other sections: each
+     * website keeps the account it sends with — the one for all websites,
+     * or its own — and the values for all websites go.
+     */
+    public function testOneStoreToSeparateStoresGivesEveryWebsiteItsTransactionalAccount(): void
+    {
+        $encrypted = $this->objectManager->get(EncryptorInterface::class)->encrypt('tx-secret');
+        $this->saver('0')->save('connect', ['subdomain' => 'shop', 'username' => 'api-user', 'password' => 'secret']);
+        foreach ([
+            Config::XML_PATH_TRANSACTIONAL_ENABLED => '1',
+            Config::XML_PATH_TRANSACTIONAL_SUBDOMAIN => 'shop-tx',
+            Config::XML_PATH_TRANSACTIONAL_USERNAME => 'api-tx',
+            Config::XML_PATH_TRANSACTIONAL_PASSWORD => $encrypted,
+            Config::XML_PATH_ORDER_CONFIRMATION_ENABLED => '1',
+        ] as $path => $value) {
+            $this->insertRow('default', 0, $path, $value);
+        }
+        $this->transactionalRow(0, 500);
+        // Second uses its own transactional account, with its own workflow.
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_TRANSACTIONAL_SUBDOMAIN, 'second-tx');
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_TRANSACTIONAL_USERNAME, 'api-second-tx');
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_TRANSACTIONAL_PASSWORD, $encrypted);
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT, '1');
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_ORDER_CONFIRMATION_ENABLED, '0');
+        $this->transactionalRow(self::SECOND, 700);
+
+        self::assertSame([], $this->saver((string)self::MAIN)->save('shape', ['shape' => 'separate']));
+
+        foreach ([
+            Config::XML_PATH_TRANSACTIONAL_ENABLED,
+            Config::XML_PATH_TRANSACTIONAL_SUBDOMAIN,
+            Config::XML_PATH_TRANSACTIONAL_PASSWORD,
+            Config::XML_PATH_ORDER_CONFIRMATION_ENABLED,
+        ] as $path) {
+            self::assertNotContains(['default', 0], $this->scopesOf($path), 'The value for all websites goes: ' . $path);
+        }
+        self::assertSame('shop-tx', $this->config->getTransactionalSubdomain(self::MAIN));
+        self::assertSame('api-tx', $this->config->getTransactionalUsername(self::MAIN));
+        self::assertSame('tx-secret', $this->config->getTransactionalPassword(self::MAIN));
+        self::assertSame('second-tx', $this->config->getTransactionalSubdomain(self::SECOND), 'Its own account stays');
+        foreach ([self::MAIN, self::SECOND] as $websiteId) {
+            self::assertTrue($this->config->isTransactionalEnabled($websiteId), 'Sends transactional emails: ' . $websiteId);
+        }
+        self::assertTrue($this->config->isOrderConfirmationEnabled(self::MAIN));
+        self::assertFalse($this->config->isOrderConfirmationEnabled(self::SECOND), 'Its own switch stays');
+        self::assertSame(
+            [[self::MAIN, 500], [self::SECOND, 700]],
+            $this->transactionalWorkflows(),
+            'The workflows for all websites are Main\'s; Second keeps its own account\'s'
+        );
+    }
+
+    /**
+     * CON-281: separate stores back to one store promotes the selected
+     * website's transactional-email account, switches and workflows as the
+     * Smaily account, and every website's own ones go.
+     */
+    public function testSeparateStoresBackToOneStoreUsesTheSelectedWebsitesTransactionalAccount(): void
+    {
+        $this->storeLayout()->toSeparateStores();
+        $encrypted = $this->objectManager->get(EncryptorInterface::class)->encrypt('tx-secret');
+        foreach ([self::MAIN => 'main-tx', self::SECOND => 'second-tx'] as $websiteId => $subdomain) {
+            $this->saver((string)$websiteId)->save('connect', [
+                'subdomain' => str_replace('-tx', '-shop', $subdomain),
+                'username' => 'api-user',
+                'password' => 'secret',
+            ]);
+            foreach ([
+                Config::XML_PATH_TRANSACTIONAL_ENABLED => '1',
+                Config::XML_PATH_TRANSACTIONAL_SUBDOMAIN => $subdomain,
+                Config::XML_PATH_TRANSACTIONAL_USERNAME => 'api-tx',
+                Config::XML_PATH_TRANSACTIONAL_PASSWORD => $encrypted,
+                Config::XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT => '1',
+                Config::XML_PATH_SHIPMENT_CONFIRMATION_ENABLED => $websiteId === self::SECOND ? '1' : '0',
+            ] as $path => $value) {
+                $this->insertRow('websites', $websiteId, $path, $value);
+            }
+            $this->transactionalRow($websiteId, $websiteId * 100);
+        }
+
+        self::assertSame([], $this->saver((string)self::SECOND)->save('shape', ['shape' => 'one']));
+
+        foreach ([
+            Config::XML_PATH_TRANSACTIONAL_ENABLED,
+            Config::XML_PATH_TRANSACTIONAL_SUBDOMAIN,
+            Config::XML_PATH_TRANSACTIONAL_PASSWORD,
+            Config::XML_PATH_SHIPMENT_CONFIRMATION_ENABLED,
+        ] as $path) {
+            self::assertSame([['default', 0]], $this->scopesOf($path), $path);
+        }
+        self::assertSame([], $this->scopesOf(Config::XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT), 'No website has its own');
+        foreach ([self::MAIN, self::SECOND] as $websiteId) {
+            self::assertSame('second-tx', $this->config->getTransactionalSubdomain($websiteId));
+            self::assertSame('tx-secret', $this->config->getTransactionalPassword($websiteId));
+            self::assertTrue($this->config->isTransactionalEnabled($websiteId));
+            self::assertTrue($this->config->isShipmentConfirmationEnabled($websiteId));
+        }
+        self::assertSame([[0, 700]], $this->transactionalWorkflows());
+    }
+
+    /**
      * CON-279: leaving separate stores dispatches the joined event right
      * before the websites' own values go (the seam for each website's own
      * engine connection); from one store it dispatches nothing.
@@ -1124,6 +1228,38 @@ class WizardStepSaverTest extends IntegrationTestCase
             'scope_id = ?' => $websiteId,
             'path = ?' => Config::XML_PATH_SUBDOMAIN,
         ]);
+    }
+
+    /**
+     * A transactional Order confirmation workflow of a website (0: for all
+     * websites), as MappingSaver::saveTransactional() stores it.
+     */
+    private function transactionalRow(int $websiteId, int $workflowId): void
+    {
+        $this->connection->insert(MappingResource::TABLE_NAME, [
+            'website_id' => $websiteId,
+            'trigger_type' => Trigger::ORDER_CONFIRMATION,
+            'language' => 'default',
+            'account_key' => Mapping::ACCOUNT_TRANSACTIONAL,
+            'workflow_id' => $workflowId,
+            'is_default_fallback' => 1,
+        ]);
+    }
+
+    /**
+     * @return array<int, array{0: int, 1: int}> each transactional row's website and workflow, in order
+     */
+    private function transactionalWorkflows(): array
+    {
+        return array_map(
+            static fn (array $row): array => [(int)$row['website_id'], (int)$row['workflow_id']],
+            $this->connection->fetchAll(
+                $this->connection->select()
+                    ->from(MappingResource::TABLE_NAME, ['website_id', 'workflow_id'])
+                    ->where('account_key = ?', Mapping::ACCOUNT_TRANSACTIONAL)
+                    ->order('website_id')
+            )
+        );
     }
 
     /**

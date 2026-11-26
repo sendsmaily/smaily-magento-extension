@@ -2597,25 +2597,38 @@ Initial setup, Settings, Log. Design rules:
       finished and the website holds a Smaily account
       (`WizardData::isWebsiteSetUp()`); the setup-completed mark stays one
       for the store.
+    - A layout change carries four sections (`StoreLayout::SECTIONS`): the
+      three above and, since CON-281, the transactional emails
+      (`WebsiteOverrides::TRANSACTIONAL`: the account, its own-account mark,
+      the four switches and the transactional mapping rows). The latter is
+      no "own" section of one store — a website saves its switches for
+      itself and may use its own account — so only the layout change reads
+      it as one.
     - One store → separate stores copies, for every website, each
-      default-scope row of the three sections it does not hold to its
+      default-scope row of the four sections it does not hold to its
       website scope as stored (the password stays encrypted) and the
       store-wide mapping rows (website 0) it has no row for
       (`WebsiteOverrides::copyStoreWideToWebsite()`; a copied default
       fallback only where the website has none of that kind); a website on
       another account (CON-190) gets its missing workflows as none and no
-      store-wide rows, as the Router read it. Then the store-wide values of
-      the three sections and website 0's non-transactional rows go
-      (`removeStoreWideValues()`), so a website added later starts with
-      nothing set. Every website reads and sends exactly as before.
+      store-wide rows, as the Router read it. The transactional rows are one
+      set per website, as `WizardData::getTransactionalTriggers()` reads
+      them: a website without rows of its own and without its own
+      transactional account gets all of website 0's, any other none. Then
+      the store-wide values of the four sections and website 0's mapping
+      rows go (`removeStoreWideValues()`), so a website added later starts
+      with nothing set. Every website reads and sends exactly as before.
     - Separate stores → one store (the page asks first): the selected
       website's own values become the store-wide ones
       (`promoteToStoreWide()`: mode A becomes Single language; its
-      one-account mapping rows join website 0's, its own winning), then
+      one-account mapping rows join website 0's, its own winning; its
+      transactional rows replace website 0's where it holds any or uses its
+      own transactional account; the own-account mark stays a website
+      value), then
       `StoreLayout::EVENT_JOINED` (`smaily_connect_store_layout_joined`,
       `website_ids`, `website_id`) is dispatched — the seam where phase 2
       (CON-237) will disconnect each website's own engine connection; today
-      nothing listens — and every website's own values of the three
+      nothing listens — and every website's own values of the four
       sections are removed (with its store views' accounts). Contacts
       confirmations stay.
     - Upgrades (CON-192): a store whose websites hold different Smaily
@@ -2635,7 +2648,17 @@ Initial setup, Settings, Log. Design rules:
   - The Settings page renders an explicit website selector next to the tab
     strip (own chrome, not Magento's native store-switcher), reloading with
     `?website=<id>`; single-website installs never see it or the switches.
-    Under separate stores the website picker at the top replaces it.
+    Under separate stores the website picker at the top replaces it
+    (`panel/website-picker.phtml`, drawn by `panel/store-shape.phtml`).
+  - The Dashboard of separate stores (CON-281) draws the same picker
+    (a child block with `WizardData`) and follows it, as Settings does: the
+    selected website — else the default website — gives the Smaily card
+    and narrows the marketing queue's figures (`DashboardStats` and
+    `QueueHealth::failedSince()` take a website id: contact syncs, queued
+    today, failed, recent activity) to its rows; the Campaign Intelligence
+    queue stays the whole installation's. Its Settings and setup links
+    carry the website. Under one store nothing changes, and the failed
+    count stays the one the HealthCheck notification counts.
     Campaign Intelligence and RSS stay installation-wide (default scope).
   - The store-wide setup reads the default scope on a 2+-website install,
     with every website's languages and every website's contacts in the

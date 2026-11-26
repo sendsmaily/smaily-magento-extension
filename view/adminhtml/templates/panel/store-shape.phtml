@@ -10,10 +10,10 @@
  *
  * - The bar names the shape — One store in several versions, or Separate
  *   stores — with Change, which opens the choice below.
- * - Separate stores: the website selector, one link per website with the
- *   Smaily subdomain it uses (or Not set up), reloading the page with
- *   `?website=<id>`; the page then shows that website on its own, as a
- *   single store's page does.
+ * - Separate stores: the website selector (panel/website-picker.phtml),
+ *   one link per website with the Smaily subdomain it uses (or Not set
+ *   up), reloading the page with `?website=<id>`; the page then shows that
+ *   website on its own, as a single store's page does.
  * - The choice: two cards and a save, posted as the `shape` step
  *   (WizardStepSaver::saveShape()). The initial setup of a store whose shape
  *   is not known yet (WizardData::isShapeChoiceFirst()) opens on it, with the
@@ -48,7 +48,7 @@ $shapes = [
     ],
 ];
 $current = $separate ? 'separate' : 'one';
-$toOne = __('All websites then use the settings of %1: its Smaily account, Contacts settings and automations. The other websites\' own settings are removed.', $selectedName);
+$toOne = __('All websites then use the settings of %1: its Smaily account, Contacts settings, automations and transactional emails. The other websites\' own settings are removed.', $selectedName);
 ?>
 <div class="smaily-store-shape" id="smaily-store-shape"
      data-shape="<?= $escaper->escapeHtmlAttr($current) ?>"
@@ -59,18 +59,7 @@ $toOne = __('All websites then use the settings of %1: its Smaily account, Conta
         <strong class="smaily-store-shape__name" id="smaily-shape-name"><?= $escaper->escapeHtml($shapes[$current]['label']) ?></strong>
         <button type="button" class="smaily-store-shape__change" id="smaily-shape-change"><?= $escaper->escapeHtml(__('Change')) ?></button>
     </div>
-    <?php if ($separate): ?>
-    <nav class="smaily-website-picker" id="smaily-website-picker" aria-label="<?= $escaper->escapeHtmlAttr(__('Website')) ?>">
-        <?php foreach ($websites as $websiteId => $website): ?>
-        <?php $active = $websiteId === $selectedWebsiteId; ?>
-        <a class="smaily-website-picker__item<?= $active ? ' is-active' : '' ?>"
-           href="?website=<?= (int)$websiteId ?>" data-website-id="<?= (int)$websiteId ?>"<?= $active ? ' aria-current="page"' : '' ?>>
-            <span class="smaily-website-picker__name"><?= $escaper->escapeHtml($website['name']) ?></span>
-            <span class="smaily-website-picker__account"><?= $escaper->escapeHtml($website['subdomain'] !== '' ? $website['subdomain'] . '.sendsmaily.net' : __('Not set up')) ?></span>
-        </a>
-        <?php endforeach; ?>
-    </nav>
-    <?php endif; ?>
+    <?= /* @noEscape */ $block->fetchView($block->getTemplateFile('Smaily_Connect::panel/website-picker.phtml')) ?>
     <div class="smaily-card smaily-shape-choice" id="smaily-shape-choice"<?= $first ? '' : ' style="display:none;"' ?>>
         <h2><?= $escaper->escapeHtml(__('How are your websites run?')) ?></h2>
         <p><?= $escaper->escapeHtml(__('This installation has %1 websites: %2.', count($websites), implode(', ', array_column($websites, 'name')))) ?></p>

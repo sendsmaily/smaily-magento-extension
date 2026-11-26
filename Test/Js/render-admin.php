@@ -1846,8 +1846,8 @@ $layoutStrings = [
     'How are your websites run?',
     'This installation has %1 websites: %2.',
     'Each website keeps the settings it uses now, as its own. Change them for each website afterwards.',
-    'All websites then use the settings of %1: its Smaily account, Contacts settings and automations. The other'
-        . ' websites\' own settings are removed.',
+    'All websites then use the settings of %1: its Smaily account, Contacts settings, automations and'
+        . ' transactional emails. The other websites\' own settings are removed.',
     'Campaign Intelligence is one connection for the whole installation, whichever website you pick: it covers every'
         . ' website (%1).',
     'Continue',
@@ -2100,7 +2100,9 @@ $pages['settings-long-wait'] = [
  * Smaily and Campaign Intelligence connected, browse tracking on, nothing
  * failed. The -storefront page has a Storefront URL saved (PRO-3918); the
  * -unsent page has had no nightly product list for three nights, the last
- * one held back by product changes waiting in the Log (PRO-3914).
+ * one held back by product changes waiting in the Log (PRO-3914); the
+ * -separate page is the three-website store set up as separate stores,
+ * with Latvia selected (CON-281).
  */
 $dashboardViewModel = static fn (
     bool $separateStorefront,
@@ -2248,6 +2250,14 @@ $dashboardViewModel = static fn (
     {
         return [];
     }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getWebsiteQuery(): array
+    {
+        return [];
+    }
 };
 $dashboardStrings = [
     'Browse tracking',
@@ -2273,6 +2283,18 @@ $pages['dashboard-unsent'] = [
     'template' => $root . '/view/adminhtml/templates/dashboard/index.phtml',
     'viewModel' => $dashboardViewModel(false, true),
     'strings' => $dashboardStrings,
+];
+$pages['dashboard-separate'] = [
+    'template' => $root . '/view/adminhtml/templates/dashboard/index.phtml',
+    'viewModel' => $dashboardViewModel(false),
+    'data' => ['children' => [
+        'website.picker' => [
+            $root . '/view/adminhtml/templates/panel/website-picker.phtml',
+            $layoutViewModel(false, false, true),
+            [],
+        ],
+    ]],
+    'strings' => array_merge($dashboardStrings, ['Not set up']),
 ];
 
 /*

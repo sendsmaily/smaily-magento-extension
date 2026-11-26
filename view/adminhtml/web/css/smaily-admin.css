@@ -637,6 +637,9 @@
 /* A long step error (e.g. the workflow list failing) wraps beside the button
  * instead of pushing it out of the pane. */
 .smaily-wizard .smaily-footer .smaily-inline-status { white-space: normal; line-height: 1.4; }
+/* The Connect step's hint while Continue waits for a passed connection test
+ * (CON-417, the WooCommerce setup's muted line beside the button). */
+.smaily-wizard .smaily-footer .smaily-continue-hint { font-size: var(--fs-13); line-height: 1.4; color: var(--s-text-3); }
 .smaily-wizard #smaily-w-back {
     padding: 9px 14px; background: transparent; border-color: transparent;
     color: var(--s-link); font-weight: 600; font-size: var(--fs-13);

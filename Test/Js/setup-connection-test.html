@@ -1,0 +1,243 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the initial setup's Connect step and its connection
+  test (CON-417, as in the WooCommerce and Shopify setups): the real
+  templates — wizard/index.phtml with panel/connection.phtml and
+  panel/panels-js.phtml — rendered in en_US and et_EE by
+  Test/Js/render-admin.php into Test/Js/build/, with jQuery from vendor/,
+  one fresh frame per scenario. Stubbed: RequireJS's require() and the
+  requests (fetch), each recorded and answered with the scenario's answer.
+
+  Checked: with a saved Smaily account that Smaily did not accept at the
+  last check, Continue is disabled and "Test your Smaily connection to
+  continue." stands beside it, so a click saves nothing; a refused Test
+  connection leaves it so; an accepted one enables Continue and hides the
+  line; an edited credential asks for the test again. Continue after an
+  accepted test saves the Connect step with `initial_setup`, and the setup
+  moves on to Contacts. When the save refuses the account, the setup stays
+  on Connect, the message shows above the form and Contacts stays locked.
+  With a saved account Smaily accepted at the last check, Continue is
+  enabled at once, as before.
+
+  Run it with bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>setup connection test harness</title>
+    <script src="build/setup-connect.en_US.js"></script>
+    <script src="build/setup-connect.et_EE.js"></script>
+    <script src="build/setup-connect-verified.en_US.js"></script>
+    <script src="build/setup-connect-verified.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var HINT = 'Test your Smaily connection to continue.';
+    var ACCEPTED = {connected: true, checked: true, accountName: 'demo'};
+    var REFUSED = {connected: false, checked: true, error: 'Smaily rejected these credentials.'};
+    var SAVED = {saved: true, errors: [], verified: true, accountName: 'demo', storefrontUrlChanged: false};
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    function text(element) {
+        return element ? element.textContent.replace(/\s+/g, ' ').trim() : null;
+    }
+
+    function shown(element) {
+        return !!element && element.ownerDocument.defaultView.getComputedStyle(element).display !== 'none';
+    }
+
+    // Runs in the frame before the page: the admin's form key, require()
+    // for a page script that asks for jQuery, and the requests, each
+    // recorded and answered with window.answer.
+    function stubs() {
+        return [
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.require = function (deps, callback) { callback(window.jQuery); };',
+            'window.requests = [];',
+            'window.answer = {};',
+            'window.fetch = function (url, options) {',
+            '  window.requests.push({url: url, body: JSON.parse(options.body || "{}")});',
+            '  return Promise.resolve(new Response(JSON.stringify(window.answer),',
+            '    {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>'
+        ].join('\n');
+    }
+
+    function open(page) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.style.width = '1200px';
+            frame.style.height = '900px';
+            frame.onload = function () {
+                wait(100).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs()
+                + '</head><body>' + rendered.html + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    // Answers the frame's next requests with `answer` and presses `button`.
+    async function press(frame, button, answer) {
+        frame.contentWindow.answer = answer;
+        frame.contentDocument.getElementById(button).click();
+        await wait(100);
+    }
+
+    function saves(frame) {
+        return frame.contentWindow.requests.filter(function (request) {
+            return request.url.indexOf('savestep') !== -1;
+        });
+    }
+
+    function waiting(doc, strings) {
+        var hint = doc.getElementById('smaily-w-continue-hint');
+
+        return doc.getElementById('smaily-w-next').disabled && shown(hint) && text(hint) === strings[HINT];
+    }
+
+    function open1(doc) {
+        return doc.querySelector('.smaily-step-panel.active').getAttribute('data-step') === '1';
+    }
+
+    async function notTested(locale) {
+        var page = 'setup-connect.' + locale,
+            strings = window.smailyAdminPages[page].strings,
+            frame = await open(page),
+            doc = frame.contentDocument;
+
+        check(locale + ': without a passed test Continue waits, with "' + HINT + '" beside it',
+            waiting(doc, strings));
+        await press(frame, 'smaily-w-next', SAVED);
+        check(locale + ': a click on the waiting Continue saves nothing and stays on Connect',
+            saves(frame).length === 0 && open1(doc));
+
+        await press(frame, 'smaily-w-test', REFUSED);
+        check(locale + ': a refused test leaves Continue waiting', waiting(doc, strings));
+
+        await press(frame, 'smaily-w-test', ACCEPTED);
+        check(locale + ': an accepted test enables Continue and hides the line',
+            !doc.getElementById('smaily-w-next').disabled
+            && !shown(doc.getElementById('smaily-w-continue-hint')));
+
+        var username = doc.getElementById('smaily-w-username');
+        username.value = 'other-user';
+        username.dispatchEvent(new Event('input', {bubbles: true}));
+        doc.getElementById('smaily-w-password').value = 'other-secret';
+        await wait(50);
+        check(locale + ': an edited credential asks for the test again', waiting(doc, strings));
+
+        await press(frame, 'smaily-w-test', ACCEPTED);
+        await press(frame, 'smaily-w-next', SAVED);
+        var posted = saves(frame);
+        check(locale + ': Continue saves the Connect step for the initial setup',
+            posted.length === 1 && posted[0].body.step === 'connect'
+            && posted[0].body.data.initial_setup === true
+            && posted[0].body.data.username === 'other-user'
+            && posted[0].body.data.password === 'other-secret');
+        check(locale + ': and the setup moves on to Contacts',
+            doc.querySelector('.smaily-step-panel.active').getAttribute('data-step') === '2');
+    }
+
+    async function refusedOnSave(locale) {
+        var page = 'setup-connect.' + locale,
+            strings = window.smailyAdminPages[page].strings,
+            frame = await open(page),
+            doc = frame.contentDocument;
+
+        await press(frame, 'smaily-w-test', ACCEPTED);
+        await press(frame, 'smaily-w-next', {
+            saved: false,
+            errors: [{field: 'step', message: strings[HINT]}]
+        });
+        var banner = doc.querySelector('.smaily-step-panel[data-step="1"] .smaily-form-banner');
+        check(locale + ': an account the save refuses keeps the setup on Connect, with the message above the form',
+            saves(frame).length === 1 && open1(doc)
+            && text(banner && banner.querySelector('.smaily-banner__message')) === strings[HINT]
+            && text(doc.getElementById('smaily-w-save-result')).indexOf(strings['Saving failed.']) !== -1);
+        check(locale + ': and Contacts stays locked',
+            !doc.querySelector('.smaily-steps li[data-step="2"]').classList.contains('done'));
+    }
+
+    async function verified(locale) {
+        var page = 'setup-connect-verified.' + locale,
+            frame = await open(page),
+            doc = frame.contentDocument;
+
+        check(locale + ': a saved account Smaily accepted at the last check continues at once',
+            !doc.getElementById('smaily-w-next').disabled
+            && !shown(doc.getElementById('smaily-w-continue-hint')));
+        await press(frame, 'smaily-w-next', SAVED);
+        check(locale + ': and Continue saves and moves on to Contacts',
+            saves(frame).length === 1
+            && doc.querySelector('.smaily-step-panel.active').getAttribute('data-step') === '2');
+    }
+
+    (async function () {
+        try {
+            for (var locale of ['en_US', 'et_EE']) {
+                await notTested(locale);
+                await refusedOnSave(locale);
+                await verified(locale);
+            }
+        } catch (error) {
+            failures++;
+            log('FAIL ' + (error && error.stack ? error.stack : error));
+        }
+        clearInterval(keepAlive);
+        document.getElementById('result').textContent = failures === 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    })();
+</script>
+</body>
+</html>

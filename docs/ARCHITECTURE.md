@@ -2902,9 +2902,14 @@ Initial setup, Settings, Log. Design rules:
   records the answers at its one chokepoint: a passed
   `validateCredentials()` accepts (Test connection, and the connection save
   — `WizardStepSaver::saveConnect()` checks what it just saved and never
-  fails the save on the answer); any 401/403 refuses, wherever it came
-  from, the queue's deliveries included. Changed credentials hash
-  differently, so they are not connected until checked. The Dashboard's
+  fails a Settings save on the answer; the initial setup's Connect step
+  posts `initial_setup`, is checked before anything is written and saves
+  only an account Smaily accepts, and its Continue waits for a passed
+  Test connection, `boot.verified` counting as passed until a credential
+  changes — CON-417, as the WooCommerce and Shopify setups); any 401/403
+  refuses, wherever it came from, the queue's deliveries included.
+  Changed credentials hash differently, so they are not connected until
+  checked. The Dashboard's
   Smaily card and verdict and the Connection status (`boot.verified` from
   `WizardData`) all ask `isWebsiteVerified()` for the account saved for
   the target website — the single account, or in mode A the default

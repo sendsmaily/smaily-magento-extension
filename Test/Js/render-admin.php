@@ -954,6 +954,76 @@ $pages['setup-completed-storefront'] = $setupCompleted
 $pages['setup-completed'] = $setupCompleted + ['viewModel' => $intelligence];
 
 /*
+ * The initial setup's Connect step before the setup is finished (CON-417),
+ * wizard/index.phtml with panel/connection.phtml: a single store with a
+ * Smaily account saved that Smaily did not accept at the last check
+ * (setup-connect), and one it accepted (setup-connect-verified). The view
+ * model is the setup-completed page's, with the setup not finished.
+ */
+$setupConnectViewModel = static fn (bool $verified): object => new class ($intelligenceViewModel(''), $verified) {
+    /**
+     * @param object $inner
+     * @param bool $verified
+     */
+    public function __construct(private readonly object $inner, private readonly bool $verified)
+    {
+    }
+
+    /**
+     * @param string $name
+     * @param array<int, mixed> $arguments
+     * @return mixed
+     */
+    public function __call(string $name, array $arguments)
+    {
+        return $this->inner->$name(...$arguments);
+    }
+
+    /**
+     * @return bool
+     */
+    public function isWebsiteSetUp(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return int
+     */
+    public function getReachedStep(): int
+    {
+        return 1;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSmailyVerified(): bool
+    {
+        return $this->verified;
+    }
+
+    /**
+     * @return string
+     */
+    public function getBootJson(): string
+    {
+        $boot = json_decode($this->inner->getBootJson(), true, 512, JSON_THROW_ON_ERROR);
+        $boot['verified'] = $this->verified;
+
+        return (string)json_encode($boot);
+    }
+};
+foreach (['setup-connect' => false, 'setup-connect-verified' => true] as $page => $verified) {
+    $pages[$page] = [
+        'template' => $setupCompleted['template'],
+        'viewModel' => $setupConnectViewModel($verified),
+        'data' => $setupCompleted['data'],
+        'strings' => ['Test your Smaily connection to continue.', 'Saving failed.'],
+    ];
+}
+
+/*
  * The store-wide setup and its website exceptions (CON-179) on a store with
  * three websites (Estonia, Latvia, Lithuania) and two store languages, in
  * One account, per-language workflows mode, Smaily login details saved but

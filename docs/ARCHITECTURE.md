@@ -1737,9 +1737,10 @@ closes only its row. A first-order row queued before this change carries no
 `CONTACT_CHECK` and is posted without a read, as before.
 
 **Where the WooCommerce plugin differs.** Its *include guests* setting holds
-a guest's reminder back in the consent mode. Magento's **Include guest order
-emails** applies only under legitimate interest (`Mode::includeGuests()`
-is read only where no opt-in is needed), so the reminder does not read it:
+a guest's reminder back in the consent mode. Magento's **Also sync guest
+buyers who did not tick the newsletter box** applies only under legitimate
+interest (`Mode::includeGuests()` is read only where no opt-in is needed;
+the switch shows in that mode only, CON-461), so the reminder does not read it:
 in the consent modes a guest is reminded by the rule above — with a
 newsletter subscription, a tick, or as a subscribed contact in Smaily.
 

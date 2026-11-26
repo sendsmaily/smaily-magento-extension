@@ -144,17 +144,16 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
             </div>
             <p class="note"><?= $escaper->escapeHtml(__('Empty values are never sent, so existing Smaily data is not wiped.')) ?></p>
         </div>
-        <?php // Orphan field (PRO-1397): native-config-only until now, real control added here.
-        // include_guests has no save-time mode dependency (only sync_enabled, handled
-        // above) — it takes effect only under legitimate interest, a read-time rule
-        // in Observer\OrderPlaced (PRO-3606), not a save-time UI constraint. ?>
-        <?php if ($isSettings): ?>
-        <div class="smaily-inline-toggle">
+        <?php // As in the WooCommerce plugin (CON-461): a guest who ticks the
+        // checkout box is synced in every mode, so the switch only adds the
+        // guests who did not tick — which only the All customers (legitimate
+        // interest) mode allows (Observer\OrderPlaced). It shows in that mode
+        // only (panels-js.phtml), on both surfaces, and keeps its value
+        // while hidden. ?>
+        <div class="smaily-inline-toggle" id="smaily-w-include-guests-row"<?= $viewModel->getSyncMode() === 'legitimate_interest' ? '' : ' style="display:none;"' ?>>
             <label><input type="checkbox" id="smaily-w-include-guests"/>
-                <?= $escaper->escapeHtml(__('Include guest order emails')) ?></label>
-            <p class="note"><?= $escaper->escapeHtml(__('Also sync emails from guest orders without the checkout newsletter opt-in. Applies only in the All customers (legitimate interest) mode; in the other modes a guest is synced only after ticking the checkout newsletter checkbox.')) ?></p>
+                <?= $escaper->escapeHtml(__('Also sync guest buyers who did not tick the newsletter box')) ?></label>
         </div>
-        <?php endif; ?>
         <div class="smaily-inline-toggle">
             <label><input type="checkbox" id="smaily-w-checkout-optin" checked/>
                 <?= $escaper->escapeHtml(__('Show a newsletter checkbox at checkout')) ?></label>

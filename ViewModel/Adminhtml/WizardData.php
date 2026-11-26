@@ -394,7 +394,10 @@ class WizardData implements ArgumentInterface
                     array_filter(array_map('trim', explode(',', $value)))
                 )) ?: '—',
             ],
-            Config::XML_PATH_INCLUDE_GUESTS => [__('Include guest order emails'), $flag($value)],
+            Config::XML_PATH_INCLUDE_GUESTS => [
+                __('Also sync guest buyers who did not tick the newsletter box'),
+                $flag($value),
+            ],
             Config::XML_PATH_CHECKOUT_OPTIN_ENABLED => [__('Show a newsletter checkbox at checkout'), $flag($value)],
             Config::XML_PATH_SUPPRESS_OPTIN_EMAILS => [
                 __('Let Smaily send the opt-in confirmation emails (suppresses Magento\'s own)'),

@@ -25,7 +25,11 @@
   settings are saved, until they are (PRO-4037). Where another website
   uses the website's Smaily account with another contact sync mode, the step
   and the Settings Contacts tab warn, naming each website with its mode;
-  elsewhere they do not (CON-432).
+  elsewhere they do not (CON-432). On the step and on the Settings Contacts
+  tab, "Also sync guest buyers who did not tick the newsletter box" shows
+  only while All customers (legitimate interest) is picked, in the
+  WooCommerce plugin's words; hidden in another mode, its value is still
+  posted, so the stored one stays (CON-461).
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
 -->
@@ -55,6 +59,7 @@
     var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
     var SWITCH = 'Sync contacts to Smaily';
     var STARTS = 'Contacts start syncing to Smaily when you save this step.';
+    var GUEST = 'Also sync guest buyers who did not tick the newsletter box';
     var SHARED_TITLE = 'Websites on this Smaily account use different contact sync modes';
     var SHARED_MESSAGE = 'Contact sync modes on this Smaily account: %1. Smaily keeps one subscription status per email address,'
         + ' so a contact that one website sends can be marked subscribed in another website too.'
@@ -185,6 +190,42 @@
         frame.contentWindow.jQuery(toggle).trigger('change');
     }
 
+    // Picks a contact sync mode card as the merchant does.
+    function pickSyncMode(frame, mode) {
+        var input = frame.contentDocument.querySelector('input[name=smaily-w-mode][value=' + mode + ']');
+
+        input.checked = true;
+        frame.contentWindow.jQuery(input).trigger('change');
+    }
+
+    // The guest switch (CON-461): only in the All customers (legitimate
+    // interest) mode, in the WooCommerce plugin's words; hidden, its value
+    // is still posted.
+    async function guestSwitch(frame, page, surface) {
+        var doc = frame.contentDocument,
+            locale = page.split('.')[1],
+            label = window.smailyAdminPages[page].strings[GUEST],
+            row = doc.getElementById('smaily-w-include-guests-row'),
+            input = doc.getElementById('smaily-w-include-guests'),
+            shown = function () {
+                return row.style.display !== 'none';
+            },
+            data;
+
+        check(surface + ': Subscribers only hides the guest switch', !shown());
+        pickSyncMode(frame, 'legitimate_interest');
+        check(surface + ': All customers shows the guest switch, in the WooCommerce plugin\'s words',
+            shown() && input.parentNode.textContent.trim() === label
+            && (locale === 'en_US' || label !== GUEST));
+        input.checked = true;
+        pickSyncMode(frame, 'checkout_optin');
+        check(surface + ': Checkout opt-in only hides the guest switch', !shown());
+        data = await save(frame);
+        check(surface + ': hidden, the guest switch still posts its value', data.include_guests === true
+            && data.sync_mode === 'checkout_optin');
+        pickSyncMode(frame, 'consent');
+    }
+
     async function run(locale) {
         var label = window.smailyAdminPages['contacts-setup-off.' + locale].strings[SWITCH],
             frame,
@@ -213,6 +254,7 @@
         check(locale + ', sync on: Continue posts no sync answer, so the stored one stays',
             !Object.prototype.hasOwnProperty.call(data, 'sync_enabled') && data.sync_mode === 'consent');
         check(locale + ', a new website, step saved: the import button is enabled', importable(doc));
+        await guestSwitch(frame, 'contacts-setup.' + locale, locale + ', setup');
         frame.remove();
 
         // A website whose contact sync is off: the switch, unticked.
@@ -263,6 +305,7 @@
         data = await save(frame);
         check(locale + ', Settings, a new website, saved: the import button is enabled',
             data.sync_enabled === true && importable(doc));
+        await guestSwitch(frame, 'contacts-settings-new.' + locale, locale + ', Settings');
         frame.remove();
 
         // Websites on one Smaily account with different contact sync modes

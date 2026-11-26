@@ -10,6 +10,7 @@ namespace Smaily\Connect\Test\Unit\Model\Log;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Smaily\Connect\Model\ContactSync\StaleSubscription;
 use Smaily\Connect\Model\Engine\CatalogManifest;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Log\ResendGuard;
@@ -23,11 +24,13 @@ class ResendGuardTest extends TestCase
 {
     private ResendGuard $guard;
     private EventQueue&MockObject $eventQueue;
+    private StaleSubscription&MockObject $staleSubscription;
 
     protected function setUp(): void
     {
         $this->eventQueue = $this->createMock(EventQueue::class);
-        $this->guard = new ResendGuard($this->eventQueue);
+        $this->staleSubscription = $this->createMock(StaleSubscription::class);
+        $this->guard = new ResendGuard($this->eventQueue, $this->staleSubscription);
     }
 
     public function testWithdrawnRowIsRefusedFromTheStoredMarker(): void
@@ -168,14 +171,37 @@ class ResendGuardTest extends TestCase
             (string)$this->guard->message(ResendGuard::REASON_ERASED),
             (string)$this->guard->message(ResendGuard::REASON_NOT_FAILED),
             (string)$this->guard->message(ResendGuard::REASON_NIGHTLY),
+            (string)$this->guard->message(ResendGuard::REASON_NEWER_SUBSCRIPTION),
         ];
 
-        self::assertCount(5, array_unique($messages));
+        self::assertCount(6, array_unique($messages));
         self::assertStringContainsString('withdrawn', $messages[0]);
         self::assertStringContainsString('twice', $messages[1]);
         self::assertStringContainsString('erased', $messages[2]);
         self::assertStringContainsString('failed', $messages[3]);
         self::assertStringContainsString('each night', $messages[4]);
+        self::assertStringContainsString('newer subscription change', $messages[5]);
+    }
+
+    /**
+     * CON-394: the guard asks StaleSubscription about the contact syncs of
+     * the marketing queue only, and refuses the stale ones by its answer.
+     */
+    public function testAStaleContactSyncIsRefusedByTheQueuesOwnAnswer(): void
+    {
+        $this->staleSubscription->expects(self::once())
+            ->method('among')
+            ->with([4 => 'jane@example.com', 5 => 'john@example.com'])
+            ->willReturn([4]);
+
+        $refused = $this->guard->refusalReasons(Collection::SOURCE_SMAILY, [
+            4 => $this->failed(EventType::CONTACT_SYNC, 'jane@example.com'),
+            5 => $this->failed(EventType::CONTACT_SYNC, 'john@example.com'),
+            6 => $this->failed(EventType::AUTOMATION_TRIGGER, 'jane@example.com'),
+            7 => $this->failed(EventType::CONTACT_SYNC, ''),
+        ]);
+
+        self::assertSame([4 => ResendGuard::REASON_NEWER_SUBSCRIPTION], $refused);
     }
 
     /**
@@ -191,5 +217,13 @@ class ResendGuardTest extends TestCase
         ]);
 
         self::assertSame([5 => ResendGuard::REASON_NIGHTLY, 6 => ResendGuard::REASON_NIGHTLY], $refused);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function failed(string $type, string $entityId): array
+    {
+        return ['type' => $type, 'entity_id' => $entityId, 'status' => Event::STATUS_FAILED];
     }
 }

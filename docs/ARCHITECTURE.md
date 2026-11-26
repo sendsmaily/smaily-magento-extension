@@ -857,7 +857,11 @@ below.
   no retry, no back-off wait), so the engine never holds a storefront request.
 - **Catalog price/URL/language scope (PRO-1352/1353):** one Magento
   installation is one engine tenant with one base currency (which every
-  catalog row now names, contract §3 `currency`, v1.7.0) — the plugin, not
+  catalog row names, contract §3 `currency`, v1.7.0, and every price is
+  sent in, as every order's amounts are, §5 "One currency per store",
+  CON-421/CON-447: Magento's price readers convert into the current
+  store's current currency, so `CatalogPayloadBuilder::basePrices()` sets
+  that to the store's base currency while they read) — the plugin, not
   the engine, is responsible for always sending one consistent scope's
   price. Both catalog
   ingest paths resolve through the SAME single canonical store
@@ -1093,14 +1097,14 @@ below.
   Magento's URL model reads the rewrite and the base URL off the product's
   OWN store, not off whatever store is emulated around it. A product
   assigned to no website at all keeps the canonical scope and is still
-  ingested, never skipped. The row's `currency` still names the canonical
-  store's display currency: an install whose second website has a different
-  base currency is mislabeled there, and per-website tenants (the
-  multi-website RFC's Phase 4, PRO-1762) are the fix for that, not this
-  (superseded 2026-10-28: one Smaily account is one engine store, CON-237;
-  per-website price inside one engine store is not in contract 1.21.0,
-  whose INT-171 work gave the links and the websites that sell a product,
-  CON-253).
+  ingested, never skipped. The row's `currency` names the base currency of
+  the store view its price is read at (CON-447): with the catalog price
+  scope per website, a connection whose websites have different base
+  currencies sends rows in more than one currency, each labelled with its
+  own, while the engine assumes one currency per store — per-website price
+  inside one engine store is not in the contract (contract 1.21.0, whose
+  INT-171 work gave the links and the websites that sell a product,
+  CON-253; one Smaily account is one engine store, CON-237).
 - **Storefront URL (PRO-3660):** a store that sells on a separate
   (headless) storefront saves its address at website scope
   (`smaily_connect/connection/storefront_url`, Settings > Connection and

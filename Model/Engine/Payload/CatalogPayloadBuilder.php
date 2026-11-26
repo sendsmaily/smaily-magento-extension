@@ -139,6 +139,7 @@ class CatalogPayloadBuilder
         $this->storeUrls = [];
         $scopeStoreId = $this->storeIdForProduct($product, $connection);
         $priceProduct = $this->scopedTo($product, $scopeStoreId);
+        [$price, $regular] = $this->basePrices($priceProduct);
         $languageValues = $this->languageValues($product, $priceProduct, $scopeStoreId, $connection);
         // A variant without a category of its own takes its configurable
         // parent's (PRO-3714); only when neither has one is it defaulted.
@@ -149,11 +150,8 @@ class CatalogPayloadBuilder
             'sku' => self::sku($product),
             'name' => $languageValues['name'],
             'category_path' => $categoryPath ?? self::PLACEHOLDER_CATEGORY,
-            'price' => round(
-                (float)$priceProduct->getPriceInfo()->getPrice('final_price')->getAmount()->getValue(),
-                4
-            ),
-            'currency' => $this->currency($connection),
+            'price' => round($price, 4),
+            'currency' => $this->currency($scopeStoreId),
             'in_stock' => $this->isInStock($product),
             'product_url' => $languageValues['product_url'],
             'external_id' => (string)$product->getId(),
@@ -164,7 +162,6 @@ class CatalogPayloadBuilder
             'is_downloadable' => $product->getTypeId() === 'downloadable',
         ];
 
-        $regular = (float)$priceProduct->getPriceInfo()->getPrice('regular_price')->getAmount()->getValue();
         if ($regular > (float)$item['price']) {
             $item['compare_price'] = round($regular, 4);
             $saleUntil = (string)$product->getData('special_to_date');
@@ -564,19 +561,51 @@ class CatalogPayloadBuilder
     }
 
     /**
-     * The currency the `price` we send is denominated in (contract §3,
-     * v1.7.0). The canonical store's DEFAULT DISPLAY currency, not its base
-     * currency: Magento's price readers (`RegularPrice`/`BasePrice`, which
-     * `final_price` resolves through) already convert the stored base amount
-     * into the store's display currency, so on a store whose base and display
-     * currencies differ, labelling the number with the base code would state
-     * a price that was never charged in it. For a connection, its canonical
-     * store's (connectionStore(), CON-237).
+     * The product's final and regular price in the base currency of the
+     * store view it is read at (contract §3 `currency`, §5 "One currency per
+     * store", CON-447), as the order builder sends every order's amounts
+     * (CON-421). Magento keeps a price in that base currency, and its price
+     * readers (`RegularPrice`, `SpecialPrice`, the tier and catalog-rule
+     * prices `final_price` resolves through) convert it into the current
+     * store's current currency (PriceCurrency::convertAndRound()). While
+     * they read, that currency is the current store's base currency, so they
+     * convert nothing; the store's own currency is put back afterwards.
+     *
+     * @param Product $product
+     * @return array{float, float} the final price, the regular price
      */
-    private function currency(Connection $connection): string
+    private function basePrices(Product $product): array
     {
-        $store = $this->connectionStore($connection);
-        $code = $store instanceof Store ? (string)$store->getDefaultCurrencyCode() : '';
+        $read = static fn (string $code): float
+            => (float)$product->getPriceInfo()->getPrice($code)->getAmount()->getValue();
+        $store = $this->storeManager->getStore();
+        if (!$store instanceof Store) {
+            return [$read('final_price'), $read('regular_price')];
+        }
+
+        $current = $store->getData('current_currency');
+        $store->setData('current_currency', $store->getBaseCurrency());
+        try {
+            return [$read('final_price'), $read('regular_price')];
+        } finally {
+            $store->setData('current_currency', $current);
+        }
+    }
+
+    /**
+     * The currency the `price` we send is in (contract §3, v1.7.0): the base
+     * currency of the store view the row's price is read at (basePrices(),
+     * CON-447) — the installation's base currency, or its website's when the
+     * catalog price scope is per website. Until CON-447 it was the canonical
+     * store's display currency, which the price was converted into.
+     *
+     * @param int $storeId
+     * @return string
+     */
+    private function currency(int $storeId): string
+    {
+        $store = $this->storeById($storeId);
+        $code = $store instanceof Store ? (string)$store->getBaseCurrencyCode() : '';
 
         return $code !== '' ? $code : self::DEFAULT_CURRENCY;
     }
@@ -644,6 +673,15 @@ class CatalogPayloadBuilder
         if ($connection->servesAllWebsites() || $storeId === null) {
             return $this->canonicalStore();
         }
+
+        return $this->storeById($storeId) ?? $this->canonicalStore();
+    }
+
+    /**
+     * A store view by id (memoized), or null when it cannot be read.
+     */
+    private function storeById(int $storeId): ?StoreInterface
+    {
         if (!array_key_exists($storeId, $this->stores)) {
             try {
                 $this->stores[$storeId] = $this->storeManager->getStore($storeId);
@@ -652,7 +690,7 @@ class CatalogPayloadBuilder
             }
         }
 
-        return $this->stores[$storeId] ?? $this->canonicalStore();
+        return $this->stores[$storeId];
     }
 
     /**

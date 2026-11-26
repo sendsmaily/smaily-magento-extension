@@ -2553,8 +2553,8 @@ Initial setup, Settings, Log. Design rules:
     setup's `use_store_wide`) removes its own automations too, so it
     returns to the store-wide ones; a website whose own login was the
     store-wide account keeps them. Such a website's Automations tab reads
-    only its own values — the prefill (`getBootJson()`), the mapping editor
-    (`getSavedMappings()`) and the save's PRO-1286 keep (`saveAutomations()`)
+    only its own values — the prefill (`getBootJson()`), the per-language
+    rows (`getLanguageWorkflows()`) and the save's PRO-1286 keep (`saveAutomations()`)
     — and `WizardData::needsOwnWorkflows()` shows **Pick this website's
     workflows** while it holds no workflow of its own. The Router reads the
     same way (Automation routing above), so a website that held another
@@ -2683,9 +2683,25 @@ Initial setup, Settings, Log. Design rules:
   account's credentials double as the website's account; the fallback
   language is saved with that account (`Config::getFallbackLanguage()`
   reads the website value, else the default-scope value). Mode `a` is
-  always a website's own Smaily account (CON-179, see "Multi-website"). Modes `a`/`b` reveal
-  the per-language workflow mapping editor on the Automations panel
-  (workflow dropdowns loaded live per account). All sections show/hide
+  always a website's own Smaily account (CON-179, see "Multi-website"). In modes `a`/`b`
+  each store-event card on the Automations panel shows a row per store
+  language in the place of its own workflow (CON-461, as in the
+  WooCommerce plugin): a workflow select per language (loaded live per
+  account) and a Default fallback radio on one of the rows — no "None"
+  row and no separate editor card. The rows come from
+  `WizardData::getLanguageWorkflows($mode)`, read through the Router
+  (`resolve()` with the mode, `resolveFallback()`), so a card saved before
+  shows what each language is sent: mode `b` each language's workflow,
+  its own or the one it falls back to; mode `a` each language's own row.
+  The radio sits on the fallback row, else (mode `a`) the default fallback
+  account's language, else (mode `b`) the first language that gets the
+  fallback workflow, else the first language. No stored row is rewritten:
+  a save from the card posts each language's workflow, which keeps every
+  store language's routing (`Test/Integration/Automation/PerLanguageCardTest`;
+  the one shape the card cannot hold — every language mapped with "None"
+  — gives a contact without a store language the first row's workflow
+  after the next save). Mode `b`'s config default stays the last resort
+  where the radio's row is left empty. All sections show/hide
   live on mode change with no save round-trip; leaving mode `a` removes
   the per-store-view credential overrides on save (confirmed in the UI
   first) and keeps its mapping rows unread. **A workflow belongs to the
@@ -2708,22 +2724,22 @@ Initial setup, Settings, Log. Design rules:
   account (or a mode-`a` block's) has another subdomain than the saved one
   (a declined question cancels the save silently) — and a save that
   removed workflows answers `workflowsRemoved`, on which Settings and the
-  initial setup reload. The editor shows each of modes `a`/`b`
-  its own rows, as the Router reads them (`WizardData::getSavedMappings($mode)`
+  initial setup reload. The cards show each of modes `a`/`b`
+  its own rows, as the Router reads them (`WizardData::getLanguageWorkflows($mode)`
   renders both modes' rows on every select, `data-saved-a`/`data-saved-b`,
   and each trigger's fallback, `data-fallback-a`/`-b`); a live switch of
   the mode cards keeps the left mode's picks and shows the next mode's
   (`switchMappingRows()` in panels-js), so a mode-`b` save never posts a
-  per-language account's workflow id (CON-184). In mode `a` the trigger
-  cards hide their workflow select (mode `a` never starts it; hidden, it
-  keeps its saved value). Each trigger's table follows its card's Enabled
-  like the card's own settings, and the editor shows only while one of the
-  three is on (CON-256). In mode `a`, `showUnmappedLanguages()` lists live, under
+  per-language account's workflow id (CON-184). In modes `a`/`b` the trigger
+  cards hide their own workflow select (mode `a` never starts it; hidden, it
+  keeps its saved value). Each trigger's rows follow its card's Enabled
+  like the card's own settings, and the modes' notes show only while one of
+  the three is on (CON-256). In mode `a`, `showUnmappedLanguages()` lists live, under
   **Some languages have no workflow**, each switched-on automation with the
   languages the Router would find no row for — the language's own select,
   else the trigger's default-fallback radio, else the select of the default
   fallback account's language (`data-unlisted-fallback-a` marks a trigger
-  whose fallback is a language-less 2.8.x row the editor does not show)
+  whose fallback is a language-less 2.8.x row the cards do not show)
   (CON-188). Single-language installs are locked to `single` and see none of
   this.
 - **Transactional emails — settings only (PRO-4062, PRO-4065, CON-33).**

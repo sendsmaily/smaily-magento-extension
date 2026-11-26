@@ -275,7 +275,9 @@ class UnreadableImportRowsTest extends IntegrationTestCase
             'state' => Order::STATE_COMPLETE,
             'customer_email' => 'customer' . $entityId . '@example.com',
             'grand_total' => $entityId * 10,
+            'base_grand_total' => $entityId * 10,
             'order_currency_code' => 'EUR',
+            'base_currency_code' => 'EUR',
             'created_at' => $createdAt,
         ]);
         $this->connection->insert('sales_order_item', [
@@ -285,6 +287,8 @@ class UnreadableImportRowsTest extends IntegrationTestCase
             'qty_ordered' => 1,
             'row_total' => $entityId * 10,
             'row_total_incl_tax' => $entityId * 10,
+            'base_row_total' => $entityId * 10,
+            'base_row_total_incl_tax' => $entityId * 10,
             'product_options' => $productOptions,
         ]);
     }

@@ -24,10 +24,20 @@ use Smaily\Connect\Model\Logger\Logger;
  *
  * Status maps onto the closed engine enum; orders in transient states
  * (payment review, pending payment, hold) are never sent — build() returns
- * null for them. All money fields are GROSS (tax-inclusive) order-currency
- * values per contract v1.4.0 amount semantics: row_total_incl_tax for
- * lines, grand_total for total_amount; items carry pre-discount unit
- * prices and post-discount line totals. Attribution fields come
+ * null for them. All money fields are GROSS (tax-inclusive) values per
+ * contract v1.4.0 amount semantics: base_row_total_incl_tax for lines,
+ * base_grand_total for total_amount; items carry pre-discount unit
+ * prices and post-discount line totals.
+ *
+ * Every amount is in the store's default currency (contract v1.36.1 §5
+ * "One currency per store", CON-421): Magento's base currency, the
+ * `base_*` amounts and `base_currency_code` it stores on the order. An
+ * order the shopper paid in another display currency carries its base
+ * amounts converted at that order's own rate at the time of the order
+ * (`base_to_order_rate`), which is the rule §5 states; the engine converts
+ * nothing. The base currency is the website's when the catalog price
+ * scope is per website and the installation's otherwise, so each order
+ * names its own. Attribution fields come
  * from the smaily_order_attribution side table; a malformed rec id
  * (Engine\RecId), visitor token, context or session id
  * (Engine\AttributionShape) is omitted on its own.
@@ -67,9 +77,9 @@ class OrderPayloadBuilder
         'product_type',
         'product_id',
         'qty_ordered',
-        'row_total',
-        'row_total_incl_tax',
-        'discount_amount',
+        'base_row_total',
+        'base_row_total_incl_tax',
+        'base_discount_amount',
     ];
 
     public function __construct(
@@ -96,13 +106,13 @@ class OrderPayloadBuilder
             'external_order_id' => (string)$order->getIncrementId(),
             'customer_email' => $email,
             'ordered_at' => $this->wireTimestamp((string)$order->getCreatedAt()),
-            'total_amount' => round((float)$order->getGrandTotal(), 4),
-            'currency' => (string)$order->getOrderCurrencyCode() ?: CatalogPayloadBuilder::DEFAULT_CURRENCY,
+            'total_amount' => round((float)$order->getBaseGrandTotal(), 4),
+            'currency' => (string)$order->getBaseCurrencyCode() ?: CatalogPayloadBuilder::DEFAULT_CURRENCY,
             'status' => $status,
             'items' => $this->items($order),
         ];
 
-        $discount = abs((float)$order->getDiscountAmount());
+        $discount = abs((float)$order->getBaseDiscountAmount());
         if ($discount > 0) {
             $item['discount_amount'] = round($discount, 4);
         }
@@ -145,8 +155,8 @@ class OrderPayloadBuilder
                 continue;
             }
 
-            $rowTotalInclTax = (float)($orderItem->getRowTotalInclTax() ?? $orderItem->getRowTotal());
-            $itemDiscount = abs((float)$orderItem->getDiscountAmount());
+            $rowTotalInclTax = (float)($orderItem->getBaseRowTotalInclTax() ?? $orderItem->getBaseRowTotal());
+            $itemDiscount = abs((float)$orderItem->getBaseDiscountAmount());
 
             $row = [
                 'sku' => $this->sku($orderItem, $childOf[(int)$orderItem->getItemId()] ?? null),

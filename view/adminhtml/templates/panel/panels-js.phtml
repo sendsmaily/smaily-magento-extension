@@ -686,9 +686,9 @@ window.smailyPanelsInit = function ($) {
 
     // --- Backfill progress polling (contacts + engine imports) -------------
     // Terminal outcomes are honest (Shopify-parity copy): "Done, X of Y
-    // synced" when everything landed; "N failed — view in the Log" when
-    // individual rows failed (queue rows still pending retry are NOT
-    // failed); "N skipped" when a Campaign Intelligence import skipped rows
+    // synced" when everything landed; for a contacts import, how many
+    // contacts Smaily did not take, with a link to the Log, which keeps each
+    // one's reason (CON-432); "N skipped" when a Campaign Intelligence import skipped rows
     // Magento could not read (CON-227); "Stopped before an error" when the job itself aborted;
     // "Cancelled" after an admin cancel; "Stalled" for a queued or running
     // import nothing has moved for an hour (PRO-3915), naming the import it
@@ -848,7 +848,7 @@ window.smailyPanelsInit = function ($) {
                 .replace('%3', data.skipped);
         } else if (state === 'failures') {
             setProgress(ui, data, data.percent, 'failed');
-            text = '<?= $escaper->escapeJs(__('Done, %1 of %2 synced — %3 failed.')) ?>'
+            text = '<?= $escaper->escapeJs(__('Done, %1 of %2 synced — Smaily did not take %3. The Log keeps the reason for each contact.')) ?>'
                 .replace('%1', data.processed)
                 .replace('%2', data.total || data.processed + data.failed)
                 .replace('%3', data.failed);

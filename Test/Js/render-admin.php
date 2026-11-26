@@ -719,8 +719,9 @@ $pages['intelligence-settings-storefront'] = [
 ];
 /*
  * The Contacts tab (view/adminhtml/templates/panel/subscribers.phtml) with its
- * behaviour, for the contacts import card's estimate (PRO-1970) and its
- * outcome for a website whose contact sync was not active (PRO-4037).
+ * behaviour, for the contacts import card's estimate (PRO-1970), its
+ * outcome for a website whose contact sync was not active (PRO-4037) and
+ * the contacts Smaily did not take (CON-432).
  */
 $pages['contacts-settings'] = [
     'template' => [
@@ -737,6 +738,8 @@ $pages['contacts-settings'] = [
         'Done, %1 of %2 synced.',
         'Contact sync was off for %1, so nothing was sent from there.'
             . ' Turn it on and save the Contacts settings, then press Run again.',
+        'Done, %1 of %2 synced — Smaily did not take %3. The Log keeps the reason for each contact.',
+        'View them in the Log',
     ],
 ];
 /*

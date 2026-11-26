@@ -683,7 +683,7 @@ own i18n):
 |---|---|
 | Importing… (beside Cancel; "%1 of %2" under the bar, PRO-3564) | (shipped) |
 | Done, %1 of %2 synced. | (shipped) |
-| Done, %1 of %2 synced — %3 failed. | (shipped) |
+| Done, %1 of %2 synced — Smaily did not take %3. The Log keeps the reason for each contact. | (shipped) |
 | Stopped before an error — %1 of %2 synced so far. Press Run again to run it again. | (shipped) |
 | Cancelled — %1 of %2 synced. Starting again begins a fresh import. | (shipped) |
 | Import your existing subscribers | Impordi oma olemasolevad tellijad |

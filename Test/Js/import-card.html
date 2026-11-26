@@ -26,6 +26,8 @@
   number of contacts its import sends for the mode picked on the panel, and
   no other total (PRO-1970); a contacts import that sent nothing because a
   website's contact sync was not active names that website (PRO-4037).
+  A finished contacts import with contacts Smaily did not take says how
+  many and links to the Log, which keeps each one's reason (CON-432).
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
 -->
@@ -52,6 +54,7 @@
     var ONE_CONTACT = 'This import sends %1 contact from this website. It runs in the background, a chunk per minute, and never slows the storefront down.';
     var CONTACTS = 'This import sends %1 contacts from this website. It runs in the background, a chunk per minute, and never slows the storefront down.';
     var SYNC_OFF = 'Contact sync was off for %1, so nothing was sent from there. Turn it on and save the Contacts settings, then press Run again.';
+    var REFUSED = 'Done, %1 of %2 synced — Smaily did not take %3. The Log keeps the reason for each contact.';
     var SKIPPED = 'Done, %1 of %2 synced — %3 skipped because Magento could not read them; var/log/smaily_connect.log on the server lists them by id.';
     var START_PART = 'Sending the orders of the last %1 months first…';
     var BACKGROUND = 'The last %1 months are in: Campaign Intelligence can start. Older orders, back to %2 months, follow in the background…';
@@ -377,6 +380,33 @@
         check(locale + ', contacts: an import that sent nothing names the website whose sync was off',
             verdict.textContent === strings['Done, %1 of %2 synced.'].replace('%1', '0').replace('%2', '0')
                 + ' ' + strings[SYNC_OFF].replace('%1', 'Main Website'));
+        frame.remove();
+
+        // A finished import with contacts Smaily did not take says how many
+        // and links to the Log, which keeps the reasons (CON-432).
+        if (locale !== 'en_US') {
+            check(locale + ': the refused-contacts outcome is translated', strings[REFUSED] !== REFUSED);
+        }
+        frame = await open(page, {status: {
+            status: 'completed',
+            processed: 40,
+            failed: 2,
+            skipped: 0,
+            total: 42,
+            percent: 95,
+            finished_at: '',
+            error: '',
+            stalled: false,
+            blocked_by: '',
+            sync_inactive: []
+        }}, 'contacts');
+        verdict = card(frame, 'contacts');
+        check(locale + ', contacts: a finished import says how many contacts Smaily did not take',
+            verdict.verdict === strings[REFUSED].replace('%1', '40').replace('%2', '42').replace('%3', '2'));
+        verdict = verdict.element.querySelector('.smaily-backfill-card__link a');
+        check(locale + ', contacts: and links to the Log of failed rows',
+            !!verdict && verdict.getAttribute('href').indexOf('smaily_connect/log') !== -1
+                && verdict.textContent === strings['View them in the Log']);
         frame.remove();
     }
 

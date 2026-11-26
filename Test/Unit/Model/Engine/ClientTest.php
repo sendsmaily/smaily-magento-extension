@@ -14,8 +14,10 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
+use Magento\Framework\App\CacheInterface;
 use Magento\Framework\App\ProductMetadataInterface;
 use Magento\Framework\App\Request\Http;
+use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -25,7 +27,9 @@ use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
+use Smaily\Connect\Model\Engine\Exception\EngineThrottledException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
+use Smaily\Connect\Model\Engine\PrivacyRequestBudget;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\SleeperInterface;
 use Smaily\Connect\Model\Logger\Logger;
@@ -46,6 +50,12 @@ class ClientTest extends TestCase
 
     /** @var array<int, array{string, string, bool}> what the installation report's health was told */
     private array $healthCalls = [];
+
+    /** @var array<string, string> the application cache the privacy budget keeps its count in */
+    private array $cache = [];
+
+    /** The clock of the privacy budget, in seconds. */
+    private int $now = 1800000000;
 
     protected function setUp(): void
     {
@@ -582,6 +592,78 @@ class ClientTest extends TestCase
     }
 
     /**
+     * CON-432: the engine takes 10 privacy requests a minute per store. The
+     * eleventh is not sent: it fails at once with the wait until the oldest
+     * leaves the window, and goes once it has.
+     */
+    public function testPrivacyRequestsStayWithinTheEnginesLimit(): void
+    {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/customer/{email}');
+        $client = $this->createClient(array_fill(0, 11, new Response(200, [], '{"ok":true}')));
+
+        for ($i = 0; $i < PrivacyRequestBudget::LIMIT; $i++) {
+            $this->now += 2;
+            $i % 2 === 0
+                ? $client->customerDelete('person@example.com')
+                : $client->customerOptOut('person@example.com', true, 'user_preference', '2026-10-02T00:00:00Z');
+        }
+        try {
+            $client->customerExport('person@example.com');
+            self::fail('The eleventh request in a minute is not sent');
+        } catch (EngineThrottledException $exception) {
+            self::assertSame(PrivacyRequestBudget::WINDOW_SECONDS - 18, $exception->getRetryAfter());
+            self::assertSame(429, $exception->getHttpStatus());
+        }
+        self::assertCount(PrivacyRequestBudget::LIMIT, $this->history);
+
+        $this->now += PrivacyRequestBudget::WINDOW_SECONDS - 18;
+        $client->customerExport('person@example.com');
+        self::assertCount(PrivacyRequestBudget::LIMIT + 1, $this->history);
+        self::assertSame([], $this->sleeps, 'A privacy request never waits in the request');
+    }
+
+    /**
+     * CON-432: a 429 on a privacy request is not retried in the request: it
+     * fails at once with the engine's retry_after_seconds (60 when the
+     * answer names none), and no privacy request of the store goes until
+     * then.
+     *
+     * @dataProvider throttledAnswers
+     */
+    public function testA429OnAPrivacyRequestWaitsAsLongAsTheEngineAsks(string $body, int $wait): void
+    {
+        $this->settings->method('getEndpoint')->willReturn('https://engine.example/api/v1/customer/{email}/opt-out');
+        $client = $this->createClient([new Response(429, [], $body), new Response(200, [], '{"ok":true}')]);
+
+        foreach ([$wait, $wait - 1] as $expected) {
+            try {
+                $client->customerOptOut('person@example.com', true, 'user_preference', '2026-10-02T00:00:00Z');
+                self::fail('A 429 on a privacy request fails at once');
+            } catch (EngineThrottledException $exception) {
+                self::assertSame($expected, $exception->getRetryAfter());
+            }
+            $this->now++;
+        }
+        self::assertCount(1, $this->history, 'Nothing is sent while the engine asks to wait');
+        self::assertSame([], $this->sleeps);
+
+        $this->now += $wait;
+        $client->customerOptOut('person@example.com', true, 'user_preference', '2026-10-02T00:00:00Z');
+        self::assertCount(2, $this->history);
+    }
+
+    /**
+     * @return array<string, array{string, int}>
+     */
+    public static function throttledAnswers(): array
+    {
+        return [
+            'the engine names the wait' => ['{"error":"rate_limit_exceeded","retry_after_seconds":300}', 300],
+            'no wait named' => ['{"error":"rate_limit_exceeded"}', PrivacyRequestBudget::WINDOW_SECONDS],
+        ];
+    }
+
+    /**
      * PRO-3572: the customer endpoints carry the address in the path, and
      * Guzzle's network-failure message ends with the full request URL. The
      * message is logged, stored on queue rows and shown in the admin.
@@ -1090,8 +1172,27 @@ class ClientTest extends TestCase
             $this->createMock(Logger::class),
             $sleeper,
             new StorefrontScript($storeManager, $request ?? $this->createMock(Http::class)),
-            $this->health
+            $this->health,
+            $this->privacyBudget()
         );
+    }
+
+    /**
+     * The real privacy budget on an in-memory cache and this test's clock.
+     */
+    private function privacyBudget(): PrivacyRequestBudget
+    {
+        $cache = $this->createMock(CacheInterface::class);
+        $cache->method('load')->willReturnCallback(fn (string $key): string|false => $this->cache[$key] ?? false);
+        $cache->method('save')->willReturnCallback(function (string $data, string $key): bool {
+            $this->cache[$key] = $data;
+
+            return true;
+        });
+        $dateTime = $this->createMock(DateTime::class);
+        $dateTime->method('gmtTimestamp')->willReturnCallback(fn (): int => $this->now);
+
+        return new PrivacyRequestBudget($cache, $dateTime);
     }
 
     /**

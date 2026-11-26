@@ -21,6 +21,7 @@ use Smaily\Connect\Model\Backfill\JobManager;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Engine\CatalogIngest;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\PrivacyRequestBudget;
 use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
@@ -310,7 +311,8 @@ class QueueRoutingTest extends IntegrationTestCase
             $this->createMock(Logger::class),
             $this->createMock(SleeperInterface::class),
             new StorefrontScript($storeManager, $this->createMock(Http::class)),
-            $this->createMock(ConnectionHealth::class)
+            $this->createMock(ConnectionHealth::class),
+            $this->createMock(PrivacyRequestBudget::class)
         );
     }
 

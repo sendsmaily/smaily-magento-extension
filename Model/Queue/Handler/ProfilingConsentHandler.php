@@ -12,6 +12,7 @@ use Smaily\Connect\Api\Queue\PausableEventHandlerInterface;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
+use Smaily\Connect\Model\Engine\Exception\EngineThrottledException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
@@ -37,6 +38,11 @@ use Smaily\Connect\Model\Queue\Skipped;
  * claim them (isPaused()), and a row that meets the refusal goes back as it
  * was. Once the account is active again they are sent, and the check above
  * still lets only the shopper's newest choice through.
+ *
+ * The choices go at the pace of the engine's limit on privacy requests
+ * (Engine\PrivacyRequestBudget, CON-432): a row the limit does not allow
+ * now, or one the engine answers 429, waits as long as the engine asks,
+ * with no attempt spent, and the run goes on with the next row.
  */
 class ProfilingConsentHandler implements PausableEventHandlerInterface
 {
@@ -89,6 +95,8 @@ class ProfilingConsentHandler implements PausableEventHandlerInterface
             try {
                 $this->client->customerOptOut($email, $optOut, self::REASON, (string)($payload['opted_out_at'] ?? ''));
                 $results[$id] = true;
+            } catch (EngineThrottledException $exception) {
+                $results[$id] = new Pending($exception->getRetryAfter());
             } catch (EngineRequestException $exception) {
                 // §10: 404 = the engine holds nothing for this address, so
                 // there is nothing to exclude (a newsletter-only guest); the

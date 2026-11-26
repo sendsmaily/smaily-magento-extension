@@ -113,6 +113,27 @@ class EventQueue
     }
 
     /**
+     * Add an event already failed for good (CON-432): a contact the contacts
+     * import could not deliver. The Log keeps it with its reason, and Send
+     * again sends it as any failed row; the flusher never claims it.
+     *
+     * @param array<int|string, mixed> $payload
+     */
+    public function enqueueFailed(
+        string $eventType,
+        array $payload,
+        string $reason,
+        ?string $entityId = null,
+        int $websiteId = 0
+    ): bool {
+        return $this->insert($eventType, $payload, $entityId, $websiteId, null, [
+            'status' => Event::STATUS_FAILED,
+            'attempts' => 1,
+            'last_error' => mb_substr($reason, 0, self::MAX_ERROR_LENGTH),
+        ]);
+    }
+
+    /**
      * @param array<int|string, mixed> $payload
      * @param array<string, mixed> $closedFields the fields of a row stored already closed
      * @return bool true when stored, false when skipped as a duplicate
@@ -257,16 +278,41 @@ class EventQueue
     }
 
     /**
+     * Give claimed rows back as release() does, due again only after
+     * $seconds (CON-432: a privacy request waits for the engine's limit) —
+     * no attempt spent, so a wait never brings a row closer to the end of
+     * its retry ladder.
+     *
+     * @param Event[] $events
+     */
+    public function postpone(array $events, int $seconds): void
+    {
+        if (!$events) {
+            return;
+        }
+
+        $dueAt = $this->dateTime->gmtDate('Y-m-d H:i:s', $this->dateTime->gmtTimestamp() + $seconds);
+        $this->unclaim(
+            ['id IN (?)' => array_map(static fn (Event $event): int => (int)$event->getId(), $events)],
+            ['next_retry_at' => $dueAt]
+        );
+        foreach ($events as $event) {
+            $event->addData(['status' => Event::STATUS_PENDING, 'next_retry_at' => $dueAt]);
+        }
+    }
+
+    /**
      * Turn the rows $where names pending and unclaimed again.
      *
      * @param array<string, mixed> $where
+     * @param array<string, mixed> $fields further columns to write
      * @return int rows changed
      */
-    private function unclaim(array $where): int
+    private function unclaim(array $where, array $fields = []): int
     {
         return $this->resourceConnection->getConnection()->update(
             $this->resourceConnection->getTableName(EventResource::TABLE_NAME),
-            ['status' => Event::STATUS_PENDING, 'claim_token' => null],
+            ['status' => Event::STATUS_PENDING, 'claim_token' => null] + $fields,
             $where
         );
     }

@@ -31,6 +31,7 @@ use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\BrowseEventValidator;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\PrivacyRequestBudget;
 use Smaily\Connect\Model\Engine\MarketingConsent;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\SleeperInterface;
@@ -214,7 +215,8 @@ class IndexTest extends TestCase
             $this->createMock(Logger::class),
             $sleeper,
             $this->createMock(StorefrontScript::class),
-            $this->createMock(ConnectionHealth::class)
+            $this->createMock(ConnectionHealth::class),
+            $this->createMock(PrivacyRequestBudget::class)
         );
 
         // A client may put any value in the forwarding headers: each request

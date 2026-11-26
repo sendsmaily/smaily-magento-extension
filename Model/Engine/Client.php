@@ -19,6 +19,7 @@ use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Client\TransportErrorMessage;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
+use Smaily\Connect\Model\Engine\Exception\EngineThrottledException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\Payload\ConnectionPrefix;
 use Smaily\Connect\Model\Logger\Logger;
@@ -35,7 +36,11 @@ use Smaily\Connect\Model\StorefrontScript;
  *   429 (honouring retry_after_seconds from the body, up to 60 s) and 5xx;
  *   other 4xx never retry. The storefront calls are the exception: one
  *   attempt, never a retry or a wait (relayBrowse(), and the shopper's
- *   recommendations, recommendations()).
+ *   recommendations, recommendations()). The privacy requests (customer
+ *   export, delete and opt-out) are paced to the engine's limit
+ *   (PrivacyRequestBudget, CON-432): one the limit does not allow now, and
+ *   one the engine answers 429, throws EngineThrottledException at once —
+ *   never a wait in the request.
  * - D6 ingest responses are per-item: a 200 is never all-or-nothing.
  * - Exception messages are translated with __(): they surface in the admin
  *   UI (wizard step 4, automations form, health notices).
@@ -155,7 +160,8 @@ class Client
         private readonly Logger $logger,
         private readonly SleeperInterface $sleeper,
         private readonly StorefrontScript $storefrontScript,
-        private readonly ConnectionHealth $health
+        private readonly ConnectionHealth $health,
+        private readonly PrivacyRequestBudget $privacyBudget
     ) {
     }
 
@@ -461,7 +467,7 @@ class Client
      */
     public function customerExport(string $email): array
     {
-        return $this->request('GET', $this->customerEndpoint('customer_export', $email), null);
+        return $this->request('GET', $this->customerEndpoint('customer_export', $email), null, privacy: true);
     }
 
     /**
@@ -475,7 +481,7 @@ class Client
             return $this->request('DELETE', $this->customerEndpoint('customer_delete', $email), [
                 'confirm' => true,
                 'reason' => 'user_request',
-            ]);
+            ], privacy: true);
         } catch (EngineRequestException $exception) {
             if ($exception->getHttpStatus() === 404) {
                 return ['ok' => true, 'already_deleted' => true];
@@ -501,7 +507,7 @@ class Client
             $body['opted_out_at'] = $timestamp;
         }
 
-        return $this->request('POST', $this->customerEndpoint('customer_opt_out', $email), $body);
+        return $this->request('POST', $this->customerEndpoint('customer_opt_out', $email), $body, privacy: true);
     }
 
     /**
@@ -655,6 +661,7 @@ class Client
      * @param array<string, mixed>|null $body
      * @param bool $singleAttempt one short attempt, no retry and no wait (the storefront calls)
      * @param int $timeoutSeconds the whole request's bound
+     * @param bool $privacy a privacy request, paced to the engine's limit (PrivacyRequestBudget)
      * @return array<string, mixed>
      */
     private function request(
@@ -663,7 +670,8 @@ class Client
         ?array $body,
         bool $authenticated = true,
         bool $singleAttempt = false,
-        int $timeoutSeconds = self::TIMEOUT_SECONDS
+        int $timeoutSeconds = self::TIMEOUT_SECONDS,
+        bool $privacy = false
     ): array {
         $this->lastExchange = null;
         $this->throttled = false;
@@ -696,6 +704,9 @@ class Client
 
         // Retry loop per contract: backoff 1/2/4/8/16s on 429 and 5xx.
         while (true) {
+            if ($privacy) {
+                $this->takePrivacyTurn();
+            }
             try {
                 $this->lastExchange['response'] = null;
                 $response = $httpClient->request($method, $url, $options);
@@ -721,6 +732,14 @@ class Client
                 $errorBody = $this->decodeSafely($rawBody);
                 if ($status === 429) {
                     $this->throttled = true;
+                }
+                if ($status === 429 && $privacy) {
+                    // Waits as long as the engine asks, outside this request.
+                    $wait = $this->privacyBudget->pause(
+                        $this->settings->getTenantId(),
+                        (int)($errorBody['retry_after_seconds'] ?? PrivacyRequestBudget::WINDOW_SECONDS)
+                    );
+                    throw $this->privacyWait($wait);
                 }
 
                 if ($status === 403 && ($errorBody['error'] ?? '') === 'tenant_inactive') {
@@ -775,6 +794,32 @@ class Client
                 $attempt++;
             }
         }
+    }
+
+    /**
+     * Count a privacy request against the engine store's limit, or throw
+     * when the limit does not allow one now.
+     */
+    private function takePrivacyTurn(): void
+    {
+        $store = $this->settings->getTenantId();
+        $wait = $this->privacyBudget->waitSeconds($store);
+        if ($wait > 0) {
+            throw $this->privacyWait($wait);
+        }
+        $this->privacyBudget->spend($store);
+    }
+
+    private function privacyWait(int $seconds): EngineThrottledException
+    {
+        return new EngineThrottledException(
+            (string)__(
+                'Campaign Intelligence takes %1 privacy requests a minute; the next one can go in %2 seconds',
+                PrivacyRequestBudget::LIMIT,
+                $seconds
+            ),
+            $seconds
+        );
     }
 
     /**

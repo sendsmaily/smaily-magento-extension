@@ -895,6 +895,7 @@ $pages['contacts-setup'] = [
         'Sync contacts to Smaily',
         'Contacts start syncing to Smaily when you save this step.',
         $contactsUnsaved,
+        'Also sync guest buyers who did not tick the newsletter box',
     ],
 ];
 $pages['contacts-setup-off'] = [
@@ -920,7 +921,7 @@ $pages['contacts-settings-new'] = [
     'template' => $contactsSetupTemplates,
     'viewModel' => $intelligence,
     'data' => ['context' => 'settings'],
-    'strings' => [$contactsUnsaved],
+    'strings' => [$contactsUnsaved, 'Also sync guest buyers who did not tick the newsletter box'],
 ];
 /*
  * The transactional-email settings of Settings (PRO-4062): the account
@@ -1087,8 +1088,11 @@ $setupCompleted = [
             . ' so that Campaign Intelligence gets the new product links.',
     ],
 ];
-$pages['setup-completed-storefront'] = $setupCompleted
-    + ['viewModel' => $intelligenceViewModel('https://shop.example.com', true)];
+// The Overview shows Campaign Intelligence connected there (CON-461).
+$pages['setup-completed-storefront'] = [
+    'viewModel' => $intelligenceViewModel('https://shop.example.com', true),
+    'strings' => array_merge($setupCompleted['strings'], ['Campaign Intelligence', 'Connected']),
+] + $setupCompleted;
 $pages['setup-completed'] = $setupCompleted + ['viewModel' => $intelligence];
 
 /*
@@ -1628,6 +1632,29 @@ $websitesStrings = [
     'A website with another Smaily account than the one saved for all websites keeps its own automations:'
         . ' their workflows come from its own account.',
 ];
+// The setup's Overview (CON-461): its step, what is active and the cron card.
+$overviewStrings = [
+    'Overview',
+    'Continue',
+    'Finish',
+    'Back',
+    'Smaily Connect is configured and ready. Make sure that all settings are correct and click Finish to save.',
+    'Syncing starts once Smaily accepts the credentials — check them in Settings > Connection and test the connection.',
+    'What\'s active',
+    'Smaily connected',
+    'Contact sync enabled',
+    'Welcome',
+    'First order',
+    'Abandoned cart',
+    'Campaign Intelligence',
+    'Connected',
+    'Not connected (optional)',
+    'Background tasks',
+    'Make sure the Magento cron runs every minute — deliveries are queued and flushed by the smaily_connect cron group.',
+    'All customers (legitimate interest)',
+    'One account, per-language workflows',
+    'Also sync guest buyers who did not tick the newsletter box',
+];
 $pages['setup-websites'] = [
     'template' => $root . '/view/adminhtml/templates/wizard/index.phtml',
     'viewModel' => $websitesViewModel(true),
@@ -1640,7 +1667,7 @@ $pages['setup-websites'] = [
         'panel.intelligence' => $root . '/view/adminhtml/templates/panel/intelligence.phtml',
         'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
     ]],
-    'strings' => array_merge($websitesStrings, $transactionalStrings, [
+    'strings' => array_merge($websitesStrings, $transactionalStrings, $overviewStrings, [
         'Once connected, set up the Order confirmation and Shipping confirmation triggers in the Automations step.',
         'Send transactional emails via transactional Smaily account, which you can connect in the first setup step.'
             . ' Transactional emails should be sent from a separate account than marketing emails.',
@@ -1946,76 +1973,82 @@ $pages['settings-separate'] = [
  * Automations tabs for a one-website store with ET and LV store views, saved
  * in per-language Smaily accounts (mode A), which holds rows of both
  * per-language modes: mode A's Welcome workflow for ET (the fallback), and
- * mode B's Welcome workflows for ET and LV (LV the fallback).
+ * mode B's Welcome workflows for ET and LV (LV the fallback). The
+ * settings-modes-single page: the same website saved in the stored default,
+ * 'single', which has no card (CON-461).
  */
-$pages['settings-modes'] = [
-    'template' => $root . '/view/adminhtml/templates/settings/index.phtml',
-    'viewModel' => new class ($websitesViewModel(false)) {
-        /**
-         * @param object $inner
-         */
-        public function __construct(private readonly object $inner)
-        {
-        }
+$modesViewModel = static fn (string $mode): object => new class ($websitesViewModel(false), $mode) {
+    /**
+     * @param object $inner
+     * @param string $mode
+     */
+    public function __construct(private readonly object $inner, private readonly string $mode)
+    {
+    }
 
-        /**
-         * @param string $name
-         * @param array<int, mixed> $arguments
-         * @return mixed
-         */
-        public function __call(string $name, array $arguments): mixed
-        {
-            return $this->inner->$name(...$arguments);
-        }
+    /**
+     * @param string $name
+     * @param array<int, mixed> $arguments
+     * @return mixed
+     */
+    public function __call(string $name, array $arguments): mixed
+    {
+        return $this->inner->$name(...$arguments);
+    }
 
-        /**
-         * @return bool
-         */
-        public function hasMultipleWebsites(): bool
-        {
-            return false;
-        }
+    /**
+     * @return bool
+     */
+    public function hasMultipleWebsites(): bool
+    {
+        return false;
+    }
 
-        /**
-         * @return string
-         */
-        public function getMultilingualMode(): string
-        {
-            return 'a';
-        }
+    /**
+     * @return string
+     */
+    public function getMultilingualMode(): string
+    {
+        return $this->mode;
+    }
 
-        /**
-         * @param string $mode
-         * @return array<string, array{workflowId: int, isDefaultFallback: bool}>
-         */
-        public function getSavedMappings(string $mode): array
-        {
-            return $mode === 'a'
-                ? ['welcome|et' => ['workflowId' => 101, 'isDefaultFallback' => true]]
-                : [
-                    'welcome|et' => ['workflowId' => 201, 'isDefaultFallback' => false],
-                    'welcome|lv' => ['workflowId' => 202, 'isDefaultFallback' => true],
-                ];
-        }
+    /**
+     * @param string $mode
+     * @return array<string, array{workflowId: int, isDefaultFallback: bool}>
+     */
+    public function getSavedMappings(string $mode): array
+    {
+        return $mode === 'a'
+            ? ['welcome|et' => ['workflowId' => 101, 'isDefaultFallback' => true]]
+            : [
+                'welcome|et' => ['workflowId' => 201, 'isDefaultFallback' => false],
+                'welcome|lv' => ['workflowId' => 202, 'isDefaultFallback' => true],
+            ];
+    }
 
-        /**
-         * @return string
-         */
-        public function getBootJson(): string
-        {
-            $boot = json_decode($this->inner->getBootJson(), true, 512, JSON_THROW_ON_ERROR);
-            $boot['connection']['multilingualMode'] = 'a';
+    /**
+     * @return string
+     */
+    public function getBootJson(): string
+    {
+        $boot = json_decode($this->inner->getBootJson(), true, 512, JSON_THROW_ON_ERROR);
+        $boot['connection']['multilingualMode'] = $this->mode;
 
-            return (string)json_encode($boot);
-        }
-    },
-    'data' => ['context' => 'settings', 'children' => [
-        'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
-        'panel.automations' => $root . '/view/adminhtml/templates/panel/automations.phtml',
-        'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
-    ]],
-    'strings' => ['Some languages have no workflow'],
-];
+        return (string)json_encode($boot);
+    }
+};
+foreach (['settings-modes' => 'a', 'settings-modes-single' => 'single'] as $page => $mode) {
+    $pages[$page] = [
+        'template' => $root . '/view/adminhtml/templates/settings/index.phtml',
+        'viewModel' => $modesViewModel($mode),
+        'data' => ['context' => 'settings', 'children' => [
+            'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
+            'panel.automations' => $root . '/view/adminhtml/templates/panel/automations.phtml',
+            'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+        ]],
+        'strings' => ['Some languages have no workflow', 'Single language'],
+    ];
+}
 
 /*
  * The settings-account-change page (CON-396) renders Settings for the

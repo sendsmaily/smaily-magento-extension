@@ -1094,6 +1094,9 @@ window.smailyPanelsInit = function ($) {
         $(document).on('change', 'input[name=smaily-w-mode]', function () {
             $('input[name=smaily-w-mode]').closest('.smaily-choice').removeClass('is-selected');
             $(this).closest('.smaily-choice').addClass('is-selected');
+            // The guest switch shows in the All customers (legitimate
+            // interest) mode only, as in the WooCommerce plugin (CON-461).
+            $('#smaily-w-include-guests-row').toggle($(this).val() === 'legitimate_interest');
             // The import estimate counts this mode's audience (PRO-3582).
             var $estimate = $('#smaily-w-backfill-estimate');
             var estimate = $estimate.attr('data-estimate-' + $(this).val());
@@ -1133,6 +1136,8 @@ window.smailyPanelsInit = function ($) {
             if (window.confirm(message)) {
                 return true;
             }
+            // A stored 'single' has no card (CON-461): none stays picked.
+            $('input[name=smaily-w-mlmode]').prop('checked', false);
             $('input[name=smaily-w-mlmode][value=' + mlModeCurrent + ']').prop('checked', true);
             return false;
         };
@@ -1594,8 +1599,8 @@ window.smailyPanelsInit = function ($) {
             if ($syncEnabled.length) {
                 data.sync_enabled = $syncEnabled.is(':checked');
             }
-            // Settings-only controls (not rendered in the wizard) — omit the
-            // keys entirely there so the wizard's save never touches them.
+            // The guest switch posts its value in every mode: hidden, it
+            // keeps the stored one (CON-461).
             var $includeGuests = $('#smaily-w-include-guests');
             if ($includeGuests.length) {
                 data.include_guests = $includeGuests.is(':checked');

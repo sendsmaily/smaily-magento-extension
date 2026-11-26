@@ -1,0 +1,302 @@
+<!doctype html>
+<!--
+/**
+ * Copyright © Smaily. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<!--
+  Headless harness for the initial setup's end (CON-461, as in the
+  WooCommerce plugin's setup): the real templates — wizard/index.phtml with
+  its panels and panel/panels-js.phtml — rendered in en_US and et_EE by
+  Test/Js/render-admin.php into Test/Js/build/, with jQuery from vendor/,
+  one fresh frame per scenario. Stubbed: RequireJS's require(), the
+  requests (fetch), each recorded and answered as saved, and the page's
+  navigation, recorded and stopped.
+
+  Checked on the store-wide setup of the three-website store (One account,
+  per-language workflows): the Campaign Intelligence step moves on with
+  Continue and does not finish the setup. The Overview step, titled
+  Overview, says that Smaily Connect is configured and ready and lists
+  under What's active the Smaily account with the language-mode card, the
+  contact sync mode, the Welcome, First order and Abandoned cart automations
+  as switched on in the steps, and Campaign Intelligence not connected
+  (optional); a Background tasks card asks for the Magento cron. Back
+  returns to the Campaign Intelligence step; Finish saves the setup as
+  finished and opens the Dashboard. When Smaily did not accept the
+  credentials, the Overview says that syncing starts once it does, and the
+  Smaily account is not active. On a finished setup with Campaign
+  Intelligence connected, the Overview shows it connected.
+
+  Run it with bin/test-js.sh (it renders the pages first); the page ends with
+  "RESULT: PASS" or "RESULT: FAIL".
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>setup overview harness</title>
+    <script src="build/setup-websites.en_US.js"></script>
+    <script src="build/setup-websites.et_EE.js"></script>
+    <script src="build/setup-completed-storefront.en_US.js"></script>
+    <script src="build/setup-completed-storefront.et_EE.js"></script>
+</head>
+<body>
+<pre id="log"></pre>
+<div id="result">RESULT: RUNNING</div>
+<script>
+    'use strict';
+
+    var JQUERY = '../../vendor/phpunit/php-code-coverage/src/Report/Html/Renderer/Template/js/jquery.min.js';
+    var DASHBOARD = 'https://store.example/admin/smaily_connect/dashboard/';
+    var READY = 'Smaily Connect is configured and ready. Make sure that all settings are correct and click Finish to save.';
+    var NOT_ACCEPTED = 'Syncing starts once Smaily accepts the credentials — check them in Settings > Connection and test the connection.';
+    var CRON = 'Make sure the Magento cron runs every minute — deliveries are queued and flushed by the smaily_connect cron group.';
+    var failures = 0;
+    var passes = 0;
+
+    // Chrome's virtual time jumps to the end of its budget when no timer is
+    // pending; a running interval keeps it stepping until the result is
+    // written (as in tracker-consent.html).
+    var keepAlive = setInterval(function () {}, 10);
+
+    function log(line) {
+        document.getElementById('log').textContent += line + '\n';
+    }
+
+    function check(label, condition) {
+        if (condition) {
+            passes++;
+            log('ok   ' + label);
+        } else {
+            failures++;
+            log('FAIL ' + label);
+        }
+    }
+
+    function wait(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    function text(element) {
+        return element ? element.textContent.replace(/\s+/g, ' ').trim() : null;
+    }
+
+    function shown(element) {
+        return !!element && element.ownerDocument.defaultView.getComputedStyle(element).display !== 'none';
+    }
+
+    // Runs in the frame before the page: the admin's form key, require()
+    // for a page script that asks for jQuery, the requests, each recorded
+    // and answered with window.answer, and the page's navigation, recorded
+    // in window.navigated and stopped.
+    function stubs() {
+        return [
+            '<script>',
+            'window.FORM_KEY = "form-key";',
+            'window.require = function (deps, callback) { callback(window.jQuery); };',
+            'window.requests = [];',
+            'window.answer = {};',
+            'window.navigated = null;',
+            'window.navigation.addEventListener("navigate", function (event) {',
+            '  window.navigated = event.destination.url; event.preventDefault(); });',
+            'window.fetch = function (url, options) {',
+            '  window.requests.push({url: url, body: JSON.parse(options.body || "{}")});',
+            '  return Promise.resolve(new Response(JSON.stringify(window.answer),',
+            '    {headers: {"Content-Type": "application/json"}})); };',
+            '<\/script>',
+            '<script src="' + JQUERY + '"><\/script>'
+        ].join('\n');
+    }
+
+    function open(page, answer) {
+        return new Promise(function (resolve, reject) {
+            var frame = document.createElement('iframe'),
+                rendered = (window.smailyAdminPages || {})[page];
+
+            if (!rendered) {
+                reject(new Error('Test/Js/build/' + page + '.js is missing; bin/test-js.sh renders it'));
+
+                return;
+            }
+            frame.style.width = '1200px';
+            frame.style.height = '900px';
+            frame.onload = function () {
+                frame.onload = null;
+                frame.contentWindow.answer = answer;
+                wait(100).then(function () {
+                    resolve(frame);
+                }, reject);
+            };
+            frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + stubs()
+                + '</head><body>' + rendered.html + '</body></html>';
+            document.body.appendChild(frame);
+        });
+    }
+
+    function answer(verified) {
+        return {saved: true, errors: [], workflows: [], status: 'idle', verified: verified, accountName: 'shop'};
+    }
+
+    function lastSave(frame, step) {
+        var saves = frame.contentWindow.requests.filter(function (request) {
+            return request.body.step === step;
+        });
+
+        return saves.length ? saves[saves.length - 1].body.data : null;
+    }
+
+    function activeStep(doc) {
+        var panel = doc.querySelector('.smaily-step-panel.active');
+
+        return panel ? Number(panel.getAttribute('data-step')) : 0;
+    }
+
+    function setChecked(frame, element, checked) {
+        element.checked = checked;
+        frame.contentWindow.jQuery(element).trigger('change');
+    }
+
+    async function next(frame) {
+        frame.contentDocument.getElementById('smaily-w-next').click();
+        await wait(100);
+    }
+
+    // One What's active row: whether it is active, its mark, label and detail.
+    function item(doc, name) {
+        var row = doc.querySelector('#smaily-w-overview-active [data-item=' + name + ']');
+
+        return {
+            active: row.classList.contains('is-active'),
+            mark: text(row.querySelector('.smaily-overview-item__mark')),
+            label: text(row.querySelector('.smaily-overview-item__label')),
+            detail: text(row.querySelector('.smaily-overview-item__detail'))
+        };
+    }
+
+    function is(row, active, label, detail) {
+        return row.active === active && row.mark === (active ? '✓' : '○') && row.label === label
+            && row.detail === detail;
+    }
+
+    async function walk(locale) {
+        var strings = window.smailyAdminPages['setup-websites.' + locale].strings,
+            frame = await open('setup-websites.' + locale, answer(true)),
+            doc = frame.contentDocument,
+            nextLabel = function () {
+                return text(doc.getElementById('smaily-w-next'));
+            },
+            panel;
+
+        await next(frame);
+        check(locale + ': Continue moves on to Contacts', activeStep(doc) === 2);
+        setChecked(frame, doc.querySelector('input[name=smaily-w-mode][value=legitimate_interest]'), true);
+        check(locale + ': the Contacts step shows the guest switch in All customers (legitimate interest)',
+            shown(doc.getElementById('smaily-w-include-guests-row'))
+            && text(doc.getElementById('smaily-w-include-guests-row')) === strings['Also sync guest buyers who did not tick the newsletter box']);
+        await next(frame);
+        setChecked(frame, doc.getElementById('smaily-w-welcome-enabled'), true);
+        await next(frame);
+        check(locale + ': the Campaign Intelligence step moves on with Continue',
+            activeStep(doc) === 4 && nextLabel() === strings.Continue);
+        await next(frame);
+        check(locale + ': Continue saves the Campaign Intelligence step and shows the Overview',
+            activeStep(doc) === 5 && lastSave(frame, 'intelligence') !== null);
+        check(locale + ': the Overview does not finish the setup by itself', lastSave(frame, 'finish') === null);
+
+        panel = doc.querySelector('.smaily-step-panel[data-step="5"]');
+        check(locale + ': the step is titled Overview', text(panel.querySelector('.smaily-step-title')) === strings.Overview);
+        check(locale + ': Back and Finish show, in that order',
+            shown(doc.getElementById('smaily-w-back')) && shown(doc.getElementById('smaily-w-next'))
+            && text(doc.getElementById('smaily-w-back')) === strings.Back && nextLabel() === strings.Finish
+            && (doc.getElementById('smaily-w-back').compareDocumentPosition(doc.getElementById('smaily-w-next'))
+                & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
+        check(locale + ': the Overview says that Smaily Connect is ready',
+            shown(doc.getElementById('smaily-w-overview-connected'))
+            && text(doc.getElementById('smaily-w-overview-connected')) === strings[READY]
+            && !shown(doc.getElementById('smaily-w-overview-not-connected')));
+        check(locale + ': the list is headed What\'s active', text(panel.querySelector('.smaily-card h2')) === strings['What\'s active']);
+        check(locale + ': the Smaily account is active, with its language-mode card',
+            is(item(doc, 'smaily'), true, strings['Smaily connected'],
+                'shop.sendsmaily.net · ' + strings['One account, per-language workflows']));
+        check(locale + ': contact sync is active, in the mode picked',
+            is(item(doc, 'contacts'), true, strings['Contact sync enabled'], strings['All customers (legitimate interest)']));
+        check(locale + ': Welcome, switched on, is active',
+            is(item(doc, 'welcome'), true, strings.Welcome, ''));
+        check(locale + ': First order and Abandoned cart, switched off, are not',
+            is(item(doc, 'firstorder'), false, strings['First order'], '')
+            && is(item(doc, 'abandoned'), false, strings['Abandoned cart'], ''));
+        check(locale + ': Campaign Intelligence is not connected (optional)',
+            is(item(doc, 'intelligence'), false, strings['Campaign Intelligence'], strings['Not connected (optional)']));
+        check(locale + ': the Background tasks card asks for the Magento cron',
+            text(doc.querySelector('#smaily-w-overview-cron h2')) === strings['Background tasks']
+            && text(doc.querySelector('#smaily-w-overview-cron p')).indexOf(strings[CRON]) === 0);
+        if (locale !== 'en_US') {
+            check(locale + ': the Overview is translated', [READY, 'What\'s active', 'Smaily connected',
+                'Contact sync enabled', 'Not connected (optional)', 'Background tasks', CRON].every(function (phrase) {
+                return strings[phrase] !== phrase;
+            }));
+        }
+
+        doc.getElementById('smaily-w-back').click();
+        check(locale + ': Back returns to the Campaign Intelligence step', activeStep(doc) === 4);
+        doc.querySelector('.smaily-steps li[data-step="3"]').click();
+        setChecked(frame, doc.getElementById('smaily-w-welcome-enabled'), false);
+        doc.querySelector('.smaily-steps li[data-step="5"]').click();
+        check(locale + ': the Overview follows a change made in the steps', is(item(doc, 'welcome'), false, strings.Welcome, ''));
+
+        await next(frame);
+        check(locale + ': Finish saves the setup as finished', lastSave(frame, 'finish') !== null);
+        check(locale + ': Finish opens the Dashboard', frame.contentWindow.navigated === DASHBOARD);
+        frame.remove();
+    }
+
+    async function notAccepted(locale) {
+        var strings = window.smailyAdminPages['setup-websites.' + locale].strings,
+            frame = await open('setup-websites.' + locale, answer(false)),
+            doc = frame.contentDocument;
+
+        await next(frame);
+        await next(frame);
+        await next(frame);
+        await next(frame);
+        check(locale + ', not accepted: the Overview says that syncing starts once Smaily accepts the credentials',
+            activeStep(doc) === 5 && shown(doc.getElementById('smaily-w-overview-not-connected'))
+            && text(doc.getElementById('smaily-w-overview-not-connected')) === strings[NOT_ACCEPTED]
+            && !shown(doc.getElementById('smaily-w-overview-connected')));
+        check(locale + ', not accepted: the Smaily account is not active', item(doc, 'smaily').active === false);
+        frame.remove();
+    }
+
+    async function intelligenceConnected(locale) {
+        var strings = window.smailyAdminPages['setup-completed-storefront.' + locale].strings,
+            frame = await open('setup-completed-storefront.' + locale, answer(true)),
+            doc = frame.contentDocument;
+
+        doc.querySelector('.smaily-steps li[data-step="5"]').click();
+        check(locale + ', Campaign Intelligence connected: the Overview shows it connected',
+            activeStep(doc) === 5 && is(item(doc, 'intelligence'), true, strings['Campaign Intelligence'], strings.Connected));
+        frame.remove();
+    }
+
+    (async function () {
+        try {
+            for (var locale of ['en_US', 'et_EE']) {
+                log('# ' + locale);
+                await walk(locale);
+                await notAccepted(locale);
+                await intelligenceConnected(locale);
+            }
+        } catch (error) {
+            failures++;
+            log('FAIL ' + (error && error.stack ? error.stack : error));
+        }
+        clearInterval(keepAlive);
+        document.getElementById('result').textContent = failures === 0 && passes > 0
+            ? 'RESULT: PASS (' + passes + ' checks)'
+            : 'RESULT: FAIL (' + failures + ' of ' + (passes + failures) + ' checks failed)';
+    })();
+</script>
+</body>
+</html>

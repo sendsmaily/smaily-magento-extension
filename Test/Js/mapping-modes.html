@@ -23,6 +23,13 @@
   Router reads the rows, and hides the cards' workflow, which mode A never
   starts.
 
+  A website saved in the stored default, 'single' (CON-461, as in the
+  WooCommerce plugin): the Connection tab shows the three cards — per-language
+  accounts, per-language workflows, one branching workflow — with none
+  picked and no Single language card, and its save keeps 'single'. Declining
+  the question on the per-language accounts card leaves none picked and the
+  save still keeps 'single'; picking a card saves that card's mode.
+
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
 -->
@@ -32,6 +39,8 @@
     <title>mapping modes harness</title>
     <script src="build/settings-modes.en_US.js"></script>
     <script src="build/settings-modes.et_EE.js"></script>
+    <script src="build/settings-modes-single.en_US.js"></script>
+    <script src="build/settings-modes-single.et_EE.js"></script>
 </head>
 <body>
 <pre id="log"></pre>
@@ -200,6 +209,48 @@
         frame.remove();
     }
 
+    // The stored default 'single' on a multilingual website (CON-461).
+    async function single(locale) {
+        var frame = await open('settings-modes-single.' + locale),
+            doc = frame.contentDocument,
+            strings = window.smailyAdminPages['settings-modes-single.' + locale].strings,
+            inputs = doc.querySelectorAll('input[name=smaily-w-mlmode]'),
+            saveConnection = async function () {
+                doc.getElementById('smaily-w-connection-save').click();
+                await wait(100);
+
+                return (lastSave(frame, 'connect') || {}).multilingual_mode;
+            };
+
+        check(locale + ', single: three cards, no Single language card',
+            Array.prototype.map.call(inputs, function (input) {
+                return input.value;
+            }).join() === 'a,b,c'
+            && doc.getElementById('smaily-ml-modes').textContent.indexOf(strings['Single language']) === -1);
+        check(locale + ', single: no card is picked',
+            doc.querySelector('input[name=smaily-w-mlmode]:checked') === null
+            && doc.querySelector('#smaily-ml-modes .smaily-choice.is-selected') === null);
+        check(locale + ', single: the Connection save keeps the stored mode', await saveConnection() === 'single');
+
+        frame.contentWindow.confirm = function () {
+            return false;
+        };
+        pickMode(frame, 'a');
+        check(locale + ', single: declining per-language accounts leaves no card picked',
+            doc.querySelector('input[name=smaily-w-mlmode]:checked') === null);
+        check(locale + ', single, declined: the save still keeps the stored mode', await saveConnection() === 'single');
+
+        frame.contentWindow.confirm = function () {
+            return true;
+        };
+        pickMode(frame, 'b');
+        check(locale + ', single: a picked card is selected',
+            doc.querySelector('input[name=smaily-w-mlmode]:checked').value === 'b'
+            && doc.querySelector('#smaily-ml-modes .smaily-choice.is-selected input').value === 'b');
+        check(locale + ', single: the save keeps the picked mode', await saveConnection() === 'b');
+        frame.remove();
+    }
+
     function tick(frame, selector) {
         var input = frame.contentDocument.querySelector(selector);
         input.checked = true;
@@ -211,6 +262,7 @@
             for (var locale of ['en_US', 'et_EE']) {
                 log('# ' + locale);
                 await run(locale);
+                await single(locale);
             }
         } catch (error) {
             failures++;

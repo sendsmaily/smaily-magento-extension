@@ -47,4 +47,29 @@ class Collection extends AbstractCollection
 
         return $this->addFieldToFilter('account_key', Mapping::ACCOUNT_DEFAULT);
     }
+
+    /**
+     * Leaves out the store-wide rows (website 0) that a website's own row
+     * of the same trigger, language and account hides (CON-396): the
+     * website's own row is read in their place, also where it holds no
+     * workflow (MappingSaver's row of a cleared workflow). Website 0 hides
+     * nothing.
+     *
+     * @return $this
+     */
+    public function addHiddenSharedRowsFilter(int $websiteId): self
+    {
+        if ($websiteId <= 0) {
+            return $this;
+        }
+        $own = $this->getConnection()->select()
+            ->from(['own' => $this->getMainTable()], ['id'])
+            ->where('own.website_id = ?', $websiteId)
+            ->where('own.trigger_type = main_table.trigger_type')
+            ->where('own.language = main_table.language')
+            ->where('own.account_key = main_table.account_key');
+        $this->getSelect()->where('main_table.website_id <> 0 OR NOT EXISTS (' . $own->assemble() . ')');
+
+        return $this;
+    }
 }

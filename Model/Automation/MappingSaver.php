@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Automation;
 
+use Magento\Framework\DB\Select;
 use Smaily\Connect\Model\Config\Source\MultilingualMode;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
 
@@ -26,6 +27,12 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
  * only that mode's rows are managed (the rows the Router reads in it,
  * Mapping\Collection::addModeFilter(), CON-184): a save in mode A keeps the
  * website's mode-B rows, and the other way round (CON-188).
+ *
+ * A website with its own automations that reads the store-wide rows
+ * (website 0) beside its own sends what its page shows (CON-396): a
+ * workflow it clears where a store-wide row of the same trigger, language
+ * and account exists is saved as its own row without a workflow
+ * (workflow_id 0), which hides that store-wide row from it in the Router.
  */
 class MappingSaver
 {
@@ -55,13 +62,17 @@ class MappingSaver
      * @param string|null $mode the multilingual mode the rows are for: only
      *        the existing rows of that mode's accounts are replaced; null
      *        replaces the rows of every account
+     * @param bool $hidesShared the website reads the store-wide rows beside
+     *        its own: a cleared workflow of a store-wide row is saved as a
+     *        row without a workflow (see the class comment)
      * @return array<int, array{field: string, message: string}> empty on success
      */
     public function save(
         array $rows,
         int $websiteId = 0,
         ?array $availableByAccount = null,
-        ?string $mode = null
+        ?string $mode = null,
+        bool $hidesShared = false
     ): array {
         $desired = [];
         foreach ($rows as $row) {
@@ -121,7 +132,7 @@ class MappingSaver
         }
         unset($row);
 
-        $this->sync($desired, $websiteId, self::MANAGED_TRIGGERS, $availableByAccount, $mode);
+        $this->sync($desired, $websiteId, self::MANAGED_TRIGGERS, $availableByAccount, $mode, $hidesShared);
 
         return [];
     }
@@ -192,32 +203,22 @@ class MappingSaver
      * @param string[] $triggers
      * @param array<string, array<int, string>>|null $availableByAccount see save()
      * @param string|null $mode see save()
+     * @param bool $hidesShared see save()
      */
     private function sync(
         array $desired,
         int $websiteId,
         array $triggers,
         ?array $availableByAccount,
-        ?string $mode = null
+        ?string $mode = null,
+        bool $hidesShared = false
     ): void {
         $connection = $this->resource->getConnection();
         $table = $this->resource->getMainTable();
 
-        $select = $connection->select()
-            ->from($table, ['id', 'trigger_type', 'language', 'account_key', 'workflow_id'])
-            ->where('website_id = ?', $websiteId)
-            ->where('trigger_type IN (?)', $triggers);
-        // The rows of the mode's accounts, as Mapping\Collection::addModeFilter() reads them.
-        if ($mode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS) {
-            $select->where(
-                $connection->quoteInto('account_key <> ?', Mapping::ACCOUNT_DEFAULT)
-                . ' OR ' . $connection->quoteInto('language = ?', Mapping::LANGUAGE_DEFAULT)
-            );
-        } elseif ($mode !== null) {
-            $select->where('account_key = ?', Mapping::ACCOUNT_DEFAULT);
-        }
-        $existing = $connection->fetchAll($select);
+        $existing = $connection->fetchAll($this->rowsSelect($websiteId, $triggers, $mode));
         $staleIds = [];
+        $kept = [];
         foreach ($existing as $row) {
             $key = $row['trigger_type'] . '|' . $row['language'] . '|' . $row['account_key'];
             if (isset($desired[$key])) {
@@ -225,9 +226,30 @@ class MappingSaver
             }
             if ($availableByAccount !== null && $this->isMissingFromList($row, $availableByAccount)) {
                 // Saved id absent from its account's live list — keep the row.
+                $kept[$key] = true;
                 continue;
             }
             $staleIds[] = (int)$row['id'];
+        }
+        if ($hidesShared && $websiteId > 0) {
+            foreach ($connection->fetchAll($this->rowsSelect(0, $triggers, $mode)) as $row) {
+                $key = $row['trigger_type'] . '|' . $row['language'] . '|' . $row['account_key'];
+                // A store-wide workflow missing from its account's list was
+                // never offered in the select: its empty post is no clear.
+                if ((int)$row['workflow_id'] <= 0 || isset($desired[$key]) || isset($kept[$key])
+                    || ($availableByAccount !== null && $this->isMissingFromList($row, $availableByAccount))
+                ) {
+                    continue;
+                }
+                $desired[$key] = [
+                    'website_id' => $websiteId,
+                    'trigger_type' => $row['trigger_type'],
+                    'language' => $row['language'],
+                    'account_key' => $row['account_key'],
+                    'workflow_id' => 0,
+                    'is_default_fallback' => 0,
+                ];
+            }
         }
         if ($staleIds !== []) {
             $connection->delete($table, ['id IN (?)' => $staleIds]);
@@ -240,6 +262,31 @@ class MappingSaver
                 ['workflow_id', 'is_default_fallback']
             );
         }
+    }
+
+    /**
+     * A website's rows of the given triggers; given a mode, only the rows of
+     * its accounts, as Mapping\Collection::addModeFilter() reads them.
+     *
+     * @param string[] $triggers
+     */
+    private function rowsSelect(int $websiteId, array $triggers, ?string $mode): Select
+    {
+        $connection = $this->resource->getConnection();
+        $select = $connection->select()
+            ->from($this->resource->getMainTable(), ['id', 'trigger_type', 'language', 'account_key', 'workflow_id'])
+            ->where('website_id = ?', $websiteId)
+            ->where('trigger_type IN (?)', $triggers);
+        if ($mode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS) {
+            $select->where(
+                $connection->quoteInto('account_key <> ?', Mapping::ACCOUNT_DEFAULT)
+                . ' OR ' . $connection->quoteInto('language = ?', Mapping::LANGUAGE_DEFAULT)
+            );
+        } elseif ($mode !== null) {
+            $select->where('account_key = ?', Mapping::ACCOUNT_DEFAULT);
+        }
+
+        return $select;
     }
 
     private function isValidKey(string $value): bool

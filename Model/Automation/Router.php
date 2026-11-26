@@ -36,6 +36,12 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory;
  * accounts' workflow ids stay in the table but are never posted through the
  * website's one account, and the other way round.
  *
+ * A website's own row hides the store-wide row of the same trigger,
+ * language and account, also where it holds no workflow (CON-396): a
+ * website with its own automations that cleared a workflow starts nothing
+ * through the store-wide one, and the store-wide default fallback that its
+ * own row replaced is not its fallback.
+ *
  * A website of a 2+-website install that uses another Smaily account than
  * the store-wide one (WebsiteOverrides::usesOtherAccount(): the account's
  * identity, not the scope its login is saved at) has only its own
@@ -138,6 +144,7 @@ class Router
             ->addFieldToFilter('trigger_type', $trigger)
             ->addFieldToFilter('is_default_fallback', ['eq' => 1])
             ->addModeFilter($mode)
+            ->addHiddenSharedRowsFilter($websiteIds[0])
             ->setOrder('website_id', 'DESC')
             ->setPageSize(1);
 

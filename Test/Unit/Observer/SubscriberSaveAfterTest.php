@@ -38,6 +38,9 @@ use Smaily\Connect\Observer\SubscriberSaveAfter;
  *
  * PRO-4036: before contact sync is active for the website (its Contacts
  * settings not saved yet), nothing goes to Smaily.
+ *
+ * PRO-4322: a status change is the saved status differing from the loaded
+ * one, not the subscriber's status-changed flag.
  */
 class SubscriberSaveAfterTest extends TestCase
 {
@@ -227,6 +230,22 @@ class SubscriberSaveAfterTest extends TestCase
     }
 
     /**
+     * PRO-4322: a save that keeps the loaded status sends nothing, whatever
+     * the subscriber's status-changed flag says.
+     *
+     * @dataProvider statusChangeProvider
+     */
+    public function testASaveThatKeepsTheStatusSendsNothing(int $status): void
+    {
+        $this->dispatcher->expects(self::never())->method('dispatchContactSync');
+        $this->dispatcher->expects(self::never())->method('dispatchAutomation');
+
+        $event = $this->eventFor($status, $status);
+        $event->getEvent()->getData('subscriber')->setStatusChanged(true);
+        $this->observer('frontend')->execute($event);
+    }
+
+    /**
      * PRO-4036: a subscription or an unsubscribe on a website whose
      * Contacts settings were never saved queues nothing, and no welcome.
      *
@@ -291,12 +310,11 @@ class SubscriberSaveAfterTest extends TestCase
     {
         $subscriber = $this->getMockBuilder(Subscriber::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['isStatusChanged', 'getStatus', 'getEmail'])
+            ->onlyMethods(['getEmail'])
             ->getMock();
-        $subscriber->method('isStatusChanged')->willReturn(true);
-        $subscriber->method('getStatus')->willReturn($status);
         $subscriber->method('getEmail')->willReturn('person@example.com');
         $subscriber->setData('store_id', 1);
+        $subscriber->setData('subscriber_status', $status);
         $subscriber->setOrigData('subscriber_status', $previousStatus);
 
         $event = $this->createMock(Event::class);

@@ -12,6 +12,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
+use Smaily\Connect\Model\Engine\Exception\EngineThrottledException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
@@ -189,6 +190,23 @@ class ProfilingConsentHandlerTest extends TestCase
             'opted_out_at' => '2026-09-21T14:13:20Z']);
 
         self::assertEquals([1 => new Pending()], $results);
+    }
+
+    /**
+     * CON-432: a choice the engine's limit on privacy requests holds back
+     * waits as long as the engine asks, with no attempt spent.
+     */
+    public function testAChoiceTheEnginesLimitHoldsBackWaitsAsLongAsTheEngineAsks(): void
+    {
+        $this->optOuts->method('moment')->willReturn(1790000000);
+        $this->client->method('customerOptOut')->willThrowException(
+            new EngineThrottledException('Campaign Intelligence takes 10 privacy requests a minute', 45)
+        );
+
+        $results = $this->handle(1, ['email' => 'person@example.com', 'opt_out' => true,
+            'opted_out_at' => '2026-09-21T14:13:20Z']);
+
+        self::assertEquals([1 => new Pending(45)], $results);
     }
 
     public function testNothingIsSentWhileCampaignIntelligenceIsNotConnected(): void

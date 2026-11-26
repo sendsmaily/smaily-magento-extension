@@ -78,10 +78,13 @@ class FlushEventQueue
         }
 
         $waiting = [];
+        $postponed = [];
         $failed = [];
         foreach ($events as $event) {
             $result = $results[(int)$event->getId()] ?? 'Handler returned no result for event';
-            if ($result instanceof Pending) {
+            if ($result instanceof Pending && $result->delaySeconds > 0) {
+                $postponed[$result->delaySeconds][] = $event;
+            } elseif ($result instanceof Pending) {
                 $waiting[] = $event;
             } elseif ($result === true) {
                 $this->eventQueue->markSent($event);
@@ -108,6 +111,9 @@ class FlushEventQueue
             );
         }
         $this->eventQueue->release($waiting);
+        foreach ($postponed as $seconds => $group) {
+            $this->eventQueue->postpone($group, (int)$seconds);
+        }
     }
 
     /**

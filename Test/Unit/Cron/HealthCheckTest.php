@@ -23,6 +23,7 @@ use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Cron\HealthCheck;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\PrivacyRequestBudget;
 use Smaily\Connect\Model\Engine\ConsentSource;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
@@ -114,7 +115,8 @@ class HealthCheckTest extends TestCase
             $this->createMock(Logger::class),
             $this->createMock(SleeperInterface::class),
             new StorefrontScript($storeManager, $this->createMock(Http::class)),
-            $this->createMock(ConnectionHealth::class)
+            $this->createMock(ConnectionHealth::class),
+            $this->createMock(PrivacyRequestBudget::class)
         );
 
         $flags = $this->createMock(FlagManager::class);

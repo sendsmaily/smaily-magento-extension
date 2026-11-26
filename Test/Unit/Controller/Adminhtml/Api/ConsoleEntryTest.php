@@ -30,6 +30,7 @@ use Psr\Http\Message\RequestInterface;
 use Smaily\Connect\Controller\Adminhtml\Api\ConsoleEntry;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\PrivacyRequestBudget;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\SleeperInterface;
 use Smaily\Connect\Model\Logger\Logger;
@@ -272,7 +273,8 @@ class ConsoleEntryTest extends TestCase
             $logger ?? $this->createMock(Logger::class),
             $this->createMock(SleeperInterface::class),
             new StorefrontScript($storeManager, $this->createMock(HttpRequest::class)),
-            $this->createMock(ConnectionHealth::class)
+            $this->createMock(ConnectionHealth::class),
+            $this->createMock(PrivacyRequestBudget::class)
         );
 
         return new ConsoleEntry(

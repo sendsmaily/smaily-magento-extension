@@ -21,6 +21,7 @@ use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Backfill\ImportsOnConnect;
 use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\PrivacyRequestBudget;
 use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Connector;
 use Smaily\Connect\Model\Engine\Settings;
@@ -171,7 +172,8 @@ class ConnectionPrefixReconnectTest extends IntegrationTestCase
             $this->createMock(Logger::class),
             $this->createMock(SleeperInterface::class),
             new StorefrontScript($storeManager, $this->createMock(Http::class)),
-            $this->createMock(ConnectionHealth::class)
+            $this->createMock(ConnectionHealth::class),
+            $this->createMock(PrivacyRequestBudget::class)
         );
     }
 

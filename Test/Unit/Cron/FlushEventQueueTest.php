@@ -207,6 +207,34 @@ class FlushEventQueueTest extends TestCase
     }
 
     /**
+     * CON-432: a row the handler leaves pending for a while waits that long,
+     * no attempt spent; rows of one wait are postponed together.
+     */
+    public function testARowLeftPendingForAWhileIsPostponed(): void
+    {
+        $first = $this->createEvent(1, 'engine.profiling_consent');
+        $second = $this->createEvent(2, 'engine.profiling_consent');
+        $later = $this->createEvent(3, 'engine.profiling_consent');
+        $this->eventQueue->method('claimBatch')->willReturn([$first, $second, $later]);
+
+        $handler = $this->createMock(EventHandlerInterface::class);
+        $handler->method('handle')->willReturn([1 => new Pending(30), 2 => new Pending(30), 3 => new Pending(300)]);
+
+        $postponed = [];
+        $this->eventQueue->method('postpone')->willReturnCallback(
+            function (array $events, int $seconds) use (&$postponed): void {
+                $postponed[$seconds] = $events;
+            }
+        );
+        $this->eventQueue->expects(self::once())->method('release')->with([]);
+        $this->eventQueue->expects(self::never())->method('markFailedMany');
+
+        $this->createCron(new HandlerPool(['engine.profiling_consent' => $handler]))->execute();
+
+        self::assertSame([30 => [$first, $second], 300 => [$later]], $postponed);
+    }
+
+    /**
      * PRO-2466: the rows of a handler that cannot send now are not claimed,
      * so they wait without crowding out the rows that can go.
      */

@@ -12,6 +12,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Console\Command\GdprCommand;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Exception\EngineThrottledException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Privacy\LocalEraser;
 use Symfony\Component\Console\Command\Command;
@@ -82,6 +83,29 @@ class GdprCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode());
         self::assertStringContainsString('Erased engine data for ' . self::EMAIL, $tester->getDisplay());
+    }
+
+    /**
+     * CON-432: an erasure the engine's limit on privacy requests holds back
+     * ends at once — the local data erased, the wait named, and the command
+     * failing so it is run again.
+     */
+    public function testAnErasureTheEnginesLimitHoldsBackSaysWhenToRunItAgain(): void
+    {
+        $this->localEraser->method('erase')->willReturn([]);
+        $this->client->method('customerDelete')->willThrowException(new EngineThrottledException(
+            'Campaign Intelligence takes 10 privacy requests a minute; the next one can go in 45 seconds',
+            45
+        ));
+
+        $tester = $this->runCommand(['action' => 'erase', 'email' => self::EMAIL, '--force' => true], false);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString(
+            'Local data is erased, but the Campaign Intelligence erasure failed: Campaign Intelligence takes 10'
+                . ' privacy requests a minute; the next one can go in 45 seconds. Run the command again to retry it.',
+            $this->oneLine($tester->getDisplay())
+        );
     }
 
     /**

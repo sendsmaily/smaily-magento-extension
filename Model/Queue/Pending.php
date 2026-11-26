@@ -14,7 +14,15 @@ namespace Smaily\Connect\Model\Queue;
  * tenant_inactive`, PRO-2451). The row goes back to pending exactly as it
  * was — no attempt spent, nothing recorded — and waits for the account to
  * be active again, as the engine ingest rows do (PRO-2466).
+ *
+ * With $delaySeconds the row waits that long first, also with no attempt
+ * spent: a privacy request the engine's limit does not allow now
+ * (Engine\PrivacyRequestBudget, CON-432).
  */
 class Pending
 {
+    public function __construct(
+        public readonly int $delaySeconds = 0
+    ) {
+    }
 }

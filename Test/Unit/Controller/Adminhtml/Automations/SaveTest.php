@@ -27,9 +27,9 @@ use Smaily\Connect\Model\Report\InstallationReport;
 
 /**
  * PRO-3734: after a save, the Automations tab shows each trigger's state as
- * the engine stored it (contract §12), not the state the merchant asked for —
- * the engine keeps a trigger that asks for real sends in test mode until a
- * Smaily operator switches real sends on (§13).
+ * the engine stored it (contract §12). A save never carries `test_mode`
+ * (CON-458): the card's Test mode switch is §20, and §13 keeps the stored
+ * value of an omitted key.
  */
 class SaveTest extends TestCase
 {
@@ -39,12 +39,12 @@ class SaveTest extends TestCase
     /** How many times the installation report was told the setup was saved (CON-234). */
     private int $reportsScheduled = 0;
 
-    public function testASaveAskingForRealSendsAnswersTheTestModeTheEngineStored(): void
+    public function testASaveSendsNoTestModeAndAnswersTheStateTheEngineStored(): void
     {
         $client = $this->createMock(Client::class);
         $client->expects(self::once())->method('putAutomationsConfig')
             ->with(self::callback(static fn (array $rows): bool => $rows[0]['enabled'] === true
-                && $rows[0]['test_mode'] === false));
+                && !array_key_exists('test_mode', $rows[0])));
         $client->method('getAutomationsConfig')->willReturn(['configs' => [
             ['trigger_key' => 'replenish_due', 'enabled' => true, 'test_mode' => true],
             ['trigger_key' => 'winback_risk', 'enabled' => true, 'test_mode' => false],
@@ -62,7 +62,7 @@ class SaveTest extends TestCase
                 'errors' => [],
                 'states' => [
                     'replenish_due' => ['enabled' => true, 'test_mode' => true],
-                    // Real sends an operator already switched on stay on.
+                    // Real sends switched on before stay on.
                     'winback_risk' => ['enabled' => true, 'test_mode' => false],
                     // No stored row: the page's fail-closed defaults.
                     'browse_abandon' => ['enabled' => false, 'test_mode' => true],

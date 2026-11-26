@@ -28,10 +28,10 @@ use Smaily\Connect\ViewModel\Adminhtml\AutomationsForm;
 
 /**
  * Persists engine automation configuration (contract §13). Every row carries
- * all eight keys — no server-side defaults; validation is all-or-nothing.
- * The engine may store a row differently from the request (a row asking for
- * real sends stays in test mode until a Smaily operator switches them on), so
- * the AJAX answer carries each trigger's stored state from §12. A save the
+ * every required key — no server-side defaults; validation is all-or-nothing.
+ * No row carries `test_mode`: the card's Test mode switch is §20 (CON-458),
+ * and the stored value is kept. The AJAX answer carries each trigger's
+ * stored state from §12. A save the
  * engine refuses over fields (§13's 422 errors[]) answers each error's
  * trigger and field as well, so the tab marks the field and keeps its trigger
  * open even when the trigger is off (CON-256).

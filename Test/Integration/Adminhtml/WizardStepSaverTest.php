@@ -14,7 +14,9 @@ use Magento\Framework\App\RequestInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Event\ManagerInterface as EventManagerInterface;
+use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Notification\NotifierInterface;
+use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
@@ -30,22 +32,31 @@ use Smaily\Connect\Model\Automation\Mapping;
 use Smaily\Connect\Model\Automation\MappingSaver;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\Trigger;
+use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Client\CredentialCheck;
 use Smaily\Connect\Model\Client\Exception\AuthenticationException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientFactory;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
+use Smaily\Connect\Model\Client\VerifiedCredentials;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\ContactSync\Mode;
+use Smaily\Connect\Model\Discount\RuleSource;
+use Smaily\Connect\Model\Discount\StoreDate;
+use Smaily\Connect\Model\Engine\ConsentSource;
+use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\ModuleVersion;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
+use Smaily\Connect\Model\OrderOrigin;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
+use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory as MappingCollectionFactory;
 use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\SubdomainNormalizer;
 use Smaily\Connect\Setup\Patch\Data\CopyAutomationsToSeparateStores;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
+use Smaily\Connect\ViewModel\Adminhtml\WizardData;
 
 /**
  * The store-wide setup (CON-179) against a real core_config_data table:
@@ -217,6 +228,42 @@ class WizardStepSaverTest extends IntegrationTestCase
         $request->method('getParam')->with('website')->willReturn($websiteParam);
 
         return new WebsiteContext($storeManager, $request);
+    }
+
+    /**
+     * The admin pages' view model over the real rows (CON-461), on a store
+     * whose store views speak these languages.
+     *
+     * @param string[] $languages
+     */
+    private function wizardData(?string $websiteParam, array $languages): WizardData
+    {
+        $storeManager = $this->storeManager([self::MAIN, self::SECOND]);
+        $accountResolver = $this->createMock(AccountResolver::class);
+        $accountResolver->method('detectedLanguages')->willReturn($languages);
+        $accountResolver->method('detectedLanguagesOfAllWebsites')->willReturn($languages);
+
+        return new WizardData(
+            $this->config,
+            $this->createMock(Mode::class),
+            $this->createMock(EngineSettings::class),
+            $accountResolver,
+            $this->createMock(ContactAudience::class),
+            new Json(),
+            $this->objectManager->get(MappingCollectionFactory::class),
+            $this->websiteContext($storeManager, $websiteParam),
+            $this->createMock(VerifiedCredentials::class),
+            $this->createMock(ResolverInterface::class),
+            $this->createMock(ConsentSource::class),
+            $this->createMock(OrderOrigin::class),
+            $this->createMock(SetupGuard::class),
+            $this->overrides([self::MAIN, self::SECOND]),
+            $this->createMock(RuleSource::class),
+            $this->createMock(StoreDate::class),
+            $this->storeLayout($storeManager),
+            $this->createMock(SharedAccountModes::class),
+            $this->router()
+        );
     }
 
     /**
@@ -749,6 +796,67 @@ class WizardStepSaverTest extends IntegrationTestCase
         self::assertSame('a', $this->config->getMultilingualMode(self::MAIN), 'Main keeps its own Smaily account');
         self::assertSame('en-shop', $this->config->getWebsiteSubdomain(self::MAIN));
         self::assertSame('shop', $this->config->getWebsiteSubdomain(self::SECOND));
+    }
+
+    /**
+     * CON-461, as in the WooCommerce plugin: a multi-language store whose
+     * multilingual mode was never saved — only etc/config.xml's 'single' —
+     * shows per-language workflows in the initial setup and on Settings,
+     * while its automations keep routing in 'single' until a save; the
+     * save stores the mode shown.
+     */
+    public function testAMultiLanguageStoreShowsPerLanguageWorkflowsUntilAModeIsSaved(): void
+    {
+        $this->insertRow('default', 0, Config::XML_PATH_WELCOME_WORKFLOW, '555');
+
+        foreach (['0', (string)self::SECOND] as $websiteParam) {
+            $viewModel = $this->wizardData($websiteParam, ['et', 'lv']);
+            self::assertSame('b', $viewModel->getMultilingualMode(), $websiteParam);
+            self::assertFalse(
+                json_decode($viewModel->getBootJson(), true)['connection']['multilingualModeSaved'],
+                $websiteParam
+            );
+        }
+        self::assertSame('single', $this->config->getMultilingualMode(self::MAIN));
+        $match = $this->router()->resolve(Trigger::WELCOME, self::MAIN, 'et');
+        self::assertSame([555, Mapping::LANGUAGE_DEFAULT], [$match?->workflowId, $match?->language]);
+
+        self::assertSame([], $this->saver('0')->save('connect', [
+            'subdomain' => 'shop',
+            'username' => 'api-user',
+            'password' => 'plain-secret',
+            'multilingual_mode' => 'b',
+        ]));
+
+        self::assertSame([['default', 0]], $this->scopesOf(Config::XML_PATH_MULTILINGUAL_MODE));
+        self::assertSame('b', $this->config->getMultilingualMode(self::MAIN));
+        $viewModel = $this->wizardData('0', ['et', 'lv']);
+        self::assertSame('b', $viewModel->getMultilingualMode());
+        self::assertTrue(json_decode($viewModel->getBootJson(), true)['connection']['multilingualModeSaved']);
+    }
+
+    /**
+     * CON-461: a saved mode is shown as saved — 'single' too, which a
+     * multi-language store shows with no mode card picked — for the whole
+     * store or for one website; a one-language store stays in 'single'.
+     */
+    public function testASavedModeAndAOneLanguageStoreShowWhatTheyShowedBefore(): void
+    {
+        self::assertSame('single', $this->wizardData('0', ['et'])->getMultilingualMode());
+
+        self::assertSame([], $this->saver('0')->save('connect', [
+            'subdomain' => 'shop',
+            'username' => 'api-user',
+            'password' => 'plain-secret',
+            'multilingual_mode' => 'single',
+        ]));
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_MULTILINGUAL_MODE, 'c');
+
+        self::assertSame('single', $this->wizardData('0', ['et', 'lv'])->getMultilingualMode());
+        self::assertSame('single', $this->wizardData((string)self::MAIN, ['et', 'lv'])->getMultilingualMode());
+        self::assertSame('c', $this->wizardData((string)self::SECOND, ['et', 'lv'])->getMultilingualMode());
+        $boot = json_decode($this->wizardData('0', ['et', 'lv'])->getBootJson(), true);
+        self::assertTrue($boot['connection']['multilingualModeSaved']);
     }
 
     /**

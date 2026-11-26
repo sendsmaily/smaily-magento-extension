@@ -30,9 +30,9 @@ class MultilingualMode implements OptionSourceInterface
     {
         return [
             ['value' => self::MODE_SINGLE, 'label' => __('Single language')],
-            ['value' => self::MODE_PER_LANGUAGE_ACCOUNTS, 'label' => __('Per-language Smaily accounts')],
-            ['value' => self::MODE_PER_LANGUAGE_WORKFLOWS, 'label' => __('One account, per-language workflows')],
-            ['value' => self::MODE_SINGLE_WORKFLOW, 'label' => __('One workflow branching by language')],
+            ['value' => self::MODE_PER_LANGUAGE_ACCOUNTS, 'label' => __('Separate Smaily accounts')],
+            ['value' => self::MODE_PER_LANGUAGE_WORKFLOWS, 'label' => __('One account, per-language automations')],
+            ['value' => self::MODE_SINGLE_WORKFLOW, 'label' => __('One account, one automation with branches')],
         ];
     }
 }

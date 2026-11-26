@@ -369,9 +369,9 @@ class WizardData implements ArgumentInterface
         $withWorkflow = static fn (string $trigger): string => $trigger . ' · ' . __('Smaily Workflow');
         $modes = [
             'single' => __('Single language'),
-            'a' => __('Per-language Smaily accounts'),
-            'b' => __('One account, per-language workflows'),
-            'c' => __('One workflow branching by language'),
+            'a' => __('Separate Smaily accounts'),
+            'b' => __('One account, per-language automations'),
+            'c' => __('One account, one automation with branches'),
         ];
         $syncModes = [
             SyncMode::MODE_CONSENT => __('Subscribers only (consent)'),
@@ -560,6 +560,9 @@ class WizardData implements ArgumentInterface
                 'username' => $this->config->getUsername($storeId),
                 'hasPassword' => $this->config->getPassword($storeId) !== '',
                 'multilingualMode' => $this->getMultilingualMode(),
+                // Never saved: the mode shown is not the one routing uses
+                // yet, 'single' (CON-461).
+                'multilingualModeSaved' => $this->isMultilingualModeSaved(),
             ],
             // The account saved for the website — the single account, or the
             // default fallback account in per-language accounts mode. An
@@ -825,12 +828,18 @@ class WizardData implements ArgumentInterface
 
     /**
      * The effective multilingual mode: single-language installations are
-     * locked to 'single' (the panels hide the mode cards for them).
+     * locked to 'single' (the panels hide the mode cards for them). A
+     * multilingual installation whose mode was never saved shows
+     * per-language workflows, as in the WooCommerce plugin (CON-461); it
+     * keeps routing in the stored default, 'single', until a save.
      */
     public function getMultilingualMode(): string
     {
         if (!$this->isMultilingual()) {
             return MultilingualMode::MODE_SINGLE;
+        }
+        if (!$this->isMultilingualModeSaved()) {
+            return MultilingualMode::MODE_PER_LANGUAGE_WORKFLOWS;
         }
         $mode = $this->config->getMultilingualMode($this->websiteContext->getWebsiteId())
             ?: MultilingualMode::MODE_SINGLE;
@@ -841,6 +850,15 @@ class WizardData implements ArgumentInterface
             && $this->websiteContext->getWebsiteId() === WebsiteContext::STORE_WIDE
             ? MultilingualMode::MODE_SINGLE
             : $mode;
+    }
+
+    /**
+     * Whether a multilingual mode is saved for the selected website, or for
+     * the whole store, rather than only the stored default (CON-461).
+     */
+    public function isMultilingualModeSaved(): bool
+    {
+        return $this->overrides->isSaved(Config::XML_PATH_MULTILINGUAL_MODE, $this->websiteContext->getWebsiteId());
     }
 
     /**

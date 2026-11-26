@@ -100,7 +100,7 @@ class PerLanguageCardTest extends IntegrationTestCase
     }
 
     /**
-     * One account, per-language workflows (mode b): the shapes the editor
+     * One account, per-language automations (mode b): the shapes the editor
      * with a "None" row could save.
      *
      * @return array<string, array{int, array<int, array{int, string, int, bool}>,
@@ -207,7 +207,7 @@ class PerLanguageCardTest extends IntegrationTestCase
     }
 
     /**
-     * Per-language Smaily accounts (mode a): each row lists its own
+     * Separate Smaily accounts (mode a): each row lists its own
      * account's workflows, so a language shows only its own row; "None"
      * used the default fallback account's language, where the card's
      * Default fallback now starts.

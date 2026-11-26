@@ -476,7 +476,7 @@ class WizardDataTest extends TestCase
             'values' => [
                 ['Subdomain', 'lt-shop'],
                 ['API password', '••••••••'],
-                ['', 'One account, per-language workflows'],
+                ['', 'One account, per-language automations'],
             ],
             'required' => false,
         ]], $list);
@@ -640,6 +640,7 @@ class WizardDataTest extends TestCase
     {
         $this->accountResolver->method('detectedLanguagesOfAllWebsites')->willReturn(['et', 'lv']);
         $this->config->method('getMultilingualMode')->willReturn(MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS);
+        $this->overrides->method('isSaved')->willReturn(true);
         $this->accountResolver->expects(self::never())->method('languageStoreIds');
         $this->contactAudience->method('count')->willReturnCallback(
             static fn (int $websiteId, string $mode): int => $mode === SyncMode::MODE_CONSENT ? $websiteId * 10 : 0
@@ -650,6 +651,24 @@ class WizardDataTest extends TestCase
         self::assertSame(MultilingualMode::MODE_SINGLE, $viewModel->getMultilingualMode());
         self::assertSame([], $viewModel->getMultilingualAccounts());
         self::assertSame(60, $viewModel->getContactImportCounts()[SyncMode::MODE_CONSENT]);
+    }
+
+    /**
+     * CON-461: a multi-language website whose mode was never saved shows
+     * per-language workflows, as in the WooCommerce plugin; a one-language
+     * website stays in 'single'.
+     */
+    public function testAModeNeverSavedShowsPerLanguageWorkflowsOnAMultiLanguageWebsite(): void
+    {
+        $this->config->method('getMultilingualMode')->willReturn(MultilingualMode::MODE_SINGLE);
+        $this->overrides->method('isSaved')->with(Config::XML_PATH_MULTILINGUAL_MODE, 2)->willReturn(false);
+        $this->accountResolver = $this->createMock(AccountResolver::class);
+        $this->accountResolver->method('detectedLanguages')->with(2)->willReturn(['et', 'lv']);
+        $multiLanguage = $this->viewModel($this->websiteContext);
+
+        self::assertSame(MultilingualMode::MODE_PER_LANGUAGE_WORKFLOWS, $multiLanguage->getMultilingualMode());
+        self::assertFalse(json_decode($multiLanguage->getBootJson(), true)['connection']['multilingualModeSaved']);
+        self::assertSame(MultilingualMode::MODE_SINGLE, $this->viewModel->getMultilingualMode());
     }
 
     public function testGetSelectedSyncFieldsReadsAtTheSelectedWebsiteScope(): void

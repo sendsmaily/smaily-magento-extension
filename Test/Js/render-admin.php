@@ -1168,7 +1168,7 @@ foreach (['setup-connect' => false, 'setup-connect-verified' => true] as $page =
 /*
  * The store-wide setup and its website exceptions (CON-179) on a store with
  * three websites (Estonia, Latvia, Lithuania) and two store languages, in
- * One account, per-language workflows mode, Smaily login details saved but
+ * One account, per-language automations mode, Smaily login details saved but
  * the setup not finished. The setup-websites page renders the initial setup
  * (wizard/index.phtml) with its Connect, Contacts and Automations steps:
  * Latvia holds its own Smaily account — another account than the
@@ -1636,7 +1636,7 @@ $websitesStrings = [
     'Use this step\'s values',
     'Saving this step starts contact sync on every website: %1.',
     'A website that keeps its own Contacts settings below syncs as those settings say.',
-    'Per-language Smaily accounts are set for one website: under Settings > Connection, pick the website and tick'
+    'Separate Smaily accounts are set for one website: under Settings > Connection, pick the website and tick'
         . ' Use its own Smaily account on this website.',
     'Use its own Smaily account on this website',
     'Use its own Contacts settings on this website',
@@ -1666,7 +1666,7 @@ $overviewStrings = [
     'Background tasks',
     'Make sure the Magento cron runs every minute — deliveries are queued and flushed by the smaily_connect cron group.',
     'All customers (legitimate interest)',
-    'One account, per-language workflows',
+    'One account, per-language automations',
     'Also sync guest buyers who did not tick the newsletter box',
 ];
 $pages['setup-websites'] = [
@@ -1989,15 +1989,24 @@ $pages['settings-separate'] = [
  * per-language modes: mode A's Welcome workflow for ET (the fallback), and
  * mode B's Welcome workflows for ET and LV (LV the fallback). The
  * settings-modes-single page: the same website saved in the stored default,
- * 'single', which has no card (CON-461).
+ * 'single', which has no card (CON-461). The settings-modes-unsaved page:
+ * the same website with no mode saved, shown in mode B (CON-461).
  */
-$modesViewModel = static fn (string $mode): object => new class ($websitesViewModel(false), $mode) {
+$modesViewModel = static fn (string $mode, bool $saved): object => new class (
+    $websitesViewModel(false),
+    $mode,
+    $saved
+) {
     /**
      * @param object $inner
      * @param string $mode
+     * @param bool $saved
      */
-    public function __construct(private readonly object $inner, private readonly string $mode)
-    {
+    public function __construct(
+        private readonly object $inner,
+        private readonly string $mode,
+        private readonly bool $saved
+    ) {
     }
 
     /**
@@ -2045,14 +2054,19 @@ $modesViewModel = static fn (string $mode): object => new class ($websitesViewMo
     {
         $boot = json_decode($this->inner->getBootJson(), true, 512, JSON_THROW_ON_ERROR);
         $boot['connection']['multilingualMode'] = $this->mode;
+        $boot['connection']['multilingualModeSaved'] = $this->saved;
 
         return (string)json_encode($boot);
     }
 };
-foreach (['settings-modes' => 'a', 'settings-modes-single' => 'single'] as $page => $mode) {
+foreach ([
+    'settings-modes' => ['a', true],
+    'settings-modes-single' => ['single', true],
+    'settings-modes-unsaved' => ['b', false],
+] as $page => [$mode, $saved]) {
     $pages[$page] = [
         'template' => $root . '/view/adminhtml/templates/settings/index.phtml',
-        'viewModel' => $modesViewModel($mode),
+        'viewModel' => $modesViewModel($mode, $saved),
         'data' => ['context' => 'settings', 'children' => [
             'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
             'panel.automations' => $root . '/view/adminhtml/templates/panel/automations.phtml',

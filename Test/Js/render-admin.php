@@ -1168,7 +1168,7 @@ foreach (['setup-connect' => false, 'setup-connect-verified' => true] as $page =
 /*
  * The store-wide setup and its website exceptions (CON-179) on a store with
  * three websites (Estonia, Latvia, Lithuania) and two store languages, in
- * One account, per-language workflows mode, Smaily login details saved but
+ * One account, per-language automations mode, Smaily login details saved but
  * the setup not finished. The setup-websites page renders the initial setup
  * (wizard/index.phtml) with its Connect, Contacts and Automations steps:
  * Latvia holds its own Smaily account — another account than the
@@ -1636,7 +1636,7 @@ $websitesStrings = [
     'Use this step\'s values',
     'Saving this step starts contact sync on every website: %1.',
     'A website that keeps its own Contacts settings below syncs as those settings say.',
-    'Per-language Smaily accounts are set for one website: under Settings > Connection, pick the website and tick'
+    'Separate Smaily accounts are set for one website: under Settings > Connection, pick the website and tick'
         . ' Use its own Smaily account on this website.',
     'Use its own Smaily account on this website',
     'Use its own Contacts settings on this website',
@@ -1666,7 +1666,7 @@ $overviewStrings = [
     'Background tasks',
     'Make sure the Magento cron runs every minute — deliveries are queued and flushed by the smaily_connect cron group.',
     'All customers (legitimate interest)',
-    'One account, per-language workflows',
+    'One account, per-language automations',
     'Also sync guest buyers who did not tick the newsletter box',
 ];
 $pages['setup-websites'] = [

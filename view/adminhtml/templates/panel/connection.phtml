@@ -45,16 +45,16 @@ $storeWideSetup = $multipleWebsites && $viewModel->isStoreWide();
 
 $modeCards = [
     'a' => [
-        'label' => __('Per-language Smaily accounts'),
-        'note' => __('Each language has its own Smaily account (subdomain and credentials) with its own contact list.'),
+        'label' => __('Separate Smaily accounts'),
+        'note' => __('One Smaily subdomain per language. Each language has its own subscriber list and credentials.'),
     ],
     'b' => [
-        'label' => __('One account, per-language workflows'),
-        'note' => __('A single Smaily account, but each language triggers its own automation workflow. The most common setup.'),
+        'label' => __('One account, per-language automations'),
+        'note' => __('Single Smaily account, but a separate automation workflow per language. Most common setup.'),
     ],
     'c' => [
-        'label' => __('One workflow branching by language'),
-        'note' => __('A single workflow that branches on the contact\'s language inside Smaily. The language is sent with every contact.'),
+        'label' => __('One account, one automation with branches'),
+        'note' => __('Single Smaily workflow that branches on the contact’s language inside Smaily.'),
     ],
 ];
 ?>
@@ -84,7 +84,7 @@ $modeCards = [
     </label>
     <?php endforeach; ?>
     <?php if ($storeWideSetup): ?>
-    <p class="note"><?= $escaper->escapeHtml(__('Per-language Smaily accounts are set for one website: under Settings > Connection, pick the website and tick Use its own Smaily account on this website.')) ?></p>
+    <p class="note"><?= $escaper->escapeHtml(__('Separate Smaily accounts are set for one website: under Settings > Connection, pick the website and tick Use its own Smaily account on this website.')) ?></p>
     <?php endif; ?>
 </div>
 <?php endif; ?>
@@ -145,7 +145,7 @@ $modeCards = [
     // Smaily's answer at the last check of the credentials saved for that
     // language; Test connection replaces it with the answer for what is typed. ?>
     <div class="smaily-ml-region">
-        <div class="smaily-ml-region__kicker"><?= $escaper->escapeHtml(__('Per-language Smaily accounts')) ?></div>
+        <div class="smaily-ml-region__kicker"><?= $escaper->escapeHtml(__('Separate Smaily accounts')) ?></div>
         <div class="smaily-ml-accounts">
             <?php foreach ($accounts as $account): ?>
             <?php // Escaped once here; the attributes below print it as is. ?>

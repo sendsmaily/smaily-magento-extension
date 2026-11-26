@@ -476,7 +476,7 @@ class WizardDataTest extends TestCase
             'values' => [
                 ['Subdomain', 'lt-shop'],
                 ['API password', '••••••••'],
-                ['', 'One account, per-language workflows'],
+                ['', 'One account, per-language automations'],
             ],
             'required' => false,
         ]], $list);

@@ -369,9 +369,9 @@ class WizardData implements ArgumentInterface
         $withWorkflow = static fn (string $trigger): string => $trigger . ' · ' . __('Smaily Workflow');
         $modes = [
             'single' => __('Single language'),
-            'a' => __('Per-language Smaily accounts'),
-            'b' => __('One account, per-language workflows'),
-            'c' => __('One workflow branching by language'),
+            'a' => __('Separate Smaily accounts'),
+            'b' => __('One account, per-language automations'),
+            'c' => __('One account, one automation with branches'),
         ];
         $syncModes = [
             SyncMode::MODE_CONSENT => __('Subscribers only (consent)'),

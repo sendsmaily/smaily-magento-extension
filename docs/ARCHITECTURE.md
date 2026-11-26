@@ -2507,7 +2507,7 @@ Initial setup, Settings, Log. Design rules:
     without, it writes the store-wide values it shows. A single-website
     install writes the default scope and removes the website's own values
     (an empty password then writes the kept one at the default scope).
-  - **Per-language Smaily accounts (mode A) are always a website's own**
+  - **Separate Smaily accounts (mode A) are always a website's own**
     (owner decision 2026-10-22): they live on one website's store views,
     and its per-language workflow rows name those accounts by language. A
     Smaily account saved in mode A — the mode, the fallback language, the

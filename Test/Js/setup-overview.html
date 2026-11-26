@@ -219,7 +219,7 @@
         check(locale + ': the list is headed What\'s active', text(panel.querySelector('.smaily-card h2')) === strings['What\'s active']);
         check(locale + ': the Smaily account is active, with its language-mode card',
             is(item(doc, 'smaily'), true, strings['Smaily connected'],
-                'shop.sendsmaily.net · ' + strings['One account, per-language workflows']));
+                'shop.sendsmaily.net · ' + strings['One account, per-language automations']));
         check(locale + ': contact sync is active, in the mode picked',
             is(item(doc, 'contacts'), true, strings['Contact sync enabled'], strings['All customers (legitimate interest)']));
         check(locale + ': Welcome, switched on, is active',

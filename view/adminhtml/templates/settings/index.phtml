@@ -300,8 +300,10 @@ require(['jquery'], function ($) {
                 // The website's own values are gone: the tab shows the
                 // values for all websites after a reload (CON-179). Its own
                 // Smaily account turned on: its automations start from no
-                // workflow, shown after a reload (CON-190).
-                if (response && (response.returnedToStoreWide || response.ownAccountStarted)) {
+                // workflow, shown after a reload (CON-190). A replaced Smaily
+                // account took its workflows with it (CON-396).
+                if (response && (response.returnedToStoreWide || response.ownAccountStarted
+                    || response.workflowsRemoved)) {
                     window.location.reload();
                     return;
                 }
@@ -316,6 +318,11 @@ require(['jquery'], function ($) {
                     : '<?= $escaper->escapeJs(__('Saved.')) ?>', true);
             })
             .catch(function (error) {
+                // The merchant declined to replace a Smaily account (CON-396).
+                if (error && error.cancelled) {
+                    panels.result(resultSelector, '', true);
+                    return;
+                }
                 panels.showFormErrors($panel, error);
                 panels.result(resultSelector, '<?= $escaper->escapeJs(__('Saving failed.')) ?>', false);
             })

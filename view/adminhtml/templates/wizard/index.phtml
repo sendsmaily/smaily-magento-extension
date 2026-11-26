@@ -354,6 +354,12 @@ require(['jquery'], function ($) {
         panels.clearFormErrors($panel);
         panels.result('#smaily-w-save-result', '<?= $escaper->escapeJs(__('Saving…')) ?>', true);
         stepSavers[step]().then(function (response) {
+            // A replaced Smaily account took its workflows with it
+            // (CON-396): the Automations step is drawn again without them.
+            if (response && response.workflowsRemoved) {
+                window.location.reload();
+                return;
+            }
             // A changed Storefront URL reaches a connected Campaign
             // Intelligence only with the next catalog import: the step the
             // setup moves on to says so beside its Continue, in the words of
@@ -370,6 +376,11 @@ require(['jquery'], function ($) {
                 panels.result('#smaily-w-save-result', '<?= $escaper->escapeJs(__('Saved. Run the catalog import again under Intelligence > Historical imports, so that Campaign Intelligence gets the new product links.')) ?>', true);
             }
         }).catch(function (error) {
+            // The merchant declined to replace a Smaily account (CON-396).
+            if (error && error.cancelled) {
+                panels.result('#smaily-w-save-result', '', true);
+                return;
+            }
             // Banner above the step's form + the field that caused it (PRO-3562).
             panels.showFormErrors($panel, error);
             panels.result('#smaily-w-save-result', '<?= $escaper->escapeJs(__('Saving failed.')) ?>', false);

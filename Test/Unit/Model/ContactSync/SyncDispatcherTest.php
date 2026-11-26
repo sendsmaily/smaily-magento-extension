@@ -20,6 +20,7 @@ use Smaily\Connect\Model\Privacy\AddressKey;
 use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
+use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
 
 class SyncDispatcherTest extends TestCase
 {
@@ -111,6 +112,22 @@ class SyncDispatcherTest extends TestCase
                 self::assertArrayNotHasKey($other, $address);
             }
         }
+    }
+
+    /**
+     * CON-387: the first-order email carries its marker and whether an
+     * address Smaily does not have may get it, for the queue's contact read.
+     */
+    public function testTheFirstOrderEmailCarriesItsContactCheck(): void
+    {
+        $this->dispatcher->dispatchFirstOrder(1, ['email' => 'shopper@example.com'], false);
+
+        self::assertSame(EventType::AUTOMATION_TRIGGER, $this->enqueued[0]['event_type']);
+        $payload = $this->enqueued[0]['payload'];
+        self::assertSame(Trigger::FIRST_ORDER, $payload['trigger_type']);
+        self::assertSame(1, $payload['website_id']);
+        self::assertArrayHasKey('first_order_automation_at', $payload['address']);
+        self::assertSame(['new_contact' => false], $payload[AutomationHandler::CONTACT_CHECK]);
     }
 
     public function testExistingPayloadFieldsAreLeftUntouched(): void

@@ -74,6 +74,41 @@ class ReminderConsentTest extends TestCase
         ], $this->consent(false)->verdicts(1, [1, 2], self::CARTS));
     }
 
+    /**
+     * CON-387: the first-order email weighs one customer by the same rule;
+     * a tick on the order is a new consent in every mode.
+     *
+     * @dataProvider oneShopperProvider
+     */
+    public function testOneShopperIsWeighedByTheSameRule(
+        bool $requiresOptin,
+        string $email,
+        int $customerId,
+        bool $ticked,
+        string $verdict
+    ): void {
+        self::assertSame(
+            $verdict,
+            $this->consent($requiresOptin, false)->verdict(1, [1, 2], $email, $customerId, $ticked)
+        );
+    }
+
+    /**
+     * @return array<string, array{0: bool, 1: string, 2: int, 3: bool, 4: string}>
+     */
+    public static function oneShopperProvider(): array
+    {
+        return [
+            'consent: a subscriber' => [true, 'customer@example.com', 7, false, ReminderConsent::SEND],
+            'consent: a tick' => [true, 'anyone@example.com', 0, true, ReminderConsent::SEND],
+            'consent: no record' => [true, 'anyone@example.com', 0, false, ReminderConsent::SEND_TO_SUBSCRIBED_CONTACT],
+            'consent: unsubscribed' => [true, 'renamed@example.com', 9, false, ReminderConsent::SEND_TO_SUBSCRIBED_CONTACT],
+            'all customers: no record' => [false, 'anyone@example.com', 0, false, ReminderConsent::SEND],
+            'all customers: unsubscribed' => [false, 'renamed@example.com', 9, false, ReminderConsent::SKIP_UNSUBSCRIBED],
+            'all customers: unsubscribed, a tick' => [false, 'left@example.com', 0, true, ReminderConsent::SEND],
+        ];
+    }
+
     public function testNoCartsReadNothing(): void
     {
         $resource = $this->createMock(ResourceConnection::class);
@@ -88,7 +123,7 @@ class ReminderConsentTest extends TestCase
         self::assertSame([], $consent->verdicts(1, [1], []));
     }
 
-    private function consent(bool $requiresOptin): ReminderConsent
+    private function consent(bool $requiresOptin, bool $readsTicks = true): ReminderConsent
     {
         $mode = $this->createMock(Mode::class);
         $mode->method('requiresOptin')->with(1)->willReturn($requiresOptin);
@@ -108,7 +143,8 @@ class ReminderConsentTest extends TestCase
         $resource->method('getTableName')->willReturnArgument(0);
 
         $stateManager = $this->createMock(StateManager::class);
-        $stateManager->expects(self::once())->method('optedInQuotes')->willReturn([2 => true, 8 => true]);
+        $stateManager->expects($readsTicks ? self::once() : self::never())->method('optedInQuotes')
+            ->willReturn([2 => true, 8 => true]);
 
         return new ReminderConsent($mode, $resource, $stateManager);
     }

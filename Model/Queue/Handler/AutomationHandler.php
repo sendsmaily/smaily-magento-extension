@@ -69,7 +69,8 @@ use Smaily\Connect\Model\Queue\Skipped;
  * cron allowed a new contact (store consent, or legitimate interest). A skip
  * closes the row as Skipped with the reason and the cart's tracker row as
  * skipped; a read that fails leaves the row on the retry ladder with nothing
- * sent.
+ * sent. A first-order email carries CONTACT_CHECK and is read the same way
+ * (CON-387); it has no cart, so its skip closes only the row.
  *
  * An automation whose "Send a discount code" is on gets its code just before
  * it is posted, after the checks above (AutomationDiscount, CON-198): a row
@@ -121,6 +122,12 @@ class AutomationHandler implements EventHandlerInterface
      */
     public const CART_REMINDER = 'cart_reminder';
 
+    /**
+     * Payload key of a first-order email (CON-387): {new_contact}, as in
+     * CART_REMINDER (SyncDispatcher::dispatchFirstOrder()).
+     */
+    public const CONTACT_CHECK = 'contact_check';
+
     public function __construct(
         private readonly SmailyClientProvider $clientProvider,
         private readonly Router $router,
@@ -168,10 +175,11 @@ class AutomationHandler implements EventHandlerInterface
             }
 
             $reminder = $payload[self::CART_REMINDER] ?? null;
+            $check = $reminder ?? $payload[self::CONTACT_CHECK] ?? null;
             try {
                 $client = $this->clientFor($match, (int)($payload['store_id'] ?? 0), $websiteId);
-                $skipReason = is_array($reminder)
-                    ? $this->reminderSkipReason($client, (string)$address['email'], !empty($reminder['new_contact']))
+                $skipReason = is_array($check)
+                    ? $this->contactSkipReason($client, (string)$address['email'], !empty($check['new_contact']))
                     : null;
             } catch (SmailyClientException $exception) {
                 // Nothing was posted: the row waits on the retry ladder.
@@ -179,7 +187,9 @@ class AutomationHandler implements EventHandlerInterface
                 continue;
             }
             if ($skipReason !== null) {
-                $this->cartState->markReminderSkipped((int)($reminder['quote_id'] ?? 0));
+                if (is_array($reminder)) {
+                    $this->cartState->markReminderSkipped((int)($reminder['quote_id'] ?? 0));
+                }
                 $results[$id] = new Skipped($skipReason);
                 continue;
             }
@@ -244,13 +254,14 @@ class AutomationHandler implements EventHandlerInterface
     }
 
     /**
-     * Why a reminder may not go, or null when it may: the account's contact
-     * unsubscribed (any status but an explicit 0 counts), or the account does
-     * not have the address (code 206) and no new contact is allowed.
+     * Why a reminder or a first-order email may not go, or null when it may:
+     * the account's contact unsubscribed (any status but an explicit 0
+     * counts), or the account does not have the address (code 206) and no
+     * new contact is allowed.
      *
      * @throws SmailyClientException when Smaily cannot be read
      */
-    private function reminderSkipReason(SmailyClient $client, string $email, bool $newContact): ?string
+    private function contactSkipReason(SmailyClient $client, string $email, bool $newContact): ?string
     {
         try {
             $contact = $client->get(SmailyClient::ENDPOINT_CONTACT, ['email' => $email]);

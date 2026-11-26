@@ -196,7 +196,9 @@ start one.
   docker run --rm -v "$PWD":/app -w /app php:8.1-cli bin/lint-php.sh
   ```
   The unit suite runs on 8.1 the same way after `apt-get install -y
-  libicu-dev && docker-php-ext-install intl` in the container.
+  libicu-dev && docker-php-ext-install intl` in the container, with
+  `php -d memory_limit=-1 vendor/bin/phpunit --testsuite unit` (the
+  image's default 128 MB runs out on the full suite).
 - **Magento 2.4.4's `setup:di:compile` cannot read union types** (CON-204;
   the sandbox's 2.4.8 can, so it never shows there): a union or intersection
   type on any constructor parameter, or a union, intersection or `mixed`

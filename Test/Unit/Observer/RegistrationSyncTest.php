@@ -140,12 +140,11 @@ class RegistrationSyncTest extends TestCase
 
         $subscriber = $this->getMockBuilder(Subscriber::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['isStatusChanged', 'getStatus', 'getEmail'])
+            ->onlyMethods(['getEmail'])
             ->getMock();
-        $subscriber->method('isStatusChanged')->willReturn(true);
-        $subscriber->method('getStatus')->willReturn($this->subscriberStatus);
         $subscriber->method('getEmail')->willReturn(self::EMAIL);
         $subscriber->setData('store_id', 1);
+        $subscriber->setData('subscriber_status', $this->subscriberStatus);
         $subscriber->setData('customer_id', 42);
 
         $event = $this->createMock(Event::class);

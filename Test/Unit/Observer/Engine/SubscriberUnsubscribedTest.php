@@ -20,6 +20,9 @@ use Smaily\Connect\Observer\Engine\SubscriberUnsubscribed;
 /**
  * PRO-3578: an unsubscribe from marketing also stops profiling — whether the
  * shopper unsubscribed in the store or Smaily's consent mirror wrote it.
+ *
+ * CON-436: a status change is the saved status differing from the loaded
+ * one, not the subscriber's status-changed flag.
  */
 class SubscriberUnsubscribedTest extends TestCase
 {
@@ -35,21 +38,23 @@ class SubscriberUnsubscribedTest extends TestCase
     {
         $this->profilingConsent->expects(self::once())->method('optOutOnUnsubscribe')->with('person@example.com');
 
-        $this->observer()->execute($this->eventFor(Subscriber::STATUS_UNSUBSCRIBED, true));
+        $this->observer()->execute($this->eventFor(Subscriber::STATUS_UNSUBSCRIBED, Subscriber::STATUS_SUBSCRIBED));
     }
 
     public function testASubscribeLeavesProfilingAlone(): void
     {
         $this->profilingConsent->expects(self::never())->method('optOutOnUnsubscribe');
 
-        $this->observer()->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED, true));
+        $this->observer()->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED, Subscriber::STATUS_UNSUBSCRIBED));
     }
 
     public function testASaveThatDidNotChangeTheStatusIsNotAnUnsubscribe(): void
     {
         $this->profilingConsent->expects(self::never())->method('optOutOnUnsubscribe');
 
-        $this->observer()->execute($this->eventFor(Subscriber::STATUS_UNSUBSCRIBED, false));
+        $event = $this->eventFor(Subscriber::STATUS_UNSUBSCRIBED, Subscriber::STATUS_UNSUBSCRIBED);
+        $event->getEvent()->getData('subscriber')->setStatusChanged(true);
+        $this->observer()->execute($event);
     }
 
     public function testNothingHappensWithoutCampaignIntelligence(): void
@@ -57,7 +62,7 @@ class SubscriberUnsubscribedTest extends TestCase
         $this->engineConnected = false;
         $this->profilingConsent->expects(self::never())->method('optOutOnUnsubscribe');
 
-        $this->observer()->execute($this->eventFor(Subscriber::STATUS_UNSUBSCRIBED, true));
+        $this->observer()->execute($this->eventFor(Subscriber::STATUS_UNSUBSCRIBED, Subscriber::STATUS_SUBSCRIBED));
     }
 
     private function observer(): SubscriberUnsubscribed
@@ -68,12 +73,18 @@ class SubscriberUnsubscribedTest extends TestCase
         return new SubscriberUnsubscribed($settings, $this->profilingConsent);
     }
 
-    private function eventFor(int $status, bool $changed): Observer
+    /**
+     * A subscriber saved with $status, loaded with $previousStatus.
+     */
+    private function eventFor(int $status, int $previousStatus): Observer
     {
-        $subscriber = $this->createMock(Subscriber::class);
-        $subscriber->method('getStatus')->willReturn($status);
-        $subscriber->method('isStatusChanged')->willReturn($changed);
+        $subscriber = $this->getMockBuilder(Subscriber::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getEmail'])
+            ->getMock();
         $subscriber->method('getEmail')->willReturn('person@example.com');
+        $subscriber->setData('subscriber_status', $status);
+        $subscriber->setOrigData('subscriber_status', $previousStatus);
 
         return new Observer(['event' => new Event(['subscriber' => $subscriber])]);
     }

@@ -21,6 +21,9 @@ use Smaily\Connect\Observer\Engine\SubscriberJoined;
  * Intelligence customer scope's group (a); the account is offered to the
  * live customer sync, which checks the scope. A move between the two sent
  * statuses changes no group.
+ *
+ * CON-436: a status change is the saved status differing from the loaded
+ * one, not the subscriber's status-changed flag.
  */
 class SubscriberJoinedTest extends TestCase
 {
@@ -32,7 +35,7 @@ class SubscriberJoinedTest extends TestCase
         $ingest = $this->createMock(CustomerIngest::class);
         $ingest->expects(self::once())->method('joined')->with(42);
 
-        (new SubscriberJoined($ingest))->execute($this->observer($from, $to, true, 42));
+        (new SubscriberJoined($ingest))->execute($this->observer($from, $to));
     }
 
     /**
@@ -51,41 +54,51 @@ class SubscriberJoinedTest extends TestCase
     /**
      * @dataProvider noJoins
      */
-    public function testAnythingElseOffersNothing(?int $from, int $to, bool $changed): void
+    public function testAnythingElseOffersNothing(?int $from, int $to): void
     {
         $ingest = $this->createMock(CustomerIngest::class);
         $ingest->expects(self::never())->method('joined');
 
-        (new SubscriberJoined($ingest))->execute($this->observer($from, $to, $changed, 42));
+        (new SubscriberJoined($ingest))->execute($this->observer($from, $to));
     }
 
     /**
-     * @return array<string, array{0: int|null, 1: int, 2: bool}>
+     * @return array<string, array{0: int|null, 1: int}>
      */
     public static function noJoins(): array
     {
         return [
-            'an unsubscribe of a subscriber' => [Subscriber::STATUS_SUBSCRIBED, Subscriber::STATUS_UNSUBSCRIBED, true],
-            'a resubscription' => [Subscriber::STATUS_UNSUBSCRIBED, Subscriber::STATUS_SUBSCRIBED, true],
-            'a pending confirmation' => [null, Subscriber::STATUS_NOT_ACTIVE, true],
-            'a save that keeps the status' => [Subscriber::STATUS_SUBSCRIBED, Subscriber::STATUS_SUBSCRIBED, false],
+            'an unsubscribe of a subscriber' => [Subscriber::STATUS_SUBSCRIBED, Subscriber::STATUS_UNSUBSCRIBED],
+            'a resubscription' => [Subscriber::STATUS_UNSUBSCRIBED, Subscriber::STATUS_SUBSCRIBED],
+            'a pending confirmation' => [null, Subscriber::STATUS_NOT_ACTIVE],
         ];
     }
 
-    private function observer(?int $from, int $to, bool $changed, int $customerId): Observer
+    /**
+     * CON-436: a save that keeps the loaded status offers nothing, whatever
+     * the subscriber's status-changed flag says.
+     */
+    public function testASaveThatKeepsTheStatusOffersNothing(): void
     {
-        // getCustomerId is a magic getter on the model (addMethods).
+        $ingest = $this->createMock(CustomerIngest::class);
+        $ingest->expects(self::never())->method('joined');
+
+        $observer = $this->observer(Subscriber::STATUS_SUBSCRIBED, Subscriber::STATUS_SUBSCRIBED);
+        $observer->getEvent()->getData('subscriber')->setStatusChanged(true);
+        (new SubscriberJoined($ingest))->execute($observer);
+    }
+
+    private function observer(?int $from, int $to): Observer
+    {
         $subscriber = $this->getMockBuilder(Subscriber::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['isStatusChanged', 'getStatus', 'getOrigData'])
-            ->addMethods(['getCustomerId'])
+            ->onlyMethods([])
             ->getMock();
-        $subscriber->method('isStatusChanged')->willReturn($changed);
-        $subscriber->method('getStatus')->willReturn($to);
-        $subscriber->method('getCustomerId')->willReturn($customerId);
-        $subscriber->method('getOrigData')->willReturnCallback(
-            static fn (?string $key = null) => $key === 'subscriber_status' ? $from : null
-        );
+        $subscriber->setData('customer_id', 42);
+        $subscriber->setData('subscriber_status', $to);
+        if ($from !== null) {
+            $subscriber->setOrigData('subscriber_status', $from);
+        }
         $event = $this->createMock(Event::class);
         $event->method('getData')->with('subscriber')->willReturn($subscriber);
         $observer = $this->createMock(Observer::class);

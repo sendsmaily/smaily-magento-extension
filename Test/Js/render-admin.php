@@ -1481,6 +1481,20 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
     }
 
     /**
+     * Each card's workflow per language (CON-461): none picked, the first
+     * language the Default fallback.
+     *
+     * @param string $mode
+     * @return array<string, array{workflows: array<string, int>, fallback: string}>
+     */
+    public function getLanguageWorkflows(string $mode): array
+    {
+        $card = ['workflows' => ['et' => 0, 'lv' => 0], 'fallback' => 'et'];
+
+        return ['welcome' => $card, 'first_order' => $card, 'abandoned_cart' => $card];
+    }
+
+    /**
      * @return array<int, string>
      */
     public function getDiscountRules(): array
@@ -2014,16 +2028,14 @@ $modesViewModel = static fn (string $mode): object => new class ($websitesViewMo
 
     /**
      * @param string $mode
-     * @return array<string, array{workflowId: int, isDefaultFallback: bool}>
+     * @return array<string, array{workflows: array<string, int>, fallback: string}>
      */
-    public function getSavedMappings(string $mode): array
+    public function getLanguageWorkflows(string $mode): array
     {
-        return $mode === 'a'
-            ? ['welcome|et' => ['workflowId' => 101, 'isDefaultFallback' => true]]
-            : [
-                'welcome|et' => ['workflowId' => 201, 'isDefaultFallback' => false],
-                'welcome|lv' => ['workflowId' => 202, 'isDefaultFallback' => true],
-            ];
+        return ['welcome' => $mode === 'a'
+            ? ['workflows' => ['et' => 101, 'lv' => 0], 'fallback' => 'et']
+            : ['workflows' => ['et' => 201, 'lv' => 202], 'fallback' => 'lv'],
+        ] + $this->inner->getLanguageWorkflows($mode);
     }
 
     /**
@@ -2049,6 +2061,70 @@ foreach (['settings-modes' => 'a', 'settings-modes-single' => 'single'] as $page
         'strings' => ['Some languages have no workflow', 'Single language'],
     ];
 }
+
+/*
+ * The per-language card pages (CON-461) render the initial setup
+ * (setup-per-language, wizard/index.phtml) and Settings
+ * (settings-per-language) of the three-website store above, in One account,
+ * per-language workflows (mode B) with ET and LV: Welcome sends ET 201 and
+ * LV 202, LV's row the Default fallback; the other automations have no
+ * workflow, the first language their Default fallback.
+ */
+$perLanguageViewModel = static fn (bool $storeWide): object => new class ($websitesViewModel($storeWide)) {
+    /**
+     * @param object $inner
+     */
+    public function __construct(private readonly object $inner)
+    {
+    }
+
+    /**
+     * @param string $name
+     * @param array<int, mixed> $arguments
+     * @return mixed
+     */
+    public function __call(string $name, array $arguments): mixed
+    {
+        return $this->inner->$name(...$arguments);
+    }
+
+    /**
+     * @param string $mode
+     * @return array<string, array{workflows: array<string, int>, fallback: string}>
+     */
+    public function getLanguageWorkflows(string $mode): array
+    {
+        return ['welcome' => ['workflows' => ['et' => 201, 'lv' => 202], 'fallback' => 'lv']]
+            + $this->inner->getLanguageWorkflows($mode);
+    }
+};
+$perLanguageStrings = [
+    'Default fallback',
+    'Smaily Workflow',
+    'Per-language workflows',
+    'Contacts whose language has no workflow get the workflow of the row marked Default fallback.',
+];
+$pages['setup-per-language'] = [
+    'template' => $root . '/view/adminhtml/templates/wizard/index.phtml',
+    'viewModel' => $perLanguageViewModel(true),
+    'data' => ['children' => [
+        'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
+        'panel.subscribers' => $root . '/view/adminhtml/templates/panel/subscribers.phtml',
+        'panel.automations' => $root . '/view/adminhtml/templates/panel/automations.phtml',
+        'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+    ]],
+    'strings' => $perLanguageStrings,
+];
+$pages['settings-per-language'] = [
+    'template' => $root . '/view/adminhtml/templates/settings/index.phtml',
+    'viewModel' => $perLanguageViewModel(false),
+    'data' => ['context' => 'settings', 'children' => [
+        'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
+        'panel.automations' => $root . '/view/adminhtml/templates/panel/automations.phtml',
+        'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+    ]],
+    'strings' => $perLanguageStrings,
+];
 
 /*
  * The settings-account-change page (CON-396) renders Settings for the

@@ -21,7 +21,8 @@
   its rows are for (CON-188). In mode A the Automations tab names the
   languages a switched-on automation has no workflow for, read as the
   Router reads the rows, and hides the cards' workflow, which mode A never
-  starts.
+  starts; mode B hides it too, each card showing its workflow per language
+  (CON-461).
 
   A website saved in the stored default, 'single' (CON-461, as in the
   WooCommerce plugin): the Connection tab shows the three cards — per-language
@@ -189,8 +190,8 @@
         check(locale + ': no notice while Welcome is off', !shown());
         tick(frame, '#smaily-w-welcome-enabled');
         check(locale + ': no notice while ET\'s row is Welcome\'s default fallback', !shown());
-        tick(frame, 'input[name=smaily-ml-fallback-welcome][value=""]');
-        check(locale + ': without a fallback, LV has no Welcome workflow',
+        tick(frame, 'input[name=smaily-ml-fallback-welcome][value=lv]');
+        check(locale + ': with LV\'s empty row the fallback, LV has no Welcome workflow',
             shown() && notice.querySelectorAll('li').length === 1
                 && /: LV$/.test(notice.querySelector('li').textContent));
         check(locale + ': the notice is in the admin\'s language',
@@ -204,8 +205,8 @@
         pickMode(frame, 'b');
         await wait(100);
         check(locale + ': mode B shows no such notice', !shown());
-        check(locale + ': mode B shows the cards\' workflow',
-            doc.getElementById('smaily-w-welcome-workflow').closest('label').style.display !== 'none');
+        check(locale + ': mode B hides the cards\' workflow too: each card has its workflow per language (CON-461)',
+            doc.getElementById('smaily-w-welcome-workflow').closest('label').style.display === 'none');
         frame.remove();
     }
 

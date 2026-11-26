@@ -191,28 +191,35 @@
             },
             welcome = byId('smaily-w-welcome-enabled'),
             card = welcome.closest('.smaily-store-trigger'),
+            // The website is in One account, per-language workflows: each
+            // card's workflow is a row per language (CON-461).
+            rows = function (id) {
+                return byId('smaily-w-' + id + '-enabled').closest('.smaily-store-trigger').querySelector('.smaily-ml-table');
+            },
+            etWorkflow = card.querySelector('.smaily-ml-workflow[data-language=et]'),
             data;
 
         check(locale + ', Welcome off: the card shows its name, description and switch',
             shown(card.querySelector('.smaily-engine-trigger__name'))
             && shown(card.querySelector('.smaily-engine-trigger__desc')) && shown(welcome));
         check(locale + ', Welcome off: no workflow and no discount code',
-            !shown(byId('smaily-w-welcome-workflow')) && !shown(byId('smaily-w-welcome-coupon-enabled')));
+            !shown(rows('welcome')) && !shown(byId('smaily-w-welcome-coupon-enabled')));
         check(locale + ', Abandoned cart off: no workflow, no "Wait (minutes)" and no discount code',
-            !shown(byId('smaily-w-abandoned-workflow')) && !shown(byId('smaily-w-cutoff'))
+            !shown(rows('abandoned')) && !shown(byId('smaily-w-cutoff'))
             && !shown(byId('smaily-w-abandoned-coupon-enabled')));
 
         tick(frame, welcome, true);
         tick(frame, byId('smaily-w-abandoned-enabled'), true);
         check(locale + ', Welcome on: the workflow and the discount code show',
-            shown(byId('smaily-w-welcome-workflow')) && shown(byId('smaily-w-welcome-coupon-enabled')));
+            shown(rows('welcome')) && !shown(byId('smaily-w-welcome-workflow'))
+            && shown(byId('smaily-w-welcome-coupon-enabled')));
         check(locale + ', Abandoned cart on: the workflow, then "Wait (minutes)", then the discount code last',
-            shown(byId('smaily-w-abandoned-workflow')) && shown(byId('smaily-w-cutoff'))
+            shown(rows('abandoned')) && shown(byId('smaily-w-cutoff'))
             && shown(byId('smaily-w-abandoned-coupon-enabled'))
-            && before(byId('smaily-w-abandoned-workflow'), byId('smaily-w-cutoff'))
+            && before(rows('abandoned'), byId('smaily-w-cutoff'))
             && before(byId('smaily-w-cutoff'), byId('smaily-w-abandoned-coupon-enabled')));
 
-        byId('smaily-w-welcome-workflow').value = '7';
+        etWorkflow.value = '7';
         tick(frame, byId('smaily-w-welcome-coupon-enabled'), true);
         byId('smaily-w-welcome-coupon-rule').value = '14';
         byId('smaily-w-welcome-coupon-days').value = '10';
@@ -221,17 +228,19 @@
         tick(frame, welcome, false);
         tick(frame, byId('smaily-w-abandoned-enabled'), false);
         check(locale + ', switched off: the workflow, the settings and the discount code hide again',
-            !shown(byId('smaily-w-welcome-workflow')) && !shown(byId('smaily-w-welcome-coupon-rule'))
+            !shown(rows('welcome')) && !shown(byId('smaily-w-welcome-coupon-rule'))
             && !shown(byId('smaily-w-cutoff')) && card.classList.contains('is-off'));
         data = await saveAutomations(frame);
         check(locale + ', switched off: the save keeps the hidden workflow, discount code and wait',
-            !!data && data.welcome_enabled === false && data.welcome_workflow === '7'
+            !!data && data.welcome_enabled === false
+            && JSON.stringify(data.mappings[0]) === JSON.stringify({trigger_type: 'welcome', language: 'et',
+                account_key: 'default', workflow_id: 7, is_default_fallback: true})
             && data.welcome_coupon_enabled === true && data.welcome_coupon_rule === 14
             && data.welcome_coupon_days === 10 && data.abandoned_enabled === false && data.abandoned_cutoff === 45);
 
         tick(frame, welcome, true);
         check(locale + ', on again: the values are back as they were',
-            shown(byId('smaily-w-welcome-workflow')) && byId('smaily-w-welcome-workflow').value === '7'
+            shown(etWorkflow) && etWorkflow.value === '7'
             && byId('smaily-w-welcome-coupon-enabled').checked && shown(byId('smaily-w-welcome-coupon-rule'))
             && byId('smaily-w-welcome-coupon-rule').value === '14'
             && byId('smaily-w-welcome-coupon-days').value === '10');

@@ -11,7 +11,7 @@ Files here:
 
 | File | Use in the portal |
 |---|---|
-| `smaily-connect-user-guide.pdf` | Documentation upload: the user guide, in English (Marketplace wants a PDF) |
+| `smaily-connect-user-guide.pdf` | Documentation upload: the user guide for 3.0.3, in English (Marketplace wants a PDF) |
 | `user-guide.html` | Source of the PDF; print it with Chrome to rebuild it (see below) |
 | `smaily-icon-240.png` | Extension icon, 240 × 240 px |
 | `screenshots/1-dashboard.png` | Gallery image: Dashboard |
@@ -102,6 +102,13 @@ long description follows Adobe's integration format (marketing review,
    link); and whom to contact for account setup and pricing.
 4. Then the Features and any other content.
 
+The marketing review of 26 Nov 2026 added two rules for the long
+description. The opening must leave the merchant knowing what the
+extension does for them and how it works, its key features, what
+changes in the store's UI or UX, whether customizations are possible,
+and example cases. Every URL is a hyperlink, and an email address a
+`mailto:` link.
+
 **Title:** `Smaily Connect`
 
 The owner's position (2026-11-20): "Smaily" in "Smaily Connect" is not
@@ -118,6 +125,16 @@ owner's decision the title stays: a support request (SALES0907379, sent
 through https://commercemarketplace.adobe.com/contact-us/, category
 Seller) asks Adobe to accept "Smaily" as the integrated service's name.
 
+The third refusal (26 Nov 2026) repeated the title objection and made
+two objections to the long description: its opening paragraph lacked
+detail, and its URLs and email address were plain text. The long description below is
+rewritten for it: the first paragraph also says what the extension does
+for the store; four short paragraphs follow on how it works, what
+changes on the storefront, what can be customized, and examples; every
+URL is a link and the support address a `mailto:` link. Which title
+Adobe accepts is asked from Adobe support; the title is unchanged until
+it answers.
+
 **Category:** Marketing › Email Marketing and Marketing › Marketing Automation (as the listing has).
 
 **Price:** Free.
@@ -128,82 +145,49 @@ Seller) asks Adobe to accept "Smaily" as the integrated service's name.
 > abandoned-cart automations, and add Smaily Campaign Intelligence
 > product recommendations to your emails and store.
 
-**Long description** (as resubmitted on 2026-11-20):
+**Long description** (for the next marketing submission, rewritten after
+the refusal of 26 Nov 2026). It is kept as HTML that uses only what the
+portal's rich-text editor (Draft.js) keeps: `p`, `strong`, `a`, `h2`,
+`ul` / `li`. To paste it: save the block as a `.html` file, open it in a
+browser, select all, copy, and paste into the editor; then check in
+**Preview** that both headings are Header 2, the lists are the editor's
+own bullets and every link and the email address are clickable. Every
+URL is a hyperlink and the email address a `mailto:` link (marketing
+review, 26 Nov 2026).
 
-> **[Smaily](https://smaily.com/)** is an email marketing and automation
-> platform for online stores. Merchants use it to design and send
-> newsletters, run automated emails such as welcome series and
-> abandoned-cart reminders, segment their contacts, and manage subscriber
-> consent in line with the GDPR.
->
-> Smaily Connect connects your Magento store to your Smaily account.
-> After installation, a guided setup in the Magento admin asks for your
-> Smaily API credentials and walks you through which contacts to sync,
-> which Smaily workflows your automated emails start, and whether to add
-> a newsletter checkbox at checkout. From then on, new subscribers and
-> customers reach Smaily as they happen, an unsubscribe in Smaily comes
-> back to the store, and store events start the welcome, first-order and
-> abandoned-cart workflows you picked. On the storefront only two
-> optional things change: a newsletter checkbox at checkout, and a
-> product-recommendations widget you can place on any page. Everything
-> else is set in the admin: the lawful basis for syncing, the workflows,
-> single-use discount codes, and one Smaily account or workflow per store
-> language. For example, a store can remind shoppers who left items in
-> their cart with an email that shows those products and restores the
-> cart in one click, or welcome every new subscriber with a discount
-> code.
->
-> ## Account & Pricing
->
-> - **A Smaily account is required.**
-> - **The account is not created during installation. Create it
->   separately at
->   [sendsmaily.net/account/register](https://www.sendsmaily.net/account/register/).**
-> - **The extension is free. Smaily is a paid service and needs a plan
->   that includes API access: see
->   [smaily.com/pricing](https://smaily.com/pricing/).**
-> - **Campaign Intelligence is an optional paid Smaily add-on; its price
->   depends on the number of contacts: see
->   [smaily.com/campaign-intelligence](https://smaily.com/campaign-intelligence/).**
-> - **For account setup and pricing, contact Smaily at
->   support@smaily.com.**
->
-> ## Features
->
-> - Contact sync: new subscribers and customers reach Smaily as they
->   happen, and an unsubscribe in Smaily comes back to the store.
-> - Three lawful bases to choose from: subscribers only (consent), all
->   customers (legitimate interest) or checkout opt-in only.
-> - An optional newsletter checkbox at checkout for guests and customers.
-> - Welcome, First order and Abandoned cart automations start the Smaily
->   workflows you pick, optionally with a single-use discount code from a
->   cart price rule.
-> - Abandoned-cart reminders carry the cart's products and a secure link
->   that restores the exact cart.
-> - Multilingual stores route each language to its own workflow or Smaily
->   account.
-> - Optional Campaign Intelligence: personalized product recommendations
->   in Smaily emails and on your store's pages, attribution of the orders
->   they bring, and automated campaigns such as replenishment and
->   win-back.
-> - A guided initial setup, one Settings page, a Dashboard and a Log of
->   every delivery with retry.
-> - Durable queues with retries; imports of existing data run in the
->   background without slowing the store.
-> - Several websites can be set up as one store or as separate stores
->   with their own Smaily accounts.
-> - Privacy: credentials stored encrypted, browse tracking only after the
->   visitor's marketing consent, a personalization opt-out for shoppers,
->   and GDPR export and erasure from the command line.
-> - Admin and storefront in English and Estonian; storefront texts also
->   in Russian, Finnish, Latvian and Lithuanian.
->
-> When a Smaily account is connected, the extension sends Smaily an
-> installation report: store addresses, versions, connected accounts,
-> switched-on features and connection health, never customer, subscriber
-> or order data.
->
-> Full user guide: https://smaily.com/connect-magento/
+```html
+<p><strong><a href="https://smaily.com/">Smaily</a></strong> is an email marketing and automation platform for online stores. Merchants use it to design and send newsletters, run automated emails such as welcome series and abandoned-cart reminders, segment their contacts, and manage subscriber consent in line with the GDPR. Smaily Connect links your Magento store to your Smaily account: your newsletter subscribers and customers are kept up to date in Smaily without manual exports, and your store's own events (a new signup, a first order, a cart left behind) send the right email automatically. With the optional Campaign Intelligence add-on, your emails and your store's pages also show each shopper personalized product recommendations.</p>
+<p><strong>How it works.</strong> After installation, a guided setup under Marketing › Smaily Connect asks for your Smaily API credentials (created in Smaily under gear icon › Integrations), then which contacts to sync, which Smaily workflows your automated emails start, and, optionally, the Campaign Intelligence connection. From then on the extension works in the background, through Magento's cron and its own delivery queues with automatic retries: new subscribers and customers reach Smaily as they happen, an unsubscribe in Smaily comes back to the store, and the Welcome, First order and Abandoned cart events start the Smaily workflows you picked. Existing contacts (and, with Campaign Intelligence, your catalog, customers and orders) are sent by imports you start, which run in the background without slowing the store. A Dashboard shows the health of each connection, and a Log lists every delivery, with Retry for a failed one.</p>
+<p><strong>What changes on your storefront.</strong> Nothing changes on the storefront unless you switch it on or place it. You can add an unticked "Subscribe to our newsletter" checkbox to the checkout's payment step, for guests and customers. With Campaign Intelligence connected, you can place the Smaily recommendations widget on product pages, the shopping cart, the order success page or any CMS page or block: it shows up to four products under "Recommended for you", as your theme's own product cards, and shows nothing to a shopper it has no recommendations for. Customers then also get a My Account › Personalization page where they can opt out of personalized recommendations. Browse tracking for recommendations is invisible to shoppers and starts only after the visitor's marketing consent in your cookie notice.</p>
+<p><strong>What you can customize.</strong> You choose who is synced (newsletter subscribers only, all customers, or only shoppers who tick the checkout checkbox), which extra customer fields go to Smaily, after how long a cart counts as abandoned, and whether each automated email carries a single-use discount code from a cart price rule. You design the emails themselves in Smaily, and the extension's product RSS feed (with category, limit and sort options) fills them with your products. A multilingual store sends each language to its own workflow or Smaily account, and several websites can run as one store or as separate stores with their own Smaily accounts. Hyvä themes are supported through the Smaily Connect Hyvä compatibility module, and your own cookie consent tool can be connected with a short script.</p>
+<p><strong>Examples.</strong> A store welcomes every new newsletter subscriber with a single-use discount code. A shopper who leaves items in the cart gets a reminder that shows those products and restores the cart in one click. A store with Estonian and English store views sends each customer the welcome email in their own language. A store with repeat purchases lets Campaign Intelligence run replenishment and win-back campaigns, and shows each shopper their recommendations on product pages and in emails.</p>
+<h2>Account &amp; Pricing</h2>
+<ul>
+<li><strong>A Smaily account is required.</strong></li>
+<li><strong>The account is not created during installation. Create it separately at <a href="https://www.sendsmaily.net/account/register/">sendsmaily.net/account/register</a>.</strong></li>
+<li><strong>The extension is free. Smaily is a paid service and needs a plan that includes API access: see <a href="https://smaily.com/pricing/">smaily.com/pricing</a>.</strong></li>
+<li><strong>Campaign Intelligence is an optional paid Smaily add-on; its price depends on the number of contacts: see <a href="https://smaily.com/campaign-intelligence/">smaily.com/campaign-intelligence</a>.</strong></li>
+<li><strong>For account setup and pricing, contact Smaily at <a href="mailto:support@smaily.com">support@smaily.com</a>.</strong></li>
+</ul>
+<h2>Features</h2>
+<ul>
+<li>Contact sync: new subscribers and customers reach Smaily as they happen, and an unsubscribe in Smaily comes back to the store.</li>
+<li>Three lawful bases to choose from: subscribers only (consent), all customers (legitimate interest) or checkout opt-in only.</li>
+<li>An optional newsletter checkbox at checkout for guests and customers.</li>
+<li>Welcome, First order and Abandoned cart automations start the Smaily workflows you pick, optionally with a single-use discount code from a cart price rule.</li>
+<li>Abandoned-cart reminders carry the cart's products and a secure link that restores the exact cart.</li>
+<li>A product RSS feed for Smaily's template editor, with category, limit and sort parameters.</li>
+<li>Multilingual stores route each language to its own workflow or Smaily account.</li>
+<li>Optional Campaign Intelligence: personalized product recommendations in Smaily emails and on your store's pages, attribution of the orders they bring, and automated campaigns such as replenishment and win-back.</li>
+<li>A guided initial setup, one Settings page, a Dashboard and a Log of every delivery with retry.</li>
+<li>Durable queues with retries; imports of existing data run in the background without slowing the store.</li>
+<li>Several websites can be set up as one store or as separate stores with their own Smaily accounts.</li>
+<li>Privacy: credentials stored encrypted, browse tracking only after the visitor's marketing consent, a personalization opt-out for shoppers, and GDPR export and erasure from the command line.</li>
+<li>Admin and storefront in English and Estonian; storefront texts also in Russian, Finnish, Latvian and Lithuanian.</li>
+</ul>
+<p>When a Smaily account is connected, the extension sends Smaily an installation report: store addresses, versions, connected accounts, switched-on features and connection health, never customer, subscriber or order data.</p>
+<p>Full user guide: <a href="https://smaily.com/connect-magento/">smaily.com/connect-magento</a></p>
+```
 
 **Release notes** (the portal's text, as entered for the version; for 3.0.1 add "Supports PHP 8.5 (Magento 2.4.9)."):
 

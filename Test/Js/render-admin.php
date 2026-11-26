@@ -2442,6 +2442,11 @@ $dashboardStrings = [
     'No nightly product list has gone to Campaign Intelligence for %1 nights',
     'Smaily Connect is running, but no nightly product list has gone to Campaign Intelligence for %1 nights.',
     'Last night product changes were still waiting to be sent in the Log, and the list waits for them.',
+    'Settings',
+    'Log',
+    'Initial setup',
+    'User Guide',
+    'the full merchant documentation: every feature, setting and troubleshooting steps',
 ];
 $pages['dashboard'] = [
     'template' => $root . '/view/adminhtml/templates/dashboard/index.phtml',

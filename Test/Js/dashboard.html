@@ -19,6 +19,8 @@
   neither (PRO-3914). A store set up as separate stores shows the website
   selector of Settings at the top, one link per website with its Smaily
   account, the selected website marked; one store shows none (CON-281).
+  Quick links end with the User Guide, which opens the guide
+  (Model/UserGuide.php) in a new tab (CON-444).
   The page has no script of its own,
   so nothing is stubbed. Run it with bin/test-js.sh (it renders the pages
   first); the page ends with "RESULT: PASS" or "RESULT: FAIL".
@@ -53,6 +55,8 @@
     var UNSENT_VERDICT = 'Smaily Connect is running, but no nightly product list has gone to Campaign Intelligence for %1 nights.';
     var UNSENT_QUEUE = 'Last night product changes were still waiting to be sent in the Log, and the list waits for them.';
     var STOREFRONT_CONSENT = 'Your separate storefront sends the browse events itself, so its own cookie consent banner decides when they are sent.';
+    var GUIDE_DESC = 'the full merchant documentation: every feature, setting and troubleshooting steps';
+    var USER_GUIDE_URL = 'https://smaily.com/connect-magento/';
     var failures = 0;
     var passes = 0;
 
@@ -133,6 +137,8 @@
             unsent,
             separate,
             links,
+            quick,
+            guide,
             banner,
             card;
 
@@ -166,6 +172,23 @@
         check(locale + ', dashboard: the list went out, no banner and all systems normal',
             !magento.doc.getElementById('smaily-dashboard-unsent-product-list')
             && magento.doc.querySelector('.smaily-verdict-kicker').textContent === strings['All systems normal']);
+
+        // CON-444: Quick links end with the User Guide, opened in a new tab.
+        if (locale !== 'en_US') {
+            check(locale + ': the User Guide link is translated', strings['User Guide'] !== 'User Guide'
+                && strings[GUIDE_DESC] !== GUIDE_DESC);
+        }
+        quick = magento.doc.querySelectorAll('.smaily-quick-links li');
+        check(locale + ', dashboard: Quick links are Settings, Log, Initial setup and User Guide, in that order',
+            Array.prototype.map.call(quick, function (item) {
+                return item.querySelector('a').textContent;
+            }).join('|') === [strings.Settings, strings.Log, strings['Initial setup'], strings['User Guide']].join('|'));
+        guide = quick.length === 4 ? quick[3] : null;
+        check(locale + ', dashboard: the User Guide link opens the guide in a new tab, with its description',
+            !!guide && guide.querySelector('a').getAttribute('href') === USER_GUIDE_URL
+            && guide.querySelector('a').getAttribute('target') === '_blank'
+            && guide.querySelector('a').getAttribute('rel') === 'noopener noreferrer'
+            && guide.querySelector('.smaily-quick-links__desc').textContent === strings[GUIDE_DESC]);
 
         // CON-281: separate stores pick the website at the top, as Settings does.
         separate = page('dashboard-separate.' + locale);

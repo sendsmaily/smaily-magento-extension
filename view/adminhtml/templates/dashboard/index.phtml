@@ -35,6 +35,8 @@ $urls = [
     'settings' => $block->getUrl('smaily_connect/settings', $viewModel->getWebsiteQuery()),
     'log' => $block->getUrl('smaily_connect/log'),
     'logFailed' => $block->getUrl('smaily_connect/log', ['_query' => ['filters' => ['status' => 'failed']]]),
+    // The user guide's address is set in one place, Model/UserGuide.php.
+    'userGuide' => \Smaily\Connect\Model\UserGuide::URL,
 ];
 
 $sourceLabels = [
@@ -266,6 +268,7 @@ $showFailures = $failed > 0 && !$bannersSuppressed;
                 <li><a href="<?= $escaper->escapeUrl($urls['settings']) ?>"><?= $escaper->escapeHtml(__('Settings')) ?></a><span class="smaily-quick-links__desc"><?= $escaper->escapeHtml(__('connection, contacts, automations, Intelligence and RSS in one tabbed page')) ?></span></li>
                 <li><a href="<?= $escaper->escapeUrl($urls['log']) ?>"><?= $escaper->escapeHtml(__('Log')) ?></a><span class="smaily-quick-links__desc"><?= $escaper->escapeHtml(__('every delivery with retry for failed rows')) ?></span></li>
                 <li><a href="<?= $escaper->escapeUrl($urls['wizard']) ?>"><?= $escaper->escapeHtml(__('Initial setup')) ?></a><span class="smaily-quick-links__desc"><?= $escaper->escapeHtml(__('re-run the guided setup at any time; your settings are kept')) ?></span></li>
+                <li><a href="<?= $escaper->escapeUrl($urls['userGuide']) ?>" target="_blank" rel="noopener noreferrer"><?= $escaper->escapeHtml(__('User Guide')) ?></a><span class="smaily-quick-links__desc"><?= $escaper->escapeHtml(__('the full merchant documentation: every feature, setting and troubleshooting steps')) ?></span></li>
             </ul>
         </div>
     </div>

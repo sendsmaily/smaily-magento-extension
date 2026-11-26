@@ -17,8 +17,8 @@ use Magento\Sales\Model\ResourceModel\Order\Collection as OrderCollection;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use Magento\Store\Model\Website;
 use PHPUnit\Framework\TestCase;
-use Smaily\Connect\Cron\AbandonedCart;
 use Smaily\Connect\Model\AbandonedCart\ReminderConsent;
 use Smaily\Connect\Model\AbandonedCart\StateManager;
 use Smaily\Connect\Model\Automation\Trigger;
@@ -257,7 +257,7 @@ class OrderPlacedTest extends TestCase
             Trigger::FIRST_ORDER,
             1,
             self::callback(static fn (array $address): bool => $address['email'] === 'person@example.com'),
-            AbandonedCart::SKIPPED_UNSUBSCRIBED_IN_STORE
+            ReminderConsent::SKIPPED_UNSUBSCRIBED_IN_STORE
         );
 
         $this->firstOrderObserver($dispatcher, ReminderConsent::SKIP_UNSUBSCRIBED, false)
@@ -320,6 +320,18 @@ class OrderPlacedTest extends TestCase
         $storeManager = $this->createMock(StoreManagerInterface::class);
         $storeManager->method('getStores')->willReturn($stores);
         $storeManager->method('getStore')->willReturn($stores[0]);
+        $storeManager->method('getWebsite')->willReturnCallback(function (int $websiteId) use ($stores): Website {
+            $website = $this->createMock(Website::class);
+            $website->method('getStoreIds')->willReturn(array_map(
+                static fn (StoreInterface $store): string => (string)$store->getId(),
+                array_values(array_filter(
+                    $stores,
+                    static fn (StoreInterface $store): bool => (int)$store->getWebsiteId() === $websiteId
+                ))
+            ));
+
+            return $website;
+        });
 
         if ($consent === null) {
             $consent = $this->createMock(ReminderConsent::class);

@@ -12,7 +12,6 @@ use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Log\Resend;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
-use Smaily\Connect\Model\Queue\PayloadDecoder;
 
 /**
  * Finds the contact syncs that would put a stale subscription into Smaily
@@ -48,8 +47,7 @@ class StaleSubscription
 {
     public function __construct(
         private readonly EventQueue $eventQueue,
-        private readonly Config $config,
-        private readonly PayloadDecoder $payloadDecoder
+        private readonly Config $config
     ) {
     }
 
@@ -57,15 +55,15 @@ class StaleSubscription
      * The rows of a batch in the order their changes were made.
      *
      * @param Event[] $events
+     * @param array<int, array<int|string, mixed>> $payloads each row's decoded payload as stored, by row id
      * @return Event[]
      */
-    public function inChangeOrder(array $events): array
+    public function inChangeOrder(array $events, array $payloads): array
     {
         $places = [];
         foreach ($events as $event) {
             $id = (int)$event->getId();
-            $payload = $this->payloadDecoder->decode($event->getPayload());
-            $places[$id] = [self::place(['id' => $id, 'payload' => $payload]), $id];
+            $places[$id] = [Resend::placeOf($id, $payloads[$id] ?? []), $id];
         }
         usort(
             $events,
@@ -89,16 +87,30 @@ class StaleSubscription
 
     /**
      * The stale rows among these contact syncs: one read of the queue for
-     * all of them.
+     * all of them. With the payload of every row, the read leaves out the
+     * delivered rows at or below the smallest place among them
+     * (EventQueue::contactSyncsOf()); without, it reads every delivered row
+     * of the contacts.
      *
      * @param array<int, string> $entityIds entity id by contact-sync row id
+     * @param array<int, array<int|string, mixed>> $payloads the rows' decoded payloads as stored, by row id
      * @return int[]
      */
-    public function among(array $entityIds): array
+    public function among(array $entityIds, array $payloads = []): array
     {
         $entityIds = array_filter($entityIds, static fn (string $entityId): bool => $entityId !== '');
+        if (!$entityIds) {
+            return [];
+        }
+        $deliveredAfter = 0;
+        if (!array_diff_key($entityIds, $payloads)) {
+            $deliveredAfter = min(array_map(
+                static fn (int $id): int => Resend::placeOf($id, $payloads[$id]),
+                array_keys($entityIds)
+            ));
+        }
         $byEntity = [];
-        foreach ($this->eventQueue->contactSyncsOf($entityIds, array_keys($entityIds)) as $row) {
+        foreach ($this->eventQueue->contactSyncsOf($entityIds, array_keys($entityIds), $deliveredAfter) as $row) {
             $byEntity[$row['entity_id']][$row['id']] = $row;
         }
 
@@ -115,11 +127,11 @@ class StaleSubscription
             if ($row === null || !self::subscribes($row['payload'])) {
                 continue;
             }
-            $place = self::place($row);
+            $place = Resend::placeOf($id, $row['payload']);
             foreach ($byEntity[$entityId] as $otherId => $other) {
                 if ($otherId !== $id
                     && $other['delivered']
-                    && self::place($other) > $place
+                    && Resend::placeOf($otherId, $other['payload']) > $place
                     && is_array($other['payload']['contact'] ?? null)
                     && self::status($other['payload']['contact']) !== null
                     && $account($other['payload']) === $account($row['payload'])
@@ -141,18 +153,5 @@ class StaleSubscription
     private static function status(array $contact): ?int
     {
         return isset($contact['is_unsubscribed']) ? (int)$contact['is_unsubscribed'] : null;
-    }
-
-    /**
-     * Where a row's change stands among the contact's: the row it sends
-     * again, for a "Send again" row, else its own id.
-     *
-     * @param array{id: int, payload: array<int|string, mixed>} $row
-     */
-    private static function place(array $row): int
-    {
-        $of = (int)($row['payload'][Resend::PAYLOAD_KEY]['of'] ?? 0);
-
-        return $of > 0 ? $of : $row['id'];
     }
 }

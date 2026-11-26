@@ -286,7 +286,7 @@ class IngestQueue
 
         $payloads = [];
         foreach ($connection->fetchAll($select) as $row) {
-            if (!$this->mayGoLate($row)) {
+            if (!$this->mayGoLate($row, $this->place($row))) {
                 $payloads[(string)$row['entity_id']] = (string)$row['payload'];
             }
         }
@@ -324,37 +324,44 @@ class IngestQueue
     public function supersededRows(string $domain, array $events, ?Connection $engineConnection = null): array
     {
         $byEntity = [];
+        $places = [];
         foreach ($events as $event) {
             $entityId = (string)$event->getEntityId();
             if ($entityId !== '') {
                 $byEntity[$entityId][] = $event;
+                // Each row's payload decoded once, for the sort, the late
+                // check and the read below.
+                $places[(int)$event->getId()] = $this->place($event->getData());
             }
         }
 
         $superseded = [];
         $late = [];
+        $latePlaces = [];
         foreach ($byEntity as $entityId => $rows) {
             usort(
                 $rows,
-                fn (IngestEvent $a, IngestEvent $b): int => $this->place($a->getData()) <=> $this->place($b->getData())
+                static fn (IngestEvent $a, IngestEvent $b): int => $places[(int)$a->getId()]
+                    <=> $places[(int)$b->getId()]
             );
             $latest = array_pop($rows);
             array_push($superseded, ...$rows);
-            if ($this->mayGoLate($latest->getData())) {
+            $place = $places[(int)$latest->getId()];
+            if ($this->mayGoLate($latest->getData(), $place)) {
                 $late[$entityId] = $latest;
+                $latePlaces[$entityId] = $place;
             }
         }
         if (!$late) {
             return $superseded;
         }
 
-        $places = array_map(fn (IngestEvent $event): int => $this->place($event->getData()), $late);
         $connection = $this->resourceConnection->getConnection();
         $select = $connection->select()
             ->from($this->table(), ['id', 'entity_id', 'payload'])
             ->where('domain = ?', $domain)
             ->where('entity_id IN (?)', array_map('strval', array_keys($late)))
-            ->where('id > ?', min($places))
+            ->where('id > ?', min($latePlaces))
             ->where('id NOT IN (?)', $this->ids($events))
             ->where('status IN (?)', [
                 IngestEvent::STATUS_PENDING,
@@ -366,7 +373,7 @@ class IngestQueue
         }
         foreach ($connection->fetchAll($select) as $row) {
             $entityId = (string)$row['entity_id'];
-            if (isset($late[$entityId]) && $this->place($row) > $places[$entityId]) {
+            if (isset($late[$entityId]) && $this->place($row) > $latePlaces[$entityId]) {
                 $superseded[] = $late[$entityId];
                 unset($late[$entityId]);
             }
@@ -849,30 +856,30 @@ class IngestQueue
     }
 
     /**
-     * Where a row stands among its entity's rows: the row it sends again,
-     * for a "Send again" row (Log\Resend's record), else its own id.
+     * Where a stored row stands among its entity's rows (Log\Resend::placeOf()).
      *
      * @param array<string, mixed> $row the stored row: id and payload
      */
     private function place(array $row): int
     {
-        $of = (int)($this->payloadDecoder->decode((string)($row['payload'] ?? ''))[Resend::PAYLOAD_KEY]['of'] ?? 0);
-
-        return $of > 0 ? $of : (int)($row['id'] ?? 0);
+        return Resend::placeOf(
+            (int)($row['id'] ?? 0),
+            $this->payloadDecoder->decode((string)($row['payload'] ?? ''))
+        );
     }
 
     /**
      * Whether a row may go after a later row of its entity: it was tried
      * before (the Log's "Retry" resets its attempts, not its error), or it
-     * sends an older row again.
+     * sends an older row again (its place is not its own id).
      *
-     * @param array<string, mixed> $row the stored row: id, payload, attempts and last_error
+     * @param array<string, mixed> $row the stored row: id, attempts and last_error
      */
-    private function mayGoLate(array $row): bool
+    private function mayGoLate(array $row, int $place): bool
     {
         return (int)($row['attempts'] ?? 0) > 0
             || (string)($row['last_error'] ?? '') !== ''
-            || $this->place($row) !== (int)($row['id'] ?? 0);
+            || $place !== (int)($row['id'] ?? 0);
     }
 
     /**

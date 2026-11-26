@@ -131,7 +131,7 @@ class AbandonedCartTest extends IntegrationTestCase
         $skipped = $rows['Shopper@Example.com'];
         self::assertSame(Event::STATUS_SENT, $skipped['status']);
         self::assertNull($skipped['sent_payload'], 'Nothing was sent');
-        self::assertSame(AbandonedCart::SKIPPED_RECENTLY_REMINDED, $skipped['last_error']);
+        self::assertSame(ReminderConsent::SKIPPED_RECENTLY_REMINDED, $skipped['last_error']);
         self::assertSame(
             Collection::STATUS_SKIPPED,
             $this->objectManager->create(QueueRowLoader::class)->load('smaily-' . $skipped['id'])['status'] ?? null,
@@ -509,7 +509,7 @@ class AbandonedCartTest extends IntegrationTestCase
             self::assertSame(StateManager::STATUS_SKIPPED, $this->statusOf($quoteId));
             self::assertSame(Event::STATUS_SENT, $rows[$email]['status']);
             self::assertNull($rows[$email]['sent_payload'], 'Nothing was sent');
-            self::assertSame(AbandonedCart::SKIPPED_UNSUBSCRIBED_IN_STORE, $rows[$email]['last_error']);
+            self::assertSame(ReminderConsent::SKIPPED_UNSUBSCRIBED_IN_STORE, $rows[$email]['last_error']);
         }
         self::assertSame(StateManager::STATUS_MAILED, $this->statusOf(6), 'The tick is a new consent');
 

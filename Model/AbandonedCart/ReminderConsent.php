@@ -54,6 +54,16 @@ class ReminderConsent
     /** The shopper unsubscribed in the store: no reminder. */
     public const SKIP_UNSUBSCRIBED = 'skip_unsubscribed';
 
+    /**
+     * The Log's reasons for a reminder or first-order email not sent, stored
+     * in the row's last_error (Cron\AbandonedCart, Observer\OrderPlaced).
+     */
+    public const SKIPPED_RECENTLY_REMINDED = 'Skipped: this address already got an abandoned-cart reminder'
+        . ' for another cart in the last 24 hours. Nothing was sent.';
+
+    public const SKIPPED_UNSUBSCRIBED_IN_STORE = 'Skipped: this shopper unsubscribed from the store\'s newsletter.'
+        . ' Nothing was sent.';
+
     public function __construct(
         private readonly Mode $mode,
         private readonly ResourceConnection $resourceConnection,

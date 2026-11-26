@@ -10,6 +10,7 @@ namespace Smaily\Connect\Model\Engine;
 
 use Magento\Framework\App\CacheInterface;
 use Magento\Framework\Stdlib\DateTime\DateTime;
+use Smaily\Connect\Model\Queue\EventQueue;
 
 /**
  * The engine's limit on privacy requests (CON-432): 10 requests in 60
@@ -19,7 +20,7 @@ use Magento\Framework\Stdlib\DateTime\DateTime;
  * so every connection to one store shares it, and in the application cache,
  * so the queue's cron run and `bin/magento smaily:gdpr` share it too.
  *
- * Engine\Client asks it before each privacy request and never waits: a
+ * Engine\Client takes a turn before each privacy request and never waits: a
  * request the limit does not allow now is not sent, and the caller learns
  * how long to wait. A 429 the engine answers anyway (a cache flush forgets
  * the requests made, the engine counts on its own) pauses the store for
@@ -32,10 +33,12 @@ class PrivacyRequestBudget
 
     /**
      * The longest pause a 429 sets: the ceiling of the queue's retry ladder
-     * (EventQueue::BACKOFF_SECONDS), so a wild answer cannot stop the
-     * privacy requests for days.
+     * (EventQueue::BACKOFF_SECONDS, its last rung), so a wild answer
+     * cannot stop the privacy requests for days. A constant expression
+     * cannot count the ladder, so it names the last rung's index;
+     * PrivacyRequestBudgetTest checks it is the last.
      */
-    public const MAX_PAUSE_SECONDS = 21600;
+    public const MAX_PAUSE_SECONDS = EventQueue::BACKOFF_SECONDS[4];
 
     private const CACHE_PREFIX = 'smaily_connect_privacy_requests_';
 
@@ -52,26 +55,26 @@ class PrivacyRequestBudget
     public function waitSeconds(string $store): int
     {
         $now = $this->now();
-        $state = $this->load($store, $now);
-        $wait = max(0, $state['until'] - $now);
-        $count = count($state['sent']);
-        if ($count >= self::LIMIT) {
-            // The request that leaves the window first makes room.
-            $wait = max($wait, $state['sent'][$count - self::LIMIT] + self::WINDOW_SECONDS - $now);
-        }
 
-        return $wait;
+        return $this->wait($this->load($store, $now), $now);
     }
 
     /**
-     * Count one privacy request the store sends now.
+     * Take a turn for one privacy request the store sends now: the seconds
+     * until it may send one, or 0 once the request is counted.
      */
-    public function spend(string $store): void
+    public function take(string $store): int
     {
         $now = $this->now();
         $state = $this->load($store, $now);
+        $wait = $this->wait($state, $now);
+        if ($wait > 0) {
+            return $wait;
+        }
         $state['sent'][] = $now;
         $this->save($store, $state, $now);
+
+        return 0;
     }
 
     /**
@@ -89,6 +92,21 @@ class PrivacyRequestBudget
         $this->save($store, $state, $now);
 
         return $seconds;
+    }
+
+    /**
+     * @param array{sent: list<int>, until: int} $state
+     */
+    private function wait(array $state, int $now): int
+    {
+        $wait = max(0, $state['until'] - $now);
+        $count = count($state['sent']);
+        if ($count >= self::LIMIT) {
+            // The request that leaves the window first makes room.
+            $wait = max($wait, $state['sent'][$count - self::LIMIT] + self::WINDOW_SECONDS - $now);
+        }
+
+        return $wait;
     }
 
     /**

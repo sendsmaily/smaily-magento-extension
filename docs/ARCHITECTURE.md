@@ -1665,7 +1665,7 @@ row's status now. A candidate whose resolved address is in that set is marked
 not start a new 24 hours) and the automation is recorded through
 `SyncDispatcher::recordSkippedAutomation()`: `EventQueue::enqueueSkipped()`
 stores the row already closed as skipped (`sent`, no `sent_payload`,
-`Cron\AbandonedCart::SKIPPED_RECENTLY_REMINDED` in `last_error`, translated by
+`AbandonedCart\ReminderConsent::SKIPPED_RECENTLY_REMINDED` in `last_error`, translated by
 `Log\FailureMessage`), so the Log shows what would have gone out and why it
 did not, and the flusher never claims it. A cart the cron marks `mailed` adds
 the address its row holds (`StateManager::trackedAddresses()`, or the
@@ -1698,7 +1698,7 @@ tick counts without an order, and is a new consent in every mode):
 - legitimate interest: every cart, an address Smaily does not have
   included (also a contact deleted in Smaily), except one whose record is
   unsubscribed. That cart is marked `skipped` in the cron and recorded in
-  the Log with `Cron\AbandonedCart::SKIPPED_UNSUBSCRIBED_IN_STORE`, as the
+  the Log with `AbandonedCart\ReminderConsent::SKIPPED_UNSUBSCRIBED_IN_STORE`, as the
   24-hour skip is.
 
 Every other cart is marked `mailed` and queued through
@@ -1728,7 +1728,7 @@ customer of the website (its store views, from `getStores()`), with the
 checkout tick read from the order's tracker row before `markCompleted()`.
 Under legitimate interest a customer unsubscribed in the store is recorded
 through `SyncDispatcher::recordSkippedAutomation()` with
-`Cron\AbandonedCart::SKIPPED_UNSUBSCRIBED_IN_STORE`. Every other first order
+`AbandonedCart\ReminderConsent::SKIPPED_UNSUBSCRIBED_IN_STORE`. Every other first order
 is queued through `SyncDispatcher::dispatchFirstOrder()`, whose payload
 carries `AutomationHandler::CONTACT_CHECK` (`new_contact`, as in
 `CART_REMINDER`); the handler reads the contact the same way, with the same

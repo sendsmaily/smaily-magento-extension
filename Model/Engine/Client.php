@@ -698,14 +698,20 @@ class Client
             $options[RequestOptions::JSON] = $body === [] ? new \stdClass() : $body;
         }
 
-        $httpClient = $this->httpClientFactory->create();
         $attempt = 0;
         $this->lastExchange = ['request' => $body ?? [], 'response' => null];
+        // A privacy request takes a turn of the engine store's limit before
+        // anything is built for it, and again before each retry.
+        $privacyStore = $privacy ? $this->settings->getTenantId() : null;
+        if ($privacyStore !== null) {
+            $this->takePrivacyTurn($privacyStore);
+        }
+        $httpClient = $this->httpClientFactory->create();
 
         // Retry loop per contract: backoff 1/2/4/8/16s on 429 and 5xx.
         while (true) {
-            if ($privacy) {
-                $this->takePrivacyTurn();
+            if ($privacyStore !== null && $attempt > 0) {
+                $this->takePrivacyTurn($privacyStore);
             }
             try {
                 $this->lastExchange['response'] = null;
@@ -732,14 +738,14 @@ class Client
                 $errorBody = $this->decodeSafely($rawBody);
                 if ($status === 429) {
                     $this->throttled = true;
-                }
-                if ($status === 429 && $privacy) {
-                    // Waits as long as the engine asks, outside this request.
-                    $wait = $this->privacyBudget->pause(
-                        $this->settings->getTenantId(),
-                        (int)($errorBody['retry_after_seconds'] ?? PrivacyRequestBudget::WINDOW_SECONDS)
-                    );
-                    throw $this->privacyWait($wait);
+                    if ($privacyStore !== null) {
+                        // Waits as long as the engine asks, outside this request.
+                        $wait = $this->privacyBudget->pause(
+                            $privacyStore,
+                            (int)($errorBody['retry_after_seconds'] ?? PrivacyRequestBudget::WINDOW_SECONDS)
+                        );
+                        throw $this->privacyWait($wait);
+                    }
                 }
 
                 if ($status === 403 && ($errorBody['error'] ?? '') === 'tenant_inactive') {
@@ -800,14 +806,12 @@ class Client
      * Count a privacy request against the engine store's limit, or throw
      * when the limit does not allow one now.
      */
-    private function takePrivacyTurn(): void
+    private function takePrivacyTurn(string $store): void
     {
-        $store = $this->settings->getTenantId();
-        $wait = $this->privacyBudget->waitSeconds($store);
+        $wait = $this->privacyBudget->take($store);
         if ($wait > 0) {
             throw $this->privacyWait($wait);
         }
-        $this->privacyBudget->spend($store);
     }
 
     private function privacyWait(int $seconds): EngineThrottledException

@@ -19,6 +19,7 @@ use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Queue\Event;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\Failure;
+use Smaily\Connect\Model\Queue\PayloadDecoder;
 use Smaily\Connect\Model\Queue\Skipped;
 
 /**
@@ -46,7 +47,8 @@ class ContactSyncHandler implements EventHandlerInterface
         private readonly SmailyClientProvider $clientProvider,
         private readonly EventQueue $eventQueue,
         private readonly Logger $logger,
-        private readonly StaleSubscription $staleSubscription
+        private readonly StaleSubscription $staleSubscription,
+        private readonly PayloadDecoder $payloadDecoder
     ) {
     }
 
@@ -57,13 +59,20 @@ class ContactSyncHandler implements EventHandlerInterface
     {
         $results = [];
         $byStore = [];
-        $stale = array_flip($this->staleSubscription->among($this->subscribing($events)));
-        foreach ($this->staleSubscription->inChangeOrder($events) as $event) {
+        // Each payload decoded once, as stored: the "Send again" record
+        // gives a row its place, and the contact is posted on its own.
+        $payloads = [];
+        foreach ($events as $event) {
+            $payloads[(int)$event->getId()] = $this->payloadDecoder->decode($event->getPayload());
+        }
+        $subscribing = $this->subscribing($events, $payloads);
+        $stale = array_flip($this->staleSubscription->among($subscribing, $payloads));
+        foreach ($this->staleSubscription->inChangeOrder($events, $payloads) as $event) {
             if (isset($stale[(int)$event->getId()])) {
                 $results[(int)$event->getId()] = new Skipped(self::SKIPPED_STALE_SUBSCRIPTION);
                 continue;
             }
-            $payload = $this->eventQueue->decodePayload($event);
+            $payload = $payloads[(int)$event->getId()];
             $contact = $payload['contact'] ?? null;
             if (!is_array($contact) || empty($contact['email'])) {
                 // Terminal: a malformed payload never improves on retry.
@@ -93,13 +102,14 @@ class ContactSyncHandler implements EventHandlerInterface
      * can be stale: no read of the queue for a batch without one.
      *
      * @param Event[] $events
+     * @param array<int, array<int|string, mixed>> $payloads decoded payload by row id
      * @return array<int, string> entity id by row id
      */
-    private function subscribing(array $events): array
+    private function subscribing(array $events, array $payloads): array
     {
         $subscribing = [];
         foreach ($events as $event) {
-            if (StaleSubscription::subscribes($this->eventQueue->decodePayload($event))) {
+            if (StaleSubscription::subscribes($payloads[(int)$event->getId()])) {
                 $subscribing[(int)$event->getId()] = (string)$event->getEntityId();
             }
         }

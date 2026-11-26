@@ -24,7 +24,7 @@ use Magento\Sales\Model\ResourceModel\Order\Collection as OrderCollection;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
-use Smaily\Connect\Cron\AbandonedCart;
+use Magento\Store\Model\Website;
 use Smaily\Connect\Cron\FlushEventQueue;
 use Smaily\Connect\Model\AbandonedCart\ReminderConsent;
 use Smaily\Connect\Model\AbandonedCart\StateManager;
@@ -113,7 +113,7 @@ class FirstOrderConsentTest extends IntegrationTestCase
 
         $stored = $this->rowFor('left-in-store@example.com');
         self::assertSame(QueueEvent::STATUS_SENT, $stored['status']);
-        self::assertSame(AbandonedCart::SKIPPED_UNSUBSCRIBED_IN_STORE, $stored['last_error']);
+        self::assertSame(ReminderConsent::SKIPPED_UNSUBSCRIBED_IN_STORE, $stored['last_error']);
         $this->assertLogShowsSkipped($stored);
 
         $this->flush([$this->notAContact(), $this->ok(), $this->contact('left-in-smaily@example.com', '1')]);
@@ -248,6 +248,18 @@ class FirstOrderConsentTest extends IntegrationTestCase
         $storeManager->method('getStore')->willReturnCallback(
             static fn (int $storeId): StoreInterface => $stores[$storeId]
         );
+        $storeManager->method('getWebsite')->willReturnCallback(function (int $websiteId) use ($stores): Website {
+            $website = $this->createMock(Website::class);
+            $website->method('getStoreIds')->willReturn(array_map(
+                static fn (StoreInterface $store): string => (string)$store->getId(),
+                array_values(array_filter(
+                    $stores,
+                    static fn (StoreInterface $store): bool => (int)$store->getWebsiteId() === $websiteId
+                ))
+            ));
+
+            return $website;
+        });
 
         $config = $this->createMock(Config::class);
         $config->method('isConnected')->willReturn(true);

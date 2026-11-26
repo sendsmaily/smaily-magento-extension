@@ -12,6 +12,7 @@ use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Newsletter\Model\Subscriber;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Newsletter\SubscriberStatus;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 
 /**
@@ -22,13 +23,6 @@ use Smaily\Connect\Model\Privacy\ProfilingConsent;
  * mirror writes onto the subscriber is the shopper's unsubscribe too.
  * Subscribing again turns profiling back on (SubscriberResubscribed), unless
  * the shopper also opted out of profiling on its own (PRO-3594).
- *
- * A status change is read from the status saved against the status loaded,
- * not from the subscriber's status-changed flag (CON-436, as the contact
- * sync since PRO-4322): code that sets the status field directly leaves the
- * flag unset, and setStatus() sets it for the unchanged status when the
- * loaded value is a string, so the flag both lost changes and sent repeated
- * saves again.
  */
 class SubscriberUnsubscribed implements ObserverInterface
 {
@@ -45,7 +39,7 @@ class SubscriberUnsubscribed implements ObserverInterface
     {
         $subscriber = $observer->getEvent()->getData('subscriber');
         if (!$subscriber instanceof Subscriber
-            || !$subscriber->dataHasChangedFor('subscriber_status')
+            || !SubscriberStatus::changed($subscriber)
             || (int)$subscriber->getStatus() !== Subscriber::STATUS_UNSUBSCRIBED
             || !$this->settings->isConnected()
         ) {

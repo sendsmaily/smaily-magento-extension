@@ -212,8 +212,11 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   it, as before; without one, the address is the whole contact payload
   (`SubscriberPayloadBuilder::build()`, `is_unsubscribed` left out), so
   `language` reaches the contact through the autoresponder call and a
-  workflow can branch on it. The checkout checkbox itself shows only while
-  contact sync is active (`Plugin\Checkout\AddNewsletterOptinToLayout`).
+  workflow can branch on it. The checkout checkbox shows on a connected
+  website while contact sync is active or the welcome is on
+  (`Plugin\Checkout\AddNewsletterOptinToLayout`), and `Observer\OrderPlaced`
+  saves a tick by the same rule, so a tick with contact sync off reaches
+  the welcome through the subscriber save.
   On a website without a connection, only the contact sync the website
   would send is recorded (CON-470); a welcome alone records nothing.
 - **A contact a website without a Smaily connection would sync is in the

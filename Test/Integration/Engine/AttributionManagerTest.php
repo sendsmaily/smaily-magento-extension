@@ -15,6 +15,7 @@ use Smaily\Connect\Model\Engine\MarketingConsent;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\OrderPlacer;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * The attribution capture against the real side table, whose visitor token
@@ -22,6 +23,8 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
  */
 class AttributionManagerTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     private const ORDER_ID = 501;
     private const REC_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
     private const SESSION_ID = '0f8e3c1a-5b2d-4e6f-8a9b-1c2d3e4f5a6b';
@@ -145,7 +148,7 @@ class AttributionManagerTest extends IntegrationTestCase
         $consent->method('isGiven')->willReturn($marketingConsent);
 
         return $this->objectManager->create(AttributionManager::class, [
-            'settings' => $settings,
+            'connections' => $this->oneEngineConnection($settings),
             'cookieManager' => $cookieManager,
             'orderPlacer' => $this->objectManager->create(OrderPlacer::class, [
                 // Magento_LoginAsCustomer is absent here.

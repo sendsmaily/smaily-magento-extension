@@ -15,11 +15,15 @@ use Magento\Store\Api\Data\WebsiteInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\AttributionManager;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 use Smaily\Connect\ViewModel\EngineState;
 
 class EngineStateTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     /**
      * Magento's cookie helper is annotated @return bool but actually returns
      * the raw config value — "0" (truthy in JS) when restriction mode is
@@ -88,8 +92,42 @@ class EngineStateTest extends TestCase
         self::assertSame($attribution, $tracker['attribution']);
     }
 
-    private function viewModel(CookieHelper $cookieHelper, string $websiteId): EngineState
+    /**
+     * CON-237: separate stores — the scripts load by the gates of the
+     * connection serving the store view, and not at all where none serves
+     * it, whatever the other connections allow.
+     */
+    public function testTheGatesAreThoseOfTheConnectionOfTheStoreView(): void
     {
+        $primary = $this->createMock(Settings::class);
+        $primary->method('isConnected')->willReturn(true);
+        $primary->method('isBrowseTrackingEnabled')->willReturn(true);
+        $primary->method('isSendingAllowed')->willReturn(true);
+        $latvia = $this->createMock(Settings::class);
+        $latvia->method('isConnected')->willReturn(true);
+        $latvia->method('isBrowseTrackingEnabled')->willReturn(false);
+        $latvia->method('isSendingAllowed')->willReturn(false);
+        $connections = fn (int $storeId) => $this->engineConnections([
+            [$this->engineConnection(0, $primary, [1], [1], 1), null],
+            [$this->engineConnection(2, $latvia, [2], [2], 2), null],
+        ], $storeId);
+
+        $atLatvia = $this->viewModel($this->createMock(CookieHelper::class), '2', $connections(2));
+        self::assertTrue($atLatvia->isAttributionActive());
+        self::assertFalse($atLatvia->isBrowseTrackingActive());
+        self::assertFalse($atLatvia->isRecommendationsActive());
+
+        $unserved = $this->viewModel($this->createMock(CookieHelper::class), '3', $connections(3));
+        self::assertFalse($unserved->isAttributionActive());
+        self::assertFalse($unserved->isBrowseTrackingActive());
+        self::assertFalse($unserved->isRecommendationsActive());
+    }
+
+    private function viewModel(
+        CookieHelper $cookieHelper,
+        string $websiteId,
+        ?Connections $connections = null
+    ): EngineState {
         $attributionManager = $this->createMock(AttributionManager::class);
         $attributionManager->method('getClientConfig')->willReturn(['cookieVisitor' => 'smaily_rec_uid']);
 
@@ -104,7 +142,7 @@ class EngineStateTest extends TestCase
         $storeManager->method('getWebsite')->willReturn($website);
 
         return new EngineState(
-            $this->createMock(Settings::class),
+            $connections ?? $this->oneEngineConnection($this->createMock(Settings::class)),
             $attributionManager,
             $cookieHelper,
             $urlBuilder,

@@ -35,6 +35,7 @@ use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
 use Smaily\Connect\Observer\Engine\CustomerLogin;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * Identity merge on login. Magento's own login (Customer\Model\Session)
@@ -54,6 +55,8 @@ use Smaily\Connect\Observer\Engine\CustomerLogin;
  */
 class CustomerLoginTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const SESSION_ID = '0b6f3c1e-2a4d-4c8e-9f10-5d2b7a9e4c31';
     private const VISITOR_TOKEN = 'vt_abc123';
     private const STORE_VISITOR_TOKEN = 'vs_4fK9a2LmQ7xZ0bR3tY8wP1';
@@ -480,7 +483,7 @@ class CustomerLoginTest extends TestCase
         $consent = $this->createMock(MarketingConsent::class);
         $consent->method('isGiven')->willReturn($this->marketingConsent);
         $attributionManager = new AttributionManager(
-            $settings,
+            $this->oneEngineConnection($settings),
             $cookieManager,
             $this->createMock(ResourceConnection::class),
             $this->createMock(OrderPlacer::class),

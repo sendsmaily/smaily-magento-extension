@@ -29,6 +29,7 @@ use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
 use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-211: the store's server sets the campaign-click cookies, so Safari
@@ -37,6 +38,8 @@ use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
  */
 class LandTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const REC_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
     private const ENGINE_TOKEN = 'vt_8f3k2a9xq4';
     private const STORE_TOKEN = 'vs_4fK9a2LmQ7xZ0bR3tY8wP1';
@@ -66,6 +69,19 @@ class LandTest extends TestCase
     public function testANotConnectedStoreAnswers404AndSetsNothing(): void
     {
         $this->controller(['visitor_token' => self::ENGINE_TOKEN], connected: false)->execute();
+
+        self::assertSame(404, $this->answer['code']);
+        self::assertSame([], $this->set);
+    }
+
+    /**
+     * CON-237: separate stores — a store view no Campaign Intelligence
+     * connection serves answers 404 and sets nothing, whatever the other
+     * connections are.
+     */
+    public function testAStoreViewNoConnectionServesAnswers404AndSetsNothing(): void
+    {
+        $this->controller(['visitor_token' => self::ENGINE_TOKEN], currentStoreId: 3)->execute();
 
         self::assertSame(404, $this->answer['code']);
         self::assertSame([], $this->set);
@@ -201,7 +217,8 @@ class LandTest extends TestCase
         array $post,
         bool $connected = true,
         bool $secure = true,
-        bool $failing = false
+        bool $failing = false,
+        int $currentStoreId = 1
     ): Land {
         $request = $this->createMock(HttpRequest::class);
         $request->method('getPost')->willReturnCallback(static fn (string $name): mixed => $post[$name] ?? null);
@@ -272,10 +289,18 @@ class LandTest extends TestCase
         $remoteAddress = $this->createMock(RemoteAddress::class);
         $remoteAddress->method('getRemoteAddress')->willReturn('203.0.113.7');
 
+        $other = $this->createMock(Settings::class);
+        $other->method('isConnected')->willReturn(true);
+
         return new Land(
             $request,
             $resultFactory,
-            $settings,
+            // Separate stores: the store's view 1 is $settings', view 2 another
+            // connected one's, view 3 no connection's.
+            $this->engineConnections([
+                [$this->engineConnection(0, $settings, [1], [1], 1), null],
+                [$this->engineConnection(2, $other, [2], [2], 2), null],
+            ], $currentStoreId),
             $attributionManager,
             new AttributionCookieWriter($request, $cookieManager, $metadataFactory, $sessionConfig),
             new PerAddressLimiter(new FixedWindowCounter($cache), $dateTime, $remoteAddress)

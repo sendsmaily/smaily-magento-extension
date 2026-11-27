@@ -21,6 +21,7 @@ use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\MarketingConsent;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\OrderPlacer;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * The visitor-token cookie is read in either form the contract allows, an
@@ -33,6 +34,8 @@ use Smaily\Connect\Model\OrderPlacer;
  */
 class AttributionManagerTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     /**
      * @dataProvider visitorCookies
      */
@@ -78,7 +81,7 @@ class AttributionManagerTest extends TestCase
         $consent->expects(self::never())->method('isGiven');
 
         (new AttributionManager(
-            $settings,
+            $this->oneEngineConnection($settings),
             $cookieManager,
             $this->createMock(ResourceConnection::class),
             $this->createMock(OrderPlacer::class),
@@ -203,6 +206,68 @@ class AttributionManagerTest extends TestCase
         $this->manager($connection, false, null, null)->saveForOrder(501);
     }
 
+    /**
+     * CON-237: separate stores — the cookie names are the config of the
+     * connection serving the store view of the request.
+     */
+    public function testTheCookieNamesAreThoseOfTheConnectionOfTheRequest(): void
+    {
+        $manager = $this->separateStoresManager(2, ['lv_rec_uid' => 'vt_latvia1'], $this->createMock(AdapterInterface::class));
+
+        self::assertSame('lv_rec_uid', $manager->getClientConfig()['cookieVisitor']);
+        self::assertSame('vt_latvia1', $manager->readCookies()['visitor_token']);
+    }
+
+    /**
+     * CON-237: a store view no connection serves stamps nothing on an order
+     * and reads the default cookie names.
+     */
+    public function testAStoreViewNoConnectionServesStampsNothing(): void
+    {
+        $connection = $this->createMock(AdapterInterface::class);
+        $connection->expects(self::never())->method('insertOnDuplicate');
+
+        $manager = $this->separateStoresManager(3, [AttributionManager::DEFAULT_COOKIE_VISITOR => 'vt_8f3k2a'], $connection);
+        $manager->saveForOrder(501);
+
+        self::assertSame(AttributionManager::DEFAULT_COOKIE_VISITOR, $manager->getClientConfig()['cookieVisitor']);
+    }
+
+    /**
+     * Separate stores: the primary serves website 1 (store view 1), the
+     * connection of website 2 (store view 2) names its own visitor cookie;
+     * store view 3 belongs to a website no connection serves.
+     *
+     * @param array<string, string> $cookies by cookie name
+     */
+    private function separateStoresManager(
+        int $currentStoreId,
+        array $cookies,
+        AdapterInterface $connection
+    ): AttributionManager {
+        $primary = $this->createMock(Settings::class);
+        $primary->method('isConnected')->willReturn(true);
+        $primary->method('getEngineConfig')->willReturn([]);
+        $latvia = $this->createMock(Settings::class);
+        $latvia->method('isConnected')->willReturn(true);
+        $latvia->method('getEngineConfig')->willReturn(['tracking_cookie_name' => 'lv_rec_uid']);
+        $cookieManager = $this->createMock(CookieManagerInterface::class);
+        $cookieManager->method('getCookie')->willReturnCallback(static fn (string $name) => $cookies[$name] ?? null);
+        $resource = $this->createMock(ResourceConnection::class);
+        $resource->method('getConnection')->willReturn($connection);
+
+        return new AttributionManager(
+            $this->engineConnections([
+                [$this->engineConnection(0, $primary, [1], [1], 1), null],
+                [$this->engineConnection(2, $latvia, [2], [2], 2), null],
+            ], $currentStoreId),
+            $cookieManager,
+            $resource,
+            $this->createMock(OrderPlacer::class),
+            $this->marketingConsent(false)
+        );
+    }
+
     private function reader(string $visitorCookie, bool $consent): AttributionManager
     {
         $settings = $this->createMock(Settings::class);
@@ -213,7 +278,7 @@ class AttributionManagerTest extends TestCase
         );
 
         return new AttributionManager(
-            $settings,
+            $this->oneEngineConnection($settings),
             $cookieManager,
             $this->createMock(ResourceConnection::class),
             $this->createMock(OrderPlacer::class),
@@ -285,7 +350,7 @@ class AttributionManagerTest extends TestCase
         }
 
         return new AttributionManager(
-            $settings,
+            $this->oneEngineConnection($settings),
             $cookieManager,
             $resource,
             new OrderPlacer($moduleManager, $objectManager, $appState),

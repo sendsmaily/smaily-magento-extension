@@ -20,7 +20,9 @@ use Smaily\Connect\Model\OrderPlacer;
  * payload builder forwards to the engine.
  *
  * Cookie names come from the tenant's setup-exchange config with the
- * cross-platform defaults below. Attribution is deliberately NOT gated on
+ * cross-platform defaults below: the config of the Campaign Intelligence
+ * connection serving the store view of the request (CON-237;
+ * Connections::current()), the defaults where none serves it. Attribution is deliberately NOT gated on
  * analytics consent (first-party functional cookie for the merchant's own
  * email click), matching the Woo/Shopify behavior, except the visitor token
  * as gated by `AttributionManager::readCookies()`.
@@ -44,7 +46,7 @@ class AttributionManager
     private const ATTRIBUTION_TABLE = 'smaily_order_attribution';
 
     public function __construct(
-        private readonly Settings $settings,
+        private readonly Connections $connections,
         private readonly CookieManagerInterface $cookieManager,
         private readonly ResourceConnection $resourceConnection,
         private readonly OrderPlacer $orderPlacer,
@@ -59,7 +61,7 @@ class AttributionManager
      */
     public function getClientConfig(): array
     {
-        $config = $this->settings->getEngineConfig();
+        $config = $this->connections->current()?->settings()->getEngineConfig() ?? [];
 
         return [
             'cookieVisitor' => (string)($config['tracking_cookie_name'] ?? self::DEFAULT_COOKIE_VISITOR),
@@ -128,11 +130,12 @@ class AttributionManager
     /**
      * Stamp the current attribution cookies onto a placed order.
      *
-     * Not on an order an admin places.
+     * Not on an order an admin places, and not where no connected Campaign
+     * Intelligence connection serves the store view of the request.
      */
     public function saveForOrder(int $orderId): void
     {
-        if ($orderId <= 0 || !$this->settings->isConnected()) {
+        if ($orderId <= 0 || !($this->connections->current()?->settings()->isConnected() ?? false)) {
             return;
         }
 

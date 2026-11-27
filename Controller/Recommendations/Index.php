@@ -15,8 +15,8 @@ use Magento\Framework\Controller\Result\Raw;
 use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\View\Element\AbstractBlock;
 use Magento\Framework\View\Result\Layout;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\RecommendedProducts;
-use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\StorefrontRecommendations;
 use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
 
@@ -30,8 +30,9 @@ use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
  * (StorefrontRecommendations): nothing in the request names the shopper.
  *
  * Guards, in order (as the WooCommerce plugin's RecommendationsEndpoint):
- *   1. a store that may not call the engine (`isSendingAllowed()`) answers
- *      a bare 404;
+ *   1. a store view whose Campaign Intelligence connection may not be
+ *      called (`isSendingAllowed()`), or that none serves (CON-237),
+ *      answers a bare 404;
  *   2. a per-address limit, as the browse relay's, because every miss in the
  *      per-shopper cache spends an engine call;
  *   3. a request another site makes (`Sec-Fetch-Site: cross-site` or
@@ -50,7 +51,7 @@ class Index implements HttpGetActionInterface
     public function __construct(
         private readonly HttpRequest $request,
         private readonly ResultFactory $resultFactory,
-        private readonly Settings $settings,
+        private readonly Connections $connections,
         private readonly StorefrontRecommendations $recommendations,
         private readonly RecommendedProducts $products,
         private readonly PerAddressLimiter $limiter
@@ -62,7 +63,7 @@ class Index implements HttpGetActionInterface
      */
     public function execute(): AbstractResult
     {
-        if (!$this->settings->isSendingAllowed()) {
+        if (!($this->connections->current()?->settings()->isSendingAllowed() ?? false)) {
             return $this->empty(404);
         }
         // The browse relay's per-address limit, on its own key.

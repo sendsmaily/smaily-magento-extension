@@ -22,8 +22,10 @@ use Magento\Framework\View\Result\Page;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Controller\Privacy\Index;
 use Smaily\Connect\Controller\Privacy\Save;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3579: My Account > Personalization exists only where Campaign
@@ -33,6 +35,8 @@ use Smaily\Connect\Model\Privacy\ProfilingConsent;
  */
 class PersonalizationGateTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private ?string $forwardedTo = null;
 
     public function testThePageIsANotFoundWithoutCampaignIntelligence(): void
@@ -76,12 +80,26 @@ class PersonalizationGateTest extends TestCase
         self::assertInstanceOf(Redirect::class, $result);
     }
 
-    private function index(bool $live): Index
+    /**
+     * CON-237: separate stores — at a store view no Campaign Intelligence
+     * connection serves, the page and the form do not exist, whatever the
+     * other connections are.
+     */
+    public function testThePageIsANotFoundWhereNoConnectionServesTheStoreView(): void
     {
-        return new Index($this->session(), $this->resultFactory(), $this->settings($live));
+        $consent = $this->createMock(ProfilingConsent::class);
+        $consent->expects(self::never())->method('setAllowed');
+
+        self::assertInstanceOf(Forward::class, $this->index(true, 3)->execute());
+        self::assertInstanceOf(Forward::class, $this->save(true, $consent, 3)->execute());
     }
 
-    private function save(bool $live, ProfilingConsent $consent): Save
+    private function index(bool $live, int $currentStoreId = 1): Index
+    {
+        return new Index($this->session(), $this->resultFactory(), $this->connections($live, $currentStoreId));
+    }
+
+    private function save(bool $live, ProfilingConsent $consent, int $currentStoreId = 1): Save
     {
         $validator = $this->createMock(FormKeyValidator::class);
         $validator->method('validate')->willReturn(true);
@@ -93,16 +111,23 @@ class PersonalizationGateTest extends TestCase
             $validator,
             $consent,
             $this->createMock(ManagerInterface::class),
-            $this->settings($live)
+            $this->connections($live, $currentStoreId)
         );
     }
 
-    private function settings(bool $live): Settings
+    /**
+     * Store view 1 is served by a connection live or not ($live); store
+     * view 3 by none.
+     */
+    private function connections(bool $live, int $currentStoreId): Connections
     {
         $settings = $this->createMock(Settings::class);
         $settings->method('isSendingAllowed')->willReturn($live);
 
-        return $settings;
+        return $this->engineConnections(
+            [[$this->engineConnection(0, $settings, [1], [1], 1), null]],
+            $currentStoreId
+        );
     }
 
     private function session(): CustomerSession

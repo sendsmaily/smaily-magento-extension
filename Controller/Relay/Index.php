@@ -17,9 +17,8 @@ use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\BrowseEventValidator;
-use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
-use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
 
@@ -38,6 +37,10 @@ use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
  * event carries the visitor token as gated by
  * `AttributionManager::readCookies()`. Without one the events go anonymous.
  * As the WooCommerce plugin's relay does (PRO-3860, CON-181).
+ *
+ * The events go to the Campaign Intelligence connection serving the store
+ * view (CON-237; Connections::current()), by its gates and with its client;
+ * where none serves it the endpoint 404s as with tracking off.
  */
 class Index implements HttpPostActionInterface, CsrfAwareActionInterface
 {
@@ -47,8 +50,7 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
     public function __construct(
         private readonly HttpRequest $request,
         private readonly JsonFactory $jsonFactory,
-        private readonly Settings $settings,
-        private readonly Client $client,
+        private readonly Connections $connections,
         private readonly BrowseEventValidator $validator,
         private readonly PerAddressLimiter $limiter,
         private readonly Logger $logger,
@@ -65,7 +67,9 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
 
         // A refused account (contract §2) receives nothing, so the beacon is
         // answered exactly like a store with tracking switched off.
-        if (!$this->settings->isBrowseTrackingEnabled() || !$this->settings->isSendingAllowed()) {
+        $connection = $this->connections->current();
+        $settings = $connection?->settings();
+        if ($connection === null || !$settings->isBrowseTrackingEnabled() || !$settings->isSendingAllowed()) {
             $result->setHttpResponseCode(404);
 
             return $result->setData(['ok' => false]);
@@ -108,7 +112,7 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
         }
 
         try {
-            $this->client->relayBrowse($events);
+            $this->connections->client($connection)->relayBrowse($events);
         } catch (EngineException $exception) {
             // Loss-tolerant by design; log at debug so a down engine cannot
             // flood the log from storefront traffic.

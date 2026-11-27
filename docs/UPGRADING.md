@@ -211,12 +211,18 @@ other websites' newsletter signups reach Smaily from then on. To send the
 signups made there before, press **Run again** on the **Initial contact
 import** card under **Settings > Contacts**. Where the websites run as one
 store on one Smaily account saved for all websites, the settings for all
-websites then win: a website's own login of that account and its own
-automations go, and so do its own Contacts settings where they change
+websites then win as far as nothing is lost: a website's own login of
+that account goes where its API password is the same (with no password
+saved for all websites, the one the websites agree on becomes it), and a
+website with another password keeps its login; a website's own
+automations go, a value the settings for all websites lack becoming
+theirs where the websites agree on it, while websites that disagree on
+one keep their own; and its own Contacts settings go where they change
 nothing of who is synced. Contacts settings that do change it (contact
 sync on or off, the sync mode, the guest buyers, the checkout checkbox)
 stay until you confirm on **Settings > Contacts** with **Use the same
-contact settings on every website**. Each website keeps its own Storefront
+contact settings on every website**, which applies to the websites the
+tab lists. Each website keeps its own Storefront
 URL. Every other store keeps its saved values where they are: each
 website's values stay its own values until you change them in Settings or
 run the initial setup again.

@@ -2567,9 +2567,11 @@ Initial setup, Settings, Log. Design rules:
       Contacts save removes the own settings of the websites that differ in
       none of them (`identical()`); the others stay in effect, Settings >
       Contacts lists them with their mode (`differing()`, in place of the
-      CON-432 warning), and only the confirmation "Use the same contact
-      settings on every website" (`use_everywhere`) removes them, answering
-      `returnedToStoreWide` so the page reloads. `contacts_confirmed` rows
+      CON-432 warning; the initial setup's Contacts step lists them too and
+      leaves them out of the websites it says start contact sync), and only
+      the confirmation "Use the same contact settings on every website"
+      (`use_everywhere`: the website ids listed) removes them, for those
+      websites only, answering `returnedToStoreWide` so the page reloads. `contacts_confirmed` rows
       are never removed.
     Per-language Smaily accounts are then set by moving to separate
     stores. Any other 2+-website store keeps per-website Settings as
@@ -2597,11 +2599,24 @@ Initial setup, Settings, Log. Design rules:
        from the website, with its `contacts_confirmed` mark for the Contacts
        settings.
     2. Where a store-wide account is saved (after step 1 or before), the
-       default scope wins: for the Smaily account and the automations the
-       default scope holds, every website's own values go (the storefront
-       address stays); for the Contacts settings, only the websites
-       `WebsiteContacts::identical()` names. The rest waits for the
-       merchant's confirmation in Settings.
+       default scope wins as far as nothing is lost:
+       - The Smaily account: a website's own values (the storefront address
+         excepted) go only where its API password, decrypted in memory, is
+         the store-wide one (its own, else that one). With no store-wide
+         password, the stored password every holder agrees on (decrypted)
+         is written at the default scope first, still encrypted. A website
+         whose password differs keeps every connection row, logged as
+         "password differs".
+       - The automations (`WebsiteOverrides::shareAutomations()`): path by
+         path a default-scope value wins; a path the default lacks moves
+         there when every website holding it agrees; mapping rows go by
+         trigger, website 0's winning, else moved there when the holders
+         agree. A website holding a path or a trigger's rows the websites
+         disagree on (and the default lacks) keeps its automations, logged
+         as "websites disagree".
+       - The Contacts settings: only the websites
+         `WebsiteContacts::identical()` names. The rest waits for the
+         merchant's confirmation in Settings.
     Every other store stays as it is; a second run finds nothing more to
     do. Each moved or removed section is logged with the website id and
     the paths, never a value, to `smaily_connect.log`.

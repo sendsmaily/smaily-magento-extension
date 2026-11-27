@@ -175,7 +175,10 @@ start one.
     preference: a class it builds that needs one (directly or through a
     dependency, e.g. `MigrateLegacyConfig` → `StoreLayout`) gets it passed
     in — `IntegrationTestCase::storeLayoutFor()` builds a `StoreLayout` on
-    a mocked store manager (CON-279).
+    a mocked store manager (CON-279). `Engine\Connections` needs one too:
+    pass a stub (`EngineConnectionsStub`), and an `AutomationHandler` from
+    the object manager takes `IntegrationTestCase::noPushedWorkflow()`
+    (CON-237).
   - `bin/test-js.sh` — the browser harnesses in headless Chrome. Chrome's
     virtual time jumps to the end of its budget when no timer is pending, so
     every page keeps a short interval running until its result is written

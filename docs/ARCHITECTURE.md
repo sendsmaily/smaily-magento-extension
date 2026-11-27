@@ -279,8 +279,8 @@ below.
   below): every enqueue site passes the canonical store view
   (`canonicalStoreId()`) of the connection it builds the row for — the
   catalog, customers and orders rows and their imports per connection
-  (see "Per-connection rows and imports" below); the marketing-queue
-  flows (identity merge, profiling consent) still the primary's — and NULL
+  (see "Per-connection rows and imports" below), and the customer an
+  identity merge sends first its merge's connection's — and NULL
   (every row queued before CON-237) is the primary. `IngestQueue::claimBatch()`,
   `latestUndeliveredPayloads()`, `hasRow()` and `countPending()` (with a
   connection; the nightly manifest's wait) take the connection and read
@@ -885,9 +885,10 @@ below.
   its refusal half: the flusher only that half, per domain, once
   connectedness is proved (so one refusal ends the run for that
   connection's engine store, CON-237); the merge and
-  profiling-consent handlers per row (`Settings::sendingBlockedReason()`:
-  a refusal leaves the row `Queue\Pending`, not connected names the
-  reason).
+  profiling-consent handlers per row, for the row's own connection
+  (`Settings::sendingBlockedReason()`: a refusal leaves the row
+  `Queue\Pending`, not connected names the reason; their `isPaused()`
+  holds only while every connection is refused).
   `isConnected()` stays the gate for everything that only enqueues, reads or
   displays, so live observers keep queueing and the store's history is intact
   when the account comes back. Rows a refusal met
@@ -982,11 +983,10 @@ below.
   engine store per Smaily account, so connections are grouped by the
   Smaily account. The ingest queue routes by it (see "Routed by engine
   connection" above), and the catalog, customers and orders rows and
-  imports are built per connection (below); the storefront and
-  marketing-queue flows (browse, recommendations, attribution, identity
-  merge, profiling consent, pushed workflows) still use the primary, and
-  nothing creates a second connection yet, so every store is still served
-  by the one installation-wide connection.
+  imports are built per connection, and the storefront and marketing-queue
+  flows use their own connection (below); nothing creates a second
+  connection yet, so every store is still served by the one
+  installation-wide connection.
   - `Model/Engine/Connection` is one connection: `key()` (0 = the primary,
     else the id of the website whose scope holds it), `settings()`,
     `websiteIds()`, `storeIds()`, `canonicalStoreId()` (the default store
@@ -1000,7 +1000,9 @@ below.
   - `Model/Engine/Connections` (built once per request, `reset()`
     rebuilds): `all()`, `primary()`, `forWebsite()`, `forStore()`,
     `forKey()`, `forRowStoreId()` (NULL = the primary: every row queued
-    before CON-237), `client()` (the DI `Engine\Client` for the primary, a
+    before CON-237), `current()` (the connection serving the store view of
+    the request; under one store the primary, without asking for the store
+    view), `client()` (the DI `Engine\Client` for the primary, a
     `ClientFactory` client of its own for any other). One store
     (`StoreLayout::isSeparateStores()` false): the primary serves every
     website, connected or not, and nothing else is read. Separate stores: a
@@ -1077,8 +1079,7 @@ below.
       and row; group (c) holds only for the connection of the store view
       the request is on. `CustomerPayloadBuilder::build($customer,
       $connection)` names the account's `website` only when the
-      connection serves it (without a connection — the login merge, a
-      later step — as before).
+      connection serves it.
     - *Orders.* `OrderIngest` sends an order to `Connections::forStore()`
       of its store view; nothing when no connected connection serves it;
       an order whose store view is gone goes to the primary only while it
@@ -1106,6 +1107,44 @@ below.
       one; `EngineImportGuard::refusal()` asks that connection;
       `ImportsOnConnect::start($connection)` queues that connection's
       three imports (`Connector` passes the primary).
+    - *Storefront.* Every storefront gate, cookie name and engine call is
+      the connection serving the store view (`Connections::current()`);
+      none serves it — nothing loads, and the routes answer 404 as when not
+      connected: `ViewModel\EngineState` (the attribution, tracker and
+      recommendations scripts), `Controller\Relay\Index` (its gates and
+      client), `Controller\Attribution\Land`,
+      `Controller\Recommendations\Index`, `StorefrontRecommendations` (its
+      client, tenant in the cache key and prefix; its 2-minute pause is
+      `Connection::flagCode('smaily_recs_paused')`), the widget block, the
+      My Account link and `Controller\Privacy\Index`/`Save`, and
+      `AttributionManager` (its cookie and parameter names, and the stamp
+      on an order: nothing where no connected connection serves the store
+      view). `StoreVisitorToken` reads the names through it.
+    - *Marketing queue.* An engine row's `website_id` is its connection's
+      `eventWebsiteId()` (0 for the primary, as before), and each handler
+      reads it back with `forWebsite()`: a row whose website no connection
+      serves now is not sent (`Settings::NOT_CONNECTED`). `CustomerLogin`
+      queues the merge for the connection of the store view logged in at,
+      by that connection's gate; `IdentityMergeHandler` merges with its
+      client, reads its queued customer (`IngestQueue::hasRow()`) and has
+      `MergeCustomerSender` send the customer to it — built for it, and
+      recorded with its canonical store view like every customers row.
+      `ProfilingConsent` queues a choice for every connected connection
+      (the store's opt-out record is the installation's; an engine store
+      that does not hold the shopper answers 404, a success), or for the
+      one `resendOptOuts()` names; `ProfilingConsentHandler` sends each row
+      with its connection's client. The subscriber observers' gate is
+      `Connections::anyConnected()`.
+    - *Pushed workflows.* `EmailDesignWorkflows` keeps a §23 read in the
+      scope of the connection that read it (`Settings::getEmailWorkflows()`
+      / `recordEmailWorkflows()`: '' rather than a delete at a website
+      scope), and `PushedWorkflow` reads the copy of the connection serving
+      the email's website — none, the picked workflow. The admin's §23 read
+      (`EmailDesigns`) is still the primary's.
+    - *GDPR command.* `bin/magento smaily:gdpr` exports and erases at every
+      connection; with one connection its output is as before, with
+      several the export's `engine` holds each connected engine store's
+      record under its name and each engine line starts with that name.
 - **The backfill page holds every product (PRO-2506):**
   `CatalogProductLoader` calls neither `addPriceData()` nor any store/website filter, so it pages exactly
   what `countProducts()` counts. `addPriceData()` INNER JOINs
@@ -2243,8 +2282,9 @@ in Magento's shape (PRO-3790). Nothing is placed automatically.
   is cached empty for 10 minutes; a timeout, network failure or 5xx also
   sets `smaily_recs_paused` for 2 minutes, during which every cache miss
   answers empty without a call (Woo PRO-3857). The engine connection is
-  the installation's one tenant (`Engine\Settings`, default scope), as for
-  every other engine call.
+  the one serving the store view (`Engine\Connections::current()`,
+  CON-237): its tenant is in the cache key and the pause is its own; under
+  one store, the installation's one tenant.
 - **Cards** (`Model\Engine\RecommendedProducts`): one product collection
   at the current store view — enabled, visible in the catalog, in the
   store's website, with the listing attributes, prices and URL rewrites —

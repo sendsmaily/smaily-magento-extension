@@ -72,6 +72,12 @@ class LoginCustomerFirstTest extends IntegrationTestCase
     /** @var array<string, true> the customers the fake engine has */
     private array $known = [];
 
+    /** Whether the fake engine refuses every customer §4 sends it (`errors[]`). */
+    private bool $refusesCustomers = false;
+
+    /** Whether the fake engine's merge never finds a customer, even one §4 took. */
+    private bool $mergeNeverFinds = false;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -79,6 +85,8 @@ class LoginCustomerFirstTest extends IntegrationTestCase
         $this->ingest = $this->objectManager->create(IngestQueue::class);
         $this->calls = [];
         $this->known = [];
+        $this->refusesCustomers = false;
+        $this->mergeNeverFinds = false;
         $this->client = $this->engine();
     }
 
@@ -196,6 +204,51 @@ class LoginCustomerFirstTest extends IntegrationTestCase
     }
 
     /**
+     * CON-469 (as WooCommerce): a customer Campaign Intelligence refused
+     * ends the merge quietly — no failed merge row, closed as Skipped with
+     * the engine's reason. The customers row the send left in the Log keeps
+     * the refusal.
+     */
+    public function testAMergeForACustomerTheEngineRefusedEndsQuietly(): void
+    {
+        $this->refusesCustomers = true;
+        $this->queueMerge([IdentityMergeHandler::SEND_CUSTOMER => true]);
+
+        $this->flushEvents();
+
+        self::assertSame(['customers', 'merge'], $this->calls);
+        $merge = $this->mergeRow();
+        self::assertSame(Event::STATUS_SENT, $merge['status'], 'Closed, not failed');
+        self::assertSame(
+            str_replace('%1', 'email: invalid_email', IdentityMergeHandler::SKIPPED_CUSTOMER_REFUSED),
+            $merge['last_error']
+        );
+        self::assertSame(0, $this->events->retry([(int)$merge['id']]), 'Nothing for the merchant to retry');
+        $rows = $this->customerRows();
+        self::assertCount(1, $rows);
+        self::assertSame(IngestEvent::STATUS_FAILED, $rows[0]['status'], 'The refused customer, in the Log');
+    }
+
+    /**
+     * CON-469 (as WooCommerce): a merge that still finds no customer after
+     * the store sent them and tried once more ends quietly — no failed row,
+     * closed as Skipped with the reason.
+     */
+    public function testAMergeThatStillFindsNoCustomerAfterTheSendEndsQuietly(): void
+    {
+        $this->mergeNeverFinds = true;
+        $this->queueMerge([IdentityMergeHandler::SEND_CUSTOMER => true]);
+
+        $this->flushEvents();
+
+        self::assertSame(['customers', 'merge', 'merge'], $this->calls);
+        $merge = $this->mergeRow();
+        self::assertSame(Event::STATUS_SENT, $merge['status'], 'Closed, not failed');
+        self::assertSame(IdentityMergeHandler::SKIPPED_NOT_FOUND_AFTER_SEND, $merge['last_error']);
+        self::assertSame(0, $this->events->retry([(int)$merge['id']]), 'Nothing for the merchant to retry');
+    }
+
+    /**
      * A row parked by a 404 before CON-262 carries no flag, only the
      * engine's answer: it too sends the customer before its merge on Retry.
      */
@@ -266,7 +319,9 @@ class LoginCustomerFirstTest extends IntegrationTestCase
 
     /**
      * A fake engine: §4 makes a customer known (after $failSends failures
-     * in transport), §7 answers 404 `customer_not_found` for an unknown one.
+     * in transport; never while it refuses customers), §7 answers 404
+     * `customer_not_found` for an unknown one (for every one while its
+     * merge never finds).
      */
     private function engine(int &$failSends = 0): Client&MockObject
     {
@@ -282,6 +337,14 @@ class LoginCustomerFirstTest extends IntegrationTestCase
                         503
                     );
                 }
+                if ($this->refusesCustomers) {
+                    return [
+                        'ok' => true,
+                        'processed' => 0,
+                        'deduplicated' => 0,
+                        'errors' => [['index' => 0, 'field' => 'email', 'error' => 'invalid_email']],
+                    ];
+                }
                 foreach ($items as $item) {
                     $this->known[strtolower((string)$item['email'])] = true;
                 }
@@ -291,7 +354,7 @@ class LoginCustomerFirstTest extends IntegrationTestCase
         );
         $client->method('identityMerge')->willReturnCallback(function (array $payload): array {
             $this->calls[] = 'merge';
-            if (!isset($this->known[$payload['customer_email']])) {
+            if ($this->mergeNeverFinds || !isset($this->known[$payload['customer_email']])) {
                 throw new EngineRequestException(
                     'Engine request failed with HTTP 404: No customer found',
                     404,

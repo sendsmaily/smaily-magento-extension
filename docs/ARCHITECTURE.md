@@ -2436,12 +2436,14 @@ Subscribers grid, or a customer account, leaves profiling as it was.
   `LoginMerge` does (CON-465): a debug line with the row id only, and the
   row closed as Skipped (`IdentityMergeHandler::SKIPPED_NOT_SENT`), never a
   failure the merchant cannot fix; the customer's next login queues a new
-  merge. Any other row the 404 leaves is parked (`Failure::permanent()`,
-  Retry in the Log) with one of two reasons the Log shows translated
-  (`FailureMessage::TRANSLATED`): `CUSTOMER_REFUSED` (§4 refused the item;
-  the engine's reason in it) and `NOT_FOUND_AFTER_SEND` (still 404 after
-  §4 answered 200). `NOT_SENT` stays translated for rows parked with it
-  before CON-465. A row parked
+  merge. A customer §4 refused and a merge still 404 after §4 answered 200
+  end the same way (CON-469, as `LoginMerge`): the row is closed as
+  Skipped with `SKIPPED_CUSTOMER_REFUSED` (the engine's reason in it; the
+  customers row `MergeCustomerSender` left in the Log carries the refusal)
+  or `SKIPPED_NOT_FOUND_AFTER_SEND`. No 404 parks a merge row any more.
+  `NOT_SENT`, `CUSTOMER_REFUSED` and `NOT_FOUND_AFTER_SEND` stay translated
+  (`FailureMessage::TRANSLATED`) for rows parked with them before CON-465
+  and CON-469. A row parked
   with `permanent_http_404` before CON-262 carries no flag; the handler
   reads its last recorded answer instead, so its Retry sends the customer
   the store sends before it merges, and links the login once the engine

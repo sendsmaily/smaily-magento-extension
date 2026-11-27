@@ -282,7 +282,8 @@ class IdentityMergeHandlerTest extends TestCase
 
     /**
      * The next attempt of that row sends the customer before it merges, and
-     * that merge is the one retry: a second 404 parks the row.
+     * that merge is the one retry: a second 404 ends the merge quietly
+     * (CON-469).
      */
     public function testTheNextAttemptAfterA404SendsTheCustomerFirstAndRetriesOnce(): void
     {
@@ -291,20 +292,31 @@ class IdentityMergeHandlerTest extends TestCase
         $this->engine(mergeFinds: [false]);
 
         self::assertEquals(
-            [1 => Failure::permanent(IdentityMergeHandler::NOT_FOUND_AFTER_SEND)],
+            [1 => new Skipped(IdentityMergeHandler::SKIPPED_NOT_FOUND_AFTER_SEND)],
             $this->handle(self::PAYLOAD + [IdentityMergeHandler::CUSTOMER_NOT_FOUND => true])
         );
         self::assertSame(['customers', 'merge'], $this->calls);
     }
 
-    public function testAConsentingLoginWhoseMergeStillFindsNoCustomerIsRetriedOnceThenParked(): void
+    /**
+     * CON-469 (as WooCommerce's LoginMerge): a merge that still finds no
+     * customer after the store sent them and tried once more ends quietly —
+     * a debug line without the address, and the row closed as Skipped,
+     * never a failure.
+     */
+    public function testAConsentingLoginWhoseMergeStillFindsNoCustomerIsRetriedOnceThenEndsQuietly(): void
     {
         $this->profilingConsent->method('isAllowed')->willReturn(true);
         $this->sender->expects(self::once())->method('send');
         $this->engine(mergeFinds: [false, false]);
+        $this->logger->expects(self::once())->method('debug')->with(
+            self::logicalNot(self::stringContains('person@example.com')),
+            ['id' => 1]
+        );
+        $this->logger->expects(self::never())->method('error');
 
         self::assertEquals(
-            [1 => Failure::permanent(IdentityMergeHandler::NOT_FOUND_AFTER_SEND)],
+            [1 => new Skipped(IdentityMergeHandler::SKIPPED_NOT_FOUND_AFTER_SEND)],
             $this->handle(self::PAYLOAD + [IdentityMergeHandler::SEND_CUSTOMER => true])
         );
         self::assertSame(['customers', 'merge', 'merge'], $this->calls);
@@ -351,15 +363,26 @@ class IdentityMergeHandlerTest extends TestCase
         self::assertSame(['customers', 'merge'], $this->calls);
     }
 
-    public function testACustomerTheEngineRefusesParksTheMergeWithTheEnginesReason(): void
+    /**
+     * CON-469 (as WooCommerce's LoginMerge): a customer the engine refused
+     * ends the merge quietly — a debug line without the address, and the row
+     * closed as Skipped with the engine's reason, never a failure. The
+     * customers row the send left in the Log carries the refusal.
+     */
+    public function testACustomerTheEngineRefusesEndsTheMergeQuietlyWithTheEnginesReason(): void
     {
         $this->profilingConsent->method('isAllowed')->willReturn(true);
-        $this->engine(refusal: 'email: Invalid email');
+        $this->engine(refusal: 'email: invalid_email');
+        $this->logger->expects(self::once())->method('debug')->with(
+            self::logicalNot(self::stringContains('person@example.com')),
+            ['id' => 1]
+        );
+        $this->logger->expects(self::never())->method('error');
 
         self::assertEquals(
-            [1 => Failure::permanent(
-                'Campaign Intelligence refused the customer (email: Invalid email), so the login was not linked'
-                . ' to them. Retry sends the customer and the login again.'
+            [1 => new Skipped(
+                'Skipped: Campaign Intelligence refused the customer (email: invalid_email), so the login'
+                . ' was not linked to them.'
             )],
             $this->handle(self::PAYLOAD + [IdentityMergeHandler::SEND_CUSTOMER => true])
         );

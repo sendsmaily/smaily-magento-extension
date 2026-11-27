@@ -143,7 +143,7 @@
     function shows(label, doc, key, strings, mode, enabled) {
         var element = card(doc, key),
             pill = element.querySelector('.smaily-pill'),
-            names = {off: 'Off', test: 'Test mode', active: 'Active', stopped: 'Stopped for review'};
+            names = {off: 'Off', test: 'Test mode', active: 'Active', stopped: 'Stopped'};
 
         check(label + ': the pill says ' + strings[names[mode]],
             pill.textContent.trim() === strings[names[mode]]

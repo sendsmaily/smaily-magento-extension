@@ -76,13 +76,11 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
             <?php
             $key = $escaper->escapeHtmlAttr($row['key']);
             // An email Smaily stopped for review shows "Stopped" (CON-466,
-            // as the WooCommerce plugin), also while it is not enabled. Its
-            // own phrase, "Stopped" in en_US.csv: an import's "Stopped" pill
-            // has another Estonian word.
+            // as the WooCommerce plugin), also while it is not enabled.
             if (($row['setup']['mode'] ?? '') === 'stopped') {
                 $modeClass = 'is-stopped';
                 $pillVariant = 'stopped';
-                $pillLabel = __('Stopped for review');
+                $pillLabel = __('Stopped');
             } elseif (!$row['enabled']) {
                 $modeClass = 'is-off';
                 $pillVariant = 'off';
@@ -294,7 +292,7 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
             'off': '<?= $escaper->escapeJs(__('Off')) ?>',
             'test': '<?= $escaper->escapeJs(__('Test mode')) ?>',
             'active': '<?= $escaper->escapeJs(__('Active')) ?>',
-            'stopped': '<?= $escaper->escapeJs(__('Stopped for review')) ?>'
+            'stopped': '<?= $escaper->escapeJs(__('Stopped')) ?>'
         };
 
         function showMode($card, mode) {

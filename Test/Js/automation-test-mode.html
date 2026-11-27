@@ -159,13 +159,13 @@
 
         // The pill of each state (CON-466): a stop Smaily reviews says
         // Stopped, also while the email is not enabled; the others as before.
-        check(locale + ', stopped: the pill says ' + strings['Stopped for review'],
-            pill(doc, 'winback_risk') === strings['Stopped for review']
+        check(locale + ', stopped: the pill says ' + strings.Stopped,
+            pill(doc, 'winback_risk') === strings.Stopped
             && doc.querySelector('[data-trigger="winback_risk"] .smaily-pill').classList.contains('smaily-pill--stopped')
             && doc.querySelector('[data-trigger="winback_risk"]').classList.contains('is-stopped'));
-        check(locale + ', stopped and not enabled: the pill says ' + strings['Stopped for review']
+        check(locale + ', stopped and not enabled: the pill says ' + strings.Stopped
             + ' and Smaily reviews the stop',
-            pill(doc, 'back_in_stock') === strings['Stopped for review']
+            pill(doc, 'back_in_stock') === strings.Stopped
             && text(part(doc, 'back_in_stock', 'status')) === stop);
         check(locale + ', test, live and no setup state: Test mode, Active and Test mode as before',
             pill(doc, 'replenish_due') === strings['Test mode'] && pill(doc, 'post_purchase') === strings.Active
@@ -301,7 +301,7 @@
             && text(part(doc, 'winback_risk', 'result').querySelector('span')) === strings['Test mode stays on:']
             && items.join('|') === stop + '|' + strings['The email has no subject']
             && text(part(doc, 'winback_risk', 'status')) === stop
-            && pill(doc, 'winback_risk') === strings['Stopped for review']);
+            && pill(doc, 'winback_risk') === strings.Stopped);
 
         // No answer at all: the card says so and keeps its state.
         win.answers.push({status: 500, body: {}});

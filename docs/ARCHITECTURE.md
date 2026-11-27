@@ -3201,9 +3201,9 @@ implemented here:
   An email in `setup_state: stopped` (or with the `stopped_needs_review`
   blocker) shows the pill "Stopped" with the review sentence below,
   also while it is not enabled, as the WooCommerce plugin (CON-466); the
-  save's answer carries `stopped` for it. Its phrase is "Stopped for
-  review" (en_US "Stopped", et_EE "Peatatud", WooCommerce's word),
-  because an import's "Stopped" pill reads "Peatunud".
+  save's answer carries `stopped` for it. Its Estonian word, "Peatatud",
+  is the WooCommerce plugin's, and the import cards' "Stopped" pill
+  shares it.
 
 ### Installation report (CON-234)
 

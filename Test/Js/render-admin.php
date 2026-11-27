@@ -521,6 +521,16 @@ $intelligenceViewModel = static fn (
     }
 
     /**
+     * One storefront address, not one per website (CON-470).
+     *
+     * @return array<int, array{name: string, url: string}>
+     */
+    public function getWebsiteStorefrontUrls(): array
+    {
+        return [];
+    }
+
+    /**
      * @return bool
      */
     public function isApiOnlyStore(): bool
@@ -653,6 +663,17 @@ $intelligenceViewModel = static fn (
      * @return array<int, array{website: string, mode: string}>
      */
     public function getSharedAccountModes(): array
+    {
+        return [];
+    }
+
+    /**
+     * No website keeps Contacts settings of its own that ask for consent
+     * (CON-470).
+     *
+     * @return list<array{name: string, enabled: bool, mode: string}>
+     */
+    public function getDifferingContactWebsites(): array
     {
         return [];
     }
@@ -859,6 +880,17 @@ $sharedAccountViewModel = static fn (object $inner): object => new class ($inner
             ['website' => 'Main Website', 'mode' => 'consent'],
             ['website' => 'Second Website', 'mode' => 'legitimate_interest'],
         ];
+    }
+
+    /**
+     * No website keeps Contacts settings of its own that ask for consent
+     * (CON-470).
+     *
+     * @return list<array{name: string, enabled: bool, mode: string}>
+     */
+    public function getDifferingContactWebsites(): array
+    {
+        return [];
     }
 };
 $sharedAccountStrings = [
@@ -1436,6 +1468,16 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
     }
 
     /**
+     * One storefront address, not one per website (CON-470).
+     *
+     * @return array<int, array{name: string, url: string}>
+     */
+    public function getWebsiteStorefrontUrls(): array
+    {
+        return [];
+    }
+
+    /**
      * @return bool
      */
     public function isApiOnlyStore(): bool
@@ -1592,6 +1634,17 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
      * @return array<int, array{website: string, mode: string}>
      */
     public function getSharedAccountModes(): array
+    {
+        return [];
+    }
+
+    /**
+     * No website keeps Contacts settings of its own that ask for consent
+     * (CON-470).
+     *
+     * @return list<array{name: string, enabled: bool, mode: string}>
+     */
+    public function getDifferingContactWebsites(): array
     {
         return [];
     }
@@ -1832,17 +1885,67 @@ $pages['settings-website'] = [
 ];
 
 // One store on one Smaily account (CON-470): Settings is store-wide, as the
-// initial setup is, and shows the values for all websites only.
+// initial setup is, and shows the values for all websites only, with a
+// storefront address per website; Latvia keeps its own Contacts settings,
+// which sync another mode, until the merchant confirms.
 $pages['settings-one-store'] = [
     'template' => $root . '/view/adminhtml/templates/settings/index.phtml',
-    'viewModel' => $websitesViewModel(true),
+    'viewModel' => new class ($websitesViewModel(true)) {
+        /**
+         * @param object $inner
+         */
+        public function __construct(private readonly object $inner)
+        {
+        }
+
+        /**
+         * @param string $name
+         * @param array<int, mixed> $arguments
+         * @return mixed
+         */
+        public function __call(string $name, array $arguments): mixed
+        {
+            return $this->inner->$name(...$arguments);
+        }
+
+        /**
+         * @return array<int, array{name: string, url: string}>
+         */
+        public function getWebsiteStorefrontUrls(): array
+        {
+            return [
+                1 => ['name' => 'Estonia', 'url' => ''],
+                2 => ['name' => 'Latvia', 'url' => 'https://lv.example.com'],
+                3 => ['name' => 'Lithuania', 'url' => ''],
+            ];
+        }
+
+        /**
+         * @return list<array{name: string, enabled: bool, mode: string}>
+         */
+        public function getDifferingContactWebsites(): array
+        {
+            return [
+                ['name' => 'Latvia', 'enabled' => true, 'mode' => 'legitimate_interest'],
+                ['name' => 'Lithuania', 'enabled' => false, 'mode' => 'consent'],
+            ];
+        }
+    },
     'data' => ['context' => 'settings', 'children' => [
         'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
         'panel.transactional.account' => $root . '/view/adminhtml/templates/panel/transactional-account.phtml',
         'panel.subscribers' => $root . '/view/adminhtml/templates/panel/subscribers.phtml',
         'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
     ]],
-    'strings' => array_merge($websitesStrings, $transactionalStrings),
+    'strings' => array_merge($websitesStrings, $transactionalStrings, [
+        'Some websites still use their own contact settings',
+        'These websites sync contacts by settings that differ from the ones on this tab, and keep them until you'
+            . ' confirm that every website uses the settings on this tab:',
+        'Use the same contact settings on every website',
+        'Contact sync is off',
+        'All customers (legitimate interest)',
+        'Each website keeps its own storefront address.',
+    ]),
 ];
 
 $pages['settings-own-account'] = [

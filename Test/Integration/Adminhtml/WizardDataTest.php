@@ -33,6 +33,7 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory as M
 use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\ViewModel\Adminhtml\WizardData;
+use Smaily\Connect\Model\Adminhtml\WebsiteContacts;
 
 /**
  * PRO-1462 (docs/internal/RFC_MULTI_WEBSITE.md §6, Phase 3): the Automations tab's prefill
@@ -80,7 +81,8 @@ class WizardDataTest extends IntegrationTestCase
             $this->createMock(SharedAccountModes::class),
             $this->objectManager->create(Router::class, [
                 'overrides' => $this->createMock(WebsiteOverrides::class),
-            ])
+            ]),
+            $this->createMock(WebsiteContacts::class)
         );
     }
 

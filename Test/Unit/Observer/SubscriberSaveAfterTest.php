@@ -25,6 +25,7 @@ use Smaily\Connect\Model\ContactSync\ReconcileGuard;
 use Smaily\Connect\Model\ContactSync\StorefrontSubscription;
 use Smaily\Connect\Model\ContactSync\SubscriberPayloadBuilder;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
+use Smaily\Connect\Model\ContactSync\UnconnectedSignup;
 use Smaily\Connect\Model\WebsiteConnections;
 use Smaily\Connect\Observer\SubscriberSaveAfter;
 
@@ -300,7 +301,9 @@ class SubscriberSaveAfterTest extends TestCase
 
     /**
      * CON-470: a store with no website connected (not set up yet) records
-     * nothing, and neither does a save that does not change the status.
+     * nothing, nor does a website whose contact sync would not be active once
+     * connected, a save that does not change the status, or a newsletter-form
+     * signup in the checkout-opt-in-only mode, which would not sync.
      */
     public function testAWebsiteWithoutAConnectionRecordsNothingElse(): void
     {
@@ -308,6 +311,10 @@ class SubscriberSaveAfterTest extends TestCase
         $this->dispatcher->expects(self::never())->method('dispatchContactSync');
 
         $this->observer('frontend', null, SyncMode::MODE_CONSENT, true, false, [])
+            ->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED));
+        $this->observer('frontend', null, SyncMode::MODE_CONSENT, false, false, [1 => 'Second'])
+            ->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED));
+        $this->observer('frontend', null, SyncMode::MODE_CHECKOUT_OPTIN, true, false, [1 => 'Second'])
             ->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED));
         $this->observer('frontend', null, SyncMode::MODE_CONSENT, true, false, [1 => 'Second'])
             ->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED, Subscriber::STATUS_SUBSCRIBED));
@@ -351,7 +358,11 @@ class SubscriberSaveAfterTest extends TestCase
             $this->createMock(CustomerRepositoryInterface::class),
             $state,
             $storefrontSubscription ?? new StorefrontSubscription(),
-            $this->createConfiguredMock(WebsiteConnections::class, ['unconnectedWebsites' => $unconnected])
+            new UnconnectedSignup(
+                $config,
+                $this->createConfiguredMock(WebsiteConnections::class, ['unconnectedWebsites' => $unconnected]),
+                $this->dispatcher
+            )
         );
     }
 

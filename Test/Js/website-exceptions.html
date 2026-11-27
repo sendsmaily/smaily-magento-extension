@@ -43,6 +43,11 @@
   all websites only — no website drop-down, no "Use its own …" switch, no
   separate transactional account for a website, no per-language Smaily
   accounts — and its saves post no switch, so they apply to every website.
+  The one exception is the storefront address: a field per website, named
+  by the website, posted per website. The Contacts tab lists the websites
+  whose own Contacts settings sync otherwise, with their mode (or sync
+  off), in place of the shared-account warning, and "Use the same contact
+  settings on every website" saves the tab with the confirmation.
 
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
@@ -367,11 +372,40 @@
         check(locale + ', one store: per-language Smaily accounts are not offered, and the note says where they are set',
             !doc.querySelector('input[name=smaily-w-mlmode][value=a]')
             && doc.body.textContent.replace(/\s+/g, ' ').indexOf(strings[PER_LANGUAGE]) !== -1);
+        var storefronts = doc.querySelectorAll('.smaily-w-storefront-website');
+        check(locale + ', one store: a storefront address per website, named by the website',
+            !doc.getElementById('smaily-w-storefront-url') && storefronts.length === 3
+            && Array.prototype.map.call(storefronts, function (input) {
+                return text(doc.querySelector('label[for="' + input.id + '"]')) + '=' + input.value;
+            }).join('|') === 'Estonia=|Latvia=https://lv.example.com|Lithuania='
+            && doc.body.textContent.indexOf(strings['Each website keeps its own storefront address.']) !== -1);
+        doc.getElementById('smaily-w-storefront-url-1').value = 'https://ee.example.com';
+        doc.getElementById('smaily-w-connection-save').click();
+        await wait(100);
+        data = lastSave(frame, 'connect');
+        check(locale + ', one store: the Connection save posts each website\'s storefront address',
+            !!data && !('storefront_url' in data) && JSON.stringify(data.storefront_urls)
+                === JSON.stringify({1: 'https://ee.example.com', 2: 'https://lv.example.com', 3: ''}));
+
+        var notice = doc.getElementById('smaily-w-website-contacts');
+        check(locale + ', one store: the Contacts tab lists the websites that sync otherwise, with their mode',
+            !!notice
+            && text(notice.querySelector('.smaily-banner__title')) === strings['Some websites still use their own contact settings']
+            && Array.prototype.map.call(notice.querySelectorAll('li'), text).join('|')
+                === 'Latvia — ' + strings['All customers (legitimate interest)']
+                + '|Lithuania — ' + strings['Contact sync is off']
+            && !doc.getElementById('smaily-w-shared-account-modes'));
         doc.querySelector('.smaily-tabs li[data-tab=subscribers]').click();
         doc.getElementById('smaily-w-subscribers-save').click();
         await wait(100);
         data = lastSave(frame, 'subscribers');
-        check(locale + ', one store: the Contacts save posts no switch', !!data && !('own' in data));
+        check(locale + ', one store: the Contacts save posts no switch and no confirmation',
+            !!data && !('own' in data) && !('use_everywhere' in data));
+        doc.getElementById('smaily-w-contacts-everywhere').click();
+        await wait(100);
+        data = lastSave(frame, 'subscribers');
+        check(locale + ', one store: "' + strings['Use the same contact settings on every website']
+            + '" saves the tab with the confirmation', !!data && data.use_everywhere === true);
         frame.remove();
     }
 

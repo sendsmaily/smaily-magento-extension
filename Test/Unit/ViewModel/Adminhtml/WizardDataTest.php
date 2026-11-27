@@ -31,6 +31,7 @@ use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\OrderOrigin;
 use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory as MappingCollectionFactory;
 use Smaily\Connect\ViewModel\Adminhtml\WizardData;
+use Smaily\Connect\Model\Adminhtml\WebsiteContacts;
 
 /**
  * PRO-1461 (docs/internal/RFC_MULTI_WEBSITE.md §2, Phase 2): every prefill path the
@@ -118,7 +119,8 @@ class WizardDataTest extends TestCase
             $this->createMock(StoreDate::class),
             $this->storeLayout,
             $this->createMock(SharedAccountModes::class),
-            $this->createMock(Router::class)
+            $this->createMock(Router::class),
+            $this->createMock(WebsiteContacts::class)
         );
     }
 

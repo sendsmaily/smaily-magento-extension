@@ -29,7 +29,10 @@ use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
 use Psr\Log\LoggerInterface;
+use Magento\Framework\App\ResourceConnection;
+use Smaily\Connect\Model\Adminhtml\WebsiteContacts;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
+use Smaily\Connect\Model\ContactSync\UnconnectedSignup;
 use Smaily\Connect\Model\Adminhtml\WizardStepSaver;
 use Smaily\Connect\Model\Automation\Router;
 use Smaily\Connect\Model\Automation\Trigger;
@@ -47,7 +50,15 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\WebsiteConnections;
+use Smaily\Connect\Observer\CustomerSaveAfter;
+use Smaily\Connect\Observer\OrderPlaced;
 use Smaily\Connect\Observer\SubscriberSaveAfter;
+use Smaily\Connect\Model\AbandonedCart\ReminderConsent;
+use Smaily\Connect\Model\AbandonedCart\StateManager;
+use Magento\Customer\Api\Data\CustomerInterface;
+use Magento\Newsletter\Model\SubscriberFactory;
+use Magento\Sales\Api\Data\OrderInterface;
+use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Smaily\Connect\Setup\Patch\Data\ShareSingleWebsiteSettings;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
@@ -74,6 +85,9 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
     /** The setup's mark an initial setup on 3.0.0-rc1 to rc12 left on its website. */
     private const SET_UP = [self::MAIN, WizardStepSaver::XML_PATH_SETUP_COMPLETED, '1'];
 
+    /** Its storefront address, which stays the website's own. */
+    private const STOREFRONT = [self::MAIN, Config::XML_PATH_STOREFRONT_URL, 'https://shop.example.com'];
+
     /** @var array<int, array{0: string, 1: array<string, mixed>}> the patch's log lines */
     private array $logged = [];
 
@@ -92,8 +106,8 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
         $this->runPatch();
 
         // Every row moved as stored, the password still encrypted; the
-        // setup's mark stays.
-        self::assertSame([self::SET_UP], $this->websiteRows(), 'No website holds values of its own');
+        // storefront address and the setup's mark stay.
+        self::assertSame([self::STOREFRONT, self::SET_UP], $this->websiteRows(), 'Nothing else of its own');
         self::assertSame([
             Config::XML_PATH_ABANDONED_ENABLED => '0',
             Config::XML_PATH_WELCOME_ENABLED => '1',
@@ -156,14 +170,16 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
         $this->runPatch();
 
         self::assertSame($rows, $this->defaultRows());
-        self::assertSame([self::SET_UP], $this->websiteRows());
+        self::assertSame([self::STOREFRONT, self::SET_UP], $this->websiteRows());
         self::assertSame([], $this->logged);
     }
 
     /**
      * A section the default scope already holds (here the Contacts
-     * settings, saved for all websites by a later setup) stays as it is,
-     * and so does the website's own value of it; the other sections move.
+     * settings, saved for all websites by a later setup) does not move; the
+     * other sections do. The website's own Contacts settings sync another
+     * mode than the ones for all websites, so they stay until the merchant
+     * confirms (WebsiteContacts).
      */
     public function testASectionTheDefaultScopeHoldsStaysAsItIs(): void
     {
@@ -173,6 +189,7 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
         $this->runPatch();
 
         self::assertSame([
+            [Config::XML_PATH_STOREFRONT_URL, 'https://shop.example.com'],
             [Config::XML_PATH_CONTACTS_CONFIRMED, '1'],
             [WizardStepSaver::XML_PATH_SETUP_COMPLETED, '1'],
             [Config::XML_PATH_SYNC_ENABLED, '1'],
@@ -270,6 +287,12 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
     {
         $this->seedWebsite(self::MAIN, $this->encrypt('secret'));
 
+        // Its Contacts settings never saved: contact sync would not be
+        // active once connected, so nothing is recorded, as before.
+        $this->observer()->execute($this->signup(self::SECOND, 'second@example.com'));
+        self::assertSame([], $this->fetchAll(EventResource::TABLE_NAME));
+
+        $this->seed('default', 0, [Config::XML_PATH_CONTACTS_CONFIRMED => '1']);
         $this->observer()->execute($this->signup(self::SECOND, 'second@example.com'));
 
         $rows = $this->fetchAll(EventResource::TABLE_NAME);
@@ -291,6 +314,178 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
     }
 
     /**
+     * A store with a Smaily account for all websites: the settings for all
+     * websites win. Second's own login of the same account and its own
+     * workflow go; Main's own Contacts settings differ in nothing of who is
+     * synced and go too; Second's own Contacts settings sync another mode,
+     * so they stay until the merchant confirms on Settings > Contacts.
+     * Second's storefront address stays its own.
+     */
+    public function testTheSettingsForAllWebsitesWinExceptContactsThatAskForConsent(): void
+    {
+        $this->seed('default', 0, [
+            WizardStepSaver::XML_PATH_SETUP_COMPLETED => '1',
+            Config::XML_PATH_SUBDOMAIN => 'shop',
+            Config::XML_PATH_USERNAME => 'api-user',
+            Config::XML_PATH_PASSWORD => $this->encrypt('secret'),
+            Config::XML_PATH_SYNC_ENABLED => '1',
+            Config::XML_PATH_SYNC_MODE => 'consent',
+            Config::XML_PATH_CONTACTS_CONFIRMED => '1',
+            Config::XML_PATH_WELCOME_ENABLED => '1',
+            Config::XML_PATH_WELCOME_WORKFLOW => '9',
+        ]);
+        $this->seed('websites', self::MAIN, [
+            Config::XML_PATH_SYNC_MODE => 'consent',
+            Config::XML_PATH_SYNC_FIELDS => 'first_name',
+        ]);
+        $this->seed('websites', self::SECOND, [
+            Config::XML_PATH_USERNAME => 'api-user',
+            Config::XML_PATH_PASSWORD => $this->encrypt('stale'),
+            Config::XML_PATH_STOREFRONT_URL => 'https://second.example.com',
+            Config::XML_PATH_WELCOME_WORKFLOW => '5',
+            Config::XML_PATH_SYNC_MODE => 'legitimate_interest',
+        ]);
+        $this->connection->insert(MappingResource::TABLE_NAME, [
+            'website_id' => self::SECOND,
+            'trigger_type' => Trigger::WELCOME,
+            'language' => 'et',
+            'account_key' => 'default',
+            'workflow_id' => 5,
+            'is_default_fallback' => 0,
+        ]);
+
+        $this->runPatch();
+
+        self::assertSame([
+            [self::SECOND, Config::XML_PATH_STOREFRONT_URL, 'https://second.example.com'],
+            [self::SECOND, Config::XML_PATH_SYNC_MODE, 'legitimate_interest'],
+        ], $this->websiteRows());
+        self::assertSame([], $this->mappingRows());
+        self::assertSame('secret', $this->config()->getPassword(self::SECOND));
+        self::assertSame(
+            [
+                ['connection', self::SECOND, [Config::XML_PATH_USERNAME, Config::XML_PATH_PASSWORD]],
+                ['automations', self::SECOND, [Config::XML_PATH_WELCOME_WORKFLOW, MappingResource::TABLE_NAME]],
+                ['subscribers', self::MAIN, [Config::XML_PATH_SYNC_MODE, Config::XML_PATH_SYNC_FIELDS]],
+            ],
+            array_map(
+                static fn (array $line): array => [
+                    $line[1]['section'],
+                    $line[1]['website_id'],
+                    $line[1]['paths'],
+                ],
+                $this->logged
+            )
+        );
+        foreach ($this->logged as [, $context]) {
+            self::assertStringNotContainsString('legitimate_interest', json_encode($context, JSON_THROW_ON_ERROR));
+        }
+    }
+
+    /**
+     * A store view on another Smaily account puts the store on two
+     * accounts: the upgrade moves nothing, and its website is not called
+     * unconnected.
+     */
+    public function testAStoreViewOnAnotherSmailyAccountKeepsTheStoreAsItIs(): void
+    {
+        $this->seedWebsite(self::MAIN, $this->encrypt('secret'));
+        $this->seed('stores', self::SECOND, [
+            Config::XML_PATH_SUBDOMAIN => 'other-shop',
+            Config::XML_PATH_USERNAME => 'other-user',
+            Config::XML_PATH_PASSWORD => $this->encrypt('other'),
+        ]);
+        $before = [$this->defaultRows(), $this->websiteRows(), $this->mappingRows()];
+
+        $layout = $this->runPatch();
+
+        self::assertSame($before, [$this->defaultRows(), $this->websiteRows(), $this->mappingRows()]);
+        self::assertTrue($layout->mixesAccounts());
+        self::assertSame([], (new WebsiteConnections($this->config(), $this->storeManager()))->unconnectedWebsites());
+    }
+
+    /**
+     * Every channel that syncs a contact records the contact as skipped on a
+     * website without a Smaily connection: a customer account save, the
+     * checkout opt-in (as a subscription) and a guest order under All
+     * customers (legitimate interest), each with what it would have sent.
+     */
+    public function testEverySignupChannelOnAWebsiteWithoutAConnectionIsRecordedAsSkipped(): void
+    {
+        $this->seedWebsite(self::MAIN, $this->encrypt('secret'));
+        $this->seed('default', 0, [
+            Config::XML_PATH_CONTACTS_CONFIRMED => '1',
+            Config::XML_PATH_SYNC_MODE => 'legitimate_interest',
+            Config::XML_PATH_INCLUDE_GUESTS => '1',
+            Config::XML_PATH_SYNC_FIELDS => '',
+        ]);
+        $config = $this->config();
+        $dispatcher = $this->dispatcher();
+
+        $customer = $this->createMock(CustomerInterface::class);
+        $customer->method('getId')->willReturn(5);
+        $customer->method('getStoreId')->willReturn(self::SECOND);
+        $customer->method('getWebsiteId')->willReturn(self::SECOND);
+        $customer->method('getEmail')->willReturn('account@example.com');
+        $subscriber = $this->createMock(Subscriber::class);
+        $subscriber->method('loadByCustomer')->willReturnSelf();
+        $subscriberFactory = $this->createMock(SubscriberFactory::class);
+        $subscriberFactory->method('create')->willReturn($subscriber);
+        (new CustomerSaveAfter(
+            $config,
+            new Mode($config),
+            new ReconcileGuard(),
+            $dispatcher,
+            $subscriberFactory,
+            $this->unconnectedSignup($dispatcher)
+        ))->execute(new Observer(['event' => new Event(['customer_data_object' => $customer])]));
+
+        $orderPlaced = function (string $email, bool $optedIn, bool $guest) use ($config, $dispatcher): void {
+            $state = $this->createMock(StateManager::class);
+            $state->method('rowForQuote')->willReturn(['status' => '', 'newsletter_optin' => $optedIn]);
+            $order = $this->createMock(OrderInterface::class);
+            $order->method('getQuoteId')->willReturn(7);
+            $order->method('getStoreId')->willReturn(self::SECOND);
+            $order->method('getCustomerEmail')->willReturn($email);
+            $order->method('getCustomerIsGuest')->willReturn($guest);
+            (new OrderPlaced(
+                $config,
+                new Mode($config),
+                $dispatcher,
+                $state,
+                $this->createMock(OrderCollectionFactory::class),
+                $this->storeManager(),
+                $this->createMock(SubscriptionManagerInterface::class),
+                new StorefrontSubscription(),
+                $this->createMock(ReminderConsent::class),
+                $this->unconnectedSignup($dispatcher)
+            ))->execute(new Observer(['event' => new Event(['order' => $order])]));
+        };
+        $orderPlaced('optin@example.com', true, false);
+        $orderPlaced('guest@example.com', false, true);
+
+        $rows = $this->fetchAll(EventResource::TABLE_NAME);
+        self::assertSame(
+            [
+                ['account@example.com', null],
+                ['optin@example.com', 0],
+                ['guest@example.com', null],
+            ],
+            array_map(static function (array $row): array {
+                $contact = json_decode((string)$row['payload'], true)['contact'];
+
+                return [$contact['email'], $contact['is_unsubscribed'] ?? null];
+            }, $rows)
+        );
+        foreach ($rows as $row) {
+            self::assertSame(EventType::CONTACT_SYNC, $row['event_type']);
+            self::assertSame(self::SECOND, (int)$row['website_id']);
+            self::assertSame('sent', $row['status']);
+            self::assertSame(WebsiteConnections::SKIPPED_NOT_CONNECTED, $row['last_error']);
+        }
+    }
+
+    /**
      * Website MAIN as an initial setup on 3.0.0-rc1 to rc12 left it: its
      * own Smaily account (mode b), Contacts settings with the mark that
      * they were saved, automations with a per-language row, and the mark
@@ -300,6 +495,7 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
     {
         $this->seed('websites', $websiteId, [
             WizardStepSaver::XML_PATH_SETUP_COMPLETED => '1',
+            Config::XML_PATH_STOREFRONT_URL => 'https://shop.example.com',
             Config::XML_PATH_SUBDOMAIN => 'shop',
             Config::XML_PATH_USERNAME => 'api-user',
             Config::XML_PATH_PASSWORD => $encryptedPassword,
@@ -328,7 +524,17 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
         $logger->method('info')->willReturnCallback(function (string $message, array $context = []): void {
             $this->logged[] = [$message, $context];
         });
-        (new ShareSingleWebsiteSettings($layout, $logger))->apply();
+        $overrides = $this->objectManager->create(WebsiteOverrides::class, ['storeManager' => $this->storeManager()]);
+        (new ShareSingleWebsiteSettings(
+            $layout,
+            $overrides,
+            new WebsiteContacts(
+                $this->objectManager->get(ResourceConnection::class),
+                $this->scopeConfig(),
+                $overrides
+            ),
+            $logger
+        ))->apply();
 
         return $layout;
     }
@@ -350,22 +556,46 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
         $appState = $this->createMock(State::class);
         $appState->method('getAreaCode')->willReturn('frontend');
 
+        $dispatcher = $this->dispatcher();
+
         return new SubscriberSaveAfter(
             $config,
             new Mode($config),
             new ReconcileGuard(),
-            new SyncDispatcher(
-                $payloadBuilder,
-                $this->createMock(LanguageResolver::class),
-                $storeManager,
-                $this->objectManager->create(EventQueue::class),
-                $this->objectManager->create(ContactEntity::class)
-            ),
+            $dispatcher,
             $payloadBuilder,
             $this->createMock(CustomerRepositoryInterface::class),
             $appState,
             new StorefrontSubscription(),
-            new WebsiteConnections($config, $storeManager)
+            $this->unconnectedSignup($dispatcher)
+        );
+    }
+
+    /**
+     * The contact syncs and their Log rows, on the real queue.
+     */
+    private function dispatcher(): SyncDispatcher
+    {
+        return new SyncDispatcher(
+            new SubscriberPayloadBuilder(
+                $this->config(),
+                $this->storeManager(),
+                $this->createMock(LanguageResolver::class),
+                $this->createMock(GroupRepositoryInterface::class)
+            ),
+            $this->createMock(LanguageResolver::class),
+            $this->storeManager(),
+            $this->objectManager->create(EventQueue::class),
+            $this->objectManager->create(ContactEntity::class)
+        );
+    }
+
+    private function unconnectedSignup(SyncDispatcher $dispatcher): UnconnectedSignup
+    {
+        return new UnconnectedSignup(
+            $this->config(),
+            new WebsiteConnections($this->config(), $this->storeManager()),
+            $dispatcher
         );
     }
 
@@ -403,12 +633,12 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
      */
     private function config(): Config
     {
-        return $this->objectManager->create(Config::class, [
-            'scopeConfig' => new DatabaseScopeConfig(
-                $this->connection,
-                [self::MAIN => self::MAIN, self::SECOND => self::SECOND]
-            ),
-        ]);
+        return $this->objectManager->create(Config::class, ['scopeConfig' => $this->scopeConfig()]);
+    }
+
+    private function scopeConfig(): DatabaseScopeConfig
+    {
+        return new DatabaseScopeConfig($this->connection, [self::MAIN => self::MAIN, self::SECOND => self::SECOND]);
     }
 
     /**

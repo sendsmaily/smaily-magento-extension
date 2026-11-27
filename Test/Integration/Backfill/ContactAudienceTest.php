@@ -36,6 +36,7 @@ use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
 use Smaily\Connect\ViewModel\Adminhtml\WizardData;
+use Smaily\Connect\Model\Adminhtml\WebsiteContacts;
 
 /**
  * PRO-3582: the contact import sends the audience the live sync covers under
@@ -149,7 +150,8 @@ class ContactAudienceTest extends IntegrationTestCase
             $this->createMock(StoreDate::class),
             $this->createMock(StoreLayout::class),
             $this->createMock(SharedAccountModes::class),
-            $this->createMock(Router::class)
+            $this->createMock(Router::class),
+            $this->createMock(WebsiteContacts::class)
         );
 
         $walked = [];

@@ -37,6 +37,7 @@ use Smaily\Connect\Model\SubdomainNormalizer;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
 use Smaily\Connect\Test\Integration\Support\Fake\RequestCachedScopeConfig;
+use Smaily\Connect\Model\Adminhtml\WebsiteContacts;
 
 /**
  * CON-396: a workflow belongs to the Smaily account it was picked from. A
@@ -126,7 +127,8 @@ class WorkflowsAfterAccountChangeTest extends IntegrationTestCase
             $this->createMock(SetupNotice::class),
             $this->createMock(TransactionalSettingsSaver::class),
             $overrides,
-            $this->createMock(StoreLayout::class)
+            $this->createMock(StoreLayout::class),
+            $this->createMock(WebsiteContacts::class)
         );
         $this->router = $this->objectManager->create(Router::class, [
             'config' => $this->config,

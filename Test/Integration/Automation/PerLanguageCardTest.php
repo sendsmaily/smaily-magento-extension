@@ -35,6 +35,7 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping\CollectionFactory as M
 use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\ViewModel\Adminhtml\WizardData;
+use Smaily\Connect\Model\Adminhtml\WebsiteContacts;
 
 /**
  * CON-461: in a per-language mode each store-event automation is one card
@@ -95,7 +96,8 @@ class PerLanguageCardTest extends IntegrationTestCase
             $this->createMock(StoreDate::class),
             $this->createMock(StoreLayout::class),
             $this->createMock(SharedAccountModes::class),
-            $this->router
+            $this->router,
+            $this->createMock(WebsiteContacts::class)
         );
     }
 

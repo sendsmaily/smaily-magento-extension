@@ -28,6 +28,7 @@ use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\ContactSync\StorefrontSubscription;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
 use Smaily\Connect\Observer\OrderPlaced;
+use Smaily\Connect\Model\ContactSync\UnconnectedSignup;
 
 /**
  * PRO-3580: the checkout opt-in is a subscription the shopper made on the
@@ -347,7 +348,8 @@ class OrderPlacedTest extends TestCase
             $storeManager,
             $this->createMock(SubscriptionManagerInterface::class),
             new StorefrontSubscription(),
-            $consent
+            $consent,
+            $this->createMock(UnconnectedSignup::class)
         );
     }
 
@@ -384,7 +386,8 @@ class OrderPlacedTest extends TestCase
             $this->createMock(StoreManagerInterface::class),
             $subscriptionManager,
             $storefrontSubscription,
-            $this->createMock(ReminderConsent::class)
+            $this->createMock(ReminderConsent::class),
+            $this->createMock(UnconnectedSignup::class)
         );
     }
 

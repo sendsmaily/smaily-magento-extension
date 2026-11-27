@@ -115,23 +115,33 @@ class DashboardDataTest extends IntegrationTestCase
     }
 
     /**
-     * CON-470: the Dashboard names the websites without a Smaily connection
-     * while another website has one, and says when websites run as one store
-     * use different Smaily accounts.
+     * CON-470: the Dashboard of one store names the websites without a
+     * Smaily connection while another website has one — never under
+     * separate stores — and says when websites run as one store use
+     * different Smaily accounts.
      */
     public function testTheDashboardWarnsOfAWebsiteWithoutAConnectionAndOfDifferentAccounts(): void
     {
+        $this->connection->delete('core_config_data', ['scope = ?' => 'websites', 'scope_id = ?' => self::SECOND]);
         $dashboard = $this->dashboard(null);
         self::assertSame([], $dashboard->getUnconnectedWebsites(), 'No website connected: nothing set up yet');
-        self::assertFalse($dashboard->isMixedAccounts(), 'No account for all websites: separate stores');
+        self::assertFalse($dashboard->isMixedAccounts());
 
         $this->insertRow('websites', self::MAIN, Config::XML_PATH_USERNAME, 'api-user');
         $this->insertRow('websites', self::MAIN, Config::XML_PATH_PASSWORD, 'encrypted');
         self::assertSame(['Website ' . self::SECOND], $this->dashboard(null)->getUnconnectedWebsites());
 
-        $this->insertRow('default', 0, Config::XML_PATH_SUBDOMAIN, 'main-shop');
-        $this->insertRow('default', 0, Config::XML_PATH_USERNAME, 'api-user');
-        self::assertTrue($this->dashboard(null)->isMixedAccounts(), 'Second uses another Smaily account');
+        $this->insertRow('default', 0, StoreLayout::XML_PATH_SEPARATE_STORES, '1');
+        self::assertSame([], $this->dashboard(null)->getUnconnectedWebsites(), 'Separate stores: never');
+        $this->connection->delete('core_config_data', ['path = ?' => StoreLayout::XML_PATH_SEPARATE_STORES]);
+
+        // A store view of Second on an account of its own connects Second,
+        // and puts the websites on two accounts.
+        $this->insertRow('stores', self::SECOND, Config::XML_PATH_SUBDOMAIN, 'second-shop');
+        $this->insertRow('stores', self::SECOND, Config::XML_PATH_USERNAME, 'api-second');
+        $this->insertRow('stores', self::SECOND, Config::XML_PATH_PASSWORD, 'encrypted');
+        self::assertSame([], $this->dashboard(null)->getUnconnectedWebsites());
+        self::assertTrue($this->dashboard(null)->isMixedAccounts(), 'Second\'s store view uses another account');
     }
 
     /**

@@ -12,6 +12,7 @@ use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Store\Api\Data\GroupInterface;
@@ -53,6 +54,9 @@ class ConnectionsTest extends TestCase
 
     private ClientFactory&MockObject $clientFactory;
 
+    /** The store view of the request (StoreManagerInterface::getStore()); null: it cannot be read. */
+    private ?int $currentStoreId = 1;
+
     protected function setUp(): void
     {
         $this->rows = [];
@@ -87,6 +91,35 @@ class ConnectionsTest extends TestCase
         self::assertSame($primary, $connections->forKey(0));
         self::assertNull($connections->forKey(2), 'A website connection left over is not served under one store');
         self::assertSame([], $this->scopedReads, 'One store reads no website scope');
+    }
+
+    /**
+     * CON-237 step 4: the storefront's connection is the one serving the
+     * store view of the request; under one store the primary, whatever the
+     * store view.
+     */
+    public function testTheCurrentConnectionServesTheStoreViewOfTheRequest(): void
+    {
+        $this->connectPrimary('shop');
+        $this->account('websites', 1, 'shop');
+        $this->account('websites', 2, 'shop-lv');
+        $this->account('websites', 3, 'shop-fi');
+        $this->websiteConnection(2, 'shop-lv');
+
+        $this->currentStoreId = null;
+        $oneStore = $this->connections(false);
+        self::assertSame($oneStore->primary(), $oneStore->current(), 'One store does not ask for the store view');
+
+        $this->currentStoreId = 5;
+        $separate = $this->connections(true);
+        self::assertSame($separate->forKey(2), $separate->current());
+        $this->currentStoreId = 2;
+        $separate = $this->connections(true);
+        self::assertSame($separate->primary(), $separate->current());
+        $this->currentStoreId = 6;
+        self::assertNull($this->connections(true)->current(), 'A website no connection serves');
+        $this->currentStoreId = null;
+        self::assertNull($this->connections(true)->current(), 'No store view');
     }
 
     public function testANotConnectedPrimaryStillServesOneStore(): void
@@ -415,6 +448,11 @@ class ConnectionsTest extends TestCase
         $storeManager->method('getWebsites')->willReturn(array_values($websites));
         $storeManager->method('getStores')->willReturn(array_values($stores));
         $storeManager->method('getDefaultStoreView')->willReturn($stores[1]);
+        $storeManager->method('getStore')->willReturnCallback(
+            fn (): StoreInterface => $this->currentStoreId === null
+                ? throw new NoSuchEntityException()
+                : $stores[$this->currentStoreId]
+        );
         $storeManager->method('getWebsite')->willReturnCallback(
             static fn (mixed $websiteId): WebsiteInterface => $websites[(int)$websiteId]
         );

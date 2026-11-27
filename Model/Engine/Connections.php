@@ -138,6 +138,27 @@ class Connections
     }
 
     /**
+     * The connection serving the store view of this request — the
+     * storefront's, a login's, a My Account page's — or null when none does
+     * (separate stores only). Under one store the primary, without asking
+     * for the store view.
+     */
+    public function current(): ?Connection
+    {
+        $this->load();
+        if (!$this->separate) {
+            return $this->primary();
+        }
+        try {
+            $storeId = (int)$this->storeManager->getStore()->getId();
+        } catch (LocalizedException) {
+            return null;
+        }
+
+        return $this->forStore($storeId);
+    }
+
+    /**
      * The connection a queue row is for: NULL (every row queued before
      * CON-237) is the primary's, any other value is the store view whose
      * website the connection serves.

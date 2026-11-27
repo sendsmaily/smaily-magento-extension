@@ -102,8 +102,14 @@ class SubscriberSaveAfter implements ObserverInterface
             return;
         }
 
+        // A website without a Smaily connection: only a sync the Log records
+        // (UnconnectedSignup) needs the customer.
+        $connected = $this->config->isConnected($storeId);
+        if (!$connected && !$this->unconnectedSignup->applies($storeId)) {
+            return;
+        }
         $customer = $this->loadCustomer((int)$subscriber->getCustomerId());
-        if (!$this->config->isConnected($storeId)) {
+        if (!$connected) {
             $this->unconnectedSignup->record($email, $storeId, $isUnsubscribed, $customer);
 
             return;

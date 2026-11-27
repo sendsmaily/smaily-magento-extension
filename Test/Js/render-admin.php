@@ -407,6 +407,29 @@ $intelligenceViewModel = static fn (
     }
 
     /**
+     * WizardData::showsSettingsForAllWebsites().
+     *
+     * @return bool
+     */
+    public function showsSettingsForAllWebsites(): bool
+    {
+        return $this->hasMultipleWebsites() && $this->isStoreWide();
+    }
+
+    /**
+     * WizardData::getStartingContactWebsites().
+     *
+     * @return string[]
+     */
+    public function getStartingContactWebsites(): array
+    {
+        return array_values(array_diff(
+            $this->getWebsiteNames(),
+            array_column($this->getDifferingContactWebsites(), 'name')
+        ));
+    }
+
+    /**
      * @param string $section
      * @return bool
      */
@@ -1002,6 +1025,16 @@ $transactionalViewModel = static fn (bool $connected): object => new class ($con
     }
 
     /**
+     * WizardData::showsSettingsForAllWebsites().
+     *
+     * @return bool
+     */
+    public function showsSettingsForAllWebsites(): bool
+    {
+        return $this->hasMultipleWebsites() && $this->isStoreWide();
+    }
+
+    /**
      * @return bool
      */
     public function isSeparateStores(): bool
@@ -1247,6 +1280,29 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
     public function isStoreWide(): bool
     {
         return $this->storeWide;
+    }
+
+    /**
+     * WizardData::showsSettingsForAllWebsites().
+     *
+     * @return bool
+     */
+    public function showsSettingsForAllWebsites(): bool
+    {
+        return $this->hasMultipleWebsites() && $this->isStoreWide();
+    }
+
+    /**
+     * WizardData::getStartingContactWebsites().
+     *
+     * @return string[]
+     */
+    public function getStartingContactWebsites(): array
+    {
+        return array_values(array_diff(
+            $this->getWebsiteNames(),
+            array_column($this->getDifferingContactWebsites(), 'name')
+        ));
     }
 
     /**
@@ -1921,6 +1977,16 @@ $pages['settings-one-store'] = [
         }
 
         /**
+         * Open: Latvia's storefront address is saved.
+         *
+         * @return bool
+         */
+        public function isStorefrontDisclosureOpen(): bool
+        {
+            return true;
+        }
+
+        /**
          * @return list<array{websiteId: int, name: string, enabled: bool, mode: string}>
          */
         public function getDifferingContactWebsites(): array
@@ -1929,6 +1995,16 @@ $pages['settings-one-store'] = [
                 ['websiteId' => 2, 'name' => 'Latvia', 'enabled' => true, 'mode' => 'legitimate_interest'],
                 ['websiteId' => 3, 'name' => 'Lithuania', 'enabled' => false, 'mode' => 'consent'],
             ];
+        }
+
+        /**
+         * Every website but those that keep their own Contacts settings.
+         *
+         * @return string[]
+         */
+        public function getStartingContactWebsites(): array
+        {
+            return ['Estonia'];
         }
     },
     'data' => ['context' => 'settings', 'children' => [
@@ -1976,6 +2052,16 @@ $pages['setup-one-store'] = [
         public function getWebsiteStorefrontUrls(): array
         {
             return [];
+        }
+
+        /**
+         * Closed: the store-wide storefront address is empty.
+         *
+         * @return bool
+         */
+        public function isStorefrontDisclosureOpen(): bool
+        {
+            return false;
         }
 
         /**

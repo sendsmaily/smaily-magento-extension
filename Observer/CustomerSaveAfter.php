@@ -60,6 +60,12 @@ class CustomerSaveAfter implements ObserverInterface
         if (!$this->config->isContactSyncActive($websiteId) || !$this->mode->syncsAccounts($websiteId)) {
             return;
         }
+        // A website without a Smaily connection: only a sync the Log records
+        // (UnconnectedSignup) needs the subscription read.
+        $connected = $this->config->isConnected($storeId ?: null);
+        if (!$connected && !$this->unconnectedSignup->applies($storeId)) {
+            return;
+        }
 
         $status = (int)$this->subscriberFactory->create()
             ->loadByCustomer((int)$customer->getId(), $websiteId)
@@ -68,7 +74,7 @@ class CustomerSaveAfter implements ObserverInterface
             return;
         }
 
-        if (!$this->config->isConnected($storeId ?: null)) {
+        if (!$connected) {
             $this->unconnectedSignup->record((string)$customer->getEmail(), $storeId, null, $customer);
 
             return;

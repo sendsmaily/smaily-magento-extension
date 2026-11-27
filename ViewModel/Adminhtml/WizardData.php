@@ -62,6 +62,9 @@ class WizardData implements ArgumentInterface
         Trigger::ABANDONED_CART => 'abandoned',
     ];
 
+    /** StoreLayout::sharesOneAccount() of this request (sharesOneAccount()). */
+    private ?bool $sharesOneAccount = null;
+
     public function __construct(
         private readonly Config $config,
         private readonly Mode $mode,
@@ -88,13 +91,20 @@ class WizardData implements ArgumentInterface
 
     /**
      * Whether the page shows the settings that the websites of one store on
-     * one Smaily account share (CON-470): store-wide, on a 2+-website install.
+     * one Smaily account share (CON-470, WebsiteContext::isSharedStoreWide()).
      */
     private function isSharedView(): bool
     {
-        return $this->websiteContext->isStoreWide()
-            && $this->websiteContext->hasMultipleWebsites()
-            && $this->storeLayout->sharesOneAccount();
+        return $this->websiteContext->isSharedStoreWide($this->sharesOneAccount());
+    }
+
+    /**
+     * StoreLayout::sharesOneAccount(), read once per request: rendering the
+     * page writes nothing.
+     */
+    private function sharesOneAccount(): bool
+    {
+        return $this->sharesOneAccount ??= $this->storeLayout->sharesOneAccount();
     }
 
     /**
@@ -140,6 +150,33 @@ class WizardData implements ArgumentInterface
         }
 
         return $websites;
+    }
+
+    /**
+     * The names of the websites a store-wide Contacts save starts contact
+     * sync on, in website order: every website except those
+     * getDifferingContactWebsites() lists, which keep their own Contacts
+     * settings (CON-470).
+     *
+     * @return string[]
+     */
+    public function getStartingContactWebsites(): array
+    {
+        return array_values(array_diff(
+            $this->getWebsiteNames(),
+            array_column($this->getDifferingContactWebsites(), 'name')
+        ));
+    }
+
+    /**
+     * Whether the page shows the values for all websites of a 2+-website
+     * install, with no website's own (CON-470): a store-wide page — on
+     * Settings, one store on one Smaily account, which Settings\Index marks
+     * store-wide, or a page called with `?website=0`.
+     */
+    public function showsSettingsForAllWebsites(): bool
+    {
+        return $this->websiteContext->hasMultipleWebsites() && $this->websiteContext->isStoreWide();
     }
 
     /**
@@ -334,7 +371,7 @@ class WizardData implements ArgumentInterface
     {
         if (!$this->websiteContext->isStoreWide()
             || !$this->websiteContext->hasMultipleWebsites()
-            || $this->isSharedView()
+            || $this->sharesOneAccount()
         ) {
             return [];
         }
@@ -595,10 +632,17 @@ class WizardData implements ArgumentInterface
 
     /**
      * Whether the "Using a separate storefront?" disclosure is drawn open: a
-     * storefront address is saved, or the store is API-only (PRO-3660).
+     * storefront address is saved — for one store on one Smaily account,
+     * any website's (CON-470, getWebsiteStorefrontUrls()) — or the store is
+     * API-only (PRO-3660).
      */
     public function isStorefrontDisclosureOpen(): bool
     {
+        $websiteUrls = $this->getWebsiteStorefrontUrls();
+        if ($websiteUrls !== []) {
+            return $this->isApiOnlyStore() || array_filter(array_column($websiteUrls, 'url')) !== [];
+        }
+
         return $this->getSavedStorefrontUrl() !== '' || $this->isApiOnlyStore();
     }
 

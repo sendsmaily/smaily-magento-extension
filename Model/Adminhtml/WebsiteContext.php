@@ -79,6 +79,17 @@ class WebsiteContext
     }
 
     /**
+     * Whether this request shows or saves the settings that the websites of
+     * one store on one Smaily account share (CON-470): a store-wide request
+     * where $sharesOneAccount (StoreLayout::sharesOneAccount(), which holds
+     * only on a 2+-website install).
+     */
+    public function isSharedStoreWide(bool $sharesOneAccount): bool
+    {
+        return $sharesOneAccount && $this->isStoreWide();
+    }
+
+    /**
      * Whether the current request explicitly named a (real) website, as
      * opposed to falling back to the installation's default one.
      */

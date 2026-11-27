@@ -1620,6 +1620,7 @@ class WizardStepSaverTest extends TestCase
         $this->onStoreWithWebsites(1, true);
         $this->withOwnValues([WebsiteOverrides::AUTOMATIONS => [2, 3]]);
         $this->overrides->method('usesOtherAccount')->willReturnCallback(static fn (int $id): bool => $id === 2);
+        $this->overrides->method('websitesOnOtherAccount')->willReturn([2]);
         $this->overrides->expects(self::once())->method('removeOwnValues')
             ->with(WebsiteOverrides::AUTOMATIONS, 3, true);
 

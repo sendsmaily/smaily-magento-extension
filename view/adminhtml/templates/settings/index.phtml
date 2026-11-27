@@ -58,7 +58,7 @@ $viewModel = $block->getData('view_model');
 $hasMultipleWebsites = $viewModel->hasMultipleWebsites();
 $separateStores = $hasMultipleWebsites && $viewModel->isSeparateStores();
 // One store on one Smaily account: the values for all websites, no website's own (CON-470).
-$sharedSettings = $hasMultipleWebsites && $viewModel->isStoreWide();
+$sharedSettings = $viewModel->showsSettingsForAllWebsites();
 $websiteOptions = $viewModel->getWebsiteOptions();
 $selectedWebsiteId = $viewModel->getSelectedWebsiteId();
 

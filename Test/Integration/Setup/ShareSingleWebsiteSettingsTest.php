@@ -201,46 +201,19 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
     }
 
     /**
-     * Websites on different Smaily accounts are not one store: every row
-     * stays, and the Dashboard says so (StoreLayout::mixesAccounts()).
-     */
-    public function testWebsitesOnDifferentSmailyAccountsStayAsTheyAre(): void
-    {
-        $this->seed('default', 0, [
-            WizardStepSaver::XML_PATH_SETUP_COMPLETED => '1',
-            Config::XML_PATH_SUBDOMAIN => 'shop',
-            Config::XML_PATH_USERNAME => 'api-user',
-            Config::XML_PATH_PASSWORD => $this->encrypt('secret'),
-        ]);
-        // Second's automations were picked from its own account: they never
-        // become the automations for all websites.
-        $this->seed('websites', self::SECOND, [
-            Config::XML_PATH_SUBDOMAIN => 'other-shop',
-            Config::XML_PATH_USERNAME => 'other-user',
-            Config::XML_PATH_PASSWORD => $this->encrypt('other'),
-            Config::XML_PATH_WELCOME_ENABLED => '1',
-            Config::XML_PATH_WELCOME_WORKFLOW => '9',
-        ]);
-        $before = [$this->defaultRows(), $this->websiteRows()];
-
-        $layout = $this->runPatch();
-
-        self::assertSame($before, [$this->defaultRows(), $this->websiteRows()]);
-        self::assertTrue($layout->mixesAccounts());
-        self::assertFalse($layout->sharesOneAccount());
-    }
-
-    /**
      * Separate stores, per-language Smaily accounts, two websites with
-     * values of their own, and a store whose initial setup is not finished
-     * (a 2.8.x upgrade, which the setup asks how its websites are run) stay
-     * as they are.
+     * values of their own, a store whose initial setup is not finished (a
+     * 2.8.x upgrade, which the setup asks how its websites are run), and
+     * websites or a store view on different Smaily accounts stay as they
+     * are. Different Smaily accounts are not one store: the Dashboard says
+     * so (StoreLayout::mixesAccounts()), and no website is called
+     * unconnected.
      *
      * @dataProvider untouchedStores
      *
      * @param array<int, array{0: string, 1: int, 2: string, 3: string}> $extraRows
      */
-    public function testOtherStoresStayAsTheyAre(array $extraRows): void
+    public function testOtherStoresStayAsTheyAre(array $extraRows, bool $mixesAccounts = false): void
     {
         $this->seedWebsite(self::MAIN, $this->encrypt('secret'));
         foreach ($extraRows as [$scope, $scopeId, $path, $value]) {
@@ -252,14 +225,21 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
         }
         $before = [$this->defaultRows(), $this->websiteRows(), $this->mappingRows()];
 
-        $this->runPatch();
+        $layout = $this->runPatch();
 
         self::assertSame($before, [$this->defaultRows(), $this->websiteRows(), $this->mappingRows()]);
         self::assertSame([], $this->logged);
+        self::assertSame($mixesAccounts, $layout->mixesAccounts());
+        if ($mixesAccounts) {
+            self::assertSame(
+                [],
+                (new WebsiteConnections($this->config(), $this->storeManager()))->unconnectedWebsites()
+            );
+        }
     }
 
     /**
-     * @return array<string, array{0: array<int, array{0: string, 1: int, 2: string, 3: string}>}>
+     * @return array<string, array{0: array<int, array{0: string, 1: int, 2: string, 3: string}>, 1?: bool}>
      */
     public static function untouchedStores(): array
     {
@@ -275,6 +255,23 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
             'the initial setup not finished' => [[
                 ['websites', self::MAIN, WizardStepSaver::XML_PATH_SETUP_COMPLETED, ''],
             ]],
+            // Second's automations were picked from its own account: they
+            // never become the automations for all websites.
+            'websites on different Smaily accounts' => [[
+                ['default', 0, Config::XML_PATH_SUBDOMAIN, 'shop'],
+                ['default', 0, Config::XML_PATH_USERNAME, 'api-user'],
+                ['default', 0, Config::XML_PATH_PASSWORD, 'encrypted'],
+                ['websites', self::SECOND, Config::XML_PATH_SUBDOMAIN, 'other-shop'],
+                ['websites', self::SECOND, Config::XML_PATH_USERNAME, 'other-user'],
+                ['websites', self::SECOND, Config::XML_PATH_PASSWORD, 'encrypted'],
+                ['websites', self::SECOND, Config::XML_PATH_WELCOME_ENABLED, '1'],
+                ['websites', self::SECOND, Config::XML_PATH_WELCOME_WORKFLOW, '9'],
+            ], true],
+            'a store view on another Smaily account' => [[
+                ['stores', self::SECOND, Config::XML_PATH_SUBDOMAIN, 'other-shop'],
+                ['stores', self::SECOND, Config::XML_PATH_USERNAME, 'other-user'],
+                ['stores', self::SECOND, Config::XML_PATH_PASSWORD, 'encrypted'],
+            ], true],
         ];
     }
 
@@ -523,28 +520,6 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
                 $this->logged
             )
         );
-    }
-
-    /**
-     * A store view on another Smaily account puts the store on two
-     * accounts: the upgrade moves nothing, and its website is not called
-     * unconnected.
-     */
-    public function testAStoreViewOnAnotherSmailyAccountKeepsTheStoreAsItIs(): void
-    {
-        $this->seedWebsite(self::MAIN, $this->encrypt('secret'));
-        $this->seed('stores', self::SECOND, [
-            Config::XML_PATH_SUBDOMAIN => 'other-shop',
-            Config::XML_PATH_USERNAME => 'other-user',
-            Config::XML_PATH_PASSWORD => $this->encrypt('other'),
-        ]);
-        $before = [$this->defaultRows(), $this->websiteRows(), $this->mappingRows()];
-
-        $layout = $this->runPatch();
-
-        self::assertSame($before, [$this->defaultRows(), $this->websiteRows(), $this->mappingRows()]);
-        self::assertTrue($layout->mixesAccounts());
-        self::assertSame([], (new WebsiteConnections($this->config(), $this->storeManager()))->unconnectedWebsites());
     }
 
     /**

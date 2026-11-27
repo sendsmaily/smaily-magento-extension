@@ -41,14 +41,6 @@ class WebsiteContacts
         Config::XML_PATH_CONTACTS_CONFIRMED,
     ];
 
-    /** The consent paths read as on/off. */
-    private const FLAGS = [
-        Config::XML_PATH_SYNC_ENABLED,
-        Config::XML_PATH_INCLUDE_GUESTS,
-        Config::XML_PATH_CHECKOUT_OPTIN_ENABLED,
-        Config::XML_PATH_CONTACTS_CONFIRMED,
-    ];
-
     public function __construct(
         private readonly ResourceConnection $resource,
         private readonly ScopeConfigInterface $scopeConfig,
@@ -80,14 +72,17 @@ class WebsiteContacts
 
     /**
      * The websites with own Contacts settings that differ from the settings
-     * for all websites in no consent path.
+     * for all websites in no consent path. $own: the websites' own Contacts
+     * settings (WebsiteOverrides::ownValues()) when the caller has read
+     * them already.
      *
+     * @param array<int, array<string, string>>|null $own
      * @return int[]
      */
-    public function identical(): array
+    public function identical(?array $own = null): array
     {
         $identical = [];
-        foreach ($this->compare() as $websiteId => [$differs]) {
+        foreach ($this->compare($own) as $websiteId => [$differs]) {
             if (!$differs) {
                 $identical[] = $websiteId;
             }
@@ -98,13 +93,14 @@ class WebsiteContacts
 
     /**
      * Each website with own Contacts settings: whether a consent path
-     * differs, and its effective consent values.
+     * differs, and its effective consent values; $own as in identical().
      *
+     * @param array<int, array<string, string>>|null $own
      * @return array<int, array{0: bool, 1: array<string, string>}>
      */
-    private function compare(): array
+    private function compare(?array $own = null): array
     {
-        $own = $this->overrides->ownValues(WebsiteOverrides::SUBSCRIBERS);
+        $own ??= $this->overrides->ownValues(WebsiteOverrides::SUBSCRIBERS);
         if ($own === []) {
             return [];
         }
@@ -132,9 +128,6 @@ class WebsiteContacts
 
         $compared = [];
         foreach ($own as $websiteId => $values) {
-            if ($websiteId === 0) {
-                continue;
-            }
             $values[Config::XML_PATH_CONTACTS_CONFIRMED] = $confirmed[$websiteId]
                 ?? $storeWide[Config::XML_PATH_CONTACTS_CONFIRMED];
             $effective = [];
@@ -149,8 +142,12 @@ class WebsiteContacts
         return $compared;
     }
 
+    /**
+     * A consent path's value as compared: the sync mode as text, every
+     * other consent path as on/off.
+     */
     private function normalize(string $path, string $value): string
     {
-        return in_array($path, self::FLAGS, true) ? ((bool)(int)$value ? '1' : '0') : trim($value);
+        return $path === Config::XML_PATH_SYNC_MODE ? trim($value) : ((bool)(int)$value ? '1' : '0');
     }
 }

@@ -240,31 +240,35 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
                 }
             }
             if (!$tried || $refusal === MergeCustomerSender::NO_ACCOUNT) {
-                $this->logger->debug(
-                    'Identity merge not linked, the store does not send the customer',
-                    ['id' => (int)$event->getId()]
-                );
-
-                return new Skipped(self::SKIPPED_NOT_SENT);
+                return $this->skip($event, 'the store does not send the customer', self::SKIPPED_NOT_SENT);
             }
             if ($refusal !== null) {
-                $this->logger->debug(
-                    'Identity merge not linked, Campaign Intelligence refused the customer',
-                    ['id' => (int)$event->getId()]
+                return $this->skip(
+                    $event,
+                    'Campaign Intelligence refused the customer',
+                    str_replace('%1', $refusal, self::SKIPPED_CUSTOMER_REFUSED)
                 );
-
-                return new Skipped(str_replace('%1', $refusal, self::SKIPPED_CUSTOMER_REFUSED));
             }
             if (!$retryLeft) {
-                $this->logger->debug(
-                    'Identity merge not linked, the customer was not found after it was sent',
-                    ['id' => (int)$event->getId()]
+                return $this->skip(
+                    $event,
+                    'the customer was not found after it was sent',
+                    self::SKIPPED_NOT_FOUND_AFTER_SEND
                 );
-
-                return new Skipped(self::SKIPPED_NOT_FOUND_AFTER_SEND);
             }
             $retryLeft = false;
         }
+    }
+
+    /**
+     * A merge that is not linked ends quietly: a debug line saying why
+     * ($debug), and the row skipped with $reason.
+     */
+    private function skip(Event $event, string $debug, string $reason): Skipped
+    {
+        $this->logger->debug('Identity merge not linked, ' . $debug, ['id' => (int)$event->getId()]);
+
+        return new Skipped($reason);
     }
 
     /**

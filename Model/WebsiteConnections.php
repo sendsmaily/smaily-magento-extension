@@ -59,22 +59,39 @@ class WebsiteConnections
         return $connected ? $unconnected : [];
     }
 
+    /**
+     * Whether the website is one unconnectedWebsites() lists: it has no
+     * Smaily connection, and another website has one. Reads the other
+     * websites only until it meets a connected one.
+     */
+    public function isUnconnectedWhileAnotherIs(int $websiteId): bool
+    {
+        $websites = [];
+        foreach ($this->storeManager->getWebsites() as $website) {
+            $websites[(int)$website->getId()] = $website;
+        }
+        if (!isset($websites[$websiteId]) || $this->isConnected($websites[$websiteId])) {
+            return false;
+        }
+        unset($websites[$websiteId]);
+        foreach ($websites as $website) {
+            if ($this->isConnected($website)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function isConnected(WebsiteInterface $website): bool
     {
         $storeIds = $website instanceof Website ? array_map('intval', $website->getStoreIds()) : [];
         foreach ($storeIds as $storeId) {
-            if ($this->config->getSubdomain($storeId) !== ''
-                && $this->config->getUsername($storeId) !== ''
-                && $this->config->hasPassword($storeId)
-            ) {
+            if ($this->config->hasCredentials($storeId)) {
                 return true;
             }
         }
-        $websiteId = (int)$website->getId();
 
-        return $storeIds === []
-            && $this->config->getWebsiteSubdomain($websiteId) !== ''
-            && $this->config->getWebsiteUsername($websiteId) !== ''
-            && $this->config->hasWebsitePassword($websiteId);
+        return $storeIds === [] && $this->config->hasWebsiteCredentials((int)$website->getId());
     }
 }

@@ -226,10 +226,7 @@ $modeCards = [
 <?php $storefrontUrl = $viewModel->getSavedStorefrontUrl(); ?>
 <?php $websiteStorefrontUrls = $viewModel->getWebsiteStorefrontUrls(); ?>
 <?php $apiOnly = $viewModel->isApiOnlyStore(); ?>
-<?php $storefrontOpen = $websiteStorefrontUrls === []
-    ? $viewModel->isStorefrontDisclosureOpen()
-    : $apiOnly || array_filter(array_column($websiteStorefrontUrls, 'url')) !== []; ?>
-<details class="smaily-disclosure" id="smaily-w-storefront"<?= $storefrontOpen ? ' open' : '' ?>>
+<details class="smaily-disclosure" id="smaily-w-storefront"<?= $viewModel->isStorefrontDisclosureOpen() ? ' open' : '' ?>>
     <summary class="smaily-disclosure__toggle"><?= $escaper->escapeHtml(__('Using a separate storefront?')) ?></summary>
     <div class="smaily-card">
         <?php if ($apiOnly): ?>

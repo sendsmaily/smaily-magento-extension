@@ -349,6 +349,10 @@ class SubscriberSaveAfterTest extends TestCase
         $payloadBuilder = $this->createMock(SubscriberPayloadBuilder::class);
         $payloadBuilder->method('build')->willReturn(['email' => 'person@example.com']);
 
+        $websiteConnections = $this->createMock(WebsiteConnections::class);
+        $websiteConnections->method('isUnconnectedWhileAnotherIs')
+            ->willReturnCallback(static fn (int $websiteId): bool => isset($unconnected[$websiteId]));
+
         return new SubscriberSaveAfter(
             $config,
             new Mode($config),
@@ -360,7 +364,7 @@ class SubscriberSaveAfterTest extends TestCase
             $storefrontSubscription ?? new StorefrontSubscription(),
             new UnconnectedSignup(
                 $config,
-                $this->createConfiguredMock(WebsiteConnections::class, ['unconnectedWebsites' => $unconnected]),
+                $websiteConnections,
                 $this->dispatcher
             )
         );

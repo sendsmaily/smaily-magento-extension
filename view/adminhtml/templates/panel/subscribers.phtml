@@ -37,7 +37,7 @@ $allWebsites = !$isSettings && $viewModel->isStoreWide() && $viewModel->hasMulti
 // settings differ in who is synced keep them, so the setup does not say
 // that its save starts contact sync there.
 $differingWebsites = $viewModel->getDifferingContactWebsites();
-$startingWebsites = array_values(array_diff($viewModel->getWebsiteNames(), array_column($differingWebsites, 'name')));
+$startingWebsites = $viewModel->getStartingContactWebsites();
 
 // Optional contact fields, server-rendered (same values the system.xml
 // multiselect edits).

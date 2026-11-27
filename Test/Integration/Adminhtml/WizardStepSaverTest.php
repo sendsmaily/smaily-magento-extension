@@ -1484,7 +1484,7 @@ class WizardStepSaverTest extends IntegrationTestCase
         self::assertTrue($this->storeLayout()->sharesOneAccount());
         self::assertSame([], $this->wizardData('0', ['en'])->getWebsiteOverrides('subscribers'));
         self::assertSame(
-            [['name' => 'Website ' . self::SECOND, 'enabled' => true, 'mode' => 'legitimate_interest']],
+            [['websiteId' => self::SECOND, 'name' => 'Website ' . self::SECOND, 'enabled' => true, 'mode' => 'legitimate_interest']],
             $this->wizardData('0', ['en'])->getDifferingContactWebsites()
         );
         self::assertSame([
@@ -1522,14 +1522,26 @@ class WizardStepSaverTest extends IntegrationTestCase
             self::assertSame('secret', $this->config->getWebsitePassword($websiteId));
         }
 
-        // The merchant confirms: every website uses the Contacts settings
-        // for all websites, and the page reloads.
+        // Main's own checkout checkbox, set after the tab listed Second:
+        // the confirmation names Second only, so Main keeps its own.
+        $this->insertRow('websites', self::MAIN, Config::XML_PATH_CHECKOUT_OPTIN_ENABLED, '0');
+
+        // The merchant confirms for the websites listed: they use the
+        // Contacts settings for all websites, and the page reloads.
         $saver = $this->saver('0');
-        self::assertSame([], $saver->save('subscribers', ['sync_mode' => 'consent', 'use_everywhere' => true]));
+        self::assertSame([], $saver->save('subscribers', ['sync_mode' => 'consent', 'use_everywhere' => [self::SECOND]]));
         self::assertTrue($saver->isReturnedToStoreWide());
         self::assertSame([['default', 0]], $this->scopesOf(Config::XML_PATH_SYNC_MODE));
         self::assertSame('consent', $this->config->getSyncMode(self::SECOND));
-        self::assertSame([], $this->wizardData('0', ['en'])->getDifferingContactWebsites());
+        self::assertSame(
+            [['websites', self::MAIN]],
+            $this->scopesOf(Config::XML_PATH_CHECKOUT_OPTIN_ENABLED),
+            'A website the confirmation did not name keeps its own'
+        );
+        self::assertSame(
+            [self::MAIN],
+            array_column($this->wizardData('0', ['en'])->getDifferingContactWebsites(), 'websiteId')
+        );
 
         // Another Smaily account on a website, or on one of its store views:
         // not one store on one account.

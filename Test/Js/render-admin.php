@@ -671,7 +671,7 @@ $intelligenceViewModel = static fn (
      * No website keeps Contacts settings of its own that ask for consent
      * (CON-470).
      *
-     * @return list<array{name: string, enabled: bool, mode: string}>
+     * @return list<array{websiteId: int, name: string, enabled: bool, mode: string}>
      */
     public function getDifferingContactWebsites(): array
     {
@@ -886,7 +886,7 @@ $sharedAccountViewModel = static fn (object $inner): object => new class ($inner
      * No website keeps Contacts settings of its own that ask for consent
      * (CON-470).
      *
-     * @return list<array{name: string, enabled: bool, mode: string}>
+     * @return list<array{websiteId: int, name: string, enabled: bool, mode: string}>
      */
     public function getDifferingContactWebsites(): array
     {
@@ -1642,7 +1642,7 @@ $websitesViewModel = static fn (bool $storeWide): object => new class ($storeWid
      * No website keeps Contacts settings of its own that ask for consent
      * (CON-470).
      *
-     * @return list<array{name: string, enabled: bool, mode: string}>
+     * @return list<array{websiteId: int, name: string, enabled: bool, mode: string}>
      */
     public function getDifferingContactWebsites(): array
     {
@@ -1921,13 +1921,13 @@ $pages['settings-one-store'] = [
         }
 
         /**
-         * @return list<array{name: string, enabled: bool, mode: string}>
+         * @return list<array{websiteId: int, name: string, enabled: bool, mode: string}>
          */
         public function getDifferingContactWebsites(): array
         {
             return [
-                ['name' => 'Latvia', 'enabled' => true, 'mode' => 'legitimate_interest'],
-                ['name' => 'Lithuania', 'enabled' => false, 'mode' => 'consent'],
+                ['websiteId' => 2, 'name' => 'Latvia', 'enabled' => true, 'mode' => 'legitimate_interest'],
+                ['websiteId' => 3, 'name' => 'Lithuania', 'enabled' => false, 'mode' => 'consent'],
             ];
         }
     },
@@ -1947,6 +1947,54 @@ $pages['settings-one-store'] = [
         'Each website keeps its own storefront address.',
     ]),
 ];
+
+// The initial setup of the same store (CON-470): its Contacts step lists
+// the websites that keep their own Contacts settings, says where to
+// confirm, and names only the other websites as starting contact sync.
+$pages['setup-one-store'] = [
+    'viewModel' => new class ($pages['settings-one-store']['viewModel']) {
+        /**
+         * @param object $inner
+         */
+        public function __construct(private readonly object $inner)
+        {
+        }
+
+        /**
+         * @param string $name
+         * @param array<int, mixed> $arguments
+         * @return mixed
+         */
+        public function __call(string $name, array $arguments): mixed
+        {
+            return $this->inner->$name(...$arguments);
+        }
+
+        /**
+         * @return array<int, array{name: string, url: string}>
+         */
+        public function getWebsiteStorefrontUrls(): array
+        {
+            return [];
+        }
+
+        /**
+         * One store on one Smaily account lists no website's own values.
+         *
+         * @param string $section
+         * @return array<int, array<string, mixed>>
+         */
+        public function getWebsiteOverrides(string $section): array
+        {
+            return [];
+        }
+    },
+    'strings' => array_merge($pages['settings-one-store']['strings'], [
+        'Confirm it under Settings > Contacts once the setup is finished.',
+        'Saving this step starts contact sync on these websites: %1. The websites listed below keep their own'
+            . ' contact settings.',
+    ]),
+] + $pages['setup-websites'];
 
 $pages['settings-own-account'] = [
     'template' => $root . '/view/adminhtml/templates/settings/index.phtml',

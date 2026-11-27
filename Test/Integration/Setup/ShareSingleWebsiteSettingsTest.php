@@ -338,9 +338,10 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
             Config::XML_PATH_SYNC_MODE => 'consent',
             Config::XML_PATH_SYNC_FIELDS => 'first_name',
         ]);
+        // Second's own password is the same one, encrypted anew.
         $this->seed('websites', self::SECOND, [
             Config::XML_PATH_USERNAME => 'api-user',
-            Config::XML_PATH_PASSWORD => $this->encrypt('stale'),
+            Config::XML_PATH_PASSWORD => $this->encrypt('secret'),
             Config::XML_PATH_STOREFRONT_URL => 'https://second.example.com',
             Config::XML_PATH_WELCOME_WORKFLOW => '5',
             Config::XML_PATH_SYNC_MODE => 'legitimate_interest',
@@ -360,7 +361,9 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
             [self::SECOND, Config::XML_PATH_STOREFRONT_URL, 'https://second.example.com'],
             [self::SECOND, Config::XML_PATH_SYNC_MODE, 'legitimate_interest'],
         ], $this->websiteRows());
-        self::assertSame([], $this->mappingRows());
+        // The welcome's per-language row: no store-wide row for the welcome,
+        // and Second alone holds one, so it becomes the one for all websites.
+        self::assertSame([[0, 'welcome', 'et', 5]], $this->mappingRows());
         self::assertSame('secret', $this->config()->getPassword(self::SECOND));
         self::assertSame(
             [
@@ -380,6 +383,146 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
         foreach ($this->logged as [, $context]) {
             self::assertStringNotContainsString('legitimate_interest', json_encode($context, JSON_THROW_ON_ERROR));
         }
+    }
+
+    /**
+     * CON-470 review: the upgrade never deletes the only working API
+     * password. With none saved for all websites, the one the websites agree
+     * on moves there, as stored, first; a website whose own password was
+     * changed at its scope keeps its whole Smaily account, and the log says
+     * why without a value.
+     *
+     * @dataProvider passwords
+     *
+     * @param array<int, string> $websitePasswords website id => its own password
+     * @param int[] $kept the websites that keep their own Smaily account
+     */
+    public function testAWebsitesSmailyAccountGivesWayOnlyWithTheSamePassword(
+        ?string $storeWidePassword,
+        array $websitePasswords,
+        array $kept
+    ): void {
+        $this->seed('default', 0, [
+            WizardStepSaver::XML_PATH_SETUP_COMPLETED => '1',
+            Config::XML_PATH_SUBDOMAIN => 'shop',
+            Config::XML_PATH_USERNAME => 'api-user',
+        ]);
+        if ($storeWidePassword !== null) {
+            $this->seed('default', 0, [Config::XML_PATH_PASSWORD => $this->encrypt($storeWidePassword)]);
+        }
+        foreach ($websitePasswords as $websiteId => $password) {
+            $this->seed('websites', $websiteId, [
+                Config::XML_PATH_USERNAME => 'api-user',
+                Config::XML_PATH_PASSWORD => $this->encrypt($password),
+            ]);
+        }
+
+        $this->runPatch();
+
+        self::assertSame($kept, array_values(array_unique(array_column($this->websiteRows(), 0))));
+        foreach ([self::MAIN, self::SECOND] as $websiteId) {
+            self::assertSame(
+                $websitePasswords[$websiteId] ?? $storeWidePassword ?? 'secret',
+                $this->config()->getWebsitePassword($websiteId),
+                'Website ' . $websiteId . ' still sends with its password'
+            );
+        }
+        foreach ($this->logged as [, $context]) {
+            $logged = json_encode($context, JSON_THROW_ON_ERROR);
+            foreach (['secret', 'changed'] as $password) {
+                self::assertStringNotContainsString($password, $logged);
+            }
+        }
+        self::assertSame(
+            $kept,
+            array_column(array_filter(
+                array_column($this->logged, 1),
+                static fn (array $context): bool => ($context['reason'] ?? '') === 'password differs'
+            ), 'website_id')
+        );
+    }
+
+    /**
+     * @return array<string, array{0: ?string, 1: array<int, string>, 2: int[]}>
+     */
+    public static function passwords(): array
+    {
+        return [
+            'identical passwords' => ['secret', [self::MAIN => 'secret', self::SECOND => 'secret'], []],
+            'a password changed only at a website' => ['secret', [self::SECOND => 'changed'], [self::SECOND]],
+            'none for all websites, the websites agree' => [null, [self::MAIN => 'secret', self::SECOND => 'secret'], []],
+            'none for all websites, the websites disagree' => [
+                null,
+                [self::MAIN => 'secret', self::SECOND => 'changed'],
+                [self::MAIN, self::SECOND],
+            ],
+        ];
+    }
+
+    /**
+     * CON-470 review: the default scope holding only a fragment of the
+     * automations (here the abandoned-cart wait) does not take a website's
+     * welcome automation away: the values the websites agree on move to the
+     * settings for all websites first, mapping rows by automation; values
+     * the websites disagree on stay each website's own.
+     */
+    public function testAWebsitesAutomationsKeepWorkingWhenTheDefaultScopeHoldsOnlyAFragment(): void
+    {
+        $this->seed('default', 0, [
+            WizardStepSaver::XML_PATH_SETUP_COMPLETED => '1',
+            Config::XML_PATH_SUBDOMAIN => 'shop',
+            Config::XML_PATH_USERNAME => 'api-user',
+            Config::XML_PATH_PASSWORD => $this->encrypt('secret'),
+            Config::XML_PATH_ABANDONED_CUTOFF => '60',
+        ]);
+        $this->seed('websites', self::SECOND, [
+            Config::XML_PATH_WELCOME_ENABLED => '1',
+            Config::XML_PATH_WELCOME_WORKFLOW => '5',
+            Config::XML_PATH_ABANDONED_CUTOFF => '30',
+        ]);
+        $this->connection->insert(MappingResource::TABLE_NAME, [
+            'website_id' => self::SECOND,
+            'trigger_type' => Trigger::WELCOME,
+            'language' => 'et',
+            'account_key' => 'default',
+            'workflow_id' => 77,
+            'is_default_fallback' => 0,
+        ]);
+
+        $this->runPatch();
+
+        self::assertSame([], $this->websiteRows());
+        self::assertSame([[0, 'welcome', 'et', 77]], $this->mappingRows());
+        $config = $this->config();
+        $router = $this->objectManager->create(Router::class, [
+            'config' => $config,
+            'overrides' => $this->objectManager->create(WebsiteOverrides::class, ['storeManager' => $this->storeManager()]),
+        ]);
+        foreach ([self::MAIN, self::SECOND] as $websiteId) {
+            self::assertTrue($config->isWelcomeEnabled($websiteId), 'Website ' . $websiteId);
+            self::assertSame(5, $router->resolve(Trigger::WELCOME, $websiteId, 'en', 'single')?->workflowId);
+        }
+        self::assertSame('60', (string)$this->scopeConfig()->getValue(Config::XML_PATH_ABANDONED_CUTOFF));
+
+        // Two websites that disagree keep their own.
+        $this->connection->delete('core_config_data', ['path = ?' => Config::XML_PATH_WELCOME_WORKFLOW]);
+        $this->seed('websites', self::MAIN, [Config::XML_PATH_WELCOME_WORKFLOW => '5']);
+        $this->seed('websites', self::SECOND, [Config::XML_PATH_WELCOME_WORKFLOW => '6']);
+        $this->logged = [];
+
+        $this->runPatch();
+
+        self::assertSame([
+            [self::MAIN, Config::XML_PATH_WELCOME_WORKFLOW, '5'],
+            [self::SECOND, Config::XML_PATH_WELCOME_WORKFLOW, '6'],
+        ], $this->websiteRows());
+        self::assertSame(
+            [[self::MAIN, 'websites disagree'], [self::SECOND, 'websites disagree']],
+            array_map(
+                static fn (array $line): array => [$line[1]['website_id'], $line[1]['reason'] ?? ''],
+                $this->logged
+            )
+        );
     }
 
     /**
@@ -533,6 +676,7 @@ class ShareSingleWebsiteSettingsTest extends IntegrationTestCase
                 $this->scopeConfig(),
                 $overrides
             ),
+            $this->objectManager->get(EncryptorInterface::class),
             $logger
         ))->apply();
 

@@ -66,6 +66,8 @@
     <script src="build/settings-website.et_EE.js"></script>
     <script src="build/settings-one-store.en_US.js"></script>
     <script src="build/settings-one-store.et_EE.js"></script>
+    <script src="build/setup-one-store.en_US.js"></script>
+    <script src="build/setup-one-store.et_EE.js"></script>
     <script src="build/settings-own-account.en_US.js"></script>
     <script src="build/settings-own-account.et_EE.js"></script>
 </head>
@@ -405,7 +407,25 @@
         await wait(100);
         data = lastSave(frame, 'subscribers');
         check(locale + ', one store: "' + strings['Use the same contact settings on every website']
-            + '" saves the tab with the confirmation', !!data && data.use_everywhere === true);
+            + '" confirms for the websites listed only',
+            !!data && JSON.stringify(data.use_everywhere) === JSON.stringify([2, 3]));
+        frame.remove();
+
+        // The initial setup's Contacts step of the same store.
+        strings = window.smailyAdminPages['setup-one-store.' + locale].strings;
+        frame = await open('setup-one-store.' + locale);
+        doc = frame.contentDocument;
+        notice = doc.getElementById('smaily-w-website-contacts');
+        check(locale + ', one store setup: the Contacts step lists the websites that keep their own settings'
+            + ' and says where to confirm, with no button',
+            !!notice && notice.querySelectorAll('li').length === 2
+            && !doc.getElementById('smaily-w-contacts-everywhere')
+            && text(notice.querySelector('.note')) === strings['Confirm it under Settings > Contacts once the setup is finished.']);
+        check(locale + ', one store setup: the step names only the other websites as starting contact sync',
+            text(doc.getElementById('smaily-w-sync-starts-websites')) === strings[
+                'Saving this step starts contact sync on these websites: %1. The websites listed below keep their own'
+                + ' contact settings.'
+            ].replace('%1', 'Estonia'));
         frame.remove();
     }
 

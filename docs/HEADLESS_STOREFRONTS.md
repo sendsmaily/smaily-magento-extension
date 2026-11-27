@@ -127,8 +127,8 @@ query string stay. `https://backend.example.com/oak-table.html` becomes
 nothing else moves — Magento's own emails, the abandoned-cart link and the
 module's back-end addresses keep the back-end host. Empty, the links are
 Magento's own. The value is saved with the Smaily account: for all
-websites, or for one website with **Use its own Smaily account on this
-website**. The field opens by itself when the last 30 days' orders all came
+websites, or — on a store whose websites use different Smaily accounts —
+for one website with **Use its own Smaily account on this website**. The field opens by itself when the last 30 days' orders all came
 through the API (GraphQL, or REST without Magento's storefront session).
 
 After a change, run the catalog import again (**Settings > Intelligence >

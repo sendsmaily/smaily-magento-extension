@@ -198,6 +198,19 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   subscribe and unsubscribe), a customer save (`Observer\CustomerSaveAfter`),
   an order (`Observer\OrderPlaced`, the checkout opt-in, guest-order emails
   and the abandoned-cart purchase marker).
+- **A signup on a website without a Smaily connection is in the Log
+  (CON-470).** `Model\WebsiteConnections::unconnectedWebsites()` lists the
+  websites whose Smaily account — their own, else the store-wide one —
+  lacks a subdomain, an API username or a password (read without
+  decrypting it), when another website has a complete one; an install with
+  no website connected (not set up yet) lists none. A subscription or
+  unsubscribe on such a website (a status change, an email) is recorded by
+  `SyncDispatcher::recordSkippedContactSync()` as a `contact.sync` row
+  closed as skipped (`EventQueue::enqueueSkipped()`) with
+  `WebsiteConnections::SKIPPED_NOT_CONNECTED`, its payload the contact a
+  sync would have sent (the same builder, nothing more); nothing is queued
+  to be sent. Before CON-470 such a signup returned without a trace. The
+  Dashboard names the websites (`DashboardData::getUnconnectedWebsites()`).
 - **A deleted subscriber row sends nothing (CON-224, Erkki 2026-10-23;
   supersedes CON-176/CON-187).** A deletion is not a withdrawal of consent,
   and the contact may come from another source, so a subscriber row deleted
@@ -2514,6 +2527,45 @@ Initial setup, Settings, Log. Design rules:
     without, it writes the store-wide values it shows. A single-website
     install writes the default scope and removes the website's own values
     (an empty password then writes the kept one at the default scope).
+  - **One store on one Smaily account shares its settings (CON-470, owner
+    decision 2026-11-27).** `StoreLayout::sharesOneAccount()`: a
+    2+-website install that is not separate stores, holds a store-wide
+    Smaily account, no per-language Smaily accounts (a mode `a` row at the
+    default or a website's scope, `WebsiteOverrides::usesPerLanguageAccounts()`)
+    and no website on another account (`usesOtherAccount()`). Then every
+    website shares the Smaily account, the Contacts settings and the
+    automations: `Settings\Index` marks the request store-wide, as the
+    setup page does, so Settings reads and saves the default scope (its
+    calls carry `?website=0`) and draws no website drop-down, no "own"
+    switch and no transactional "separate account for this website"
+    switch; a store-wide save (Settings or the setup) removes every
+    website's own values of the section (`sectionTarget()`), so the saved
+    value applies to every website; and `WizardData::getWebsiteOverrides()`
+    lists no website. Per-language Smaily accounts are then set by moving
+    to separate stores. Any other 2+-website store keeps per-website
+    Settings as described here. `StoreLayout::mixesAccounts()` (one store,
+    no mode `a`, a website on another account) shows a Dashboard warning
+    that the websites are not one store.
+  - **The upgrade shares one website's settings (CON-470).** An initial
+    setup on 3.0.0-rc1 to rc12 saved the Smaily account, the Contacts
+    settings and the automations at the chosen website's scope, and rc13
+    (CON-179) made the setup store-wide without moving them: every other
+    website had no Smaily connection. The data patch
+    `ShareSingleWebsiteSettings` (`StoreLayout::shareSingleWebsiteSettings()`)
+    moves them when the setup is finished (the mark at the default or a
+    website's scope), the store is one store on one account (not separate
+    stores, no mode `a`, no website on another account) and exactly one
+    website holds own values of the three sections: each section of that
+    website whose values the default scope does not hold
+    (`WebsiteOverrides::hasStoreWideValues()`: no default-scope row of its
+    paths, no website-0 mapping row of it; for the Contacts settings no
+    default `contacts_confirmed` either) is promoted as stored
+    (`promoteToStoreWide()`, the password still encrypted, the mapping rows
+    to website 0) and removed from the website (`removeOwnValues()`), with
+    its `contacts_confirmed` mark for the Contacts settings. Every other
+    store, and a section the default scope holds, stays as it is; a second
+    run finds nothing to move. It logs each moved section with the website
+    id and the paths, never a value, to `smaily_connect.log`.
   - **Separate Smaily accounts (mode A) are always a website's own**
     (owner decision 2026-10-22): they live on one website's store views,
     and its per-language workflow rows name those accounts by language. A
@@ -2655,7 +2707,8 @@ Initial setup, Settings, Log. Design rules:
       ingest" above), nothing routes by it yet.
   - The Settings page renders an explicit website selector next to the tab
     strip (own chrome, not Magento's native store-switcher), reloading with
-    `?website=<id>`; single-website installs never see it or the switches.
+    `?website=<id>`; single-website installs and one store on one Smaily
+    account (CON-470) never see it or the switches.
     Under separate stores the website picker at the top replaces it
     (`panel/website-picker.phtml`, drawn by `panel/store-shape.phtml`).
   - The Dashboard of separate stores (CON-281) draws the same picker

@@ -1,1 +1,0 @@
-- The **Dashboard**'s **Quick links** now end with **User Guide**, which opens the full merchant guide in a new tab: every feature, setting and troubleshooting step.

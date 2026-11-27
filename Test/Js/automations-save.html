@@ -45,9 +45,19 @@
             saved: true,
             errors: [],
             states: {
-                replenish_due: {enabled: true, test_mode: true},
-                post_purchase: {enabled: true, test_mode: false},
-                winback_risk: {enabled: false, test_mode: true}
+                replenish_due: {enabled: true, test_mode: true, stopped: false},
+                post_purchase: {enabled: true, test_mode: false, stopped: false},
+                winback_risk: {enabled: false, test_mode: true, stopped: false}
+            }
+        },
+        // Smaily stopped Replenishment due for review (CON-466).
+        stopped: {
+            saved: true,
+            errors: [],
+            states: {
+                replenish_due: {enabled: true, test_mode: true, stopped: true},
+                post_purchase: {enabled: true, test_mode: false, stopped: false},
+                winback_risk: {enabled: false, test_mode: true, stopped: false}
             }
         },
         readFailed: {saved: true, errors: [], states: null}
@@ -133,7 +143,7 @@
     function shows(label, doc, key, strings, mode, enabled) {
         var element = card(doc, key),
             pill = element.querySelector('.smaily-pill'),
-            names = {off: 'Off', test: 'Test mode', active: 'Active'};
+            names = {off: 'Off', test: 'Test mode', active: 'Active', stopped: 'Stopped for review'};
 
         check(label + ': the pill says ' + strings[names[mode]],
             pill.textContent.trim() === strings[names[mode]]
@@ -168,6 +178,13 @@
         shows(locale + ', Post-purchase stored active', doc, 'post_purchase', strings, 'active', true);
         shows(locale + ', Win-back left off', doc, 'winback_risk', strings, 'off', false);
         check(locale + ': the result says saved', result(doc) === strings['Saved.']);
+        frame.remove();
+
+        frame = await save(locale, ANSWERS.stopped);
+        doc = frame.contentDocument;
+        shows(locale + ', Replenishment due stopped for review', doc, 'replenish_due', strings, 'stopped', true);
+        shows(locale + ', stopped: Post-purchase stays active', doc, 'post_purchase', strings, 'active', true);
+        shows(locale + ', stopped: Win-back stays off', doc, 'winback_risk', strings, 'off', false);
         frame.remove();
 
         frame = await save(locale, ANSWERS.readFailed);

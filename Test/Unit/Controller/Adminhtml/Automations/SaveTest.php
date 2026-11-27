@@ -45,10 +45,20 @@ class SaveTest extends TestCase
         $client->expects(self::once())->method('putAutomationsConfig')
             ->with(self::callback(static fn (array $rows): bool => $rows[0]['enabled'] === true
                 && !array_key_exists('test_mode', $rows[0])));
-        $client->method('getAutomationsConfig')->willReturn(['configs' => [
-            ['trigger_key' => 'replenish_due', 'enabled' => true, 'test_mode' => true],
-            ['trigger_key' => 'winback_risk', 'enabled' => true, 'test_mode' => false],
-        ]]);
+        $client->method('getAutomationsConfig')->willReturn([
+            'configs' => [
+                ['trigger_key' => 'replenish_due', 'enabled' => true, 'test_mode' => true],
+                ['trigger_key' => 'winback_risk', 'enabled' => true, 'test_mode' => false],
+            ],
+            'setup' => [
+                [
+                    'trigger_key' => 'replenish_due',
+                    'setup_state' => 'stopped',
+                    'go_live_blockers' => ['stopped_needs_review'],
+                ],
+                ['trigger_key' => 'winback_risk', 'setup_state' => 'live'],
+            ],
+        ]);
 
         $this->controller($client, [
             'replenish_due' => ['enabled' => '1', 'workflow_id' => '123'],
@@ -61,11 +71,12 @@ class SaveTest extends TestCase
                 'saved' => true,
                 'errors' => [],
                 'states' => [
-                    'replenish_due' => ['enabled' => true, 'test_mode' => true],
+                    // Smaily stopped it for review (CON-466).
+                    'replenish_due' => ['enabled' => true, 'test_mode' => true, 'stopped' => true],
                     // Real sends switched on before stay on.
-                    'winback_risk' => ['enabled' => true, 'test_mode' => false],
+                    'winback_risk' => ['enabled' => true, 'test_mode' => false, 'stopped' => false],
                     // No stored row: the page's fail-closed defaults.
-                    'browse_abandon' => ['enabled' => false, 'test_mode' => true],
+                    'browse_abandon' => ['enabled' => false, 'test_mode' => true, 'stopped' => false],
                 ],
             ],
             $this->response

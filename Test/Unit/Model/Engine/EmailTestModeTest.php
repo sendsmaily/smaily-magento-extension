@@ -95,10 +95,14 @@ class EmailTestModeTest extends TestCase
                 ],
                 [
                     'test_mode' => true,
-                    'mode' => 'test',
+                    'mode' => 'stopped',
                     'status' => 'Smaily reviews this stop before the email can send again',
                     'notice' => '',
                 ],
+            ],
+            'test mode: the pill it showed before' => [
+                ['setup_state' => 'test'],
+                ['test_mode' => true, 'mode' => 'test', 'status' => '', 'notice' => ''],
             ],
             'an unknown notice shows nothing' => [
                 ['setup_state' => 'set_up', 'notice' => 'something_new'],
@@ -301,6 +305,7 @@ class EmailTestModeTest extends TestCase
             'Smaily reviews this stop before the email can send again',
             $answer['body']['state']['status']
         );
+        self::assertSame('stopped', $answer['body']['state']['mode'], 'The pill still says Stopped (CON-466).');
 
         StoreLocale::use('et_EE');
         $answer = $this->testMode([new Response(409, [], $refusal), $this->configAnswer($stopped)])

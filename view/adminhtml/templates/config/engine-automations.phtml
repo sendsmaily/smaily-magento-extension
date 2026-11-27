@@ -75,7 +75,15 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
         <?php foreach ($viewModel->getRows() as $row): ?>
             <?php
             $key = $escaper->escapeHtmlAttr($row['key']);
-            if (!$row['enabled']) {
+            // An email Smaily stopped for review shows "Stopped" (CON-466,
+            // as the WooCommerce plugin), also while it is not enabled. Its
+            // own phrase, "Stopped" in en_US.csv: an import's "Stopped" pill
+            // has another Estonian word.
+            if (($row['setup']['mode'] ?? '') === 'stopped') {
+                $modeClass = 'is-stopped';
+                $pillVariant = 'stopped';
+                $pillLabel = __('Stopped for review');
+            } elseif (!$row['enabled']) {
                 $modeClass = 'is-off';
                 $pillVariant = 'off';
                 $pillLabel = __('Off');
@@ -285,13 +293,14 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
         var pills = {
             'off': '<?= $escaper->escapeJs(__('Off')) ?>',
             'test': '<?= $escaper->escapeJs(__('Test mode')) ?>',
-            'active': '<?= $escaper->escapeJs(__('Active')) ?>'
+            'active': '<?= $escaper->escapeJs(__('Active')) ?>',
+            'stopped': '<?= $escaper->escapeJs(__('Stopped for review')) ?>'
         };
 
         function showMode($card, mode) {
-            $card.removeClass('is-off is-test is-active').addClass('is-' + mode);
+            $card.removeClass('is-off is-test is-active is-stopped').addClass('is-' + mode);
             $card.find('.smaily-pill')
-                .removeClass('smaily-pill--off smaily-pill--test smaily-pill--active')
+                .removeClass('smaily-pill--off smaily-pill--test smaily-pill--active smaily-pill--stopped')
                 .addClass('smaily-pill--' + mode)
                 .contents().last().replaceWith(document.createTextNode(pills[mode]));
         }
@@ -304,7 +313,8 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
                     return;
                 }
                 $card.find('[data-field="enabled"]').prop('checked', state.enabled);
-                showMode($card, !state.enabled ? 'off' : (state.test_mode ? 'test' : 'active'));
+                showMode($card, state.stopped ? 'stopped'
+                    : (!state.enabled ? 'off' : (state.test_mode ? 'test' : 'active')));
                 applyOpen($card);
             });
         }

@@ -355,6 +355,26 @@ class Settings
     }
 
     /**
+     * The Smaily workflows the engine pushed for the extension's emails, as
+     * EmailDesignWorkflows keeps them (JSON), '' when none.
+     */
+    public function getEmailWorkflows(): string
+    {
+        return (string)$this->value(self::XML_PATH_EMAIL_WORKFLOWS);
+    }
+
+    /** Keep the pushed workflows (EmailDesignWorkflows); '' unsets them. */
+    public function recordEmailWorkflows(string $json): void
+    {
+        if ($json === '') {
+            $this->unsetValue(self::XML_PATH_EMAIL_WORKFLOWS);
+        } else {
+            $this->write(self::XML_PATH_EMAIL_WORKFLOWS, $json);
+        }
+        $this->cleanConfigCache();
+    }
+
+    /**
      * Store the prefix the ping answers (contract v1.33.0 §2) when it
      * differs from the stored one: the engine's prefix wins.
      */

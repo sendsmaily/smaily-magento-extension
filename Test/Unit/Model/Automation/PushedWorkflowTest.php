@@ -8,16 +8,15 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Unit\Model\Automation;
 
-use Magento\Framework\App\Cache\TypeListInterface;
-use Magento\Framework\App\Config\ScopeConfigInterface;
-use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Automation\PushedWorkflow;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Automation\WorkflowMatch;
 use Smaily\Connect\Model\Engine\EmailDesignWorkflows;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-258 (the WooCommerce plugin's Router::resolve_workflow(), CON-218):
@@ -28,6 +27,8 @@ use Smaily\Connect\Model\Engine\Settings;
  */
 class PushedWorkflowTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const PICKED = 7;
     private const PUSHED = 456;
 
@@ -96,6 +97,28 @@ class PushedWorkflowTest extends TestCase
     }
 
     /**
+     * CON-237: separate stores — a send reads the pushed workflows of the
+     * connection serving its website; a website no connection serves keeps
+     * the picked workflow.
+     */
+    public function testTheConnectionOfTheEmailsWebsiteHoldsItsPushedWorkflows(): void
+    {
+        $latvia = $this->createMock(Settings::class);
+        $latvia->method('getEmailWorkflows')->willReturn('{"plugin.welcome":{"workflow_id":789,"subdomain":"shop"}}');
+        $connections = $this->engineConnections([
+            [$this->engineConnection(0, $this->settingsStoring(self::STORED), [1], [1], 1), null],
+            [$this->engineConnection(2, $latvia, [2], [2], 2), null],
+        ]);
+
+        self::assertSame(self::PUSHED, $this->send(Trigger::WELCOME, 'default', 'shop', connections: $connections));
+        self::assertSame(789, $this->send(Trigger::WELCOME, 'default', 'shop', connections: $connections, websiteId: 2));
+        self::assertSame(
+            self::PICKED,
+            $this->send(Trigger::WELCOME, 'default', 'shop', connections: $connections, websiteId: 3)
+        );
+    }
+
+    /**
      * The workflow a send posts: the picked workflow matched for
      * `$language`, sent through the account `$subdomain` on a website whose
      * default language is `$defaultLanguage`, with the pushed workflows
@@ -106,24 +129,30 @@ class PushedWorkflowTest extends TestCase
         ?string $language,
         string $subdomain,
         string $defaultLanguage = self::ESTONIAN,
-        ?string $stored = self::STORED
+        ?string $stored = self::STORED,
+        ?Connections $connections = null,
+        int $websiteId = 1
     ): int {
-        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
-        $scopeConfig->method('getValue')->willReturnCallback(
-            static fn (string $path): ?string => $path === Settings::XML_PATH_EMAIL_WORKFLOWS ? $stored : null
+        $pushedWorkflow = new PushedWorkflow(
+            new EmailDesignWorkflows(new Json()),
+            $connections ?? $this->oneEngineConnection($this->settingsStoring($stored))
         );
-        $pushedWorkflow = new PushedWorkflow(new EmailDesignWorkflows(
-            $scopeConfig,
-            $this->createMock(WriterInterface::class),
-            $this->createMock(TypeListInterface::class),
-            new Json()
-        ));
 
         return $pushedWorkflow->workflowId(
             $trigger,
             new WorkflowMatch(self::PICKED, null, $language),
             $subdomain,
-            $defaultLanguage
+            $defaultLanguage,
+            $websiteId
         );
+    }
+
+    /** A connection's settings holding the pushed workflows `$stored` (null: nothing pushed). */
+    private function settingsStoring(?string $stored): Settings
+    {
+        $settings = $this->createMock(Settings::class);
+        $settings->method('getEmailWorkflows')->willReturn($stored ?? '');
+
+        return $settings;
     }
 }

@@ -8,10 +8,6 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model\Engine;
 
-use Magento\Framework\App\Cache\Type\Config as ConfigCache;
-use Magento\Framework\App\Cache\TypeListInterface;
-use Magento\Framework\App\Config\ScopeConfigInterface;
-use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use Smaily\Connect\Model\Automation\Trigger;
 
@@ -30,9 +26,11 @@ use Smaily\Connect\Model\Automation\Trigger;
  *
  * §23 is read when the email settings open and when the admin comes back
  * from a design page — never before a send (§23). remember() keeps the ids
- * and accounts of the last read in core_config_data
- * (Settings::XML_PATH_EMAIL_WORKFLOWS, JSON `{email_key: {workflow_id,
- * subdomain}}`), and the send path reads only this copy. A setup exchange
+ * and accounts of the last read in core_config_data, in the scope of the
+ * Campaign Intelligence connection that read them (CON-237;
+ * Settings::XML_PATH_EMAIL_WORKFLOWS, JSON `{email_key: {workflow_id,
+ * subdomain}}`), and the send path reads only the copy of the connection
+ * serving the email's website (Automation\PushedWorkflow). A setup exchange
  * and a disconnect delete it (Settings). The template id is not kept
  * (contract v1.18.0 makes it informational), and neither is `created_by`:
  * the WooCommerce plugin does not read it either.
@@ -68,9 +66,6 @@ class EmailDesignWorkflows
     private const SUBDOMAIN_PATTERN = '/^[a-z0-9-]{1,64}$/';
 
     public function __construct(
-        private readonly ScopeConfigInterface $scopeConfig,
-        private readonly WriterInterface $configWriter,
-        private readonly TypeListInterface $cacheTypeList,
         private readonly Json $serializer
     ) {
     }
@@ -84,8 +79,9 @@ class EmailDesignWorkflows
      * reads of a store whose ids are all null write nothing.
      *
      * @param array<int|string, mixed> $emails the §23 `emails` list
+     * @param Settings $settings the settings of the connection that read it
      */
-    public function remember(array $emails): void
+    public function remember(array $emails, Settings $settings): void
     {
         $workflows = [];
         foreach ($emails as $item) {
@@ -109,26 +105,21 @@ class EmailDesignWorkflows
         }
         ksort($workflows);
 
-        $stored = $this->stored();
-        if ($workflows === $stored) {
+        if ($workflows === $this->stored($settings)) {
             return;
         }
-        if ($workflows === []) {
-            $this->configWriter->delete(Settings::XML_PATH_EMAIL_WORKFLOWS);
-        } else {
-            $this->configWriter->save(Settings::XML_PATH_EMAIL_WORKFLOWS, $this->serializer->serialize($workflows));
-        }
-        $this->cacheTypeList->cleanType(ConfigCache::TYPE_IDENTIFIER);
+        $settings->recordEmailWorkflows($workflows === [] ? '' : (string)$this->serializer->serialize($workflows));
     }
 
     /**
      * The pushed workflow id of a trigger's email when the extension sends
      * it through the Smaily account `$subdomain`, or 0: no pushed workflow,
-     * or one another account holds.
+     * or one another account holds. Read from the settings of the
+     * connection serving the email's website.
      */
-    public function workflowId(string $trigger, string $subdomain): int
+    public function workflowId(string $trigger, string $subdomain, Settings $settings): int
     {
-        $entry = $this->stored()[self::EMAIL_KEYS[$trigger] ?? ''] ?? null;
+        $entry = $this->stored($settings)[self::EMAIL_KEYS[$trigger] ?? ''] ?? null;
         if ($entry === null || $entry['subdomain'] !== $this->normaliseSubdomain($subdomain)) {
             return 0;
         }
@@ -148,9 +139,9 @@ class EmailDesignWorkflows
      *
      * @return array<string, array{workflow_id: int, subdomain: string}>
      */
-    private function stored(): array
+    private function stored(Settings $settings): array
     {
-        $raw = (string)$this->scopeConfig->getValue(Settings::XML_PATH_EMAIL_WORKFLOWS);
+        $raw = $settings->getEmailWorkflows();
         if ($raw === '') {
             return [];
         }

@@ -27,6 +27,7 @@ use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Discount\AutomationDiscount;
 use Smaily\Connect\Model\Discount\CodeIssuer;
 use Smaily\Connect\Model\Engine\EmailDesignWorkflows;
+use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
@@ -36,6 +37,7 @@ use Smaily\Connect\Model\ResourceModel\Automation\Mapping as MappingResource;
 use Smaily\Connect\Model\SubdomainNormalizer;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-258: a Welcome email starts with the workflow Campaign Intelligence
@@ -53,6 +55,8 @@ use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
  */
 class PushedWorkflowTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     private const MAIN = 1;
     private const OWN = 2;
 
@@ -146,7 +150,7 @@ class PushedWorkflowTest extends IntegrationTestCase
             'smaily_workflow_id' => null,
             'smaily_subdomain' => null,
             'created_by' => null,
-        ]]);
+        ]], $this->engineSettings());
         $this->automation(1, 'et');
         $this->automation(3, 'et');
 
@@ -174,17 +178,21 @@ class PushedWorkflowTest extends IntegrationTestCase
             'smaily_workflow_id' => (string)self::PUSHED,
             'smaily_subdomain' => $subdomain,
             'created_by' => 'engine',
-        ]]);
+        ]], $this->engineSettings());
     }
 
     private function workflows(): EmailDesignWorkflows
     {
-        return new EmailDesignWorkflows(
-            $this->scopeConfig,
-            $this->objectManager->get(WriterInterface::class),
-            $this->createMock(TypeListInterface::class),
-            new Json()
-        );
+        return new EmailDesignWorkflows(new Json());
+    }
+
+    /** The primary Campaign Intelligence connection's settings, on this test's scope config. */
+    private function engineSettings(): Settings
+    {
+        return $this->objectManager->create(Settings::class, [
+            'scopeConfig' => $this->scopeConfig,
+            'cacheTypeList' => $this->createMock(TypeListInterface::class),
+        ]);
     }
 
     private function automation(int $storeId, string $language): void
@@ -246,7 +254,11 @@ class PushedWorkflowTest extends IntegrationTestCase
                     'config' => $config,
                     'overrides' => $overrides,
                     'storeManager' => $storeManager,
-                    'pushedWorkflow' => new PushedWorkflow($this->workflows()),
+                    // One store: the primary connection serves both websites.
+                    'pushedWorkflow' => new PushedWorkflow(
+                        $this->workflows(),
+                        $this->oneEngineConnection($this->engineSettings())
+                    ),
                 ]),
             ]),
         ]);

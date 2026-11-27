@@ -49,6 +49,13 @@ class WebsiteOverrides
     public const AUTOMATIONS = 'automations';
     public const TRANSACTIONAL = 'transactional';
 
+    /**
+     * The paths every website keeps of its own also where the websites
+     * share their settings (CON-470): a separate storefront has an address
+     * per website.
+     */
+    public const PER_WEBSITE = [Config::XML_PATH_STOREFRONT_URL];
+
     public const PATHS = [
         self::CONNECTION => [
             Config::XML_PATH_SUBDOMAIN,
@@ -200,7 +207,10 @@ class WebsiteOverrides
      * store-wide account's login of its own (a 2.8.x upgrade often saved it
      * on every website) uses the same account. Its automations are then
      * always its own, because the store-wide workflows were picked from
-     * another account.
+     * another account. A store view of the website that holds another
+     * account of its own counts too (CON-470), except under per-language
+     * Smaily accounts (mode A), whose store views hold the languages'
+     * accounts by design.
      *
      * False where no store-wide account is saved (only website logins, a
      * 2.8.x shape): which account the default-scope workflows were picked
@@ -212,17 +222,95 @@ class WebsiteOverrides
         if (count($this->websiteIds()) < 2) {
             return false;
         }
-        $own = $this->ownValues(self::CONNECTION)[$websiteId] ?? null;
         $storeWide = $this->storeWideAccount();
-        if ($own === null || $storeWide === null) {
+        if ($storeWide === null) {
             return false;
         }
-        $subdomain = isset($own[Config::XML_PATH_SUBDOMAIN])
-            ? $this->normalizer->normalize($own[Config::XML_PATH_SUBDOMAIN])
-            : $storeWide[0];
-        $username = trim($own[Config::XML_PATH_USERNAME] ?? $storeWide[1]);
+        foreach ($this->accountsInUse()[$websiteId] ?? [] as $account) {
+            if ($account !== $storeWide[0] . "\n" . $storeWide[1]) {
+                return true;
+            }
+        }
 
-        return $subdomain !== $storeWide[0] || $username !== $storeWide[1];
+        return false;
+    }
+
+    /**
+     * Whether every website and store view uses one Smaily account, or none
+     * (CON-470): at most one account among the accounts in use
+     * (accountsInUse()).
+     */
+    public function usesOneAccount(): bool
+    {
+        $accounts = [];
+        foreach ($this->accountsInUse() as $websiteAccounts) {
+            foreach ($websiteAccounts as $account) {
+                $accounts[$account] = true;
+            }
+        }
+
+        return count($accounts) <= 1;
+    }
+
+    /**
+     * The Smaily accounts each website uses, website id => accounts (its
+     * normalized subdomain and API username, joined by a line break): the
+     * website's own account, else the store-wide one, and the account of
+     * each of its store views that holds a subdomain or API username of its
+     * own (CON-470), the rest read from the website. The store views of a
+     * website with per-language Smaily accounts (mode A) are left out:
+     * those accounts are the website's languages, by design. A website with
+     * no account at all uses none.
+     *
+     * @return array<int, string[]>
+     */
+    private function accountsInUse(): array
+    {
+        $connection = $this->resource->getConnection();
+        $values = [];
+        foreach ($connection->fetchAll(
+            $connection->select()
+                ->from($this->resource->getTableName('core_config_data'), ['scope', 'scope_id', 'path', 'value'])
+                ->where('path IN (?)', [
+                    Config::XML_PATH_SUBDOMAIN,
+                    Config::XML_PATH_USERNAME,
+                    Config::XML_PATH_MULTILINGUAL_MODE,
+                ])
+        ) as $row) {
+            $values[(string)$row['scope']][(int)$row['scope_id']][(string)$row['path']] = (string)$row['value'];
+        }
+        $default = $values[ScopeConfigInterface::SCOPE_TYPE_DEFAULT][0] ?? [];
+        $account = fn (string $subdomain, string $username): string => $subdomain === '' && $username === ''
+            ? ''
+            : $this->normalizer->normalize($subdomain) . "\n" . trim($username);
+
+        $accounts = [];
+        foreach ($this->storeManager->getWebsites() as $website) {
+            $websiteId = (int)$website->getId();
+            $own = $values[ScopeInterface::SCOPE_WEBSITES][$websiteId] ?? [];
+            $subdomain = $own[Config::XML_PATH_SUBDOMAIN] ?? $default[Config::XML_PATH_SUBDOMAIN] ?? '';
+            $username = $own[Config::XML_PATH_USERNAME] ?? $default[Config::XML_PATH_USERNAME] ?? '';
+            $accounts[$websiteId] = array_values(array_filter([$account($subdomain, $username)]));
+            $mode = $own[Config::XML_PATH_MULTILINGUAL_MODE] ?? $default[Config::XML_PATH_MULTILINGUAL_MODE] ?? '';
+            if ($mode === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS || !$website instanceof Website) {
+                continue;
+            }
+            foreach ($website->getStoreIds() as $storeId) {
+                $store = $values[ScopeInterface::SCOPE_STORES][(int)$storeId] ?? [];
+                if (!isset($store[Config::XML_PATH_SUBDOMAIN]) && !isset($store[Config::XML_PATH_USERNAME])) {
+                    continue;
+                }
+                $storeAccount = $account(
+                    $store[Config::XML_PATH_SUBDOMAIN] ?? $subdomain,
+                    $store[Config::XML_PATH_USERNAME] ?? $username
+                );
+                if ($storeAccount !== '') {
+                    $accounts[$websiteId][] = $storeAccount;
+                }
+            }
+        }
+
+        return $accounts;
     }
 
     /**
@@ -284,6 +372,192 @@ class WebsiteOverrides
     public function hasStoreWideAccount(): bool
     {
         return $this->storeWideAccount() !== null;
+    }
+
+    /**
+     * Whether any scope holds per-language Smaily accounts (multilingual
+     * mode A): a saved mode A at the default scope or at a website's scope.
+     */
+    public function usesPerLanguageAccounts(): bool
+    {
+        $connection = $this->resource->getConnection();
+
+        return (bool)$connection->fetchOne(
+            $connection->select()
+                ->from($this->resource->getTableName('core_config_data'), ['config_id'])
+                ->where('path = ?', Config::XML_PATH_MULTILINGUAL_MODE)
+                ->where('value = ?', MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS)
+                ->where('scope IN (?)', [ScopeConfigInterface::SCOPE_TYPE_DEFAULT, ScopeInterface::SCOPE_WEBSITES])
+                ->limit(1)
+        );
+    }
+
+    /**
+     * ownValues() without the paths every website keeps of its own
+     * (PER_WEBSITE): the values a website holds that the websites of one
+     * store on one Smaily account share (CON-470). A website that holds
+     * only such paths holds none.
+     *
+     * @return array<int, array<string, string>>
+     */
+    public function sharedOwnValues(string $section): array
+    {
+        $shared = [];
+        foreach ($this->ownValues($section) as $websiteId => $values) {
+            $values = array_diff_key($values, array_flip(self::PER_WEBSITE));
+            if ($values !== []) {
+                $shared[$websiteId] = $values;
+            }
+        }
+
+        return $shared;
+    }
+
+    /**
+     * Writes a value at the default scope as stored (CON-470: the API
+     * password the websites agree on, still encrypted).
+     */
+    public function promotePath(string $path, string $value): void
+    {
+        $this->configWriter->save($path, $value);
+    }
+
+    /**
+     * Gives every website the automations the websites hold of their own
+     * (CON-470, one store on one Smaily account): path by path, a value the
+     * default scope holds wins; a value it lacks moves there when every
+     * website that holds the path holds the same value. Mapping rows go by
+     * automation (trigger): the store-wide rows (website 0) win where there
+     * are any for the trigger; else the websites' rows move there when every
+     * website that holds rows for the trigger holds the same ones. Then each
+     * website's own automations are removed — except on a website that
+     * holds a path or a trigger's rows the websites disagree on and the
+     * default scope lacks: its automations stay as they are.
+     *
+     * @return array{0: array<int, string[]>, 1: int[]} the websites whose own
+     *     automations went, with their paths, and the websites kept
+     */
+    public function shareAutomations(): array
+    {
+        $own = $this->sharedOwnValues(self::AUTOMATIONS);
+        if ($own === []) {
+            return [[], []];
+        }
+        $storeWide = $this->storeWideValues(self::AUTOMATIONS);
+        $conflicted = [];
+
+        $byPath = [];
+        foreach ($own as $websiteId => $values) {
+            foreach ($values as $path => $value) {
+                if ($path !== 'mappings' && !array_key_exists($path, $storeWide)) {
+                    $byPath[$path][$websiteId] = $value;
+                }
+            }
+        }
+        $moveValues = [];
+        foreach ($byPath as $path => $values) {
+            if (count(array_unique($values)) === 1) {
+                $moveValues[$path] = reset($values);
+            } else {
+                $conflicted += array_fill_keys(array_keys($values), true);
+            }
+        }
+
+        $connection = $this->resource->getConnection();
+        $table = $this->resource->getTableName(MappingResource::TABLE_NAME);
+        $select = $connection->select()
+            ->from($table, [
+                'website_id',
+                'trigger_type',
+                'language',
+                'account_key',
+                'workflow_id',
+                'is_default_fallback',
+            ])
+            ->where('website_id IN (?)', array_merge([0], array_keys($own)))
+            ->order(['website_id', 'trigger_type', 'language', 'account_key']);
+        foreach (self::MAPPING_ROWS[self::AUTOMATIONS] as $condition => $value) {
+            $select->where($condition, $value);
+        }
+        $rows = [];
+        foreach ($connection->fetchAll($select) as $row) {
+            $rows[(string)$row['trigger_type']][(int)$row['website_id']][] = $row;
+        }
+        $moveRows = [];
+        foreach ($rows as $trigger => $byWebsite) {
+            if (isset($byWebsite[0])) {
+                continue;
+            }
+            $shapes = array_map(
+                static fn (array $websiteRows): string => implode("\n", array_map(
+                    static fn (array $row): string => $row['language'] . '|' . $row['account_key'] . '|'
+                        . (int)$row['workflow_id'] . '|' . (int)$row['is_default_fallback'],
+                    $websiteRows
+                )),
+                $byWebsite
+            );
+            if (count(array_unique($shapes)) === 1) {
+                $moveRows[$trigger] = reset($byWebsite);
+            } else {
+                $conflicted += array_fill_keys(array_keys($byWebsite), true);
+            }
+        }
+
+        foreach ($moveValues as $path => $value) {
+            $this->configWriter->save($path, $value);
+        }
+        foreach ($moveRows as $triggerRows) {
+            foreach ($triggerRows as $row) {
+                $connection->insertOnDuplicate(
+                    $table,
+                    [
+                        'website_id' => 0,
+                        'trigger_type' => $row['trigger_type'],
+                        'language' => $row['language'],
+                        'account_key' => $row['account_key'],
+                        'workflow_id' => (int)$row['workflow_id'],
+                        'is_default_fallback' => (int)$row['is_default_fallback'],
+                    ],
+                    ['workflow_id', 'is_default_fallback']
+                );
+            }
+        }
+        $removed = [];
+        foreach ($own as $websiteId => $values) {
+            if (isset($conflicted[$websiteId])) {
+                continue;
+            }
+            $this->removeOwnValues(self::AUTOMATIONS, $websiteId);
+            $removed[$websiteId] = array_keys($values);
+        }
+
+        return [$removed, array_keys($conflicted)];
+    }
+
+    /**
+     * Whether the default scope holds a value of the section that the
+     * websites share (not a PER_WEBSITE path): a default-scope row of its
+     * paths, or for the automations and the transactional emails a
+     * store-wide mapping row (website 0) of the section.
+     */
+    public function hasStoreWideValues(string $section): bool
+    {
+        if (array_diff_key($this->storeWideValues($section), array_flip(self::PER_WEBSITE)) !== []) {
+            return true;
+        }
+        if (!isset(self::MAPPING_ROWS[$section])) {
+            return false;
+        }
+        $connection = $this->resource->getConnection();
+        $select = $connection->select()
+            ->from($this->resource->getTableName(MappingResource::TABLE_NAME), ['id'])
+            ->where('website_id = ?', 0)
+            ->limit(1);
+        foreach (self::MAPPING_ROWS[$section] as $condition => $value) {
+            $select->where($condition, $value);
+        }
+
+        return (bool)$connection->fetchOne($select);
     }
 
     /**
@@ -363,14 +637,18 @@ class WebsiteOverrides
      * accounts stay the website's. The transactional emails' store-wide rows
      * become the rows the website reads: its own, where it holds any or uses
      * its own transactional account (CON-281). The mark of a website's own
-     * transactional account is not written at the default scope. The
-     * website's own values stay until removeOwnValues().
+     * transactional account is not written at the default scope, nor are
+     * the $keep paths. The website's own values stay until removeOwnValues().
+     *
+     * @param string[] $keep paths that stay the website's own
      */
-    public function promoteToStoreWide(string $section, int $websiteId): void
+    public function promoteToStoreWide(string $section, int $websiteId, array $keep = []): void
     {
         $own = $this->ownValues($section)[$websiteId] ?? [];
         foreach ($own as $path => $value) {
-            if ($path === 'mappings' || $path === Config::XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT) {
+            if ($path === 'mappings' || $path === Config::XML_PATH_TRANSACTIONAL_WEBSITE_ACCOUNT
+                || in_array($path, $keep, true)
+            ) {
                 continue;
             }
             if ($path === Config::XML_PATH_MULTILINGUAL_MODE && $value === MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS) {
@@ -407,7 +685,7 @@ class WebsiteOverrides
      *
      * @return array<string, string>
      */
-    private function storeWideValues(string $section): array
+    public function storeWideValues(string $section): array
     {
         $connection = $this->resource->getConnection();
         $values = [];
@@ -507,11 +785,18 @@ class WebsiteOverrides
      * Removes a website's own values of the section, with its mapping rows
      * of the section, so it follows the store-wide values again. For the
      * Smaily account, with $storeViewAccounts, its store views' own accounts
-     * (multilingual mode A, which it set for itself) go as well.
+     * (multilingual mode A, which it set for itself) go as well. The $keep
+     * paths stay.
+     *
+     * @param string[] $keep
      */
-    public function removeOwnValues(string $section, int $websiteId, bool $storeViewAccounts = false): void
-    {
-        foreach (self::PATHS[$section] as $path) {
+    public function removeOwnValues(
+        string $section,
+        int $websiteId,
+        bool $storeViewAccounts = false,
+        array $keep = []
+    ): void {
+        foreach (array_diff(self::PATHS[$section], $keep) as $path) {
             $this->configWriter->delete($path, ScopeInterface::SCOPE_WEBSITES, $websiteId);
         }
         if ($section === self::CONNECTION && $storeViewAccounts) {

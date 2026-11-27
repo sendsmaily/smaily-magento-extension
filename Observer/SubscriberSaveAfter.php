@@ -23,6 +23,7 @@ use Smaily\Connect\Model\ContactSync\ReconcileGuard;
 use Smaily\Connect\Model\ContactSync\StorefrontSubscription;
 use Smaily\Connect\Model\ContactSync\SubscriberPayloadBuilder;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
+use Smaily\Connect\Model\ContactSync\UnconnectedSignup;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Newsletter\SubscriberStatus;
 
@@ -49,6 +50,11 @@ use Smaily\Connect\Model\Newsletter\SubscriberStatus;
  * (CON-196, the same rule in every Smaily connector): it always sends
  * is_unsubscribed, 0 or 1, and a subscription may re-subscribe a contact who
  * unsubscribed in Smaily. Every other write leaves the status out.
+ *
+ * A subscription or unsubscribe that a website without a Smaily connection
+ * would have synced is recorded in the Log as skipped (CON-470,
+ * UnconnectedSignup), so a website the setup left unconnected does not drop
+ * its signups unseen.
  */
 class SubscriberSaveAfter implements ObserverInterface
 {
@@ -60,7 +66,8 @@ class SubscriberSaveAfter implements ObserverInterface
         private readonly SubscriberPayloadBuilder $payloadBuilder,
         private readonly CustomerRepositoryInterface $customerRepository,
         private readonly State $appState,
-        private readonly StorefrontSubscription $storefrontSubscription
+        private readonly StorefrontSubscription $storefrontSubscription,
+        private readonly UnconnectedSignup $unconnectedSignup
     ) {
     }
 
@@ -76,10 +83,7 @@ class SubscriberSaveAfter implements ObserverInterface
 
         $storeId = (int)$subscriber->getStoreId();
         $websiteId = $this->dispatcher->websiteId($storeId);
-        if (!$this->config->isContactSyncActive($websiteId)
-            || !$this->config->isConnected($storeId)
-            || !SubscriberStatus::changed($subscriber)
-        ) {
+        if (!$this->config->isContactSyncActive($websiteId) || !SubscriberStatus::changed($subscriber)) {
             return;
         }
 
@@ -99,6 +103,11 @@ class SubscriberSaveAfter implements ObserverInterface
         }
 
         $customer = $this->loadCustomer((int)$subscriber->getCustomerId());
+        if (!$this->config->isConnected($storeId)) {
+            $this->unconnectedSignup->record($email, $storeId, $isUnsubscribed, $customer);
+
+            return;
+        }
 
         $this->dispatcher->dispatchContactSync($email, $storeId, $isUnsubscribed, $customer);
 

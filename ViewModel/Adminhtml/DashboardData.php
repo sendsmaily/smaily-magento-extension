@@ -22,6 +22,7 @@ use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Health\QueueHealth;
 use Smaily\Connect\Model\Log\StatusPill;
 use Smaily\Connect\Model\StoreLayout;
+use Smaily\Connect\Model\WebsiteConnections;
 use Smaily\Connect\Ui\Component\QueueStatusOptions;
 
 /**
@@ -70,8 +71,33 @@ class DashboardData implements ArgumentInterface
         private readonly QueueStatusOptions $statusOptions,
         private readonly DateTime $dateTime,
         private readonly CatalogManifest $catalogManifest,
-        private readonly StoreLayout $storeLayout
+        private readonly StoreLayout $storeLayout,
+        private readonly WebsiteConnections $websiteConnections
     ) {
+    }
+
+    /**
+     * The names of the websites without a Smaily connection while another
+     * website has one (CON-470): their signups do not reach Smaily. Only for
+     * websites run as one store; separate stores set each website up on its
+     * own, and may leave one without Smaily.
+     *
+     * @return string[]
+     */
+    public function getUnconnectedWebsites(): array
+    {
+        return $this->storeLayout->isSeparateStores()
+            ? []
+            : array_values($this->websiteConnections->unconnectedWebsites());
+    }
+
+    /**
+     * Whether websites run as one store use different Smaily accounts
+     * (CON-470): they are not one store.
+     */
+    public function isMixedAccounts(): bool
+    {
+        return $this->storeLayout->mixesAccounts();
     }
 
     /**

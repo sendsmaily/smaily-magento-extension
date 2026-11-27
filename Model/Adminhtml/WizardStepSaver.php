@@ -51,6 +51,16 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * - The initial setup (a store-wide request) writes the default scope; on a
  *   2+-website install a website listed with its own values keeps them
  *   unless the post names it in `use_store_wide`.
+ * - One store on one Smaily account (StoreLayout::sharesOneAccount(),
+ *   CON-470): Settings is store-wide as the initial setup is, and a
+ *   store-wide save of the Smaily account or the automations removes every
+ *   website's own values of the section, so the saved value applies to
+ *   every website; each website keeps its own storefront address
+ *   (`storefront_urls`, WebsiteOverrides::PER_WEBSITE). A store-wide
+ *   Contacts save removes a website's own Contacts settings only where they
+ *   differ in no consent question (WebsiteContacts), and those of the
+ *   websites the post names in its confirmation (`use_everywhere`: the
+ *   website ids Settings > Contacts listed).
  * - Settings on a 2+-website install, for its selected website: `own` true
  *   writes the website's own values (its scope; the mapping rows under its
  *   id); otherwise a website with own values gets them removed and nothing
@@ -141,7 +151,8 @@ class WizardStepSaver
         private readonly SetupNotice $setupNotice,
         private readonly TransactionalSettingsSaver $transactionalSaver,
         private readonly WebsiteOverrides $overrides,
-        private readonly StoreLayout $storeLayout
+        private readonly StoreLayout $storeLayout,
+        private readonly WebsiteContacts $websiteContacts
     ) {
     }
 
@@ -282,6 +293,8 @@ class WizardStepSaver
         [$target, $remove, $write] = $this->sectionTarget($section, $data, $websiteId);
         // Separate stores have no store-wide account to compare with (CON-279).
         $multiple = $this->websiteContext->hasMultipleWebsites() && !$this->storeLayout->isSeparateStores();
+        // One store on one Smaily account shares the section (CON-470).
+        $shared = $target === null && $this->isSharedSave();
         // A Smaily account saved for one website of a 2+-website install
         // (CON-190): whether it used another account than the store-wide
         // one before this save.
@@ -291,6 +304,17 @@ class WizardStepSaver
         if ($errors !== []) {
             return $errors;
         }
+        // Who is synced is a consent question (CON-470): a website's own
+        // Contacts settings that differ in it go only when the merchant
+        // confirms, compared with the settings this save wrote.
+        $confirmed = [];
+        if ($shared && $section === WebsiteOverrides::SUBSCRIBERS) {
+            $confirmed = array_values(array_intersect(
+                array_keys($this->overrides->ownValues(WebsiteOverrides::SUBSCRIBERS)),
+                array_map('intval', is_array($data['use_everywhere'] ?? null) ? $data['use_everywhere'] : [])
+            ));
+            $remove = array_values(array_unique(array_merge($this->websiteContacts->identical(), $confirmed)));
+        }
         foreach ($remove as $removeId) {
             // The workflows of a website on another Smaily account came from
             // that account: its own automations go with it (CON-190).
@@ -298,7 +322,12 @@ class WizardStepSaver
                 && $this->overrides->usesOtherAccount($removeId);
             // A website that set its own per-language accounts (mode A)
             // keeps them on its store views; they go with its own account.
-            $this->overrides->removeOwnValues($section, $removeId, $multiple);
+            $this->overrides->removeOwnValues(
+                $section,
+                $removeId,
+                $multiple,
+                $shared ? WebsiteOverrides::PER_WEBSITE : []
+            );
             if ($otherAccount) {
                 $this->overrides->removeOwnValues(WebsiteOverrides::AUTOMATIONS, $removeId);
             }
@@ -310,9 +339,20 @@ class WizardStepSaver
             $this->overrides->removeOwnValues(WebsiteOverrides::AUTOMATIONS, (int)$target);
             $this->ownAccountStarted = true;
         }
-        $this->returnedToStoreWide = !$write;
+        $this->returnedToStoreWide = !$write || $confirmed !== [];
 
         return [];
+    }
+
+    /**
+     * Whether this save is the store-wide save of one store on one Smaily
+     * account, whose websites share the settings (CON-470).
+     */
+    private function isSharedSave(): bool
+    {
+        return $this->websiteContext->hasMultipleWebsites()
+            && $this->websiteContext->isStoreWide()
+            && $this->storeLayout->sharesOneAccount();
     }
 
     /**
@@ -339,6 +379,12 @@ class WizardStepSaver
             return [$websiteId, [], true];
         }
         if ($this->websiteContext->isStoreWide()) {
+            // One store on one Smaily account: every website shares the
+            // values, so no website keeps its own (CON-470); the Contacts
+            // settings that go are decided after the save (saveSection()).
+            if ($this->storeLayout->sharesOneAccount()) {
+                return [null, $section === WebsiteOverrides::SUBSCRIBERS ? [] : $withOwn, true];
+            }
             $chosen = array_map('intval', is_array($data['use_store_wide'] ?? null) ? $data['use_store_wide'] : []);
             // A website on another Smaily account keeps its automations (CON-190).
             if ($section === WebsiteOverrides::AUTOMATIONS) {
@@ -538,7 +584,17 @@ class WizardStepSaver
 
         // The storefront address (PRO-3660; Settings > Connection and the
         // initial setup's Connect step, PRO-3802) is checked before anything
-        // is saved as well; a post without the key leaves it as is.
+        // is saved as well; a post without the key leaves it as is. One
+        // store on one Smaily account keeps an address per website (CON-470).
+        $storefrontError = null;
+        $websiteStorefrontUrls = null;
+        if ($target === null && $this->isSharedSave()) {
+            $websiteStorefrontUrls = $this->postedWebsiteStorefrontUrls($data, $storefrontError);
+            unset($data['storefront_url']);
+        }
+        if ($storefrontError !== null) {
+            return [['field' => 'storefront_url', 'message' => $storefrontError]];
+        }
         $storefrontUrl = null;
         if (array_key_exists('storefront_url', $data)) {
             $storefrontUrl = is_string($data['storefront_url'])
@@ -678,12 +734,51 @@ class WizardStepSaver
             $this->storefrontUrlChanged = $storefrontUrl !== $savedStorefrontUrl;
             $this->write(Config::XML_PATH_STOREFRONT_URL, $storefrontUrl, $target);
         }
+        foreach ($websiteStorefrontUrls ?? [] as $storefrontWebsiteId => $websiteStorefrontUrl) {
+            $saved = StorefrontUrl::normalize($this->config->getWebsiteStorefrontUrl($storefrontWebsiteId));
+            if ($websiteStorefrontUrl !== $saved) {
+                $this->storefrontUrlChanged = true;
+                $this->write(Config::XML_PATH_STOREFRONT_URL, $websiteStorefrontUrl, $storefrontWebsiteId);
+            }
+        }
 
         if (!$initialSetup) {
             $this->checkCredentials($subdomain, $username, $password, $websiteId);
         }
 
         return [];
+    }
+
+    /**
+     * The storefront addresses posted per website (`storefront_urls`,
+     * website id => address) on one store on one Smaily account (CON-470),
+     * normalized, for the real websites only; null when the post holds none
+     * or an address is not one, which $error then says.
+     *
+     * @param array<string, mixed> $data
+     * @return array<int, string>|null
+     */
+    private function postedWebsiteStorefrontUrls(array $data, ?string &$error): ?array
+    {
+        if (!is_array($data['storefront_urls'] ?? null)) {
+            return null;
+        }
+        $urls = [];
+        $websites = $this->websiteContext->getWebsiteOptions();
+        foreach ($data['storefront_urls'] as $websiteId => $url) {
+            if (!isset($websites[(int)$websiteId])) {
+                continue;
+            }
+            $normalized = is_string($url) ? StorefrontUrl::normalize($url) : null;
+            if ($normalized === null) {
+                $error = (string)__('Enter the storefront\'s address only, starting with https:// — for example https://shop.example.com — without a path or a query.');
+
+                return null;
+            }
+            $urls[(int)$websiteId] = $normalized;
+        }
+
+        return $urls;
     }
 
     /**

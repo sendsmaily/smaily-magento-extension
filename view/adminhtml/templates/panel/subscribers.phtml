@@ -33,6 +33,11 @@ $showSyncSwitch = $isSettings || !$syncEnabled;
 // The initial setup on a 2+-website install saves the Contacts settings for
 // the whole store (CON-179): its save starts contact sync on every website.
 $allWebsites = !$isSettings && $viewModel->isStoreWide() && $viewModel->hasMultipleWebsites();
+// One store on one Smaily account (CON-470): the websites whose own Contacts
+// settings differ in who is synced keep them, so the setup does not say
+// that its save starts contact sync there.
+$differingWebsites = $viewModel->getDifferingContactWebsites();
+$startingWebsites = array_values(array_diff($viewModel->getWebsiteNames(), array_column($differingWebsites, 'name')));
 
 // Optional contact fields, server-rendered (same values the system.xml
 // multiselect edits).
@@ -60,7 +65,9 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
         // shown, panels-js.phtml shows it while the switch is ticked. ?>
         <?php if ($allWebsites): ?>
         <p id="smaily-w-sync-starts-websites"<?= $showSyncSwitch ? ' style="display:none;"' : '' ?>>
-            <?= $escaper->escapeHtml(__('Saving this step starts contact sync on every website: %1.', implode(', ', $viewModel->getWebsiteNames()))) ?>
+            <?= $escaper->escapeHtml($differingWebsites === []
+                ? __('Saving this step starts contact sync on every website: %1.', implode(', ', $startingWebsites))
+                : __('Saving this step starts contact sync on these websites: %1. The websites listed below keep their own contact settings.', implode(', ', $startingWebsites))) ?>
             <?php if ($viewModel->getWebsiteOverrides('subscribers') !== []): ?>
             <?= $escaper->escapeHtml(__('A website that keeps its own Contacts settings below syncs as those settings say.')) ?>
             <?php endif; ?>
@@ -110,7 +117,37 @@ $selectedSyncFields = $viewModel->getSelectedSyncFields();
         <?php // Websites on one Smaily account with different contact sync
         // modes, from the saved settings (CON-432, Model\Adminhtml\SharedAccountModes),
         // each named with its mode as the cards above name it. ?>
-        <?php $sharedAccountModes = $viewModel->getSharedAccountModes(); ?>
+        <?php // One store on one Smaily account (CON-470): the websites whose own
+        // Contacts settings differ in who is synced keep them until the
+        // merchant confirms on Settings > Contacts; the confirmation saves
+        // this tab for the websites listed (settings/index.phtml). The
+        // initial setup lists them too and says where to confirm. It names
+        // the same websites as the warning below, so that one steps aside. ?>
+        <?php if ($differingWebsites !== []): ?>
+        <div class="smaily-banner smaily-banner--warning" id="smaily-w-website-contacts" role="status" style="margin-top:1.5rem;">
+            <span class="smaily-banner__icon">&#9888;</span>
+            <div class="smaily-banner__body">
+                <div class="smaily-banner__title"><?= $escaper->escapeHtml(__('Some websites still use their own contact settings')) ?></div>
+                <div class="smaily-banner__message"><?= $escaper->escapeHtml(__('These websites sync contacts by settings that differ from the ones on this tab, and keep them until you confirm that every website uses the settings on this tab:')) ?></div>
+                <ul class="smaily-banner__list">
+                    <?php foreach ($differingWebsites as $differingWebsite): ?>
+                    <li><?= $escaper->escapeHtml($differingWebsite['name'] . ' — ' . ($differingWebsite['enabled']
+                        ? (string)($subscriberModes[$differingWebsite['mode']]['title'] ?? $differingWebsite['mode'])
+                        : (string)__('Contact sync is off'))) ?></li>
+                    <?php endforeach; ?>
+                </ul>
+                <?php if ($isSettings): ?>
+                <button type="button" class="action-secondary" id="smaily-w-contacts-everywhere"
+                        data-website-ids="<?= $escaper->escapeHtmlAttr(implode(',', array_column($differingWebsites, 'websiteId'))) ?>">
+                    <span><?= $escaper->escapeHtml(__('Use the same contact settings on every website')) ?></span>
+                </button>
+                <?php else: ?>
+                <p class="note"><?= $escaper->escapeHtml(__('Confirm it under Settings > Contacts once the setup is finished.')) ?></p>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+        <?php $sharedAccountModes = $differingWebsites === [] ? $viewModel->getSharedAccountModes() : []; ?>
         <?php if ($sharedAccountModes !== []): ?>
         <div class="smaily-banner smaily-banner--warning" id="smaily-w-shared-account-modes" role="status" style="margin-top:1.5rem;">
             <span class="smaily-banner__icon">&#9888;</span>

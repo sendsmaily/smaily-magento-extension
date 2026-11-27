@@ -1450,10 +1450,19 @@ window.smailyPanelsInit = function ($) {
     // The Storefront URL field (PRO-3660), on Settings > Connection and in
     // the initial setup's Connect step (PRO-3802); a page without the field
     // posts no key and leaves the saved value as is.
+    // One store on one Smaily account posts an address per website
+    // (`storefront_urls`, website id => address, CON-470).
     function withStorefrontUrl(data) {
         var $field = $('#smaily-w-storefront-url');
         if ($field.length) {
             data.storefront_url = String($field.val() || '');
+        }
+        var $websites = $('.smaily-w-storefront-website');
+        if ($websites.length) {
+            data.storefront_urls = {};
+            $websites.each(function () {
+                data.storefront_urls[String($(this).data('website-id'))] = String($(this).val() || '');
+            });
         }
         return data;
     }

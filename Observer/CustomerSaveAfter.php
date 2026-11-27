@@ -17,6 +17,7 @@ use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\ContactSync\ReconcileGuard;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
+use Smaily\Connect\Model\ContactSync\UnconnectedSignup;
 
 /**
  * Keeps Smaily contact fields fresh on customer profile changes
@@ -28,7 +29,9 @@ use Smaily\Connect\Model\ContactSync\SyncDispatcher;
  * other fields, so it never sends is_unsubscribed (CON-196; Erkki,
  * 2026-10-23, superseding PRO-3616 here): Smaily keeps an existing contact's
  * status, and creates a missing contact as subscribed — also one who
- * unsubscribed in the store under legitimate interest.
+ * unsubscribed in the store under legitimate interest. A website without a
+ * Smaily connection records the sync it would have sent in the Log as
+ * skipped (CON-470, UnconnectedSignup).
  */
 class CustomerSaveAfter implements ObserverInterface
 {
@@ -37,7 +40,8 @@ class CustomerSaveAfter implements ObserverInterface
         private readonly Mode $mode,
         private readonly ReconcileGuard $guard,
         private readonly SyncDispatcher $dispatcher,
-        private readonly SubscriberFactory $subscriberFactory
+        private readonly SubscriberFactory $subscriberFactory,
+        private readonly UnconnectedSignup $unconnectedSignup
     ) {
     }
 
@@ -53,10 +57,7 @@ class CustomerSaveAfter implements ObserverInterface
 
         $storeId = (int)$customer->getStoreId();
         $websiteId = (int)$customer->getWebsiteId();
-        if (!$this->config->isContactSyncActive($websiteId)
-            || !$this->config->isConnected($storeId ?: null)
-            || !$this->mode->syncsAccounts($websiteId)
-        ) {
+        if (!$this->config->isContactSyncActive($websiteId) || !$this->mode->syncsAccounts($websiteId)) {
             return;
         }
 
@@ -64,6 +65,12 @@ class CustomerSaveAfter implements ObserverInterface
             ->loadByCustomer((int)$customer->getId(), $websiteId)
             ->getStatus();
         if ($this->mode->requiresOptin($websiteId) && $status !== Subscriber::STATUS_SUBSCRIBED) {
+            return;
+        }
+
+        if (!$this->config->isConnected($storeId ?: null)) {
+            $this->unconnectedSignup->record((string)$customer->getEmail(), $storeId, null, $customer);
+
             return;
         }
 

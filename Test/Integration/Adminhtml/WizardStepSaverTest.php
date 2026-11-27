@@ -57,6 +57,7 @@ use Smaily\Connect\Setup\Patch\Data\CopyAutomationsToSeparateStores;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
 use Smaily\Connect\ViewModel\Adminhtml\WizardData;
+use Smaily\Connect\Model\Adminhtml\WebsiteContacts;
 
 /**
  * The store-wide setup (CON-179) against a real core_config_data table:
@@ -132,7 +133,12 @@ class WizardStepSaverTest extends IntegrationTestCase
                 $storeManager,
                 new SubdomainNormalizer()
             ),
-            $this->storeLayout($storeManager, $overrides)
+            $this->storeLayout($storeManager, $overrides),
+            new WebsiteContacts(
+                $this->objectManager->get(ResourceConnection::class),
+                new DatabaseScopeConfig($this->connection, [self::MAIN => self::MAIN, self::SECOND => self::SECOND]),
+                $overrides
+            )
         );
     }
 
@@ -262,7 +268,12 @@ class WizardStepSaverTest extends IntegrationTestCase
             $this->createMock(StoreDate::class),
             $this->storeLayout($storeManager),
             $this->createMock(SharedAccountModes::class),
-            $this->router()
+            $this->router(),
+            new WebsiteContacts(
+                $this->objectManager->get(ResourceConnection::class),
+                new DatabaseScopeConfig($this->connection, [self::MAIN => self::MAIN, self::SECOND => self::SECOND]),
+                $this->overrides([self::MAIN, self::SECOND])
+            )
         );
     }
 
@@ -1443,6 +1454,104 @@ class WizardStepSaverTest extends IntegrationTestCase
 
         $this->insertRow('stores', self::SECOND, Config::XML_PATH_SUBDOMAIN, 'Shop');
         self::assertSame($expected, $modes->of(self::MAIN), 'a store view on the shared account');
+    }
+
+    /**
+     * CON-470: one store on one Smaily account shares its settings across
+     * its websites. Settings is store-wide there, and its save of the Smaily
+     * account or the automations applies to every website: the values for
+     * all websites are written and every website's own values of the section
+     * go, except each website's storefront address, which the Connection
+     * save writes per website. A Contacts save removes a website's own
+     * Contacts settings only where they differ in nothing of who is synced;
+     * a website that syncs another mode keeps its own, and the tab lists it,
+     * until the merchant confirms the settings for every website. The
+     * initial setup lists no website with values of its own. Websites on
+     * different Smaily accounts keep their per-website Settings.
+     */
+    public function testOneStoreOnOneSmailyAccountSavesEverySettingForEveryWebsite(): void
+    {
+        $this->saver('0')->save('connect', ['subdomain' => 'shop', 'username' => 'api-user', 'password' => 'secret']);
+        $this->saver('0')->save('subscribers', ['sync_enabled' => true, 'sync_mode' => 'consent']);
+        // The websites' own values from before: Second's own login of the
+        // same account, its own sync mode, workflow and storefront address;
+        // Main's own extra fields, which change nobody's consent.
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_USERNAME, 'api-user');
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_SYNC_MODE, 'legitimate_interest');
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_WELCOME_WORKFLOW, '5');
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_STOREFRONT_URL, 'https://second.example.com');
+        $this->insertRow('websites', self::MAIN, Config::XML_PATH_SYNC_FIELDS, 'first_name');
+        self::assertTrue($this->storeLayout()->sharesOneAccount());
+        self::assertSame([], $this->wizardData('0', ['en'])->getWebsiteOverrides('subscribers'));
+        self::assertSame(
+            [['websiteId' => self::SECOND, 'name' => 'Website ' . self::SECOND, 'enabled' => true, 'mode' => 'legitimate_interest']],
+            $this->wizardData('0', ['en'])->getDifferingContactWebsites()
+        );
+        self::assertSame([
+            self::MAIN => ['name' => 'Website ' . self::MAIN, 'url' => ''],
+            self::SECOND => ['name' => 'Website ' . self::SECOND, 'url' => 'https://second.example.com'],
+        ], $this->wizardData('0', ['en'])->getWebsiteStorefrontUrls());
+
+        self::assertSame([], $this->saver('0')->save('subscribers', ['sync_mode' => 'consent', 'sync_fields' => []]));
+        self::assertSame([], $this->saver('0')->save('automations', ['welcome_enabled' => true, 'welcome_workflow' => 900]));
+        self::assertSame([], $this->saver('0')->save('connect', [
+            'subdomain' => 'shop',
+            'username' => 'api-user',
+            'storefront_urls' => [self::MAIN => 'https://main.example.com', self::SECOND => 'https://second.example.com'],
+        ]));
+
+        foreach ([Config::XML_PATH_USERNAME, Config::XML_PATH_SYNC_FIELDS, Config::XML_PATH_WELCOME_WORKFLOW] as $path) {
+            self::assertSame([['default', 0]], $this->scopesOf($path), $path);
+        }
+        self::assertSame(
+            [['websites', self::MAIN], ['websites', self::SECOND]],
+            $this->scopesOf(Config::XML_PATH_STOREFRONT_URL),
+            'Each website keeps its own storefront address'
+        );
+        self::assertSame('https://main.example.com', $this->config->getWebsiteStorefrontUrl(self::MAIN));
+        self::assertSame('https://second.example.com', $this->config->getWebsiteStorefrontUrl(self::SECOND));
+        self::assertSame(
+            [['default', 0], ['websites', self::SECOND]],
+            $this->scopesOf(Config::XML_PATH_SYNC_MODE),
+            'Second syncs another mode until the merchant confirms'
+        );
+        self::assertSame('legitimate_interest', $this->config->getSyncMode(self::SECOND));
+        foreach ([self::MAIN, self::SECOND] as $websiteId) {
+            self::assertTrue($this->config->isContactSyncActive($websiteId));
+            self::assertSame(900, $this->router()->resolve('welcome', $websiteId, 'default')?->workflowId);
+            self::assertSame('secret', $this->config->getWebsitePassword($websiteId));
+        }
+
+        // Main's own checkout checkbox, set after the tab listed Second:
+        // the confirmation names Second only, so Main keeps its own.
+        $this->insertRow('websites', self::MAIN, Config::XML_PATH_CHECKOUT_OPTIN_ENABLED, '0');
+
+        // The merchant confirms for the websites listed: they use the
+        // Contacts settings for all websites, and the page reloads.
+        $saver = $this->saver('0');
+        self::assertSame([], $saver->save('subscribers', ['sync_mode' => 'consent', 'use_everywhere' => [self::SECOND]]));
+        self::assertTrue($saver->isReturnedToStoreWide());
+        self::assertSame([['default', 0]], $this->scopesOf(Config::XML_PATH_SYNC_MODE));
+        self::assertSame('consent', $this->config->getSyncMode(self::SECOND));
+        self::assertSame(
+            [['websites', self::MAIN]],
+            $this->scopesOf(Config::XML_PATH_CHECKOUT_OPTIN_ENABLED),
+            'A website the confirmation did not name keeps its own'
+        );
+        self::assertSame(
+            [self::MAIN],
+            array_column($this->wizardData('0', ['en'])->getDifferingContactWebsites(), 'websiteId')
+        );
+
+        // Another Smaily account on a website, or on one of its store views:
+        // not one store on one account.
+        $this->insertRow('stores', self::SECOND, Config::XML_PATH_SUBDOMAIN, 'other-shop');
+        self::assertFalse($this->storeLayout()->sharesOneAccount());
+        self::assertTrue($this->storeLayout()->mixesAccounts());
+        $this->connection->delete('core_config_data', ['scope = ?' => 'stores']);
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_SUBDOMAIN, 'other-shop');
+        self::assertFalse($this->storeLayout()->sharesOneAccount());
+        self::assertTrue($this->storeLayout()->mixesAccounts());
     }
 
     private function insertRow(string $scope, int $scopeId, string $path, string $value): void

@@ -58,6 +58,7 @@ use Smaily\Connect\Model\Queue\Event as QueueEvent;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
+use Smaily\Connect\Model\ContactSync\UnconnectedSignup;
 use Smaily\Connect\Observer\CustomerSaveAfter;
 use Smaily\Connect\Observer\SubscriberSaveAfter;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
@@ -226,7 +227,8 @@ class SubscriptionStatusTest extends IntegrationTestCase
             new Mode($this->config()),
             new ReconcileGuard(),
             $this->dispatcher(),
-            $subscriberFactory
+            $subscriberFactory,
+            $this->createMock(UnconnectedSignup::class)
         );
 
         $observer->execute(new Observer(['event' => new Event(['customer_data_object' => $customer])]));
@@ -441,7 +443,8 @@ class SubscriptionStatusTest extends IntegrationTestCase
             $this->payloadBuilder(),
             $this->createMock(CustomerRepositoryInterface::class),
             $appState,
-            $storefrontSubscription
+            $storefrontSubscription,
+            $this->createMock(UnconnectedSignup::class)
         );
         $eventManager = $this->createMock(EventManagerInterface::class);
         $eventManager->method('dispatch')->willReturnCallback(

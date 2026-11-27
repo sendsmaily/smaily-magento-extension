@@ -53,6 +53,7 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
 use Smaily\Connect\Test\Integration\Support\Fake\RequestCachedScopeConfig;
 use Smaily\Connect\ViewModel\Adminhtml\WizardData;
+use Smaily\Connect\Model\Adminhtml\WebsiteContacts;
 
 /**
  * PRO-3683: with per-language Smaily accounts, saving the accounts gives
@@ -207,7 +208,8 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
                 $storeManager,
                 new SubdomainNormalizer()
             ),
-            $this->createMock(StoreLayout::class)
+            $this->createMock(StoreLayout::class),
+            $this->createMock(WebsiteContacts::class)
         );
 
         // The other website's store view holds its own Estonian account.
@@ -540,7 +542,8 @@ class PerLanguageAccountsSaveTest extends IntegrationTestCase
             $this->createMock(StoreDate::class),
             $this->createMock(StoreLayout::class),
             $this->createMock(SharedAccountModes::class),
-            $this->createMock(Router::class)
+            $this->createMock(Router::class),
+            $this->createMock(WebsiteContacts::class)
         );
     }
 

@@ -69,11 +69,51 @@ class SyncDispatcher
         }
 
         $this->enqueueContactSync($contact, $storeId);
+        $this->remember($key, $contact);
+    }
+
+    /**
+     * Keeps the contact as the last one this process queued or recorded for
+     * the store and address.
+     *
+     * @param array<string, mixed> $contact
+     */
+    private function remember(string $key, array $contact): void
+    {
         unset($this->lastQueued[$key]);
         $this->lastQueued[$key] = $contact;
         if (count($this->lastQueued) > self::QUEUED_MEMORY) {
             unset($this->lastQueued[array_key_first($this->lastQueued)]);
         }
+    }
+
+    /**
+     * Records a contact sync in the Log as skipped, with the reason, instead
+     * of queueing it to be sent (CON-470); the row holds what
+     * dispatchContactSync() would have sent, and one that adds nothing to
+     * the last one this request recorded for the address is left out, as
+     * dispatchContactSync() leaves it out.
+     */
+    public function recordSkippedContactSync(
+        string $email,
+        int $storeId,
+        ?bool $isUnsubscribed,
+        ?CustomerInterface $customer,
+        string $reason
+    ): void {
+        $contact = $this->payloadBuilder->build($email, $storeId, $isUnsubscribed, $customer);
+        $key = $storeId . '|' . ($contact['email'] ?? '');
+        if (isset($this->lastQueued[$key]) && $this->addsNothing($contact, $this->lastQueued[$key])) {
+            return;
+        }
+        $this->remember($key, $contact);
+        $this->eventQueue->enqueueSkipped(
+            EventType::CONTACT_SYNC,
+            ['store_id' => $storeId, 'contact' => $contact],
+            $reason,
+            $this->contactEntity->of((string)($contact['email'] ?? '')),
+            $this->websiteId($storeId)
+        );
     }
 
     /**

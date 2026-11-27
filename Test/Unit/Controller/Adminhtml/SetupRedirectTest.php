@@ -8,7 +8,6 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Test\Unit\Controller\Adminhtml;
 
-use Magento\Backend\App\Action;
 use Magento\Backend\App\Action\Context;
 use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
@@ -23,6 +22,7 @@ use Smaily\Connect\Controller\Adminhtml\Settings\Index as SettingsIndex;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\ModuleVersion;
+use Smaily\Connect\Model\StoreLayout;
 
 /**
  * Settings, Dashboard or Log opened while the store is not set up redirect
@@ -32,22 +32,22 @@ use Smaily\Connect\Model\ModuleVersion;
 class SetupRedirectTest extends TestCase
 {
     /**
-     * @return array<string, array{0: class-string<Action>}>
+     * @return array<string, array{0: string}>
      */
     public static function pages(): array
     {
         return [
-            'Settings' => [SettingsIndex::class],
-            'Dashboard' => [DashboardIndex::class],
-            'Log' => [LogIndex::class],
+            'Settings' => ['Settings'],
+            'Dashboard' => ['Dashboard'],
+            'Log' => ['Log'],
         ];
     }
 
     /**
-     * @param class-string<SettingsIndex|DashboardIndex|LogIndex> $controllerClass
+     * @param 'Settings'|'Dashboard'|'Log' $page
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('pages')]
-    public function testAPageOfAStoreNotSetUpRedirectsToTheStoresSetup(string $controllerClass): void
+    public function testAPageOfAStoreNotSetUpRedirectsToTheStoresSetup(string $page): void
     {
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $scopeConfig->method('isSetFlag')->willReturn(false);
@@ -73,6 +73,17 @@ class SetupRedirectTest extends TestCase
         $context = $this->createMock(Context::class);
         $context->method('getResultFactory')->willReturn($resultFactory);
 
-        self::assertSame($redirect, (new $controllerClass($context, $setupGuard))->execute());
+        $controller = match ($page) {
+            'Settings' => new SettingsIndex(
+                $context,
+                $setupGuard,
+                $websiteContext,
+                $this->createMock(StoreLayout::class)
+            ),
+            'Dashboard' => new DashboardIndex($context, $setupGuard),
+            'Log' => new LogIndex($context, $setupGuard),
+        };
+
+        self::assertSame($redirect, $controller->execute());
     }
 }

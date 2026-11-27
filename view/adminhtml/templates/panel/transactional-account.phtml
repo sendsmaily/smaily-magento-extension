@@ -10,7 +10,8 @@
  * website, or by the setup for the whole store; PRO-4065) shows the account.
  * A separate Smaily account for order and shipment emails, saved for all
  * websites; on an install with more than one website, a website may use its
- * own, set in Settings only. Saved with Save Connection, or the setup's
+ * own, set in Settings only — not on one store on one Smaily account, whose
+ * websites share it (CON-470). Saved with Save Connection, or the setup's
  * Continue; its own Test connection checks what is typed, and a successful
  * one shows the triggers. Behavior lives in panel/panels-js.phtml. Nothing
  * is sent through it yet.
@@ -52,7 +53,8 @@ $isSettings = $block->getData('context') === 'settings';
         // switch is implied, kept ticked and out of sight for the page script. ?>
         <?php if ($viewModel->hasMultipleWebsites() && $viewModel->isSeparateStores() && !$viewModel->isStoreWide()): ?>
         <input type="checkbox" id="smaily-tx-website-account" checked hidden/>
-        <?php elseif ($isSettings && $viewModel->hasMultipleWebsites()): ?>
+        <?php // One store on one Smaily account shares it across its websites (CON-470). ?>
+        <?php elseif ($isSettings && $viewModel->hasMultipleWebsites() && !$viewModel->isStoreWide()): ?>
         <div class="smaily-inline-toggle">
             <label>
                 <input type="checkbox" id="smaily-tx-website-account" <?= $account['websiteAccount'] ? 'checked' : '' ?>/>

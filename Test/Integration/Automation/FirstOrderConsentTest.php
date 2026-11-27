@@ -60,6 +60,7 @@ use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Observer\OrderPlaced;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
+use Smaily\Connect\Model\ContactSync\UnconnectedSignup;
 
 /**
  * CON-387: who gets the first-order email follows the website's
@@ -296,7 +297,8 @@ class FirstOrderConsentTest extends IntegrationTestCase
             $storeManager,
             $this->createMock(SubscriptionManagerInterface::class),
             new StorefrontSubscription(),
-            new ReminderConsent($mode, $this->objectManager->get(ResourceConnection::class), $this->stateManager)
+            new ReminderConsent($mode, $this->objectManager->get(ResourceConnection::class), $this->stateManager),
+            $this->createMock(UnconnectedSignup::class)
         );
     }
 

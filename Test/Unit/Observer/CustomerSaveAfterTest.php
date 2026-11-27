@@ -20,6 +20,7 @@ use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\ContactSync\ReconcileGuard;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
 use Smaily\Connect\Observer\CustomerSaveAfter;
+use Smaily\Connect\Model\ContactSync\UnconnectedSignup;
 
 /**
  * CON-196: a profile save changes no subscription status, so it never sends
@@ -113,7 +114,7 @@ class CustomerSaveAfterTest extends TestCase
         $subscriberFactory = $this->createMock(SubscriberFactory::class);
         $subscriberFactory->method('create')->willReturn($subscriber);
 
-        return new CustomerSaveAfter($config, new Mode($config), new ReconcileGuard(), $dispatcher, $subscriberFactory);
+        return new CustomerSaveAfter($config, new Mode($config), new ReconcileGuard(), $dispatcher, $subscriberFactory, $this->createMock(UnconnectedSignup::class));
     }
 
     private function event(): Observer

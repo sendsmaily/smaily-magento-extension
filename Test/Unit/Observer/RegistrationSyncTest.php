@@ -30,6 +30,7 @@ use Smaily\Connect\Model\Privacy\AddressKey;
 use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
+use Smaily\Connect\Model\ContactSync\UnconnectedSignup;
 use Smaily\Connect\Observer\CustomerSaveAfter;
 use Smaily\Connect\Observer\SubscriberSaveAfter;
 
@@ -126,7 +127,7 @@ class RegistrationSyncTest extends TestCase
         $observer = $this->createMock(Observer::class);
         $observer->method('getEvent')->willReturn($event);
 
-        (new CustomerSaveAfter($config, new Mode($config), new ReconcileGuard(), $this->dispatcher, $subscriberFactory))
+        (new CustomerSaveAfter($config, new Mode($config), new ReconcileGuard(), $this->dispatcher, $subscriberFactory, $this->createMock(UnconnectedSignup::class)))
             ->execute($observer);
     }
 
@@ -160,7 +161,8 @@ class RegistrationSyncTest extends TestCase
             $this->payloadBuilder(),
             $customerRepository,
             $state,
-            new StorefrontSubscription()
+            new StorefrontSubscription(),
+            $this->createMock(UnconnectedSignup::class)
         ))->execute($observer);
     }
 

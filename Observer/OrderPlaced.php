@@ -23,13 +23,16 @@ use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\ContactSync\Mode;
 use Smaily\Connect\Model\ContactSync\StorefrontSubscription;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
+use Smaily\Connect\Model\ContactSync\UnconnectedSignup;
 
 /**
  * Order placement side effects (sales_order_place_after):
  * 1. The quote is no longer an abandoned cart candidate.
  * 2. A cart that WAS reminded gets its purchase marker (and its still-queued
  *    reminder withdrawn), so the follow-up workflow can exit.
- * 3. Checkout newsletter opt-in and guest-email contact sync.
+ * 3. Checkout newsletter opt-in and guest-email contact sync; on a website
+ *    without a Smaily connection, the contact it would have synced is
+ *    recorded in the Log as skipped (CON-470, UnconnectedSignup).
  * 4. First-order automation for a customer's first purchase, by the
  *    abandoned-cart reminder's rule (ReminderConsent, CON-387).
  */
@@ -44,7 +47,8 @@ class OrderPlaced implements ObserverInterface
         private readonly StoreManagerInterface $storeManager,
         private readonly SubscriptionManagerInterface $subscriptionManager,
         private readonly StorefrontSubscription $storefrontSubscription,
-        private readonly ReminderConsent $consent
+        private readonly ReminderConsent $consent,
+        private readonly UnconnectedSignup $unconnectedSignup
     ) {
     }
 
@@ -71,6 +75,8 @@ class OrderPlaced implements ObserverInterface
 
         $storeId = (int)$order->getStoreId();
         if (!$this->config->isConnected($storeId ?: null)) {
+            $this->recordUnconnected($order, $storeId, $optedIn);
+
             return;
         }
 
@@ -83,6 +89,34 @@ class OrderPlaced implements ObserverInterface
         $this->markCartPurchased($email, $storeId, $websiteId, $wasReminded);
         $this->syncContact($order, $email, $storeId, $websiteId, $optedIn);
         $this->triggerFirstOrder($order, $email, $storeId, $websiteId, $optedIn);
+    }
+
+    /**
+     * The contact a website without a Smaily connection would have synced
+     * from the order (CON-470): the checkout opt-in, as a subscription, or a
+     * guest order's email by the rule of syncContact(). The Log records it
+     * as skipped (UnconnectedSignup); nothing else of the order is.
+     */
+    private function recordUnconnected(OrderInterface $order, int $storeId, bool $optedIn): void
+    {
+        $websiteId = $this->dispatcher->websiteId($storeId);
+        $email = strtolower(trim((string)$order->getCustomerEmail()));
+        if ($optedIn) {
+            $this->unconnectedSignup->record($email, $storeId, false, null);
+        } elseif ($this->syncsGuest($order, $websiteId)) {
+            $this->unconnectedSignup->record($email, $storeId, null, null);
+        }
+    }
+
+    /**
+     * Whether a guest order's email syncs without the opt-in: only in a mode
+     * that needs no opt-in (legitimate interest) with the guests included.
+     */
+    private function syncsGuest(OrderInterface $order, int $websiteId): bool
+    {
+        return (bool)$order->getCustomerIsGuest()
+            && $this->mode->includeGuests($websiteId)
+            && !$this->mode->requiresOptin($websiteId);
     }
 
     /**
@@ -142,8 +176,7 @@ class OrderPlaced implements ObserverInterface
         // status, so none is sent (CON-196; Erkki, 2026-10-23, superseding
         // PRO-3616 here): Smaily keeps an existing contact's status and
         // creates a missing one as subscribed.
-        $isGuest = (bool)$order->getCustomerIsGuest();
-        if ($isGuest && $this->mode->includeGuests($websiteId) && !$this->mode->requiresOptin($websiteId)) {
+        if ($this->syncsGuest($order, $websiteId)) {
             $this->dispatcher->dispatchContactSync($email, $storeId, null, null);
         }
     }

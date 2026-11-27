@@ -128,7 +128,9 @@ nothing else moves — Magento's own emails, the abandoned-cart link and the
 module's back-end addresses keep the back-end host. Empty, the links are
 Magento's own. The value is saved with the Smaily account: for all
 websites, or for one website with **Use its own Smaily account on this
-website**. The field opens by itself when the last 30 days' orders all came
+website**. Where the websites run as one store on one Smaily account, it
+is saved per website: **Settings > Connection** shows a field for each
+website, named by the website. The field opens by itself when the last 30 days' orders all came
 through the API (GraphQL, or REST without Magento's storefront session).
 
 After a change, run the catalog import again (**Settings > Intelligence >

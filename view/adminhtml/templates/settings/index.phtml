@@ -38,6 +38,17 @@
  * website's values are always its own) and the drop-down next to the tabs
  * is not drawn.
  *
+ * One store on one Smaily account (CON-470, StoreLayout::sharesOneAccount())
+ * shares every setting across its websites: the page is store-wide
+ * (Settings\Index marks it so, as the initial setup is), shows and saves the
+ * values for all websites, and draws neither the drop-down nor the "own"
+ * switches nor the transactional "separate account for this website"
+ * switch. Each website keeps its own storefront address (a field per
+ * website on the Connection tab), and a website whose own Contacts
+ * settings differ in who is synced keeps them until the merchant confirms
+ * on the Contacts tab ("Use the same contact settings on every website",
+ * posted as `use_everywhere` with the ids of the websites listed).
+ *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
  */
@@ -46,13 +57,15 @@
 $viewModel = $block->getData('view_model');
 $hasMultipleWebsites = $viewModel->hasMultipleWebsites();
 $separateStores = $hasMultipleWebsites && $viewModel->isSeparateStores();
+// One store on one Smaily account: the values for all websites, no website's own (CON-470).
+$sharedSettings = $hasMultipleWebsites && $viewModel->isStoreWide();
 $websiteOptions = $viewModel->getWebsiteOptions();
 $selectedWebsiteId = $viewModel->getSelectedWebsiteId();
 
 // The "own values" switch of a tab (2+-website installs only, CON-179).
 // A website of separate stores has no switch: its values are its own (CON-279).
-$ownSwitch = static function (string $section, string $label) use ($viewModel, $escaper, $hasMultipleWebsites, $separateStores): string {
-    if (!$hasMultipleWebsites || $separateStores) {
+$ownSwitch = static function (string $section, string $label) use ($viewModel, $escaper, $hasMultipleWebsites, $separateStores, $sharedSettings): string {
+    if (!$hasMultipleWebsites || $separateStores || $sharedSettings) {
         return '';
     }
     $own = $viewModel->hasOwnValues($section);
@@ -86,7 +99,7 @@ $tabs = [
             <li data-tab="<?= $escaper->escapeHtmlAttr($tabId) ?>"><?= $escaper->escapeHtml($tabLabel) ?></li>
             <?php endforeach; ?>
         </ul>
-        <?php if ($hasMultipleWebsites && !$separateStores): ?>
+        <?php if ($hasMultipleWebsites && !$separateStores && !$sharedSettings): ?>
         <div class="smaily-website-select" id="smaily-website-select">
             <label for="smaily-website-select-input"><?= $escaper->escapeHtml(__('Website')) ?></label>
             <select id="smaily-website-select-input">
@@ -283,7 +296,7 @@ require(['jquery'], function ($) {
     // page-wide Save (PRO-3641). A failed save shows the error banner above
     // the tab's form and marks the field that caused it; the status beside
     // the button says the save failed (PRO-3562).
-    function saveTab($button, step, resultSelector) {
+    function saveTab($button, step, resultSelector, extra) {
         var $panel = $('.smaily-tab-panel.active');
         $button.prop('disabled', true);
         panels.clearFormErrors($panel);
@@ -294,7 +307,7 @@ require(['jquery'], function ($) {
                 if ($own.length) {
                     data.own = $own.is(':checked');
                 }
-                return panels.saveStep(step, data);
+                return panels.saveStep(step, $.extend(data, extra || {}));
             })
             .then(function (response) {
                 // The website's own values are gone: the tab shows the
@@ -337,6 +350,14 @@ require(['jquery'], function ($) {
 
     $('#smaily-w-subscribers-save').on('click', function () {
         saveTab($(this), 'subscribers', '#smaily-w-subscribers-result');
+    });
+
+    // One store on one Smaily account (CON-470): the merchant confirms that
+    // every website uses this tab's Contacts settings; the save removes the
+    // websites' own and the page reloads.
+    $('#smaily-w-contacts-everywhere').on('click', function () {
+        var ids = String($(this).data('website-ids') || '').split(',').filter(Boolean).map(Number);
+        saveTab($(this), 'subscribers', '#smaily-w-subscribers-result', {use_everywhere: ids});
     });
 
     $('#smaily-w-automations-save').on('click', function () {

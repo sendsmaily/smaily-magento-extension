@@ -35,6 +35,7 @@ use Smaily\Connect\Model\Config\Source\SyncMode;
 use Smaily\Connect\Model\Engine\Settings as EngineSettings;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\SubdomainNormalizer;
+use Smaily\Connect\Model\Adminhtml\WebsiteContacts;
 
 /**
  * The wizard/Settings single-mode workflow selects (.smaily-w-workflow) share
@@ -140,7 +141,8 @@ class WizardStepSaverTest extends TestCase
             $this->setupNotice,
             $this->transactionalSaver,
             $this->overrides,
-            $this->storeLayout
+            $this->storeLayout,
+            $this->createMock(WebsiteContacts::class)
         );
     }
 
@@ -1125,7 +1127,8 @@ class WizardStepSaverTest extends TestCase
             $this->setupNotice,
             $this->createMock(TransactionalSettingsSaver::class),
             $this->overrides,
-            $this->storeLayout
+            $this->storeLayout,
+            $this->createMock(WebsiteContacts::class)
         );
 
         $errors = $saver->save('connect', [

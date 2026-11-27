@@ -149,17 +149,18 @@ class OrderPlaced implements ObserverInterface
         int $websiteId,
         bool $optedIn
     ): void {
-        if (!$this->config->isContactSyncActive($websiteId)) {
-            return;
-        }
-
+        $syncActive = $this->config->isContactSyncActive($websiteId);
         if ($optedIn) {
             // Explicit checkout opt-in: create a native newsletter subscriber.
             // The subscriber-save observer handles the Smaily sync + welcome
             // automation, and double opt-in confirmation is honoured. It is
             // marked as the shopper's own storefront subscription, because
             // Luma's checkout places the order through the REST API
-            // (PRO-3580).
+            // (PRO-3580). The checkbox shows while contact sync is active or
+            // the welcome is on (CON-477), and its tick is saved by that rule.
+            if (!$syncActive && !$this->config->isWelcomeEnabled($websiteId)) {
+                return;
+            }
             $customerId = (int)$order->getCustomerId();
             $this->storefrontSubscription->run(function () use ($customerId, $email, $storeId): void {
                 if ($customerId > 0) {
@@ -169,6 +170,10 @@ class OrderPlaced implements ObserverInterface
                 }
             });
 
+            return;
+        }
+
+        if (!$syncActive) {
             return;
         }
 

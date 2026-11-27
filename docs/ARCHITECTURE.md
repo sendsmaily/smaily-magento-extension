@@ -198,6 +198,27 @@ Observer / cron ──enqueue──> smaily_event_queue ──cron flush (1 min)
   subscribe and unsubscribe), a customer save (`Observer\CustomerSaveAfter`),
   an order (`Observer\OrderPlaced`, the checkout opt-in, guest-order emails
   and the abandoned-cart purchase marker).
+- **The welcome follows the shopper's subscription, not contact sync
+  (CON-477, Erkki 2026-11-27; refines the 26 Nov rule that it followed
+  contact sync).** `Observer\SubscriberSaveAfter` queues the welcome for
+  every storefront subscription (frontend area, or the checkout opt-in's
+  `StorefrontSubscription` mark — PRO-3580) on a connected website with the
+  welcome on, whether or not a `contact.sync` goes with it: contact sync off
+  or not yet active, or a newsletter-form signup the checkout-opt-in-only
+  mode leaves out (PRO-3606). A customer account created without a
+  subscription saves no subscriber, so it queues none; a subscription in
+  the admin, through the API or by an import still queues none. With a
+  `contact.sync` queued first, the welcome's address leaves `language` to
+  it, as before; without one, the address is the whole contact payload
+  (`SubscriberPayloadBuilder::build()`, `is_unsubscribed` left out), so
+  `language` reaches the contact through the autoresponder call and a
+  workflow can branch on it. The checkout checkbox shows on a connected
+  website while contact sync is active or the welcome is on
+  (`Plugin\Checkout\AddNewsletterOptinToLayout`), and `Observer\OrderPlaced`
+  saves a tick by the same rule, so a tick with contact sync off reaches
+  the welcome through the subscriber save.
+  On a website without a connection, only the contact sync the website
+  would send is recorded (CON-470); a welcome alone records nothing.
 - **A contact a website without a Smaily connection would sync is in the
   Log (CON-470).** `Model\WebsiteConnections::unconnectedWebsites()` lists
   the websites none of whose store views has a Smaily account — its own,

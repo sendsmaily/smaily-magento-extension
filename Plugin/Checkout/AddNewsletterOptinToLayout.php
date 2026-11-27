@@ -16,6 +16,11 @@ use Smaily\Connect\Model\Config;
  * Injects the newsletter opt-in checkbox into the Luma/Knockout checkout
  * payment step. Hyvä Checkout has its own integration surface and is
  * handled by a separate compatibility package.
+ *
+ * The checkbox shows on a connected website while its contact sync is active
+ * (PRO-4036) or its welcome automation is on (CON-477): a tick is the
+ * shopper's own subscription, and the welcome follows it with contact sync
+ * off too.
  */
 class AddNewsletterOptinToLayout
 {
@@ -34,8 +39,8 @@ class AddNewsletterOptinToLayout
         $websiteId = (int)$this->storeManager->getWebsite()->getId();
         $storeId = (int)$this->storeManager->getStore()->getId();
         if (!$this->config->isCheckoutOptinEnabled($websiteId)
-            || !$this->config->isContactSyncActive($websiteId)
             || !$this->config->isConnected($storeId ?: null)
+            || (!$this->config->isContactSyncActive($websiteId) && !$this->config->isWelcomeEnabled($websiteId))
         ) {
             return $jsLayout;
         }

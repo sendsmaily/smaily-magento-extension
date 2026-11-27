@@ -20,17 +20,25 @@ use Smaily\Connect\Plugin\Checkout\AddNewsletterOptinToLayout;
  * PRO-4036: the checkout newsletter checkbox follows the contact-sync rule —
  * it shows only once the website's contact sync is active (its Contacts
  * settings saved), as an opt-in there would reach Smaily.
+ *
+ * CON-477: it shows with contact sync off too while the welcome automation
+ * is on, as the welcome follows the shopper's tick; with both off it stays
+ * hidden.
  */
 class AddNewsletterOptinToLayoutTest extends TestCase
 {
     /**
      * @dataProvider activeProvider
      */
-    public function testTheCheckboxShowsOnlyWhileContactSyncIsActive(bool $active): void
-    {
+    public function testTheCheckboxShowsWhileContactSyncIsActiveOrTheWelcomeIsOn(
+        bool $active,
+        bool $welcome,
+        bool $shown
+    ): void {
         $config = $this->createMock(Config::class);
         $config->method('isCheckoutOptinEnabled')->willReturn(true);
         $config->method('isContactSyncActive')->with(4)->willReturn($active);
+        $config->method('isWelcomeEnabled')->with(4)->willReturn($welcome);
         $config->method('isConnected')->willReturn(true);
 
         $website = $this->createMock(WebsiteInterface::class);
@@ -48,17 +56,19 @@ class AddNewsletterOptinToLayoutTest extends TestCase
 
         $afterMethods = $layout['components']['checkout']['children']['steps']['children']
             ['billing-step']['children']['payment']['children']['afterMethods']['children'];
-        self::assertSame($active, isset($afterMethods['smaily-newsletter-optin']));
+        self::assertSame($shown, isset($afterMethods['smaily-newsletter-optin']));
     }
 
     /**
-     * @return array<string, array{0: bool}>
+     * @return array<string, array{0: bool, 1: bool, 2: bool}>
      */
     public static function activeProvider(): array
     {
         return [
-            'contact sync active' => [true],
-            'Contacts settings not saved yet' => [false],
+            'contact sync active, the welcome off' => [true, false, true],
+            'contact sync active, the welcome on' => [true, true, true],
+            'contact sync off, the welcome on' => [false, true, true],
+            'contact sync off or Contacts settings not saved yet, the welcome off' => [false, false, false],
         ];
     }
 

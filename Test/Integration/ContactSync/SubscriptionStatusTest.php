@@ -37,6 +37,7 @@ use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Model\Website;
 use Psr\Log\LoggerInterface;
+use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Backfill\ContactAudience;
 use Smaily\Connect\Model\Backfill\ContactsProcessor;
 use Smaily\Connect\Model\Backfill\Job;
@@ -80,6 +81,12 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  * status field directly leaves unset. Magento's own newsletter form, its
  * confirmation link and its unsubscribe link run here through Magento's
  * SubscriptionManager and subscriber model, unchanged.
+ *
+ * CON-477: the welcome follows the shopper's own storefront subscription,
+ * not contact sync. With contact sync off, or in a mode that leaves the
+ * signup out, the welcome row is queued alone and carries the contact's
+ * language; with contact sync on, it is queued after the contact sync and
+ * leaves the language to it.
  */
 class SubscriptionStatusTest extends IntegrationTestCase
 {
@@ -92,6 +99,10 @@ class SubscriptionStatusTest extends IntegrationTestCase
     private string $area = 'adminhtml';
 
     private bool $connected = true;
+
+    private bool $syncActive = true;
+
+    private bool $welcome = false;
 
     protected function setUp(): void
     {
@@ -409,6 +420,155 @@ class SubscriptionStatusTest extends IntegrationTestCase
     }
 
     /**
+     * CON-477: with contact sync off, a shopper who subscribes on the
+     * storefront — the newsletter form, the newsletter box of their account,
+     * the checkout opt-in placed through the REST API — gets the welcome. No
+     * contact sync is queued, so the welcome carries the language.
+     *
+     * @dataProvider storefrontSignups
+     */
+    public function testWithContactSyncOffAStorefrontSignupGetsTheWelcomeWithItsLanguage(string $channel): void
+    {
+        $this->syncActive = false;
+        $this->welcome = true;
+
+        $this->subscribeThrough($channel, 'shopper@example.com');
+
+        self::assertSame([['email' => 'shopper@example.com', 'language' => 'et']], $this->queuedRows());
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function storefrontSignups(): array
+    {
+        return [
+            'the newsletter form' => ['form'],
+            'the newsletter box of the customer account' => ['account'],
+            'the checkout opt-in' => ['checkout'],
+        ];
+    }
+
+    /**
+     * CON-477: in the checkout-opt-in-only mode a newsletter-form signup
+     * syncs no contact but gets the welcome, with the language.
+     */
+    public function testInCheckoutOptInOnlyModeANewsletterFormSignupGetsTheWelcome(): void
+    {
+        $this->area = 'frontend';
+        $this->syncMode = SyncMode::MODE_CHECKOUT_OPTIN;
+        $this->welcome = true;
+
+        $this->subscriptionManager()->subscribe('guest@example.com', 1);
+
+        self::assertSame([['email' => 'guest@example.com', 'language' => 'et']], $this->queuedRows());
+    }
+
+    /**
+     * CON-477: with contact sync on, the welcome is queued after the contact
+     * sync, which carries the language; the welcome leaves it out, as before.
+     */
+    public function testWithContactSyncOnTheWelcomeFollowsTheContactSync(): void
+    {
+        $this->area = 'frontend';
+        $this->welcome = true;
+
+        $this->subscriptionManager()->subscribe('guest@example.com', 1);
+
+        self::assertSame(['contact', ['email' => 'guest@example.com']], $this->queuedRows());
+    }
+
+    /**
+     * CON-477: with contact sync off and "Need to Confirm" on, the signup
+     * queues nothing until the confirmation link, which queues the welcome.
+     */
+    public function testWithContactSyncOffADoubleOptInSignupGetsTheWelcomeWhenConfirmed(): void
+    {
+        $this->area = 'frontend';
+        $this->syncActive = false;
+        $this->welcome = true;
+        $this->env->getScopeConfig()->setValue(Subscriber::XML_PATH_CONFIRMATION_FLAG, 1);
+
+        $subscriber = $this->subscriptionManager()->subscribe('pending@example.com', 1);
+
+        self::assertSame(Subscriber::STATUS_NOT_ACTIVE, (int)$subscriber->getSubscriberStatus());
+        self::assertSame([], $this->queuedRows());
+
+        $confirming = $this->newSubscriber($this->observingEventManager(new StorefrontSubscription()));
+        $confirming->loadBySubscriberEmail('pending@example.com', 1);
+        self::assertTrue($confirming->confirm((string)$subscriber->getSubscriberConfirmCode()));
+
+        self::assertSame([['email' => 'pending@example.com', 'language' => 'et']], $this->queuedRows());
+    }
+
+    /**
+     * CON-477: with contact sync off, a subscription made in the admin,
+     * through the API or by an import queues nothing — no welcome, as before.
+     *
+     * @dataProvider nonStorefrontContexts
+     */
+    public function testWithContactSyncOffANonStorefrontSubscriptionQueuesNothing(string $area): void
+    {
+        $this->area = $area;
+        $this->syncActive = false;
+        $this->welcome = true;
+        $id = $this->seedSubscriber('returning@example.com', Subscriber::STATUS_UNSUBSCRIBED);
+
+        $this->changeStatus($id, Subscriber::STATUS_SUBSCRIBED);
+
+        self::assertSame([], $this->queuedRows());
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function nonStorefrontContexts(): array
+    {
+        return [
+            'staff in the admin' => ['adminhtml'],
+            'a GraphQL call' => ['graphql'],
+            'a Magento import from cron' => ['crontab'],
+        ];
+    }
+
+    /**
+     * A subscription through one storefront channel, as Magento makes it: a
+     * guest through the newsletter form, customer 7 through the newsletter
+     * box of their account, a guest through the checkout opt-in, which
+     * OrderPlaced saves through the REST API with the storefront mark.
+     */
+    private function subscribeThrough(string $channel, string $email): void
+    {
+        if ($channel === 'form') {
+            $this->area = 'frontend';
+            $this->subscriptionManager()->subscribe($email, 1);
+
+            return;
+        }
+        if ($channel === 'account') {
+            $this->area = 'frontend';
+            $customer = $this->createConfiguredMock(CustomerInterface::class, [
+                'getId' => 7,
+                'getEmail' => $email,
+                'getStoreId' => 1,
+                'getWebsiteId' => 1,
+            ]);
+            $customerRepository = $this->createMock(CustomerRepositoryInterface::class);
+            $customerRepository->method('getById')->willReturn($customer);
+            $this->subscriptionManager(null, $customerRepository)->subscribeCustomer(7, 1);
+
+            return;
+        }
+
+        $this->area = 'webapi_rest';
+        $storefrontSubscription = new StorefrontSubscription();
+        $manager = $this->subscriptionManager($storefrontSubscription);
+        $storefrontSubscription->run(static function () use ($manager, $email): void {
+            $manager->subscribe($email, 1);
+        });
+    }
+
+    /**
      * Change a stored subscriber's status through Magento's subscriber model,
      * its save event dispatched to the module's observer, in the test's area.
      * A REST save is the checkout opt-in, marked as OrderPlaced marks it.
@@ -462,9 +622,11 @@ class SubscriptionStatusTest extends IntegrationTestCase
      * Magento's own SubscriptionManager — what the storefront newsletter
      * form calls — on real subscriber models whose saves reach the observer.
      */
-    private function subscriptionManager(): SubscriptionManager
-    {
-        $eventManager = $this->observingEventManager(new StorefrontSubscription());
+    private function subscriptionManager(
+        ?StorefrontSubscription $storefrontSubscription = null,
+        ?CustomerRepositoryInterface $customerRepository = null
+    ): SubscriptionManager {
+        $eventManager = $this->observingEventManager($storefrontSubscription ?? new StorefrontSubscription());
         $resource = $this->subscriberResource();
         $subscriberFactory = $this->createMock(SubscriberFactory::class);
         $subscriberFactory->method('create')->willReturnCallback(
@@ -477,7 +639,7 @@ class SubscriptionStatusTest extends IntegrationTestCase
             'storeManager' => $this->storeManager,
             'scopeConfig' => $this->env->getScopeConfig(),
             'customerAccountManagement' => $this->createMock(AccountManagementInterface::class),
-            'customerRepository' => $this->createMock(CustomerRepositoryInterface::class),
+            'customerRepository' => $customerRepository ?? $this->createMock(CustomerRepositoryInterface::class),
             'customerSubscriberCache' => $this->createMock(CustomerSubscriberCache::class),
         ]);
     }
@@ -520,22 +682,26 @@ class SubscriptionStatusTest extends IntegrationTestCase
 
     private function payloadBuilder(): SubscriberPayloadBuilder
     {
+        $languageResolver = $this->createMock(LanguageResolver::class);
+        $languageResolver->method('forStore')->willReturn('et');
+
         return new SubscriberPayloadBuilder(
             $this->config(),
             $this->storeManager,
-            $this->createMock(LanguageResolver::class),
+            $languageResolver,
             $this->createMock(GroupRepositoryInterface::class)
         );
     }
 
     /**
-     * Contact sync active, connected unless the test says not, in the test's
-     * mode, no optional fields.
+     * Contact sync active and connected unless the test says not, in the
+     * test's mode, no optional fields, the welcome off unless the test says on.
      */
     private function config(): Config
     {
         $config = $this->createMock(Config::class);
-        $config->method('isContactSyncActive')->willReturn(true);
+        $config->method('isContactSyncActive')->willReturnCallback(fn (): bool => $this->syncActive);
+        $config->method('isWelcomeEnabled')->willReturnCallback(fn (): bool => $this->welcome);
         $config->method('isConnected')->willReturnCallback(fn (): bool => $this->connected);
         $config->method('getSyncMode')->willReturnCallback(fn (): string => $this->syncMode);
         $config->method('getSyncFields')->willReturn([]);
@@ -628,6 +794,29 @@ class SubscriptionStatusTest extends IntegrationTestCase
         }
 
         return $this->fields($contacts);
+    }
+
+    /**
+     * The queued rows in queue order: a contact sync as 'contact', a welcome
+     * as its address's email and language (the fields these tests read).
+     *
+     * @return list<array<string, mixed>|string>
+     */
+    private function queuedRows(): array
+    {
+        $rows = [];
+        foreach ($this->fetchAll(EventResource::TABLE_NAME) as $row) {
+            $payload = json_decode((string)$row['payload'], true);
+            if ($row['event_type'] === EventType::CONTACT_SYNC) {
+                $rows[] = 'contact';
+            } elseif ($row['event_type'] === EventType::AUTOMATION_TRIGGER
+                && $payload['trigger_type'] === Trigger::WELCOME
+            ) {
+                $rows[] = array_intersect_key($payload['address'], ['email' => true, 'language' => true]);
+            }
+        }
+
+        return $rows;
     }
 
     /**

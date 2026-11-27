@@ -45,6 +45,10 @@ use Smaily\Connect\Model\ContactSync\UnconnectedSignup;
  * no contact and saves no checkout opt-in; the abandoned-cart purchase
  * marker, an automation's, still goes.
  *
+ * CON-477: with contact sync off and the welcome on, the checkout opt-in is
+ * still saved as the shopper's storefront subscription, so the welcome
+ * follows it; no contact is queued from the order.
+ *
  * CON-387: who gets the first-order email follows the abandoned-cart
  * reminder's rule: a customer unsubscribed in the store under legitimate
  * interest is recorded as skipped, every other email is queued with whether
@@ -165,7 +169,7 @@ class OrderPlacedTest extends TestCase
     /**
      * PRO-4036: an order on a website whose Contacts settings were never
      * saved — an opt-in or a guest email under all customers — queues no
-     * contact and subscribes nobody.
+     * contact and, with the welcome off, subscribes nobody.
      *
      * @dataProvider orderBeforeActiveProvider
      */
@@ -195,6 +199,44 @@ class OrderPlacedTest extends TestCase
             'a customer\'s checkout opt-in' => [SyncMode::MODE_CONSENT, true, 42],
             'a guest email under all customers' => [SyncMode::MODE_LEGITIMATE_INTEREST, false, 0],
         ];
+    }
+
+    /**
+     * CON-477: with contact sync off and the welcome on, the checkout opt-in
+     * is saved as a storefront subscription; the order queues no contact.
+     *
+     * @dataProvider customerIdProvider
+     */
+    public function testWithContactSyncOffTheCheckoutOptInIsSavedWhileTheWelcomeIsOn(
+        int $customerId,
+        string $method
+    ): void {
+        $dispatcher = $this->createMock(SyncDispatcher::class);
+        $dispatcher->method('websiteId')->willReturn(1);
+        $dispatcher->expects(self::never())->method('dispatchContactSync');
+        $storefrontSubscription = new StorefrontSubscription();
+        $markedDuringSave = null;
+        $subscriptionManager = $this->createMock(SubscriptionManagerInterface::class);
+        $subscriptionManager->expects(self::once())->method($method)->willReturnCallback(
+            function () use ($storefrontSubscription, &$markedDuringSave) {
+                $markedDuringSave = $storefrontSubscription->isActive();
+
+                return $this->createMock(Subscriber::class);
+            }
+        );
+
+        $this->observer(
+            $subscriptionManager,
+            $storefrontSubscription,
+            SyncMode::MODE_CONSENT,
+            true,
+            $dispatcher,
+            '',
+            false,
+            true
+        )->execute($this->eventFor($customerId));
+
+        self::assertTrue($markedDuringSave);
     }
 
     /**
@@ -360,11 +402,13 @@ class OrderPlacedTest extends TestCase
         bool $optedIn = true,
         ?SyncDispatcher $dispatcher = null,
         string $cartStatus = '',
-        bool $active = true
+        bool $active = true,
+        bool $welcome = false
     ): OrderPlaced {
         $config = $this->createMock(Config::class);
         $config->method('isConnected')->willReturn(true);
         $config->method('isContactSyncActive')->with(1)->willReturn($active);
+        $config->method('isWelcomeEnabled')->willReturn($welcome);
         $config->method('getSyncMode')->willReturn($mode);
         $config->method('includeGuests')->willReturn(true);
         $config->method('isAbandonedCartEnabled')->willReturn(true);

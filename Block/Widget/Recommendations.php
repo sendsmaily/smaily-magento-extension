@@ -11,7 +11,7 @@ namespace Smaily\Connect\Block\Widget;
 use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Widget\Block\BlockInterface;
-use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Engine\Connections;
 
 /**
  * The "Smaily recommendations" widget (etc/widget.xml) a merchant places on
@@ -19,7 +19,8 @@ use Smaily\Connect\Model\Engine\Settings;
  * the page stays full-page-cacheable. After the page has loaded the
  * storefront script (engine/recommendations.phtml) asks the store for the
  * shopper's cards (Controller\Recommendations\Index) and puts them in it.
- * Nothing renders while the engine may not be called.
+ * Nothing renders while the engine of the Campaign Intelligence connection
+ * serving the store view (CON-237) may not be called, or none serves it.
  */
 class Recommendations extends Template implements BlockInterface
 {
@@ -30,12 +31,12 @@ class Recommendations extends Template implements BlockInterface
 
     /**
      * @param Context $context
-     * @param Settings $engineSettings
+     * @param Connections $connections
      * @param array<string, mixed> $data
      */
     public function __construct(
         Context $context,
-        private readonly Settings $engineSettings,
+        private readonly Connections $connections,
         array $data = []
     ) {
         parent::__construct($context, $data);
@@ -46,6 +47,6 @@ class Recommendations extends Template implements BlockInterface
      */
     protected function _toHtml()
     {
-        return $this->engineSettings->isSendingAllowed() ? parent::_toHtml() : '';
+        return $this->connections->current()?->settings()->isSendingAllowed() ? parent::_toHtml() : '';
     }
 }

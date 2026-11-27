@@ -35,16 +35,19 @@ use Smaily\Connect\Model\Privacy\ProfilingConsent;
  *     the half of that rule the server can see;
  *   - nobody else.
  * Always only while the engine may be called (`isSendingAllowed()`), in one
- * attempt (Client).
+ * attempt (Client) — of the Campaign Intelligence connection serving the
+ * store view (CON-237; Connections::current()), and never where none
+ * serves it.
  *
  * The request names the shopper's current website (v1.21.0, CON-253). The
  * answer, an empty one included (§15: do not retry), is cached for an
  * hour under a hash of the tenant, the website and the identifier type and
  * value. A
  * failure is cached as an empty answer for 10 minutes, and a timeout, a
- * network failure or a 5xx also pauses every shopper's engine call for 2
- * minutes: a cache miss then answers empty at once, so a hanging engine
- * cannot hold a PHP worker per guest (Woo PRO-3857).
+ * network failure or a 5xx also pauses every shopper's engine call to that
+ * connection for 2 minutes (Connection::flagCode() keys the pause): a
+ * cache miss then answers empty at once, so a hanging engine cannot hold a
+ * PHP worker per guest (Woo PRO-3857).
  */
 class StorefrontRecommendations
 {
@@ -62,8 +65,7 @@ class StorefrontRecommendations
     private const ID_VISITOR = 'visitor';
 
     public function __construct(
-        private readonly Settings $settings,
-        private readonly Client $client,
+        private readonly Connections $connections,
         private readonly ProfilingConsent $profilingConsent,
         private readonly AttributionManager $attributionManager,
         private readonly CustomerSession $customerSession,
@@ -83,9 +85,11 @@ class StorefrontRecommendations
      */
     public function slots(): array
     {
-        if (!$this->settings->isSendingAllowed()) {
+        $connection = $this->connections->current();
+        if ($connection === null || !$connection->settings()->isSendingAllowed()) {
             return [];
         }
+        $settings = $connection->settings();
 
         $identity = $this->identity();
         if ($identity === null) {
@@ -98,7 +102,7 @@ class StorefrontRecommendations
         $website = (string)$this->websites->current();
         $cacheKey = self::CACHE_PREFIX . hash(
             'sha256',
-            $this->settings->getTenantId() . '|' . $website . '|' . $identity['type'] . '|' . $identity['id']
+            $settings->getTenantId() . '|' . $website . '|' . $identity['type'] . '|' . $identity['id']
         );
         $cached = $this->cache->load($cacheKey);
         if (is_string($cached)) {
@@ -107,12 +111,14 @@ class StorefrontRecommendations
             return is_array($slots) ? $slots : [];
         }
 
-        if ($this->cache->load(self::PAUSE_KEY) !== false) {
+        $pauseKey = $connection->flagCode(self::PAUSE_KEY);
+        if ($this->cache->load($pauseKey) !== false) {
             return [];
         }
 
         try {
-            $answer = $this->client->recommendations([$identity['key'] => $identity['id']], self::LIMIT, $website);
+            $answer = $this->connections->client($connection)
+                ->recommendations([$identity['key'] => $identity['id']], self::LIMIT, $website);
         } catch (EngineException $exception) {
             $this->logger->debug('Storefront recommendations: the engine call failed', [
                 'error' => $exception->getMessage(),
@@ -121,13 +127,13 @@ class StorefrontRecommendations
             if ($exception instanceof EngineTransportException
                 && ($exception->getHttpStatus() === 0 || $exception->getHttpStatus() >= 500)
             ) {
-                $this->cache->save('1', self::PAUSE_KEY, [], self::PAUSE_TTL_SECONDS);
+                $this->cache->save('1', $pauseKey, [], self::PAUSE_TTL_SECONDS);
             }
 
             return [];
         }
 
-        $slots = $this->usableSlots($answer);
+        $slots = $this->usableSlots($answer, $settings->getConnectionPrefix());
         $this->cache->save((string)json_encode($slots), $cacheKey, [], self::CACHE_TTL_SECONDS);
 
         return $slots;
@@ -176,12 +182,12 @@ class StorefrontRecommendations
      * `external_id` only.
      *
      * @param array<string, mixed> $answer the §15 response body
+     * @param string $prefix the connection's code prefix
      * @return array<int, array{rec_id: string, external_id: string, sku: string}>
      */
-    private function usableSlots(array $answer): array
+    private function usableSlots(array $answer, string $prefix): array
     {
         $slots = is_array($answer['slots'] ?? null) ? $answer['slots'] : [];
-        $prefix = $this->settings->getConnectionPrefix();
         $usable = [];
         foreach ($slots as $slot) {
             if (!is_array($slot)) {

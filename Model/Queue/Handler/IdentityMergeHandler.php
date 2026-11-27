@@ -12,6 +12,7 @@ use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Smaily\Connect\Api\Queue\PausableEventHandlerInterface;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
@@ -35,9 +36,16 @@ use Smaily\Connect\Model\Queue\Skipped;
  * than at login, so the login never waits on a Smaily read. Such a row is
  * closed as Skipped with the reason, never as delivered (PRO-3634).
  *
- * While Campaign Intelligence refuses the account (PRO-2451) the rows wait,
- * as the engine ingest rows do (PRO-2466): the queue does not claim them
- * (isPaused()), and a row that meets the refusal goes back as it was.
+ * A row goes to the Campaign Intelligence connection of its website_id
+ * (CON-237): the login's connection, Engine\Connection::eventWebsiteId(),
+ * 0 for the primary — every row queued before. The customer is sent to,
+ * and the queued customer read from, the same connection. A row whose
+ * website no connection serves now is not sent, as when not connected.
+ *
+ * While Campaign Intelligence refuses the row's account (PRO-2451) the row
+ * waits, as the engine ingest rows do (PRO-2466): a row that meets the
+ * refusal goes back as it was, and while every connection is refused the
+ * queue does not claim the rows at all (isPaused()).
  *
  * The merge finds only a customer the engine already has (contract v1.23.0,
  * CON-262), so the customer goes first, in this run (MergeCustomerSender),
@@ -130,8 +138,6 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
         . ' so their browsing is not linked to their address. Nothing was sent.';
 
     public function __construct(
-        private readonly Settings $settings,
-        private readonly Client $client,
         private readonly EventQueue $eventQueue,
         private readonly ProfilingConsent $profilingConsent,
         private readonly CustomerRepositoryInterface $customerRepository,
@@ -150,12 +156,17 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
         $results = [];
         foreach ($events as $event) {
             $id = (int)$event->getId();
-            // Asked per row: a refusal (a 403 on one row) stops the rest,
-            // and the rows wait for the account (PRO-2466); not connected, the
-            // row says why.
-            $blocked = $this->settings->sendingBlockedReason();
+            // Asked per row: a refusal (a 403 on one row) stops the rest of
+            // its connection's rows, and they wait for the account (PRO-2466);
+            // not connected, the row says why.
+            $connection = $this->connections->forWebsite($event->getWebsiteId());
+            if ($connection === null) {
+                $results[$id] = Settings::NOT_CONNECTED;
+                continue;
+            }
+            $blocked = $connection->settings()->sendingBlockedReason();
             if ($blocked !== null) {
-                $results[$id] = $this->settings->isRefused() ? new Pending() : $blocked;
+                $results[$id] = $connection->settings()->isRefused() ? new Pending() : $blocked;
                 continue;
             }
 
@@ -173,19 +184,26 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
                 continue;
             }
 
-            $results[$id] = $this->deliver($event, $payload);
+            $results[$id] = $this->deliver($event, $payload, $connection);
         }
 
         return $results;
     }
 
     /**
-     * While Campaign Intelligence refuses the account, the rows wait
-     * unclaimed (PRO-2466).
+     * While Campaign Intelligence refuses every connection's account, the
+     * rows wait unclaimed (PRO-2466); one connection refused, its rows wait
+     * row by row (handle()).
      */
     public function isPaused(): bool
     {
-        return $this->settings->isRefused();
+        foreach ($this->connections->all() as $connection) {
+            if (!$connection->settings()->isRefused()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -195,7 +213,7 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
      * @param array<int|string, mixed> $payload
      * @return mixed true, Pending, Skipped, Failure or the EngineException handed on
      */
-    private function deliver(Event $event, array $payload): mixed
+    private function deliver(Event $event, array $payload, Connection $connection): mixed
     {
         $customerId = (int)($payload['customer_external_id'] ?? 0);
         $consented = !empty($payload[self::SEND_CUSTOMER]);
@@ -208,12 +226,12 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
 
         $tried = false;
         $refusal = null;
-        if ($consented || ($metNotFound && $this->isQueuedCustomer($customerId))) {
+        if ($consented || ($metNotFound && $this->isQueuedCustomer($customerId, $connection))) {
             $tried = true;
             try {
-                $refusal = $this->customerSender->send($customerId);
+                $refusal = $this->customerSender->send($customerId, $connection);
             } catch (EngineException $exception) {
-                return $this->failed($exception);
+                return $this->failed($exception, $connection);
             }
         }
         // After a 404 this merge is the one retry; a first merge has one left.
@@ -221,22 +239,22 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
 
         while (true) {
             try {
-                $this->merge($event, $payload);
+                $this->merge($event, $payload, $this->connections->client($connection));
 
                 return true;
             } catch (EngineException $exception) {
                 if (!self::isCustomerNotFound($exception)) {
-                    return $this->failed($exception);
+                    return $this->failed($exception, $connection);
                 }
             }
 
             $this->eventQueue->addToPayload($event, [self::CUSTOMER_NOT_FOUND => true]);
-            if (!$tried && $this->isQueuedCustomer($customerId)) {
+            if (!$tried && $this->isQueuedCustomer($customerId, $connection)) {
                 $tried = true;
                 try {
-                    $refusal = $this->customerSender->send($customerId);
+                    $refusal = $this->customerSender->send($customerId, $connection);
                 } catch (EngineException $exception) {
-                    return $this->failed($exception);
+                    return $this->failed($exception, $connection);
                 }
             }
             if (!$tried || $refusal === MergeCustomerSender::NO_ACCOUNT) {
@@ -277,12 +295,12 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
      * @param array<int|string, mixed> $payload
      * @throws EngineException
      */
-    private function merge(Event $event, array $payload): void
+    private function merge(Event $event, array $payload, Client $client): void
     {
         try {
-            $this->client->identityMerge($payload);
+            $client->identityMerge($payload);
         } finally {
-            $exchange = $this->client->lastExchange();
+            $exchange = $client->lastExchange();
             if ($exchange !== null) {
                 $this->eventQueue->recordExchange($event, $exchange['request'], $exchange['response']);
             }
@@ -295,9 +313,9 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
      * account refusal (contract §2 `403 tenant_inactive`) is not this row's
      * fault: it waits (PRO-2466).
      */
-    private function failed(EngineException $exception): object
+    private function failed(EngineException $exception, Connection $connection): object
     {
-        return $this->settings->isRefused() ? new Pending() : $exception;
+        return $connection->settings()->isRefused() ? new Pending() : $exception;
     }
 
     private static function isCustomerNotFound(EngineException $exception): bool
@@ -325,15 +343,14 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
 
     /**
      * Whether the store sends this customer anyway: a customer the live
-     * sync or an import has queued (CON-262).
+     * sync or an import has queued (CON-262) for the row's connection.
      */
-    private function isQueuedCustomer(int $customerId): bool
+    private function isQueuedCustomer(int $customerId, Connection $connection): bool
     {
-        // The primary connection's rows (CON-237; the row's own connection is a later step).
         return $customerId > 0 && $this->ingestQueue->hasRow(
             Client::DOMAIN_CUSTOMERS,
             (string)$customerId,
-            $this->connections->primary()
+            $connection
         );
     }
 

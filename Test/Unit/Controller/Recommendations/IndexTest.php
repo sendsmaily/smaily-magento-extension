@@ -25,6 +25,7 @@ use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\StorefrontRecommendations;
 use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
 use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3790: the store route the recommendations script asks — its guards,
@@ -32,6 +33,8 @@ use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
  */
 class IndexTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     /** @var array{code: int, contents: string|null, headers: array<string, string>, block: mixed} */
     private array $answer = ['code' => 200, 'contents' => null, 'headers' => [], 'block' => null];
 
@@ -188,7 +191,7 @@ class IndexTest extends TestCase
         return new Index(
             $request,
             $resultFactory,
-            $settings,
+            $this->oneEngineConnection($settings),
             $recommendations,
             $products,
             new PerAddressLimiter(new FixedWindowCounter($cache), $dateTime, $remoteAddress)

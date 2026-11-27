@@ -13,8 +13,10 @@ use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Console\Command\GdprCommand;
 use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineThrottledException;
+use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Privacy\LocalEraser;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -26,6 +28,8 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 class GdprCommandTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const EMAIL = 'jane@example.com';
 
     private Client&MockObject $client;
@@ -109,6 +113,54 @@ class GdprCommandTest extends TestCase
     }
 
     /**
+     * CON-237: with several connections the export holds each connected
+     * engine store's record under its name and the erasure reaches each of
+     * them, every engine line naming its store; one that fails fails the
+     * command, and the other is still erased.
+     */
+    public function testEveryConnectedEngineStoreIsExportedAndErased(): void
+    {
+        $this->localEraser->method('export')->willReturn([]);
+        $this->localEraser->method('erase')->willReturn([]);
+        $this->client->method('customerExport')->willReturn(['customer' => 'ee']);
+        $this->client->method('customerDelete')->willReturn([]);
+        $latviaClient = $this->createMock(Client::class);
+        $latviaClient->method('customerExport')->willReturn(['customer' => 'lv']);
+        $latviaClient->method('customerDelete')->willThrowException(new EngineTransportException('timed out', 0));
+        $settings = function (string $name, bool $connected): Settings {
+            $settings = $this->createMock(Settings::class);
+            $settings->method('isConnected')->willReturn($connected);
+            $settings->method('getTenantName')->willReturn($name);
+
+            return $settings;
+        };
+        $connections = $this->engineConnections([
+            [$this->engineConnection(0, $settings('Shop EE', true), [1], [1], 1), $this->client],
+            [$this->engineConnection(2, $settings('Shop LV', true), [2], [2], 2), $latviaClient],
+            [$this->engineConnection(3, $settings('Shop FI', false), [3], [3], 3), null],
+        ]);
+
+        $export = new CommandTester(new GdprCommand($connections, $this->localEraser));
+        $export->execute(['action' => 'export', 'email' => self::EMAIL]);
+        $erase = new CommandTester(new GdprCommand($connections, $this->localEraser));
+        $erase->execute(['action' => 'erase', 'email' => self::EMAIL, '--force' => true]);
+
+        self::assertSame(Command::SUCCESS, $export->getStatusCode());
+        self::assertSame(
+            ['Shop EE' => ['customer' => 'ee'], 'Shop LV' => ['customer' => 'lv']],
+            json_decode($export->getDisplay(), true)['engine']
+        );
+        self::assertSame(Command::FAILURE, $erase->getStatusCode());
+        $display = $this->oneLine($erase->getDisplay());
+        self::assertStringContainsString('Shop EE: Erased engine data for ' . self::EMAIL . '.', $display);
+        self::assertStringContainsString(
+            'Shop LV: Local data is erased, but the Campaign Intelligence erasure failed: timed out.',
+            $display
+        );
+        self::assertStringNotContainsString('Shop FI', $display);
+    }
+
+    /**
      * @param array<string, mixed> $arguments
      */
     private function runCommand(array $arguments, bool $refused): CommandTester
@@ -117,7 +169,9 @@ class GdprCommandTest extends TestCase
         $settings->method('isConnected')->willReturn(true);
         $settings->method('isRefused')->willReturn($refused);
 
-        $tester = new CommandTester(new GdprCommand($settings, $this->client, $this->localEraser));
+        $tester = new CommandTester(
+            new GdprCommand($this->oneEngineConnection($settings, $this->client), $this->localEraser)
+        );
         $tester->execute($arguments);
 
         return $tester;

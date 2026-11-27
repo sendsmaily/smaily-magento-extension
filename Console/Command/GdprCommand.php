@@ -8,9 +8,9 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Console\Command;
 
-use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connection;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
-use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Privacy\LocalEraser;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -28,6 +28,12 @@ use Symfony\Component\Console\Output\OutputInterface;
  * Idempotent: repeating either is safe. Smaily marketing-contact deletion
  * is done in the Smaily UI; Magento's own customer data is handled by
  * Magento's native tooling.
+ *
+ * The Campaign Intelligence half goes to every connection (CON-237): a
+ * shopper may be in the engine store of each separate store. With one
+ * connection the output is as it always was; with several, the export's
+ * `engine` holds each connected engine store's record under its name, and
+ * each engine line starts with that name.
  */
 class GdprCommand extends Command
 {
@@ -41,8 +47,7 @@ class GdprCommand extends Command
         . ' Ask Smaily to make the account active again, then run the command again.';
 
     public function __construct(
-        private readonly Settings $settings,
-        private readonly Client $client,
+        private readonly Connections $connections,
         private readonly LocalEraser $localEraser
     ) {
         parent::__construct();
@@ -93,30 +98,35 @@ class GdprCommand extends Command
      */
     private function export(string $email, OutputInterface $output): int
     {
-        $engine = null;
-        $failure = null;
-        if ($this->settings->isRefused()) {
-            $failure = 'Campaign Intelligence data was not exported: ' . self::ACCOUNT_NOT_ACTIVE;
-        } elseif ($this->settings->isConnected()) {
-            try {
-                $engine = $this->client->customerExport($email);
-            } catch (EngineException $exception) {
-                $failure = $exception->getMessage();
+        $several = count($this->connections->all()) > 1;
+        $records = [];
+        $failures = [];
+        foreach ($this->connections->all() as $connection) {
+            $settings = $connection->settings();
+            if ($settings->isRefused()) {
+                $failures[] = $this->prefix($connection, $several)
+                    . 'Campaign Intelligence data was not exported: ' . self::ACCOUNT_NOT_ACTIVE;
+            } elseif ($settings->isConnected()) {
+                try {
+                    $records[$this->name($connection)] = $this->connections->client($connection)
+                        ->customerExport($email);
+                } catch (EngineException $exception) {
+                    $failures[] = $this->prefix($connection, $several) . $exception->getMessage();
+                }
             }
         }
+        $engine = $several ? ($records === [] ? null : $records) : (array_values($records)[0] ?? null);
 
         $output->writeln((string)json_encode(
             ['engine' => $engine, 'local' => $this->localEraser->export($email)],
             JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
         ));
 
-        if ($failure !== null) {
+        foreach ($failures as $failure) {
             $output->writeln(sprintf('<error>%s</error>', $failure));
-
-            return Command::FAILURE;
         }
 
-        return Command::SUCCESS;
+        return $failures === [] ? Command::SUCCESS : Command::FAILURE;
     }
 
     /**
@@ -134,39 +144,74 @@ class GdprCommand extends Command
             ));
         }
 
-        if (!$this->settings->isConnected()) {
+        $connected = $this->connections->connected();
+        if ($connected === []) {
             $output->writeln('<comment>Campaign Intelligence is not connected; no engine data to erase.</comment>');
 
             return Command::SUCCESS;
         }
 
-        if ($this->settings->isRefused()) {
+        $several = count($this->connections->all()) > 1;
+        $status = Command::SUCCESS;
+        foreach ($connected as $connection) {
+            if (!$this->eraseAt($connection, $this->prefix($connection, $several), $email, $output)) {
+                $status = Command::FAILURE;
+            }
+        }
+
+        return $status;
+    }
+
+    /**
+     * Erase the shopper at one connection's engine store; false when it
+     * was not erased there.
+     */
+    private function eraseAt(Connection $connection, string $prefix, string $email, OutputInterface $output): bool
+    {
+        if ($connection->settings()->isRefused()) {
             $output->writeln(sprintf(
-                '<error>Local data is erased, but Campaign Intelligence data was not: %s</error>',
+                '<error>%sLocal data is erased, but Campaign Intelligence data was not: %s</error>',
+                $prefix,
                 self::ACCOUNT_NOT_ACTIVE
             ));
 
-            return Command::FAILURE;
+            return false;
         }
 
         try {
-            $result = $this->client->customerDelete($email);
+            $result = $this->connections->client($connection)->customerDelete($email);
         } catch (EngineException $exception) {
             $output->writeln(sprintf(
-                '<error>Local data is erased, but the Campaign Intelligence erasure failed: %s. '
+                '<error>%sLocal data is erased, but the Campaign Intelligence erasure failed: %s. '
                 . 'Run the command again to retry it.</error>',
+                $prefix,
                 $exception->getMessage()
             ));
 
-            return Command::FAILURE;
+            return false;
         }
 
         $output->writeln(sprintf(
-            '<info>Erased engine data for %s.%s</info>',
+            '<info>%sErased engine data for %s.%s</info>',
+            $prefix,
             $email,
             !empty($result['already_deleted']) ? ' (was already deleted)' : ''
         ));
 
-        return Command::SUCCESS;
+        return true;
+    }
+
+    /** A connection's engine store by name: its tenant name, else its tenant id. */
+    private function name(Connection $connection): string
+    {
+        $settings = $connection->settings();
+
+        return $settings->getTenantName() !== '' ? $settings->getTenantName() : $settings->getTenantId();
+    }
+
+    /** What an engine line starts with: the engine store's name when there are several connections. */
+    private function prefix(Connection $connection, bool $several): string
+    {
+        return $several ? $this->name($connection) . ': ' : '';
     }
 }

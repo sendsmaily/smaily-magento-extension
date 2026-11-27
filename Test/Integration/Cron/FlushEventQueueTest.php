@@ -270,8 +270,6 @@ class FlushEventQueueTest extends IntegrationTestCase
         $consent->method('isAllowed')->willReturn(true);
 
         return $this->objectManager->create(IdentityMergeHandler::class, [
-            'settings' => $settings,
-            'client' => $client,
             'profilingConsent' => $consent,
             'customerRepository' => $this->createMock(CustomerRepositoryInterface::class),
             'customerSender' => $this->createMock(MergeCustomerSender::class),
@@ -757,6 +755,7 @@ class FlushEventQueueTest extends IntegrationTestCase
         $clientProvider->expects(self::never())->method('forStore');
 
         $this->runCron([EventType::AUTOMATION_TRIGGER => $this->objectManager->create(AutomationHandler::class, [
+            'pushedWorkflow' => $this->noPushedWorkflow(),
             // No discount code: the automation's switch is off (CON-198).
             'discount' => $this->objectManager->create(AutomationDiscount::class, [
                 'issuer' => $this->createMock(CodeIssuer::class),

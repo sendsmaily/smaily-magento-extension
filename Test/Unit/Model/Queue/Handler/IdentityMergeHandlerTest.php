@@ -14,6 +14,7 @@ use Magento\Framework\Exception\NoSuchEntityException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\MergeCustomerSender;
@@ -192,6 +193,52 @@ class IdentityMergeHandlerTest extends TestCase
         self::assertEquals([1 => new Pending()], $this->handle(self::PAYLOAD, $refused));
         self::assertTrue($this->handler($refused)->isPaused());
         self::assertFalse($this->handler($active)->isPaused());
+    }
+
+    /**
+     * CON-237: a row goes to the connection of its website_id — the merge
+     * with that connection's client, the customer first to that connection
+     * and the queued customer read from it; a row whose website no
+     * connection serves is not sent.
+     */
+    public function testARowGoesToTheConnectionOfItsWebsite(): void
+    {
+        $this->profilingConsent->method('isAllowed')->willReturn(true);
+        $latviaClient = $this->createMock(Client::class);
+        $latviaClient->expects(self::once())->method('identityMerge')->willThrowException(self::notFound());
+        $this->client->expects(self::never())->method('identityMerge');
+        $connections = $this->separateStores($latviaClient);
+        $latvia = $connections->forKey(2);
+        $this->ingestQueue->expects(self::once())->method('hasRow')
+            ->with(Client::DOMAIN_CUSTOMERS, '42', $latvia)->willReturn(true);
+        $this->sender->expects(self::once())->method('send')->with(42, $latvia)->willReturn('email: invalid');
+        $eventQueue = $this->createMock(EventQueue::class);
+        $eventQueue->method('decodePayload')->willReturn(self::PAYLOAD);
+
+        $results = $this->handlerFor($connections, $eventQueue)->handle($this->rows([1 => 2, 2 => 3]));
+
+        self::assertInstanceOf(Skipped::class, $results[1]);
+        self::assertSame(Settings::NOT_CONNECTED, $results[2], 'Website 3 has no connection');
+    }
+
+    /**
+     * CON-237: a refused connection's rows wait row by row while another
+     * connection's rows go; the queue stops claiming only when every
+     * connection is refused.
+     */
+    public function testARefusedConnectionsRowsWaitWhileTheOthersGo(): void
+    {
+        $this->profilingConsent->method('isAllowed')->willReturn(true);
+        $latviaClient = $this->createMock(Client::class);
+        $latviaClient->expects(self::never())->method('identityMerge');
+        $this->client->expects(self::once())->method('identityMerge')->willReturn(['ok' => true]);
+        $eventQueue = $this->createMock(EventQueue::class);
+        $eventQueue->method('decodePayload')->willReturn(self::PAYLOAD);
+        $handler = $this->handlerFor($this->separateStores($latviaClient, [2]), $eventQueue);
+
+        self::assertEquals([1 => true, 2 => new Pending()], $handler->handle($this->rows([1 => 0, 2 => 2])));
+        self::assertFalse($handler->isPaused());
+        self::assertTrue($this->handlerFor($this->separateStores($latviaClient, [0, 2]))->isPaused());
     }
 
     /**
@@ -501,17 +548,63 @@ class IdentityMergeHandlerTest extends TestCase
             return $refused ? 'Campaign Intelligence account is not active' : null;
         });
 
+        return $this->handlerFor($this->oneEngineConnection($settings, $this->client), $eventQueue);
+    }
+
+    private function handlerFor(Connections $connections, ?EventQueue $eventQueue = null): IdentityMergeHandler
+    {
         return new IdentityMergeHandler(
-            $settings,
-            $this->client,
             $eventQueue ?? $this->createMock(EventQueue::class),
             $this->profilingConsent,
             $this->customerRepository,
             $this->logger,
             $this->sender,
             $this->ingestQueue,
-            $this->oneEngineConnection($settings)
+            $connections
         );
+    }
+
+    /**
+     * Separate stores: the primary serves website 1, the connection of
+     * website 2 website 2 with its own client ($latviaClient); website 3 is
+     * served by none. A connection is refused when named in $refused.
+     *
+     * @param int[] $refused connection keys
+     */
+    private function separateStores(Client $latviaClient, array $refused = []): Connections
+    {
+        $settings = function (int $key) use ($refused): Settings {
+            $settings = $this->createMock(Settings::class);
+            $settings->method('isConnected')->willReturn(true);
+            $settings->method('isRefused')->willReturn(in_array($key, $refused, true));
+            $settings->method('sendingBlockedReason')->willReturn(
+                in_array($key, $refused, true) ? 'Campaign Intelligence account is not active' : null
+            );
+
+            return $settings;
+        };
+
+        return $this->engineConnections([
+            [$this->engineConnection(0, $settings(0), [1], [1], 1), $this->client],
+            [$this->engineConnection(2, $settings(2), [2], [2], 2), $latviaClient],
+        ]);
+    }
+
+    /**
+     * @param array<int, int> $websiteIds row id => the row's website_id
+     * @return Event[]
+     */
+    private function rows(array $websiteIds): array
+    {
+        $events = [];
+        foreach ($websiteIds as $id => $websiteId) {
+            $event = $this->createMock(Event::class);
+            $event->method('getId')->willReturn($id);
+            $event->method('getWebsiteId')->willReturn($websiteId);
+            $events[] = $event;
+        }
+
+        return $events;
     }
 
     /**

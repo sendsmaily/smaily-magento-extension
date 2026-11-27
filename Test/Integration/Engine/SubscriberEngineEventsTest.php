@@ -44,6 +44,7 @@ use Smaily\Connect\Observer\Engine\SubscriberResubscribed;
 use Smaily\Connect\Observer\Engine\SubscriberUnsubscribed;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-436: a newsletter join, rejoin or leave reaches Campaign Intelligence
@@ -60,6 +61,8 @@ use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
  */
 class SubscriberEngineEventsTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     private SchemaInstaller $schema;
 
     private StoreManagerInterface $storeManager;
@@ -238,8 +241,8 @@ class SubscriberEngineEventsTest extends IntegrationTestCase
         });
         $observers = [
             new SubscriberJoined($customerIngest),
-            new SubscriberUnsubscribed($settings, $consent),
-            new SubscriberResubscribed($settings, $consent),
+            new SubscriberUnsubscribed($this->oneEngineConnection($settings), $consent),
+            new SubscriberResubscribed($this->oneEngineConnection($settings), $consent),
         ];
         $eventManager = $this->createMock(EventManagerInterface::class);
         $eventManager->method('dispatch')->willReturnCallback(
@@ -282,7 +285,7 @@ class SubscriberEngineEventsTest extends IntegrationTestCase
         /** @var ProfilingConsent $consent */
         $consent = $this->objectManager->create(ProfilingConsent::class, [
             'smailyClientProvider' => $provider,
-            'engineSettings' => $settings,
+            'connections' => $this->oneEngineConnection($settings),
             'optOuts' => $optOuts,
         ]);
 

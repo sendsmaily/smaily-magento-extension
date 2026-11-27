@@ -77,7 +77,7 @@ class EmailDesigns
         if (!is_array($items)) {
             return [];
         }
-        $this->workflows->remember($items);
+        $this->workflows->remember($items, $this->settings);
 
         $designs = [];
         foreach ($items as $item) {

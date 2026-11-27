@@ -20,6 +20,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\MarketingConsent;
@@ -29,6 +30,7 @@ use Smaily\Connect\Model\Engine\Websites;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\OrderPlacer;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3790: who the engine is asked about, and how its answer is cached.
@@ -40,6 +42,8 @@ use Smaily\Connect\Model\Privacy\ProfilingConsent;
  */
 class StorefrontRecommendationsTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const REC_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
 
     private Settings&MockObject $settings;
@@ -363,8 +367,34 @@ class StorefrontRecommendationsTest extends TestCase
         return reset($entries);
     }
 
-    private function service(?Settings $settings = null): StorefrontRecommendations
+    /**
+     * CON-237: separate stores — the shopper's recommendations come from the
+     * connection serving the store view, with its own client and its own
+     * pause; a store view no connection serves asks nobody.
+     */
+    public function testTheConnectionOfTheStoreViewIsAsked(): void
     {
+        $this->guest('vt_8f3k2a');
+        $primaryClient = $this->createMock(Client::class);
+        $primaryClient->expects(self::never())->method('recommendations');
+        $this->engineAnswer = new EngineTransportException('Engine request failed', 503);
+        $connections = fn (int $storeId) => $this->engineConnections([
+            [$this->engineConnection(0, $this->settings, [1], [1], 1), $primaryClient],
+            [$this->engineConnection(2, $this->settings, [2], [3], 3), $this->client],
+        ], $storeId);
+
+        self::assertSame([], $this->service(null, $connections(3))->slots());
+        self::assertCount(1, $this->engineCalls);
+        self::assertArrayHasKey('smaily_recs_paused_c2', $this->cacheStore, 'The pause is its connection\'s');
+        self::assertArrayNotHasKey('smaily_recs_paused', $this->cacheStore);
+
+        self::assertSame([], $this->service(null, $connections(4))->slots());
+        self::assertCount(1, $this->engineCalls, 'A store view no connection serves asks nobody');
+    }
+
+    private function service(?Settings $settings = null, ?Connections $connections = null): StorefrontRecommendations
+    {
+        $connections ??= $this->oneEngineConnection($settings ?? $this->settings, $this->client);
         $attributionSettings = $this->createMock(Settings::class);
         $attributionSettings->method('getEngineConfig')->willReturn([]);
         $cookieManager = $this->createMock(CookieManagerInterface::class);
@@ -372,7 +402,7 @@ class StorefrontRecommendationsTest extends TestCase
             fn (string $name) => $name === AttributionManager::DEFAULT_COOKIE_VISITOR ? $this->visitorToken : null
         );
         $attribution = new AttributionManager(
-            $attributionSettings,
+            $this->oneEngineConnection($attributionSettings),
             $cookieManager,
             $this->createMock(ResourceConnection::class),
             $this->createMock(OrderPlacer::class),
@@ -400,8 +430,7 @@ class StorefrontRecommendationsTest extends TestCase
         );
 
         return new StorefrontRecommendations(
-            $settings ?? $this->settings,
-            $this->client,
+            $connections,
             $this->profiling,
             $attribution,
             $this->session,

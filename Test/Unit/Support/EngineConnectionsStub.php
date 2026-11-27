@@ -21,7 +21,8 @@ use Smaily\Connect\Model\Logger\Logger;
  * Engine\Connections for a test (CON-237): the connections it is handed,
  * each with its own client, routed as the real registry routes them — a
  * queue row's NULL store view and website 0 to the primary, a store view
- * or website to the connection that serves it.
+ * or website to the connection that serves it, and the request's own
+ * store view (current()) to the connection that serves it.
  *
  * For a PHPUnit TestCase (unit or integration).
  */
@@ -70,8 +71,9 @@ trait EngineConnectionsStub
 
     /**
      * @param array<int, array{0: Connection, 1: Client|null}> $connections the primary first
+     * @param int $currentStoreId the store view of the request (Connections::current())
      */
-    private function engineConnections(array $connections): Connections&MockObject
+    private function engineConnections(array $connections, int $currentStoreId = 1): Connections&MockObject
     {
         $byKey = [];
         $clients = [];
@@ -110,6 +112,7 @@ trait EngineConnectionsStub
         $stub->method('primary')->willReturn($primary);
         $stub->method('forKey')->willReturnCallback(static fn (int $key): ?Connection => $byKey[$key] ?? null);
         $stub->method('forStore')->willReturnCallback($forStore);
+        $stub->method('current')->willReturnCallback(static fn (): ?Connection => $forStore($currentStoreId));
         $stub->method('forWebsite')->willReturnCallback($forWebsite);
         $stub->method('forRowStoreId')->willReturnCallback(
             static fn (?int $storeId): ?Connection => $storeId === null ? $primary : $forStore($storeId)

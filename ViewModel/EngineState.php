@@ -14,16 +14,18 @@ use Magento\Framework\UrlInterface;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Smaily\Connect\Model\Engine\AttributionManager;
-use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Engine\Connections;
 
 /**
  * Storefront view model for the attribution, browse-tracking and
- * recommendations scripts.
+ * recommendations scripts. Each gate is the Campaign Intelligence
+ * connection serving the store view (CON-237; Connections::current()):
+ * where none serves it, no script loads.
  */
 class EngineState implements ArgumentInterface
 {
     public function __construct(
-        private readonly Settings $settings,
+        private readonly Connections $connections,
         private readonly AttributionManager $attributionManager,
         private readonly CookieHelper $cookieHelper,
         private readonly UrlInterface $urlBuilder,
@@ -34,12 +36,12 @@ class EngineState implements ArgumentInterface
 
     public function isAttributionActive(): bool
     {
-        return $this->settings->isConnected();
+        return $this->connections->current()?->settings()->isConnected() ?? false;
     }
 
     public function isBrowseTrackingActive(): bool
     {
-        return $this->settings->isBrowseTrackingEnabled();
+        return $this->connections->current()?->settings()->isBrowseTrackingEnabled() ?? false;
     }
 
     /**
@@ -48,7 +50,7 @@ class EngineState implements ArgumentInterface
      */
     public function isRecommendationsActive(): bool
     {
-        return $this->settings->isSendingAllowed();
+        return $this->connections->current()?->settings()->isSendingAllowed() ?? false;
     }
 
     public function getAttributionConfigJson(): string

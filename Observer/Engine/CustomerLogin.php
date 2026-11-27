@@ -15,8 +15,8 @@ use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Engine\AttributionManager;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\MarketingConsent;
-use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Engine\StoreVisitorToken;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
@@ -28,7 +28,11 @@ use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
  * customer token request (whose cookies a separate storefront forwards).
  * Not on an admin's "Login as Customer": those cookies are the admin's own.
  * Queued (never blocks login) — the handler calls
- * POST identity/merge with the engine's retry policy.
+ * POST identity/merge with the engine's retry policy — for the Campaign
+ * Intelligence connection serving the store view logged in at (CON-237):
+ * the row carries its Engine\Connection::eventWebsiteId(), 0 for the
+ * primary. Nothing is queued where that connection is not connected or no
+ * connection serves the store view.
  *
  * It sends the visitor token as gated by `AttributionManager::readCookies()`.
  *
@@ -71,7 +75,7 @@ class CustomerLogin implements ObserverInterface
 
     public function __construct(
         private readonly RequestInterface $request,
-        private readonly Settings $settings,
+        private readonly Connections $connections,
         private readonly AttributionManager $attributionManager,
         private readonly EventQueue $eventQueue,
         private readonly MarketingConsent $marketingConsent,
@@ -85,7 +89,9 @@ class CustomerLogin implements ObserverInterface
      */
     public function execute(Observer $observer): void
     {
-        if (!$this->settings->isConnected()
+        $connection = $this->connections->current();
+        if ($connection === null
+            || !$connection->settings()->isConnected()
             || $this->request->getModuleName() === self::LOGIN_AS_CUSTOMER_ROUTE
         ) {
             return;
@@ -130,7 +136,8 @@ class CustomerLogin implements ObserverInterface
         $this->eventQueue->enqueue(
             EventType::ENGINE_IDENTITY_MERGE,
             $payload,
-            (string)$customer->getId()
+            (string)$customer->getId(),
+            $connection->eventWebsiteId()
         );
     }
 

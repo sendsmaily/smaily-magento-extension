@@ -14,6 +14,7 @@ use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineThrottledException;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
@@ -23,9 +24,12 @@ use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\Handler\ProfilingConsentHandler;
 use Smaily\Connect\Model\Queue\Pending;
 use Smaily\Connect\Model\Queue\Skipped;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 class ProfilingConsentHandlerTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private Settings&MockObject $settings;
     private Client&MockObject $client;
     private ProfilingOptOuts&MockObject $optOuts;
@@ -255,11 +259,54 @@ class ProfilingConsentHandlerTest extends TestCase
         return $this->handler($eventQueue)->handle([$event]);
     }
 
+    /**
+     * CON-237: a row goes to the connection of its website_id with that
+     * connection's client; a refused connection's row waits while the
+     * other's goes, a row of a website no connection serves is not sent,
+     * and the queue stops claiming only when every connection is refused.
+     */
+    public function testARowGoesToTheConnectionOfItsWebsite(): void
+    {
+        $this->optOuts->method('moment')->willReturn(1790000000);
+        $latvia = $this->createMock(Settings::class);
+        $latvia->method('isRefused')->willReturn(true);
+        $latvia->method('sendingBlockedReason')->willReturn('Campaign Intelligence account is not active');
+        $latviaClient = $this->createMock(Client::class);
+        $latviaClient->expects(self::never())->method('customerOptOut');
+        $this->client->expects(self::once())->method('customerOptOut')->willReturn(['ok' => true]);
+        $connections = $this->engineConnections([
+            [$this->engineConnection(0, $this->settings, [1], [1], 1), $this->client],
+            [$this->engineConnection(2, $latvia, [2], [2], 2), $latviaClient],
+        ]);
+        $eventQueue = $this->createMock(EventQueue::class);
+        $eventQueue->method('decodePayload')->willReturn(['email' => 'person@example.com', 'opt_out' => true]);
+        $events = [];
+        foreach ([1 => 0, 2 => 2, 3 => 3] as $id => $websiteId) {
+            $event = $this->createMock(Event::class);
+            $event->method('getId')->willReturn($id);
+            $event->method('getWebsiteId')->willReturn($websiteId);
+            $events[] = $event;
+        }
+        $handler = $this->handlerFor($connections, $eventQueue);
+
+        self::assertEquals(
+            [1 => true, 2 => new Pending(), 3 => Settings::NOT_CONNECTED],
+            $handler->handle($events)
+        );
+        self::assertFalse($handler->isPaused());
+        $this->refused = true;
+        self::assertTrue($handler->isPaused(), 'Every connection refused');
+    }
+
     private function handler(?EventQueue $eventQueue = null): ProfilingConsentHandler
     {
+        return $this->handlerFor($this->oneEngineConnection($this->settings, $this->client), $eventQueue);
+    }
+
+    private function handlerFor(Connections $connections, ?EventQueue $eventQueue = null): ProfilingConsentHandler
+    {
         return new ProfilingConsentHandler(
-            $this->settings,
-            $this->client,
+            $connections,
             $eventQueue ?? $this->createMock(EventQueue::class),
             $this->optOuts,
             $this->createMock(Logger::class)

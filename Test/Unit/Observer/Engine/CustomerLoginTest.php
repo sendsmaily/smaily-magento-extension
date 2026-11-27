@@ -35,6 +35,7 @@ use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
 use Smaily\Connect\Observer\Engine\CustomerLogin;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * Identity merge on login. Magento's own login (Customer\Model\Session)
@@ -54,6 +55,8 @@ use Smaily\Connect\Observer\Engine\CustomerLogin;
  */
 class CustomerLoginTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const SESSION_ID = '0b6f3c1e-2a4d-4c8e-9f10-5d2b7a9e4c31';
     private const VISITOR_TOKEN = 'vt_abc123';
     private const STORE_VISITOR_TOKEN = 'vs_4fK9a2LmQ7xZ0bR3tY8wP1';
@@ -64,6 +67,13 @@ class CustomerLoginTest extends TestCase
     private bool $marketingConsent = false;
     private bool $storefrontUrl = false;
     private bool $cookieFails = false;
+
+    /**
+     * Separate stores (CON-237) when set: the store view logged in at; the
+     * primary serves store view 1, the connection of website 2 store view 2,
+     * none store view 3. Null: one store.
+     */
+    private ?int $currentStoreId = null;
 
     /** @var array<string, array{value: string, metadata: array<string, mixed>}> */
     private array $set = [];
@@ -426,6 +436,27 @@ class CustomerLoginTest extends TestCase
         $this->observer()->execute($this->eventFor($this->customerDataObject('person@example.com')));
     }
 
+    /**
+     * CON-237: separate stores — the merge is queued for the connection
+     * serving the store view logged in at, by that connection's gate.
+     */
+    public function testTheMergeIsQueuedForTheConnectionOfTheStoreView(): void
+    {
+        $this->currentStoreId = 2;
+        $this->eventQueue->expects(self::once())->method('enqueue')
+            ->with(EventType::ENGINE_IDENTITY_MERGE, self::anything(), '42', 2);
+
+        $this->observer()->execute($this->eventFor($this->customerModel('person@example.com')));
+    }
+
+    public function testNothingIsQueuedWhereNoConnectionServesTheStoreView(): void
+    {
+        $this->currentStoreId = 3;
+        $this->eventQueue->expects(self::never())->method('enqueue');
+
+        $this->observer()->execute($this->eventFor($this->customerModel('person@example.com')));
+    }
+
     public function testTheLoginIsNamedAsTheEngineAcceptsIt(): void
     {
         self::assertSame('user_logged_in', IdentityMergeHandler::MERGE_REASON_LOGIN);
@@ -449,7 +480,8 @@ class CustomerLoginTest extends TestCase
 
                 return true;
             }),
-            '42'
+            '42',
+            0
         );
     }
 
@@ -479,8 +511,14 @@ class CustomerLoginTest extends TestCase
         );
         $consent = $this->createMock(MarketingConsent::class);
         $consent->method('isGiven')->willReturn($this->marketingConsent);
+        $connections = $this->currentStoreId === null
+            ? $this->oneEngineConnection($settings)
+            : $this->engineConnections([
+                [$this->engineConnection(0, $settings, [1], [1], 1), null],
+                [$this->engineConnection(2, $settings, [2], [2], 2), null],
+            ], $this->currentStoreId);
         $attributionManager = new AttributionManager(
-            $settings,
+            $connections,
             $cookieManager,
             $this->createMock(ResourceConnection::class),
             $this->createMock(OrderPlacer::class),
@@ -497,7 +535,7 @@ class CustomerLoginTest extends TestCase
 
         return new CustomerLogin(
             $request,
-            $settings,
+            $connections,
             $attributionManager,
             $this->eventQueue,
             $consent,

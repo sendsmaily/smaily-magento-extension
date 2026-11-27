@@ -31,6 +31,7 @@ use Smaily\Connect\Model\Client\HttpClientFactory;
 use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\BrowseEventValidator;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\PrivacyRequestBudget;
 use Smaily\Connect\Model\Engine\MarketingConsent;
 use Smaily\Connect\Model\Engine\Settings;
@@ -41,6 +42,7 @@ use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
 use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
 use Smaily\Connect\Model\Report\ConnectionHealth;
 use Smaily\Connect\Model\StorefrontScript;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3575: the storefront browse relay rate-limits by the connection's own
@@ -51,6 +53,8 @@ use Smaily\Connect\Model\StorefrontScript;
  */
 class IndexTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const BODY = '{"events":[{"event_id":"9b2f6c3a-1d4e-4f5a-8b6c-7d8e9f0a1b2c",'
         . '"session_id":"s1","event_type":"product_view","sku":"ABC-1"}]}';
 
@@ -183,9 +187,36 @@ class IndexTest extends TestCase
     }
 
     /**
+     * CON-237: separate stores — the events go to the connection serving
+     * the store view, with its own client; where none serves it the beacon
+     * is answered 404, as with tracking off, and no engine hears it.
+     */
+    public function testTheEventsGoToTheConnectionOfTheStoreView(): void
+    {
+        $settings = $this->createMock(Settings::class);
+        $settings->method('isBrowseTrackingEnabled')->willReturn(true);
+        $settings->method('isSendingAllowed')->willReturn(true);
+        $primaryClient = $this->createMock(Client::class);
+        $primaryClient->expects(self::never())->method('relayBrowse');
+        $latviaClient = $this->createMock(Client::class);
+        $latviaClient->expects(self::once())->method('relayBrowse')
+            ->with(self::callback(static fn (array $events): bool => $events[0]['sku'] === 'ABC-1'));
+        $connections = fn (int $storeId) => $this->engineConnections([
+            [$this->engineConnection(0, $settings, [1], [1], 1), $primaryClient],
+            [$this->engineConnection(2, $settings, [2], [2], 2), $latviaClient],
+        ], $storeId);
+
+        $this->createRelay([], $connections(2))->execute();
+        self::assertSame(200, $this->answer['code']);
+
+        $this->createRelay([], $connections(3))->execute();
+        self::assertSame(404, $this->answer['code']);
+    }
+
+    /**
      * @param array<int, Response|\Throwable> $responses
      */
-    private function createRelay(array $responses): Index
+    private function createRelay(array $responses, ?Connections $connections = null): Index
     {
         $handlerStack = HandlerStack::create(new MockHandler($responses));
         $handlerStack->push(Middleware::history($this->history));
@@ -255,19 +286,20 @@ class IndexTest extends TestCase
         $dateTime = $this->createMock(DateTime::class);
         $dateTime->method('gmtTimestamp')->willReturn(1_790_000_000);
 
+        $connections ??= $this->oneEngineConnection($settings, $client);
+
         return new Index(
             $request,
             $jsonFactory,
-            $settings,
-            $client,
+            $connections,
             new BrowseEventValidator(),
             new PerAddressLimiter(new FixedWindowCounter($cache), $dateTime, new RemoteAddress($request)),
             $this->createMock(Logger::class),
-            $this->attributionManager($settings)
+            $this->attributionManager($connections)
         );
     }
 
-    private function attributionManager(Settings $settings): AttributionManager
+    private function attributionManager(Connections $connections): AttributionManager
     {
         $cookieManager = $this->createMock(CookieManagerInterface::class);
         $cookieManager->method('getCookie')->willReturnCallback(
@@ -277,7 +309,7 @@ class IndexTest extends TestCase
         $consent->method('isGiven')->willReturnCallback(fn (): bool => $this->marketingConsent);
 
         return new AttributionManager(
-            $settings,
+            $connections,
             $cookieManager,
             $this->createMock(ResourceConnection::class),
             $this->createMock(OrderPlacer::class),

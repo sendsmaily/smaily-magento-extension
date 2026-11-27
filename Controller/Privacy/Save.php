@@ -17,7 +17,7 @@ use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\Controller\ResultInterface;
 use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
 use Magento\Framework\Message\ManagerInterface;
-use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 
 /**
@@ -34,7 +34,7 @@ class Save implements HttpPostActionInterface
         private readonly FormKeyValidator $formKeyValidator,
         private readonly ProfilingConsent $profilingConsent,
         private readonly ManagerInterface $messageManager,
-        private readonly Settings $engineSettings
+        private readonly Connections $connections
     ) {
     }
 
@@ -45,7 +45,7 @@ class Save implements HttpPostActionInterface
      */
     public function execute(): ResultInterface
     {
-        if (!$this->engineSettings->isSendingAllowed()) {
+        if (!($this->connections->current()?->settings()->isSendingAllowed() ?? false)) {
             /** @var Forward $forward */
             $forward = $this->resultFactory->create(ResultFactory::TYPE_FORWARD);
 

@@ -16,6 +16,7 @@ use Magento\Framework\View\Element\Template\Context;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Block\Account\PersonalizationLink;
 use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3579: the My Account "Personalization" link appears only where
@@ -23,6 +24,8 @@ use Smaily\Connect\Model\Engine\Settings;
  */
 class PersonalizationLinkTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     public function testNoLinkWithoutCampaignIntelligence(): void
     {
         self::assertSame('', $this->render(false));
@@ -33,7 +36,16 @@ class PersonalizationLinkTest extends TestCase
         self::assertStringContainsString('Personalization', $this->render(true));
     }
 
-    private function render(bool $live): string
+    /**
+     * CON-237: no link at a store view no Campaign Intelligence connection
+     * serves.
+     */
+    public function testNoLinkWhereNoConnectionServesTheStoreView(): void
+    {
+        self::assertSame('', $this->render(true, 3));
+    }
+
+    private function render(bool $live, int $currentStoreId = 1): string
     {
         $escaper = $this->createMock(Escaper::class);
         $escaper->method('escapeHtml')->willReturnCallback(static fn ($value) => (string)$value);
@@ -51,7 +63,7 @@ class PersonalizationLinkTest extends TestCase
         $link = new PersonalizationLink(
             $context,
             $this->createMock(DefaultPathInterface::class),
-            $settings,
+            $this->engineConnections([[$this->engineConnection(0, $settings, [1], [1], 1), null]], $currentStoreId),
             ['path' => 'smaily/privacy', 'label' => 'Personalization']
         );
 

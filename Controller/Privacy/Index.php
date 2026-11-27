@@ -15,13 +15,14 @@ use Magento\Framework\Controller\Result\Redirect;
 use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\Controller\ResultInterface;
 use Magento\Framework\View\Result\Page;
-use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Engine\Connections;
 
 /**
  * Customer account page for the shopper personalization (profiling) choice.
  *
- * Exists only where Campaign Intelligence is live — connected and the
- * account not refused (PRO-3579, Woo PRO-2513/PRO-3189): elsewhere the page's
+ * Exists only where Campaign Intelligence is live for the store view —
+ * the connection serving it (CON-237) connected and its account not refused
+ * (PRO-3579, Woo PRO-2513/PRO-3189): elsewhere the page's
  * claim that shopping activity personalizes recommendations is untrue, so a
  * direct request is a 404 like any page the store does not have.
  */
@@ -30,7 +31,7 @@ class Index implements HttpGetActionInterface
     public function __construct(
         private readonly CustomerSession $customerSession,
         private readonly ResultFactory $resultFactory,
-        private readonly Settings $engineSettings
+        private readonly Connections $connections
     ) {
     }
 
@@ -41,7 +42,7 @@ class Index implements HttpGetActionInterface
      */
     public function execute(): ResultInterface
     {
-        if (!$this->engineSettings->isSendingAllowed()) {
+        if (!($this->connections->current()?->settings()->isSendingAllowed() ?? false)) {
             /** @var Forward $forward */
             $forward = $this->resultFactory->create(ResultFactory::TYPE_FORWARD);
 

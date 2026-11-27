@@ -213,7 +213,8 @@ class AutomationHandler implements EventHandlerInterface
                         $trigger,
                         $match,
                         $client->subdomain(),
-                        $this->accountResolver->defaultLanguage($websiteId)
+                        $this->accountResolver->defaultLanguage($websiteId),
+                        $websiteId
                     ),
                     'addresses' => [$address],
                     'force_opt_in' => false,

@@ -88,6 +88,9 @@ class Settings
      */
     public const XML_PATH_CONNECTION_PREFIX = 'smaily_connect/intelligence/connection_prefix';
 
+    /** Why a queued engine row is not sent while its connection is not connected (sendingBlockedReason()). */
+    public const NOT_CONNECTED = 'Campaign Intelligence is not connected';
+
     /** Every path a website-scope connection holds; its clear() removes them all. */
     public const WEBSITE_PATHS = [
         self::XML_PATH_CONNECTED,
@@ -209,7 +212,7 @@ class Settings
             return 'Campaign Intelligence account is not active';
         }
 
-        return $this->isConnected() ? null : 'Campaign Intelligence is not connected';
+        return $this->isConnected() ? null : self::NOT_CONNECTED;
     }
 
     /**
@@ -349,6 +352,26 @@ class Settings
         }
 
         return $this->isConnected() ? '' : null;
+    }
+
+    /**
+     * The Smaily workflows the engine pushed for the extension's emails, as
+     * EmailDesignWorkflows keeps them (JSON), '' when none.
+     */
+    public function getEmailWorkflows(): string
+    {
+        return (string)$this->value(self::XML_PATH_EMAIL_WORKFLOWS);
+    }
+
+    /** Keep the pushed workflows (EmailDesignWorkflows); '' unsets them. */
+    public function recordEmailWorkflows(string $json): void
+    {
+        if ($json === '') {
+            $this->unsetValue(self::XML_PATH_EMAIL_WORKFLOWS);
+        } else {
+            $this->write(self::XML_PATH_EMAIL_WORKFLOWS, $json);
+        }
+        $this->cleanConfigCache();
     }
 
     /**

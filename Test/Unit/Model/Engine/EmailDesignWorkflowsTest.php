@@ -11,7 +11,9 @@ namespace Smaily\Connect\Test\Unit\Model\Engine;
 use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Config\Storage\WriterInterface;
+use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Serialize\Serializer\Json;
+use Magento\Framework\Stdlib\DateTime\DateTime;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Automation\Trigger;
@@ -65,7 +67,7 @@ class EmailDesignWorkflowsTest extends TestCase
                 'smaily_workflow_id' => '459',
                 'smaily_subdomain' => 'shop',
             ]),
-        ]);
+        ], $this->settings());
 
         self::assertSame(
             [
@@ -112,10 +114,10 @@ class EmailDesignWorkflowsTest extends TestCase
      */
     public function testAnItemWithoutAPushedWorkflowOnANamedAccountKeepsNothing(array $override): void
     {
-        $this->workflows()->remember([$this->item('plugin.welcome', $override)]);
+        $this->workflows()->remember([$this->item('plugin.welcome', $override)], $this->settings());
 
         self::assertArrayNotHasKey(Settings::XML_PATH_EMAIL_WORKFLOWS, $this->values);
-        self::assertSame(0, $this->workflows()->workflowId(Trigger::WELCOME, 'shop'));
+        self::assertSame(0, $this->workflows()->workflowId(Trigger::WELCOME, 'shop', $this->settings()));
     }
 
     public function testAReadWithNullIdsWritesNothing(): void
@@ -125,15 +127,18 @@ class EmailDesignWorkflowsTest extends TestCase
         $this->workflows()->remember([
             $this->item('plugin.welcome', ['smaily_state' => 'not_available', 'smaily_workflow_id' => null]),
             'not an item',
-        ]);
+        ], $this->settings());
 
         self::assertSame(0, $this->writes, 'Today\'s reads must not touch core_config_data or the config cache');
     }
 
     public function testAnUnchangedListIsNotWrittenAgain(): void
     {
-        $this->workflows()->remember([$this->item('plugin.welcome')]);
-        $this->workflows()->remember([$this->item('plugin.welcome', ['smaily_subdomain' => 'SHOP'])]);
+        $this->workflows()->remember([$this->item('plugin.welcome')], $this->settings());
+        $this->workflows()->remember(
+            [$this->item('plugin.welcome', ['smaily_subdomain' => 'SHOP'])],
+            $this->settings()
+        );
 
         self::assertSame(1, $this->writes);
     }
@@ -141,36 +146,50 @@ class EmailDesignWorkflowsTest extends TestCase
     public function testEachReadReplacesTheLastOne(): void
     {
         $this->cacheTypeList->expects(self::exactly(2))->method('cleanType')->with('config');
-        $this->workflows()->remember([$this->item('plugin.welcome')]);
+        $this->workflows()->remember([$this->item('plugin.welcome')], $this->settings());
 
-        $this->workflows()->remember([$this->item('plugin.welcome', ['smaily_workflow_id' => null])]);
+        $this->workflows()->remember(
+            [$this->item('plugin.welcome', ['smaily_workflow_id' => null])],
+            $this->settings()
+        );
 
         self::assertArrayNotHasKey(Settings::XML_PATH_EMAIL_WORKFLOWS, $this->values);
-        self::assertSame(0, $this->workflows()->workflowId(Trigger::WELCOME, 'shop'));
+        self::assertSame(0, $this->workflows()->workflowId(Trigger::WELCOME, 'shop', $this->settings()));
     }
 
     public function testASendUsesTheWorkflowOnlyOnTheNamedAccount(): void
     {
-        $this->workflows()->remember([$this->item('plugin.welcome', ['smaily_subdomain' => 'Shop'])]);
+        $this->workflows()->remember(
+            [$this->item('plugin.welcome', ['smaily_subdomain' => 'Shop'])],
+            $this->settings()
+        );
         $workflows = $this->workflows();
 
-        self::assertSame(456, $workflows->workflowId(Trigger::WELCOME, 'shop'));
-        self::assertSame(456, $workflows->workflowId(Trigger::WELCOME, ' SHOP '), 'Case and spaces do not matter');
-        self::assertSame(0, $workflows->workflowId(Trigger::WELCOME, 'other-shop'));
-        self::assertSame(0, $workflows->workflowId(Trigger::WELCOME, ''));
-        self::assertSame(0, $workflows->workflowId(Trigger::FIRST_ORDER, 'shop'), 'Each email has its own');
-        self::assertSame(0, $workflows->workflowId('mystery', 'shop'));
+        self::assertSame(456, $workflows->workflowId(Trigger::WELCOME, 'shop', $this->settings()));
+        self::assertSame(
+            456,
+            $workflows->workflowId(Trigger::WELCOME, ' SHOP ', $this->settings()),
+            'Case and spaces do not matter'
+        );
+        self::assertSame(0, $workflows->workflowId(Trigger::WELCOME, 'other-shop', $this->settings()));
+        self::assertSame(0, $workflows->workflowId(Trigger::WELCOME, '', $this->settings()));
+        self::assertSame(
+            0,
+            $workflows->workflowId(Trigger::FIRST_ORDER, 'shop', $this->settings()),
+            'Each email has its own'
+        );
+        self::assertSame(0, $workflows->workflowId('mystery', 'shop', $this->settings()));
     }
 
     public function testAStoredValueOfAnotherShapeCountsAsNone(): void
     {
         $this->values[Settings::XML_PATH_EMAIL_WORKFLOWS] = '{"plugin.welcome":456,"plugin.first_order":'
             . '{"workflow_id":"457","subdomain":"shop"}}';
-        self::assertSame(0, $this->workflows()->workflowId(Trigger::WELCOME, 'shop'));
-        self::assertSame(0, $this->workflows()->workflowId(Trigger::FIRST_ORDER, 'shop'));
+        self::assertSame(0, $this->workflows()->workflowId(Trigger::WELCOME, 'shop', $this->settings()));
+        self::assertSame(0, $this->workflows()->workflowId(Trigger::FIRST_ORDER, 'shop', $this->settings()));
 
         $this->values[Settings::XML_PATH_EMAIL_WORKFLOWS] = 'not json';
-        self::assertSame(0, $this->workflows()->workflowId(Trigger::WELCOME, 'shop'));
+        self::assertSame(0, $this->workflows()->workflowId(Trigger::WELCOME, 'shop', $this->settings()));
     }
 
     /**
@@ -197,6 +216,16 @@ class EmailDesignWorkflowsTest extends TestCase
 
     private function workflows(): EmailDesignWorkflows
     {
+        return new EmailDesignWorkflows(new Json());
+    }
+
+    /**
+     * The primary connection's settings on this test's default scope; a
+     * website connection's copy (CON-237) reads and writes the same values
+     * at its website's scope.
+     */
+    private function settings(): Settings
+    {
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $scopeConfig->method('getValue')->willReturnCallback(
             fn (string $path): ?string => $this->values[$path] ?? null
@@ -211,6 +240,13 @@ class EmailDesignWorkflowsTest extends TestCase
             $this->writes++;
         });
 
-        return new EmailDesignWorkflows($scopeConfig, $writer, $this->cacheTypeList, new Json());
+        return new Settings(
+            $scopeConfig,
+            $writer,
+            $this->createMock(EncryptorInterface::class),
+            $this->cacheTypeList,
+            new Json(),
+            $this->createMock(DateTime::class)
+        );
     }
 }

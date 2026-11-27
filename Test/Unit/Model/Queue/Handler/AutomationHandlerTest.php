@@ -24,6 +24,7 @@ use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Config;
 use Smaily\Connect\Model\Discount\AutomationDiscount;
 use Smaily\Connect\Model\Engine\EmailDesignWorkflows;
+use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Multilingual\AccountResolver;
 use Smaily\Connect\Model\Queue\Event;
@@ -31,9 +32,12 @@ use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\Handler\AutomationHandler;
 use Smaily\Connect\Model\Queue\Skipped;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 class AutomationHandlerTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private EventQueue $eventQueue;
 
     /**
@@ -128,7 +132,7 @@ class AutomationHandlerTest extends TestCase
             $this->createMock(StoreManagerInterface::class),
             $this->createMock(StateManager::class),
             $this->noDiscount(),
-            new PushedWorkflow($workflows)
+            new PushedWorkflow($workflows, $this->oneEngineConnection($this->createMock(Settings::class)))
         );
 
         self::assertSame([1 => true], $handler->handle([$event]));
@@ -681,7 +685,10 @@ class AutomationHandlerTest extends TestCase
     /** Campaign Intelligence pushed no workflow: every send keeps the matched one. */
     private function noPushedWorkflow(): PushedWorkflow
     {
-        return new PushedWorkflow($this->createMock(EmailDesignWorkflows::class));
+        return new PushedWorkflow(
+            $this->createMock(EmailDesignWorkflows::class),
+            $this->oneEngineConnection($this->createMock(Settings::class))
+        );
     }
 
     private function noDiscount(): AutomationDiscount

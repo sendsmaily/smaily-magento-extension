@@ -19,8 +19,8 @@ use Magento\Framework\Exception\LocalizedException;
 use Smaily\Connect\Model\Engine\AttributionCookieWriter;
 use Smaily\Connect\Model\Engine\AttributionManager;
 use Smaily\Connect\Model\Engine\AttributionShape;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\RecId;
-use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
 
 /**
@@ -47,7 +47,8 @@ use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
  *
  * CSRF-exempt: the landing page may come from the full-page cache, so it has
  * no session form key. A request gives no more than a link with the same
- * parameters does. 404 when the engine is not connected; limited per
+ * parameters does. 404 when the Campaign Intelligence connection serving
+ * the store view (CON-237) is not connected, or none serves it; limited per
  * address as the browse relay; 400 when nothing in it has its shape; every
  * answer is `Cache-Control: no-store, private` with an empty body.
  */
@@ -59,7 +60,7 @@ class Land implements HttpPostActionInterface, CsrfAwareActionInterface
     public function __construct(
         private readonly HttpRequest $request,
         private readonly ResultFactory $resultFactory,
-        private readonly Settings $settings,
+        private readonly Connections $connections,
         private readonly AttributionManager $attributionManager,
         private readonly AttributionCookieWriter $cookieWriter,
         private readonly PerAddressLimiter $limiter
@@ -71,7 +72,7 @@ class Land implements HttpPostActionInterface, CsrfAwareActionInterface
      */
     public function execute(): Raw
     {
-        if (!$this->settings->isConnected()) {
+        if (!($this->connections->current()?->settings()->isConnected() ?? false)) {
             return $this->answer(404);
         }
         if (!$this->limiter->allow('smaily_land_', self::RATE_LIMIT_PER_MINUTE)) {

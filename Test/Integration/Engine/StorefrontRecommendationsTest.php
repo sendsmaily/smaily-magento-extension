@@ -51,6 +51,7 @@ use Smaily\Connect\Model\RateLimit\FixedWindowCounter;
 use Smaily\Connect\Model\RateLimit\PerAddressLimiter;
 use Smaily\Connect\Model\StorefrontScript;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3790: the storefront recommendations route end to end — the real
@@ -61,6 +62,8 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
  */
 class StorefrontRecommendationsTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     private const ENDPOINT = 'https://intelligence.smaily.com/api/v1/recommendations/customer';
     private const REC_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
     private const ANSWER = '{"slots":[{"position":1,"rec_id":"' . self::REC_ID . '","sku":"MJ07",'
@@ -217,7 +220,7 @@ class StorefrontRecommendationsTest extends IntegrationTestCase
         return new Index(
             $this->request(),
             $this->resultFactory(),
-            $settings,
+            $this->oneEngineConnection($settings),
             $this->recommendations($settings, $engineResponses),
             $this->cardsPerSlot(),
             new PerAddressLimiter(
@@ -264,7 +267,7 @@ class StorefrontRecommendationsTest extends IntegrationTestCase
         $cookieManager = $this->createMock(CookieManagerInterface::class);
         $cookieManager->method('getCookie')->willReturnCallback(fn (string $name) => $this->cookies[$name] ?? null);
         $attribution = $this->objectManager->create(AttributionManager::class, [
-            'settings' => $settings,
+            'connections' => $this->oneEngineConnection($settings),
             'cookieManager' => $cookieManager,
             'orderPlacer' => $this->objectManager->create(OrderPlacer::class, [
                 'moduleManager' => $this->createMock(ModuleManager::class),
@@ -292,8 +295,7 @@ class StorefrontRecommendationsTest extends IntegrationTestCase
         $storeManager->method('getWebsite')->with(1)->willReturn($website);
 
         return new StorefrontRecommendations(
-            $settings,
-            $client,
+            $this->oneEngineConnection($settings, $client),
             $profiling,
             $attribution,
             $session,

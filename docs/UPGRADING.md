@@ -171,7 +171,9 @@ keeps them until a save replaces them. Where every website uses the
 default scope's Smaily login, the websites share their settings: the
 Connect, Contacts and Automations steps list no website, each step's
 save gives every website its values, and **Settings** shows only the
-settings for all websites. Where the websites use different Smaily
+settings for all websites (and a Storefront URL per website). A website
+whose own Contacts settings sync otherwise keeps them until you confirm on
+**Settings > Contacts**. Where the websites use different Smaily
 logins, or no Smaily login is saved at the default scope, the steps list
 each such website under **Websites with their own values**, with those
 values. Leave **Keep its own values** to keep them, or pick **Use this
@@ -207,9 +209,17 @@ websites run as one store on that one account, the update gives every
 website those settings: they become the settings for all websites, so the
 other websites' newsletter signups reach Smaily from then on. To send the
 signups made there before, press **Run again** on the **Initial contact
-import** card under **Settings > Contacts**. Every other saved value stays
-where it is: each website's values stay its own values until you change
-them in Settings or run the initial setup again.
+import** card under **Settings > Contacts**. Where the websites run as one
+store on one Smaily account saved for all websites, the settings for all
+websites then win: a website's own login of that account and its own
+automations go, and so do its own Contacts settings where they change
+nothing of who is synced. Contacts settings that do change it (contact
+sync on or off, the sync mode, the guest buyers, the checkout checkbox)
+stay until you confirm on **Settings > Contacts** with **Use the same
+contact settings on every website**. Each website keeps its own Storefront
+URL. Every other store keeps its saved values where they are: each
+website's values stay its own values until you change them in Settings or
+run the initial setup again.
 
 For a website where 2.8.x had *Enable Module = No* — or its own *Yes*
 under a Default Config with *No*, and no *Enable Syncronization* value at

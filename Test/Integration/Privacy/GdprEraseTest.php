@@ -26,6 +26,7 @@ use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
@@ -37,6 +38,8 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 class GdprEraseTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     private const SUBJECT = 'erase-test-1@example.test';
     private const BYSTANDER = 'erase-test-2@example.test';
     private const NON_ASCII_SUBJECT = 'mõni@näide.test';
@@ -777,7 +780,7 @@ class GdprEraseTest extends IntegrationTestCase
             $client->method('customerDelete')->willReturn(['ok' => true]);
         }
 
-        $command = new GdprCommand($settings, $client, $this->eraser);
+        $command = new GdprCommand($this->oneEngineConnection($settings, $client), $this->eraser);
 
         $tester = new CommandTester($command);
         $tester->execute($arguments);

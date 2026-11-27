@@ -10,7 +10,6 @@ namespace Smaily\Connect\Test\Integration\Privacy;
 
 use Smaily\Connect\Console\Command\GdprCommand;
 use Smaily\Connect\Model\Automation\Trigger;
-use Smaily\Connect\Model\Engine\Client;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Privacy\LocalEraser;
 use Smaily\Connect\Model\Queue\Event;
@@ -19,6 +18,7 @@ use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\SchemaInstaller;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
@@ -32,6 +32,8 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 class DiscountCodeErasureTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     private const SUBJECT = 'erase-test-1@example.test';
     private const LABEL = 'Discount codes';
 
@@ -236,7 +238,7 @@ class DiscountCodeErasureTest extends IntegrationTestCase
         $settings = $this->createMock(Settings::class);
         $settings->method('isConnected')->willReturn(false);
 
-        $tester = new CommandTester(new GdprCommand($settings, $this->createMock(Client::class), $this->eraser));
+        $tester = new CommandTester(new GdprCommand($this->oneEngineConnection($settings), $this->eraser));
         $tester->execute($arguments);
 
         return $tester;

@@ -16,6 +16,7 @@ use Smaily\Connect\Model\Queue\Handler\ContactSyncHandler;
 use Smaily\Connect\Model\Queue\Handler\IdentityMergeHandler;
 use Smaily\Connect\Model\Queue\Failure;
 use Smaily\Connect\Model\Queue\Handler\ProfilingConsentHandler;
+use Smaily\Connect\Model\WebsiteConnections;
 
 /**
  * What a failed row says to the merchant (PRO-2454).
@@ -62,8 +63,9 @@ class FailureMessage
         'Smaily API credentials are not configured (store scope: %1)',
         'The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.',
         // Not errors: the reasons a row was closed without sending (PRO-3619, PRO-3634, PRO-3693, CON-195, CON-394,
-        // CON-465, CON-469).
+        // CON-465, CON-469, CON-470).
         ContactSyncHandler::SKIPPED_NOT_A_CONTACT,
+        WebsiteConnections::SKIPPED_NOT_CONNECTED,
         ContactSyncHandler::SKIPPED_STALE_SUBSCRIPTION,
         AutomationHandler::SKIPPED_NO_WORKFLOW,
         AutomationHandler::SKIPPED_NO_LANGUAGE_WORKFLOW,

@@ -267,13 +267,17 @@ class WizardData implements ArgumentInterface
      * The websites that hold their own values of a section, for the initial
      * setup's step on a 2+-website install (CON-179): each with its name
      * and its own values as label/value lines (a password only as saved).
-     * Empty elsewhere.
+     * Empty elsewhere, and for one store on one Smaily account, whose save
+     * gives every website the step's values (CON-470).
      *
      * @return array<int, array{websiteId: int, name: string, values: array<int, array{0: string, 1: string}>, required: bool}>
      */
     public function getWebsiteOverrides(string $section): array
     {
-        if (!$this->websiteContext->isStoreWide() || !$this->websiteContext->hasMultipleWebsites()) {
+        if (!$this->websiteContext->isStoreWide()
+            || !$this->websiteContext->hasMultipleWebsites()
+            || $this->storeLayout->sharesOneAccount()
+        ) {
             return [];
         }
         $names = $this->websiteContext->getWebsiteOptions();

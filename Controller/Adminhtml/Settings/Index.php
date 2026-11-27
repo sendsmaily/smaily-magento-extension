@@ -16,11 +16,16 @@ use Magento\Framework\Controller\Result\Redirect;
 use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\Controller\ResultInterface;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
+use Smaily\Connect\Model\Adminhtml\WebsiteContext;
+use Smaily\Connect\Model\StoreLayout;
 
 /**
  * Tabbed settings page — the wizard's step content as always-available tabs
  * (Connection / Contacts / Automations / Intelligence / RSS), saving via
  * AJAX into the same system config paths as the wizard and system.xml.
+ * One store on one Smaily account (CON-470) shares its settings across its
+ * websites: the page reads and saves the values for all websites, as the
+ * initial setup does, with no website of its own.
  */
 class Index extends Action implements HttpGetActionInterface
 {
@@ -28,7 +33,9 @@ class Index extends Action implements HttpGetActionInterface
 
     public function __construct(
         Context $context,
-        private readonly SetupGuard $setupGuard
+        private readonly SetupGuard $setupGuard,
+        private readonly WebsiteContext $websiteContext,
+        private readonly StoreLayout $storeLayout
     ) {
         parent::__construct($context);
     }
@@ -43,6 +50,9 @@ class Index extends Action implements HttpGetActionInterface
         $redirect = $this->setupGuard->redirectIfNotSetUp($this->resultFactory);
         if ($redirect !== null) {
             return $redirect;
+        }
+        if ($this->storeLayout->sharesOneAccount()) {
+            $this->websiteContext->useStoreWide();
         }
 
         /** @var Page $page */

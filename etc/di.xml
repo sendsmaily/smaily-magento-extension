@@ -39,6 +39,15 @@
         </arguments>
     </type>
 
+    <!-- The upgrade that shares one website's settings with every website
+         (CON-470) records what it moved in smaily_connect.log, whatever the
+         log verbosity. -->
+    <type name="Smaily\Connect\Setup\Patch\Data\ShareSingleWebsiteSettings">
+        <arguments>
+            <argument name="logger" xsi:type="object">Smaily\Connect\Logger</argument>
+        </arguments>
+    </type>
+
     <!-- Marketing event queue handlers, keyed by event type
          (see Cron\FlushEventQueue). -->
     <type name="Smaily\Connect\Model\Queue\HandlerPool">

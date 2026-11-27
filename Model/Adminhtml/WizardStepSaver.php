@@ -51,6 +51,10 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  * - The initial setup (a store-wide request) writes the default scope; on a
  *   2+-website install a website listed with its own values keeps them
  *   unless the post names it in `use_store_wide`.
+ * - One store on one Smaily account (StoreLayout::sharesOneAccount(),
+ *   CON-470): Settings is store-wide as the initial setup is, and a
+ *   store-wide save removes every website's own values of the section, so
+ *   the saved value applies to every website.
  * - Settings on a 2+-website install, for its selected website: `own` true
  *   writes the website's own values (its scope; the mapping rows under its
  *   id); otherwise a website with own values gets them removed and nothing
@@ -339,6 +343,11 @@ class WizardStepSaver
             return [$websiteId, [], true];
         }
         if ($this->websiteContext->isStoreWide()) {
+            // One store on one Smaily account: every website shares the
+            // values, so no website keeps its own (CON-470).
+            if ($this->storeLayout->sharesOneAccount()) {
+                return [null, $withOwn, true];
+            }
             $chosen = array_map('intval', is_array($data['use_store_wide'] ?? null) ? $data['use_store_wide'] : []);
             // A website on another Smaily account keeps its automations (CON-190).
             if ($section === WebsiteOverrides::AUTOMATIONS) {

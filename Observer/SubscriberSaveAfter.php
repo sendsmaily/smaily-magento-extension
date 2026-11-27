@@ -25,6 +25,7 @@ use Smaily\Connect\Model\ContactSync\SubscriberPayloadBuilder;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
 use Smaily\Connect\Model\Automation\Trigger;
 use Smaily\Connect\Model\Newsletter\SubscriberStatus;
+use Smaily\Connect\Model\WebsiteConnections;
 
 /**
  * Real-time newsletter subscription sync (newsletter_subscriber_save_after).
@@ -49,6 +50,11 @@ use Smaily\Connect\Model\Newsletter\SubscriberStatus;
  * (CON-196, the same rule in every Smaily connector): it always sends
  * is_unsubscribed, 0 or 1, and a subscription may re-subscribe a contact who
  * unsubscribed in Smaily. Every other write leaves the status out.
+ *
+ * A subscription or unsubscribe on a website without a Smaily connection,
+ * while another website has one, is recorded in the Log as skipped with the
+ * reason (CON-470), so a website the setup left unconnected does not drop
+ * its signups unseen.
  */
 class SubscriberSaveAfter implements ObserverInterface
 {
@@ -60,7 +66,8 @@ class SubscriberSaveAfter implements ObserverInterface
         private readonly SubscriberPayloadBuilder $payloadBuilder,
         private readonly CustomerRepositoryInterface $customerRepository,
         private readonly State $appState,
-        private readonly StorefrontSubscription $storefrontSubscription
+        private readonly StorefrontSubscription $storefrontSubscription,
+        private readonly WebsiteConnections $websiteConnections
     ) {
     }
 
@@ -76,10 +83,12 @@ class SubscriberSaveAfter implements ObserverInterface
 
         $storeId = (int)$subscriber->getStoreId();
         $websiteId = $this->dispatcher->websiteId($storeId);
-        if (!$this->config->isContactSyncActive($websiteId)
-            || !$this->config->isConnected($storeId)
-            || !SubscriberStatus::changed($subscriber)
-        ) {
+        if (!$this->config->isConnected($storeId)) {
+            $this->recordNotConnected($subscriber, $storeId, $websiteId);
+
+            return;
+        }
+        if (!$this->config->isContactSyncActive($websiteId) || !SubscriberStatus::changed($subscriber)) {
             return;
         }
 
@@ -107,6 +116,32 @@ class SubscriberSaveAfter implements ObserverInterface
             unset($address['language']);
             $this->dispatcher->dispatchAutomation(Trigger::WELCOME, $storeId, $address);
         }
+    }
+
+    /**
+     * A subscription or unsubscribe on a website without a Smaily connection
+     * while another website has one (CON-470): the Log shows it skipped,
+     * with what would have been sent.
+     */
+    private function recordNotConnected(Subscriber $subscriber, int $storeId, int $websiteId): void
+    {
+        $status = (int)$subscriber->getStatus();
+        $email = (string)$subscriber->getEmail();
+        if ($email === ''
+            || !in_array($status, [Subscriber::STATUS_SUBSCRIBED, Subscriber::STATUS_UNSUBSCRIBED], true)
+            || !SubscriberStatus::changed($subscriber)
+            || !isset($this->websiteConnections->unconnectedWebsites()[$websiteId])
+        ) {
+            return;
+        }
+
+        $this->dispatcher->recordSkippedContactSync(
+            $email,
+            $storeId,
+            $status !== Subscriber::STATUS_SUBSCRIBED,
+            $this->loadCustomer((int)$subscriber->getCustomerId()),
+            WebsiteConnections::SKIPPED_NOT_CONNECTED
+        );
     }
 
     /**

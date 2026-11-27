@@ -43,7 +43,10 @@ use Smaily\Connect\Model\Newsletter\SubscriberStatus;
  * checkout saves through the REST API), a resubscription included. A
  * subscription made in the admin, through the REST/SOAP/GraphQL API or by an
  * import (cron or command line) syncs the contact but fires no welcome
- * (PRO-3580).
+ * (PRO-3580). The welcome follows that subscription, not contact sync
+ * (CON-477, refining the 26 Nov rule): it fires while contact sync is off,
+ * and for a signup the contact sync mode leaves out. Without a contact sync
+ * queued before it, the welcome itself carries the contact's language.
  *
  * A change of the subscription status is a consent act whoever makes it — the
  * shopper, staff in the admin, an API call in any context, a Magento import
@@ -83,7 +86,7 @@ class SubscriberSaveAfter implements ObserverInterface
 
         $storeId = (int)$subscriber->getStoreId();
         $websiteId = $this->dispatcher->websiteId($storeId);
-        if (!$this->config->isContactSyncActive($websiteId) || !SubscriberStatus::changed($subscriber)) {
+        if (!SubscriberStatus::changed($subscriber)) {
             return;
         }
 
@@ -98,14 +101,17 @@ class SubscriberSaveAfter implements ObserverInterface
         }
 
         $isUnsubscribed = $status !== Subscriber::STATUS_SUBSCRIBED;
-        if (!$isUnsubscribed && !$this->syncsSubscription($subscriber, $websiteId)) {
+        $syncs = $this->config->isContactSyncActive($websiteId)
+            && ($isUnsubscribed || $this->syncsSubscription($subscriber, $websiteId));
+        $welcomes = !$isUnsubscribed && $this->isStorefront() && $this->config->isWelcomeEnabled($websiteId);
+        if (!$syncs && !$welcomes) {
             return;
         }
 
         // A website without a Smaily connection: only a sync the Log records
         // (UnconnectedSignup) needs the customer.
         $connected = $this->config->isConnected($storeId);
-        if (!$connected && !$this->unconnectedSignup->applies($storeId)) {
+        if (!$connected && !($syncs && $this->unconnectedSignup->applies($storeId))) {
             return;
         }
         $customer = $this->loadCustomer((int)$subscriber->getCustomerId());
@@ -115,11 +121,16 @@ class SubscriberSaveAfter implements ObserverInterface
             return;
         }
 
-        $this->dispatcher->dispatchContactSync($email, $storeId, $isUnsubscribed, $customer);
+        if ($syncs) {
+            $this->dispatcher->dispatchContactSync($email, $storeId, $isUnsubscribed, $customer);
+        }
 
-        if (!$isUnsubscribed && $this->isStorefront() && $this->config->isWelcomeEnabled($websiteId)) {
+        if ($welcomes) {
             $address = $this->payloadBuilder->build($email, $storeId, null, $customer);
-            unset($address['language']);
+            if ($syncs) {
+                // The contact sync queued above stores the language on the contact.
+                unset($address['language']);
+            }
             $this->dispatcher->dispatchAutomation(Trigger::WELCOME, $storeId, $address);
         }
     }

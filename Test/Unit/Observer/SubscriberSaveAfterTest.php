@@ -46,6 +46,10 @@ use Smaily\Connect\Observer\SubscriberSaveAfter;
  *
  * CON-470: a signup on a website without a Smaily connection, while another
  * website has one, is recorded in the Log as skipped; nothing is sent.
+ *
+ * CON-477: the welcome follows the shopper's own storefront subscription,
+ * not contact sync: it fires while contact sync is off and for a signup the
+ * contact sync mode leaves out, and then carries the contact's language.
  */
 class SubscriberSaveAfterTest extends TestCase
 {
@@ -151,14 +155,121 @@ class SubscriberSaveAfterTest extends TestCase
 
     /**
      * PRO-3606: in the checkout-opt-in-only mode a newsletter-form signup
-     * alone sends nothing to Smaily: no contact and no welcome.
+     * alone syncs no contact. CON-477: it still gets the welcome, which
+     * carries the contact's language, as no contact sync stores it.
      */
-    public function testInCheckoutOptInOnlyModeANewsletterFormSignupSendsNothing(): void
+    public function testInCheckoutOptInOnlyModeANewsletterFormSignupGetsOnlyTheWelcome(): void
+    {
+        $this->dispatcher->expects(self::never())->method('dispatchContactSync');
+        $this->dispatcher->expects(self::once())->method('dispatchAutomation')
+            ->with(Trigger::WELCOME, 1, ['email' => 'person@example.com', 'language' => 'et']);
+
+        $this->observer('frontend', null, SyncMode::MODE_CHECKOUT_OPTIN)
+            ->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED));
+    }
+
+    /**
+     * CON-477: with contact sync active, the contact sync queued first
+     * stores the language, so the welcome after it leaves it out, as before.
+     */
+    public function testWithContactSyncTheWelcomeFollowsTheContactSyncWithoutTheLanguage(): void
+    {
+        $calls = [];
+        $this->dispatcher->expects(self::once())->method('dispatchContactSync')
+            ->willReturnCallback(static function () use (&$calls): void {
+                $calls[] = 'contact';
+            });
+        $this->dispatcher->expects(self::once())->method('dispatchAutomation')
+            ->with(Trigger::WELCOME, 1, ['email' => 'person@example.com'])
+            ->willReturnCallback(static function () use (&$calls): void {
+                $calls[] = 'welcome';
+            });
+
+        $this->observer('frontend')->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED));
+
+        self::assertSame(['contact', 'welcome'], $calls);
+    }
+
+    /**
+     * CON-477: with contact sync off (or before its Contacts settings are
+     * saved), a storefront subscription — the newsletter form, the account's
+     * newsletter box, the checkout opt-in — gets the welcome, with the
+     * contact's language, and syncs no contact.
+     *
+     * @dataProvider storefrontSubscriptionProvider
+     */
+    public function testWithContactSyncOffAStorefrontSubscriptionGetsTheWelcome(string $area, bool $checkout): void
+    {
+        $this->dispatcher->expects(self::never())->method('dispatchContactSync');
+        $this->dispatcher->expects(self::once())->method('dispatchAutomation')
+            ->with(Trigger::WELCOME, 1, ['email' => 'person@example.com', 'language' => 'et']);
+
+        $storefrontSubscription = new StorefrontSubscription();
+        $subscribe = function () use ($area, $storefrontSubscription): void {
+            $this->observer($area, $storefrontSubscription, SyncMode::MODE_CONSENT, false)
+                ->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED, Subscriber::STATUS_UNSUBSCRIBED));
+        };
+        $checkout ? $storefrontSubscription->run($subscribe) : $subscribe();
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: bool}>
+     */
+    public static function storefrontSubscriptionProvider(): array
+    {
+        return [
+            'the newsletter form or the account\'s newsletter box' => ['frontend', false],
+            'the checkout opt-in, placed through the REST API' => ['webapi_rest', true],
+        ];
+    }
+
+    /**
+     * CON-477: with contact sync off and "Need to Confirm" on, the pending
+     * signup sends nothing; its confirmation sends the welcome.
+     */
+    public function testWithContactSyncOffAConfirmedSignupGetsTheWelcomeOnlyOnConfirmation(): void
+    {
+        $this->dispatcher->expects(self::never())->method('dispatchContactSync');
+        $this->dispatcher->expects(self::once())->method('dispatchAutomation')
+            ->with(Trigger::WELCOME, 1, ['email' => 'person@example.com', 'language' => 'et']);
+
+        $observer = $this->observer('frontend', null, SyncMode::MODE_CONSENT, false);
+        $observer->execute($this->eventFor(Subscriber::STATUS_NOT_ACTIVE));
+        $observer->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED, Subscriber::STATUS_NOT_ACTIVE));
+    }
+
+    /**
+     * CON-477: with contact sync off, a subscription made in the admin,
+     * through the API or by an import still sends no welcome, and an
+     * unsubscribe sends nothing.
+     *
+     * @dataProvider nonStorefrontAreaProvider
+     */
+    public function testWithContactSyncOffANonStorefrontSubscriptionSendsNothing(?string $area): void
     {
         $this->dispatcher->expects(self::never())->method('dispatchContactSync');
         $this->dispatcher->expects(self::never())->method('dispatchAutomation');
 
-        $this->observer('frontend', null, SyncMode::MODE_CHECKOUT_OPTIN)
+        $this->observer($area, null, SyncMode::MODE_CONSENT, false)
+            ->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED));
+        $this->observer('frontend', null, SyncMode::MODE_CONSENT, false)
+            ->execute($this->eventFor(Subscriber::STATUS_UNSUBSCRIBED, Subscriber::STATUS_SUBSCRIBED));
+    }
+
+    /**
+     * CON-477: with contact sync off and the welcome off, a storefront
+     * subscription sends nothing; on a website without a Smaily connection
+     * it sends nothing and records nothing, as contact sync would not run.
+     */
+    public function testWithContactSyncOffNoWelcomeOrNoConnectionSendsNothing(): void
+    {
+        $this->dispatcher->expects(self::never())->method('dispatchContactSync');
+        $this->dispatcher->expects(self::never())->method('dispatchAutomation');
+        $this->dispatcher->expects(self::never())->method('recordSkippedContactSync');
+
+        $this->observer('frontend', null, SyncMode::MODE_CONSENT, false, true, [], false)
+            ->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED));
+        $this->observer('frontend', null, SyncMode::MODE_CONSENT, false, false, [1 => 'Second'])
             ->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED));
     }
 
@@ -252,14 +363,14 @@ class SubscriberSaveAfterTest extends TestCase
 
     /**
      * PRO-4036: a subscription or an unsubscribe on a website whose
-     * Contacts settings were never saved queues nothing, and no welcome.
+     * Contacts settings were never saved queues no contact (the welcome
+     * follows the subscription, CON-477).
      *
      * @dataProvider statusChangeProvider
      */
-    public function testNothingIsQueuedBeforeContactSyncIsActive(int $status): void
+    public function testNoContactIsQueuedBeforeContactSyncIsActive(int $status): void
     {
         $this->dispatcher->expects(self::never())->method('dispatchContactSync');
-        $this->dispatcher->expects(self::never())->method('dispatchAutomation');
 
         $this->observer('frontend', null, SyncMode::MODE_CONSENT, false)->execute($this->eventFor($status));
     }
@@ -329,12 +440,13 @@ class SubscriberSaveAfterTest extends TestCase
         string $mode = SyncMode::MODE_CONSENT,
         bool $active = true,
         bool $connected = true,
-        array $unconnected = []
+        array $unconnected = [],
+        bool $welcome = true
     ): SubscriberSaveAfter {
         $config = $this->createMock(Config::class);
         $config->method('isContactSyncActive')->with(1)->willReturn($active);
         $config->method('isConnected')->willReturn($connected);
-        $config->method('isWelcomeEnabled')->willReturn(true);
+        $config->method('isWelcomeEnabled')->willReturn($welcome);
         $config->method('getSyncMode')->willReturn($mode);
 
         $state = $this->createMock(State::class);
@@ -347,7 +459,7 @@ class SubscriberSaveAfterTest extends TestCase
         }
 
         $payloadBuilder = $this->createMock(SubscriberPayloadBuilder::class);
-        $payloadBuilder->method('build')->willReturn(['email' => 'person@example.com']);
+        $payloadBuilder->method('build')->willReturn(['email' => 'person@example.com', 'language' => 'et']);
 
         $websiteConnections = $this->createMock(WebsiteConnections::class);
         $websiteConnections->method('isUnconnectedWhileAnotherIs')

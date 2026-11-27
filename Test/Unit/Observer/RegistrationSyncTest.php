@@ -39,6 +39,10 @@ use Smaily\Connect\Observer\SubscriberSaveAfter;
  * Magento's customer save twice — the account, then the password-reset
  * token — and the newsletter subscription between them. The registration
  * queues one contact sync for it, not one per save.
+ *
+ * CON-477: the welcome follows the newsletter subscription, not contact
+ * sync — a registration with the box gets it with contact sync off too, and
+ * one without the box gets none.
  */
 class RegistrationSyncTest extends TestCase
 {
@@ -50,6 +54,8 @@ class RegistrationSyncTest extends TestCase
     private int $subscriberStatus = 0;
 
     private string $firstName = 'Test';
+
+    private bool $syncActive = true;
 
     private SyncDispatcher $dispatcher;
 
@@ -97,6 +103,44 @@ class RegistrationSyncTest extends TestCase
             ['email' => self::EMAIL, 'is_unsubscribed' => 0, 'first_name' => 'Test'],
             ['email' => self::EMAIL, 'first_name' => 'Changed'],
         ], $this->contactSyncs());
+    }
+
+    /**
+     * CON-477: with contact sync off, the registration's newsletter
+     * subscription still gets one welcome; no contact sync is queued.
+     */
+    public function testARegistrationWithTheNewsletterBoxGetsTheWelcomeWithContactSyncOff(): void
+    {
+        $this->syncActive = false;
+        $this->register(SyncMode::MODE_CONSENT);
+
+        self::assertSame([], $this->contactSyncs());
+        self::assertCount(1, $this->rowsOf(EventType::AUTOMATION_TRIGGER));
+    }
+
+    /**
+     * CON-477: a registration without the newsletter box makes no
+     * subscription, so it sends no welcome, with contact sync on or off.
+     *
+     * @dataProvider contactSyncSwitchProvider
+     */
+    public function testARegistrationWithoutTheNewsletterBoxSendsNoWelcome(bool $syncActive): void
+    {
+        $this->syncActive = $syncActive;
+        $this->dispatcher = $this->createDispatcher();
+
+        $this->customerSaved(SyncMode::MODE_LEGITIMATE_INTEREST);
+        $this->customerSaved(SyncMode::MODE_LEGITIMATE_INTEREST);
+
+        self::assertSame([], $this->rowsOf(EventType::AUTOMATION_TRIGGER));
+    }
+
+    /**
+     * @return array<string, array{0: bool}>
+     */
+    public static function contactSyncSwitchProvider(): array
+    {
+        return ['contact sync on' => [true], 'contact sync off' => [false]];
     }
 
     /**
@@ -217,7 +261,7 @@ class RegistrationSyncTest extends TestCase
     private function config(string $mode): Config
     {
         $config = $this->createMock(Config::class);
-        $config->method('isContactSyncActive')->willReturn(true);
+        $config->method('isContactSyncActive')->willReturn($this->syncActive);
         $config->method('isConnected')->willReturn(true);
         $config->method('isWelcomeEnabled')->willReturn(true);
         $config->method('getSyncMode')->willReturn($mode);

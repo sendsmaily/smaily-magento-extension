@@ -16,6 +16,7 @@ use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Privacy\AddressKey;
@@ -24,9 +25,12 @@ use Smaily\Connect\Model\Privacy\ProfilingOptOuts;
 use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 class ProfilingConsentTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const NOW = 1790000000;
     private const NOW_Z = '2026-09-21T14:13:20Z';
 
@@ -61,6 +65,9 @@ class ProfilingConsentTest extends TestCase
 
     private SmailyClient&MockObject $smailyClient;
     private Settings&MockObject $engineSettings;
+
+    /** Separate stores (CON-237) when set; else one store on $engineSettings. */
+    private ?Connections $connections = null;
 
     protected function setUp(): void
     {
@@ -580,12 +587,30 @@ class ProfilingConsentTest extends TestCase
     public function testAnOptOutIsSentAgainToTheConnectionThatConfirmedTheShopper(): void
     {
         $this->records['u1@example.invalid'] = self::NOW - 3600;
+        $this->connections = $this->separateStores(true);
 
         $this->consent()->resendOptOuts(['u1@example.invalid'], 2);
         $this->consent()->resendOptOuts(['u1@example.invalid']);
 
         self::assertSame([2, 0], $this->enqueuedWebsites);
         self::assertSame([2, 0], $this->waitingWebsites);
+    }
+
+    /**
+     * CON-237: the store's record is the installation's, so a choice is
+     * queued once for each connected connection, with its website — and
+     * not for a connection that is not connected.
+     */
+    public function testAChoiceIsQueuedForEveryConnectedConnection(): void
+    {
+        $this->connections = $this->separateStores(true);
+        $this->consent()->setAllowed('person@example.com', false, 1);
+        self::assertSame([0, 2], $this->enqueuedWebsites);
+
+        $this->enqueuedWebsites = [];
+        $this->connections = $this->separateStores(false);
+        $this->consent()->optOutOnUnsubscribe('other@example.com');
+        self::assertSame([0], $this->enqueuedWebsites);
     }
 
     public function testAShopperWhoDidNotOptOutGetsNoConsentCall(): void
@@ -643,6 +668,21 @@ class ProfilingConsentTest extends TestCase
 
         self::assertSame([self::keyedHash($email)], array_column($this->enqueued, 'entity_id'));
         self::assertSame($email, $this->enqueued[0]['payload']['email']);
+    }
+
+    /**
+     * Separate stores: the primary ($engineSettings) serves website 1, the
+     * connection of website 2 website 2, connected or not.
+     */
+    private function separateStores(bool $latviaConnected): Connections
+    {
+        $latvia = $this->createMock(Settings::class);
+        $latvia->method('isConnected')->willReturn($latviaConnected);
+
+        return $this->engineConnections([
+            [$this->engineConnection(0, $this->engineSettings, [1], [1], 1), null],
+            [$this->engineConnection(2, $latvia, [2], [2], 2), null],
+        ]);
     }
 
     private function consent(): ProfilingConsent
@@ -714,7 +754,7 @@ class ProfilingConsentTest extends TestCase
 
         return new ProfilingConsent(
             $provider,
-            $this->engineSettings,
+            $this->connections ?? $this->oneEngineConnection($this->engineSettings),
             $eventQueue,
             $optOuts,
             $addressKey,

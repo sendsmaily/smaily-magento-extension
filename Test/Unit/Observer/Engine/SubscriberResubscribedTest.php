@@ -16,6 +16,7 @@ use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 use Smaily\Connect\Observer\Engine\SubscriberResubscribed;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3594: subscribing to marketing again switches profiling back on when
@@ -27,6 +28,8 @@ use Smaily\Connect\Observer\Engine\SubscriberResubscribed;
  */
 class SubscriberResubscribedTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private ProfilingConsent&MockObject $profilingConsent;
     private bool $engineConnected = true;
 
@@ -71,7 +74,7 @@ class SubscriberResubscribedTest extends TestCase
         $settings = $this->createMock(Settings::class);
         $settings->method('isConnected')->willReturn($this->engineConnected);
 
-        return new SubscriberResubscribed($settings, $this->profilingConsent);
+        return new SubscriberResubscribed($this->oneEngineConnection($settings), $this->profilingConsent);
     }
 
     /**

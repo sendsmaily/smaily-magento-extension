@@ -16,6 +16,7 @@ use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\Settings;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 use Smaily\Connect\Observer\Engine\SubscriberUnsubscribed;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * PRO-3578: an unsubscribe from marketing also stops profiling — whether the
@@ -26,6 +27,8 @@ use Smaily\Connect\Observer\Engine\SubscriberUnsubscribed;
  */
 class SubscriberUnsubscribedTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private ProfilingConsent&MockObject $profilingConsent;
     private bool $engineConnected = true;
 
@@ -70,7 +73,7 @@ class SubscriberUnsubscribedTest extends TestCase
         $settings = $this->createMock(Settings::class);
         $settings->method('isConnected')->willReturn($this->engineConnected);
 
-        return new SubscriberUnsubscribed($settings, $this->profilingConsent);
+        return new SubscriberUnsubscribed($this->oneEngineConnection($settings), $this->profilingConsent);
     }
 
     /**

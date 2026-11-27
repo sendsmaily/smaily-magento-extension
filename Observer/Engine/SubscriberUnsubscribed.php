@@ -11,7 +11,7 @@ namespace Smaily\Connect\Observer\Engine;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Newsletter\Model\Subscriber;
-use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Newsletter\SubscriberStatus;
 use Smaily\Connect\Model\Privacy\ProfilingConsent;
 
@@ -27,7 +27,7 @@ use Smaily\Connect\Model\Privacy\ProfilingConsent;
 class SubscriberUnsubscribed implements ObserverInterface
 {
     public function __construct(
-        private readonly Settings $settings,
+        private readonly Connections $connections,
         private readonly ProfilingConsent $profilingConsent
     ) {
     }
@@ -41,7 +41,7 @@ class SubscriberUnsubscribed implements ObserverInterface
         if (!$subscriber instanceof Subscriber
             || !SubscriberStatus::changed($subscriber)
             || (int)$subscriber->getStatus() !== Subscriber::STATUS_UNSUBSCRIBED
-            || !$this->settings->isConnected()
+            || !$this->connections->anyConnected()
         ) {
             return;
         }

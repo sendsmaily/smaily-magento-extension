@@ -25,6 +25,7 @@ use Smaily\Connect\Model\Queue\Handler\ProfilingConsentHandler;
 use Smaily\Connect\Model\Queue\HandlerPool;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * A shopper's profiling choice travels to the engine through the marketing
@@ -34,6 +35,8 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
  */
 class ProfilingConsentDeliveryTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     /** @var array<string, int> */
     private array $records = [];
 
@@ -237,7 +240,7 @@ class ProfilingConsentDeliveryTest extends IntegrationTestCase
         /** @var ProfilingConsent $consent */
         $consent = $this->objectManager->create(ProfilingConsent::class, [
             'smailyClientProvider' => $provider,
-            'engineSettings' => $this->settings,
+            'connections' => $this->oneEngineConnection($this->settings),
             'optOuts' => $this->optOuts,
         ]);
 
@@ -264,8 +267,7 @@ class ProfilingConsentDeliveryTest extends IntegrationTestCase
 
         /** @var ProfilingConsentHandler $handler */
         $handler = $this->objectManager->create(ProfilingConsentHandler::class, [
-            'settings' => $this->settings,
-            'client' => $client,
+            'connections' => $this->oneEngineConnection($this->settings, $client),
             'optOuts' => $this->optOuts,
         ]);
         /** @var FlushEventQueue $cron */

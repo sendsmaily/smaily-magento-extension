@@ -279,7 +279,7 @@ class ProfilingOptOutReplayTest extends IntegrationTestCase
         /** @var ProfilingConsent $consent */
         $consent = $this->objectManager->create(ProfilingConsent::class, [
             'smailyClientProvider' => $provider,
-            'engineSettings' => $this->settings,
+            'connections' => $this->oneEngineConnection($this->settings),
             'optOuts' => $this->optOuts,
         ]);
 
@@ -310,8 +310,7 @@ class ProfilingOptOutReplayTest extends IntegrationTestCase
     {
         /** @var ProfilingConsentHandler $handler */
         $handler = $this->objectManager->create(ProfilingConsentHandler::class, [
-            'settings' => $this->settings,
-            'client' => $this->client,
+            'connections' => $this->oneEngineConnection($this->settings, $this->client),
             'optOuts' => $this->optOuts,
         ]);
         /** @var FlushEventQueue $cron */

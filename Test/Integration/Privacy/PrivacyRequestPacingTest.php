@@ -35,6 +35,7 @@ use Smaily\Connect\Model\Report\ConnectionHealth;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Model\StorefrontScript;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-432: the shoppers' profiling choices go to the engine at the pace of
@@ -47,6 +48,8 @@ use Smaily\Connect\Test\Integration\IntegrationTestCase;
  */
 class PrivacyRequestPacingTest extends IntegrationTestCase
 {
+    use EngineConnectionsStub;
+
     /** @var array<int, string> the paths the engine was asked, in order */
     private array $requests = [];
 
@@ -176,8 +179,7 @@ class PrivacyRequestPacingTest extends IntegrationTestCase
 
         /** @var ProfilingConsentHandler $handler */
         $handler = $this->objectManager->create(ProfilingConsentHandler::class, [
-            'settings' => $this->settings,
-            'client' => $this->client(),
+            'connections' => $this->oneEngineConnection($this->settings, $this->client()),
             'optOuts' => $optOuts,
         ]);
         /** @var FlushEventQueue $cron */

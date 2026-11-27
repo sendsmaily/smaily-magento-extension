@@ -9,7 +9,7 @@ declare(strict_types=1);
 namespace Smaily\Connect\Model\Queue\Handler;
 
 use Smaily\Connect\Api\Queue\PausableEventHandlerInterface;
-use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Exception\EngineThrottledException;
@@ -33,11 +33,17 @@ use Smaily\Connect\Model\Queue\Skipped;
  * own. Such a row is closed as Skipped with the reason, never as delivered
  * (PRO-3634).
  *
- * While Campaign Intelligence refuses the account (PRO-2451) the choices
- * wait, as the identity merges do (PRO-2466, PRO-3752): the queue does not
- * claim them (isPaused()), and a row that meets the refusal goes back as it
- * was. Once the account is active again they are sent, and the check above
- * still lets only the shopper's newest choice through.
+ * A row goes to the Campaign Intelligence connection of its website_id
+ * (CON-237): Engine\Connection::eventWebsiteId(), 0 for the primary —
+ * every row queued before. A row whose website no connection serves now is
+ * not sent, as when not connected.
+ *
+ * While Campaign Intelligence refuses the row's account (PRO-2451) the
+ * choice waits, as the identity merges do (PRO-2466, PRO-3752): a row that
+ * meets the refusal goes back as it was, and while every connection is
+ * refused the queue does not claim the rows at all (isPaused()). Once the
+ * account is active again they are sent, and the check above still lets
+ * only the shopper's newest choice through.
  *
  * The choices go at the pace of the engine's limit on privacy requests
  * (Engine\PrivacyRequestBudget, CON-432): a row the limit does not allow
@@ -52,8 +58,7 @@ class ProfilingConsentHandler implements PausableEventHandlerInterface
     private const REASON = 'user_preference';
 
     public function __construct(
-        private readonly Settings $settings,
-        private readonly Client $client,
+        private readonly Connections $connections,
         private readonly EventQueue $eventQueue,
         private readonly ProfilingOptOuts $optOuts,
         private readonly Logger $logger
@@ -68,14 +73,21 @@ class ProfilingConsentHandler implements PausableEventHandlerInterface
         $results = [];
         foreach ($events as $event) {
             $id = (int)$event->getId();
-            // Asked per row: a refusal (a 403 on one row) stops the rest,
-            // and the rows wait for the account (PRO-3752); not connected, the
-            // row says why.
-            $blocked = $this->settings->sendingBlockedReason();
-            if ($blocked !== null) {
-                $results[$id] = $this->settings->isRefused() ? new Pending() : $blocked;
+            // Asked per row: a refusal (a 403 on one row) stops the rest of
+            // its connection's rows, and they wait for the account
+            // (PRO-3752); not connected, the row says why.
+            $connection = $this->connections->forWebsite($event->getWebsiteId());
+            if ($connection === null) {
+                $results[$id] = Settings::NOT_CONNECTED;
                 continue;
             }
+            $settings = $connection->settings();
+            $blocked = $settings->sendingBlockedReason();
+            if ($blocked !== null) {
+                $results[$id] = $settings->isRefused() ? new Pending() : $blocked;
+                continue;
+            }
+            $client = $this->connections->client($connection);
 
             $payload = $this->eventQueue->decodePayload($event);
             $email = (string)($payload['email'] ?? '');
@@ -93,7 +105,7 @@ class ProfilingConsentHandler implements PausableEventHandlerInterface
             }
 
             try {
-                $this->client->customerOptOut($email, $optOut, self::REASON, (string)($payload['opted_out_at'] ?? ''));
+                $client->customerOptOut($email, $optOut, self::REASON, (string)($payload['opted_out_at'] ?? ''));
                 $results[$id] = true;
             } catch (EngineThrottledException $exception) {
                 $results[$id] = new Pending($exception->getRetryAfter());
@@ -107,7 +119,7 @@ class ProfilingConsentHandler implements PausableEventHandlerInterface
                 // tenant_inactive`) is not this row's fault: it waits.
                 $results[$id] = match (true) {
                     $exception->getHttpStatus() === 404 => true,
-                    $this->settings->isRefused() => new Pending(),
+                    $settings->isRefused() => new Pending(),
                     default => $exception,
                 };
             } catch (EngineException $exception) {
@@ -115,7 +127,7 @@ class ProfilingConsentHandler implements PausableEventHandlerInterface
                 $results[$id] = $exception;
             }
 
-            $exchange = $this->client->lastExchange();
+            $exchange = $client->lastExchange();
             if ($exchange !== null) {
                 $this->eventQueue->recordExchange($event, $exchange['request'], $exchange['response']);
             }
@@ -125,11 +137,18 @@ class ProfilingConsentHandler implements PausableEventHandlerInterface
     }
 
     /**
-     * While Campaign Intelligence refuses the account, the rows wait
-     * unclaimed (PRO-3752).
+     * While Campaign Intelligence refuses every connection's account, the
+     * rows wait unclaimed (PRO-3752); one connection refused, its rows wait
+     * row by row (handle()).
      */
     public function isPaused(): bool
     {
-        return $this->settings->isRefused();
+        foreach ($this->connections->all() as $connection) {
+            if (!$connection->settings()->isRefused()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

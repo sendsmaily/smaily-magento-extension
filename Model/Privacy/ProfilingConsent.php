@@ -14,7 +14,7 @@ use Smaily\Connect\Model\Client\Exception\ApiException;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClient;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
-use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Model\Engine\Connections;
 use Smaily\Connect\Model\Logger\Logger;
 use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\EventQueue;
@@ -32,7 +32,10 @@ use Smaily\Connect\Model\Queue\EventType;
  * sent without a status as subscribed (PRO-3619) — into the store's own
  * durable record (ProfilingOptOuts) and onto the marketing event queue for
  * the engine's opt-out endpoint (contract §10), where it gets the normal
- * retry ladder (PRO-3578).
+ * retry ladder (PRO-3578). The store's record is one for the installation,
+ * so a choice is queued for every connected Campaign Intelligence
+ * connection (CON-237), one row each; an engine store that does not hold
+ * the shopper answers "not found", which closes its row.
  *
  * A read resolves the Smaily contact against the store's record, and the
  * newest choice wins (Woo PRO-3191/3192/3434): only an opt-in on the contact
@@ -64,7 +67,7 @@ class ProfilingConsent
 
     public function __construct(
         private readonly SmailyClientProvider $smailyClientProvider,
-        private readonly Settings $engineSettings,
+        private readonly Connections $connections,
         private readonly EventQueue $eventQueue,
         private readonly ProfilingOptOuts $optOuts,
         private readonly AddressKey $addressKey,
@@ -407,23 +410,32 @@ class ProfilingConsent
 
     /**
      * The engine hears a choice through the queue — retried and logged like
-     * every other delivery. isConnected() is the gate for paths that only
-     * enqueue; the handler asks the sending gate. The row's entity is the
-     * address's keyed hash (AddressKey), never the address (PRO-3765): it
-     * always fits the column, so the waiting check finds a long address
-     * too, and only the payload the engine needs names the shopper.
+     * every other delivery: one row for each connected connection (CON-237),
+     * or for the one connection $websiteId names. isConnected() is the gate
+     * for paths that only enqueue; the handler asks the sending gate. The
+     * row's entity is the address's keyed hash (AddressKey), never the
+     * address (PRO-3765): it always fits the column, so the waiting check
+     * finds a long address too, and only the payload the engine needs names
+     * the shopper.
      *
      * @param string|null $key the address's keyed hash, when the caller holds it
-     * @param int $websiteId the connection's Engine\Connection::eventWebsiteId(), 0 for the primary
+     * @param int|null $websiteId one connection's Engine\Connection::eventWebsiteId()
+     *        (0 for the primary); null for every connected connection
      */
     private function queueForEngine(
         string $email,
         bool $optOut,
         string $timestamp,
         ?string $key = null,
-        int $websiteId = 0
+        ?int $websiteId = null
     ): void {
-        if (!$this->engineSettings->isConnected()) {
+        if ($websiteId === null) {
+            $connections = $this->connections->connected();
+        } else {
+            $connection = $this->connections->forWebsite($websiteId);
+            $connections = $connection !== null && $connection->settings()->isConnected() ? [$connection] : [];
+        }
+        if ($connections === []) {
             return;
         }
 
@@ -431,11 +443,14 @@ class ProfilingConsent
         if ($optOut) {
             $payload['opted_out_at'] = $timestamp;
         }
-        $this->eventQueue->enqueue(
-            EventType::ENGINE_PROFILING_CONSENT,
-            $payload,
-            $key ?? $this->addressKey->of($email),
-            $websiteId
-        );
+        $key ??= $this->addressKey->of($email);
+        foreach ($connections as $connection) {
+            $this->eventQueue->enqueue(
+                EventType::ENGINE_PROFILING_CONSENT,
+                $payload,
+                $key,
+                $connection->eventWebsiteId()
+            );
+        }
     }
 }

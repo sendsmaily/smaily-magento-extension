@@ -61,7 +61,8 @@ class FailureMessage
         'Smaily API returned code %1',
         'Smaily API credentials are not configured (store scope: %1)',
         'The subdomain must be a plain Smaily subdomain such as "demo": letters, digits and hyphens only.',
-        // Not errors: the reasons a row was closed without sending (PRO-3619, PRO-3634, PRO-3693, CON-195, CON-394).
+        // Not errors: the reasons a row was closed without sending (PRO-3619, PRO-3634, PRO-3693, CON-195, CON-394,
+        // CON-465).
         ContactSyncHandler::SKIPPED_NOT_A_CONTACT,
         ContactSyncHandler::SKIPPED_STALE_SUBSCRIPTION,
         AutomationHandler::SKIPPED_NO_WORKFLOW,
@@ -71,6 +72,7 @@ class FailureMessage
         AutomationHandler::SKIPPED_UNSUBSCRIBED_IN_SMAILY,
         ProfilingConsentHandler::SKIPPED_REPLACED,
         IdentityMergeHandler::SKIPPED_OPTED_OUT,
+        IdentityMergeHandler::SKIPPED_NOT_SENT,
         ReminderConsent::SKIPPED_RECENTLY_REMINDED,
         ReminderConsent::SKIPPED_UNSUBSCRIBED_IN_STORE,
         // A catalog, customer or order row a newer row of the same entity
@@ -80,7 +82,8 @@ class FailureMessage
         IngestQueue::SKIPPED_SUPERSEDED_ORDER,
         // Why a nightly catalog manifest was not sent (PRO-3854).
         CatalogManifest::TOO_MANY_PRODUCTS,
-        // Why an identity merge that met `404 customer_not_found` was parked (CON-262).
+        // Why an identity merge that met `404 customer_not_found` was parked (CON-262;
+        // NOT_SENT only before CON-465).
         IdentityMergeHandler::NOT_SENT,
         IdentityMergeHandler::CUSTOMER_REFUSED,
         IdentityMergeHandler::NOT_FOUND_AFTER_SEND,

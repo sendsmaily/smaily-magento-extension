@@ -177,12 +177,12 @@ class LoginCustomerFirstTest extends IntegrationTestCase
     }
 
     /**
-     * A customer the store does not send (no consent, never bought, not in
-     * the contact sync): the row is parked with the reason, not retried
-     * forever. Once the customer reaches the engine, Retry in the Log
-     * sends the customer the store now sends and links the login.
+     * CON-465 (as WooCommerce): a customer the store does not send (no
+     * consent, never bought, not in the contact sync) ends the merge
+     * quietly — no failed row, closed as Skipped with the reason, never
+     * retried.
      */
-    public function testAMergeForACustomerTheStoreDoesNotSendIsParkedAndRecoversOnRetry(): void
+    public function testAMergeForACustomerTheStoreDoesNotSendEndsQuietly(): void
     {
         $this->queueMerge();
 
@@ -190,20 +190,9 @@ class LoginCustomerFirstTest extends IntegrationTestCase
 
         self::assertSame(['merge'], $this->calls);
         $merge = $this->mergeRow();
-        self::assertSame(Event::STATUS_FAILED, $merge['status']);
-        self::assertSame(IdentityMergeHandler::NOT_SENT, $merge['last_error']);
-
-        // The customer buys: the order sync queues the customer row, which
-        // the ingest cron delivers.
-        $this->queueCustomerRow('later-row');
-        $this->flushIngest();
-        self::assertSame(1, $this->events->retry([(int)$merge['id']]));
-        $this->calls = [];
-
-        $this->flushEvents();
-
-        self::assertSame(['customers', 'merge'], $this->calls, 'Customer first: the row met a 404 before');
-        self::assertSame(Event::STATUS_SENT, $this->mergeRow()['status']);
+        self::assertSame(Event::STATUS_SENT, $merge['status'], 'Closed, not failed');
+        self::assertSame(IdentityMergeHandler::SKIPPED_NOT_SENT, $merge['last_error']);
+        self::assertSame(0, $this->events->retry([(int)$merge['id']]), 'Nothing for the merchant to retry');
     }
 
     /**

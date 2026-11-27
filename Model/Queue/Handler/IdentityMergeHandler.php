@@ -50,15 +50,17 @@ use Smaily\Connect\Model\Queue\Skipped;
  *   example one who has just registered), and once §4 answered 200 for
  *   them the merge is tried once more. It is never tried again before
  *   that: the row remembers the 404 (CUSTOMER_NOT_FOUND), and its next
- *   attempt sends the customer before it merges. A customer the store does
- *   not send ends the merge quietly (CON-465, as WooCommerce's LoginMerge):
- *   a debug line and the row closed as Skipped (SKIPPED_NOT_SENT), never a
- *   failure the merchant cannot fix; the customer's next login is merged
- *   again. One the engine refused and one it still does not find park the
- *   row with the reason (CUSTOMER_REFUSED, NOT_FOUND_AFTER_SEND). Retry in
- *   the Log sends the customer (where the store sends them) and the merge
- *   again, so a row parked by a 404 links the login once the customer is
- *   sent.
+ *   attempt sends the customer before it merges. A merge the 404 leaves
+ *   unlinked ends quietly, as WooCommerce's LoginMerge does: a debug line
+ *   with the row id only and the row closed as Skipped with the reason,
+ *   never a failure the merchant cannot fix; the customer's next login is
+ *   merged again. The reason is a customer the store does not send
+ *   (SKIPPED_NOT_SENT, CON-465), one the engine refused
+ *   (SKIPPED_CUSTOMER_REFUSED, CON-469; the customers row the send left in
+ *   the Log carries the refusal) or one it still does not find
+ *   (SKIPPED_NOT_FOUND_AFTER_SEND, CON-469). A row parked by a 404 before
+ *   these changes is still retried from the Log: its Retry sends the
+ *   customer (where the store sends them) and the merge again.
  */
 class IdentityMergeHandler implements PausableEventHandlerInterface
 {
@@ -96,17 +98,33 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
         . ' to them. The store sends a customer who is in your contact sync, has an order or logs in with'
         . ' marketing consent; Retry links the login after that.';
 
-    /** Why a merge whose customer the engine refused is parked; %1 is the engine's reason. */
+    /**
+     * Why a merge whose customer the engine refused was parked before
+     * CON-469; %1 is the engine's reason. Such a row still in the Log is
+     * shown translated.
+     */
     public const CUSTOMER_REFUSED = 'Campaign Intelligence refused the customer (%1), so the login was not linked'
         . ' to them. Retry sends the customer and the login again.';
 
-    /** Why a merge that still finds no customer after the customer was sent is parked. */
+    /**
+     * Why a merge that still found no customer after the customer was sent
+     * was parked before CON-469: such a row still in the Log is shown
+     * translated.
+     */
     public const NOT_FOUND_AFTER_SEND = 'Campaign Intelligence did not find this customer even after the store'
         . ' sent them, so the login was not linked to them. Retry sends the customer and the login again.';
 
     /** Why a merge whose customer the store does not send is closed (CON-465). */
     public const SKIPPED_NOT_SENT = 'Skipped: Campaign Intelligence does not have this customer, and the store does'
         . ' not send them, so the login was not linked to them.';
+
+    /** Why a merge whose customer the engine refused is closed (CON-469); %1 is the engine's reason. */
+    public const SKIPPED_CUSTOMER_REFUSED = 'Skipped: Campaign Intelligence refused the customer (%1), so the login'
+        . ' was not linked to them.';
+
+    /** Why a merge that still finds no customer after the store sent them is closed (CON-469). */
+    public const SKIPPED_NOT_FOUND_AFTER_SEND = 'Skipped: Campaign Intelligence did not find this customer even'
+        . ' after the store sent them, so the login was not linked to them.';
 
     public const SKIPPED_OPTED_OUT = 'Skipped: the shopper opted out of personalized recommendations,'
         . ' so their browsing is not linked to their address. Nothing was sent.';
@@ -230,10 +248,20 @@ class IdentityMergeHandler implements PausableEventHandlerInterface
                 return new Skipped(self::SKIPPED_NOT_SENT);
             }
             if ($refusal !== null) {
-                return Failure::permanent(str_replace('%1', $refusal, self::CUSTOMER_REFUSED));
+                $this->logger->debug(
+                    'Identity merge not linked, Campaign Intelligence refused the customer',
+                    ['id' => (int)$event->getId()]
+                );
+
+                return new Skipped(str_replace('%1', $refusal, self::SKIPPED_CUSTOMER_REFUSED));
             }
             if (!$retryLeft) {
-                return Failure::permanent(self::NOT_FOUND_AFTER_SEND);
+                $this->logger->debug(
+                    'Identity merge not linked, the customer was not found after it was sent',
+                    ['id' => (int)$event->getId()]
+                );
+
+                return new Skipped(self::SKIPPED_NOT_FOUND_AFTER_SEND);
             }
             $retryLeft = false;
         }

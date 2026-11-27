@@ -1,5 +1,11 @@
 # Changelog
 
+### 3.2.1
+
+**Changes since 3.2.0**
+
+- A shopper who subscribes to the newsletter in your store gets the **Welcome** email also while **Sync contacts to Smaily** is off, and under **Checkout opt-in only** also when they subscribe through the newsletter form or their account. The checkout's **Subscribe to our newsletter** box now shows also with contact sync off while **Welcome** is on, and a tick there gets the welcome email. Without a contact sync, the welcome email carries the shopper's store language, so a Smaily workflow can still branch on it. Creating an account without subscribing sends no welcome email.
+
 ### 3.2.0
 
 After upgrading, a store with several websites run as one store on one Smaily account has its Smaily account, Contacts settings and automations shared across all its websites; a website whose own contact settings sync differently keeps them until you confirm with **Use the same contact settings on every website** under **Settings > Contacts**. To send the newsletter signups a website missed while it had no Smaily connection, press **Run again** on the **Initial contact import** card under **Settings > Contacts**.

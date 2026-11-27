@@ -7,16 +7,32 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-11-27 session end — **3.2.0 is cut** (the
-`release/3.2.0` PR); its tag waits for Erkki's go. 10 fragments went
-into 8 bullets (CON-461's three into two, CON-465 and CON-469 into one)
-under a lead sentence: after upgrading, a store with several websites
-run as one store on one Smaily account shares its Smaily account,
-Contacts settings and automations across all its websites; a website
-whose own contact settings differ keeps them until the merchant
-confirms under **Settings > Contacts**; the signups a website missed
-while it had no connection reach Smaily with **Run again** on the
-**Initial contact import** card.
+_Last updated: 2026-11-27 — **3.2.0 was released** on 27 Nov on
+Erkki's go (tag on the cut commit c5f52e4; both ZIPs, the Hyvä mirror
+tag 3.2.0 and Packagist 3.2.0 for both packages). **3.2.1 is cut** (the
+`release/3.2.1` PR) with one change, #322 CON-477; its tag waits for
+Erkki's go. No lead sentence: a store has nothing to do after
+upgrading.
+
+**In 3.2.1 (merged since 3.2.0):**
+- #322 CON-477: the welcome email follows the shopper's own storefront
+  subscription (newsletter form, registration, the account's newsletter
+  box, the checkout tick, the confirmation link) with contact sync on or
+  off. Without a contact sync queued with it, the welcome request
+  carries the contact payload, `language` included, so a Smaily
+  workflow can still branch on it. The checkout newsletter checkbox
+  shows while contact sync is active OR the welcome is on. A
+  subscription in the admin, through the API or by an import, and an
+  account created without a subscription, still send no welcome.
+
+3.2.0's cut put 10 fragments into 8 bullets (CON-461's three into two,
+CON-465 and CON-469 into one) under a lead sentence: after upgrading, a
+store with several websites run as one store on one Smaily account
+shares its Smaily account, Contacts settings and automations across all
+its websites; a website whose own contact settings differ keeps them
+until the merchant confirms under **Settings > Contacts**; the signups a
+website missed while it had no connection reach Smaily with **Run
+again** on the **Initial contact import** card.
 
 **Marketplace (CON-152):** unchanged since 26 Nov — 3.0.3 is submitted
 as a new version (`xiggy2ui4q`): the technical part in automated
@@ -109,7 +125,15 @@ the per-language mode setup gate); CON-452 (PrestaShop: the guest tick,
 the welcome email, the store-side unsubscribe); CON-478 (WooCommerce)
 and CON-479 (PrestaShop): the welcome email follows the signup.
 
-**Human acceptance pending:** the Estonian proofread of 27 Nov's new
+**Human acceptance pending:** the Estonian proofread of CON-477's texts
+— in the guide the **Tervitus** row of the automations table, the
+**Ainult kassas turunduskirjade nõusoleku andnud kontaktid** row of the
+sync-mode table, the `language` row of the email-field reference and
+the **Näita kassas uudiskirja märkeruutu** option; in the admin the two
+checkout-opt-in-only help strings ("…; kui Tervitus on sees, jõuavad
+muud uudiskirjaga liitumised Smailysse tervituskirja kaudu." in the
+lawful-basis preset help, and "Kui Tervitus on sees, …" on the
+Contacts panel). The Estonian proofread of 27 Nov's other new
 texts — the Skipped reasons for identity merges and for websites
 without a connection, the "Peatatud" pill, the one-store Settings and
 setup texts and notices, and the guide's multi-website, Log and
@@ -133,8 +157,16 @@ CON-153 on the pilot store. CON-363 and CON-366 as before.
 - The guide's Estonian import table explains "Katkestatud" as
   "Peatatud sinu soovil", which may now read ambiguously next to the
   "Peatatud" pill.
-- The welcome autoresponder request carries no language (CON-477
-  changes that).
+- With contact sync off, a contact who unsubscribed in Smaily and
+  resubscribes in the store gets no welcome email: the welcome request
+  goes with `force_opt_in` false and nothing else resubscribes them in
+  Smaily (CON-477).
+- A 2.8.x-migrated store with the welcome on whose Contacts were never
+  saved now shows the checkout newsletter checkbox: its switch defaults
+  on (CON-477).
+- The checkout-checkbox switch sits among the Contacts settings,
+  although since CON-477 it also matters with contact sync off (the
+  welcome alone shows the checkbox).
 - A PR body can be overwritten by a parallel worker: before a merge,
   check that the body names the PR's own issue (master commit 1d67c39
   carries CON-434's text by that mistake; history is not rewritten).
@@ -172,14 +204,14 @@ CON-153 on the pilot store. CON-363 and CON-366 as before.
   system-messages popup, one push per `release/*` branch) still hold.
 
 **Next session opens with:**
-1. Erkki's go for the 3.2.0 tag, then the release (both ZIPs, the Hyvä
-   mirror, Packagist) and the guide check.
-2. CON-477 (the welcome email follows the signup) → 3.2.1.
-3. CON-237 steps 4–6.
-4. The Marketplace 3.0.3 review result and Adobe support's answer on
+1. Erkki's go for the 3.2.1 tag, then the release checks (both ZIPs,
+   the Hyvä mirror tag, Packagist for both packages) and the guide
+   check.
+2. CON-237 steps 4–6 (in progress).
+3. The Marketplace 3.0.3 review result and Adobe support's answer on
    the title.
-5. The Estonian proofread list (Erkki).
-6. CON-252 after INT-332's answer; designs CON-369 (payment reminder)
+4. The Estonian proofread list (Erkki).
+5. CON-252 after INT-332's answer; designs CON-369 (payment reminder)
    and CON-361 (stock alerts) wait for Erkki._
 
 _Earlier (2026-11-26 session end): **3.1.0 was released** on Erkki's

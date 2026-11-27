@@ -7,24 +7,29 @@
 > current"). Stale status is a defect. If this file and your memory
 > disagree, trust this file and fix it.
 
-_Last updated: 2026-11-26 session end — **3.1.0 is released** (26 Nov,
-on Erkki's go; tag on the cut commit 49097e1; both ZIPs, the Hyvä
-mirror tag 3.1.0 and Packagist 3.1.0 for both packages). 3.0.3 was
-released earlier the same day. A store that sells in more than one
-currency, or whose display currency differs from its base currency,
-presses **Run again** on **Orders** and **Catalog** under **Settings >
-Intelligence** after upgrading.
+_Last updated: 2026-11-27 session end — **3.2.0 is cut** (the
+`release/3.2.0` PR); its tag waits for Erkki's go. 10 fragments went
+into 8 bullets (CON-461's three into two, CON-465 and CON-469 into one)
+under a lead sentence: after upgrading, a store with several websites
+run as one store on one Smaily account shares its Smaily account,
+Contacts settings and automations across all its websites; a website
+whose own contact settings differ keeps them until the merchant
+confirms under **Settings > Contacts**; the signups a website missed
+while it had no connection reach Smaily with **Run again** on the
+**Initial contact import** card.
 
-**Marketplace (CON-152):** 3.0.3 is submitted as a new version
-(`xiggy2ui4q`): the technical part in automated testing, the marketing
-part awaiting review with the rewritten description and the 3.0.3
-user-guide PDF. The title "Smaily Connect" waits for Adobe support's
-answer (Erkki replied to the support request on 26 Nov, asking which
-title it accepts). The 3.0.1 submission `2q6w4ofnme` is left to finish.
-The new draft's title reverted to "Smaily Ecommerce Integration" and
-was reset by hand — check it on every new draft.
+**Marketplace (CON-152):** unchanged since 26 Nov — 3.0.3 is submitted
+as a new version (`xiggy2ui4q`): the technical part in automated
+testing, the marketing part awaiting review with the rewritten
+description and the 3.0.3 user-guide PDF. The title "Smaily Connect"
+waits for Adobe support's answer (Erkki replied to the support request
+on 26 Nov, asking which title it accepts). The 3.0.1 submission
+`2q6w4ofnme` is left to finish. The new draft's title reverted to
+"Smaily Ecommerce Integration" and was reset by hand — check it on
+every new draft.
 
-**Merged since 3.1.0 (on master, not released yet):**
+**In 3.2.0 (merged since 3.1.0; the guide site was republished after
+each change to it):**
 - #308 CON-281: separate stores — the Dashboard follows the website
   selector; a layout change carries the transactional-email account.
 - #309 CON-458: the Campaign Intelligence email cards get the **Test
@@ -46,41 +51,90 @@ was reset by hand — check it on every new draft.
 - #313 CON-461: a multi-language store that never saved a mode shows B
   picked (detected by the absence of a saved `multilingual_mode` row);
   WooCommerce's EN/ET card titles.
+- #314: STATUS for the 26 Nov session end.
+- #315: the reviewed Estonian installation-report paragraph in the
+  guide.
+- #316 CON-465 and #318 CON-469: an identity merge that cannot be
+  linked — a customer the store never sends, one the engine refused,
+  one still unmatched after the send — ends as **Skipped** with the
+  reason, not failed, as in WooCommerce.
+- #317 CON-466: a Campaign Intelligence email that Smaily stopped for
+  review shows **Stopped** on its card; in Estonian both the email and
+  the import pills read "Peatatud".
+- #319 CON-470: one store on one Smaily account shares its connection,
+  contact settings and automations across its websites; Settings shows
+  no per-website settings. The upgrade patch
+  `ShareSingleWebsiteSettings` lifts settings saved at one website's
+  scope to the default scope; a website's own contact settings that
+  differ wait for the merchant's confirmation (**Use the same contact
+  settings on every website**); the storefront URL stays per website.
+  A signup that a website without a connection would have synced gets
+  a "not connected" **Skipped** Log row on every channel (newsletter,
+  customer account, checkout checkbox, guest order); the Dashboard
+  names such websites and warns when websites use different accounts.
+- #320: the simplification review of the 27 Nov changes (nothing a
+  merchant sees changes).
 
-**Decisions of 26 Nov** (Erkki, recorded on CON-397): a late
-unsubscribe is always delivered; with double opt-in a checkout tick
-counts as consent before the shopper confirms; a guest's checkout tick
-syncs in every mode (WooCommerce CON-439); the welcome email follows
-contact sync; a store-side newsletter unsubscribe reaches Smaily in
-every mode (PrestaShop asked to follow in CON-452); `smaily:gdpr erase`
-fails loudly and asks to be run again when the engine delete fails;
-catalog and orders go in the store's base currency. Re-entering
-per-language accounts drops the per-language workflows kept from an
-earlier stay (accepted as built). Later the same day: the §19/§20
-wording is shared by all plugins (test mode on or off, never "go
-live"); under separate stores the Dashboard follows the website
-selector; mode B is the default for a new multi-language store; the
-automation cards take WooCommerce's titles; the Dashboard gets a "User
-Guide" quick link; an identity merge for a customer the store never
-sends ends quietly (CON-465, not built yet).
+**Field finding (27 Nov):** the second pilot store's second website
+(own domain) lost every newsletter signup and welcome email since its
+install. Setups on rc1–rc12 saved the connection, contact settings and
+automations at one website's scope and nothing moved them; the store's
+contact sync for that website was never confirmed, and the signups
+were dropped with no Log row. CON-470 fixes it in 3.2.0; on 3.1.0 a
+store fixes it by saving Contacts and Automations for that website
+with "Use its own…" unticked. The store installed 3.1.0 on 27 Nov and
+presses **Run again** on Catalog and Orders (that also closes CON-283's
+check).
+
+**Decisions of 27 Nov** (Erkki): the "Stopped" pill reads "Peatatud"
+in Estonian on both the email and the import cards; a refused or
+still-unmatched identity merge ends quietly, as in WooCommerce
+(CON-469); a resubscribe after a delete or an unsubscribe sends a new
+welcome email with a new coupon (accepted, no guard); one store on one
+Smaily account shares its settings and Settings shows no per-website
+settings (CON-470) — per-language accounts on a multi-website store go
+through **Separate stores**; a website's own contact settings that
+differ wait for the merchant's confirmation; the storefront URL stays
+per website; the "not connected" Skipped row is written on every
+channel, and the Dashboard banner shows only for one store; the
+welcome email follows the shopper's own act of subscribing, not the
+contact sync setting (refines the 26 Nov rule on CON-397; Magento
+CON-477, asked of WooCommerce in CON-478 and of PrestaShop in
+CON-479); CON-237 steps 4–6 are to be built. CON-230, CON-279 and
+CON-227 are closed.
 
 **Asked elsewhere:** INT-332 (engine: one normal form for an email
 address as an identity — CON-252 waits for it); CON-441 (WooCommerce:
 the per-language mode setup gate); CON-452 (PrestaShop: the guest tick,
-the welcome email, the store-side unsubscribe).
+the welcome email, the store-side unsubscribe); CON-478 (WooCommerce)
+and CON-479 (PrestaShop): the welcome email follows the signup.
 
-**Human acceptance pending:** the Estonian proofread of all of 26 Nov's
-new texts — guide: the first-order section, setup step 1, the
-shared-account warning, the privacy and import texts, the Log skip
-reasons, the installation-report sentence, the test-mode section, the
-language-mode cards and the per-language card, the Overview, the guest
-switch, the Quick links; admin: the account-change questions, the
-import card, the test-mode strings, the Overview items. CON-458 against
-the live engine (a real test send and a test-mode switch on a connected
-store). CON-153 on the pilot store. CON-363, CON-366 and CON-230 as
-before.
+**Human acceptance pending:** the Estonian proofread of 27 Nov's new
+texts — the Skipped reasons for identity merges and for websites
+without a connection, the "Peatatud" pill, the one-store Settings and
+setup texts and notices, and the guide's multi-website, Log and
+Dashboard paragraphs; the 26 Nov proofread list (in the 26 Nov
+paragraph below) unless Erkki has done it. CON-283's count after the
+second pilot store's Catalog **Run again**. CON-458 against the live
+engine (a real test send and a test-mode switch on a connected store).
+CON-153 on the pilot store. CON-363 and CON-366 as before.
 
 **Gotchas and technical notes:**
+- The upgrade patch shares automations value by value, so a merged
+  combination nobody set is possible (for example the store-wide
+  welcome email on without a workflow, plus one website's workflow).
+  A candidate to decide per automation as a unit.
+- A website-scope transactional-email value stays in effect while the
+  shared Settings hides it (transactional sending is not wired yet).
+- `WizardData` still calls `usesOtherAccount()` per website inside an
+  `array_filter`; it could use `websitesOnOtherAccount()`.
+- The 404 the second pilot store saw in the workflow list is
+  unexplained: the endpoint answers 200 with a credentials message.
+- The guide's Estonian import table explains "Katkestatud" as
+  "Peatatud sinu soovil", which may now read ambiguously next to the
+  "Peatatud" pill.
+- The welcome autoresponder request carries no language (CON-477
+  changes that).
 - A PR body can be overwritten by a parallel worker: before a merge,
   check that the body names the PR's own issue (master commit 1d67c39
   carries CON-434's text by that mistake; history is not rewritten).
@@ -118,14 +172,38 @@ before.
   system-messages popup, one push per `release/*` branch) still hold.
 
 **Next session opens with:**
-1. The Marketplace 3.0.3 review results and Adobe support's answer on
-   the title; then decide whether 3.1.x goes to the Marketplace.
-2. The Estonian proofread list (Erkki).
-3. CON-465 (an identity merge for a never-sent customer ends quietly).
-4. Cut the next release (3.2.0: #308–#313) on Erkki's go.
-5. CON-252 after INT-332's answer.
-6. Designs CON-369 (payment reminder) and CON-361 (stock alerts) wait
-   for Erkki._
+1. Erkki's go for the 3.2.0 tag, then the release (both ZIPs, the Hyvä
+   mirror, Packagist) and the guide check.
+2. CON-477 (the welcome email follows the signup) → 3.2.1.
+3. CON-237 steps 4–6.
+4. The Marketplace 3.0.3 review result and Adobe support's answer on
+   the title.
+5. The Estonian proofread list (Erkki).
+6. CON-252 after INT-332's answer; designs CON-369 (payment reminder)
+   and CON-361 (stock alerts) wait for Erkki._
+
+_Earlier (2026-11-26 session end): **3.1.0 was released** on Erkki's
+go (tag on the cut commit 49097e1; both ZIPs, the Hyvä mirror tag and
+Packagist for both packages); 3.0.3 was released and submitted to the
+Marketplace (`xiggy2ui4q`) the same day. Merged after the cut: #308–#313
+(now in 3.2.0). Decisions of 26 Nov (recorded on CON-397): a late
+unsubscribe is always delivered; with double opt-in a checkout tick
+counts as consent before the shopper confirms; a guest's checkout tick
+syncs in every mode (WooCommerce CON-439); the welcome email follows
+contact sync (refined on 27 Nov: it follows the signup, CON-477); a
+store-side newsletter unsubscribe reaches Smaily in every mode
+(PrestaShop CON-452); `smaily:gdpr erase` fails loudly when the engine
+delete fails; catalog and orders go in the store's base currency;
+re-entering per-language accounts drops the per-language workflows
+kept from an earlier stay (accepted); the §19/§20 wording is shared by
+all plugins (test mode on or off, never "go live"); mode B is the
+default for a new multi-language store. The 26 Nov Estonian proofread
+list — guide: the first-order section, setup step 1, the shared-account
+warning, the privacy and import texts, the Log skip reasons, the
+installation-report sentence, the test-mode section, the language-mode
+cards and the per-language card, the Overview, the guest switch, the
+Quick links; admin: the account-change questions, the import card, the
+test-mode strings, the Overview items._
 
 _Earlier (2026-11-26 evening, the 3.1.0 cut): **3.1.0 was cut (#307)**;
 10 fragments into 10 bullets under a lead sentence on **Run again** for

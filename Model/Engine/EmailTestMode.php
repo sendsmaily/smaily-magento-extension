@@ -39,8 +39,9 @@ class EmailTestMode
 
     /**
      * The card's state from one §12 `setup[]` item: whether test mode is on,
-     * the pill's mode (`off`, `test`, `active`), the state line and the
-     * notice ('' when there is none).
+     * the pill's mode (`off`, `test`, `active`, `stopped`), the state line
+     * and the notice ('' when there is none). An email Smaily stopped for
+     * review shows "Stopped" (CON-466, as the WooCommerce plugin).
      *
      * @param array<string, mixed> $item
      * @return array{test_mode: bool, mode: string, status: string, notice: string}
@@ -65,7 +66,7 @@ class EmailTestMode
 
         return [
             'test_mode' => !$live,
-            'mode' => $live ? 'active' : (in_array($state, ['test', 'stopped'], true) ? 'test' : 'off'),
+            'mode' => $live ? 'active' : ($stopped ? 'stopped' : ($state === 'test' ? 'test' : 'off')),
             'status' => (string)$status,
             'notice' => ($item['notice'] ?? null) === self::NOTICE_SENDER
                 ? (string)__('Starts when your sender domain is verified in Smaily')

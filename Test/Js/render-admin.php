@@ -278,6 +278,7 @@ $pages = [
             'Off',
             'Test mode',
             'Active',
+            'Stopped',
             'Saved.',
             'Saved. Reload the page to see the state of each trigger.',
         ],
@@ -288,7 +289,8 @@ $pages = [
      * Replenishment due in test mode, Post-purchase sending to real
      * customers at the ramp's second step, Win-back stopped until Smaily
      * reviews the stop, and Browse abandon without a setup item (an engine
-     * before contract v1.15.0), so without the switch.
+     * before contract v1.15.0), so without the switch; and Back in stock,
+     * not enabled, stopped by a Smaily operator (CON-466).
      */
     'automations-test-mode' => [
         'template' => $root . '/view/adminhtml/templates/config/engine-automations.phtml',
@@ -303,10 +305,17 @@ $pages = [
                 'go_live_blockers' => ['stopped_needs_review'],
             ]] + $trigger('winback_risk', 'Win-back', true),
             ['enabled' => true] + $trigger('browse_abandon', 'Browse abandon', true),
+            ['setup_item' => [
+                'setup_state' => 'stopped',
+                'stop_reason' => 'operator',
+                'go_live_blockers' => ['stopped_needs_review'],
+            ]] + $trigger('back_in_stock', 'Back in stock', true),
         ], false),
         'strings' => [
+            'Off',
             'Test mode',
             'Active',
+            'Stopped',
             'The email goes to test addresses only.',
             'Send test email',
             'This address is added to the Smaily list as a test contact.',

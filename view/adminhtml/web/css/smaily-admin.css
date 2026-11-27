@@ -353,7 +353,8 @@
 .smaily-pill--sent { color: var(--s-success); background: var(--s-success-soft); border-color: var(--s-success-border); }
 .smaily-pill--test { color: var(--s-info); background: var(--s-info-soft); border-color: var(--s-info-border); }
 .smaily-pill--pending { color: var(--s-warning); background: var(--s-warning-soft); border-color: var(--s-warning-border); }
-.smaily-pill--failed { color: var(--s-danger); background: var(--s-danger-soft); border-color: var(--s-danger-border); }
+.smaily-pill--failed,
+.smaily-pill--stopped { color: var(--s-danger); background: var(--s-danger-soft); border-color: var(--s-danger-border); }
 .smaily-pill--parked { color: var(--s-parked); background: var(--s-parked-soft); border-color: var(--s-parked-border); }
 .smaily-pill--off,
 .smaily-pill--neutral { color: var(--s-neutral); background: var(--s-neutral-soft); border-color: var(--s-neutral-border); }
@@ -766,6 +767,7 @@
 .smaily-engine-trigger.is-closed .smaily-trigger-settings { display: none; }
 .smaily-engine-trigger.is-test { border-left: 3px solid var(--s-info-border); }
 .smaily-engine-trigger.is-active { border-left: 3px solid var(--s-success-border); }
+.smaily-engine-trigger.is-stopped { border-left: 3px solid var(--s-danger-border); }
 .smaily-engine-trigger__top { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
 .smaily-engine-trigger__head { flex: 1; min-width: 220px; }
 .smaily-engine-trigger__name-row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: 3px; }

@@ -20,6 +20,7 @@ use Smaily\Connect\Model\Automation\ConfigRowNormalizer;
 use Smaily\Connect\Model\Client\Exception\SmailyClientException;
 use Smaily\Connect\Model\Client\SmailyClientProvider;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\EmailTestMode;
 use Smaily\Connect\Model\Engine\Exception\EngineException;
 use Smaily\Connect\Model\Engine\Exception\EngineRequestException;
 use Smaily\Connect\Model\Engine\Settings;
@@ -171,11 +172,12 @@ class Save extends Action implements HttpPostActionInterface
 
     /**
      * Each saved trigger's state as the engine stored it (§12), with the
-     * page's fail-closed defaults for a row the read does not return. Null
+     * page's fail-closed defaults for a row the read does not return, and
+     * whether Smaily stopped the email for review (`setup[]`, CON-466). Null
      * when the read fails — the screen then cannot tell what was stored.
      *
      * @param string[] $keys
-     * @return array<string, array{enabled: bool, test_mode: bool}>|null
+     * @return array<string, array{enabled: bool, test_mode: bool, stopped: bool}>|null
      */
     private function storedStates(array $keys): ?array
     {
@@ -192,11 +194,13 @@ class Save extends Action implements HttpPostActionInterface
             }
         }
 
+        $setup = EmailTestMode::states($config);
         $states = [];
         foreach ($keys as $key) {
             $states[$key] = [
                 'enabled' => (bool)($stored[$key]['enabled'] ?? false),
                 'test_mode' => (bool)($stored[$key]['test_mode'] ?? true),
+                'stopped' => ($setup[$key]['mode'] ?? '') === 'stopped',
             ];
         }
 

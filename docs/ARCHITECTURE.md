@@ -3198,6 +3198,12 @@ implemented here:
   card's state read again from §12 with any refusal in the admin's
   words. A card without a `setup[]` item (an engine before contract
   v1.15.0) has no switch; a Smaily operator switches its real sends.
+  An email in `setup_state: stopped` (or with the `stopped_needs_review`
+  blocker) shows the pill "Stopped" with the review sentence below,
+  also while it is not enabled, as the WooCommerce plugin (CON-466); the
+  save's answer carries `stopped` for it. Its Estonian word, "Peatatud",
+  is the WooCommerce plugin's, and the import cards' "Stopped" pill
+  shares it.
 
 ### Installation report (CON-234)
 

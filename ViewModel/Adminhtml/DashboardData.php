@@ -78,13 +78,17 @@ class DashboardData implements ArgumentInterface
 
     /**
      * The names of the websites without a Smaily connection while another
-     * website has one (CON-470): their signups do not reach Smaily.
+     * website has one (CON-470): their signups do not reach Smaily. Only for
+     * websites run as one store; separate stores set each website up on its
+     * own, and may leave one without Smaily.
      *
      * @return string[]
      */
     public function getUnconnectedWebsites(): array
     {
-        return array_values($this->websiteConnections->unconnectedWebsites());
+        return $this->storeLayout->isSeparateStores()
+            ? []
+            : array_values($this->websiteConnections->unconnectedWebsites());
     }
 
     /**

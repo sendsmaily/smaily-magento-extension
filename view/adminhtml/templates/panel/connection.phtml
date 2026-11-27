@@ -221,19 +221,39 @@ $modeCards = [
 // or, with one sentence saying why, when the last 30 days' orders all came
 // through the API. Drawn in the initial setup too, so the address is saved
 // with the connection, before the Contacts step switches contact sync on
-// (PRO-3802). ?>
+// (PRO-3802). One store on one Smaily account keeps an address per website
+// (CON-470): a field per website, named by the website. ?>
 <?php $storefrontUrl = $viewModel->getSavedStorefrontUrl(); ?>
+<?php $websiteStorefrontUrls = $viewModel->getWebsiteStorefrontUrls(); ?>
 <?php $apiOnly = $viewModel->isApiOnlyStore(); ?>
-<details class="smaily-disclosure" id="smaily-w-storefront"<?= $viewModel->isStorefrontDisclosureOpen() ? ' open' : '' ?>>
+<?php $storefrontOpen = $websiteStorefrontUrls === []
+    ? $viewModel->isStorefrontDisclosureOpen()
+    : $apiOnly || array_filter(array_column($websiteStorefrontUrls, 'url')) !== []; ?>
+<details class="smaily-disclosure" id="smaily-w-storefront"<?= $storefrontOpen ? ' open' : '' ?>>
     <summary class="smaily-disclosure__toggle"><?= $escaper->escapeHtml(__('Using a separate storefront?')) ?></summary>
     <div class="smaily-card">
         <?php if ($apiOnly): ?>
         <p class="smaily-disclosure__why"><?= $escaper->escapeHtml(__('In the last 30 days your orders came only through Magento\'s API, as they do from a separate storefront.')) ?></p>
         <?php endif; ?>
+        <?php if ($websiteStorefrontUrls !== []): ?>
+        <div class="smaily-field" id="smaily-w-storefront-websites">
+            <label><?= $escaper->escapeHtml(__('Storefront URL')) ?></label>
+            <?php foreach ($websiteStorefrontUrls as $storefrontWebsiteId => $websiteStorefront): ?>
+            <div class="smaily-field">
+                <label for="smaily-w-storefront-url-<?= (int)$storefrontWebsiteId ?>"><?= $escaper->escapeHtml($websiteStorefront['name']) ?></label>
+                <input type="text" inputmode="url" class="smaily-w-storefront-website"
+                       id="smaily-w-storefront-url-<?= (int)$storefrontWebsiteId ?>"
+                       data-website-id="<?= (int)$storefrontWebsiteId ?>" placeholder="https://shop.example.com"
+                       value="<?= $escaper->escapeHtmlAttr($websiteStorefront['url']) ?>"/>
+            </div>
+            <?php endforeach; ?>
+            <p class="note"><?= $escaper->escapeHtml(__('Each website keeps its own storefront address.')) ?></p>
+        <?php else: ?>
         <div class="smaily-field">
             <label for="smaily-w-storefront-url"><?= $escaper->escapeHtml(__('Storefront URL')) ?></label>
             <input type="text" inputmode="url" id="smaily-w-storefront-url" placeholder="https://shop.example.com"
                    value="<?= $escaper->escapeHtmlAttr($storefrontUrl) ?>"/>
+        <?php endif; ?>
             <p class="note"><?= $escaper->escapeHtml(__('If shoppers buy on a separate storefront, enter its address. The product links in the catalog sync to Campaign Intelligence and in the RSS feed then start with it; the rest of each link stays the same. Image links do not change. Leave empty to use Magento\'s own product links.')) ?></p>
         </div>
     </div>

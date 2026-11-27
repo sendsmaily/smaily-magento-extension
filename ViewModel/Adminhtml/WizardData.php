@@ -13,6 +13,7 @@ use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
 use Smaily\Connect\Model\Adminhtml\SetupGuard;
 use Smaily\Connect\Model\Adminhtml\SharedAccountModes;
+use Smaily\Connect\Model\Adminhtml\WebsiteContacts;
 use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Model\Adminhtml\WebsiteContext;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
@@ -80,8 +81,64 @@ class WizardData implements ArgumentInterface
         private readonly StoreDate $storeDate,
         private readonly StoreLayout $storeLayout,
         private readonly SharedAccountModes $sharedAccountModes,
-        private readonly Router $router
+        private readonly Router $router,
+        private readonly WebsiteContacts $websiteContacts
     ) {
+    }
+
+    /**
+     * Whether the page shows the settings that the websites of one store on
+     * one Smaily account share (CON-470): store-wide, on a 2+-website install.
+     */
+    private function isSharedView(): bool
+    {
+        return $this->websiteContext->isStoreWide()
+            && $this->websiteContext->hasMultipleWebsites()
+            && $this->storeLayout->sharesOneAccount();
+    }
+
+    /**
+     * Each website's storefront address, for one store on one Smaily
+     * account (CON-470), whose websites keep it of their own: website id =>
+     * its name and address ('' when none). Empty elsewhere: the page shows
+     * one address.
+     *
+     * @return array<int, array{name: string, url: string}>
+     */
+    public function getWebsiteStorefrontUrls(): array
+    {
+        if (!$this->isSharedView()) {
+            return [];
+        }
+        $urls = [];
+        foreach ($this->websiteContext->getWebsiteOptions() as $websiteId => $name) {
+            $urls[$websiteId] = ['name' => $name, 'url' => $this->config->getWebsiteStorefrontUrl($websiteId)];
+        }
+
+        return $urls;
+    }
+
+    /**
+     * The websites of one store on one Smaily account whose own Contacts
+     * settings differ from the settings for all websites in who is synced
+     * (CON-470, WebsiteContacts): each with its name, whether its contact
+     * sync is on and its sync mode. They keep them until the merchant
+     * confirms. Empty elsewhere.
+     *
+     * @return list<array{name: string, enabled: bool, mode: string}>
+     */
+    public function getDifferingContactWebsites(): array
+    {
+        if (!$this->isSharedView()) {
+            return [];
+        }
+        $names = $this->websiteContext->getWebsiteOptions();
+        $websites = [];
+        foreach ($this->websiteContacts->differing() as $websiteId => $contacts) {
+            $websites[] = ['name' => $names[$websiteId] ?? (string)$websiteId] + $contacts;
+        }
+
+        return $websites;
     }
 
     /**
@@ -276,7 +333,7 @@ class WizardData implements ArgumentInterface
     {
         if (!$this->websiteContext->isStoreWide()
             || !$this->websiteContext->hasMultipleWebsites()
-            || $this->storeLayout->sharesOneAccount()
+            || $this->isSharedView()
         ) {
             return [];
         }

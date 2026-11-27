@@ -181,6 +181,27 @@ class Config
     }
 
     /**
+     * Whether a Smaily API password is saved for a store view (its own, else
+     * its website's, else the default scope's), read without decrypting it.
+     *
+     * @param int|string|null $storeId
+     */
+    public function hasPassword(int|string|null $storeId = null): bool
+    {
+        return (string)$this->scopeConfig->getValue(self::XML_PATH_PASSWORD, ScopeInterface::SCOPE_STORE, $storeId)
+            !== '';
+    }
+
+    /**
+     * The separate storefront's address saved for a website ('' when none):
+     * its own, else the default scope's.
+     */
+    public function getWebsiteStorefrontUrl(int $websiteId): string
+    {
+        return trim((string)$this->websiteValue(self::XML_PATH_STOREFRONT_URL, $websiteId));
+    }
+
+    /**
      * Whether a complete set of API credentials is configured for the scope.
      *
      * @param int|string|null $storeId

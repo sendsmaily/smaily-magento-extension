@@ -8,16 +8,20 @@ declare(strict_types=1);
 
 namespace Smaily\Connect\Model;
 
+use Magento\Store\Api\Data\WebsiteInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use Magento\Store\Model\Website;
 
 /**
  * The websites of an installation that have no Smaily connection while
  * another website has one (CON-470). A store whose setup gave only one
  * website the Smaily account dropped every other website's newsletter
  * signups without a trace: such a signup is now recorded in the Log as
- * skipped (SKIPPED_NOT_CONNECTED), and the Dashboard names these websites.
- * A website is connected when its Smaily account — its own, else the one
- * for all websites — has a subdomain, an API username and a password. A
+ * skipped (SKIPPED_NOT_CONNECTED), and the Dashboard of one store names
+ * these websites. A website is connected when one of its store views has a
+ * Smaily account — the store view's own, else its website's, else the one
+ * for all websites — with a subdomain, an API username and a password (a
+ * website without store views: its own, else the one for all websites). A
  * single-website install, or one with no website connected, lists none: a
  * store not set up yet is not warned about.
  */
@@ -44,11 +48,10 @@ class WebsiteConnections
         $connected = false;
         $unconnected = [];
         foreach ($this->storeManager->getWebsites() as $website) {
-            $websiteId = (int)$website->getId();
-            if ($this->isConnected($websiteId)) {
+            if ($this->isConnected($website)) {
                 $connected = true;
             } else {
-                $unconnected[$websiteId] = (string)$website->getName();
+                $unconnected[(int)$website->getId()] = (string)$website->getName();
             }
         }
         ksort($unconnected);
@@ -56,9 +59,21 @@ class WebsiteConnections
         return $connected ? $unconnected : [];
     }
 
-    private function isConnected(int $websiteId): bool
+    private function isConnected(WebsiteInterface $website): bool
     {
-        return $this->config->getWebsiteSubdomain($websiteId) !== ''
+        $storeIds = $website instanceof Website ? array_map('intval', $website->getStoreIds()) : [];
+        foreach ($storeIds as $storeId) {
+            if ($this->config->getSubdomain($storeId) !== ''
+                && $this->config->getUsername($storeId) !== ''
+                && $this->config->hasPassword($storeId)
+            ) {
+                return true;
+            }
+        }
+        $websiteId = (int)$website->getId();
+
+        return $storeIds === []
+            && $this->config->getWebsiteSubdomain($websiteId) !== ''
             && $this->config->getWebsiteUsername($websiteId) !== ''
             && $this->config->hasWebsitePassword($websiteId);
     }

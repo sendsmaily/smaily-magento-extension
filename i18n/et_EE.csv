@@ -731,3 +731,8 @@
 "Their newsletter signups do not reach Smaily. The Log shows each one as Skipped.","Nende uudiskirjaga liitumised ei jõua Smailysse. Logi näitab igaüht olekuga Vahele jäetud."
 "Your websites use different Smaily accounts, so they are not one store","Sinu veebisaidid kasutavad eri Smaily kontosid, seega pole need üks pood"
 "In Settings, set them up as Separate stores, or give every website the same Smaily account.","Seadista need lehel Seaded valikuga Eraldi poed või anna kõigile veebisaitidele sama Smaily konto."
+"Some websites still use their own contact settings","Mõnel veebisaidil on veel oma kontaktide seaded"
+"These websites sync contacts by settings that differ from the ones on this tab, and keep them until you confirm that every website uses the settings on this tab:","Need veebisaidid sünkroonivad kontakte selle vahekaardi seadetest erinevate seadetega ja jäävad nende juurde, kuni kinnitad, et kõik veebisaidid kasutavad selle vahekaardi seadeid:"
+"Use the same contact settings on every website","Kasuta kõigil veebisaitidel samu kontaktide seadeid"
+"Contact sync is off","Kontaktide sünkroonimine on väljas"
+"Each website keeps its own storefront address.","Igal veebisaidil on oma poe veebilehe aadress."

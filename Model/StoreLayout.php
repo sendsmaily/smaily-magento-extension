@@ -213,39 +213,43 @@ class StoreLayout
     /**
      * Whether the websites of a 2+-website install run as one store on one
      * Smaily account (CON-470): not separate stores, a Smaily account saved
-     * for all websites, no per-language Smaily accounts (mode A) and no
-     * website on another Smaily account than the one for all websites
-     * (WebsiteOverrides::usesOtherAccount()). Every website then shares the
+     * for all websites, no per-language Smaily accounts (mode A), and every
+     * website and store view on that one account
+     * (WebsiteOverrides::usesOneAccount()). Every website then shares the
      * Smaily account, the Contacts settings and the automations: Settings
      * shows and saves the values for all websites, with no website of its
-     * own.
+     * own except its storefront address (WebsiteOverrides::PER_WEBSITE).
      */
     public function sharesOneAccount(): bool
     {
-        $websiteIds = $this->websiteIds();
-
-        return count($websiteIds) > 1
-            && !$this->isSeparateStores()
-            && $this->overrides->hasStoreWideAccount()
-            && !$this->overrides->usesPerLanguageAccounts()
-            && !$this->usesOtherAccounts($websiteIds);
+        return $this->isOneStoreOnOneAccount() && $this->overrides->hasStoreWideAccount();
     }
 
     /**
      * Whether websites run as one store use different Smaily accounts
      * (CON-470): a 2+-website install that is not separate stores, without
-     * per-language Smaily accounts, where a website uses another Smaily
-     * account than the one for all websites. Such websites are not one
-     * store, and the Dashboard says so.
+     * per-language Smaily accounts, where the websites and store views use
+     * more than one Smaily account. Such websites are not one store, and the
+     * Dashboard says so.
      */
     public function mixesAccounts(): bool
     {
-        $websiteIds = $this->websiteIds();
-
-        return count($websiteIds) > 1
+        return count($this->websiteIds()) > 1
             && !$this->isSeparateStores()
             && !$this->overrides->usesPerLanguageAccounts()
-            && $this->usesOtherAccounts($websiteIds);
+            && !$this->overrides->usesOneAccount();
+    }
+
+    /**
+     * Whether the upgrade may share the websites' settings (CON-470): the
+     * initial setup is finished (its mark at the default or a website's
+     * scope: a 2.8.x upgrade is first asked how its websites are run) and
+     * the websites run as one store on at most one Smaily account, with or
+     * without an account saved for all websites yet.
+     */
+    public function isSetUpAsOneStore(): bool
+    {
+        return $this->isSetUp() && $this->isOneStoreOnOneAccount();
     }
 
     /**
@@ -254,37 +258,27 @@ class StoreLayout
      * on 3.0.0-rc1 to rc12 saved them at the chosen website's scope, and
      * every other website then had no Smaily connection.
      *
-     * Only for a store whose initial setup is finished (its mark at the
-     * default or a website's scope: a 2.8.x upgrade is first asked how its
-     * websites are run), run as one store on one Smaily account — a
-     * 2+-website install that is not separate stores, holds no
-     * per-language Smaily accounts (mode A) and no website on another
-     * Smaily account than the one for all websites — where exactly one
-     * website holds its own values of these sections. Of that website, each section the default scope holds no
-     * value of moves there as stored (the password stays encrypted), with
-     * its automations' mapping rows (to website 0) and, for the Contacts
-     * settings, its mark that they were saved
-     * (Config::XML_PATH_CONTACTS_CONFIRMED); its own values of the section
-     * are then removed. A section the default scope already holds stays as
-     * it is, and so does every other store. A second run finds no website
-     * values to move.
+     * Only where isSetUpAsOneStore() and exactly one website holds its own
+     * values of these sections (WebsiteOverrides::sharedOwnValues(): its
+     * storefront address stays its own and does not count). Of that
+     * website, each section the default scope holds no value of moves there
+     * as stored (the password stays encrypted), with its automations'
+     * mapping rows (to website 0) and, for the Contacts settings, its mark
+     * that they were saved (Config::XML_PATH_CONTACTS_CONFIRMED); its own
+     * values of the section are then removed. A section the default scope
+     * already holds stays as it is here, and so does every other store. A
+     * second run finds no website values to move.
      *
      * @return array<string, array{website: int, paths: string[]}> what moved, per section
      */
     public function shareSingleWebsiteSettings(): array
     {
-        $websiteIds = $this->websiteIds();
-        if (count($websiteIds) < 2
-            || !$this->isSetUp()
-            || $this->isSeparateStores()
-            || $this->overrides->usesPerLanguageAccounts()
-            || $this->usesOtherAccounts($websiteIds)
-        ) {
+        if (!$this->isSetUpAsOneStore()) {
             return [];
         }
         $own = [];
         foreach (self::SHARED_SECTIONS as $section) {
-            $own[$section] = $this->overrides->ownValues($section);
+            $own[$section] = $this->overrides->sharedOwnValues($section);
         }
         $holders = array_unique(array_merge(...array_map('array_keys', array_values($own))));
         if (count($holders) !== 1) {
@@ -301,16 +295,16 @@ class StoreLayout
             ) {
                 continue;
             }
-            // The mapping rows are named by their table.
-            $paths = array_map(
-                static fn (string $path): string => $path === 'mappings' ? MappingResource::TABLE_NAME : $path,
-                array_keys($own[$section][$websiteId] ?? [])
-            );
-            $this->overrides->promoteToStoreWide($section, $websiteId);
-            $this->overrides->removeOwnValues($section, $websiteId);
+            $paths = self::pathNames(array_keys($own[$section][$websiteId] ?? []));
+            $this->overrides->promoteToStoreWide($section, $websiteId, WebsiteOverrides::PER_WEBSITE);
+            $this->overrides->removeOwnValues($section, $websiteId, false, WebsiteOverrides::PER_WEBSITE);
             if ($confirmed !== '') {
                 $this->configWriter->save(Config::XML_PATH_CONTACTS_CONFIRMED, $confirmed);
-                $this->configWriter->delete(Config::XML_PATH_CONTACTS_CONFIRMED, ScopeInterface::SCOPE_WEBSITES, $websiteId);
+                $this->configWriter->delete(
+                    Config::XML_PATH_CONTACTS_CONFIRMED,
+                    ScopeInterface::SCOPE_WEBSITES,
+                    $websiteId
+                );
                 $paths[] = Config::XML_PATH_CONTACTS_CONFIRMED;
             }
             $moved[$section] = ['website' => $websiteId, 'paths' => $paths];
@@ -320,20 +314,31 @@ class StoreLayout
     }
 
     /**
-     * Whether a website uses another Smaily account than the one for all
-     * websites (CON-190).
+     * The paths of own values as a log names them: the mapping rows by
+     * their table.
      *
-     * @param int[] $websiteIds
+     * @param string[] $paths
+     * @return string[]
      */
-    private function usesOtherAccounts(array $websiteIds): bool
+    public static function pathNames(array $paths): array
     {
-        foreach ($websiteIds as $websiteId) {
-            if ($this->overrides->usesOtherAccount($websiteId)) {
-                return true;
-            }
-        }
+        return array_map(
+            static fn (string $path): string => $path === 'mappings' ? MappingResource::TABLE_NAME : $path,
+            $paths
+        );
+    }
 
-        return false;
+    /**
+     * A 2+-website install that is not separate stores, without per-language
+     * Smaily accounts, whose websites and store views use one Smaily account
+     * at most.
+     */
+    private function isOneStoreOnOneAccount(): bool
+    {
+        return count($this->websiteIds()) > 1
+            && !$this->isSeparateStores()
+            && !$this->overrides->usesPerLanguageAccounts()
+            && $this->overrides->usesOneAccount();
     }
 
     /**

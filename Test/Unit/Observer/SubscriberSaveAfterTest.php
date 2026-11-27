@@ -25,6 +25,7 @@ use Smaily\Connect\Model\ContactSync\ReconcileGuard;
 use Smaily\Connect\Model\ContactSync\StorefrontSubscription;
 use Smaily\Connect\Model\ContactSync\SubscriberPayloadBuilder;
 use Smaily\Connect\Model\ContactSync\SyncDispatcher;
+use Smaily\Connect\Model\WebsiteConnections;
 use Smaily\Connect\Observer\SubscriberSaveAfter;
 
 /**
@@ -41,6 +42,9 @@ use Smaily\Connect\Observer\SubscriberSaveAfter;
  *
  * PRO-4322: a status change is the saved status differing from the loaded
  * one, not the subscriber's status-changed flag.
+ *
+ * CON-470: a signup on a website without a Smaily connection, while another
+ * website has one, is recorded in the Log as skipped; nothing is sent.
  */
 class SubscriberSaveAfterTest extends TestCase
 {
@@ -270,15 +274,59 @@ class SubscriberSaveAfterTest extends TestCase
         ];
     }
 
+    /**
+     * CON-470: the website has no Smaily connection while another website
+     * has one — the subscription or unsubscribe is recorded as skipped, with
+     * what would have been sent, and nothing is queued to be sent.
+     *
+     * @dataProvider statusChangeProvider
+     */
+    public function testAStatusChangeOnAWebsiteWithoutAConnectionIsRecordedAsSkipped(int $status): void
+    {
+        $this->dispatcher->expects(self::once())->method('recordSkippedContactSync')
+            ->with(
+                'person@example.com',
+                1,
+                $status !== Subscriber::STATUS_SUBSCRIBED,
+                null,
+                WebsiteConnections::SKIPPED_NOT_CONNECTED
+            );
+        $this->dispatcher->expects(self::never())->method('dispatchContactSync');
+        $this->dispatcher->expects(self::never())->method('dispatchAutomation');
+
+        $this->observer('frontend', null, SyncMode::MODE_CONSENT, true, false, [1 => 'Second'])
+            ->execute($this->eventFor($status));
+    }
+
+    /**
+     * CON-470: a store with no website connected (not set up yet) records
+     * nothing, and neither does a save that does not change the status.
+     */
+    public function testAWebsiteWithoutAConnectionRecordsNothingElse(): void
+    {
+        $this->dispatcher->expects(self::never())->method('recordSkippedContactSync');
+        $this->dispatcher->expects(self::never())->method('dispatchContactSync');
+
+        $this->observer('frontend', null, SyncMode::MODE_CONSENT, true, false, [])
+            ->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED));
+        $this->observer('frontend', null, SyncMode::MODE_CONSENT, true, false, [1 => 'Second'])
+            ->execute($this->eventFor(Subscriber::STATUS_SUBSCRIBED, Subscriber::STATUS_SUBSCRIBED));
+    }
+
+    /**
+     * @param array<int, string> $unconnected the websites without a Smaily connection
+     */
     private function observer(
         ?string $area,
         ?StorefrontSubscription $storefrontSubscription = null,
         string $mode = SyncMode::MODE_CONSENT,
-        bool $active = true
+        bool $active = true,
+        bool $connected = true,
+        array $unconnected = []
     ): SubscriberSaveAfter {
         $config = $this->createMock(Config::class);
         $config->method('isContactSyncActive')->with(1)->willReturn($active);
-        $config->method('isConnected')->willReturn(true);
+        $config->method('isConnected')->willReturn($connected);
         $config->method('isWelcomeEnabled')->willReturn(true);
         $config->method('getSyncMode')->willReturn($mode);
 
@@ -302,7 +350,8 @@ class SubscriberSaveAfterTest extends TestCase
             $payloadBuilder,
             $this->createMock(CustomerRepositoryInterface::class),
             $state,
-            $storefrontSubscription ?? new StorefrontSubscription()
+            $storefrontSubscription ?? new StorefrontSubscription(),
+            $this->createConfiguredMock(WebsiteConnections::class, ['unconnectedWebsites' => $unconnected])
         );
     }
 

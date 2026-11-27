@@ -24,6 +24,7 @@ use Smaily\Connect\Model\Queue\EventType;
 use Smaily\Connect\Model\ResourceModel\Engine\IngestEvent as IngestEventResource;
 use Smaily\Connect\Model\ResourceModel\Queue\Event as EventResource;
 use Smaily\Connect\Model\StoreLayout;
+use Smaily\Connect\Model\WebsiteConnections;
 use Smaily\Connect\Test\Integration\IntegrationTestCase;
 use Smaily\Connect\Test\Integration\Support\Fake\DatabaseScopeConfig;
 use Smaily\Connect\ViewModel\Adminhtml\DashboardData;
@@ -114,6 +115,26 @@ class DashboardDataTest extends IntegrationTestCase
     }
 
     /**
+     * CON-470: the Dashboard names the websites without a Smaily connection
+     * while another website has one, and says when websites run as one store
+     * use different Smaily accounts.
+     */
+    public function testTheDashboardWarnsOfAWebsiteWithoutAConnectionAndOfDifferentAccounts(): void
+    {
+        $dashboard = $this->dashboard(null);
+        self::assertSame([], $dashboard->getUnconnectedWebsites(), 'No website connected: nothing set up yet');
+        self::assertFalse($dashboard->isMixedAccounts(), 'No account for all websites: separate stores');
+
+        $this->insertRow('websites', self::MAIN, Config::XML_PATH_USERNAME, 'api-user');
+        $this->insertRow('websites', self::MAIN, Config::XML_PATH_PASSWORD, 'encrypted');
+        self::assertSame(['Website ' . self::SECOND], $this->dashboard(null)->getUnconnectedWebsites());
+
+        $this->insertRow('default', 0, Config::XML_PATH_SUBDOMAIN, 'main-shop');
+        $this->insertRow('default', 0, Config::XML_PATH_USERNAME, 'api-user');
+        self::assertTrue($this->dashboard(null)->isMixedAccounts(), 'Second uses another Smaily account');
+    }
+
+    /**
      * The Dashboard as a request with this `website` parameter sees it.
      */
     private function dashboard(?string $websiteParam): DashboardData
@@ -134,6 +155,7 @@ class DashboardDataTest extends IntegrationTestCase
             'catalogManifest' => $this->createMock(CatalogManifest::class),
             'websiteContext' => new WebsiteContext($storeManager, $request),
             'storeLayout' => $this->storeLayoutFor($storeManager),
+            'websiteConnections' => new WebsiteConnections($config, $storeManager),
         ]);
     }
 

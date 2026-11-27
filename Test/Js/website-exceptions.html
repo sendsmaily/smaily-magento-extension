@@ -39,6 +39,11 @@
   workflow of its own the tab asks for its workflows; the save posts its own
   automations.
 
+  One store on one Smaily account (CON-470): Settings shows the values for
+  all websites only — no website drop-down, no "Use its own …" switch, no
+  separate transactional account for a website, no per-language Smaily
+  accounts — and its saves post no switch, so they apply to every website.
+
   Run it with bin/test-js.sh (it renders the pages first); the page ends with
   "RESULT: PASS" or "RESULT: FAIL".
 -->
@@ -54,6 +59,8 @@
     <script src="build/setup-websites-completed.et_EE.js"></script>
     <script src="build/settings-website.en_US.js"></script>
     <script src="build/settings-website.et_EE.js"></script>
+    <script src="build/settings-one-store.en_US.js"></script>
+    <script src="build/settings-one-store.et_EE.js"></script>
     <script src="build/settings-own-account.en_US.js"></script>
     <script src="build/settings-own-account.et_EE.js"></script>
 </head>
@@ -68,8 +75,8 @@
     var KEEP = 'Keep its own values';
     var STARTS = 'Saving this step starts contact sync on every website: %1.';
     var KEEPS_OWN = 'A website that keeps its own Contacts settings below syncs as those settings say.';
-    var PER_LANGUAGE = 'Separate Smaily accounts are set for one website: under Settings > Connection,'
-        + ' pick the website and tick Use its own Smaily account on this website.';
+    var PER_LANGUAGE = 'Separate Smaily accounts are set for each website on its own: press Change next to'
+        + ' Your websites at the top and pick Separate stores.';
     var OWN_ACCOUNT = 'Use its own Smaily account on this website';
     var OWN_CONTACTS = 'Use its own Contacts settings on this website';
     var RETURNS = 'Save to remove this website\'s own values: it then uses the settings saved for all websites.';
@@ -345,6 +352,29 @@
         frame.remove();
     }
 
+    async function oneStore(locale) {
+        var strings = window.smailyAdminPages['settings-one-store.' + locale].strings,
+            frame = await open('settings-one-store.' + locale),
+            doc = frame.contentDocument,
+            data;
+
+        check(locale + ', one store: Settings draws no website drop-down',
+            !doc.getElementById('smaily-website-select'));
+        check(locale + ', one store: no tab has a "Use its own …" switch',
+            doc.querySelectorAll('.smaily-own-switch').length === 0);
+        check(locale + ', one store: the transactional account has no switch for this website',
+            !doc.getElementById('smaily-tx-website-account'));
+        check(locale + ', one store: per-language Smaily accounts are not offered, and the note says where they are set',
+            !doc.querySelector('input[name=smaily-w-mlmode][value=a]')
+            && doc.body.textContent.replace(/\s+/g, ' ').indexOf(strings[PER_LANGUAGE]) !== -1);
+        doc.querySelector('.smaily-tabs li[data-tab=subscribers]').click();
+        doc.getElementById('smaily-w-subscribers-save').click();
+        await wait(100);
+        data = lastSave(frame, 'subscribers');
+        check(locale + ', one store: the Contacts save posts no switch', !!data && !('own' in data));
+        frame.remove();
+    }
+
     (async function () {
         try {
             for (var locale of ['en_US', 'et_EE']) {
@@ -356,6 +386,7 @@
                 await setup(locale);
                 await reopened(locale);
                 await settings(locale);
+                await oneStore(locale);
                 await ownAccount(locale);
             }
         } catch (error) {

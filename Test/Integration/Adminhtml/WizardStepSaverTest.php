@@ -1445,6 +1445,46 @@ class WizardStepSaverTest extends IntegrationTestCase
         self::assertSame($expected, $modes->of(self::MAIN), 'a store view on the shared account');
     }
 
+    /**
+     * CON-470: one store on one Smaily account shares its settings across
+     * its websites. Settings is store-wide there, and its save of the Smaily
+     * account, the Contacts settings or the automations applies to every
+     * website: the values for all websites are written and every website's
+     * own values of the section go. The initial setup lists no website with
+     * values of its own. Websites on different Smaily accounts keep their
+     * per-website Settings.
+     */
+    public function testOneStoreOnOneSmailyAccountSavesEverySettingForEveryWebsite(): void
+    {
+        $this->saver('0')->save('connect', ['subdomain' => 'shop', 'username' => 'api-user', 'password' => 'secret']);
+        // A website's own values from before: its own login of the same
+        // account, its own Contacts settings and its own workflow.
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_USERNAME, 'api-user');
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_SYNC_MODE, 'legitimate_interest');
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_WELCOME_WORKFLOW, '5');
+        self::assertTrue($this->storeLayout()->sharesOneAccount());
+        self::assertSame([], $this->wizardData('0', ['en'])->getWebsiteOverrides('subscribers'));
+
+        self::assertSame([], $this->saver('0')->save('subscribers', ['sync_mode' => 'consent']));
+        self::assertSame([], $this->saver('0')->save('automations', ['welcome_enabled' => true, 'welcome_workflow' => 900]));
+        self::assertSame([], $this->saver('0')->save('connect', ['subdomain' => 'shop', 'username' => 'api-user']));
+
+        foreach ([Config::XML_PATH_USERNAME, Config::XML_PATH_SYNC_MODE, Config::XML_PATH_WELCOME_WORKFLOW] as $path) {
+            self::assertSame([['default', 0]], $this->scopesOf($path), $path);
+        }
+        foreach ([self::MAIN, self::SECOND] as $websiteId) {
+            self::assertSame('consent', $this->config->getSyncMode($websiteId));
+            self::assertTrue($this->config->isContactSyncActive($websiteId));
+            self::assertSame(900, $this->router()->resolve('welcome', $websiteId, 'default')?->workflowId);
+            self::assertSame('secret', $this->config->getWebsitePassword($websiteId));
+        }
+
+        // Another Smaily account on a website: not one store on one account.
+        $this->insertRow('websites', self::SECOND, Config::XML_PATH_SUBDOMAIN, 'other-shop');
+        self::assertFalse($this->storeLayout()->sharesOneAccount());
+        self::assertTrue($this->storeLayout()->mixesAccounts());
+    }
+
     private function insertRow(string $scope, int $scopeId, string $path, string $value): void
     {
         $this->connection->insert('core_config_data', [

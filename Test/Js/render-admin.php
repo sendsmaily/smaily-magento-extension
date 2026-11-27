@@ -960,6 +960,16 @@ $transactionalViewModel = static fn (bool $connected): object => new class ($con
     }
 
     /**
+     * Settings for one website, not for all websites (CON-470).
+     *
+     * @return bool
+     */
+    public function isStoreWide(): bool
+    {
+        return false;
+    }
+
+    /**
      * @return bool
      */
     public function isSeparateStores(): bool
@@ -1645,8 +1655,8 @@ $websitesStrings = [
     'Use this step\'s values',
     'Saving this step starts contact sync on every website: %1.',
     'A website that keeps its own Contacts settings below syncs as those settings say.',
-    'Separate Smaily accounts are set for one website: under Settings > Connection, pick the website and tick'
-        . ' Use its own Smaily account on this website.',
+    'Separate Smaily accounts are set for each website on its own: press Change next to Your websites at the'
+        . ' top and pick Separate stores.',
     'Use its own Smaily account on this website',
     'Use its own Contacts settings on this website',
     'Save to remove this website\'s own values: it then uses the settings saved for all websites.',
@@ -1819,6 +1829,20 @@ $pages['settings-website'] = [
         'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
     ]],
     'strings' => $websitesStrings,
+];
+
+// One store on one Smaily account (CON-470): Settings is store-wide, as the
+// initial setup is, and shows the values for all websites only.
+$pages['settings-one-store'] = [
+    'template' => $root . '/view/adminhtml/templates/settings/index.phtml',
+    'viewModel' => $websitesViewModel(true),
+    'data' => ['context' => 'settings', 'children' => [
+        'panel.connection' => $root . '/view/adminhtml/templates/panel/connection.phtml',
+        'panel.transactional.account' => $root . '/view/adminhtml/templates/panel/transactional-account.phtml',
+        'panel.subscribers' => $root . '/view/adminhtml/templates/panel/subscribers.phtml',
+        'panel.js' => $root . '/view/adminhtml/templates/panel/panels-js.phtml',
+    ]],
+    'strings' => array_merge($websitesStrings, $transactionalStrings),
 ];
 
 $pages['settings-own-account'] = [
@@ -2299,18 +2323,41 @@ $pages['settings-long-wait'] = [
  * -unsent page has had no nightly product list for three nights, the last
  * one held back by product changes waiting in the Log (PRO-3914); the
  * -separate page is the three-website store set up as separate stores,
- * with Latvia selected (CON-281).
+ * with Latvia selected (CON-281). The -websites page is a three-website
+ * store run as one store whose Latvia and Lithuania have no Smaily
+ * connection, and whose websites use different Smaily accounts (CON-470).
  */
 $dashboardViewModel = static fn (
     bool $separateStorefront,
-    bool $unsent = false
-): object => new class ($separateStorefront, $unsent) {
+    bool $unsent = false,
+    bool $websiteWarnings = false
+): object => new class ($separateStorefront, $unsent, $websiteWarnings) {
     /**
      * @param bool $separateStorefront
      * @param bool $unsent
+     * @param bool $websiteWarnings
      */
-    public function __construct(private readonly bool $separateStorefront, private readonly bool $unsent)
+    public function __construct(
+        private readonly bool $separateStorefront,
+        private readonly bool $unsent,
+        private readonly bool $websiteWarnings
+    ) {
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getUnconnectedWebsites(): array
     {
+        return $this->websiteWarnings ? ['Latvia', 'Lithuania'] : [];
+    }
+
+    /**
+     * @return bool
+     */
+    public function isMixedAccounts(): bool
+    {
+        return $this->websiteWarnings;
     }
 
     /**
@@ -2485,6 +2532,17 @@ $pages['dashboard-unsent'] = [
     'template' => $root . '/view/adminhtml/templates/dashboard/index.phtml',
     'viewModel' => $dashboardViewModel(false, true),
     'strings' => $dashboardStrings,
+];
+$pages['dashboard-websites'] = [
+    'template' => $root . '/view/adminhtml/templates/dashboard/index.phtml',
+    'viewModel' => $dashboardViewModel(false, false, true),
+    'strings' => array_merge($dashboardStrings, [
+        'These websites have no Smaily connection: %1',
+        'Their newsletter signups do not reach Smaily. The Log shows each one as Skipped.',
+        'Open Connection settings',
+        'Your websites use different Smaily accounts, so they are not one store',
+        'In Settings, set them up as Separate stores, or give every website the same Smaily account.',
+    ]),
 ];
 $pages['dashboard-separate'] = [
     'template' => $root . '/view/adminhtml/templates/dashboard/index.phtml',

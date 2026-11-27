@@ -30,6 +30,7 @@ use Smaily\Connect\Model\Privacy\AddressKey;
 use Smaily\Connect\Model\Queue\ContactEntity;
 use Smaily\Connect\Model\Queue\EventQueue;
 use Smaily\Connect\Model\Queue\EventType;
+use Smaily\Connect\Model\WebsiteConnections;
 use Smaily\Connect\Observer\CustomerSaveAfter;
 use Smaily\Connect\Observer\SubscriberSaveAfter;
 
@@ -160,7 +161,8 @@ class RegistrationSyncTest extends TestCase
             $this->payloadBuilder(),
             $customerRepository,
             $state,
-            new StorefrontSubscription()
+            new StorefrontSubscription(),
+            $this->createMock(WebsiteConnections::class)
         ))->execute($observer);
     }
 

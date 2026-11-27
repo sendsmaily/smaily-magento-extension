@@ -627,6 +627,7 @@ class AbandonedCartTest extends IntegrationTestCase
         $cron = $this->objectManager->create(FlushEventQueue::class, [
             'handlerPool' => new HandlerPool([
                 EventType::AUTOMATION_TRIGGER => $this->objectManager->create(AutomationHandler::class, [
+                    'pushedWorkflow' => $this->noPushedWorkflow(),
                     // No discount code: the automation's switch is off (CON-198).
                     'discount' => $this->objectManager->create(AutomationDiscount::class, [
                         'issuer' => $this->createMock(CodeIssuer::class),

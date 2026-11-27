@@ -11,9 +11,13 @@ namespace Smaily\Connect\Test\Integration;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\Framework\Event\ManagerInterface as EventManagerInterface;
 use Magento\Framework\ObjectManagerInterface;
+use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Adminhtml\WebsiteOverrides;
+use Smaily\Connect\Model\Automation\PushedWorkflow;
+use Smaily\Connect\Model\Engine\Connections;
+use Smaily\Connect\Model\Engine\EmailDesignWorkflows;
 use Smaily\Connect\Model\StoreLayout;
 use Smaily\Connect\Test\Integration\Support\TestClock;
 use Smaily\Connect\Test\Integration\Support\TestEnvironment;
@@ -52,6 +56,20 @@ abstract class IntegrationTestCase extends TestCase
             'overrides' => $this->objectManager->create(WebsiteOverrides::class, ['storeManager' => $storeManager]),
             'eventManager' => $this->createMock(EventManagerInterface::class),
         ]);
+    }
+
+    /**
+     * Automation\PushedWorkflow for a test that pushes no workflow: every
+     * email keeps its picked workflow. The DI one reads Engine\Connections
+     * (CON-237), which needs a StoreManagerInterface the harness has no
+     * preference for.
+     */
+    protected function noPushedWorkflow(): PushedWorkflow
+    {
+        $connections = $this->createMock(Connections::class);
+        $connections->method('forWebsite')->willReturn(null);
+
+        return new PushedWorkflow(new EmailDesignWorkflows(new Json()), $connections);
     }
 
     /**

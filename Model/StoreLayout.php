@@ -129,7 +129,7 @@ class StoreLayout
     public function toSeparateStores(): void
     {
         if ($this->isSeparateStores()) {
-            $this->configWriter->save(self::XML_PATH_SEPARATE_STORES, '1');
+            $this->remember();
 
             return;
         }
@@ -234,10 +234,7 @@ class StoreLayout
      */
     public function mixesAccounts(): bool
     {
-        return count($this->websiteIds()) > 1
-            && !$this->isSeparateStores()
-            && !$this->overrides->usesPerLanguageAccounts()
-            && !$this->overrides->usesOneAccount();
+        return $this->isOneStoreWithoutPerLanguageAccounts() && !$this->overrides->usesOneAccount();
     }
 
     /**
@@ -335,10 +332,18 @@ class StoreLayout
      */
     private function isOneStoreOnOneAccount(): bool
     {
+        return $this->isOneStoreWithoutPerLanguageAccounts() && $this->overrides->usesOneAccount();
+    }
+
+    /**
+     * A 2+-website install that is not separate stores, without
+     * per-language Smaily accounts.
+     */
+    private function isOneStoreWithoutPerLanguageAccounts(): bool
+    {
         return count($this->websiteIds()) > 1
             && !$this->isSeparateStores()
-            && !$this->overrides->usesPerLanguageAccounts()
-            && $this->overrides->usesOneAccount();
+            && !$this->overrides->usesPerLanguageAccounts();
     }
 
     /**

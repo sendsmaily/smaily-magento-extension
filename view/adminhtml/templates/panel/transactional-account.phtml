@@ -54,7 +54,7 @@ $isSettings = $block->getData('context') === 'settings';
         <?php if ($viewModel->hasMultipleWebsites() && $viewModel->isSeparateStores() && !$viewModel->isStoreWide()): ?>
         <input type="checkbox" id="smaily-tx-website-account" checked hidden/>
         <?php // One store on one Smaily account shares it across its websites (CON-470). ?>
-        <?php elseif ($isSettings && $viewModel->hasMultipleWebsites() && !$viewModel->isStoreWide()): ?>
+        <?php elseif ($isSettings && $viewModel->hasMultipleWebsites() && !$viewModel->showsSettingsForAllWebsites()): ?>
         <div class="smaily-inline-toggle">
             <label>
                 <input type="checkbox" id="smaily-tx-website-account" <?= $account['websiteAccount'] ? 'checked' : '' ?>/>

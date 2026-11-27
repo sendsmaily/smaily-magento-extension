@@ -282,25 +282,30 @@ class WizardStepSaver
 
     /**
      * Saves a section where sectionTarget() says, then removes the own
-     * values of the websites it names.
+     * values of the websites it names. $save gets the target and whether
+     * this is the store-wide save of one store on one Smaily account.
      *
      * @param array<string, mixed> $data
-     * @param callable(int|null): array<int, array{field: string, message: string}> $save
+     * @param callable(int|null, bool): array<int, array{field: string, message: string}> $save
      * @return array<int, array{field: string, message: string}>
      */
     private function saveSection(string $section, array $data, int $websiteId, callable $save): array
     {
-        [$target, $remove, $write] = $this->sectionTarget($section, $data, $websiteId);
+        // The store-wide save of one store on one Smaily account, whose
+        // websites share the settings (CON-470): read once, before anything
+        // of this save is written.
+        $sharedStoreWide = $this->websiteContext->isSharedStoreWide($this->storeLayout->sharesOneAccount());
+        [$target, $remove, $write] = $this->sectionTarget($section, $data, $websiteId, $sharedStoreWide);
         // Separate stores have no store-wide account to compare with (CON-279).
         $multiple = $this->websiteContext->hasMultipleWebsites() && !$this->storeLayout->isSeparateStores();
         // One store on one Smaily account shares the section (CON-470).
-        $shared = $target === null && $this->isSharedSave();
+        $shared = $target === null && $sharedStoreWide;
         // A Smaily account saved for one website of a 2+-website install
         // (CON-190): whether it used another account than the store-wide
         // one before this save.
         $ownAccountSave = $section === WebsiteOverrides::CONNECTION && $multiple && $write && $target !== null;
         $usedOtherAccount = $ownAccountSave && $this->overrides->usesOtherAccount((int)$target);
-        $errors = $write ? $save($target) : [];
+        $errors = $write ? $save($target, $sharedStoreWide) : [];
         if ($errors !== []) {
             return $errors;
         }
@@ -309,11 +314,12 @@ class WizardStepSaver
         // confirms, compared with the settings this save wrote.
         $confirmed = [];
         if ($shared && $section === WebsiteOverrides::SUBSCRIBERS) {
+            $own = $this->overrides->ownValues(WebsiteOverrides::SUBSCRIBERS);
             $confirmed = array_values(array_intersect(
-                array_keys($this->overrides->ownValues(WebsiteOverrides::SUBSCRIBERS)),
+                array_keys($own),
                 array_map('intval', is_array($data['use_everywhere'] ?? null) ? $data['use_everywhere'] : [])
             ));
-            $remove = array_values(array_unique(array_merge($this->websiteContacts->identical(), $confirmed)));
+            $remove = array_values(array_unique(array_merge($this->websiteContacts->identical($own), $confirmed)));
         }
         foreach ($remove as $removeId) {
             // The workflows of a website on another Smaily account came from
@@ -345,27 +351,17 @@ class WizardStepSaver
     }
 
     /**
-     * Whether this save is the store-wide save of one store on one Smaily
-     * account, whose websites share the settings (CON-470).
-     */
-    private function isSharedSave(): bool
-    {
-        return $this->websiteContext->hasMultipleWebsites()
-            && $this->websiteContext->isStoreWide()
-            && $this->storeLayout->sharesOneAccount();
-    }
-
-    /**
      * Where a section's save writes: the website id whose scope gets the
      * values (null = the default scope, the whole store), the websites
      * whose own values of the section are removed, and whether the values
      * are written at all (not when a website returns to the store-wide
-     * values) — see the class comment.
+     * values) — see the class comment. $sharedStoreWide: the store-wide
+     * save of one store on one Smaily account (saveSection()).
      *
      * @param array<string, mixed> $data
      * @return array{0: int|null, 1: int[], 2: bool}
      */
-    private function sectionTarget(string $section, array $data, int $websiteId): array
+    private function sectionTarget(string $section, array $data, int $websiteId, bool $sharedStoreWide): array
     {
         $withOwn = array_keys($this->overrides->ownValues($section));
         $perLanguage = $this->isPerLanguageAccounts($section, $data, $websiteId);
@@ -382,13 +378,14 @@ class WizardStepSaver
             // One store on one Smaily account: every website shares the
             // values, so no website keeps its own (CON-470); the Contacts
             // settings that go are decided after the save (saveSection()).
-            if ($this->storeLayout->sharesOneAccount()) {
+            if ($sharedStoreWide) {
                 return [null, $section === WebsiteOverrides::SUBSCRIBERS ? [] : $withOwn, true];
             }
             $chosen = array_map('intval', is_array($data['use_store_wide'] ?? null) ? $data['use_store_wide'] : []);
             // A website on another Smaily account keeps its automations (CON-190).
             if ($section === WebsiteOverrides::AUTOMATIONS) {
-                $chosen = array_filter($chosen, fn (int $id): bool => !$this->overrides->usesOtherAccount($id));
+                $otherAccount = $this->overrides->websitesOnOtherAccount();
+                $chosen = array_filter($chosen, static fn (int $id): bool => !in_array($id, $otherAccount, true));
             }
 
             return [null, array_values(array_intersect($withOwn, $chosen)), true];
@@ -498,7 +495,12 @@ class WizardStepSaver
             WebsiteOverrides::CONNECTION,
             $data,
             $websiteId,
-            fn (?int $target): array => $this->saveConnect($data, $websiteId, $target)
+            fn (?int $target, bool $sharedStoreWide): array => $this->saveConnect(
+                $data,
+                $websiteId,
+                $target,
+                $sharedStoreWide
+            )
         );
         if ($errors === [] && $transactional !== null) {
             $this->transactionalSaver->saveAccount($transactional, $websiteId);
@@ -528,10 +530,13 @@ class WizardStepSaver
      * views of one website, so on a 2+-website install they are a website's
      * own Smaily account: a store-wide save there does not take mode A.
      *
+     * $sharedStoreWide: the store-wide save of one store on one Smaily
+     * account (saveSection()).
+     *
      * @param array<string, mixed> $data
      * @return array<int, array{field: string, message: string}>
      */
-    private function saveConnect(array $data, int $websiteId, ?int $target): array
+    private function saveConnect(array $data, int $websiteId, ?int $target, bool $sharedStoreWide): array
     {
         $this->connectionAccepted = false;
         $this->storefrontUrlChanged = false;
@@ -586,14 +591,13 @@ class WizardStepSaver
         // initial setup's Connect step, PRO-3802) is checked before anything
         // is saved as well; a post without the key leaves it as is. One
         // store on one Smaily account keeps an address per website (CON-470).
-        $storefrontError = null;
         $websiteStorefrontUrls = null;
-        if ($target === null && $this->isSharedSave()) {
-            $websiteStorefrontUrls = $this->postedWebsiteStorefrontUrls($data, $storefrontError);
+        if ($target === null && $sharedStoreWide) {
+            [$websiteStorefrontUrls, $storefrontError] = $this->postedWebsiteStorefrontUrls($data);
+            if ($storefrontError !== null) {
+                return [['field' => 'storefront_url', 'message' => $storefrontError]];
+            }
             unset($data['storefront_url']);
-        }
-        if ($storefrontError !== null) {
-            return [['field' => 'storefront_url', 'message' => $storefrontError]];
         }
         $storefrontUrl = null;
         if (array_key_exists('storefront_url', $data)) {
@@ -752,16 +756,16 @@ class WizardStepSaver
     /**
      * The storefront addresses posted per website (`storefront_urls`,
      * website id => address) on one store on one Smaily account (CON-470),
-     * normalized, for the real websites only; null when the post holds none
-     * or an address is not one, which $error then says.
+     * normalized, for the real websites only (null when the post holds
+     * none), and the error when an address is not one (then no addresses).
      *
      * @param array<string, mixed> $data
-     * @return array<int, string>|null
+     * @return array{0: array<int, string>|null, 1: string|null}
      */
-    private function postedWebsiteStorefrontUrls(array $data, ?string &$error): ?array
+    private function postedWebsiteStorefrontUrls(array $data): array
     {
         if (!is_array($data['storefront_urls'] ?? null)) {
-            return null;
+            return [null, null];
         }
         $urls = [];
         $websites = $this->websiteContext->getWebsiteOptions();
@@ -771,14 +775,12 @@ class WizardStepSaver
             }
             $normalized = is_string($url) ? StorefrontUrl::normalize($url) : null;
             if ($normalized === null) {
-                $error = (string)__('Enter the storefront\'s address only, starting with https:// — for example https://shop.example.com — without a path or a query.');
-
-                return null;
+                return [null, (string)__('Enter the storefront\'s address only, starting with https:// — for example https://shop.example.com — without a path or a query.')];
             }
             $urls[(int)$websiteId] = $normalized;
         }
 
-        return $urls;
+        return [$urls, null];
     }
 
     /**

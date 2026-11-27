@@ -219,20 +219,36 @@ class WebsiteOverrides
      */
     public function usesOtherAccount(int $websiteId): bool
     {
+        return in_array($websiteId, $this->websitesOnOtherAccount(), true);
+    }
+
+    /**
+     * The websites that use another Smaily account than the store-wide one
+     * (usesOtherAccount()), read at once.
+     *
+     * @return int[]
+     */
+    public function websitesOnOtherAccount(): array
+    {
         if (count($this->websiteIds()) < 2) {
-            return false;
+            return [];
         }
         $storeWide = $this->storeWideAccount();
         if ($storeWide === null) {
-            return false;
+            return [];
         }
-        foreach ($this->accountsInUse()[$websiteId] ?? [] as $account) {
-            if ($account !== $storeWide[0] . "\n" . $storeWide[1]) {
-                return true;
+        $storeWideKey = self::accountKey($storeWide[0], $storeWide[1]);
+        $websiteIds = [];
+        foreach ($this->accountsInUse() as $websiteId => $accounts) {
+            foreach ($accounts as $account) {
+                if ($account !== $storeWideKey) {
+                    $websiteIds[] = $websiteId;
+                    break;
+                }
             }
         }
 
-        return false;
+        return $websiteIds;
     }
 
     /**
@@ -282,7 +298,7 @@ class WebsiteOverrides
         $default = $values[ScopeConfigInterface::SCOPE_TYPE_DEFAULT][0] ?? [];
         $account = fn (string $subdomain, string $username): string => $subdomain === '' && $username === ''
             ? ''
-            : $this->normalizer->normalize($subdomain) . "\n" . trim($username);
+            : self::accountKey($this->normalizer->normalize($subdomain), trim($username));
 
         $accounts = [];
         foreach ($this->storeManager->getWebsites() as $website) {
@@ -358,11 +374,20 @@ class WebsiteOverrides
             $subdomain = $this->normalizer->normalize((string)($own[$websiteId][Config::XML_PATH_SUBDOMAIN] ?? ''));
             $username = trim((string)($own[$websiteId][Config::XML_PATH_USERNAME] ?? ''));
             if ($subdomain !== '' || $username !== '') {
-                $accounts[$subdomain . "\n" . $username] = true;
+                $accounts[self::accountKey($subdomain, $username)] = true;
             }
         }
 
         return count($accounts) > 1;
+    }
+
+    /**
+     * A Smaily account's identity as one key: its normalized subdomain and
+     * API username, joined by a line break.
+     */
+    private static function accountKey(string $subdomain, string $username): string
+    {
+        return $subdomain . "\n" . $username;
     }
 
     /**

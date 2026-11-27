@@ -296,9 +296,10 @@ $saveUrl = $block->getUrl('smaily_connect/automations/save');
         };
 
         function showMode($card, mode) {
-            $card.removeClass('is-off is-test is-active is-stopped').addClass('is-' + mode);
+            var modes = Object.keys(pills);
+            $card.removeClass(modes.map(function (m) { return 'is-' + m; }).join(' ')).addClass('is-' + mode);
             $card.find('.smaily-pill')
-                .removeClass('smaily-pill--off smaily-pill--test smaily-pill--active smaily-pill--stopped')
+                .removeClass(modes.map(function (m) { return 'smaily-pill--' + m; }).join(' '))
                 .addClass('smaily-pill--' + mode)
                 .contents().last().replaceWith(document.createTextNode(pills[mode]));
         }

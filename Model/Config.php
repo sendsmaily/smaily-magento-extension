@@ -172,24 +172,30 @@ class Config
     }
 
     /**
-     * Whether a Smaily API password is saved for a website (its own, else
-     * the default scope's), read without decrypting it.
+     * Whether a Smaily subdomain, API username and API password are saved
+     * for a website (each its own, else the default scope's), the password
+     * read without decrypting it.
      */
-    public function hasWebsitePassword(int $websiteId): bool
+    public function hasWebsiteCredentials(int $websiteId): bool
     {
-        return (string)$this->websiteValue(self::XML_PATH_PASSWORD, $websiteId) !== '';
+        return $this->getWebsiteSubdomain($websiteId) !== ''
+            && $this->getWebsiteUsername($websiteId) !== ''
+            && (string)$this->websiteValue(self::XML_PATH_PASSWORD, $websiteId) !== '';
     }
 
     /**
-     * Whether a Smaily API password is saved for a store view (its own, else
-     * its website's, else the default scope's), read without decrypting it.
+     * Whether a Smaily subdomain, API username and API password are saved
+     * for a store view (each its own, else its website's, else the default
+     * scope's), the password read without decrypting it.
      *
      * @param int|string|null $storeId
      */
-    public function hasPassword(int|string|null $storeId = null): bool
+    public function hasCredentials(int|string|null $storeId = null): bool
     {
-        return (string)$this->scopeConfig->getValue(self::XML_PATH_PASSWORD, ScopeInterface::SCOPE_STORE, $storeId)
-            !== '';
+        return $this->getSubdomain($storeId) !== ''
+            && $this->getUsername($storeId) !== ''
+            && (string)$this->scopeConfig->getValue(self::XML_PATH_PASSWORD, ScopeInterface::SCOPE_STORE, $storeId)
+                !== '';
     }
 
     /**

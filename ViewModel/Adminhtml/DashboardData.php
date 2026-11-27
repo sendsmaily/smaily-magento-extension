@@ -86,7 +86,7 @@ class DashboardData implements ArgumentInterface
      */
     public function getUnconnectedWebsites(): array
     {
-        return $this->storeLayout->isSeparateStores()
+        return $this->separateStoreId() !== null
             ? []
             : array_values($this->websiteConnections->unconnectedWebsites());
     }
@@ -97,7 +97,7 @@ class DashboardData implements ArgumentInterface
      */
     public function isMixedAccounts(): bool
     {
-        return $this->storeLayout->mixesAccounts();
+        return $this->separateStoreId() === null && $this->storeLayout->mixesAccounts();
     }
 
     /**

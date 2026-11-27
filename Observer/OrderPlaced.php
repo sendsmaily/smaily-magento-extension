@@ -74,14 +74,14 @@ class OrderPlaced implements ObserverInterface
         $optedIn = $cartState['newsletter_optin'];
 
         $storeId = (int)$order->getStoreId();
+        $websiteId = $this->dispatcher->websiteId($storeId);
+        $email = strtolower(trim((string)$order->getCustomerEmail()));
         if (!$this->config->isConnected($storeId ?: null)) {
-            $this->recordUnconnected($order, $storeId, $optedIn);
+            $this->recordUnconnected($order, $email, $storeId, $websiteId, $optedIn);
 
             return;
         }
 
-        $websiteId = $this->dispatcher->websiteId($storeId);
-        $email = strtolower(trim((string)$order->getCustomerEmail()));
         if ($email === '') {
             return;
         }
@@ -97,10 +97,13 @@ class OrderPlaced implements ObserverInterface
      * guest order's email by the rule of syncContact(). The Log records it
      * as skipped (UnconnectedSignup); nothing else of the order is.
      */
-    private function recordUnconnected(OrderInterface $order, int $storeId, bool $optedIn): void
-    {
-        $websiteId = $this->dispatcher->websiteId($storeId);
-        $email = strtolower(trim((string)$order->getCustomerEmail()));
+    private function recordUnconnected(
+        OrderInterface $order,
+        string $email,
+        int $storeId,
+        int $websiteId,
+        bool $optedIn
+    ): void {
         if ($optedIn) {
             $this->unconnectedSignup->record($email, $storeId, false, null);
         } elseif ($this->syncsGuest($order, $websiteId)) {

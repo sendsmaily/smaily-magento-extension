@@ -19,7 +19,7 @@ use Smaily\Connect\Model\WebsiteConnections;
  * opt-in and a guest order: the Log records it as skipped, with the reason
  * WebsiteConnections::SKIPPED_NOT_CONNECTED and the contact the sync would
  * have sent, while another website has a Smaily connection
- * (WebsiteConnections::unconnectedWebsites()). Only where contact sync
+ * (WebsiteConnections::isUnconnectedWhileAnotherIs()). Only where contact sync
  * would be active for the website if it were connected — its contact sync
  * on and its Contacts settings saved (Config::isContactSyncActive()); any
  * other contact goes unrecorded, as before. Each caller has already
@@ -34,13 +34,23 @@ class UnconnectedSignup
     ) {
     }
 
-    public function record(string $email, int $storeId, ?bool $isUnsubscribed, ?CustomerInterface $customer): void
+    /**
+     * Whether a contact sync of the store view would be recorded: its
+     * website's contact sync would be active, and the website has no Smaily
+     * connection while another website has one. A caller checks it before
+     * it reads what record() needs.
+     */
+    public function applies(int $storeId): bool
     {
         $websiteId = $this->dispatcher->websiteId($storeId);
-        if ($email === ''
-            || !$this->config->isContactSyncActive($websiteId)
-            || !isset($this->websiteConnections->unconnectedWebsites()[$websiteId])
-        ) {
+
+        return $this->config->isContactSyncActive($websiteId)
+            && $this->websiteConnections->isUnconnectedWhileAnotherIs($websiteId);
+    }
+
+    public function record(string $email, int $storeId, ?bool $isUnsubscribed, ?CustomerInterface $customer): void
+    {
+        if ($email === '' || !$this->applies($storeId)) {
             return;
         }
 

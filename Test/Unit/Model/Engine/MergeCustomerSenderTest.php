@@ -14,18 +14,25 @@ use Magento\Framework\Exception\NoSuchEntityException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Smaily\Connect\Model\Engine\Client;
+use Smaily\Connect\Model\Engine\Connection;
 use Smaily\Connect\Model\Engine\Exception\EngineTransportException;
 use Smaily\Connect\Model\Engine\MergeCustomerSender;
 use Smaily\Connect\Model\Engine\Payload\CustomerPayloadBuilder;
 use Smaily\Connect\Model\Engine\Queue\IngestEvent;
 use Smaily\Connect\Model\Engine\Queue\IngestQueue;
+use Smaily\Connect\Model\Engine\Settings;
+use Smaily\Connect\Test\Unit\Support\EngineConnectionsStub;
 
 /**
  * CON-262: the customer of an identity merge goes to the engine alone,
  * right before the merge, and the Log records it as a customers row.
+ * CON-237: to the merge's connection, recorded with that connection's
+ * canonical store view.
  */
 class MergeCustomerSenderTest extends TestCase
 {
+    use EngineConnectionsStub;
+
     private const ITEM = ['email' => 'person@example.com', 'external_id' => '42'];
 
     private CustomerRepositoryInterface&MockObject $customerRepository;
@@ -46,14 +53,14 @@ class MergeCustomerSenderTest extends TestCase
         ]);
         $this->event = $this->createMock(IngestEvent::class);
         $this->ingestQueue = $this->createMock(IngestQueue::class);
-        $this->ingestQueue->method('newEvent')->with(Client::DOMAIN_CUSTOMERS, self::ITEM)->willReturn($this->event);
+        $this->ingestQueue->method('newEvent')->with(Client::DOMAIN_CUSTOMERS, self::ITEM, 1)->willReturn($this->event);
         $this->ingestQueue->method('decodePayload')->with($this->event)
             ->willReturn(self::ITEM + ['event_id' => 'uuid-1']);
     }
 
     public function testTheEngineTakingTheCustomerIsRecordedDelivered(): void
     {
-        $this->event->expects(self::once())->method('addData')->with(['entity_id' => '42', 'store_id' => 3]);
+        $this->event->expects(self::once())->method('addData')->with(['entity_id' => '42']);
         $this->client->expects(self::once())->method('ingest')
             ->with(Client::DOMAIN_CUSTOMERS, [self::ITEM + ['event_id' => 'uuid-1']])
             ->willReturn(['ok' => true, 'processed' => 1, 'deduplicated' => 0, 'errors' => []]);
@@ -62,7 +69,7 @@ class MergeCustomerSenderTest extends TestCase
         $this->ingestQueue->expects(self::once())->method('markSent')->with($this->event);
         $this->ingestQueue->expects(self::never())->method('markFailed');
 
-        self::assertNull($this->sender()->send(42));
+        self::assertNull($this->sender()->send(42, $this->connection()));
     }
 
     /**
@@ -86,7 +93,7 @@ class MergeCustomerSenderTest extends TestCase
             ->with($this->event, 'email: rejected by engine', true);
         $this->ingestQueue->expects(self::never())->method('markSent');
 
-        self::assertSame('email: rejected by engine', $this->sender()->send(42));
+        self::assertSame('email: rejected by engine', $this->sender()->send(42, $this->connection()));
     }
 
     public function testAFailedRequestIsHandedOnAndNotRecorded(): void
@@ -97,7 +104,7 @@ class MergeCustomerSenderTest extends TestCase
         $this->ingestQueue->expects(self::never())->method('markFailed');
 
         $this->expectExceptionObject($outage);
-        $this->sender()->send(42);
+        $this->sender()->send(42, $this->connection());
     }
 
     public function testNoAccountSendsNothing(): void
@@ -106,7 +113,37 @@ class MergeCustomerSenderTest extends TestCase
         $this->customerRepository->method('getById')->willThrowException(new NoSuchEntityException());
         $this->client->expects(self::never())->method('ingest');
 
-        self::assertSame(MergeCustomerSender::NO_ACCOUNT, $this->sender()->send(42));
+        self::assertSame(MergeCustomerSender::NO_ACCOUNT, $this->sender()->send(42, $this->connection()));
+    }
+
+    /**
+     * CON-237: separate stores — the customer is built for the merge's
+     * connection, sent with its client and recorded with its canonical
+     * store view.
+     */
+    public function testTheCustomerGoesToTheMergesConnection(): void
+    {
+        $latviaClient = $this->createMock(Client::class);
+        $latviaClient->expects(self::once())->method('ingest')->willReturn(['ok' => true, 'errors' => []]);
+        $this->client->expects(self::never())->method('ingest');
+        $primary = $this->engineConnection(0, $this->createMock(Settings::class), [1], [1], 1);
+        $latvia = $this->engineConnection(2, $this->createMock(Settings::class), [2], [4, 5], 4);
+        $connections = $this->engineConnections([[$primary, $this->client], [$latvia, $latviaClient]]);
+        $builder = $this->createMock(CustomerPayloadBuilder::class);
+        $builder->expects(self::once())->method('build')->with(self::anything(), $latvia)->willReturn(self::ITEM);
+        $ingestQueue = $this->createMock(IngestQueue::class);
+        $ingestQueue->expects(self::once())->method('newEvent')->with(Client::DOMAIN_CUSTOMERS, self::ITEM, 4)
+            ->willReturn($this->event);
+        $ingestQueue->expects(self::once())->method('markSent');
+
+        $sender = new MergeCustomerSender($this->customerRepository, $builder, $connections, $ingestQueue);
+
+        self::assertNull($sender->send(42, $latvia));
+    }
+
+    private function connection(): Connection
+    {
+        return $this->engineConnection(0, $this->createMock(Settings::class), [1], [1], 1, true);
     }
 
     private function sender(): MergeCustomerSender
@@ -114,6 +151,8 @@ class MergeCustomerSenderTest extends TestCase
         $builder = $this->createMock(CustomerPayloadBuilder::class);
         $builder->method('build')->willReturn(self::ITEM);
 
-        return new MergeCustomerSender($this->customerRepository, $builder, $this->client, $this->ingestQueue);
+        $connections = $this->oneEngineConnection($this->createMock(Settings::class), $this->client);
+
+        return new MergeCustomerSender($this->customerRepository, $builder, $connections, $this->ingestQueue);
     }
 }

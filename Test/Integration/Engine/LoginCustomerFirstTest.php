@@ -390,15 +390,14 @@ class LoginCustomerFirstTest extends IntegrationTestCase
         $builder = $this->createMock(CustomerPayloadBuilder::class);
         $builder->method('build')->willReturn(['email' => self::EMAIL, 'external_id' => '42']);
 
+        $connections = $this->oneEngineConnection($settings, $this->client);
         $handler = $this->objectManager->create(IdentityMergeHandler::class, [
-            'settings' => $settings,
-            'client' => $this->client,
             'eventQueue' => $this->events,
             'profilingConsent' => $consent,
             'customerRepository' => $repository,
-            'customerSender' => new MergeCustomerSender($repository, $builder, $this->client, $this->ingest),
+            'customerSender' => new MergeCustomerSender($repository, $builder, $connections, $this->ingest),
             'ingestQueue' => $this->ingest,
-            'connections' => $this->oneEngineConnection($settings, $this->client),
+            'connections' => $connections,
         ]);
         /** @var FlushEventQueue $cron */
         $cron = $this->objectManager->create(FlushEventQueue::class, [

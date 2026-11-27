@@ -25,7 +25,10 @@ use Smaily\Connect\Model\Engine\Queue\ItemError;
  * the engine before the merge, whatever the cron order.
  *
  * The row is built from the account as it is now (Payload\CustomerPayloadBuilder,
- * the row a customer save queues) and goes alone, with its own `event_id`.
+ * the row a customer save queues) for the merge's Campaign Intelligence
+ * connection (CON-237) and goes alone to that connection, with its own
+ * `event_id`; it is recorded with the connection's canonical store view, as
+ * every customers row of the connection is.
  * The Log records it as a customers row (IngestQueue::newEvent(), as the
  * nightly catalog manifest is recorded): delivered when the engine took
  * it, failed with the engine's reason when it refused the item. A request
@@ -42,20 +45,20 @@ class MergeCustomerSender
     public function __construct(
         private readonly CustomerRepositoryInterface $customerRepository,
         private readonly CustomerPayloadBuilder $payloadBuilder,
-        private readonly Client $client,
+        private readonly Connections $connections,
         private readonly IngestQueue $ingestQueue
     ) {
     }
 
     /**
-     * Send the customer with §4.
+     * Send the customer with §4 to the merge's connection.
      *
      * @return string|null null when the engine answered 200 and took the
      *         customer; else why not: NO_ACCOUNT, or the engine's refusal
      *         of the item (`field: message`)
      * @throws EngineException the request failed (refused as a whole, or no answer)
      */
-    public function send(int $customerId): ?string
+    public function send(int $customerId, Connection $connection): ?string
     {
         try {
             $customer = $this->customerRepository->getById($customerId);
@@ -63,13 +66,18 @@ class MergeCustomerSender
             return self::NO_ACCOUNT;
         }
 
-        $event = $this->ingestQueue->newEvent(Client::DOMAIN_CUSTOMERS, $this->payloadBuilder->build($customer));
-        $event->addData(['entity_id' => (string)$customerId, 'store_id' => (int)$customer->getStoreId()]);
+        $event = $this->ingestQueue->newEvent(
+            Client::DOMAIN_CUSTOMERS,
+            $this->payloadBuilder->build($customer, $connection),
+            $connection->canonicalStoreId()
+        );
+        $event->addData(['entity_id' => (string)$customerId]);
         $item = $this->ingestQueue->decodePayload($event);
 
-        $response = $this->client->ingest(Client::DOMAIN_CUSTOMERS, [$item]);
+        $client = $this->connections->client($connection);
+        $response = $client->ingest(Client::DOMAIN_CUSTOMERS, [$item]);
 
-        $exchange = $this->client->lastExchange();
+        $exchange = $client->lastExchange();
         if ($exchange !== null) {
             $this->ingestQueue->recordExchange($event, $item, $exchange['response']);
         }

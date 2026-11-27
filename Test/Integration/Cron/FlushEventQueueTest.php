@@ -270,8 +270,6 @@ class FlushEventQueueTest extends IntegrationTestCase
         $consent->method('isAllowed')->willReturn(true);
 
         return $this->objectManager->create(IdentityMergeHandler::class, [
-            'settings' => $settings,
-            'client' => $client,
             'profilingConsent' => $consent,
             'customerRepository' => $this->createMock(CustomerRepositoryInterface::class),
             'customerSender' => $this->createMock(MergeCustomerSender::class),

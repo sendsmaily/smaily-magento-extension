@@ -88,6 +88,9 @@ class Settings
      */
     public const XML_PATH_CONNECTION_PREFIX = 'smaily_connect/intelligence/connection_prefix';
 
+    /** Why a queued engine row is not sent while its connection is not connected (sendingBlockedReason()). */
+    public const NOT_CONNECTED = 'Campaign Intelligence is not connected';
+
     /** Every path a website-scope connection holds; its clear() removes them all. */
     public const WEBSITE_PATHS = [
         self::XML_PATH_CONNECTED,
@@ -209,7 +212,7 @@ class Settings
             return 'Campaign Intelligence account is not active';
         }
 
-        return $this->isConnected() ? null : 'Campaign Intelligence is not connected';
+        return $this->isConnected() ? null : self::NOT_CONNECTED;
     }
 
     /**

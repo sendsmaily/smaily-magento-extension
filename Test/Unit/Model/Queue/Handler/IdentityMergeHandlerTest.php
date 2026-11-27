@@ -49,6 +49,7 @@ class IdentityMergeHandlerTest extends TestCase
     private array $recorded = [];
 
     private MergeCustomerSender&MockObject $sender;
+    private Logger&MockObject $logger;
     private IngestQueue&MockObject $ingestQueue;
 
     /** @var string[] the engine calls in order: `customers`, `merge` */
@@ -67,6 +68,7 @@ class IdentityMergeHandlerTest extends TestCase
         $this->added = [];
         $this->lastResponse = null;
         $this->sender = $this->createMock(MergeCustomerSender::class);
+        $this->logger = $this->createMock(Logger::class);
         $this->ingestQueue = $this->createMock(IngestQueue::class);
         $this->client = $this->createMock(Client::class);
         $this->profilingConsent = $this->createMock(ProfilingConsent::class);
@@ -309,22 +311,44 @@ class IdentityMergeHandlerTest extends TestCase
     }
 
     /**
-     * A customer the store does not send (no consent, not queued by the
-     * live sync or an import): the merge is not retried, and the row says
-     * why; Retry links the login once the customer is sent.
+     * CON-465 (as WooCommerce's LoginMerge): a customer the store does not
+     * send (no consent, not queued by the live sync or an import) ends the
+     * merge quietly — not retried, a debug line without the address, and
+     * the row closed as Skipped, never a failure.
      */
-    public function testA404ForACustomerTheStoreDoesNotSendIsParkedWithTheReason(): void
+    public function testA404ForACustomerTheStoreDoesNotSendEndsQuietly(): void
     {
         $this->profilingConsent->method('isAllowed')->willReturn(true);
         $this->queued(false);
         $this->sender->expects(self::never())->method('send');
         $this->engine();
+        $this->logger->expects(self::once())->method('debug')->with(
+            self::logicalNot(self::stringContains('person@example.com')),
+            ['id' => 1]
+        );
+        $this->logger->expects(self::never())->method('error');
 
         self::assertEquals(
-            [1 => Failure::permanent(IdentityMergeHandler::NOT_SENT)],
+            [1 => new Skipped(IdentityMergeHandler::SKIPPED_NOT_SENT)],
             $this->handle(self::PAYLOAD)
         );
         self::assertSame(['merge'], $this->calls);
+    }
+
+    /**
+     * A consenting login whose account is gone by the time the row runs: the
+     * store cannot send the customer, so a 404 ends the merge quietly too.
+     */
+    public function testA404ForAConsentingLoginWhoseAccountIsGoneEndsQuietly(): void
+    {
+        $this->profilingConsent->method('isAllowed')->willReturn(true);
+        $this->engine(refusal: MergeCustomerSender::NO_ACCOUNT);
+
+        self::assertEquals(
+            [1 => new Skipped(IdentityMergeHandler::SKIPPED_NOT_SENT)],
+            $this->handle(self::PAYLOAD + [IdentityMergeHandler::SEND_CUSTOMER => true])
+        );
+        self::assertSame(['customers', 'merge'], $this->calls);
     }
 
     public function testACustomerTheEngineRefusesParksTheMergeWithTheEnginesReason(): void
@@ -460,7 +484,7 @@ class IdentityMergeHandlerTest extends TestCase
             $eventQueue ?? $this->createMock(EventQueue::class),
             $this->profilingConsent,
             $this->customerRepository,
-            $this->createMock(Logger::class),
+            $this->logger,
             $this->sender,
             $this->ingestQueue,
             $this->oneEngineConnection($settings)

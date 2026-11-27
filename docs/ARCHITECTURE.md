@@ -2430,13 +2430,18 @@ Subscribers grid, or a customer account, leaves profiling as it was.
   once §4 answered 200 for the customer it tries the merge once more. It
   never merges again before that: §4 in transport trouble leaves the row
   on the ladder, and its next attempt sends the customer before it merges
-  (that merge is the one retry). A row the 404 leaves is parked
-  (`Failure::permanent()`, Retry in the Log) with one of three reasons the
-  Log shows translated (`FailureMessage::TRANSLATED`):
-  `IdentityMergeHandler::NOT_SENT` (the store does not send this customer:
-  no consent, no order, not in the contact sync),
-  `CUSTOMER_REFUSED` (§4 refused the item; the engine's reason in it) and
-  `NOT_FOUND_AFTER_SEND` (still 404 after §4 answered 200). A row parked
+  (that merge is the one retry). A 404 for a customer the store does not
+  send (no consent, no order, not in the contact sync; or an account
+  deleted since the login) ends the merge quietly, as WooCommerce's
+  `LoginMerge` does (CON-465): a debug line with the row id only, and the
+  row closed as Skipped (`IdentityMergeHandler::SKIPPED_NOT_SENT`), never a
+  failure the merchant cannot fix; the customer's next login queues a new
+  merge. Any other row the 404 leaves is parked (`Failure::permanent()`,
+  Retry in the Log) with one of two reasons the Log shows translated
+  (`FailureMessage::TRANSLATED`): `CUSTOMER_REFUSED` (§4 refused the item;
+  the engine's reason in it) and `NOT_FOUND_AFTER_SEND` (still 404 after
+  §4 answered 200). `NOT_SENT` stays translated for rows parked with it
+  before CON-465. A row parked
   with `permanent_http_404` before CON-262 carries no flag; the handler
   reads its last recorded answer instead, so its Retry sends the customer
   the store sends before it merges, and links the login once the engine

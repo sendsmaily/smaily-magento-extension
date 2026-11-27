@@ -45,8 +45,9 @@ use Smaily\Connect\Model\Privacy\ProfilingConsent;
  * value. A
  * failure is cached as an empty answer for 10 minutes, and a timeout, a
  * network failure or a 5xx also pauses every shopper's engine call to that
- * connection for 2 minutes (Connection::flagCode() keys the pause): a cache miss then answers empty at once, so a hanging engine
- * cannot hold a PHP worker per guest (Woo PRO-3857).
+ * connection for 2 minutes (Connection::flagCode() keys the pause): a
+ * cache miss then answers empty at once, so a hanging engine cannot hold a
+ * PHP worker per guest (Woo PRO-3857).
  */
 class StorefrontRecommendations
 {

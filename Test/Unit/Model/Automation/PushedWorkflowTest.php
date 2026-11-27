@@ -111,7 +111,10 @@ class PushedWorkflowTest extends TestCase
         ]);
 
         self::assertSame(self::PUSHED, $this->send(Trigger::WELCOME, 'default', 'shop', connections: $connections));
-        self::assertSame(789, $this->send(Trigger::WELCOME, 'default', 'shop', connections: $connections, websiteId: 2));
+        self::assertSame(
+            789,
+            $this->send(Trigger::WELCOME, 'default', 'shop', connections: $connections, websiteId: 2)
+        );
         self::assertSame(
             self::PICKED,
             $this->send(Trigger::WELCOME, 'default', 'shop', connections: $connections, websiteId: 3)

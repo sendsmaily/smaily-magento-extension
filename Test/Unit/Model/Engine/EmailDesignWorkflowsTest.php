@@ -135,7 +135,10 @@ class EmailDesignWorkflowsTest extends TestCase
     public function testAnUnchangedListIsNotWrittenAgain(): void
     {
         $this->workflows()->remember([$this->item('plugin.welcome')], $this->settings());
-        $this->workflows()->remember([$this->item('plugin.welcome', ['smaily_subdomain' => 'SHOP'])], $this->settings());
+        $this->workflows()->remember(
+            [$this->item('plugin.welcome', ['smaily_subdomain' => 'SHOP'])],
+            $this->settings()
+        );
 
         self::assertSame(1, $this->writes);
     }
@@ -145,7 +148,10 @@ class EmailDesignWorkflowsTest extends TestCase
         $this->cacheTypeList->expects(self::exactly(2))->method('cleanType')->with('config');
         $this->workflows()->remember([$this->item('plugin.welcome')], $this->settings());
 
-        $this->workflows()->remember([$this->item('plugin.welcome', ['smaily_workflow_id' => null])], $this->settings());
+        $this->workflows()->remember(
+            [$this->item('plugin.welcome', ['smaily_workflow_id' => null])],
+            $this->settings()
+        );
 
         self::assertArrayNotHasKey(Settings::XML_PATH_EMAIL_WORKFLOWS, $this->values);
         self::assertSame(0, $this->workflows()->workflowId(Trigger::WELCOME, 'shop', $this->settings()));
@@ -153,14 +159,25 @@ class EmailDesignWorkflowsTest extends TestCase
 
     public function testASendUsesTheWorkflowOnlyOnTheNamedAccount(): void
     {
-        $this->workflows()->remember([$this->item('plugin.welcome', ['smaily_subdomain' => 'Shop'])], $this->settings());
+        $this->workflows()->remember(
+            [$this->item('plugin.welcome', ['smaily_subdomain' => 'Shop'])],
+            $this->settings()
+        );
         $workflows = $this->workflows();
 
         self::assertSame(456, $workflows->workflowId(Trigger::WELCOME, 'shop', $this->settings()));
-        self::assertSame(456, $workflows->workflowId(Trigger::WELCOME, ' SHOP ', $this->settings()), 'Case and spaces do not matter');
+        self::assertSame(
+            456,
+            $workflows->workflowId(Trigger::WELCOME, ' SHOP ', $this->settings()),
+            'Case and spaces do not matter'
+        );
         self::assertSame(0, $workflows->workflowId(Trigger::WELCOME, 'other-shop', $this->settings()));
         self::assertSame(0, $workflows->workflowId(Trigger::WELCOME, '', $this->settings()));
-        self::assertSame(0, $workflows->workflowId(Trigger::FIRST_ORDER, 'shop', $this->settings()), 'Each email has its own');
+        self::assertSame(
+            0,
+            $workflows->workflowId(Trigger::FIRST_ORDER, 'shop', $this->settings()),
+            'Each email has its own'
+        );
         self::assertSame(0, $workflows->workflowId('mystery', 'shop', $this->settings()));
     }
 

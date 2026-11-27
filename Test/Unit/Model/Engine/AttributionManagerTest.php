@@ -212,7 +212,11 @@ class AttributionManagerTest extends TestCase
      */
     public function testTheCookieNamesAreThoseOfTheConnectionOfTheRequest(): void
     {
-        $manager = $this->separateStoresManager(2, ['lv_rec_uid' => 'vt_latvia1'], $this->createMock(AdapterInterface::class));
+        $manager = $this->separateStoresManager(
+            2,
+            ['lv_rec_uid' => 'vt_latvia1'],
+            $this->createMock(AdapterInterface::class)
+        );
 
         self::assertSame('lv_rec_uid', $manager->getClientConfig()['cookieVisitor']);
         self::assertSame('vt_latvia1', $manager->readCookies()['visitor_token']);
@@ -227,7 +231,11 @@ class AttributionManagerTest extends TestCase
         $connection = $this->createMock(AdapterInterface::class);
         $connection->expects(self::never())->method('insertOnDuplicate');
 
-        $manager = $this->separateStoresManager(3, [AttributionManager::DEFAULT_COOKIE_VISITOR => 'vt_8f3k2a'], $connection);
+        $manager = $this->separateStoresManager(
+            3,
+            [AttributionManager::DEFAULT_COOKIE_VISITOR => 'vt_8f3k2a'],
+            $connection
+        );
         $manager->saveForOrder(501);
 
         self::assertSame(AttributionManager::DEFAULT_COOKIE_VISITOR, $manager->getClientConfig()['cookieVisitor']);

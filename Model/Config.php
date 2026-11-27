@@ -172,6 +172,15 @@ class Config
     }
 
     /**
+     * Whether a Smaily API password is saved for a website (its own, else
+     * the default scope's), read without decrypting it.
+     */
+    public function hasWebsitePassword(int $websiteId): bool
+    {
+        return (string)$this->websiteValue(self::XML_PATH_PASSWORD, $websiteId) !== '';
+    }
+
+    /**
      * Whether a complete set of API credentials is configured for the scope.
      *
      * @param int|string|null $storeId

@@ -287,6 +287,50 @@ class WebsiteOverrides
     }
 
     /**
+     * Whether any scope holds per-language Smaily accounts (multilingual
+     * mode A): a saved mode A at the default scope or at a website's scope.
+     */
+    public function usesPerLanguageAccounts(): bool
+    {
+        $connection = $this->resource->getConnection();
+
+        return (bool)$connection->fetchOne(
+            $connection->select()
+                ->from($this->resource->getTableName('core_config_data'), ['config_id'])
+                ->where('path = ?', Config::XML_PATH_MULTILINGUAL_MODE)
+                ->where('value = ?', MultilingualMode::MODE_PER_LANGUAGE_ACCOUNTS)
+                ->where('scope IN (?)', [ScopeConfigInterface::SCOPE_TYPE_DEFAULT, ScopeInterface::SCOPE_WEBSITES])
+                ->limit(1)
+        );
+    }
+
+    /**
+     * Whether the default scope holds a value of the section: a
+     * default-scope row of its paths, or for the automations and the
+     * transactional emails a store-wide mapping row (website 0) of the
+     * section.
+     */
+    public function hasStoreWideValues(string $section): bool
+    {
+        if ($this->storeWideValues($section) !== []) {
+            return true;
+        }
+        if (!isset(self::MAPPING_ROWS[$section])) {
+            return false;
+        }
+        $connection = $this->resource->getConnection();
+        $select = $connection->select()
+            ->from($this->resource->getTableName(MappingResource::TABLE_NAME), ['id'])
+            ->where('website_id = ?', 0)
+            ->limit(1);
+        foreach (self::MAPPING_ROWS[$section] as $condition => $value) {
+            $select->where($condition, $value);
+        }
+
+        return (bool)$connection->fetchOne($select);
+    }
+
+    /**
      * Whether a value of the path is saved for the website — a row at its
      * website scope or at the default scope — rather than only the module's
      * etc/config.xml default, which a read returns the same way (CON-461).

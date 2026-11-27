@@ -77,6 +77,28 @@ class SyncDispatcher
     }
 
     /**
+     * Records a contact sync in the Log as skipped, with the reason, instead
+     * of queueing it to be sent (CON-470); the row holds what
+     * dispatchContactSync() would have sent.
+     */
+    public function recordSkippedContactSync(
+        string $email,
+        int $storeId,
+        bool $isUnsubscribed,
+        ?CustomerInterface $customer,
+        string $reason
+    ): void {
+        $contact = $this->payloadBuilder->build($email, $storeId, $isUnsubscribed, $customer);
+        $this->eventQueue->enqueueSkipped(
+            EventType::CONTACT_SYNC,
+            ['store_id' => $storeId, 'contact' => $contact],
+            $reason,
+            $this->contactEntity->of((string)($contact['email'] ?? '')),
+            $this->websiteId($storeId)
+        );
+    }
+
+    /**
      * Stamps the trigger's own run marker onto the address and enqueues it.
      * The stamp is taken here, where the trigger FIRES, not when the queue row
      * is POSTed — a retry then resends the moment the store event happened,

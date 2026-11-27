@@ -736,3 +736,5 @@
 "Use the same contact settings on every website","Kasuta kõigil veebisaitidel samu kontaktide seadeid"
 "Contact sync is off","Kontaktide sünkroonimine on väljas"
 "Each website keeps its own storefront address.","Igal veebisaidil on oma poe veebilehe aadress."
+"Confirm it under Settings > Contacts once the setup is finished.","Kinnita see pärast seadistuse lõpetamist jaotises Seaded > Kontaktid."
+"Saving this step starts contact sync on these websites: %1. The websites listed below keep their own contact settings.","Selle sammu salvestamine käivitab kontaktide sünkroonimise neil veebisaitidel: %1. Allpool loetletud veebisaidid jäävad oma kontaktide seadete juurde."

@@ -414,6 +414,127 @@ class WebsiteOverrides
     }
 
     /**
+     * Writes a value at the default scope as stored (CON-470: the API
+     * password the websites agree on, still encrypted).
+     */
+    public function promotePath(string $path, string $value): void
+    {
+        $this->configWriter->save($path, $value);
+    }
+
+    /**
+     * Gives every website the automations the websites hold of their own
+     * (CON-470, one store on one Smaily account): path by path, a value the
+     * default scope holds wins; a value it lacks moves there when every
+     * website that holds the path holds the same value. Mapping rows go by
+     * automation (trigger): the store-wide rows (website 0) win where there
+     * are any for the trigger; else the websites' rows move there when every
+     * website that holds rows for the trigger holds the same ones. Then each
+     * website's own automations are removed — except on a website that
+     * holds a path or a trigger's rows the websites disagree on and the
+     * default scope lacks: its automations stay as they are.
+     *
+     * @return array{0: array<int, string[]>, 1: int[]} the websites whose own
+     *     automations went, with their paths, and the websites kept
+     */
+    public function shareAutomations(): array
+    {
+        $own = $this->sharedOwnValues(self::AUTOMATIONS);
+        if ($own === []) {
+            return [[], []];
+        }
+        $storeWide = $this->storeWideValues(self::AUTOMATIONS);
+        $conflicted = [];
+
+        $byPath = [];
+        foreach ($own as $websiteId => $values) {
+            foreach ($values as $path => $value) {
+                if ($path !== 'mappings' && !array_key_exists($path, $storeWide)) {
+                    $byPath[$path][$websiteId] = $value;
+                }
+            }
+        }
+        $moveValues = [];
+        foreach ($byPath as $path => $values) {
+            if (count(array_unique($values)) === 1) {
+                $moveValues[$path] = reset($values);
+            } else {
+                $conflicted += array_fill_keys(array_keys($values), true);
+            }
+        }
+
+        $connection = $this->resource->getConnection();
+        $table = $this->resource->getTableName(MappingResource::TABLE_NAME);
+        $select = $connection->select()
+            ->from($table, [
+                'website_id',
+                'trigger_type',
+                'language',
+                'account_key',
+                'workflow_id',
+                'is_default_fallback',
+            ])
+            ->where('website_id IN (?)', array_merge([0], array_keys($own)))
+            ->order(['website_id', 'trigger_type', 'language', 'account_key']);
+        foreach (self::MAPPING_ROWS[self::AUTOMATIONS] as $condition => $value) {
+            $select->where($condition, $value);
+        }
+        $rows = [];
+        foreach ($connection->fetchAll($select) as $row) {
+            $rows[(string)$row['trigger_type']][(int)$row['website_id']][] = $row;
+        }
+        $moveRows = [];
+        foreach ($rows as $trigger => $byWebsite) {
+            if (isset($byWebsite[0])) {
+                continue;
+            }
+            $shapes = array_map(
+                static fn (array $websiteRows): string => implode("\n", array_map(
+                    static fn (array $row): string => $row['language'] . '|' . $row['account_key'] . '|'
+                        . (int)$row['workflow_id'] . '|' . (int)$row['is_default_fallback'],
+                    $websiteRows
+                )),
+                $byWebsite
+            );
+            if (count(array_unique($shapes)) === 1) {
+                $moveRows[$trigger] = reset($byWebsite);
+            } else {
+                $conflicted += array_fill_keys(array_keys($byWebsite), true);
+            }
+        }
+
+        foreach ($moveValues as $path => $value) {
+            $this->configWriter->save($path, $value);
+        }
+        foreach ($moveRows as $triggerRows) {
+            foreach ($triggerRows as $row) {
+                $connection->insertOnDuplicate(
+                    $table,
+                    [
+                        'website_id' => 0,
+                        'trigger_type' => $row['trigger_type'],
+                        'language' => $row['language'],
+                        'account_key' => $row['account_key'],
+                        'workflow_id' => (int)$row['workflow_id'],
+                        'is_default_fallback' => (int)$row['is_default_fallback'],
+                    ],
+                    ['workflow_id', 'is_default_fallback']
+                );
+            }
+        }
+        $removed = [];
+        foreach ($own as $websiteId => $values) {
+            if (isset($conflicted[$websiteId])) {
+                continue;
+            }
+            $this->removeOwnValues(self::AUTOMATIONS, $websiteId);
+            $removed[$websiteId] = array_keys($values);
+        }
+
+        return [$removed, array_keys($conflicted)];
+    }
+
+    /**
      * Whether the default scope holds a value of the section that the
      * websites share (not a PER_WEBSITE path): a default-scope row of its
      * paths, or for the automations and the transactional emails a
@@ -564,7 +685,7 @@ class WebsiteOverrides
      *
      * @return array<string, string>
      */
-    private function storeWideValues(string $section): array
+    public function storeWideValues(string $section): array
     {
         $connection = $this->resource->getConnection();
         $values = [];

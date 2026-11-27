@@ -58,8 +58,9 @@ use Smaily\Connect\Model\SubdomainNormalizer;
  *   every website; each website keeps its own storefront address
  *   (`storefront_urls`, WebsiteOverrides::PER_WEBSITE). A store-wide
  *   Contacts save removes a website's own Contacts settings only where they
- *   differ in no consent question (WebsiteContacts), or, for every website,
- *   when the post confirms it (`use_everywhere`).
+ *   differ in no consent question (WebsiteContacts), and those of the
+ *   websites the post names in its confirmation (`use_everywhere`: the
+ *   website ids Settings > Contacts listed).
  * - Settings on a 2+-website install, for its selected website: `own` true
  *   writes the website's own values (its scope; the mapping rows under its
  *   id); otherwise a website with own values gets them removed and nothing
@@ -306,11 +307,13 @@ class WizardStepSaver
         // Who is synced is a consent question (CON-470): a website's own
         // Contacts settings that differ in it go only when the merchant
         // confirms, compared with the settings this save wrote.
-        $confirmed = $shared && $section === WebsiteOverrides::SUBSCRIBERS && !empty($data['use_everywhere']);
+        $confirmed = [];
         if ($shared && $section === WebsiteOverrides::SUBSCRIBERS) {
-            $remove = $confirmed
-                ? array_keys($this->overrides->ownValues(WebsiteOverrides::SUBSCRIBERS))
-                : $this->websiteContacts->identical();
+            $confirmed = array_values(array_intersect(
+                array_keys($this->overrides->ownValues(WebsiteOverrides::SUBSCRIBERS)),
+                array_map('intval', is_array($data['use_everywhere'] ?? null) ? $data['use_everywhere'] : [])
+            ));
+            $remove = array_values(array_unique(array_merge($this->websiteContacts->identical(), $confirmed)));
         }
         foreach ($remove as $removeId) {
             // The workflows of a website on another Smaily account came from
@@ -336,7 +339,7 @@ class WizardStepSaver
             $this->overrides->removeOwnValues(WebsiteOverrides::AUTOMATIONS, (int)$target);
             $this->ownAccountStarted = true;
         }
-        $this->returnedToStoreWide = !$write || ($confirmed && $remove !== []);
+        $this->returnedToStoreWide = !$write || $confirmed !== [];
 
         return [];
     }

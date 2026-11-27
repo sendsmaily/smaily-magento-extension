@@ -123,9 +123,10 @@ class WizardData implements ArgumentInterface
      * settings differ from the settings for all websites in who is synced
      * (CON-470, WebsiteContacts): each with its name, whether its contact
      * sync is on and its sync mode. They keep them until the merchant
-     * confirms. Empty elsewhere.
+     * confirms (the initial setup's Contacts step lists them too). Empty
+     * elsewhere.
      *
-     * @return list<array{name: string, enabled: bool, mode: string}>
+     * @return list<array{websiteId: int, name: string, enabled: bool, mode: string}>
      */
     public function getDifferingContactWebsites(): array
     {
@@ -135,7 +136,7 @@ class WizardData implements ArgumentInterface
         $names = $this->websiteContext->getWebsiteOptions();
         $websites = [];
         foreach ($this->websiteContacts->differing() as $websiteId => $contacts) {
-            $websites[] = ['name' => $names[$websiteId] ?? (string)$websiteId] + $contacts;
+            $websites[] = ['websiteId' => $websiteId, 'name' => $names[$websiteId] ?? (string)$websiteId] + $contacts;
         }
 
         return $websites;

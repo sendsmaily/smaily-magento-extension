@@ -47,7 +47,7 @@
  * website on the Connection tab), and a website whose own Contacts
  * settings differ in who is synced keeps them until the merchant confirms
  * on the Contacts tab ("Use the same contact settings on every website",
- * posted as `use_everywhere`).
+ * posted as `use_everywhere` with the ids of the websites listed).
  *
  * @var \Magento\Backend\Block\Template $block
  * @var \Magento\Framework\Escaper $escaper
@@ -356,7 +356,8 @@ require(['jquery'], function ($) {
     // every website uses this tab's Contacts settings; the save removes the
     // websites' own and the page reloads.
     $('#smaily-w-contacts-everywhere').on('click', function () {
-        saveTab($(this), 'subscribers', '#smaily-w-subscribers-result', {use_everywhere: true});
+        var ids = String($(this).data('website-ids') || '').split(',').filter(Boolean).map(Number);
+        saveTab($(this), 'subscribers', '#smaily-w-subscribers-result', {use_everywhere: ids});
     });
 
     $('#smaily-w-automations-save').on('click', function () {
